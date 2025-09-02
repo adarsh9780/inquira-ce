@@ -1,46 +1,45 @@
-# kill program running on a particular port
-
-lsof -ti :8000 | xargs kill -TERM
-
 # Inquira
 
 A FastAPI-based API that integrates with Google Gemini LLM for conversational AI capabilities.
-
-## Features
-
-- RESTful API for chat interactions
-- Google Gemini LLM integration
-- Automatic API documentation with Swagger UI
-- Error handling and graceful degradation
-- Configurable system instructions and models
 
 ## Setup
 
 ### Prerequisites
 
-- Python 3.11+
-- Google AI API key
+- Python 3.12+
+- Google Gemini API key
 
-### Installation
+## Alternative Installation Methods
 
-1. Clone the repository and navigate to the project directory
-2. Install dependencies using uv:
+If you prefer not to use UV, you can install and run the application using pip or run it directly with Python:
 
-   ```bash
-   uv sync
-   ```
+### Using pip
 
-3. Create a `.env` file with your Google AI API key:
+1. Install the package in development mode:
 
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+pip install -e .
+```
 
-   Edit `.env` and add your API key:
+2. Run the application:
 
-   ```
-   GOOGLE_API_KEY=your_actual_api_key_here
-   ```
+```bash
+inquira
+```
+
+### Direct Python Execution
+
+You can also run the application directly without installation:
+
+```bash
+python -m src.inquira.main
+```
+
+**Note:** When running directly with Python, make sure all dependencies are installed:
+
+```bash
+pip install -r requirements.txt
+```
 
 ## Usage
 
@@ -53,6 +52,10 @@ uv run python -m src.inquira.main
 ```
 
 The API will be available at `http://localhost:8000`
+
+### Launching the GUI
+
+The application includes a web-based GUI that can be accessed at `http://localhost:8000/ui` after starting the server. The server will automatically open your default web browser to the GUI when launched.
 
 ### API Endpoints
 
@@ -71,30 +74,200 @@ Returns basic API information.
 
 #### POST /chat
 
-Send a chat message to the LLM.
+Send a chat message to the LLM for data analysis.
 
 **Request Body:**
 
 ```json
 {
-  "message": "Hello, how are you?",
-  "system_instruction": "You are a helpful AI assistant.",
-  "model": "gemini-2.5-flash"
+  "question": "What is the average sales by region?",
+  "current_code": "",
+  "model": "gemini-2.5-flash",
+  "context": "Sales data analysis"
 }
 ```
 
 **Parameters:**
 
-- `message` (required): The user's message
-- `system_instruction` (optional): Custom system instruction for the chat session
+- `question` (required): The data analysis question
+- `current_code` (optional): Existing Python code to build upon
 - `model` (optional): LLM model to use (defaults to "gemini-2.5-flash")
+- `context` (optional): Additional context about the data
 
 **Response:**
 
 ```json
 {
-  "response": "Hello! I'm doing well, thank you for asking. How can I help you today?",
-  "model": "gemini-2.5-flash"
+  "is_safe": true,
+  "is_relevant": true,
+  "code": "import pandas as pd\n# Analysis code here",
+  "explanation": "Step-by-step explanation of the analysis"
+}
+```
+
+### Authentication Endpoints
+
+#### POST /auth/register
+
+Register a new user account.
+
+**Request Body:**
+
+```json
+{
+  "username": "johndoe",
+  "password": "securepassword123"
+}
+```
+
+#### POST /auth/login
+
+Login with existing credentials.
+
+**Request Body:**
+
+```json
+{
+  "username": "johndoe",
+  "password": "securepassword123"
+}
+```
+
+#### POST /auth/logout
+
+Logout the current user.
+
+#### GET /auth/verify
+
+Verify if the current user is authenticated.
+
+#### GET /auth/profile
+
+Get the current user's profile information.
+
+#### POST /auth/change-password
+
+Change the current user's password.
+
+#### DELETE /auth/delete-account
+
+Permanently delete the current user's account.
+
+### API Key Management
+
+#### POST /set-api-key
+
+Set the Google Gemini API key for LLM services.
+
+**Request Body:**
+
+```json
+{
+  "api_key": "your-google-gemini-api-key"
+}
+```
+
+### Settings Management
+
+#### POST /settings/create
+
+Create or update user settings including API key, data path, and schema path.
+
+**Request Body:**
+
+```json
+{
+  "api_key": "your-api-key",
+  "data_path": "/path/to/data",
+  "schema_path": "/path/to/schema.json",
+  "context": "Data domain context"
+}
+```
+
+#### GET /settings/view
+
+View current user settings.
+
+#### DELETE /settings/delete
+
+Delete all user settings.
+
+### Data Preview Endpoints
+
+#### GET /data/schema
+
+Get schema information for the configured data file.
+
+#### GET /data/preview
+
+Get a preview of the configured data file with optional sampling type.
+
+**Query Parameters:**
+
+- `sample_type`: "random", "first", or "last" (default: "random")
+
+### Schema Management Endpoints
+
+#### POST /schema/generate
+
+Generate a schema for a data file using LLM analysis.
+
+**Request Body:**
+
+```json
+{
+  "filepath": "/path/to/data/file",
+  "context": "Optional context about the data"
+}
+```
+
+#### GET /schema/load/{filepath}
+
+Load an existing schema for a data file.
+
+#### POST /schema/save
+
+Save a user-modified schema.
+
+#### GET /schema/list
+
+List all schemas for the current user.
+
+### Code Execution Endpoints
+
+#### POST /execute/
+
+Execute Python code safely with security checks.
+
+**Request Body:**
+
+```json
+{
+  "code": "print('Hello, World!')"
+}
+```
+
+#### POST /execute/analyze
+
+Analyze Python code for security violations without executing it.
+
+**Request Body:**
+
+```json
+{
+  "code": "import os; os.system('ls')"
+}
+```
+
+#### POST /execute/with-variables
+
+Execute Python code and return created variables.
+
+**Request Body:**
+
+```json
+{
+  "code": "x = 42\ny = x * 2"
 }
 ```
 
