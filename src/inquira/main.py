@@ -1,13 +1,11 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
-from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
-from pathlib import Path
-import os
 import importlib.resources
-from .llm_service import LLMService
-from . import generate_schema
+import webbrowser
+import threading
+import time
 from .generate_schema import router as schema_router
 from .chat import router as chat_router
 from .auth import router as auth_router
@@ -55,7 +53,7 @@ def get_ui_dir() -> str:
     """
     # --- variables at the top (per your standard) ---
     packaged_ui = importlib.resources.files("inquira").joinpath("frontend", "dist")  # Traversable, not necessarily a Path
-    dev_ui = "/Users/adarshmaurya/Downloads/Projects/vue-ui/dist"
+    dev_ui = "/Users/adarshmaurya/Downloads/Projects/inquira-ui/dist"
 
     # Traversable has no `.exists()`. Use `.is_dir()` which implies existence & type.
     # Optionally, tighten by checking for a known file:
@@ -105,6 +103,13 @@ async def root():
 
 
 def run():
+    # Open browser in a separate thread
+    def open_browser():
+        time.sleep(2)  # Wait for server to start
+        webbrowser.open("http://127.0.0.1:8000/ui")
+
+    threading.Thread(target=open_browser, daemon=True).start()
+
     import uvicorn
     uvicorn.run(
         app,

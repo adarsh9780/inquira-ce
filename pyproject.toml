@@ -23,18 +23,11 @@ dependencies = [
 inquira = "inquira.main:run"
 
 [build-system]
-requires = ["hatchling>=1.25"]
-build-backend = "hatchling.build"
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
 
-[tool.hatch.build]
-sources = ["src"]
-include = ["src/inquira/app_config.json"]
+[tool.setuptools.packages.find]
+where = ["src"]
 
-[tool.hatch.build.targets.wheel]
-packages = ["inquira"]
-
-[tool.hatch.build.targets.sdist]
-packages = ["inquira"]
-
-[tool.hatch.build.targets.sdist.force-include]
-"../dist" = "inquira/frontend/dist"
+[tool.setuptools.package-data]
+inquira = ["app_config.json", "frontend/dist/**/*"]
