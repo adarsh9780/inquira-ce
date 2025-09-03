@@ -41,6 +41,10 @@ class AppConfig(BaseModel):
         description="Whether system operations are allowed"
     )
 
+    SECURE: bool = Field(
+        default=False,
+        description="For cookies, use False for development and for production use True")
+
     @classmethod
     def from_json_file(cls, file_path: str) -> "AppConfig":
         """Load configuration from a JSON file"""

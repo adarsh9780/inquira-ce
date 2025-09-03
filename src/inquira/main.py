@@ -106,7 +106,7 @@ def run():
     # Open browser in a separate thread
     def open_browser():
         time.sleep(2)  # Wait for server to start
-        webbrowser.open("http://127.0.0.1:8000/ui")
+        webbrowser.open("http://localhost:8000/ui")
 
     threading.Thread(target=open_browser, daemon=True).start()
 

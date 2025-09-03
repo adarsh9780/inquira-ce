@@ -10,6 +10,7 @@ from .database import (
     create_session, get_session, update_session, add_chat_message,
     migrate_json_to_sqlite, update_user_password, delete_user_account
 )
+from .config_models import AppConfig
 
 router = APIRouter(tags=["Authentication"])
 
@@ -121,13 +122,16 @@ async def login_user(request: UserLoginRequest, response: Response):
     if not success:
         raise HTTPException(status_code=500, detail="Failed to create session")
 
+    config = AppConfig.from_json_file("src/inquira/app_config.json")
+
     # Set session cookie
     response.set_cookie(
         key="session_token",
         value=session_token,
         httponly=True,
         max_age=86400,  # 24 hours
-        samesite="lax"
+        samesite="lax",
+        secure=config.SECURE
     )
 
     return {"message": "Login successful", "user_id": user["user_id"]}
