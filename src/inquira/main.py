@@ -103,18 +103,21 @@ async def root():
 
 
 def run():
+    HOST = "localhost"
+    PORT = 8000
+    UI = "/ui"
     # Open browser in a separate thread
     def open_browser():
         time.sleep(2)  # Wait for server to start
-        webbrowser.open("http://localhost:8000/ui")
+        webbrowser.open(f"http://{HOST}:{PORT}{UI}")
 
     threading.Thread(target=open_browser, daemon=True).start()
 
     import uvicorn
     uvicorn.run(
         app,
-        host="127.0.0.1",
-        port=8000,
+        host=HOST,
+        port=PORT,
         reload=False
     )
 
