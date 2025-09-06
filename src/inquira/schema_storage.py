@@ -1,16 +1,13 @@
 import json
-import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from .auth import get_current_user
-from fastapi import HTTPException, Depends
 
 # Schema folder path
 SCHEMA_DIR = Path.home() / ".inquira" / "schemas"
 
 class SchemaColumn:
-    def __init__(self, name: str, description: str, data_type: str = "", sample_values: List[Any] = None):
+    def __init__(self, name: str, description: str, data_type: str = "", sample_values: Optional[List[Any]] = None):
         self.name = name
         self.description = description
         self.data_type = data_type
@@ -34,7 +31,7 @@ class SchemaColumn:
         )
 
 class SchemaFile:
-    def __init__(self, filepath: str, context: str, columns: List[SchemaColumn], created_at: str = None, updated_at: str = None):
+    def __init__(self, filepath: str, context: str, columns: List[SchemaColumn], created_at: Optional[str] = None, updated_at: Optional[str] = None):
         self.filepath = filepath
         self.context = context
         self.columns = columns
@@ -57,8 +54,8 @@ class SchemaFile:
             filepath=data["filepath"],
             context=data["context"],
             columns=columns,
-            created_at=data.get("created_at"),
-            updated_at=data.get("updated_at")
+            created_at=data.get("created_at") or None,
+            updated_at=data.get("updated_at") or None
         )
 
 def get_schema_filename(filepath: str) -> str:
@@ -107,7 +104,7 @@ def load_schema(user_id: str, data_filepath: str) -> Optional[SchemaFile]:
 def list_user_schemas(user_id: str) -> List[Dict[str, Any]]:
     """List all schemas for a user"""
     schema_dir = get_user_schema_dir(user_id)
-    schemas = []
+    schemas: List[Dict[str, Any]] = []
 
     if not schema_dir.exists():
         return schemas

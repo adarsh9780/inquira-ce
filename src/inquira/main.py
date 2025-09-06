@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,13 +6,15 @@ import importlib.resources
 import webbrowser
 import threading
 import time
-from .generate_schema import router as schema_router
-from .chat import router as chat_router
-from .auth import router as auth_router
-from .settings import router as settings_router
-from .data_preview import router as data_preview_router
-from .code_execution import router as code_execution_router
-from .api_key import router as api_key_router
+import os
+from .api.generate_schema import router as schema_router
+from .api.chat import router as chat_router
+from .api.auth import router as auth_router
+from .api.settings import router as settings_router
+from .api.data_preview import router as data_preview_router
+from .api.code_execution import router as code_execution_router
+from .api.api_key import router as api_key_router
+from .config_models import AppConfig
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -26,6 +28,16 @@ async def lifespan(app: FastAPI):
     app.state.context = None
     app.state.llm_service = None
     app.state.llm_initialized = False
+
+    # Load merged configuration
+    try:
+        default_config_path = os.path.join(os.path.dirname(__file__), "app_config.json")
+        app.state.config = AppConfig.load_merged_config(default_config_path)
+        print("Configuration loaded successfully")
+    except Exception as e:
+        print(f"Failed to load configuration: {e}")
+        # Create a default config if loading fails
+        app.state.config = AppConfig()
 
     yield
 

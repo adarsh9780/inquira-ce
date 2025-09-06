@@ -2,8 +2,7 @@ from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel, Field
 from typing import Any, Optional
 
-from .code_whisperer import CodeWhisperer, CodeSecurityError, CodeExecutionError, TimeoutError
-from .config_models import AppConfig
+from ..code_whisperer import CodeWhisperer
 
 router = APIRouter(prefix="/execute", tags=["Code Execution"])
 
@@ -31,7 +30,7 @@ def get_code_whisperer(app_state = Depends(get_app_state)) -> CodeWhisperer:
     """Dependency to get CodeWhisperer instance"""
     if not hasattr(app_state, 'code_whisperer') or app_state.code_whisperer is None:
         # Load configuration
-        config = AppConfig.from_json_file("src/inquira/app_config.json")
+        config = app_state.config
         app_state.code_whisperer = CodeWhisperer(config)
     return app_state.code_whisperer
 
@@ -41,12 +40,10 @@ async def execute_code(
     code_whisperer: CodeWhisperer = Depends(get_code_whisperer)
 ):
     """
-    Execute Python code safely with security checks
+    Execute Python code
 
     This endpoint:
-    - Analyzes the code using AST for security violations
-    - Checks for whitelisted/blacklisted libraries
-    - Executes code in a restricted environment
+    - Executes code in the environment
     - Returns results or error messages
     """
     import time
@@ -55,20 +52,6 @@ async def execute_code(
     print(f"DEBUG: Received code: {request.code}")  # Debug print
 
     try:
-        print("DEBUG: Starting code analysis")  # Debug print
-        # First just analyze the code
-        is_safe, violations = code_whisperer.analyze_code(request.code)
-        print(f"DEBUG: Analysis result - Safe: {is_safe}, Violations: {violations}")  # Debug print
-
-        if not is_safe:
-            execution_time = time.time() - start_time
-            return CodeExecutionResponse(
-                result=None,
-                output=None,
-                error=f"Security violation: {'; '.join(violations)}",
-                execution_time=execution_time
-            )
-
         print("DEBUG: Starting code execution")  # Debug print
         # Execute the code
         result, error = code_whisperer.execute_with_timeout(request.code)
@@ -93,25 +76,6 @@ async def execute_code(
             detail=f"Unexpected error: {str(e)}"
         )
 
-@router.post("/analyze", response_model=dict)
-async def analyze_code(
-    request: CodeExecutionRequest,
-    code_whisperer: CodeWhisperer = Depends(get_code_whisperer)
-):
-    """
-    Analyze Python code for security violations without executing it
-
-    Returns:
-    - is_safe: boolean indicating if code is safe
-    - violations: list of security violations found
-    """
-    is_safe, violations = code_whisperer.analyze_code(request.code)
-
-    return {
-        "is_safe": is_safe,
-        "violations": violations,
-        "code_length": len(request.code)
-    }
 
 @router.post("/with-variables", response_model=CodeExecutionWithVariablesResponse)
 async def execute_code_with_variables(
@@ -119,31 +83,17 @@ async def execute_code_with_variables(
     code_whisperer: CodeWhisperer = Depends(get_code_whisperer)
 ):
     """
-    Execute Python code safely with security checks and return created variables
+    Execute Python code and return created variables
 
     This endpoint:
-    - Analyzes the code using AST for security violations
-    - If safe, executes the code in a controlled environment
-    - Extracts and returns only the variables created by the code
+    - Executes the code in the environment
+    - Extracts and returns the variables created by the code
     - Returns results, variables, or error messages
     """
     import time
     start_time = time.time()
 
     try:
-        # First analyze the code for security violations
-        is_safe, violations = code_whisperer.analyze_code(request.code)
-
-        if not is_safe:
-            execution_time = time.time() - start_time
-            return CodeExecutionWithVariablesResponse(
-                result=None,
-                variables={},
-                output=None,
-                error=f"Security violation: {'; '.join(violations)}",
-                execution_time=execution_time
-            )
-
         # Execute the code and extract variables
         result, variables, error = code_whisperer.execute_with_variables(request.code)
 

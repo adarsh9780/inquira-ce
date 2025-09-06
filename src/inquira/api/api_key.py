@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel, Field
-from .llm_service import LLMService
+from ..llm_service import LLMService
 
 router = APIRouter(tags=["API Key"])
 

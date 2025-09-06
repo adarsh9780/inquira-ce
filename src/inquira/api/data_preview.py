@@ -3,9 +3,8 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Any
 import os
-from pathlib import Path
 from .auth import get_current_user
-from .database import get_user_settings
+from ..database import get_user_settings
 
 router = APIRouter(tags=["Data Preview"])
 
@@ -67,7 +66,7 @@ def read_file_with_duckdb(file_path: str, sample_size: int = 100) -> List[Dict[s
             # Convert to list of dictionaries
             data = []
             for row in result:
-                row_dict = {}
+                row_dict: Dict[str, Any] = {}
                 for i, col_name in enumerate(column_names):
                     # Handle different data types
                     value = row[i]
@@ -317,7 +316,7 @@ def read_file_with_duckdb_sample(file_path: str, sample_type: str = "random", sa
             # Convert to list of dictionaries
             data = []
             for row in result:
-                row_dict = {}
+                row_dict: Dict[str, Any] = {}
                 for i, col_name in enumerate(column_names):
                     # Handle different data types
                     value = row[i]

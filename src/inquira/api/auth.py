@@ -1,16 +1,15 @@
 from fastapi import APIRouter, HTTPException, Request, Depends, Response
 from pydantic import BaseModel, Field
-from typing import Optional
 import hashlib
 import secrets
 import uuid
 from datetime import datetime, timedelta
-from .database import (
+from ..database import (
     create_user, get_user_by_username, get_user_by_id,
-    create_session, get_session, update_session, add_chat_message,
+    create_session, get_session,
     migrate_json_to_sqlite, update_user_password, delete_user_account
 )
-from .config_models import AppConfig
+from ..config_models import AppConfig
 
 router = APIRouter(tags=["Authentication"])
 
@@ -50,6 +49,10 @@ def generate_salt() -> str:
 def generate_session_token() -> str:
     """Generate a unique session token"""
     return str(uuid.uuid4())
+
+def get_app_config(request: Request) -> AppConfig:
+    """Get app config from state"""
+    return request.app.state.config
 
 def get_current_user(request: Request) -> dict:
     """Get current user from session cookie"""
@@ -98,18 +101,18 @@ async def register_user(request: UserRegisterRequest):
     )
 
 @router.post("/auth/login")
-async def login_user(request: UserLoginRequest, response: Response):
+async def login_user(request: UserLoginRequest, response: Response, config: AppConfig = Depends(get_app_config)):
     """Login user and create session"""
     # Find user by username
     user = get_user_by_username(request.username)
 
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+        raise HTTPException(status_code=401, detail="username doesn't exist")
 
     # Verify password using stored salt
     hashed_password = hash_password(request.password, user["salt"])
     if hashed_password != user["password_hash"]:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+        raise HTTPException(status_code=401, detail="either username or password is wrong")
 
     # Create session
     session_token = generate_session_token()
@@ -121,8 +124,6 @@ async def login_user(request: UserLoginRequest, response: Response):
     success = create_session(session_token, user["user_id"], session_data)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to create session")
-
-    config = AppConfig.from_json_file("src/inquira/app_config.json")
 
     # Set session cookie
     response.set_cookie(

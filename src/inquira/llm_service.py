@@ -1,7 +1,5 @@
-import json
 import os
 from google import genai
-from typing import Dict, Any
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import HTTPException
@@ -67,7 +65,7 @@ class LLMService:
                 },
             )
             return response.parsed
-        except Exception as e:
+        except Exception:
             raise HTTPException(
                 status_code=500, detail="Error while asking question from LLM"
             )

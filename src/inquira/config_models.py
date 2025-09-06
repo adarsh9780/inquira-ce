@@ -1,45 +1,11 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Any
 import json
 from pathlib import Path
 
 class AppConfig(BaseModel):
     """Configuration model for the FastAPI application"""
 
-    WHITELISTED_LIBS: List[str] = Field(
-        default_factory=list,
-        description="Libraries that are allowed to be imported"
-    )
-
-    BLACKLISTED_LIBS: List[str] = Field(
-        default_factory=list,
-        description="Libraries that are not allowed to be imported"
-    )
-
-    ALLOWED_FUNCTIONS: List[str] = Field(
-        default_factory=list,
-        description="Functions that are allowed to be used"
-    )
-
-    BLACKLISTED_FUNCTIONS: List[str] = Field(
-        default_factory=list,
-        description="Functions that are not allowed to be used"
-    )
-
-    ALLOW_FILE_OPERATIONS: bool = Field(
-        default=False,
-        description="Whether file operations are allowed"
-    )
-
-    ALLOW_NETWORK_OPERATIONS: bool = Field(
-        default=False,
-        description="Whether network operations are allowed"
-    )
-
-    ALLOW_SYSTEM_OPERATIONS: bool = Field(
-        default=False,
-        description="Whether system operations are allowed"
-    )
 
     SECURE: bool = Field(
         default=False,
@@ -57,28 +23,73 @@ class AppConfig(BaseModel):
 
         return cls(**data)
 
-    def is_library_allowed(self, library_name: str) -> bool:
-        """Check if a library is allowed"""
-        # Check if it's in the blacklist
-        if library_name in self.BLACKLISTED_LIBS:
+    @classmethod
+    def get_user_config_path(cls) -> Path:
+        """Get the path to the user configuration file"""
+        return Path.home() / ".inquira" / "config.json"
+
+    @classmethod
+    def load_merged_config(cls, default_config_path: str) -> "AppConfig":
+        """Load and merge default config with user config"""
+        # Load default config
+        default_config = cls.from_json_file(default_config_path)
+
+        # Get user config path
+        user_config_path = cls.get_user_config_path()
+
+        # Create user config directory if it doesn't exist
+        user_config_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Load or create user config
+        if user_config_path.exists():
+            with open(user_config_path, 'r') as f:
+                user_data = json.load(f)
+        else:
+            # Create empty user config
+            user_data = {}
+            with open(user_config_path, 'w') as f:
+                json.dump(user_data, f, indent=2)
+
+        # Merge configs (user config overrides defaults)
+        merged_data = default_config.model_dump()
+        merged_data.update(user_data)
+
+        return cls(**merged_data)
+
+    def save_user_config(self) -> bool:
+        """Save the current config as user config"""
+        try:
+            user_config_path = self.get_user_config_path()
+            user_config_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(user_config_path, 'w') as f:
+                json.dump(self.model_dump(), f, indent=2)
+
+            return True
+        except Exception:
             return False
 
-        # If whitelist is empty, allow everything not blacklisted
-        if not self.WHITELISTED_LIBS:
+    @classmethod
+    def update_user_config_section(cls, section: str, value: Any) -> bool:
+        """Update a specific section of the user config"""
+        try:
+            user_config_path = cls.get_user_config_path()
+            user_config_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Load existing user config
+            if user_config_path.exists():
+                with open(user_config_path, 'r') as f:
+                    user_data = json.load(f)
+            else:
+                user_data = {}
+
+            # Update the section
+            user_data[section] = value
+
+            # Save updated config
+            with open(user_config_path, 'w') as f:
+                json.dump(user_data, f, indent=2)
+
             return True
-
-        # Check if it's in the whitelist
-        return library_name in self.WHITELISTED_LIBS
-
-    def is_function_allowed(self, function_name: str) -> bool:
-        """Check if a function is allowed"""
-        # Check if it's in the blacklist
-        if function_name in self.BLACKLISTED_FUNCTIONS:
+        except Exception:
             return False
-
-        # If whitelist is empty, allow everything not blacklisted
-        if not self.ALLOWED_FUNCTIONS:
-            return True
-
-        # Check if it's in the whitelist
-        return function_name in self.ALLOWED_FUNCTIONS

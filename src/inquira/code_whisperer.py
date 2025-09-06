@@ -1,16 +1,6 @@
-import ast
-import sys
-import subprocess
-import tempfile
-import traceback
-from typing import Any, Dict, List, Optional, Tuple, Union
-from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 
 from .config_models import AppConfig
-
-class CodeSecurityError(Exception):
-    """Raised when code contains security violations"""
-    pass
 
 class CodeExecutionError(Exception):
     """Raised when code execution fails"""
@@ -21,138 +11,23 @@ class TimeoutError(Exception):
     pass
 
 class CodeWhisperer:
-    """Safe Python code execution with AST analysis"""
+    """Python code execution"""
 
     def __init__(self, config: AppConfig):
         self.config = config
-        self._local_vars = {}
+        self._local_vars: Dict[str, Any] = {}
         self._global_vars = {
-            '__builtins__': {
-                '__import__': __import__,
-                'print': print,
-                'len': len,
-                'range': range,
-                'enumerate': enumerate,
-                'zip': zip,
-                'map': map,
-                'filter': filter,
-                'sum': sum,
-                'min': min,
-                'max': max,
-                'abs': abs,
-                'round': round,
-                'sorted': sorted,
-                'reversed': reversed,
-                'all': all,
-                'any': any,
-                'bool': bool,
-                'int': int,
-                'float': float,
-                'str': str,
-                'list': list,
-                'dict': dict,
-                'set': set,
-                'tuple': tuple,
-                'type': type,
-                'isinstance': isinstance,
-                'hasattr': hasattr,
-                'getattr': getattr,
-                'dir': dir,
-                'vars': vars,
-                'id': id,
-                'hash': hash,
-                'repr': repr,
-                'format': format,
-            }
+            '__builtins__': __builtins__
         }
 
-    def analyze_code(self, code: str) -> Tuple[bool, List[str]]:
-        """
-        Analyze Python code using AST to check for security violations
-
-        Returns:
-            Tuple of (is_safe: bool, violations: List[str])
-        """
-        try:
-            tree = ast.parse(code)
-            violations = []
-
-            # Walk through the AST and check for violations
-            for node in ast.walk(tree):
-                violations.extend(self._check_node(node))
-
-            is_safe = len(violations) == 0
-            return is_safe, violations
-
-        except SyntaxError as e:
-            return False, [f"Syntax error: {e}"]
-        except Exception as e:
-            return False, [f"AST parsing error: {e}"]
-
-    def _check_node(self, node: ast.AST) -> List[str]:
-        """Check individual AST nodes for security violations"""
-        violations = []
-
-        # Check imports
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if not self.config.is_library_allowed(alias.name):
-                    violations.append(f"Import not allowed: {alias.name}")
-
-        elif isinstance(node, ast.ImportFrom):
-            if node.module and not self.config.is_library_allowed(node.module):
-                violations.append(f"Import not allowed: {node.module}")
-
-        # Check function calls
-        elif isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Name):
-                func_name = node.func.id
-                if not self.config.is_function_allowed(func_name):
-                    violations.append(f"Function call not allowed: {func_name}")
-
-        # Check attribute access (potential security risk)
-        elif isinstance(node, ast.Attribute):
-            # Check for dangerous attribute access
-            if isinstance(node.value, ast.Name):
-                if node.value.id in ['os', 'sys', 'subprocess', 'multiprocessing']:
-                    violations.append(f"Dangerous attribute access: {node.value.id}.{node.attr}")
-
-        # Check for file operations if not allowed
-        if not self.config.ALLOW_FILE_OPERATIONS:
-            if isinstance(node, ast.Call):
-                if isinstance(node.func, ast.Name) and node.func.id in ['open', 'file']:
-                    violations.append("File operations not allowed")
-
-        # Check for network operations if not allowed
-        if not self.config.ALLOW_NETWORK_OPERATIONS:
-            if isinstance(node, ast.Call):
-                if isinstance(node.func, ast.Attribute):
-                    if isinstance(node.func.value, ast.Name):
-                        if node.func.value.id in ['socket', 'http', 'urllib', 'requests']:
-                            violations.append("Network operations not allowed")
-
-        # Check for system operations if not allowed
-        if not self.config.ALLOW_SYSTEM_OPERATIONS:
-            if isinstance(node, ast.Call):
-                if isinstance(node.func, ast.Attribute):
-                    if isinstance(node.func.value, ast.Name):
-                        if node.func.value.id in ['os', 'sys', 'subprocess']:
-                            violations.append("System operations not allowed")
-
-        return violations
 
     def execute_code(self, code: str) -> Tuple[Any, Optional[str]]:
         """
-        Execute Python code safely with security analysis
+        Execute Python code
 
         Returns:
             Tuple of (result: Any, error_message: Optional[str])
         """
-        # First analyze the code for security
-        is_safe, violations = self.analyze_code(code)
-        if not is_safe:
-            raise CodeSecurityError(f"Code contains security violations: {'; '.join(violations)}")
-
         try:
             # Execute the code using exec with restricted environment
             exec(code, self._global_vars, self._local_vars)
@@ -180,74 +55,86 @@ class CodeWhisperer:
 
     def execute_with_variables(self, code: str) -> Tuple[Any, Dict[str, Any], Optional[str]]:
         """
-        Execute Python code and return created variables
+        Execute Python code and return all pandas DataFrames, plotly figures, and scalar variables
+
+        Scans all variables created by the code and categorizes them into:
+        - dataframes: Dictionary of all pandas DataFrames converted to JSON {"var_name": "json_data"}
+        - figures: Dictionary of all plotly figures converted to JSON {"var_name": "json_data"}
+        - scalars: Dictionary of all JSON serializable scalar values {"var_name": value}
 
         Returns:
             Tuple of (result: Any, variables: Dict[str, Any], error_message: Optional[str])
         """
-        # First analyze the code for security
-        is_safe, violations = self.analyze_code(code)
-        if not is_safe:
-            raise CodeSecurityError(f"Code contains security violations: {'; '.join(violations)}")
-
         try:
             # Create fresh local and global environments for this execution
             exec_globals = self._global_vars.copy()
             exec_locals = self._local_vars.copy()
 
-            # Track variables before execution
-            initial_vars = set(exec_locals.keys()) | set(exec_globals.keys())
-            initial_vars.add('__builtins__')  # Exclude builtins
-
             # Execute the code
             exec(code, exec_globals, exec_locals)
 
-            # Only return specific variables: result_df and figure
-            variables = {}
+            # Initialize result dictionaries
+            dataframes = {}
+            figures = {}
+            scalars = {}
 
-            # Handle result_df variable
-            result_df_value = None
-            if 'result_df' in exec_locals:
-                result_df_value = exec_locals['result_df']
-            elif 'result_df' in exec_globals:
-                result_df_value = exec_globals['result_df']
+            # Helper function to check if value is JSON serializable
+            def is_json_serializable(value):
+                try:
+                    import json
+                    json.dumps(value)
+                    return True
+                except (TypeError, ValueError):
+                    return False
 
-            if result_df_value is not None:
-                # Check if it's a pandas DataFrame and convert to JSON
-                if hasattr(result_df_value, 'to_json') and hasattr(result_df_value, '__class__'):
-                    try:
-                        if 'DataFrame' in str(type(result_df_value)):
-                            variables['result_df'] = result_df_value.to_json(orient="records")
-                        else:
-                            variables['result_df'] = None
-                    except:
-                        variables['result_df'] = None
-                else:
-                    variables['result_df'] = None
-            else:
-                variables['result_df'] = None
+            # Scan all variables in both locals and globals
+            all_vars = {}
+            all_vars.update(exec_globals)
+            all_vars.update(exec_locals)  # locals take precedence
 
-            # Handle figure variable
-            figure_value = None
-            if 'figure' in exec_locals:
-                figure_value = exec_locals['figure']
-            elif 'figure' in exec_globals:
-                figure_value = exec_globals['figure']
+            for var_name, var_value in all_vars.items():
+                if var_name == '__builtins__' or var_value is None:
+                    continue
 
-            if figure_value is not None:
-                # Check if it's a plotly figure and convert to JSON
-                if hasattr(figure_value, 'to_json') and hasattr(figure_value, 'data'):
-                    try:
-                        if 'plotly' in str(type(figure_value)).lower():
-                            variables['figure'] = figure_value.to_json()
-                        else:
-                            variables['figure'] = None
-                    except:
-                        variables['figure'] = None
-                else:
-                    variables['figure'] = None
-            else:
-                variables['figure'] = None
+                try:
+                    # Check for pandas DataFrames
+                    if hasattr(var_value, '__class__'):
+                        type_str = str(type(var_value))
+                        if 'DataFrame' in type_str and 'pandas' in type_str:
+                            if hasattr(var_value, 'to_json'):
+                                try:
+                                    dataframes[var_name] = var_value.to_json(orient="records")
+                                except Exception:
+                                    dataframes[var_name] = None
+                            continue
+
+                        # Check for plotly figures
+                        type_str_lower = type_str.lower()
+                        if 'plotly' in type_str_lower and 'figure' in type_str_lower:
+                            if hasattr(var_value, 'to_json'):
+                                try:
+                                    figures[var_name] = var_value.to_json()
+                                except Exception:
+                                    figures[var_name] = None
+                            continue
+
+                    # Check for scalar values (JSON serializable)
+                    if is_json_serializable(var_value):
+                        scalars[var_name] = var_value
+                    else:
+                        # Convert to string for non-serializable values
+                        scalars[var_name] = str(var_value)
+
+                except Exception:
+                    # If there's any error processing a variable, skip it
+                    continue
+
+            # Structure the variables response
+            variables = {
+                'dataframes': dataframes,
+                'figures': figures,
+                'scalars': scalars
+            }
 
             # Try to get the last expression result if it's an expression
             try:
@@ -277,18 +164,6 @@ class CodeWhisperer:
                         try:
                             if 'plotly' in str(type(result)).lower():
                                 result = result.to_json()
-                        except:
-                            pass
-
-                    # Handle matplotlib figure result
-                    if hasattr(result, 'savefig'):
-                        try:
-                            import io
-                            import base64
-                            buf = io.BytesIO()
-                            result.savefig(buf, format='png')
-                            buf.seek(0)
-                            result = f"data:image/png;base64,{base64.b64encode(buf.read()).decode()}"
                         except:
                             pass
 

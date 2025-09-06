@@ -29,7 +29,7 @@ class DataAnalysisRequest(BaseModel):
 
 class DataAnalysisResponse(BaseModel):
     is_safe: bool = Field(description="Whether the query is safe to execute")
-    is_relevant: bool = Field(description="Whether the query is relevant to the data")
+    is_relevant: bool = Field(description="Whether the query is relevant to data analysis")
     code: str = Field(description="Generated Python code for the analysis")
     explanation: str = Field(description="Explanation of the analysis in markdown format")
 
@@ -81,13 +81,13 @@ async def chat_endpoint(
         if not hasattr(app_state, 'schema_path') or app_state.schema_path is None:
             raise HTTPException(
                 status_code=400,
-                detail="Schema path not configured. Please set your settings first using /settings/create endpoint."
+                detail="Schema path not configured. Please set your data path and context using /settings/set/filepath and /settings/set/context endpoints."
             )
 
         if not hasattr(app_state, 'data_path') or app_state.data_path is None:
             raise HTTPException(
                 status_code=400,
-                detail="Data path not configured. Please set your settings first using /settings/create endpoint."
+                detail="Data path not configured. Please set your data path using /settings/set/filepath endpoint."
             )
 
         # Build context from user settings stored in app_state
@@ -113,11 +113,19 @@ async def chat_endpoint(
         Prefer to read only as much as data as required to do the analysis (avoid loading whole data into memory, no matter what).
         Use DuckDB to achieve this. The data is stored in the following location:
         {data_path}
-        Once the required data is loaded by duckdb, feel free to use Pandas to achieve the final result.
+        Once the required data is loaded by duckdb, feel free to use Pandas to achieve the final result. Basically, use DuckDB to load initial
+        data into the memory and use pandas to analyse the code. this is because, the user file could be very large and reading the whole data
+        into memory using pandas might take a long time or might not work at all.
 
-        # Variables to create in the code
-        If required, generate a Plotly figure and store it in a variable called **figure**.
-        Default output will be a pandas dataframe and should be stored in variable called **result_df**.
+        # Steps
+        1. First based on the user ask, analyse how much data you need to load into memory
+        2. use duckdb and write a SQL query to load the data. if the ask is simple you can use duckdb completely to achieve the task
+        3. if the ask is not straight forward, make sure first to load the data into memory and then use pandas to do the further transformation
+        4. Use ".query" to filter rows in pandas, if required
+        5. Use ".assign" to create new column in pandas, if required
+        6. Use chained operation as much as possible in pandas
+        7. make sure all outputs are either: pandas dataframe, plotly figure or scalars and nothing else.
+
 
         Return your response as a JSON object with these exact keys:
         - is_safe: boolean

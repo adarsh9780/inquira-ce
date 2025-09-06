@@ -4,8 +4,8 @@ from typing import Any, List, Optional
 import duckdb
 from duckdb import BinderException
 from .auth import get_current_user
-from .database import get_user_settings, save_user_settings
-from .schema_storage import SchemaFile, SchemaColumn, save_schema, load_schema
+from ..database import get_user_settings, save_user_settings
+from ..schema_storage import SchemaFile, SchemaColumn, save_schema, load_schema
 
 def get_app_state(request: Request):
     """Dependency to get app state"""
@@ -75,7 +75,7 @@ def generate_schema(
     current_api_key: str = Depends(get_api_key),
     app_state = Depends(get_app_state),
     model: str = "gemini-2.5-flash"
- ):
+  ):
     # Get context from settings or use provided override
     user_id = current_user["user_id"]
     user_settings = get_user_settings(user_id)
@@ -83,7 +83,7 @@ def generate_schema(
 
     # Initialize LLM service with the user's API key
     try:
-        from .llm_service import LLMService
+        from ..llm_service import LLMService
         llm_service = LLMService(api_key=current_api_key)
     except Exception as e:
         raise HTTPException(
@@ -92,8 +92,8 @@ def generate_schema(
         )
 
     try:
-        df = duckdb.sql(f"select * from '{request.filepath}' limit 10;")
-    except BinderException as e:
+        duckdb.sql(f"select * from '{request.filepath}' limit 10;")
+    except BinderException:
         raise HTTPException(
             status_code=400,
             detail="invalid file type, supported: json, parquet, or csv",
@@ -259,6 +259,6 @@ def list_schemas_endpoint(
     current_user: dict = Depends(get_current_user)
 ):
     """List all schemas for the current user"""
-    from .schema_storage import list_user_schemas
+    from ..schema_storage import list_user_schemas
     user_id = current_user["user_id"]
     return list_user_schemas(user_id)
