@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel, Field
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 
 from ..code_whisperer import CodeWhisperer
+from ..session_variable_store import session_variable_store
 from .auth import get_current_user
 
 router = APIRouter(prefix="/execute", tags=["Code Execution"])
@@ -80,8 +81,8 @@ async def execute_code(
             except Exception as e:
                 print(f"DEBUG: Could not inject database connection: {e}")
 
-        # Execute the code
-        result, error = code_whisperer.execute_with_timeout(request.code)
+        # Execute the code with user session
+        result, error = code_whisperer.execute_with_timeout(request.code, current_user["user_id"])
         print(f"DEBUG: Execution result - Result: {result}, Error: {error}")  # Debug print
 
         execution_time = time.time() - start_time
@@ -101,6 +102,53 @@ async def execute_code(
         raise HTTPException(
             status_code=500,
             detail=f"Unexpected error: {str(e)}"
+        )
+
+
+@router.get("/session-variables", response_model=Dict[str, Any])
+async def get_session_variables(current_user: dict = Depends(get_current_user)):
+    """
+    Get current session variables for debugging purposes
+
+    Returns:
+        Dictionary containing global and local variables in the user's session
+    """
+    try:
+        global_vars = session_variable_store.get_global_vars(current_user["user_id"])
+        local_vars = session_variable_store.get_local_vars(current_user["user_id"])
+
+        # Filter out builtins for cleaner output
+        filtered_globals = {k: v for k, v in global_vars.items() if k != '__builtins__'}
+        filtered_locals = {k: v for k, v in local_vars.items() if k != '__builtins__'}
+
+        return {
+            "user_id": current_user["user_id"],
+            "global_variables": filtered_globals,
+            "local_variables": filtered_locals,
+            "global_count": len(filtered_globals),
+            "local_count": len(filtered_locals)
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get session variables: {str(e)}"
+        )
+
+
+@router.delete("/session-variables")
+async def clear_session_variables(current_user: dict = Depends(get_current_user)):
+    """
+    Clear all session variables for the current user
+    """
+    try:
+        session_variable_store.clear_session(current_user["user_id"])
+        return {"message": f"Session variables cleared for user {current_user['user_id']}"}
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to clear session variables: {str(e)}"
         )
 
 
@@ -138,8 +186,8 @@ async def execute_code_with_variables(
             except Exception as e:
                 print(f"DEBUG: Could not inject database connection: {e}")
 
-        # Execute the code and extract variables
-        result, variables, error = code_whisperer.execute_with_variables(request.code)
+        # Execute the code and extract variables with user session
+        result, variables, error = code_whisperer.execute_with_variables(request.code, current_user["user_id"])
 
         execution_time = time.time() - start_time
 

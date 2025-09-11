@@ -2,6 +2,7 @@ from typing import Any, Dict, Optional, Tuple
 import hashlib
 
 from .config_models import AppConfig
+from .session_variable_store import session_variable_store
 
 class CodeExecutionError(Exception):
     """Raised when code execution fails"""
@@ -12,16 +13,11 @@ class TimeoutError(Exception):
     pass
 
 class CodeWhisperer:
-    """Python code execution"""
+    """Python code execution with session-based variable management"""
 
     def __init__(self, config: AppConfig):
         self.config = config
-        self._local_vars: Dict[str, Any] = {}
-        self._global_vars = {
-            '__builtins__': __builtins__
-        }
         self._cached_connections: Dict[str, Any] = {}  # Store cached DuckDB connections
-        self._last_code_hash: Optional[str] = None  # Track hash of last executed code
 
     def set_cached_connection(self, key: str, connection: Any):
         """Set a cached DuckDB connection"""
@@ -36,36 +32,21 @@ class CodeWhisperer:
         """Get a cached connection"""
         return self._cached_connections.get(key)
 
-    def check_code_change_and_reset(self, code: str) -> bool:
+    def execute_code(self, code: str, user_id: str) -> Tuple[Any, Optional[str]]:
         """
-        Check if code has changed since last execution.
-        If changed, reset the environment and return True.
-        """
-        code_hash = hashlib.md5(code.encode()).hexdigest()
-        if self._last_code_hash is not None and self._last_code_hash != code_hash:
-            # Code has changed, reset environment
-            self.reset_environment()
-            self._last_code_hash = code_hash
-            return True
-        else:
-            # Code is same or first execution
-            self._last_code_hash = code_hash
-            return False
+        Execute Python code with session-based variable management
 
-    def execute_code(self, code: str) -> Tuple[Any, Optional[str]]:
-        """
-        Execute Python code
+        Args:
+            code: Python code to execute
+            user_id: User ID for session-based variable storage
 
         Returns:
             Tuple of (result: Any, error_message: Optional[str])
         """
         try:
-            # Check if code has changed and reset if needed
-            code_changed = self.check_code_change_and_reset(code)
-
-            # Prepare execution environment with cached connections
-            exec_globals = self._global_vars.copy()
-            exec_locals = self._local_vars.copy()
+            # Get current session variables
+            exec_globals = session_variable_store.get_global_vars(user_id)
+            exec_locals = session_variable_store.get_local_vars(user_id)
 
             # Inject cached connections into globals
             for key, conn in self._cached_connections.items():
@@ -76,8 +57,18 @@ class CodeWhisperer:
                     # Keep the old naming for backward compatibility
                     exec_globals[f"cached_conn_{key.replace(':', '_').replace('/', '_')}"] = conn
 
-            # Execute the code using exec with restricted environment
+            # Execute the code using exec with session environment
             exec(code, exec_globals, exec_locals)
+
+            # For variable persistence, move all local variables to global scope
+            # This ensures variables defined in cells persist across executions
+            for var_name, var_value in exec_locals.items():
+                if var_name not in exec_globals:
+                    exec_globals[var_name] = var_value
+
+            # Update session variables with any new/modified variables
+            session_variable_store.update_global_vars(user_id, exec_globals)
+            session_variable_store.update_local_vars(user_id, exec_locals)
 
             # Try to get the last expression result if it's an expression
             try:
@@ -91,16 +82,16 @@ class CodeWhisperer:
         except Exception as e:
             return None, f"Execution error: {str(e)}"
 
-    def execute_with_timeout(self, code: str, timeout: Optional[int] = None) -> Tuple[Any, Optional[str]]:
+    def execute_with_timeout(self, code: str, user_id: str, timeout: Optional[int] = None) -> Tuple[Any, Optional[str]]:
         """Execute code with a custom timeout"""
         # For now, execute directly without threading to avoid resource limit issues
         # TODO: Implement proper timeout mechanism
         try:
-            return self.execute_code(code)
+            return self.execute_code(code, user_id)
         except Exception as e:
             return None, str(e)
 
-    def execute_with_variables(self, code: str) -> Tuple[Any, Dict[str, Any], Optional[str]]:
+    def execute_with_variables(self, code: str, user_id: str) -> Tuple[Any, Dict[str, Any], Optional[str]]:
         """
         Execute Python code and return all pandas DataFrames, plotly figures, and scalar variables
 
@@ -109,16 +100,17 @@ class CodeWhisperer:
         - figures: Dictionary of all plotly figures converted to JSON {"var_name": "json_data"}
         - scalars: Dictionary of all JSON serializable scalar values {"var_name": value}
 
+        Args:
+            code: Python code to execute
+            user_id: User ID for session-based variable storage
+
         Returns:
             Tuple of (result: Any, variables: Dict[str, Any], error_message: Optional[str])
         """
         try:
-            # Check if code has changed and reset if needed
-            code_changed = self.check_code_change_and_reset(code)
-
-            # Create fresh local and global environments for this execution
-            exec_globals = self._global_vars.copy()
-            exec_locals = self._local_vars.copy()
+            # Get current session variables
+            exec_globals = session_variable_store.get_global_vars(user_id)
+            exec_locals = session_variable_store.get_local_vars(user_id)
 
             # Inject cached connections into globals
             for key, conn in self._cached_connections.items():
@@ -131,6 +123,16 @@ class CodeWhisperer:
 
             # Execute the code
             exec(code, exec_globals, exec_locals)
+
+            # For variable persistence, move all local variables to global scope
+            # This ensures variables defined in cells persist across executions
+            for var_name, var_value in exec_locals.items():
+                if var_name not in exec_globals:
+                    exec_globals[var_name] = var_value
+
+            # Update session variables with any new/modified variables
+            session_variable_store.update_global_vars(user_id, exec_globals)
+            session_variable_store.update_local_vars(user_id, exec_locals)
 
             # Initialize result dictionaries
             dataframes = {}
@@ -221,7 +223,8 @@ class CodeWhisperer:
                     # Handle plotly figure result
                     if hasattr(result, 'to_json') and hasattr(result, 'data'):
                         try:
-                            if 'plotly' in str(type(result)).lower():
+                            type_str = str(type(result)).lower()
+                            if 'plotly' in type_str and 'figure' in type_str:
                                 result = result.to_json()
                         except:
                             pass
@@ -241,9 +244,3 @@ class CodeWhisperer:
 
         except Exception as e:
             return None, {}, f"Execution error: {str(e)}"
-
-    def reset_environment(self):
-        """Reset the execution environment"""
-        self._local_vars.clear()
-        self._last_code_hash = None  # Reset code hash tracking
-        # Keep the restricted builtins

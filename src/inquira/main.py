@@ -8,6 +8,7 @@ import threading
 import time
 import os
 import uvicorn
+import asyncio
 from datetime import datetime
 from .api.generate_schema import router as schema_router
 from .api.chat import router as chat_router
@@ -19,6 +20,7 @@ from .api.api_key import router as api_key_router
 from .config_models import AppConfig
 from .websocket_manager import websocket_manager
 from .database_manager import DatabaseManager
+from .session_variable_store import session_variable_store
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -47,12 +49,33 @@ async def lifespan(app: FastAPI):
     app.state.db_manager = DatabaseManager(app.state.config)
     print("Database manager initialized")
 
+    # Start session cleanup task
+    cleanup_task = asyncio.create_task(session_cleanup_worker())
+    print("Session cleanup worker started")
+
     yield
 
     # Cleanup on shutdown
     print("Shutting down API server")
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+
     if hasattr(app.state, 'db_manager'):
         app.state.db_manager.shutdown()
+
+
+async def session_cleanup_worker():
+    """Background task to clean up expired sessions"""
+    while True:
+        try:
+            session_variable_store.cleanup_expired_sessions()
+            await asyncio.sleep(300)  # Clean up every 5 minutes
+        except Exception as e:
+            print(f"Error in session cleanup: {e}")
+            await asyncio.sleep(60)  # Wait a minute before retrying
 
 app = FastAPI(
     title="Inquira",
@@ -94,6 +117,7 @@ def get_ui_dir() -> str:
     return dev_ui
 
 app.mount("/ui", StaticFiles(directory=get_ui_dir(), html=True), name="ui")
+app.mount("/logo", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "logo")), name="logo")
 
 # Configure CORS
 app.add_middleware(
@@ -205,6 +229,12 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
         print(f"🔌 [WebSocket] Cleaning up connection for user {user_id}")
         await websocket_manager.disconnect(user_id)
 
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    """Serve the favicon"""
+    from fastapi.responses import FileResponse
+    return FileResponse(os.path.join(os.path.dirname(__file__), "logo", "inquira_logo.svg"), media_type="image/svg+xml")
 
 @app.get("/", tags=["General"])
 async def root():

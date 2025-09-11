@@ -1,650 +1,795 @@
-# Inquira
+# 🚀 Inquira - AI-Powered Data Analysis Tool
 
-A FastAPI-based conversational AI platform that integrates with Google Gemini LLM for natural language data analysis. Inquira enables users to ask business questions in plain English and receive actionable insights through automatically generated and executed Python code, with real-time progress updates and secure sandboxed execution.
+<p align="center">
+  <img src="./logo/inquira_logo.svg" alt="Inquira Logo" width="100" height="100">
+</p>
 
-## Business Purpose
+<p align="center">
+  <strong>Transform natural language into powerful data insights with AI-generated Python code</strong>
+</p>
 
-Inquira bridges the gap between natural language queries and complex data analysis by:
+<p align="center">
+  <img src="https://img.shields.io/badge/Status-Active-success?style=for-the-badge" alt="Status">
+  <img src="https://img.shields.io/badge/Version-0.3.1-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python" alt="Python">
+  <img src="https://img.shields.io/badge/Vue.js-3-4FC08D?style=for-the-badge&logo=vue.js" alt="Vue.js">
+  <img src="https://img.shields.io/badge/FastAPI-00C853?style=for-the-badge&logo=fastapi" alt="FastAPI">
+</p>
 
-- Converting plain English questions into executable Python code
-- Providing secure, sandboxed code execution with DuckDB optimization
-- Offering real-time feedback through WebSocket connections
-- Maintaining conversation context across multiple queries
-- Generating interactive visualizations and downloadable analysis code
+---
 
-Designed for data analysts, business users, and technical professionals who need fast insights from large datasets without writing complex code.
+## 📋 Table of Contents
 
-## Setup
+- [🎯 What is Inquira?](#-what-is-inquira)
+- [💡 Value Proposition](#-value-proposition)
+- [👥 Target Audience](#-target-audience)
+- [✨ Key Features](#-key-features)
+- [🚀 Quick Start](#-quick-start)
+- [📖 How to Use](#-how-to-use)
+- [🛠️ Technical Architecture](#️-technical-architecture)
+- [🔧 Installation & Setup](#-installation--setup)
+- [📚 API Documentation](#-api-documentation)
+- [⚙️ Configuration](#️-configuration)
+- [🔒 Security](#-security)
+- [🐛 Troubleshooting](#-troubleshooting)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+- [🙋 Support](#-support)
+
+---
+
+## 🎯 What is Inquira?
+
+**Inquira** is a revolutionary desktop application that democratizes data analysis by allowing users to query structured data using natural language. Powered by advanced Large Language Models (LLMs), Inquira automatically generates, executes, and visualizes Python code based on your questions.
+
+### 🎪 How It Works
+
+1. **Ask in Plain English**: "Show me sales by category this quarter"
+2. **AI Generates Code**: LLM creates optimized Python/DuckDB queries
+3. **Instant Execution**: Code runs automatically with real-time results
+4. **Visual Insights**: Interactive charts, tables, and exports
+
+### 🏆 Core Capabilities
+
+- **📊 Multi-Format Support**: CSV, Excel, Parquet, DuckDB databases
+- **🤖 AI-Powered**: Google Gemini integration for intelligent code generation
+- **🎨 Rich Visualizations**: Plotly charts and interactive dashboards
+- **⚡ Real-Time Execution**: Instant results with progress tracking
+- **💾 Smart Caching**: Optimized performance for large datasets
+- **🔄 Export Ready**: CSV, PNG, HTML export capabilities
+
+---
+
+## 💡 Value Proposition
+
+### 🎯 **For Data Analysts & Scientists**
+- **10x Faster Analysis**: Natural language queries instead of complex SQL/Python
+- **Reduced Errors**: AI-generated code is optimized and tested
+- **Focus on Insights**: Spend less time coding, more time analyzing
+
+### 🏢 **For Business Users**
+- **Self-Service Analytics**: No technical expertise required
+- **Instant Answers**: Get insights in seconds, not hours
+- **Cost Effective**: Reduce dependency on expensive analysts
+
+### 🏫 **For Educators & Students**
+- **Learn by Doing**: See how data analysis works in real-time
+- **Interactive Learning**: Experiment with data without coding barriers
+- **Practical Skills**: Understand both questions and solutions
+
+### 💼 **For Organizations**
+- **Democratize Data**: Enable non-technical users to explore data
+- **Accelerate Decisions**: Faster insights drive better business outcomes
+- **Reduce Costs**: Lower technical barriers to data access
+
+---
+
+## 👥 Target Audience
+
+### 👨‍💼 **Primary Users**
+- **Data Analysts** seeking faster workflows
+- **Business Intelligence Teams** needing quick insights
+- **Product Managers** exploring user behavior data
+- **Marketing Teams** analyzing campaign performance
+- **Financial Analysts** processing transaction data
+
+### 👩‍🎓 **Secondary Users**
+- **Students** learning data analysis concepts
+- **Educators** teaching data science courses
+- **Researchers** exploring datasets
+- **Consultants** delivering client insights
+- **Small Business Owners** understanding their data
+
+### 🏢 **Enterprise Use Cases**
+- **Retail**: Customer behavior analysis
+- **Finance**: Transaction pattern detection
+- **Healthcare**: Patient data insights
+- **E-commerce**: Sales trend analysis
+- **Logistics**: Supply chain optimization
+
+---
+
+## ✨ Key Features
+
+### 🔍 **Data Analysis**
+- ✅ Natural language to SQL/Python conversion
+- ✅ Support for complex joins and aggregations
+- ✅ Real-time query execution and results
+- ✅ Interactive data exploration
+
+### 📊 **Visualization**
+- ✅ Automatic chart generation (bar, line, pie, scatter)
+- ✅ Interactive Plotly visualizations
+- ✅ Customizable chart themes and layouts
+- ✅ Export charts as PNG/HTML
+
+### 🎨 **User Interface**
+- ✅ Modern, intuitive desktop application
+- ✅ Dark/light theme support
+- ✅ Drag-and-drop file uploads
+- ✅ Real-time progress indicators
+
+### 🔧 **Developer Experience**
+- ✅ RESTful API for integrations
+- ✅ Comprehensive logging and debugging
+- ✅ Extensible plugin architecture
+- ✅ Cross-platform compatibility
+
+---
+
+## 🚀 Quick Start
+
+### 📋 Prerequisites
+- **Node.js** 18+ and npm
+- **Python** 3.12+
+- **UV** (Python package manager)
+- **Google Gemini API Key**
+
+### ⚡ 3-Step Setup
+
+```bash
+# 1. Clone and install frontend
+git clone https://github.com/your-org/inquira.git
+cd inquira
+npm install
+
+# 2. Setup backend
+cd inquira  # Backend directory
+uv sync
+
+# 3. Start development servers
+# Terminal 1: Backend
+uv run python -m src.inquira.main
+
+# Terminal 2: Frontend
+npm run dev
+```
+
+**🎉 Ready!** Open `http://localhost:5173` and start analyzing data.
+
+---
+
+## 📖 How to Use
+
+### 📤 **Step 1: Upload Your Data**
+```bash
+# Supported formats:
+# - CSV files (.csv)
+# - Excel files (.xlsx, .xls)
+# - Parquet files (.parquet)
+# - DuckDB databases (.db)
+```
+
+### 📝 **Step 2: Define Your Schema** (Optional)
+Create a schema file describing your data structure:
+
+```csv
+Table Name,Column Name,Data Type,Description,Categories
+sales_data,product_id,int,Unique identifier for products,
+sales_data,product_name,string,Name of the product,
+sales_data,category,string,Product category,"Electronics,Clothing,Books"
+```
+
+### 🔑 **Step 3: Configure API**
+1. Get your [Google Gemini API key](https://makersuite.google.com/app/apikey)
+2. Select your preferred model (gemini-pro, gemini-1.5-flash, etc.)
+3. Enter your API key in the settings
+
+### 💬 **Step 4: Ask Questions**
+```bash
+# Examples of natural language queries:
+
+"Show me total sales by category this month"
+"What are the top 10 best-selling products?"
+"Compare sales performance across different regions"
+"Find customers who haven't purchased in 30 days"
+"Calculate average order value by customer segment"
+```
+
+### 📊 **Step 5: Review & Execute**
+1. **Review Generated Code**: AI creates optimized Python/DuckDB code
+2. **Execute Analysis**: Click run to see results instantly
+3. **Explore Visualizations**: View charts and interactive dashboards
+4. **Export Results**: Download data as CSV or charts as images
+
+### 🎯 **Example Workflow**
+
+```bash
+# Upload: sales_data.csv (1M rows)
+# Schema: sales_schema.csv
+# Question: "What's the sales trend by category over the last 6 months?"
+
+# Result: AI generates optimized query + beautiful visualization
+```
+
+---
+
+## 🛠️ Technical Architecture
+
+### 🏗️ **System Architecture**
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Vue.js 3      │    │   FastAPI       │    │   Google Gemini │
+│   Frontend      │◄──►│   Backend       │◄──►│   LLM Service   │
+│                 │    │                 │    │                 │
+│ • Monaco Editor │    │ • Data Processing│    │ • Code Generation│
+│ • AG Grid       │    │ • File Upload    │    │ • Query Optimization│
+│ • Plotly Charts │    │ • Code Execution │    │ • Error Handling │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                              │
+                              ▼
+                       ┌─────────────────┐
+                       │   Data Sources  │
+                       │                 │
+                       │ • CSV/Excel     │
+                       │ • Parquet       │
+                       │ • DuckDB        │
+                       │ • Local Files   │
+└─────────────────┘
+```
+
+### 🛠️ **Technology Stack**
+
+#### **Frontend**
+- **Framework**: Vue.js 3 (Composition API)
+- **Styling**: Tailwind CSS
+- **Code Editor**: Monaco Editor (VS Code engine)
+- **Data Grid**: AG Grid
+- **Charts**: Plotly.js
+- **Icons**: Heroicons
+- **Build Tool**: Vite
+
+#### **Backend**
+- **Framework**: FastAPI (async Python)
+- **Data Processing**: Pandas + DuckDB
+- **LLM Integration**: Google Gemini API
+- **File Handling**: aiofiles
+- **Validation**: Pydantic
+- **Package Manager**: UV
+
+#### **Infrastructure**
+- **Packaging**: PyInstaller (desktop app)
+- **Database**: DuckDB (analytical queries)
+- **Caching**: In-memory with file persistence
+- **Logging**: Structured JSON logging
+
+### 📊 **Performance Characteristics**
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| **Query Response Time** | < 3 seconds | Average for typical queries |
+| **Data Processing** | Up to 10M rows | Memory-optimized |
+| **Concurrent Users** | 1 (desktop) | Single-user application |
+| **File Size Limit** | 100MB | Configurable |
+| **Code Execution Timeout** | 30 seconds | Configurable |
+
+---
+
+## 🔧 Installation & Setup
+
+### 📦 **Option 1: Development Setup**
+
+#### **Prerequisites**
+- Node.js 18+ and npm
+- Python 3.12+
+- UV package manager
+- Google Gemini API key
+
+#### **Step-by-Step Installation**
+
+```bash
+# 1. Clone repository
+git clone https://github.com/your-org/inquira.git
+cd inquira
+
+# 2. Frontend setup
+npm install
+npm run dev  # Starts at http://localhost:5173
+
+# 3. Backend setup (new terminal)
+cd inquira  # Navigate to backend directory
+uv sync
+uv run python -m src.inquira.main  # Starts at http://localhost:8000
+```
+
+### 🖥️ **Option 2: Desktop Application**
+
+```bash
+# Build for your platform
+npm run build
+cd inquira
+uv run python -m src.inquira.build
+
+# Find executable in dist/ directory
+```
+
+### 🐳 **Option 3: Docker Deployment**
+
+```bash
+# Build and run with Docker
+docker build -t inquira .
+docker run -p 5173:5173 -p 8000:8000 inquira
+```
+
+---
+
+## 📚 API Documentation
+
+### 🔗 **Core Endpoints**
+
+#### **File Management**
+```http
+POST   /upload/data     # Upload data files
+POST   /upload/schema   # Upload schema files
+DELETE /upload/data/{id}    # Delete data file
+DELETE /upload/schema/{id}  # Delete schema file
+```
+
+#### **Analysis Engine**
+```http
+POST   /analyze         # Generate code from natural language
+POST   /execute         # Execute generated code
+GET    /health          # Health check
+```
+
+#### **Export & Logging**
+```http
+POST   /export/csv      # Export data as CSV
+POST   /export/chart    # Export chart as PNG/HTML
+POST   /log/question    # Log user questions
+GET    /log/questions   # Retrieve question history
+```
+
+### 📝 **Example API Usage**
+
+```python
+import requests
+
+# Analyze data with natural language
+response = requests.post('http://localhost:8000/analyze', json={
+    'question': 'Show me sales by category',
+    'data_file': 'sales.csv',
+    'schema_file': 'schema.csv',
+    'model': 'gemini-pro'
+})
+
+# Execute generated code
+result = requests.post('http://localhost:8000/execute', json={
+    'code': response.json()['code'],
+    'data_file': 'sales.csv'
+})
+```
+
+---
+
+## ⚙️ Configuration
+
+### 🔧 **Environment Variables**
+
+Create `.env` file in backend directory:
+
+```env
+# Server Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
+DEBUG=True
+
+# File Handling
+UPLOAD_DIR=uploads
+MAX_FILE_SIZE=104857600  # 100MB
+ALLOWED_EXTENSIONS=csv,xlsx,xls,parquet,db
+
+# LLM Configuration
+GEMINI_API_KEY=your_api_key_here
+DEFAULT_MODEL=gemini-1.5-flash
+CODE_TIMEOUT=30
+
+# Security
+SECRET_KEY=your_secret_key
+CORS_ORIGINS=http://localhost:5173
+
+# Logging
+LOG_LEVEL=INFO
+LOG_DIR=logs
+```
+
+### 🤖 **Supported LLM Models**
+
+| Model | Context Window | Best For |
+|-------|----------------|----------|
+| `gemini-pro` | 32K tokens | General analysis |
+| `gemini-1.5-flash` | 1M tokens | Large datasets |
+| `gemini-1.5-pro` | 1M tokens | Complex analysis |
+| `gemini-pro-vision` | 16K + images | Visual data |
+
+---
+
+## 🔒 Security
+
+### 🛡️ **Security Features**
+
+- **🔐 API Key Protection**: Keys never stored permanently
+- **📁 File Validation**: Strict file type and size validation
+- **⚡ Sandboxed Execution**: Limited Python imports and execution
+- **🚫 No Cloud Storage**: All data remains local
+- **🔍 Input Sanitization**: All user inputs validated
+- **⏰ Execution Timeouts**: Prevents infinite loops
+- **📊 Audit Logging**: Complete activity tracking
+
+### ⚠️ **Security Best Practices**
+
+1. **API Keys**: Rotate regularly, use restricted keys
+2. **File Uploads**: Validate file types and scan for malware
+3. **Network**: Use HTTPS in production
+4. **Data**: Encrypt sensitive data at rest
+5. **Access**: Implement user authentication if needed
+
+---
+
+## 🐛 Troubleshooting
+
+### 🔧 **Common Issues & Solutions**
+
+#### **1. Import Errors**
+```bash
+# Solution: Reinstall dependencies
+cd inquira
+uv sync --reinstall
+```
+
+#### **2. Port Conflicts**
+```bash
+# Change ports in .env
+API_PORT=8001
+# Frontend proxy in vite.config.js
+target: 'http://localhost:8001'
+```
+
+#### **3. API Key Issues**
+```bash
+# Check API key validity
+curl -H "Authorization: Bearer YOUR_KEY" \
+     https://generativelanguage.googleapis.com/v1/models
+```
+
+#### **4. Memory Issues**
+```bash
+# For large datasets, increase memory
+export PYTHONPATH=/usr/local/lib/python3.10
+# Or use chunked processing
+```
+
+#### **5. Code Execution Timeouts**
+```env
+# Increase timeout in .env
+CODE_TIMEOUT=60
+```
+
+### 📊 **Performance Tuning**
+
+```python
+# Optimize for large datasets
+df = pd.read_csv('large_file.csv', chunksize=10000)
+for chunk in df:
+    # Process in chunks
+    pass
+```
+
+### 🔍 **Debug Mode**
+
+```bash
+# Enable detailed logging
+export DEBUG=True
+export LOG_LEVEL=DEBUG
+
+# Check logs
+tail -f logs/inquira.log
+```
+
+---
+
+## 🤝 Contributing
+
+### 🚀 **Development Workflow**
+
+1. **Fork** the repository
+2. **Create** feature branch: `git checkout -b feature/amazing-feature`
+3. **Install** dependencies: `npm install && uv sync`
+4. **Make** changes with tests
+5. **Commit**: `git commit -m 'Add amazing feature'`
+6. **Push**: `git push origin feature/amazing-feature`
+7. **Create** Pull Request
+
+### 📋 **Code Standards**
+
+- **Frontend**: Vue 3 Composition API, TypeScript preferred
+- **Backend**: FastAPI with Pydantic models
+- **Testing**: pytest for backend, Vitest for frontend
+- **Documentation**: Update README for new features
+- **Commits**: Conventional commit format
+
+### 🧪 **Testing**
+
+```bash
+# Frontend tests
+npm run test
+
+# Backend tests
+uv run pytest
+
+# End-to-end tests
+npm run test:e2e
+```
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+```
+MIT License
+
+Copyright (c) 2024 Inquira
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software...
+```
+
+---
+
+## 🙋 Support
+
+### 📞 **Getting Help**
+
+- **📧 Email**: support@inquira.dev
+- **💬 Discord**: [Join our community](https://discord.gg/inquira)
+- **📖 Documentation**: [Full docs](https://docs.inquira.dev)
+- **🐛 Bug Reports**: [GitHub Issues](https://github.com/your-org/inquira/issues)
+- **💡 Feature Requests**: [GitHub Discussions](https://github.com/your-org/inquira/discussions)
+
+### 📚 **Resources**
+
+- **🖥️ Live Demo**: [Try Inquira](https://demo.inquira.dev)
+- **📺 Tutorials**: [YouTube Channel](https://youtube.com/@inquira)
+- **📝 Blog**: [Latest Updates](https://blog.inquira.dev)
+- **📰 Newsletter**: [Stay Updated](https://newsletter.inquira.dev)
+
+### 🎯 **Roadmap**
+
+- [ ] **Mobile App** (React Native)
+- [ ] **Cloud Deployment** (AWS/GCP)
+- [ ] **Team Collaboration** features
+- [ ] **Advanced ML** integrations
+- [ ] **Plugin System** for custom analyses
+
+---
+
+<p align="center">
+  <strong>Made with ❤️ for data enthusiasts worldwide</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/your-org/inquira">⭐ Star us on GitHub</a> •
+  <a href="https://twitter.com/inquira_dev">🐦 Follow on Twitter</a> •
+  <a href="https://discord.gg/inquira">💬 Join Discord</a>
+</p>
+
+## Features
+
+- **Data Input**: Support for CSV, Excel, Parquet, and DuckDB files
+- **Schema Definition**: Upload schema files to describe your data structure
+- **LLM Integration**: Uses Google Gemini models for code generation
+- **Interactive Analysis**: IDE-like interface with editable, executable code
+- **Visualizations**: Generate Plotly charts and graphs
+- **Data Export**: Export results as CSV or charts as images
+- **Logging**: Track all user questions locally
+- **Desktop App**: Can be packaged as a standalone desktop application
+
+## Architecture
+
+- **Frontend**: Vue.js 3 + Tailwind CSS + Monaco Editor + AG Grid + Plotly
+- **Backend**: FastAPI + Python 3.12+
+- **Data Processing**: Pandas + DuckDB
+- **LLM**: Google Gemini API
+- **Packaging**: PyInstaller for desktop distribution
+
+## Development Setup
 
 ### Prerequisites
 
+- Node.js 18+ and npm
 - Python 3.12+
-- Google Gemini API key
+- UV (Python package manager)
 
-## Alternative Installation Methods
-
-If you prefer not to use UV, you can install and run the application using pip or run it directly with Python:
-
-### Using pip
-
-1. Install the package in development mode:
+### Frontend Setup
 
 ```bash
-pip install -e .
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
 ```
 
-2. Run the application:
+The frontend will be available at `http://localhost:5173`
+
+### Backend Setup
 
 ```bash
-inquira
+# Navigate to backend directory
+cd inquira
+
+# Install dependencies (UV will create virtual environment automatically)
+uv sync
+
+# Start the FastAPI server
+uv run python src/inquira/main.py
 ```
 
-### Direct Python Execution
+The backend API will be available at `http://localhost:8000`
 
-You can also run the application directly without installation:
+### Full Development Mode
 
-```bash
-python -m src.inquira.main
-```
-
-**Note:** When running directly with Python, make sure all dependencies are installed:
+1. Start the backend server:
 
 ```bash
-pip install -r requirements.txt
-```
-
-## Usage
-
-### Starting the API Server
-
-Run the API server:
-
-```bash
+cd inquira
 uv run python -m src.inquira.main
 ```
 
-The API will be available at `http://localhost:8000`
+2. In a new terminal, start the frontend:
 
-### Performance Optimizations
-
-Inquira includes advanced performance optimizations for handling large datasets:
-
-#### Persistent Database Caching
-
-- **Automatic Database Creation**: When you set a data file path, Inquira automatically converts CSV/Parquet/JSON files to optimized DuckDB databases
-- **Persistent Storage**: Databases are stored on disk and persist across application restarts
-- **Smart Updates**: Automatically detects file changes and recreates databases when source files are modified
-- **Connection Reuse**: Maintains persistent connections to avoid repeated file loading
-
-#### Performance Benefits
-
-- **First Query**: Initial database creation (only happens once per file)
-- **Subsequent Queries**: 5-10x faster due to instant database connections
-- **Memory Efficient**: Uses DuckDB's optimized storage format
-- **Large File Support**: Handles files larger than available RAM
-
-#### How It Works
-
-1. User sets data file path via settings
-2. System creates DuckDB database file (e.g., `user123_data.duckdb`)
-3. Database persists on disk for future use
-4. LLM-generated code uses cached connections instead of creating new ones
-5. Variables and intermediate results are maintained between queries
-
-#### Real-Time Processing Updates
-
-Inquira provides real-time feedback during long-running operations using WebSocket connections:
-
-- **WebSocket Endpoint**: `/ws/settings/{user_id}`
-- **Progress Updates**: Real-time progress with informative status messages
-- **Background Processing**: Non-blocking database creation and schema generation
-- **Status Messages**: Contextual updates for each processing stage
-- **Parallel Processing**: Simultaneous schema generation and preview caching
-- **Connection Recovery**: Automatic handling of connection drops and reconnections
-
-#### WebSocket Message Flow
-
-```javascript
-// Connection established
-{"type": "connected", "message": "Connected to Inquira processing service"}
-
-// Progress updates with status messages
-{
-  "type": "progress",
-  "stage": "converting",
-  "progress": 50,
-  "message": "📊 Analyzing data patterns..."
-}
-
-// Parallel processing updates
-{
-  "type": "progress",
-  "stage": "parallel_processing",
-  "message": "🚀 Processing data schema and optimizing preview performance..."
-}
-
-// Completion with results
-{
-  "type": "completed",
-  "result": {
-    "success": true,
-    "data_path": "/data/sales.csv",
-    "parallel_processing": {
-      "schema_generation": "success",
-      "preview_cache": "success"
-    }
-  }
-}
+```bash
+npm run dev
 ```
 
-#### Code Execution Environment
+3. Open `http://localhost:5173` in your browser
 
-Inquira's code execution has unique characteristics for optimal performance:
+The Vite dev server will proxy API calls to the FastAPI backend.
 
-- **Environment Reset**: Execution environment resets when code changes (detected via hash)
-- **Variable Persistence**: Variables maintained between queries within same code context
-- **Connection Injection**: DuckDB connections automatically available as 'conn' variable
-- **Security Sandboxing**: Restricted execution with limited builtins and network access
-- **Error Tracking**: Comprehensive error reporting with execution time and resource usage
+## API Endpoints
 
-**WebSocket Message Flow:**
+### File Upload
 
-```javascript
-// Connection established
-{"type": "connected", "message": "Connected to Inquira processing service"}
+- `POST /upload/data` - Upload data files (CSV, Excel, Parquet, DuckDB)
+- `POST /upload/schema` - Upload schema files (CSV, Excel)
+- `DELETE /upload/data/{file_id}` - Delete uploaded data file
+- `DELETE /upload/schema/{file_id}` - Delete uploaded schema file
 
-// Progress updates with status messages
-{
-  "type": "progress",
-  "stage": "converting",
-  "progress": 50,
-  "message": "📊 Analyzing data patterns..."
-}
+### Analysis
 
-// Completion
-{
-  "type": "completed",
-  "result": {"success": true, "data_path": "/data/sales.csv"}
-}
+- `POST /analyze` - Generate Python code using LLM
+- `POST /execute` - Execute Python code and return results
+
+### Export
+
+- `POST /export/csv` - Export data as CSV
+- `POST /export/chart` - Export chart as PNG/HTML
+
+### Logging
+
+- `POST /log/question` - Log user questions
+- `GET /log/questions` - Retrieve logged questions
+- `GET /log/stats` - Get logging statistics
+
+### Health
+
+- `GET /health` - Health check endpoint
+
+## Usage
+
+1. **Upload Data**: Choose your data file (CSV, Excel, Parquet, or DuckDB)
+2. **Upload Schema**: Provide a schema file describing your data structure
+3. **Configure LLM**: Select a Gemini model and enter your API key
+4. **Ask Questions**: Type natural language questions about your data
+5. **Review Code**: Examine the generated Python code
+6. **Execute & Analyze**: Run the code to see results, tables, and charts
+7. **Export Results**: Download data as CSV or charts as images
+
+## Schema File Format
+
+Your schema file should be a CSV or Excel file with these columns:
+
+| Column Name | Description                                         |
+| ----------- | --------------------------------------------------- |
+| Table Name  | Name of the data table                              |
+| Column Name | Name of the column                                  |
+| Data Type   | Data type (int, string, float, date, datetime)      |
+| Description | Description of what the column contains (mandatory) |
+| Categories  | Optional: comma-separated list of possible values   |
+
+Example:
+
+```csv
+Table Name,Column Name,Data Type,Description,Categories
+sales_data,product_id,int,Unique identifier for products,
+sales_data,product_name,string,Name of the product,
+sales_data,category,string,Product category,"Electronics,Clothing,Books"
+sales_data,price,float,Price in USD,
+sales_data,sale_date,date,Date of sale,
 ```
-
-### Launching the GUI
-
-The application includes a web-based GUI that can be accessed at `http://localhost:8000/ui` after starting the server. The server will automatically open your default web browser to the GUI when launched.
-
-### API Endpoints
-
-#### GET /
-
-Returns basic API information.
-
-**Response:**
-
-```json
-{
-  "message": "Inquira is running",
-  "version": "1.0.0"
-}
-```
-
-#### POST /chat
-
-Send a chat message to the LLM for data analysis.
-
-**Request Body:**
-
-```json
-{
-  "question": "What is the average sales by region?",
-  "current_code": "",
-  "model": "gemini-2.5-flash",
-  "context": "Sales data analysis"
-}
-```
-
-**Parameters:**
-
-- `question` (required): The data analysis question
-- `current_code` (optional): Existing Python code to build upon
-- `model` (optional): LLM model to use (defaults to "gemini-2.5-flash")
-- `context` (optional): Additional context about the data
-
-**Response:**
-
-```json
-{
-  "is_safe": true,
-  "is_relevant": true,
-  "code": "import pandas as pd\n# Analysis code here",
-  "explanation": "Step-by-step explanation of the analysis"
-}
-```
-
-### Authentication Endpoints
-
-#### POST /auth/register
-
-Register a new user account.
-
-**Request Body:**
-
-```json
-{
-  "username": "johndoe",
-  "password": "securepassword123"
-}
-```
-
-#### POST /auth/login
-
-Login with existing credentials.
-
-**Request Body:**
-
-```json
-{
-  "username": "johndoe",
-  "password": "securepassword123"
-}
-```
-
-#### POST /auth/logout
-
-Logout the current user.
-
-#### GET /auth/verify
-
-Verify if the current user is authenticated.
-
-#### GET /auth/profile
-
-Get the current user's profile information.
-
-#### POST /auth/change-password
-
-Change the current user's password.
-
-#### DELETE /auth/delete-account
-
-Permanently delete the current user's account.
-
-### API Key Management
-
-#### POST /set-api-key
-
-Set the Google Gemini API key for LLM services.
-
-**Request Body:**
-
-```json
-{
-  "api_key": "your-google-gemini-api-key"
-}
-```
-
-### Settings Management
-
-#### POST /settings/create
-
-Create or update user settings including API key, data path, and schema path.
-
-**Request Body:**
-
-```json
-{
-  "api_key": "your-api-key",
-  "data_path": "/path/to/data",
-  "schema_path": "/path/to/schema.json",
-  "context": "Data domain context"
-}
-```
-
-#### GET /settings/view
-
-View current user settings.
-
-#### DELETE /settings/delete
-
-Delete all user settings.
-
-### Data Preview Endpoints
-
-#### GET /data/schema
-
-Get schema information for the configured data file.
-
-#### GET /data/preview
-
-Get a preview of the configured data file with optional sampling type.
-
-**Query Parameters:**
-
-- `sample_type`: "random", "first", or "last" (default: "random")
-
-### Schema Management Endpoints
-
-#### POST /schema/generate
-
-Generate a schema for a data file using LLM analysis.
-
-**Request Body:**
-
-```json
-{
-  "filepath": "/path/to/data/file",
-  "context": "Optional context about the data"
-}
-```
-
-#### GET /schema/load/{filepath}
-
-Load an existing schema for a data file.
-
-#### POST /schema/save
-
-Save a user-modified schema.
-
-#### GET /schema/list
-
-List all schemas for the current user.
-
-### Code Execution Endpoints
-
-#### POST /execute/
-
-Execute Python code safely with security checks.
-
-**Request Body:**
-
-```json
-{
-  "code": "print('Hello, World!')"
-}
-```
-
-#### POST /execute/analyze
-
-Analyze Python code for security violations without executing it.
-
-**Request Body:**
-
-```json
-{
-  "code": "import os; os.system('ls')"
-}
-```
-
-#### POST /execute/with-variables
-
-Execute Python code and return created variables.
-
-**Request Body:**
-
-```json
-{
-  "code": "x = 42\ny = x * 2"
-}
-```
-
-### API Documentation
-
-Access the interactive API documentation at:
-
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-
-## Frontend Integration
-
-### Vue.js Web Interface
-
-Inquira includes a modern Vue.js web interface with the following features:
-
-- **Component Architecture**: Modular components for chat, analysis tabs, and settings
-- **State Management**: Pinia store for reactive state management
-- **Real-time Updates**: WebSocket integration for live progress feedback
-- **Code Editor**: CodeMirror6 with syntax highlighting and undo/redo
-- **Data Visualization**: Interactive Plotly charts and AG Grid tables
-- **Authentication**: Secure user authentication with session management
-
-### UI Architecture
-
-```
-src/
-├── components/
-│   ├── chat/           # Chat input and history
-│   ├── analysis/       # Code, figure, table, and terminal tabs
-│   ├── layout/         # Top toolbar, left/right panels
-│   ├── modals/         # Settings, auth, confirmation dialogs
-│   └── ui/             # Reusable UI components
-├── stores/             # Pinia state management
-├── services/           # API and WebSocket services
-└── composables/        # Vue composition functions
-```
-
-### JavaScript Example
-
-```javascript
-// Send a chat message
-async function sendChatMessage(message) {
-  const response = await fetch("http://localhost:8000/chat", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      message: message,
-      system_instruction: "You are a helpful AI assistant.",
-    }),
-  });
-
-  const data = await response.json();
-  return data.response;
-}
-
-// Usage
-sendChatMessage("Hello!").then((response) => {
-  console.log("AI Response:", response);
-});
-```
-
-### React Example
-
-```jsx
-import { useState } from "react";
-
-function ChatComponent() {
-  const [message, setMessage] = useState("");
-  const [response, setResponse] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const sendMessage = async () => {
-    if (!message.trim()) return;
-
-    setLoading(true);
-    try {
-      const res = await fetch("http://localhost:8000/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: message,
-          system_instruction: "You are a helpful AI assistant.",
-        }),
-      });
-
-      const data = await res.json();
-      setResponse(data.response);
-    } catch (error) {
-      setResponse("Error: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div>
-      <input
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        placeholder="Type your message..."
-      />
-      <button onClick={sendMessage} disabled={loading}>
-        {loading ? "Sending..." : "Send"}
-      </button>
-      {response && <p>AI: {response}</p>}
-    </div>
-  );
-}
-```
-
-## Error Handling
-
-The API returns appropriate HTTP status codes:
-
-- `200`: Success
-- `422`: Validation error (invalid request format)
-- `500`: Internal server error
-- `503`: Service unavailable (LLM not configured)
 
 ## Configuration
 
 ### Environment Variables
 
-- `GOOGLE_API_KEY`: Your Google AI API key (required)
+Create a `.env` file in the backend directory:
 
-### Database Configuration
-
-Inquira automatically manages database storage in the `~/.inquira/` directory. You can customize this behavior by modifying the `DatabaseManager` configuration in `database_manager.py`:
-
-```python
-# Default base directory
-self.base_dir = Path.home() / '.inquira'
+```env
+API_HOST=0.0.0.0
+API_PORT=8000
+DEBUG=True
+UPLOAD_DIR=uploads
+LOG_DIR=logs
+MAX_FILE_SIZE=104857600
+CODE_TIMEOUT=30
 ```
 
-### Default Settings
+### Supported Models
 
-- Default model: `gemini-2.5-flash`
-- Default system instruction: `"You are a helpful AI assistant."`
-- Database directory: `~/.inquira/` (auto-created)
-- Database cleanup: Removes databases unused for 30+ days
+- gemini-pro
+- gemini-pro-vision
+- gemini-1.5-pro
+- gemini-1.5-flash
 
-## Development
+## Security Considerations
 
-### Project Structure
+- Code execution is sandboxed with limited imports
+- File uploads are validated and size-limited
+- API keys are not stored permanently
+- Local logging only (no cloud storage)
 
-```
-src/inquira/
-├── __init__.py
-├── main.py              # FastAPI application and endpoints
-├── llm_service.py       # Google Gemini LLM integration
-├── database_manager.py  # Persistent database caching system
-├── code_whisperer.py    # Secure Python code execution
-├── config_models.py     # Application configuration models
-├── schema_storage.py    # Schema management and persistence
-└── api/                 # API endpoints
-    ├── __init__.py
-    ├── auth.py          # Authentication endpoints
-    ├── chat.py          # Data analysis chat endpoints
-    ├── code_execution.py # Code execution endpoints
-    ├── data_preview.py  # Data preview and schema endpoints
-    ├── generate_schema.py # Schema generation endpoints
-    ├── settings.py      # User settings management
-    └── api_key.py       # API key management
-```
+## Troubleshooting
 
-### Database Management
+### Common Issues
 
-Inquira automatically manages a local database directory for performance optimization:
+1. **Import errors**: Make sure all dependencies are installed with `uv sync`
+2. **Port conflicts**: Change ports in configuration if 8000/5173 are in use
+3. **API key issues**: Verify your Gemini API key is valid and has quota
+4. **File upload failures**: Check file size limits and supported formats
+5. **Code execution timeouts**: Increase `CODE_TIMEOUT` for complex operations
 
-#### Database Directory Structure
+### Development Tips
 
-```
-~/.inquira/
-├── inquira.db              # SQLite database for user management
-├── sessions.json           # Session management
-├── config.json             # Application configuration
-├── user123/
-│   ├── user123_data.duckdb     # DuckDB database for all user files
-│   ├── user123_schema.json     # Schema metadata for all user files
-│   └── user123_settings.json   # User-specific settings
-├── user456/
-│   ├── user456_data.duckdb     # DuckDB database for all user files
-│   ├── user456_schema.json     # Schema metadata for all user files
-│   └── user456_settings.json   # User-specific settings
-└── schemas/                # Legacy schema storage (if any)
-```
+- Use the browser developer tools to debug frontend issues
+- Check FastAPI logs for backend errors
+- Test API endpoints directly at `http://localhost:8000/docs`
+- Monitor file uploads in the `uploads/` directory
+- Check question logs in the `logs/` directory
 
-#### Database Features
+## Contributing
 
-- **Automatic Creation**: Databases are created when you set a data file path
-- **Persistent Storage**: Databases survive application restarts
-- **Smart Updates**: Detects source file changes and recreates databases
-- **User Isolation**: Each user has their own database directory
-- **Metadata Tracking**: Stores creation time, file size, and access patterns
-
-#### Manual Database Management
-
-You can manually manage databases using the following endpoints:
-
-- `POST /data/connection/create` - Create database for a file
-- `DELETE /data/connection/{key}` - Remove cached connection
-- `GET /data/connections` - List active connections
-
-#### Schema Generation Workflow
-
-Inquira uses a sophisticated schema generation process to improve LLM code quality:
-
-1. **Data Sampling**: Extracts representative samples from your data files
-2. **LLM Analysis**: Uses Google Gemini to analyze data structure and infer column types
-3. **Context Integration**: Incorporates business domain context for better descriptions
-4. **Schema Storage**: Saves generated schemas as JSON files with metadata
-5. **User Refinement**: Allows users to modify and enhance generated schemas
-
-#### Database Management Quirks
-
-- **Table Naming**: Automatic generation from file paths (e.g., `sales_data.csv` → `sales_data`)
-- **Sanitization**: Special characters replaced with underscores, starts with letter if needed
-- **Metadata Tracking**: Stores creation time, file size, row count, and access patterns
-- **Smart Updates**: Automatically recreates database when source file is modified
-- **User Isolation**: Each user gets separate database directory (`~/.inquira/{user_id}/`)
-- **Cleanup**: Removes unused databases after 30+ days of inactivity
-
-### Progress Messages
-
-Inquira displays informative progress messages during long-running operations to keep users engaged. The system uses built-in progress messages that cycle through different status updates for each processing stage.
-
-The progress messages are organized by processing stage:
-
-- **Processing Messages**: Database creation and optimization updates
-- **Schema Messages**: Data structure analysis updates
-- **Context Messages**: Data context and domain categorization updates
-- **API Key Messages**: Authentication and API configuration updates
-- **Finalization Messages**: Setup completion and validation updates
-
-The system automatically cycles through these messages during long-running operations, keeping users engaged and informed.
-
-### Granular Step-by-Step Processing
-
-The settings API now processes data through distinct phases, each with real-time WebSocket feedback:
-
-1. **Database Conversion** - Converts CSV/Excel/Parquet files to DuckDB
-2. **Context Saving** - Saves data context and domain information
-3. **API Key Configuration** - Sets up authentication and API connections
-4. **Schema Generation** - Analyzes data structure and generates metadata
-5. **Finalization** - Secures connections and completes setup
-
-Each step shows progress updates, status messages, and completion status via WebSocket.
-
-### Running Tests
-
-```bash
-# Install test dependencies if needed
-uv add pytest
-
-# Run tests
-uv run pytest
-```
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
 ## License
 
