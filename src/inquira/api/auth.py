@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 import hashlib
 import secrets
 import uuid
+import logging
 from datetime import datetime, timedelta
 from ..database import (
     create_user, get_user_by_username, get_user_by_id,
@@ -57,6 +58,7 @@ def get_app_config(request: Request) -> AppConfig:
 def get_current_user(request: Request) -> dict:
     """Get current user from session cookie"""
     session_token = request.cookies.get("session_token")
+    print(f"Cookies received: {dict(request.cookies)}")
     if not session_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -75,6 +77,7 @@ def get_current_user(request: Request) -> dict:
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
+    print(f"👤 [Auth] Authenticated user: {user['user_id']} (username: {user['username']})")
     return user
 
 @router.post("/auth/register", response_model=UserResponse)
@@ -132,7 +135,8 @@ async def login_user(request: UserLoginRequest, response: Response, config: AppC
         httponly=True,
         max_age=86400,  # 24 hours
         samesite="lax",
-        secure=config.SECURE
+        secure=config.SECURE,
+        domain="localhost"
     )
 
     return {"message": "Login successful", "user_id": user["user_id"]}
@@ -142,7 +146,7 @@ async def logout_user(request: Request, response: Response):
     """Logout user by clearing session"""
     # For logout, we just clear the cookie since sessions are managed by the database
     # The session will naturally expire based on the timestamp
-    response.delete_cookie("session_token")
+    response.delete_cookie("session_token", domain="localhost")
     return {"message": "Logout successful"}
 
 @router.get("/auth/verify")
@@ -217,6 +221,6 @@ async def delete_account(
 
     # Clear the session cookie
     if response:
-        response.delete_cookie("session_token")
+        response.delete_cookie("session_token", domain="localhost")
 
     return {"message": "Account deleted successfully"}

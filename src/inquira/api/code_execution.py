@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Any, Optional
 
 from ..code_whisperer import CodeWhisperer
+from .auth import get_current_user
 
 router = APIRouter(prefix="/execute", tags=["Code Execution"])
 
@@ -32,12 +33,21 @@ def get_code_whisperer(app_state = Depends(get_app_state)) -> CodeWhisperer:
         # Load configuration
         config = app_state.config
         app_state.code_whisperer = CodeWhisperer(config)
+
+    # Inject database connections if available
+    if hasattr(app_state, 'db_manager') and hasattr(app_state, 'data_path'):
+        # Get the current user's database connection
+        # Note: We need to get user_id from the request context
+        # This will be handled in the endpoint where we have access to current_user
+        pass
+
     return app_state.code_whisperer
 
 @router.post("/", response_model=CodeExecutionResponse)
 async def execute_code(
     request: CodeExecutionRequest,
-    code_whisperer: CodeWhisperer = Depends(get_code_whisperer)
+    current_user: dict = Depends(get_current_user),
+    app_state = Depends(get_app_state)
 ):
     """
     Execute Python code
@@ -53,6 +63,23 @@ async def execute_code(
 
     try:
         print("DEBUG: Starting code execution")  # Debug print
+
+        # Get CodeWhisperer instance
+        code_whisperer = get_code_whisperer(app_state)
+
+        # Inject database connection if available
+        if (hasattr(app_state, 'db_manager') and
+            hasattr(app_state, 'data_path') and
+            app_state.data_path):
+            try:
+                user_id = current_user["user_id"]
+                db_connection = app_state.db_manager.get_connection(user_id, app_state.data_path)
+                # Inject the connection into CodeWhisperer as 'conn'
+                code_whisperer.set_cached_connection("conn", db_connection)
+                print(f"DEBUG: Injected database connection as 'conn' for user {user_id}")
+            except Exception as e:
+                print(f"DEBUG: Could not inject database connection: {e}")
+
         # Execute the code
         result, error = code_whisperer.execute_with_timeout(request.code)
         print(f"DEBUG: Execution result - Result: {result}, Error: {error}")  # Debug print
@@ -80,7 +107,8 @@ async def execute_code(
 @router.post("/with-variables", response_model=CodeExecutionWithVariablesResponse)
 async def execute_code_with_variables(
     request: CodeExecutionRequest,
-    code_whisperer: CodeWhisperer = Depends(get_code_whisperer)
+    current_user: dict = Depends(get_current_user),
+    app_state = Depends(get_app_state)
 ):
     """
     Execute Python code and return created variables
@@ -94,6 +122,22 @@ async def execute_code_with_variables(
     start_time = time.time()
 
     try:
+        # Get CodeWhisperer instance
+        code_whisperer = get_code_whisperer(app_state)
+
+        # Inject database connection if available
+        if (hasattr(app_state, 'db_manager') and
+            hasattr(app_state, 'data_path') and
+            app_state.data_path):
+            try:
+                user_id = current_user["user_id"]
+                db_connection = app_state.db_manager.get_connection(user_id, app_state.data_path)
+                # Inject the connection into CodeWhisperer as 'conn'
+                code_whisperer.set_cached_connection("conn", db_connection)
+                print(f"DEBUG: Injected database connection as 'conn' for user {user_id}")
+            except Exception as e:
+                print(f"DEBUG: Could not inject database connection: {e}")
+
         # Execute the code and extract variables
         result, variables, error = code_whisperer.execute_with_variables(request.code)
 

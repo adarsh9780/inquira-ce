@@ -33,10 +33,21 @@ class LLMService:
             self.api_key = os.getenv("GOOGLE_API_KEY", "")
 
         self.model = model
-        self.client = genai.Client()
+
+        # Only initialize client if API key is available
+        if self.api_key:
+            self.client = genai.Client(api_key=self.api_key)
+        else:
+            self.client = None
+
         self.chat_client = None
 
     def create_chat_client(self, system_instruction: str = "", model: str = ""):
+        if not self.client:
+            raise HTTPException(
+                status_code=503, detail="LLM service not available. API key not set."
+            )
+
         if model:
             model = model
         else:
@@ -55,6 +66,11 @@ class LLMService:
         return self.chat_client
 
     def ask(self, user_query: str, structured_output_format):
+        if not self.client:
+            raise HTTPException(
+                status_code=503, detail="LLM service not available. API key not set."
+            )
+
         try:
             response = self.client.models.generate_content(
                 model=self.model,

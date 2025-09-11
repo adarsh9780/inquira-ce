@@ -5,6 +5,7 @@ import json
 from .settings import load_user_settings_to_app_state
 from .auth import get_current_user
 from pathlib import Path
+from ..prompt_library import get_prompt
 
 router = APIRouter(tags=["Chat"])
 
@@ -93,64 +94,30 @@ async def chat_endpoint(
         # Build context from user settings stored in app_state
         schema = load_schema(app_state.schema_path)
 
-        # Create system instruction for data analysis
-        system_instruction = """
-        You are an expert data analysis assistant. When given a question you should:
+        # Get table name from app state
+        table_name = getattr(app_state, 'table_name', 'your_table_name')
 
-        1. Determine if the question is safe to answer (is_safe)
-        2. Determine if the question is relevant to data analysis (is_relevant)
-        3. Generate appropriate Python code to answer the question (code)
-        4. Provide a clear explanation in markdown format (explanation)
-
-        The code should be generated based on the following schema:
-        {schema}
-
-        Occasionally, you might also see an existing code which will help you to understand what the user was trying.
-        If there is code, build on top of it, making sure that the new code is self sufficient, meaning it should be able to produce
-        the user ask without user needing to run the old code.
-        {code}
-
-        Prefer to read only as much as data as required to do the analysis (avoid loading whole data into memory, no matter what).
-        Use DuckDB to achieve this. The data is stored in the following location:
-        {data_path}
-        Once the required data is loaded by duckdb, feel free to use Pandas to achieve the final result. Basically, use DuckDB to load initial
-        data into the memory and use pandas to analyse the code. this is because, the user file could be very large and reading the whole data
-        into memory using pandas might take a long time or might not work at all.
-
-        # Steps
-        1. First based on the user ask, analyse how much data you need to load into memory
-        2. use duckdb and write a SQL query to load the data. if the ask is simple you can use duckdb completely to achieve the task
-        3. if the ask is not straight forward, make sure first to load the data into memory and then use pandas to do the further transformation
-        4. Use ".query" to filter rows in pandas, if required
-        5. Use ".assign" to create new column in pandas, if required
-        6. Use chained operation as much as possible in pandas
-        7. make sure all outputs are either: pandas dataframe, plotly figure or scalars and nothing else.
-
-
-        Return your response as a JSON object with these exact keys:
-        - is_safe: boolean
-        - is_relevant: boolean
-        - code: string (Python code)
-        - explanation: string (markdown formatted explanation) - step by step markdown format explanantion of what code is doing to acheive the task
-        """
+        # Create system instruction for business analysis
+        system_instruction = get_prompt(
+            "business_analysis_system",
+            table_name=table_name,
+            schema=schema,
+            data_path=app_state.data_path,
+            current_code=request.current_code
+        )
 
         # Create chat client with data analysis instruction
         app_state.llm_service.create_chat_client(
-            system_instruction=system_instruction.format(schema=schema, data_path=app_state.data_path, code=request.current_code),
+            system_instruction=system_instruction,
             model=request.model
         )
 
         # Format the user question
-        user_question = f"""
-        Please analyze this question and provide a structured response:
-
-        Question: {request.question}
-
-        Remember to return only a valid JSON object with is_safe, is_relevant, code, and explanation keys.
-
-        # Special Instruction
-        - use regular expression `regexp_matches` in duckdb to filter out rows based on string type columns
-        """
+        user_question = get_prompt(
+            "business_analysis_user",
+            question=request.question,
+            table_name=table_name
+        )
 
         # Get response from LLM
         response = app_state.llm_service.chat(user_question)

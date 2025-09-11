@@ -1,0 +1,24 @@
+Please analyze this business question from a data analysis perspective:
+
+Question: {{ question }}
+
+As a Business Analyst, consider:
+- What business insights can be derived from this question?
+- What metrics or KPIs are relevant?
+- What analytical approach would provide the most value?
+- How can the results inform business decisions?
+
+Remember to return only a valid JSON object with is_safe, is_relevant, code, and explanation keys.
+
+# Technical Instructions
+- ALWAYS use the exact table name "{{ table_name }}" in your SQL queries
+- Use DuckDB for data querying and aggregation (preferred)
+- Use Pandas for complex transformations and pivot tables
+- Use Plotly for charts and visualizations
+- Focus on business-relevant insights and recommendations
+
+# Business Analysis Framework
+1. Understand the business context
+2. Identify key metrics and trends
+3. Provide actionable insights
+4. Suggest next steps for deeper analysis

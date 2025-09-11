@@ -1,4 +1,5 @@
 from typing import Any, Dict, Optional, Tuple
+import hashlib
 
 from .config_models import AppConfig
 
@@ -19,7 +20,37 @@ class CodeWhisperer:
         self._global_vars = {
             '__builtins__': __builtins__
         }
+        self._cached_connections: Dict[str, Any] = {}  # Store cached DuckDB connections
+        self._last_code_hash: Optional[str] = None  # Track hash of last executed code
 
+    def set_cached_connection(self, key: str, connection: Any):
+        """Set a cached DuckDB connection"""
+        self._cached_connections[key] = connection
+
+    def remove_cached_connection(self, key: str):
+        """Remove a cached connection"""
+        if key in self._cached_connections:
+            del self._cached_connections[key]
+
+    def get_cached_connection(self, key: str) -> Any:
+        """Get a cached connection"""
+        return self._cached_connections.get(key)
+
+    def check_code_change_and_reset(self, code: str) -> bool:
+        """
+        Check if code has changed since last execution.
+        If changed, reset the environment and return True.
+        """
+        code_hash = hashlib.md5(code.encode()).hexdigest()
+        if self._last_code_hash is not None and self._last_code_hash != code_hash:
+            # Code has changed, reset environment
+            self.reset_environment()
+            self._last_code_hash = code_hash
+            return True
+        else:
+            # Code is same or first execution
+            self._last_code_hash = code_hash
+            return False
 
     def execute_code(self, code: str) -> Tuple[Any, Optional[str]]:
         """
@@ -29,13 +60,29 @@ class CodeWhisperer:
             Tuple of (result: Any, error_message: Optional[str])
         """
         try:
+            # Check if code has changed and reset if needed
+            code_changed = self.check_code_change_and_reset(code)
+
+            # Prepare execution environment with cached connections
+            exec_globals = self._global_vars.copy()
+            exec_locals = self._local_vars.copy()
+
+            # Inject cached connections into globals
+            for key, conn in self._cached_connections.items():
+                if key == "conn":
+                    # Inject main database connection as 'conn'
+                    exec_globals["conn"] = conn
+                else:
+                    # Keep the old naming for backward compatibility
+                    exec_globals[f"cached_conn_{key.replace(':', '_').replace('/', '_')}"] = conn
+
             # Execute the code using exec with restricted environment
-            exec(code, self._global_vars, self._local_vars)
+            exec(code, exec_globals, exec_locals)
 
             # Try to get the last expression result if it's an expression
             try:
                 # If the code is a simple expression, evaluate it to get the result
-                result = eval(code, self._global_vars, self._local_vars)
+                result = eval(code, exec_globals, exec_locals)
                 return result, None
             except:
                 # If it's not a simple expression, return success message
@@ -66,9 +113,21 @@ class CodeWhisperer:
             Tuple of (result: Any, variables: Dict[str, Any], error_message: Optional[str])
         """
         try:
+            # Check if code has changed and reset if needed
+            code_changed = self.check_code_change_and_reset(code)
+
             # Create fresh local and global environments for this execution
             exec_globals = self._global_vars.copy()
             exec_locals = self._local_vars.copy()
+
+            # Inject cached connections into globals
+            for key, conn in self._cached_connections.items():
+                if key == "conn":
+                    # Inject main database connection as 'conn'
+                    exec_globals["conn"] = conn
+                else:
+                    # Keep the old naming for backward compatibility
+                    exec_globals[f"cached_conn_{key.replace(':', '_').replace('/', '_')}"] = conn
 
             # Execute the code
             exec(code, exec_globals, exec_locals)
@@ -186,4 +245,5 @@ class CodeWhisperer:
     def reset_environment(self):
         """Reset the execution environment"""
         self._local_vars.clear()
+        self._last_code_hash = None  # Reset code hash tracking
         # Keep the restricted builtins

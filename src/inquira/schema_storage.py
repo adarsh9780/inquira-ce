@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-# Schema folder path
-SCHEMA_DIR = Path.home() / ".inquira" / "schemas"
+# Schema folder path - now using user-specific directories
+BASE_DIR = Path.home() / ".inquira"
 
 class SchemaColumn:
     def __init__(self, name: str, description: str, data_type: str = "", sample_values: Optional[List[Any]] = None):
@@ -58,23 +58,20 @@ class SchemaFile:
             updated_at=data.get("updated_at") or None
         )
 
-def get_schema_filename(filepath: str) -> str:
-    """Generate a filename for the schema based on the data file path"""
-    # Create a safe filename from the filepath
-    import hashlib
-    file_hash = hashlib.md5(filepath.encode()).hexdigest()[:8]
-    return f"schema_{file_hash}.json"
+def get_schema_filename(user_id: str) -> str:
+    """Generate a filename for the schema based on user ID"""
+    return f"{user_id}_schema.json"
 
 def get_user_schema_dir(user_id: str) -> Path:
     """Get the schema directory for a specific user"""
-    user_dir = SCHEMA_DIR / user_id
+    user_dir = BASE_DIR / user_id
     user_dir.mkdir(parents=True, exist_ok=True)
     return user_dir
 
 def save_schema(user_id: str, schema: SchemaFile) -> str:
     """Save a schema to a JSON file"""
     schema_dir = get_user_schema_dir(user_id)
-    filename = get_schema_filename(schema.filepath)
+    filename = get_schema_filename(user_id)
     filepath = schema_dir / filename
 
     # Update the updated_at timestamp
@@ -88,7 +85,7 @@ def save_schema(user_id: str, schema: SchemaFile) -> str:
 def load_schema(user_id: str, data_filepath: str) -> Optional[SchemaFile]:
     """Load a schema from a JSON file"""
     schema_dir = get_user_schema_dir(user_id)
-    filename = get_schema_filename(data_filepath)
+    filename = get_schema_filename(user_id)
     filepath = schema_dir / filename
 
     if not filepath.exists():
@@ -128,7 +125,7 @@ def list_user_schemas(user_id: str) -> List[Dict[str, Any]]:
 def delete_schema(user_id: str, data_filepath: str) -> bool:
     """Delete a schema file"""
     schema_dir = get_user_schema_dir(user_id)
-    filename = get_schema_filename(data_filepath)
+    filename = get_schema_filename(user_id)
     filepath = schema_dir / filename
 
     if filepath.exists():

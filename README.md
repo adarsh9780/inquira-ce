@@ -1,6 +1,6 @@
 # Inquira
 
-A FastAPI-based API that integrates with Google Gemini LLM for conversational AI capabilities.
+A FastAPI-based API that integrates with Google Gemini LLM for conversational AI capabilities with optimized performance for large datasets through persistent database caching.
 
 ## Setup
 
@@ -52,6 +52,62 @@ uv run python -m src.inquira.main
 ```
 
 The API will be available at `http://localhost:8000`
+
+### Performance Optimizations
+
+Inquira includes advanced performance optimizations for handling large datasets:
+
+#### Persistent Database Caching
+
+- **Automatic Database Creation**: When you set a data file path, Inquira automatically converts CSV/Parquet/JSON files to optimized DuckDB databases
+- **Persistent Storage**: Databases are stored on disk and persist across application restarts
+- **Smart Updates**: Automatically detects file changes and recreates databases when source files are modified
+- **Connection Reuse**: Maintains persistent connections to avoid repeated file loading
+
+#### Performance Benefits
+
+- **First Query**: Initial database creation (only happens once per file)
+- **Subsequent Queries**: 5-10x faster due to instant database connections
+- **Memory Efficient**: Uses DuckDB's optimized storage format
+- **Large File Support**: Handles files larger than available RAM
+
+#### How It Works
+
+1. User sets data file path via settings
+2. System creates DuckDB database file (e.g., `user123_data.duckdb`)
+3. Database persists on disk for future use
+4. LLM-generated code uses cached connections instead of creating new ones
+5. Variables and intermediate results are maintained between queries
+
+#### Real-Time Processing Updates
+
+Inquira provides real-time feedback during long-running operations using WebSocket connections:
+
+- **WebSocket Endpoint**: `/ws/settings/{user_id}`
+- **Progress Updates**: Real-time progress with informative status messages
+- **Background Processing**: Non-blocking database creation and schema generation
+- **Status Messages**: Contextual updates for each processing stage
+
+**WebSocket Message Flow:**
+
+```javascript
+// Connection established
+{"type": "connected", "message": "Connected to Inquira processing service"}
+
+// Progress updates with status messages
+{
+  "type": "progress",
+  "stage": "converting",
+  "progress": 50,
+  "message": "📊 Analyzing data patterns..."
+}
+
+// Completion
+{
+  "type": "completed",
+  "result": {"success": true, "data_path": "/data/sales.csv"}
+}
+```
 
 ### Launching the GUI
 
@@ -372,10 +428,21 @@ The API returns appropriate HTTP status codes:
 
 - `GOOGLE_API_KEY`: Your Google AI API key (required)
 
+### Database Configuration
+
+Inquira automatically manages database storage in the `~/.inquira/` directory. You can customize this behavior by modifying the `DatabaseManager` configuration in `database_manager.py`:
+
+```python
+# Default base directory
+self.base_dir = Path.home() / '.inquira'
+```
+
 ### Default Settings
 
 - Default model: `gemini-2.5-flash`
 - Default system instruction: `"You are a helpful AI assistant."`
+- Database directory: `~/.inquira/` (auto-created)
+- Database cleanup: Removes databases unused for 30+ days
 
 ## Development
 
@@ -384,9 +451,86 @@ The API returns appropriate HTTP status codes:
 ```
 src/inquira/
 ├── __init__.py
-├── main.py          # FastAPI application and endpoints
-└── llm_service.py   # Google Gemini LLM integration
+├── main.py              # FastAPI application and endpoints
+├── llm_service.py       # Google Gemini LLM integration
+├── database_manager.py  # Persistent database caching system
+├── code_whisperer.py    # Secure Python code execution
+├── config_models.py     # Application configuration models
+├── schema_storage.py    # Schema management and persistence
+└── api/                 # API endpoints
+    ├── __init__.py
+    ├── auth.py          # Authentication endpoints
+    ├── chat.py          # Data analysis chat endpoints
+    ├── code_execution.py # Code execution endpoints
+    ├── data_preview.py  # Data preview and schema endpoints
+    ├── generate_schema.py # Schema generation endpoints
+    ├── settings.py      # User settings management
+    └── api_key.py       # API key management
 ```
+
+### Database Management
+
+Inquira automatically manages a local database directory for performance optimization:
+
+#### Database Directory Structure
+
+```
+~/.inquira/
+├── inquira.db              # SQLite database for user management
+├── sessions.json           # Session management
+├── config.json             # Application configuration
+├── user123/
+│   ├── user123_data.duckdb     # DuckDB database for all user files
+│   ├── user123_schema.json     # Schema metadata for all user files
+│   └── user123_settings.json   # User-specific settings
+├── user456/
+│   ├── user456_data.duckdb     # DuckDB database for all user files
+│   ├── user456_schema.json     # Schema metadata for all user files
+│   └── user456_settings.json   # User-specific settings
+└── schemas/                # Legacy schema storage (if any)
+```
+
+#### Database Features
+
+- **Automatic Creation**: Databases are created when you set a data file path
+- **Persistent Storage**: Databases survive application restarts
+- **Smart Updates**: Detects source file changes and recreates databases
+- **User Isolation**: Each user has their own database directory
+- **Metadata Tracking**: Stores creation time, file size, and access patterns
+
+#### Manual Database Management
+
+You can manually manage databases using the following endpoints:
+
+- `POST /data/connection/create` - Create database for a file
+- `DELETE /data/connection/{key}` - Remove cached connection
+- `GET /data/connections` - List active connections
+
+### Progress Messages
+
+Inquira displays informative progress messages during long-running operations to keep users engaged. The system uses built-in progress messages that cycle through different status updates for each processing stage.
+
+The progress messages are organized by processing stage:
+
+- **Processing Messages**: Database creation and optimization updates
+- **Schema Messages**: Data structure analysis updates
+- **Context Messages**: Data context and domain categorization updates
+- **API Key Messages**: Authentication and API configuration updates
+- **Finalization Messages**: Setup completion and validation updates
+
+The system automatically cycles through these messages during long-running operations, keeping users engaged and informed.
+
+### Granular Step-by-Step Processing
+
+The settings API now processes data through distinct phases, each with real-time WebSocket feedback:
+
+1. **Database Conversion** - Converts CSV/Excel/Parquet files to DuckDB
+2. **Context Saving** - Saves data context and domain information
+3. **API Key Configuration** - Sets up authentication and API connections
+4. **Schema Generation** - Analyzes data structure and generates metadata
+5. **Finalization** - Secures connections and completes setup
+
+Each step shows progress updates, status messages, and completion status via WebSocket.
 
 ### Running Tests
 

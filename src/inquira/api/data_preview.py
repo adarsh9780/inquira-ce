@@ -1,12 +1,116 @@
 import duckdb
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Dict, Any
+from fastapi import APIRouter, HTTPException, Depends, Request
+from typing import List, Dict, Any, Optional
 import os
+import pickle
+from pathlib import Path
+from enum import Enum
+from datetime import datetime
 from .auth import get_current_user
 from ..database import get_user_settings
+from ..schema_storage import load_schema, get_user_schema_dir
+
+class SampleType(str, Enum):
+    random = "random"
+    first = "first"
 
 router = APIRouter(tags=["Data Preview"])
+
+def get_app_state(request: Request):
+    """Dependency to get app state"""
+    return request.app.state
+
+def get_preview_cache_file_path(user_id: str, sample_type: str) -> Path:
+    """Get the file path for a user's preview cache file"""
+    user_dir = get_user_schema_dir(user_id)
+    filename = f"{user_id}_preview_{sample_type}.pkl"
+    return user_dir / filename
+
+def get_cached_preview(app_state, user_id: str, sample_type: str, data_path: str) -> Optional[Dict[str, Any]]:
+    """Get cached preview data from pickle file if available"""
+    try:
+        cache_file = get_preview_cache_file_path(user_id, sample_type)
+
+        if not cache_file.exists():
+            return None
+
+        # Check if cache is still valid (file hasn't been modified since cache was created)
+        if os.path.exists(data_path):
+            data_mtime = os.path.getmtime(data_path)
+            cache_mtime = os.path.getmtime(cache_file)
+
+            # If data file is newer than cache, invalidate cache
+            if data_mtime > cache_mtime:
+                print(f"⚠️ [Data Preview] Cache invalidated - data file modified since cache creation")
+                cache_file.unlink()  # Delete invalid cache
+                return None
+
+        with open(cache_file, 'rb') as f:
+            cached_data = pickle.load(f)
+
+        # Verify the cached data is for the correct file path
+        if cached_data.get('file_path') != data_path:
+            print(f"⚠️ [Data Preview] Cache file path mismatch, invalidating cache")
+            cache_file.unlink()
+            return None
+
+        print(f"✅ [Data Preview] Loaded cached preview from: {cache_file}")
+        return cached_data
+
+    except Exception as e:
+        print(f"⚠️ [Data Preview] Error loading cache file: {str(e)}")
+        # Try to clean up corrupted cache file
+        try:
+            cache_file = get_preview_cache_file_path(user_id, sample_type)
+            if cache_file.exists():
+                cache_file.unlink()
+        except:
+            pass
+        return None
+
+def set_cached_preview(app_state, user_id: str, sample_type: str, data_path: str, preview_data: Dict[str, Any]):
+    """Cache preview data to pickle file"""
+    try:
+        cache_file = get_preview_cache_file_path(user_id, sample_type)
+
+        # Ensure the user directory exists
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Add metadata to the cached data
+        cache_data = preview_data.copy()
+        cache_data['_cache_metadata'] = {
+            'created_at': datetime.now().isoformat(),
+            'data_path': data_path,
+            'sample_type': sample_type,
+            'user_id': user_id
+        }
+
+        with open(cache_file, 'wb') as f:
+            pickle.dump(cache_data, f)
+
+        print(f"✅ [Data Preview] Saved cache to: {cache_file}")
+
+    except Exception as e:
+        print(f"❌ [Data Preview] Error saving cache file: {str(e)}")
+
+def clear_user_preview_cache(app_state, user_id: str):
+    """Clear all cached preview data for a user by deleting pickle files"""
+    try:
+        user_dir = get_user_schema_dir(user_id)
+        deleted_count = 0
+
+        # Delete all preview cache files for this user
+        for sample_type in ['random', 'first']:
+            cache_file = get_preview_cache_file_path(user_id, sample_type)
+            if cache_file.exists():
+                cache_file.unlink()
+                deleted_count += 1
+
+        print(f"🗑️ [Data Preview] Cleared {deleted_count} cached files for user: {user_id}")
+
+    except Exception as e:
+        print(f"❌ [Data Preview] Error clearing cache files: {str(e)}")
 
 def get_file_type(file_path: str) -> str:
     """Determine file type based on extension"""
@@ -25,6 +129,7 @@ def get_file_type(file_path: str) -> str:
 def read_file_with_duckdb(file_path: str, sample_size: int = 100) -> List[Dict[str, Any]]:
     """
     Read a sample of data from various file formats using DuckDB
+    Optimized to avoid loading entire files into memory
     """
     try:
         file_type = get_file_type(file_path)
@@ -36,32 +141,38 @@ def read_file_with_duckdb(file_path: str, sample_size: int = 100) -> List[Dict[s
                 detail=f"Data file not found: {file_path}"
             )
 
-        # Connect to DuckDB
+        # Connect to DuckDB with memory optimizations
         con = duckdb.connect(database=':memory:')
+        con.execute("SET memory_limit='1GB'")
+        con.execute("SET threads=1")
 
         try:
-            # Create table from file based on type
+            # Build optimized query based on file type
             if file_type == 'csv':
-                # Read CSV with auto-detection
-                con.execute(f"CREATE TABLE temp_table AS SELECT * FROM read_csv_auto('{file_path}')")
-            elif file_type == 'excel':
-                # For Excel, we'll use pandas first then import to DuckDB
-                df = pd.read_excel(file_path)
-                con.register('temp_df', df)
-                con.execute("CREATE TABLE temp_table AS SELECT * FROM temp_df")
+                query = f"SELECT * FROM read_csv_auto('{file_path}') USING SAMPLE {sample_size} ROWS"
+                describe_query = f"DESCRIBE (SELECT * FROM read_csv_auto('{file_path}') LIMIT 10)"
             elif file_type == 'parquet':
-                con.execute(f"CREATE TABLE temp_table AS SELECT * FROM read_parquet('{file_path}')")
+                query = f"SELECT * FROM read_parquet('{file_path}') USING SAMPLE {sample_size} ROWS"
+                describe_query = f"DESCRIBE (SELECT * FROM read_parquet('{file_path}') LIMIT 10)"
             elif file_type == 'json':
-                con.execute(f"CREATE TABLE temp_table AS SELECT * FROM read_json_auto('{file_path}')")
+                query = f"SELECT * FROM read_json_auto('{file_path}') USING SAMPLE {sample_size} ROWS"
+                describe_query = f"DESCRIBE (SELECT * FROM read_json_auto('{file_path}') LIMIT 10)"
+            elif file_type == 'excel':
+                # For Excel, use pandas but limit rows
+                df_sample = pd.read_excel(file_path, nrows=min(1000, sample_size * 10))
+                con.register('temp_df', df_sample)
+                query = f"SELECT * FROM temp_df USING SAMPLE {sample_size} ROWS"
+                describe_query = "DESCRIBE temp_df"
             else:
-                # Try CSV as fallback
-                con.execute(f"CREATE TABLE temp_table AS SELECT * FROM read_csv_auto('{file_path}')")
+                # Fallback to CSV
+                query = f"SELECT * FROM read_csv_auto('{file_path}') USING SAMPLE {sample_size} ROWS"
+                describe_query = f"DESCRIBE (SELECT * FROM read_csv_auto('{file_path}') LIMIT 10)"
 
-            # Get sample data using DuckDB SAMPLE
-            result = con.execute(f"SELECT * FROM temp_table USING SAMPLE {sample_size} ROWS").fetchall()
+            # Get sample data
+            result = con.execute(query).fetchall()
 
             # Get column names
-            column_names = [desc[0] for desc in con.execute("DESCRIBE temp_table").fetchall()]
+            column_names = [desc[0] for desc in con.execute(describe_query).fetchall()]
 
             # Convert to list of dictionaries
             data = []
@@ -109,12 +220,16 @@ def read_file_with_duckdb(file_path: str, sample_size: int = 100) -> List[Dict[s
             detail=f"Unexpected error reading file: {str(e)}"
         )
 
+
+
+
 @router.get("/data/schema")
 async def get_data_schema(
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
     Get schema information for the user's data file
+    First checks for existing saved schema, falls back to generating new one if needed
     """
     try:
         # Get user's settings
@@ -128,14 +243,40 @@ async def get_data_schema(
                 detail="No data file path configured. Please set your data path in settings."
             )
 
-        # Get schema information
+        # First, try to load existing schema
+        existing_schema = load_schema(user_id, data_path)
+        if existing_schema:
+            print(f"✅ [Data Preview] Using existing schema for: {data_path}")
+            schema_info = [
+                {
+                    "name": col.name,
+                    "type": col.data_type,
+                    "description": col.description,
+                    "nullable": True,
+                    "sample_value": str(col.sample_values[0]) if col.sample_values else None
+                }
+                for col in existing_schema.columns
+            ]
+
+            return {
+                "success": True,
+                "schema": schema_info,
+                "file_path": data_path,
+                "context": existing_schema.context,
+                "created_at": existing_schema.created_at,
+                "updated_at": existing_schema.updated_at,
+                "message": f"Successfully loaded existing schema for {len(schema_info)} columns"
+            }
+
+        # If no existing schema, get basic schema information from file
+        print(f"⚠️ [Data Preview] No existing schema found, getting basic schema for: {data_path}")
         schema_info = get_file_schema(data_path)
 
         return {
             "success": True,
             "schema": schema_info,
             "file_path": data_path,
-            "message": f"Successfully retrieved schema for {len(schema_info)} columns"
+            "message": f"Successfully retrieved basic schema for {len(schema_info)} columns (no saved schema found)"
         }
 
     except HTTPException:
@@ -148,14 +289,14 @@ async def get_data_schema(
 
 @router.get("/data/preview")
 async def get_data_preview(
-    sample_type: str = "random",
-    current_user: dict = Depends(get_current_user)
+    sample_type: SampleType = SampleType.random,
+    current_user: dict = Depends(get_current_user),
+    app_state = Depends(get_app_state)
 ) -> Dict[str, Any]:
     """
     Get a preview of the user's data file with different sampling options
 
-    Args:
-        sample_type: Type of sampling - "random", "first", or "last"
+    Returns cached data if available, otherwise generates new preview.
     """
     try:
         # Get user's settings
@@ -169,23 +310,50 @@ async def get_data_preview(
                 detail="No data file path configured. Please set your data path in settings."
             )
 
-        # Read sample data based on type
-        sample_data = read_file_with_duckdb_sample(data_path, sample_type, 100)
+        # Check cache first
+        cached_data = get_cached_preview(app_state, user_id, sample_type.value, data_path)
+        if cached_data:
+            print(f"✅ [Data Preview] Returning cached preview for: {user_id}:{data_path}:{sample_type.value}")
+            # Send cache hit message to WebSocket if connected
+            try:
+                from ..websocket_manager import websocket_manager
+                websocket_user_id = user_id if websocket_manager.is_connected(user_id) else ("current_user" if websocket_manager.is_connected("current_user") else None)
+                if websocket_user_id:
+                    import asyncio
+                    # Send message asynchronously without blocking
+                    asyncio.create_task(
+                        websocket_manager.send_to_user(websocket_user_id, {
+                            "type": "cache_hit",
+                            "sample_type": sample_type.value,
+                            "data_path": data_path,
+                            "row_count": cached_data.get("row_count", 0),
+                            "message": f"⚡ Using cached preview data for {sample_type.value} ({cached_data.get('row_count', 0)} rows)",
+                            "timestamp": datetime.now().isoformat()
+                        })
+                    )
+            except Exception as e:
+                print(f"⚠️ [Data Preview] Could not send cache hit message: {str(e)}")
 
-        sample_type_text = {
-            "random": "random",
-            "first": "first",
-            "last": "last"
-        }.get(sample_type, "random")
+            return cached_data
 
-        return {
+        # Generate new preview data
+        print(f"⚠️ [Data Preview] No cached preview found, generating new for: {user_id}:{data_path}:{sample_type.value}")
+        sample_data = read_file_with_duckdb_sample(data_path, sample_type.value, 100)
+
+        # Prepare response
+        response_data = {
             "success": True,
             "data": sample_data,
             "row_count": len(sample_data),
             "file_path": data_path,
-            "sample_type": sample_type,
-            "message": f"Successfully loaded {len(sample_data)} {sample_type_text} sample rows"
+            "sample_type": sample_type.value,
+            "message": f"Successfully loaded {len(sample_data)} {sample_type.value} sample rows"
         }
+
+        # Cache the response
+        set_cached_preview(app_state, user_id, sample_type.value, data_path, response_data)
+
+        return response_data
 
     except HTTPException:
         raise
@@ -195,9 +363,121 @@ async def get_data_preview(
             detail=f"Error retrieving data preview: {str(e)}"
         )
 
+@router.post("/data/preview/refresh")
+async def refresh_data_preview(
+    sample_type: SampleType = SampleType.random,
+    current_user: dict = Depends(get_current_user),
+    app_state = Depends(get_app_state)
+) -> Dict[str, Any]:
+    """
+    Refresh the cached preview data for the user's data file
+
+    Forces regeneration of preview data and updates the cache.
+    """
+    try:
+        # Get user's settings
+        user_id = current_user["user_id"]
+        user_settings = get_user_settings(user_id)
+        data_path = user_settings.get("data_path")
+
+        if not data_path:
+            raise HTTPException(
+                status_code=400,
+                detail="No data file path configured. Please set your data path in settings."
+            )
+
+        # Send refresh start message to WebSocket if connected
+        try:
+            from ..websocket_manager import websocket_manager
+            websocket_user_id = user_id if websocket_manager.is_connected(user_id) else ("current_user" if websocket_manager.is_connected("current_user") else None)
+            if websocket_user_id:
+                import asyncio
+                asyncio.create_task(
+                    websocket_manager.send_to_user(websocket_user_id, {
+                        "type": "cache_refresh",
+                        "sample_type": sample_type.value,
+                        "data_path": data_path,
+                        "message": f"🔄 Refreshing cached preview data for {sample_type.value}...",
+                        "timestamp": datetime.now().isoformat()
+                    })
+                )
+        except Exception as e:
+            print(f"⚠️ [Data Preview] Could not send refresh start message: {str(e)}")
+
+        # Generate fresh preview data
+        print(f"🔄 [Data Preview] Refreshing preview for: {user_id}:{data_path}:{sample_type.value}")
+        sample_data = read_file_with_duckdb_sample(data_path, sample_type.value, 100)
+
+        # Prepare response
+        response_data = {
+            "success": True,
+            "data": sample_data,
+            "row_count": len(sample_data),
+            "file_path": data_path,
+            "sample_type": sample_type.value,
+            "message": f"Successfully refreshed {len(sample_data)} {sample_type.value} sample rows"
+        }
+
+        # Update cache with fresh data
+        set_cached_preview(app_state, user_id, sample_type.value, data_path, response_data)
+
+        # Send refresh completion message to WebSocket if connected
+        try:
+            from ..websocket_manager import websocket_manager
+            websocket_user_id = user_id if websocket_manager.is_connected(user_id) else ("current_user" if websocket_manager.is_connected("current_user") else None)
+            if websocket_user_id:
+                import asyncio
+                asyncio.create_task(
+                    websocket_manager.send_to_user(websocket_user_id, {
+                        "type": "cache_refresh",
+                        "sample_type": sample_type.value,
+                        "data_path": data_path,
+                        "status": "completed",
+                        "row_count": len(sample_data),
+                        "message": f"✅ Successfully refreshed cache for {sample_type.value} ({len(sample_data)} rows)",
+                        "timestamp": datetime.now().isoformat()
+                    })
+                )
+        except Exception as e:
+            print(f"⚠️ [Data Preview] Could not send refresh completion message: {str(e)}")
+
+        return response_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error refreshing data preview: {str(e)}"
+        )
+
+@router.delete("/data/preview/cache")
+async def clear_preview_cache(
+    current_user: dict = Depends(get_current_user),
+    app_state = Depends(get_app_state)
+) -> Dict[str, Any]:
+    """
+    Clear all cached preview data for the current user
+    """
+    try:
+        user_id = current_user["user_id"]
+        clear_user_preview_cache(app_state, user_id)
+
+        return {
+            "success": True,
+            "message": f"Successfully cleared preview cache for user: {user_id}"
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error clearing preview cache: {str(e)}"
+        )
+
 def get_file_schema(file_path: str) -> List[Dict[str, Any]]:
     """
     Get schema information (column names and types) from a file
+    Optimized to avoid loading entire files into memory
     """
     try:
         file_type = get_file_type(file_path)
@@ -209,39 +489,51 @@ def get_file_schema(file_path: str) -> List[Dict[str, Any]]:
                 detail=f"Data file not found: {file_path}"
             )
 
-        # Connect to DuckDB
+        # Connect to DuckDB with memory optimizations
         con = duckdb.connect(database=':memory:')
+        con.execute("SET memory_limit='512MB'")  # Smaller limit for schema
+        con.execute("SET threads=1")
 
         try:
-            # Create table from file based on type
+            # Build schema query based on file type
             if file_type == 'csv':
-                con.execute(f"CREATE TABLE temp_table AS SELECT * FROM read_csv_auto('{file_path}')")
-            elif file_type == 'excel':
-                df = pd.read_excel(file_path)
-                con.register('temp_df', df)
-                con.execute("CREATE TABLE temp_table AS SELECT * FROM temp_df")
+                # Sample just a few rows to get schema
+                schema_query = f"DESCRIBE (SELECT * FROM read_csv_auto('{file_path}') LIMIT 10)"
+                sample_query = f"SELECT * FROM read_csv_auto('{file_path}') LIMIT 5"
             elif file_type == 'parquet':
-                con.execute(f"CREATE TABLE temp_table AS SELECT * FROM read_parquet('{file_path}')")
+                schema_query = f"DESCRIBE (SELECT * FROM read_parquet('{file_path}') LIMIT 10)"
+                sample_query = f"SELECT * FROM read_parquet('{file_path}') LIMIT 5"
             elif file_type == 'json':
-                con.execute(f"CREATE TABLE temp_table AS SELECT * FROM read_json_auto('{file_path}')")
+                schema_query = f"DESCRIBE (SELECT * FROM read_json_auto('{file_path}') LIMIT 10)"
+                sample_query = f"SELECT * FROM read_json_auto('{file_path}') LIMIT 5"
+            elif file_type == 'excel':
+                # For Excel, use pandas but limit rows
+                df_sample = pd.read_excel(file_path, nrows=10)
+                con.register('temp_df', df_sample)
+                schema_query = "DESCRIBE temp_df"
+                sample_query = "SELECT * FROM temp_df LIMIT 5"
             else:
-                con.execute(f"CREATE TABLE temp_table AS SELECT * FROM read_csv_auto('{file_path}')")
+                # Fallback to CSV
+                schema_query = f"DESCRIBE (SELECT * FROM read_csv_auto('{file_path}') LIMIT 10)"
+                sample_query = f"SELECT * FROM read_csv_auto('{file_path}') LIMIT 5"
 
             # Get column information
-            columns_info = con.execute("DESCRIBE temp_table").fetchall()
+            columns_info = con.execute(schema_query).fetchall()
+
+            # Get sample data for better type inference
+            sample_data = con.execute(sample_query).fetchall()
+            column_names = [desc[0] for desc in columns_info]
 
             # Convert to schema format
             schema = []
-            for col_info in columns_info:
+            for i, col_info in enumerate(columns_info):
                 column_name = col_info[0]
                 column_type = col_info[1]
 
-                # Get sample values to infer more details
-                try:
-                    sample_values = con.execute(f"SELECT {column_name} FROM temp_table LIMIT 5").fetchall()
-                    sample_value = sample_values[0][0] if sample_values else None
-                except:
-                    sample_value = None
+                # Get sample value from the sample data
+                sample_value = None
+                if sample_data and len(sample_data) > 0 and i < len(sample_data[0]):
+                    sample_value = sample_data[0][i]
 
                 schema.append({
                     "name": column_name,
@@ -264,6 +556,7 @@ def get_file_schema(file_path: str) -> List[Dict[str, Any]]:
 def read_file_with_duckdb_sample(file_path: str, sample_type: str = "random", sample_size: int = 100) -> List[Dict[str, Any]]:
     """
     Read a sample of data from various file formats using DuckDB with different sampling methods
+    Optimized to avoid loading entire files into memory
     """
     try:
         file_type = get_file_type(file_path)
@@ -275,43 +568,70 @@ def read_file_with_duckdb_sample(file_path: str, sample_type: str = "random", sa
                 detail=f"Data file not found: {file_path}"
             )
 
-        # Connect to DuckDB
+        # Connect to DuckDB with memory optimizations
         con = duckdb.connect(database=':memory:')
 
+        # Set memory and performance optimizations
+        con.execute("SET memory_limit='1GB'")  # Limit memory usage
+        con.execute("SET threads=1")  # Use single thread to reduce memory
+        con.execute("SET preserve_insertion_order=false")  # Performance optimization
+
         try:
-            # Create table from file based on type
+            # Build query based on file type and sample type
             if file_type == 'csv':
-                # Read CSV with auto-detection
-                con.execute(f"CREATE TABLE temp_table AS SELECT * FROM read_csv_auto('{file_path}')")
-            elif file_type == 'excel':
-                # For Excel, we'll use pandas first then import to DuckDB
-                df = pd.read_excel(file_path)
-                con.register('temp_df', df)
-                con.execute("CREATE TABLE temp_table AS SELECT * FROM temp_df")
+                base_query = f"SELECT * FROM read_csv_auto('{file_path}')"
+
+                if sample_type == "random":
+                    query = f"{base_query} USING SAMPLE {sample_size} ROWS"
+                elif sample_type == "first":
+                    query = f"{base_query} LIMIT {sample_size}"
+                else:
+                    query = f"{base_query} USING SAMPLE {sample_size} ROWS"
+
             elif file_type == 'parquet':
-                con.execute(f"CREATE TABLE temp_table AS SELECT * FROM read_parquet('{file_path}')")
+                base_query = f"SELECT * FROM read_parquet('{file_path}')"
+
+                if sample_type == "random":
+                    query = f"{base_query} USING SAMPLE {sample_size} ROWS"
+                elif sample_type == "first":
+                    query = f"{base_query} LIMIT {sample_size}"
+                else:
+                    query = f"{base_query} USING SAMPLE {sample_size} ROWS"
+
             elif file_type == 'json':
-                con.execute(f"CREATE TABLE temp_table AS SELECT * FROM read_json_auto('{file_path}')")
-            else:
-                # Try CSV as fallback
-                con.execute(f"CREATE TABLE temp_table AS SELECT * FROM read_csv_auto('{file_path}')")
+                base_query = f"SELECT * FROM read_json_auto('{file_path}')"
 
-            # Get sample data based on type
-            if sample_type == "random":
-                result = con.execute(f"SELECT * FROM temp_table USING SAMPLE {sample_size} ROWS").fetchall()
-            elif sample_type == "first":
-                result = con.execute(f"SELECT * FROM temp_table LIMIT {sample_size}").fetchall()
-            elif sample_type == "last":
-                # Get total count first
-                total_count = con.execute("SELECT COUNT(*) FROM temp_table").fetchone()[0]
-                offset = max(0, total_count - sample_size)
-                result = con.execute(f"SELECT * FROM temp_table LIMIT {sample_size} OFFSET {offset}").fetchall()
-            else:
-                # Default to random
-                result = con.execute(f"SELECT * FROM temp_table USING SAMPLE {sample_size} ROWS").fetchall()
+                if sample_type == "random":
+                    query = f"{base_query} USING SAMPLE {sample_size} ROWS"
+                elif sample_type == "first":
+                    query = f"{base_query} LIMIT {sample_size}"
+                else:
+                    query = f"{base_query} USING SAMPLE {sample_size} ROWS"
 
-            # Get column names
-            column_names = [desc[0] for desc in con.execute("DESCRIBE temp_table").fetchall()]
+            else:
+                # Excel files - use pandas with memory optimization
+                if file_type == 'excel':
+                    # Read only first few rows for schema detection and sampling
+                    df_sample = pd.read_excel(file_path, nrows=min(1000, sample_size * 10))
+                    con.register('temp_df', df_sample)
+
+                    if sample_type == "random":
+                        query = f"SELECT * FROM temp_df USING SAMPLE {sample_size} ROWS"
+                    elif sample_type == "first":
+                        query = f"SELECT * FROM temp_df LIMIT {sample_size}"
+                    else:
+                        query = f"SELECT * FROM temp_df USING SAMPLE {sample_size} ROWS"
+                else:
+                    # Fallback to CSV
+                    base_query = f"SELECT * FROM read_csv_auto('{file_path}')"
+                    query = f"{base_query} USING SAMPLE {sample_size} ROWS"
+
+            # Execute the optimized query
+            result = con.execute(query).fetchall()
+
+            # Get column names by describing the query result
+            describe_query = f"DESCRIBE ({query})"
+            column_names = [desc[0] for desc in con.execute(describe_query).fetchall()]
 
             # Convert to list of dictionaries
             data = []
