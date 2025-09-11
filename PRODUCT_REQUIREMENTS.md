@@ -4,6 +4,18 @@
 
 Inquira is a FastAPI-based conversational AI platform that integrates with Google Gemini LLM for data analysis. The platform provides secure code execution, persistent database caching, and an intuitive web interface for data scientists and analysts.
 
+### Business Purpose
+
+Inquira serves as a bridge between natural language queries and complex data analysis, enabling users to:
+
+- Ask business questions in plain English and receive actionable insights
+- Generate and execute Python code automatically for data processing
+- Visualize results through interactive charts and tables
+- Maintain conversation context across multiple queries
+- Share analysis workflows through downloadable code
+
+The platform is designed for data analysts, business users, and technical professionals who need fast insights from large datasets without writing complex code.
+
 ## Core Features
 
 ### 1. Conversational Data Analysis
@@ -27,7 +39,15 @@ Inquira is a FastAPI-based conversational AI platform that integrates with Googl
 - **Smart Updates**: Detects source file changes and recreates databases automatically
 - **Performance Gains**: 5-10x faster query execution for large datasets
 
-### 4. User Management
+### 4. Real-Time Processing
+
+- **WebSocket Communication**: Real-time progress updates during data processing
+- **Background Processing**: Non-blocking database creation and schema generation
+- **Parallel Operations**: Simultaneous schema generation and preview caching
+- **Progress Messaging**: Contextual status messages for each processing stage
+- **Connection Management**: Automatic handling of WebSocket disconnections
+
+### 5. User Management
 
 - **Authentication System**: Secure user registration and login
 - **Profile Management**: User preferences and settings
@@ -57,6 +77,22 @@ User Query → LLM Analysis → Code Generation → Secure Execution → Result 
 CSV/Parquet/JSON → DuckDB Database → Persistent Storage → Cached Connections → Query Execution
 ```
 
+#### Code Execution Environment
+
+- **Environment Reset**: Code execution environment resets when code changes (hash-based detection)
+- **Variable Persistence**: Variables maintained between queries within same code context
+- **Connection Injection**: DuckDB connections automatically injected as 'conn' variable
+- **Security Sandboxing**: Restricted execution environment with limited builtins
+- **Error Handling**: Comprehensive error reporting with execution time tracking
+
+#### Database Management Quirks
+
+- **Table Naming**: Automatic table name generation from file paths with sanitization
+- **Metadata Tracking**: Creation time, file size, row count, and access patterns stored
+- **Smart Updates**: Automatic database recreation when source files are modified
+- **User Isolation**: Each user has separate database directory and files
+- **Connection Caching**: Persistent connections to avoid repeated file loading
+
 ### Frontend Components
 
 #### Web Interface
@@ -72,6 +108,14 @@ CSV/Parquet/JSON → DuckDB Database → Persistent Storage → Cached Connectio
 - **Authentication**: JWT-based authentication with refresh tokens
 - **Error Handling**: Client-side error handling and user feedback
 - **Caching**: Browser-side caching for improved performance
+
+#### WebSocket Communication
+
+- **Real-Time Updates**: Live progress messages during long-running operations
+- **Connection Management**: Automatic reconnection and error recovery
+- **User Identification**: Support for both actual user IDs and fallback identifiers
+- **Message Types**: Structured messages for progress, completion, and errors
+- **Background Processing**: Non-blocking operations with client feedback
 
 ## Performance Requirements
 
@@ -151,6 +195,22 @@ CSV/Parquet/JSON → DuckDB Database → Persistent Storage → Cached Connectio
 - **Parquet Files**: Optimized columnar storage
 - **JSON Files**: Structured and semi-structured data
 - **Excel Files**: Multiple sheets and formatting preservation
+
+### Schema Generation Workflow
+
+- **LLM-Powered Analysis**: Schema descriptions generated using LLM analysis of data samples
+- **Context Integration**: Business domain context incorporated into schema generation
+- **User Refinement**: Users can modify and enhance generated schemas
+- **Persistent Storage**: Schemas stored as JSON files with version tracking
+- **Validation**: Schema validation against actual data structure
+
+### Parallel Processing Capabilities
+
+- **Concurrent Operations**: Schema generation and preview caching run simultaneously
+- **Resource Optimization**: Efficient use of system resources during parallel processing
+- **Progress Synchronization**: Coordinated progress updates across parallel tasks
+- **Error Isolation**: Failures in one task don't affect others
+- **Result Aggregation**: Combined results from parallel processing stages
 
 ### Integration Requirements
 

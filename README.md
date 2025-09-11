@@ -1,6 +1,18 @@
 # Inquira
 
-A FastAPI-based API that integrates with Google Gemini LLM for conversational AI capabilities with optimized performance for large datasets through persistent database caching.
+A FastAPI-based conversational AI platform that integrates with Google Gemini LLM for natural language data analysis. Inquira enables users to ask business questions in plain English and receive actionable insights through automatically generated and executed Python code, with real-time progress updates and secure sandboxed execution.
+
+## Business Purpose
+
+Inquira bridges the gap between natural language queries and complex data analysis by:
+
+- Converting plain English questions into executable Python code
+- Providing secure, sandboxed code execution with DuckDB optimization
+- Offering real-time feedback through WebSocket connections
+- Maintaining conversation context across multiple queries
+- Generating interactive visualizations and downloadable analysis code
+
+Designed for data analysts, business users, and technical professionals who need fast insights from large datasets without writing complex code.
 
 ## Setup
 
@@ -87,6 +99,53 @@ Inquira provides real-time feedback during long-running operations using WebSock
 - **Progress Updates**: Real-time progress with informative status messages
 - **Background Processing**: Non-blocking database creation and schema generation
 - **Status Messages**: Contextual updates for each processing stage
+- **Parallel Processing**: Simultaneous schema generation and preview caching
+- **Connection Recovery**: Automatic handling of connection drops and reconnections
+
+#### WebSocket Message Flow
+
+```javascript
+// Connection established
+{"type": "connected", "message": "Connected to Inquira processing service"}
+
+// Progress updates with status messages
+{
+  "type": "progress",
+  "stage": "converting",
+  "progress": 50,
+  "message": "📊 Analyzing data patterns..."
+}
+
+// Parallel processing updates
+{
+  "type": "progress",
+  "stage": "parallel_processing",
+  "message": "🚀 Processing data schema and optimizing preview performance..."
+}
+
+// Completion with results
+{
+  "type": "completed",
+  "result": {
+    "success": true,
+    "data_path": "/data/sales.csv",
+    "parallel_processing": {
+      "schema_generation": "success",
+      "preview_cache": "success"
+    }
+  }
+}
+```
+
+#### Code Execution Environment
+
+Inquira's code execution has unique characteristics for optimal performance:
+
+- **Environment Reset**: Execution environment resets when code changes (detected via hash)
+- **Variable Persistence**: Variables maintained between queries within same code context
+- **Connection Injection**: DuckDB connections automatically available as 'conn' variable
+- **Security Sandboxing**: Restricted execution with limited builtins and network access
+- **Error Tracking**: Comprehensive error reporting with execution time and resource usage
 
 **WebSocket Message Flow:**
 
@@ -336,6 +395,32 @@ Access the interactive API documentation at:
 
 ## Frontend Integration
 
+### Vue.js Web Interface
+
+Inquira includes a modern Vue.js web interface with the following features:
+
+- **Component Architecture**: Modular components for chat, analysis tabs, and settings
+- **State Management**: Pinia store for reactive state management
+- **Real-time Updates**: WebSocket integration for live progress feedback
+- **Code Editor**: CodeMirror6 with syntax highlighting and undo/redo
+- **Data Visualization**: Interactive Plotly charts and AG Grid tables
+- **Authentication**: Secure user authentication with session management
+
+### UI Architecture
+
+```
+src/
+├── components/
+│   ├── chat/           # Chat input and history
+│   ├── analysis/       # Code, figure, table, and terminal tabs
+│   ├── layout/         # Top toolbar, left/right panels
+│   ├── modals/         # Settings, auth, confirmation dialogs
+│   └── ui/             # Reusable UI components
+├── stores/             # Pinia state management
+├── services/           # API and WebSocket services
+└── composables/        # Vue composition functions
+```
+
 ### JavaScript Example
 
 ```javascript
@@ -505,6 +590,25 @@ You can manually manage databases using the following endpoints:
 - `POST /data/connection/create` - Create database for a file
 - `DELETE /data/connection/{key}` - Remove cached connection
 - `GET /data/connections` - List active connections
+
+#### Schema Generation Workflow
+
+Inquira uses a sophisticated schema generation process to improve LLM code quality:
+
+1. **Data Sampling**: Extracts representative samples from your data files
+2. **LLM Analysis**: Uses Google Gemini to analyze data structure and infer column types
+3. **Context Integration**: Incorporates business domain context for better descriptions
+4. **Schema Storage**: Saves generated schemas as JSON files with metadata
+5. **User Refinement**: Allows users to modify and enhance generated schemas
+
+#### Database Management Quirks
+
+- **Table Naming**: Automatic generation from file paths (e.g., `sales_data.csv` → `sales_data`)
+- **Sanitization**: Special characters replaced with underscores, starts with letter if needed
+- **Metadata Tracking**: Stores creation time, file size, row count, and access patterns
+- **Smart Updates**: Automatically recreates database when source file is modified
+- **User Isolation**: Each user gets separate database directory (`~/.inquira/{user_id}/`)
+- **Cleanup**: Removes unused databases after 30+ days of inactivity
 
 ### Progress Messages
 
