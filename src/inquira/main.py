@@ -15,17 +15,20 @@ from .api.chat import router as chat_router
 from .api.auth import router as auth_router
 from .api.settings import router as settings_router
 from .api.data_preview import router as data_preview_router
+from .api.datasets import router as datasets_router
 from .api.code_execution import router as code_execution_router
 from .api.api_key import router as api_key_router
+from .api.api_test import router as api_test_router
 from .config_models import AppConfig
 from .websocket_manager import websocket_manager
 from .database_manager import DatabaseManager
 from .session_variable_store import session_variable_store
+from .logger import logprint, patch_print
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage the lifecycle of the application"""
-    print("API server started. Authentication system initialized.")
+    logprint("API server started. Authentication system initialized.")
 
     # Initialize app state with None values
     app.state.api_key = None
@@ -39,24 +42,24 @@ async def lifespan(app: FastAPI):
     try:
         default_config_path = os.path.join(os.path.dirname(__file__), "app_config.json")
         app.state.config = AppConfig.load_merged_config(default_config_path)
-        print("Configuration loaded successfully")
+        logprint("Configuration loaded successfully")
     except Exception as e:
-        print(f"Failed to load configuration: {e}")
+        logprint(f"Failed to load configuration: {e}", level="error")
         # Create a default config if loading fails
         app.state.config = AppConfig()
 
     # Initialize database manager
     app.state.db_manager = DatabaseManager(app.state.config)
-    print("Database manager initialized")
+    logprint("Database manager initialized")
 
     # Start session cleanup task
     cleanup_task = asyncio.create_task(session_cleanup_worker())
-    print("Session cleanup worker started")
+    logprint("Session cleanup worker started")
 
     yield
 
     # Cleanup on shutdown
-    print("Shutting down API server")
+    logprint("Shutting down API server")
     cleanup_task.cancel()
     try:
         await cleanup_task
@@ -74,7 +77,7 @@ async def session_cleanup_worker():
             session_variable_store.cleanup_expired_sessions()
             await asyncio.sleep(300)  # Clean up every 5 minutes
         except Exception as e:
-            print(f"Error in session cleanup: {e}")
+            logprint(f"Error in session cleanup: {e}", level="error")
             await asyncio.sleep(60)  # Wait a minute before retrying
 
 app = FastAPI(
@@ -82,6 +85,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Route legacy print() to structured logger
+patch_print()
 
 def get_ui_dir() -> str:
     """
@@ -99,21 +105,21 @@ def get_ui_dir() -> str:
     # --- variables at the top (per your standard) ---
     packaged_ui = importlib.resources.files("inquira").joinpath("frontend", "dist")  # Traversable, not necessarily a Path
     dev_ui = "/Users/adarshmaurya/Downloads/Projects/inquira-ui/dist"
-    print(f"Packaged UI path: {packaged_ui}")
-    print(f"Dev UI path: {dev_ui}")
+    logprint(f"Packaged UI path: {packaged_ui}")
+    logprint(f"Dev UI path: {dev_ui}")
 
     # Prefer dev UI for debugging
-    print(f"Checking dev UI: {dev_ui}")
+    logprint(f"Checking dev UI: {dev_ui}")
     if os.path.exists(dev_ui):
-        print(f"Using dev UI: {dev_ui}")
+        logprint(f"Using dev UI: {dev_ui}")
         return dev_ui
 
     # Fallback to packaged UI
     if packaged_ui.is_dir():
-        print(f"Got the UI from wheel: {packaged_ui}")
+        logprint(f"Got the UI from wheel: {packaged_ui}")
         return str(packaged_ui)
 
-    print(f"No UI found, using dev UI path: {dev_ui}")
+    logprint(f"No UI found, using dev UI path: {dev_ui}")
     return dev_ui
 
 app.mount("/ui", StaticFiles(directory=get_ui_dir(), html=True), name="ui")
@@ -144,24 +150,26 @@ app.include_router(settings_router)
 app.include_router(data_preview_router)
 app.include_router(schema_router)
 app.include_router(code_execution_router)
+app.include_router(api_test_router)
+app.include_router(datasets_router)
 
 # WebSocket endpoint for real-time processing updates
 @app.websocket("/ws/settings/{user_id}")
 async def settings_websocket(websocket: WebSocket, user_id: str):
     """WebSocket endpoint for real-time settings processing updates"""
-    print(f"🔌 [WebSocket] New WebSocket connection request for user: {user_id}")
-    print(f"🔍 [WebSocket] User ID type: {type(user_id)}, value: '{user_id}'")
+    logprint(f"🔌 [WebSocket] New WebSocket connection request for user: {user_id}")
+    logprint(f"🔍 [WebSocket] User ID type: {type(user_id)}, value: '{user_id}'")
 
     # Check for common issues
     if user_id == "current_user":
-        print(f"⚠️ [WebSocket] WARNING: Frontend is using 'current_user' instead of actual user ID!")
-        print(f"💡 [WebSocket] Frontend should connect to: ws://localhost:8000/ws/settings/{user_id}")
-        print(f"💡 [WebSocket] But it's connecting to: ws://localhost:8000/ws/settings/current_user")
-        print(f"✅ [WebSocket] Accepting connection with 'current_user' for compatibility")
+        logprint(f"⚠️ [WebSocket] WARNING: Frontend is using 'current_user' instead of actual user ID!")
+        logprint(f"💡 [WebSocket] Frontend should connect to: ws://localhost:8000/ws/settings/{user_id}")
+        logprint(f"💡 [WebSocket] But it's connecting to: ws://localhost:8000/ws/settings/current_user")
+        logprint(f"✅ [WebSocket] Accepting connection with 'current_user' for compatibility")
 
     await websocket_manager.connect(user_id, websocket)
-    print(f"✅ [WebSocket] Connection established for user: {user_id}")
-    print(f"🔍 [WebSocket] Active connections after connect: {list(websocket_manager.active_connections.keys())}")
+    logprint(f"✅ [WebSocket] Connection established for user: {user_id}")
+    logprint(f"🔍 [WebSocket] Active connections after connect: {list(websocket_manager.active_connections.keys())}")
 
     # Check for existing preview cache and create if missing
     try:
@@ -180,10 +188,10 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
 
                 if cached_data:
                     cache_status[sample_type.value] = "cached"
-                    print(f"✅ [WebSocket] Cache found for {user_id}:{sample_type.value}")
+                    logprint(f"✅ [WebSocket] Cache found for {user_id}:{sample_type.value}")
                 else:
                     # Cache doesn't exist, create it asynchronously
-                    print(f"🔄 [WebSocket] Creating cache for {user_id}:{sample_type.value}")
+                    logprint(f"🔄 [WebSocket] Creating cache for {user_id}:{sample_type.value}")
                     try:
                         sample_data = read_file_with_duckdb_sample(data_path, sample_type.value, 100)
                         response_data = {
@@ -196,9 +204,9 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
                         }
                         set_cached_preview(app.state, user_id, sample_type.value, data_path, response_data)
                         cache_status[sample_type.value] = "cached"
-                        print(f"✅ [WebSocket] Cache created for {user_id}:{sample_type.value} ({len(sample_data)} rows)")
+                        logprint(f"✅ [WebSocket] Cache created for {user_id}:{sample_type.value} ({len(sample_data)} rows)")
                     except Exception as cache_error:
-                        print(f"❌ [WebSocket] Failed to create cache for {user_id}:{sample_type.value}: {str(cache_error)}")
+                        logprint(f"❌ [WebSocket] Failed to create cache for {user_id}:{sample_type.value}: {str(cache_error)}", level="error")
                         cache_status[sample_type.value] = "error"
 
             # Send cache status to client
@@ -210,23 +218,23 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
                 "timestamp": datetime.now().isoformat()
             })
 
-            print(f"📊 [WebSocket] Cache status sent to user {user_id}: {cache_status}")
+            logprint(f"📊 [WebSocket] Cache status sent to user {user_id}: {cache_status}")
 
     except Exception as e:
-        print(f"⚠️ [WebSocket] Error checking cache status: {str(e)}")
+        logprint(f"⚠️ [WebSocket] Error checking cache status: {str(e)}", level="error")
 
     try:
         while True:
             # Keep connection alive and handle any incoming messages
-            print(f"👂 [WebSocket] Waiting for messages from user {user_id}...")
+            logprint(f"👂 [WebSocket] Waiting for messages from user {user_id}...")
             data = await websocket.receive_text()
-            print(f"📨 [WebSocket] Received message from user {user_id}: {data}")
+            logprint(f"📨 [WebSocket] Received message from user {user_id}: {data}")
             # For now, we just keep the connection alive
             # In the future, this could handle cancellation requests, etc.
     except Exception as e:
-        print(f"❌ [WebSocket] Error for user {user_id}: {e}")
+        logprint(f"❌ [WebSocket] Error for user {user_id}: {e}", level="error")
     finally:
-        print(f"🔌 [WebSocket] Cleaning up connection for user {user_id}")
+        logprint(f"🔌 [WebSocket] Cleaning up connection for user {user_id}")
         await websocket_manager.disconnect(user_id)
 
 

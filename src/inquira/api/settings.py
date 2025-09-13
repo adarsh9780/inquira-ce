@@ -5,10 +5,11 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 from .auth import get_current_user, get_app_config
-from ..database import get_user_settings, save_user_settings
+from ..database import get_user_settings, save_user_settings, get_dataset_by_path
 from ..config_models import AppConfig
 from ..websocket_manager import websocket_manager
 from ..database_manager import DatabaseManager
+from ..logger import logprint
 
 def get_app_state(request: Request):
     """Dependency to get app state"""
@@ -40,15 +41,51 @@ class ApiKeyRequest(BaseModel):
 
 # Full settings response
 class SettingsResponse(BaseModel):
+    # Core settings
     data_path: Optional[str] = None
     context: Optional[str] = None
-    api_key: Optional[str] = None
+    api_key_present: bool = False
+    settings_created_at: Optional[str] = None
+    settings_updated_at: Optional[str] = None
+
+    # Paths
+    base_directory: Optional[str] = None
+    schema_path: Optional[str] = None
+    database_path: Optional[str] = None
+
+    # Source file metadata
+    file_exists: bool = False
+    file_size_bytes: Optional[int] = None
+    file_mtime: Optional[str] = None
+    file_ctime: Optional[str] = None
+
+    # Dataset / DuckDB info
+    table_name: Optional[str] = None
+    dataset_created_at: Optional[str] = None
+    dataset_updated_at: Optional[str] = None
+    derived_table_name: Optional[str] = None
 
 # Paths response
 class PathsResponse(BaseModel):
     schema_path: str
     database_path: str
     base_directory: str
+
+
+class CheckUpdateResponse(BaseModel):
+    success: bool = True
+    should_update: bool
+    reasons: List[str]
+    data_path: Optional[str] = None
+    file_exists: bool = False
+    table_name: Optional[str] = None
+    derived_table_name: Optional[str] = None
+    stored_source_mtime: Optional[str] = None
+    current_source_mtime: Optional[str] = None
+    stored_file_size: Optional[int] = None
+    current_file_size: Optional[int] = None
+    dataset_created_at: Optional[str] = None
+    dataset_updated_at: Optional[str] = None
 
 
 
@@ -64,19 +101,19 @@ async def set_data_path(
     user_id = current_user["user_id"]
 
     # Check if user has an active WebSocket connection
-    print(f"🔍 [Settings] Checking WebSocket connection for user: {user_id}")
-    print(f"🔍 [Settings] Active connections: {list(websocket_manager.active_connections.keys())}")
+    logprint(f"🔍 [Settings] Checking WebSocket connection for user: {user_id}")
+    logprint(f"🔍 [Settings] Active connections: {list(websocket_manager.active_connections.keys())}")
 
     # Check for the actual user_id first
     if websocket_manager.is_connected(user_id):
-        print(f"✅ [Settings] WebSocket connection verified for user: {user_id}")
+        logprint(f"✅ [Settings] WebSocket connection verified for user: {user_id}")
     # Temporary workaround: Check if frontend is using "current_user" instead of actual user_id
     elif websocket_manager.is_connected("current_user"):
-        print(f"⚠️ [Settings] Frontend using 'current_user' instead of actual user_id")
-        print(f"✅ [Settings] Using existing 'current_user' connection for user: {user_id}")
+        logprint(f"⚠️ [Settings] Frontend using 'current_user' instead of actual user_id")
+        logprint(f"✅ [Settings] Using existing 'current_user' connection for user: {user_id}")
         # For now, allow this to work, but log the issue
     else:
-        print(f"❌ [Settings] No WebSocket connection found for user: {user_id}")
+        logprint(f"❌ [Settings] No WebSocket connection found for user: {user_id}", level="error")
         raise HTTPException(
             status_code=400,
             detail=f"WebSocket connection required for data processing. Please establish a WebSocket connection to /ws/settings/{user_id} before setting the data path. This allows real-time progress updates during file processing."
@@ -164,20 +201,20 @@ async def set_apikey(
 ):
     """Set the API key"""
     user_id = current_user["user_id"]
-    print(f"🔑 [Settings] Setting API key for user: {user_id}")
-    print(f"🔑 [Settings] API key length: {len(request.api_key) if request.api_key else 0}")
+    logprint(f"🔑 [Settings] Setting API key for user: {user_id}")
+    logprint(f"🔑 [Settings] API key length: {len(request.api_key) if request.api_key else 0}")
 
     user_settings = get_user_settings(user_id) or {}
-    print(f"🔑 [Settings] Current settings before update: {user_settings}")
+    logprint(f"🔑 [Settings] Current settings before update: {user_settings}")
 
     user_settings["api_key"] = request.api_key
     success = save_user_settings(user_id, user_settings)
 
     if not success:
-        print(f"❌ [Settings] Failed to save API key to database")
+        logprint(f"❌ [Settings] Failed to save API key to database", level="error")
         raise HTTPException(status_code=500, detail="Failed to save API key")
 
-    print(f"✅ [Settings] API key saved successfully to database")
+    logprint(f"✅ [Settings] API key saved successfully to database")
 
     # Update app_state and try to initialize LLM service
     app_state.api_key = request.api_key
@@ -186,12 +223,12 @@ async def set_apikey(
         app_state.llm_service = LLMService(api_key=request.api_key)
         app_state.llm_initialized = True
         status = "initialized"
-        print(f"✅ [Settings] LLM service initialized successfully")
+        logprint(f"✅ [Settings] LLM service initialized successfully")
     except Exception as e:
         app_state.llm_service = None
         app_state.llm_initialized = False
         status = "saved"
-        print(f"⚠️ [Settings] LLM service initialization failed: {str(e)}")
+        logprint(f"⚠️ [Settings] LLM service initialization failed: {str(e)}")
 
     return {"message": "API key updated successfully", "status": status}
 
@@ -233,13 +270,13 @@ async def view_apikey(
 ):
     """View the current API key"""
     user_id = current_user["user_id"]
-    print(f"🔍 [Settings] Viewing API key for user: {user_id}")
+    logprint(f"🔍 [Settings] Viewing API key for user: {user_id}")
 
     user_settings = get_user_settings(user_id) or {}
-    print(f"🔍 [Settings] Current settings: {user_settings}")
+    logprint(f"🔍 [Settings] Current settings: {user_settings}")
 
     api_key = user_settings.get("api_key")
-    print(f"🔍 [Settings] API key status: {'Set' if api_key else 'Not set'}")
+    logprint(f"🔍 [Settings] API key status: {'Set' if api_key else 'Not set'}")
 
     # Load into app_state if needed
     if api_key:
@@ -249,11 +286,11 @@ async def view_apikey(
             from ..llm_service import LLMService
             app_state.llm_service = LLMService(api_key=api_key)
             app_state.llm_initialized = True
-            print(f"✅ [Settings] LLM service initialized successfully")
+            logprint(f"✅ [Settings] LLM service initialized successfully")
         except Exception as e:
             app_state.llm_service = None
             app_state.llm_initialized = False
-            print(f"❌ [Settings] LLM service initialization failed: {str(e)}")
+            logprint(f"❌ [Settings] LLM service initialization failed: {str(e)}")
 
     return ApiKeyResponse(api_key=api_key)
 
@@ -272,10 +309,74 @@ async def view_all_settings(
 
     user_settings = get_user_settings(user_id) or {}
 
+    data_path = user_settings.get("data_path")
+    api_key = user_settings.get("api_key")
+
+    # Paths
+    base_dir = Path.home() / '.inquira' / user_id
+    database_path = base_dir / f"{user_id}_data.duckdb"
+    schema_path = user_settings.get("schema_path")
+
+    # File metadata
+    file_exists = bool(data_path and Path(data_path).exists())
+    file_size = None
+    file_mtime_iso = None
+    file_ctime_iso = None
+    if file_exists:
+        try:
+            st = Path(data_path).stat()
+            file_size = st.st_size
+            from datetime import datetime
+            file_mtime_iso = datetime.fromtimestamp(getattr(st, 'st_mtime', st.st_ctime)).isoformat()
+            file_ctime_iso = datetime.fromtimestamp(getattr(st, 'st_ctime', st.st_mtime)).isoformat()
+        except Exception:
+            pass
+
+    # Dataset info and table name
+    table_name = None
+    dataset_created_at = None
+    dataset_updated_at = None
+    derived_table_name = None
+    if data_path:
+        # Prefer dataset catalog (created during conversion)
+        ds = get_dataset_by_path(user_id, data_path)
+        if ds:
+            table_name = ds.get('table_name')
+            dataset_created_at = ds.get('created_at')
+            dataset_updated_at = ds.get('updated_at')
+        else:
+            # Derive the would-be table name without creating the DB
+            try:
+                from ..database_manager import DatabaseManager
+                dbm = DatabaseManager(config)
+                derived_table_name = dbm._get_table_name(data_path)
+            except Exception:
+                derived_table_name = None
+
     return SettingsResponse(
-        data_path=user_settings.get("data_path"),
+        # Core settings
+        data_path=data_path,
         context=user_settings.get("context"),
-        api_key=user_settings.get("api_key")
+        api_key_present=bool(api_key),
+        settings_created_at=user_settings.get("created_at"),
+        settings_updated_at=user_settings.get("updated_at"),
+
+        # Paths
+        base_directory=str(base_dir),
+        schema_path=schema_path,
+        database_path=str(database_path),
+
+        # File metadata
+        file_exists=file_exists,
+        file_size_bytes=file_size,
+        file_mtime=file_mtime_iso,
+        file_ctime=file_ctime_iso,
+
+        # Dataset / DuckDB
+        table_name=table_name,
+        dataset_created_at=dataset_created_at,
+        dataset_updated_at=dataset_updated_at,
+        derived_table_name=derived_table_name,
     )
 
 @router.get("/settings/paths", response_model=PathsResponse)
@@ -286,8 +387,8 @@ async def get_storage_paths(current_user: dict = Depends(get_current_user)):
     # Base directory for user data
     base_dir = Path.home() / '.inquira' / user_id
 
-    # Schema file path
-    schema_path = base_dir / f"{user_id}_schema.json"
+    # Schemas directory (per-file schemas are stored here)
+    schema_path = base_dir / 'schemas'
 
     # Database file path
     database_path = base_dir / f"{user_id}_data.duckdb"
@@ -296,6 +397,115 @@ async def get_storage_paths(current_user: dict = Depends(get_current_user)):
         schema_path=str(schema_path),
         database_path=str(database_path),
         base_directory=str(base_dir)
+    )
+
+@router.get("/settings/check-update", response_model=CheckUpdateResponse)
+async def check_update_needed(
+    current_user: dict = Depends(get_current_user),
+    app_state = Depends(get_app_state)
+):
+    """Return whether the DuckDB table needs to be updated and why.
+
+    Compares current filesystem metadata with the stored dataset catalog.
+    Does not perform any update.
+    """
+    user_id = current_user["user_id"]
+    user_settings = get_user_settings(user_id) or {}
+    data_path = user_settings.get("data_path")
+
+    if not data_path:
+        raise HTTPException(status_code=400, detail="No data_path set for user")
+
+    reasons: List[str] = []
+    should_update = False
+
+    # Stored dataset entry
+    ds = get_dataset_by_path(user_id, data_path)
+    table_name = ds.get("table_name") if ds else None
+    dataset_created_at = ds.get("created_at") if ds else None
+    dataset_updated_at = ds.get("updated_at") if ds else None
+    stored_file_size = int(ds.get("file_size")) if ds and ds.get("file_size") is not None else None
+    stored_mtime = float(ds.get("source_mtime")) if ds and ds.get("source_mtime") is not None else None
+
+    # Derived (if dataset is missing)
+    derived_table_name = None
+    try:
+        cfg = app_state.config if hasattr(app_state, 'config') and app_state.config else AppConfig()
+        dbm = DatabaseManager(cfg)
+        derived_table_name = dbm._get_table_name(data_path)
+    except Exception:
+        pass
+
+    # Current filesystem state
+    from os import path, stat
+    file_exists = path.exists(data_path)
+    current_file_size = None
+    current_mtime_iso = None
+    stored_mtime_iso = None
+    current_mtime_val = None
+    if file_exists:
+        try:
+            st = stat(data_path)
+            current_file_size = st.st_size
+            from datetime import datetime
+            current_mtime_val = getattr(st, 'st_mtime', st.st_ctime)
+            current_mtime_iso = datetime.fromtimestamp(current_mtime_val).isoformat()
+        except Exception:
+            pass
+
+    if stored_mtime is not None:
+        try:
+            from datetime import datetime
+            stored_mtime_iso = datetime.fromtimestamp(float(stored_mtime)).isoformat()
+        except Exception:
+            stored_mtime_iso = None
+
+    # Decide whether update is needed and why
+    if not ds:
+        reasons.append("no_dataset_entry")
+        should_update = file_exists  # can only update if file exists
+    else:
+        if not file_exists:
+            reasons.append("source_missing")
+            should_update = False
+        else:
+            if current_mtime_val is not None and stored_mtime is not None and current_mtime_val > stored_mtime:
+                reasons.append("mtime_newer")
+                should_update = True
+            if (current_file_size is not None and stored_file_size is not None and current_file_size != stored_file_size):
+                reasons.append("size_changed")
+                should_update = True
+
+            # Also verify the table actually exists in the DuckDB database
+            try:
+                # Use existing DB manager to avoid external locks
+                cfg = app_state.config if hasattr(app_state, 'config') and app_state.config else AppConfig()
+                dbm = getattr(app_state, 'db_manager', None) or DatabaseManager(cfg)
+                # Try to get an existing connection without triggering recreation
+                conn = dbm.get_existing_connection(user_id)
+                if conn is not None and table_name:
+                    rows = conn.execute("SHOW TABLES").fetchall()
+                    existing = {r[0] for r in rows}
+                    if table_name not in existing:
+                        reasons.append("table_missing")
+                        should_update = True
+            except Exception:
+                # If we can't check, ignore silently; other signals still apply
+                pass
+
+    return CheckUpdateResponse(
+        should_update=should_update,
+        reasons=reasons,
+        data_path=data_path,
+        file_exists=file_exists,
+        table_name=table_name,
+        derived_table_name=derived_table_name,
+        stored_source_mtime=stored_mtime_iso,
+        current_source_mtime=current_mtime_iso,
+        stored_file_size=stored_file_size,
+        current_file_size=current_file_size,
+        dataset_created_at=dataset_created_at,
+        dataset_updated_at=dataset_updated_at,
     )
 
 @router.post("/settings/close-connections")
@@ -308,7 +518,7 @@ async def close_database_connections(
 
     if hasattr(app_state, 'db_manager') and app_state.db_manager:
         # Debug: Print all current connections
-        print(f"🔍 [Close Connections] Current connections in cache: {list(app_state.db_manager.connections.keys())}")
+        logprint(f"🔍 [Close Connections] Current connections in cache: {list(app_state.db_manager.connections.keys())}")
 
         # Close all connections for this user
         closed_connections = []
@@ -316,18 +526,18 @@ async def close_database_connections(
             # Check if this connection belongs to the current user
             if user_id in db_path_str:
                 try:
-                    print(f"🔌 [Close Connections] Closing connection: {db_path_str}")
+                    logprint(f"🔌 [Close Connections] Closing connection: {db_path_str}")
                     conn.close()
                     closed_connections.append(db_path_str)
                 except Exception as e:
-                    print(f"❌ [Close Connections] Error closing connection {db_path_str}: {e}")
+                    logprint(f"❌ [Close Connections] Error closing connection {db_path_str}: {e}", level="error")
 
         # Remove from connections cache
         for db_path_str in closed_connections:
             if db_path_str in app_state.db_manager.connections:
                 del app_state.db_manager.connections[db_path_str]
 
-        print(f"✅ [Close Connections] Closed {len(closed_connections)} connections for user {user_id}")
+        logprint(f"✅ [Close Connections] Closed {len(closed_connections)} connections for user {user_id}")
 
         # If no connections were found in cache, try to force close by creating a new connection and closing it
         if len(closed_connections) == 0:
@@ -338,14 +548,14 @@ async def close_database_connections(
                 # Try to connect to the user's database file directly
                 db_path = Path.home() / '.inquira' / user_id / f"{user_id}_data.duckdb"
                 if db_path.exists():
-                    print(f"🔄 [Close Connections] Attempting direct connection to force close: {db_path}")
+                    logprint(f"🔄 [Close Connections] Attempting direct connection to force close: {db_path}")
                     # This will create a connection that we can immediately close
                     conn = duckdb.connect(str(db_path))
                     conn.close()
-                    print(f"✅ [Close Connections] Successfully closed direct connection to: {db_path}")
+                    logprint(f"✅ [Close Connections] Successfully closed direct connection to: {db_path}")
                     closed_connections.append(str(db_path))
             except Exception as e:
-                print(f"⚠️ [Close Connections] Could not create direct connection: {e}")
+                logprint(f"⚠️ [Close Connections] Could not create direct connection: {e}")
 
         return {
             "message": f"Closed {len(closed_connections)} database connections",
@@ -361,31 +571,31 @@ def load_user_settings_to_app_state(user_id: str, app_state):
     Load user settings from database into app_state for global access
     Only loads if user has existing settings to avoid overwriting None values for new users
     """
-    print(f"DEBUG: load_user_settings_to_app_state called for user {user_id}")
+    logprint(f"DEBUG: load_user_settings_to_app_state called for user {user_id}", level="debug")
     user_settings = get_user_settings(user_id)
-    print(f"DEBUG: user_settings = {user_settings}")
+    logprint(f"DEBUG: user_settings = {user_settings}", level="debug")
 
     # Check if schema_path is missing but schema exists for the data_path
     if (user_settings.get("data_path") and
         not user_settings.get("schema_path")):
-        print(f"DEBUG: schema_path missing, checking for schema file")
+        logprint(f"DEBUG: schema_path missing, checking for schema file", level="debug")
         from ..schema_storage import load_schema, get_schema_filename, get_user_schema_dir
         schema_file = load_schema(user_id, user_settings["data_path"])
-        print(f"DEBUG: schema_file loaded = {schema_file is not None}")
+        logprint(f"DEBUG: schema_file loaded = {schema_file is not None}", level="debug")
         if schema_file:
             # Schema exists, update settings with the path
             schema_dir = get_user_schema_dir(user_id)
-            filename = get_schema_filename(user_id)
+            filename = get_schema_filename(user_id, user_settings["data_path"])
             schema_path = str(schema_dir / filename)
-            print(f"DEBUG: updating schema_path to {schema_path}")
+            logprint(f"DEBUG: updating schema_path to {schema_path}", level="debug")
             user_settings["schema_path"] = schema_path
             # Save the updated settings
             save_user_settings(user_id, user_settings)
-            print(f"DEBUG: settings saved with schema_path")
+            logprint(f"DEBUG: settings saved with schema_path", level="debug")
 
     # Only load settings into app_state if user has existing settings
     if user_settings and any(user_settings.values()):
-        print(f"DEBUG: loading settings into app_state")
+        logprint(f"DEBUG: loading settings into app_state", level="debug")
         # Load settings into app_state
         if user_settings.get("api_key"):
             app_state.api_key = user_settings["api_key"]
@@ -407,10 +617,10 @@ def load_user_settings_to_app_state(user_id: str, app_state):
             db_manager = DatabaseManager(config)
             table_name = db_manager._get_table_name(user_settings["data_path"])
             app_state.table_name = table_name
-            print(f"DEBUG: app_state.table_name set to {table_name}")
+            logprint(f"DEBUG: app_state.table_name set to {table_name}", level="debug")
         if user_settings.get("schema_path"):
             app_state.schema_path = user_settings["schema_path"]
-            print(f"DEBUG: app_state.schema_path set to {app_state.schema_path}")
+            logprint(f"DEBUG: app_state.schema_path set to {app_state.schema_path}", level="debug")
         if user_settings.get("context"):
             app_state.context = user_settings["context"]
 
@@ -421,20 +631,20 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
     """Background task to process data path with granular WebSocket updates for each step"""
     # Determine which user_id to use for WebSocket messages
     # If frontend is using "current_user", we need to send messages there
-    print(f"🔍 [Background] Checking WebSocket connections for user: {user_id}")
-    print(f"🔍 [Background] Active connections: {list(websocket_manager.active_connections.keys())}")
-    print(f"🔍 [Background] Is '{user_id}' connected: {websocket_manager.is_connected(user_id)}")
-    print(f"🔍 [Background] Is 'current_user' connected: {websocket_manager.is_connected('current_user')}")
+    logprint(f"🔍 [Background] Checking WebSocket connections for user: {user_id}")
+    logprint(f"🔍 [Background] Active connections: {list(websocket_manager.active_connections.keys())}")
+    logprint(f"🔍 [Background] Is '{user_id}' connected: {websocket_manager.is_connected(user_id)}")
+    logprint(f"🔍 [Background] Is 'current_user' connected: {websocket_manager.is_connected('current_user')}")
 
     websocket_user_id = user_id
     if websocket_manager.is_connected("current_user") and not websocket_manager.is_connected(user_id):
         websocket_user_id = "current_user"
-        print(f"⚠️ [Background] Using 'current_user' for WebSocket messages (frontend issue)")
+        logprint(f"⚠️ [Background] Using 'current_user' for WebSocket messages (frontend issue)")
     elif websocket_manager.is_connected(user_id):
-        print(f"✅ [Background] Using actual user_id '{user_id}' for WebSocket messages")
+        logprint(f"✅ [Background] Using actual user_id '{user_id}' for WebSocket messages")
     else:
-        print(f"❌ [Background] No WebSocket connection found for user '{user_id}' or 'current_user'")
-        print(f"🔍 [Background] Active connections: {list(websocket_manager.active_connections.keys())}")
+        logprint(f"❌ [Background] No WebSocket connection found for user '{user_id}' or 'current_user'", level="error")
+        logprint(f"🔍 [Background] Active connections: {list(websocket_manager.active_connections.keys())}")
 
     try:
 
@@ -519,24 +729,39 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
 
         # Define parallel tasks with correct websocket_user_id scope
         async def generate_schema_task():
-            """Task to generate schema"""
+            """Task to generate schema using LLM if API key is available; otherwise skip."""
             try:
+                # Determine API key and context
+                current_settings = get_user_settings(user_id) or {}
+                context_val = current_settings.get("context", "General data analysis")
+                api_key_val = app_state.api_key if hasattr(app_state, 'api_key') else None
+
+                if not api_key_val:
+                    logprint(f"⚠️ [Settings] Skipping LLM schema generation (no API key)")
+                    await websocket_manager.send_to_user(websocket_user_id, {
+                        "type": "progress",
+                        "stage": "generating_schema",
+                        "message": "⚠️ Skipping LLM schema generation (no API key). Minimal schema will be used on demand."
+                    })
+                    return {"status": "skipped", "task": "schema_generation", "reason": "no_api_key"}
+
                 await websocket_manager.send_to_user(websocket_user_id, {
                     "type": "progress",
                     "stage": "generating_schema",
                     "progress": 0,
-                    "message": "🧠 Generating data schema..."
+                    "message": "🧠 Generating data schema with LLM..."
                 })
 
-                # Simulate schema generation progress
-                for progress in [25, 50, 75, 100]:
-                    await asyncio.sleep(1.0)  # Reduced sleep for parallel execution
-                    await websocket_manager.send_to_user(websocket_user_id, {
-                        "type": "progress",
-                        "stage": "generating_schema",
-                        "progress": progress,
-                        "message": f"🧠 Schema generation {progress}% complete..."
-                    })
+                # Offload blocking generation to a thread
+                from .generate_schema import _generate_schema_internal
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, lambda: _generate_schema_internal(
+                    user_id=user_id,
+                    filepath=data_path,
+                    context=context_val,
+                    api_key=api_key_val,
+                    app_state=app_state
+                ))
 
                 await websocket_manager.send_to_user(websocket_user_id, {
                     "type": "progress",
@@ -548,7 +773,7 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
                 return {"status": "success", "task": "schema_generation"}
 
             except Exception as e:
-                print(f"❌ [Settings] Schema generation failed: {str(e)}")
+                logprint(f"❌ [Settings] Schema generation failed: {str(e)}")
                 await websocket_manager.send_to_user(websocket_user_id, {
                     "type": "progress",
                     "stage": "generating_schema",
@@ -572,7 +797,7 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
                 cached_count = 0
                 for sample_type in [SampleType.random, SampleType.first]:
                     try:
-                        print(f"🔄 [Settings] Starting cache creation for sample_type: {sample_type.value}")
+                        logprint(f"🔄 [Settings] Starting cache creation for sample_type: {sample_type.value}")
 
                         # Send progress message to client
                         await websocket_manager.send_to_user(websocket_user_id, {
@@ -583,9 +808,9 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
                             "timestamp": datetime.now().isoformat()
                         })
 
-                        print(f"🔄 [Settings] Calling read_file_with_duckdb_sample for {sample_type.value}")
+                        logprint(f"🔄 [Settings] Calling read_file_with_duckdb_sample for {sample_type.value}")
                         sample_data = read_file_with_duckdb_sample(data_path, sample_type.value, 100)
-                        print(f"✅ [Settings] Got {len(sample_data) if sample_data else 0} rows for {sample_type.value}")
+                        logprint(f"✅ [Settings] Got {len(sample_data) if sample_data else 0} rows for {sample_type.value}")
 
                         if not sample_data:
                             raise Exception(f"No data returned for sample type {sample_type.value}")
@@ -599,10 +824,10 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
                             "message": f"Successfully loaded {len(sample_data)} {sample_type.value} sample rows"
                         }
 
-                        print(f"🔄 [Settings] Calling set_cached_preview for {sample_type.value}")
+                        logprint(f"🔄 [Settings] Calling set_cached_preview for {sample_type.value}")
                         set_cached_preview(app_state, user_id, sample_type.value, data_path, response_data)
                         cached_count += 1
-                        print(f"✅ [Settings] Successfully cached preview for {sample_type.value}: {len(sample_data)} rows")
+                        logprint(f"✅ [Settings] Successfully cached preview for {sample_type.value}: {len(sample_data)} rows")
 
                         # Send success message to client
                         await websocket_manager.send_to_user(websocket_user_id, {
@@ -616,9 +841,9 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
                         })
 
                     except Exception as cache_error:
-                        print(f"❌ [Settings] Failed to cache {sample_type.value}: {str(cache_error)}")
+                        logprint(f"❌ [Settings] Failed to cache {sample_type.value}: {str(cache_error)}")
                         import traceback
-                        print(f"❌ [Settings] Full traceback: {traceback.format_exc()}")
+                        logprint(f"❌ [Settings] Full traceback: {traceback.format_exc()}")
 
                         # Send error message to client
                         await websocket_manager.send_to_user(websocket_user_id, {
@@ -641,7 +866,7 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
                 return {"status": "success", "task": "preview_cache", "cached_count": cached_count}
 
             except Exception as e:
-                print(f"❌ [Settings] Preview cache population failed: {str(e)}")
+                logprint(f"❌ [Settings] Preview cache population failed: {str(e)}", level="error")
                 await websocket_manager.send_to_user(websocket_user_id, {
                     "type": "progress",
                     "stage": "caching_preview",
@@ -650,7 +875,7 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
                 return {"status": "error", "task": "preview_cache", "error": str(e)}
 
         # Run schema generation and preview caching in parallel
-        print(f"🚀 [Settings] Starting parallel tasks for user: {websocket_user_id}")
+        logprint(f"🚀 [Settings] Starting parallel tasks for user: {websocket_user_id}")
         schema_task = generate_schema_task()
         preview_task = populate_preview_cache_task()
 
@@ -661,9 +886,9 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
         schema_result = results[0] if not isinstance(results[0], Exception) else {"status": "error", "task": "schema_generation", "error": str(results[0])}
         preview_result = results[1] if not isinstance(results[1], Exception) else {"status": "error", "task": "preview_cache", "error": str(results[1])}
 
-        print(f"📊 [Settings] Parallel processing results for user {websocket_user_id}:")
-        print(f"   Schema: {schema_result}")
-        print(f"   Preview: {preview_result}")
+        logprint(f"📊 [Settings] Parallel processing results for user {websocket_user_id}:")
+        logprint(f"   Schema: {schema_result}")
+        logprint(f"   Preview: {preview_result}")
 
         # Send final status update
         schema_status = schema_result.get('status', 'unknown') if isinstance(schema_result, dict) else 'error'
@@ -677,11 +902,11 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
 
         # Check if WebSocket connection is still active before sending final messages
         if not websocket_manager.is_connected(websocket_user_id):
-            print(f"⚠️ [Settings] WebSocket connection lost for user {websocket_user_id} - skipping final messages")
+            logprint(f"⚠️ [Settings] WebSocket connection lost for user {websocket_user_id} - skipping final messages")
             return
 
         # Step 8: Finalize and close
-        print(f"🔒 [Settings] Sending finalization message to user: {websocket_user_id}")
+        logprint(f"🔒 [Settings] Sending finalization message to user: {websocket_user_id}")
         await websocket_manager.send_to_user(websocket_user_id, {
             "type": "progress",
             "stage": "finalizing",
@@ -690,13 +915,13 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
 
         # Show finalization facts
         await asyncio.sleep(0.5)
-        print(f"📊 [Settings] Sending finalization progress to user: {websocket_user_id}")
+        logprint(f"📊 [Settings] Sending finalization progress to user: {websocket_user_id}")
         await websocket_manager.broadcast_progress(websocket_user_id, "finalizing")
         await asyncio.sleep(0.5)
 
         # Double-check connection before sending completion
         if not websocket_manager.is_connected(websocket_user_id):
-            print(f"⚠️ [Settings] WebSocket connection lost during finalization for user {websocket_user_id}")
+            logprint(f"⚠️ [Settings] WebSocket connection lost during finalization for user {websocket_user_id}")
             return
 
         # Prepare completion data with safe access
@@ -713,7 +938,7 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
             parallel_processing["preview_cache"] = "error"
             parallel_processing["cached_sample_types"] = 0
 
-        print(f"🎉 [Settings] Sending completion message to user: {websocket_user_id}")
+        logprint(f"🎉 [Settings] Sending completion message to user: {websocket_user_id}")
         await websocket_manager.send_completion(websocket_user_id, {
             "success": True,
             "data_path": data_path,
@@ -727,7 +952,7 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
                 "Finalization"
             ]
         })
-        print(f"✅ [Settings] Completion message sent successfully")
+        logprint(f"✅ [Settings] Completion message sent successfully")
 
     except Exception as e:
         await websocket_manager.send_error(websocket_user_id, f"Processing failed: {str(e)}")

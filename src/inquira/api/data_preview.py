@@ -10,6 +10,8 @@ from datetime import datetime
 from .auth import get_current_user
 from ..database import get_user_settings
 from ..schema_storage import load_schema, get_user_schema_dir
+from ..logger import logprint
+from ..sql_library import get_sql
 
 class SampleType(str, Enum):
     random = "random"
@@ -42,7 +44,7 @@ def get_cached_preview(app_state, user_id: str, sample_type: str, data_path: str
 
             # If data file is newer than cache, invalidate cache
             if data_mtime > cache_mtime:
-                print(f"⚠️ [Data Preview] Cache invalidated - data file modified since cache creation")
+                logprint(f"⚠️ [Data Preview] Cache invalidated - data file modified since cache creation")
                 cache_file.unlink()  # Delete invalid cache
                 return None
 
@@ -51,15 +53,15 @@ def get_cached_preview(app_state, user_id: str, sample_type: str, data_path: str
 
         # Verify the cached data is for the correct file path
         if cached_data.get('file_path') != data_path:
-            print(f"⚠️ [Data Preview] Cache file path mismatch, invalidating cache")
+            logprint(f"⚠️ [Data Preview] Cache file path mismatch, invalidating cache")
             cache_file.unlink()
             return None
 
-        print(f"✅ [Data Preview] Loaded cached preview from: {cache_file}")
+        logprint(f"✅ [Data Preview] Loaded cached preview from: {cache_file}")
         return cached_data
 
     except Exception as e:
-        print(f"⚠️ [Data Preview] Error loading cache file: {str(e)}")
+        logprint(f"⚠️ [Data Preview] Error loading cache file: {str(e)}", level="warning")
         # Try to clean up corrupted cache file
         try:
             cache_file = get_preview_cache_file_path(user_id, sample_type)
@@ -89,10 +91,10 @@ def set_cached_preview(app_state, user_id: str, sample_type: str, data_path: str
         with open(cache_file, 'wb') as f:
             pickle.dump(cache_data, f)
 
-        print(f"✅ [Data Preview] Saved cache to: {cache_file}")
+        logprint(f"✅ [Data Preview] Saved cache to: {cache_file}")
 
     except Exception as e:
-        print(f"❌ [Data Preview] Error saving cache file: {str(e)}")
+        logprint(f"❌ [Data Preview] Error saving cache file: {str(e)}", level="error")
 
 def clear_user_preview_cache(app_state, user_id: str):
     """Clear all cached preview data for a user by deleting pickle files"""
@@ -107,24 +109,43 @@ def clear_user_preview_cache(app_state, user_id: str):
                 cache_file.unlink()
                 deleted_count += 1
 
-        print(f"🗑️ [Data Preview] Cleared {deleted_count} cached files for user: {user_id}")
+        logprint(f"🗑️ [Data Preview] Cleared {deleted_count} cached files for user: {user_id}")
 
     except Exception as e:
-        print(f"❌ [Data Preview] Error clearing cache files: {str(e)}")
+        logprint(f"❌ [Data Preview] Error clearing cache files: {str(e)}", level="error")
 
 def get_file_type(file_path: str) -> str:
     """Determine file type based on extension"""
-    if file_path.lower().endswith('.csv'):
+    lower = file_path.lower()
+    if lower.endswith('.csv'):
         return 'csv'
-    elif file_path.lower().endswith(('.xlsx', '.xls')):
-        return 'excel'
-    elif file_path.lower().endswith('.parquet'):
+    elif lower.endswith('.xlsx'):
+        return 'xlsx'
+    elif lower.endswith('.xls'):
+        return 'xls'
+    elif lower.endswith('.parquet'):
         return 'parquet'
-    elif file_path.lower().endswith('.json'):
+    elif lower.endswith('.json'):
         return 'json'
     else:
         # Try to detect from content or default to CSV
         return 'csv'
+
+def _try_load_excel_extension(con: duckdb.DuckDBPyConnection) -> bool:
+    """Attempt to LOAD (and if needed INSTALL) DuckDB excel extension.
+    Returns True on success, False on failure.
+    """
+    try:
+        con.execute("LOAD excel")
+        return True
+    except duckdb.Error:
+        try:
+            # INSTALL may require network; ignore errors and fallback if it fails
+            con.execute("INSTALL excel")
+            con.execute("LOAD excel")
+            return True
+        except duckdb.Error:
+            return False
 
 def read_file_with_duckdb(file_path: str, sample_size: int = 100) -> List[Dict[str, Any]]:
     """
@@ -149,24 +170,34 @@ def read_file_with_duckdb(file_path: str, sample_size: int = 100) -> List[Dict[s
         try:
             # Build optimized query based on file type
             if file_type == 'csv':
-                query = f"SELECT * FROM read_csv_auto('{file_path}') USING SAMPLE {sample_size} ROWS"
-                describe_query = f"DESCRIBE (SELECT * FROM read_csv_auto('{file_path}') LIMIT 10)"
+                query = get_sql('read_csv_sample', file_path=file_path, sample_type='random', sample_size=sample_size)
+                describe_query = get_sql('describe_csv', file_path=file_path)
             elif file_type == 'parquet':
-                query = f"SELECT * FROM read_parquet('{file_path}') USING SAMPLE {sample_size} ROWS"
-                describe_query = f"DESCRIBE (SELECT * FROM read_parquet('{file_path}') LIMIT 10)"
+                query = get_sql('read_parquet_sample', file_path=file_path, sample_type='random', sample_size=sample_size)
+                describe_query = get_sql('describe_parquet', file_path=file_path)
             elif file_type == 'json':
-                query = f"SELECT * FROM read_json_auto('{file_path}') USING SAMPLE {sample_size} ROWS"
-                describe_query = f"DESCRIBE (SELECT * FROM read_json_auto('{file_path}') LIMIT 10)"
-            elif file_type == 'excel':
-                # For Excel, use pandas but limit rows
-                df_sample = pd.read_excel(file_path, nrows=min(1000, sample_size * 10))
-                con.register('temp_df', df_sample)
-                query = f"SELECT * FROM temp_df USING SAMPLE {sample_size} ROWS"
-                describe_query = "DESCRIBE temp_df"
+                query = get_sql('read_json_sample', file_path=file_path, sample_type='random', sample_size=sample_size)
+                describe_query = get_sql('describe_json', file_path=file_path)
+            elif file_type == 'xlsx':
+                # Prefer DuckDB excel extension to avoid pandas memory usage
+                if _try_load_excel_extension(con):
+                    query = get_sql('read_xlsx_sample', file_path=file_path, sample_type='random', sample_size=sample_size)
+                    describe_query = get_sql('describe_xlsx', file_path=file_path)
+                else:
+                    # Fallback to pandas if extension unavailable
+                    df_sample = pd.read_excel(file_path, nrows=min(1000, sample_size * 10))
+                    con.register('temp_df', df_sample)
+                    query = get_sql('read_table_sample', table_name='temp_df', sample_type='random', sample_size=sample_size)
+                    describe_query = get_sql('describe_table', table_name='temp_df')
+            elif file_type == 'xls':
+                raise HTTPException(
+                    status_code=400,
+                    detail=".xls files are not supported. Please convert to .xlsx or csv."
+                )
             else:
                 # Fallback to CSV
-                query = f"SELECT * FROM read_csv_auto('{file_path}') USING SAMPLE {sample_size} ROWS"
-                describe_query = f"DESCRIBE (SELECT * FROM read_csv_auto('{file_path}') LIMIT 10)"
+                query = get_sql('read_csv_sample', file_path=file_path, sample_type='random', sample_size=sample_size)
+                describe_query = get_sql('describe_csv', file_path=file_path)
 
             # Get sample data
             result = con.execute(query).fetchall()
@@ -246,7 +277,7 @@ async def get_data_schema(
         # First, try to load existing schema
         existing_schema = load_schema(user_id, data_path)
         if existing_schema:
-            print(f"✅ [Data Preview] Using existing schema for: {data_path}")
+            logprint(f"✅ [Data Preview] Using existing schema for: {data_path}")
             schema_info = [
                 {
                     "name": col.name,
@@ -269,7 +300,7 @@ async def get_data_schema(
             }
 
         # If no existing schema, get basic schema information from file
-        print(f"⚠️ [Data Preview] No existing schema found, getting basic schema for: {data_path}")
+        logprint(f"⚠️ [Data Preview] No existing schema found, getting basic schema for: {data_path}")
         schema_info = get_file_schema(data_path)
 
         return {
@@ -313,7 +344,7 @@ async def get_data_preview(
         # Check cache first
         cached_data = get_cached_preview(app_state, user_id, sample_type.value, data_path)
         if cached_data:
-            print(f"✅ [Data Preview] Returning cached preview for: {user_id}:{data_path}:{sample_type.value}")
+            logprint(f"✅ [Data Preview] Returning cached preview for: {user_id}:{data_path}:{sample_type.value}")
             # Send cache hit message to WebSocket if connected
             try:
                 from ..websocket_manager import websocket_manager
@@ -332,12 +363,12 @@ async def get_data_preview(
                         })
                     )
             except Exception as e:
-                print(f"⚠️ [Data Preview] Could not send cache hit message: {str(e)}")
+                logprint(f"⚠️ [Data Preview] Could not send cache hit message: {str(e)}", level="warning")
 
             return cached_data
 
         # Generate new preview data
-        print(f"⚠️ [Data Preview] No cached preview found, generating new for: {user_id}:{data_path}:{sample_type.value}")
+        logprint(f"⚠️ [Data Preview] No cached preview found, generating new for: {user_id}:{data_path}:{sample_type.value}")
         sample_data = read_file_with_duckdb_sample(data_path, sample_type.value, 100)
 
         # Prepare response
@@ -402,10 +433,10 @@ async def refresh_data_preview(
                     })
                 )
         except Exception as e:
-            print(f"⚠️ [Data Preview] Could not send refresh start message: {str(e)}")
+            logprint(f"⚠️ [Data Preview] Could not send refresh start message: {str(e)}")
 
         # Generate fresh preview data
-        print(f"🔄 [Data Preview] Refreshing preview for: {user_id}:{data_path}:{sample_type.value}")
+        logprint(f"🔄 [Data Preview] Refreshing preview for: {user_id}:{data_path}:{sample_type.value}")
         sample_data = read_file_with_duckdb_sample(data_path, sample_type.value, 100)
 
         # Prepare response
@@ -439,7 +470,7 @@ async def refresh_data_preview(
                     })
                 )
         except Exception as e:
-            print(f"⚠️ [Data Preview] Could not send refresh completion message: {str(e)}")
+            logprint(f"⚠️ [Data Preview] Could not send refresh completion message: {str(e)}")
 
         return response_data
 
@@ -497,25 +528,32 @@ def get_file_schema(file_path: str) -> List[Dict[str, Any]]:
         try:
             # Build schema query based on file type
             if file_type == 'csv':
-                # Sample just a few rows to get schema
-                schema_query = f"DESCRIBE (SELECT * FROM read_csv_auto('{file_path}') LIMIT 10)"
-                sample_query = f"SELECT * FROM read_csv_auto('{file_path}') LIMIT 5"
+                schema_query = get_sql('describe_csv', file_path=file_path)
+                sample_query = get_sql('read_csv_sample', file_path=file_path, sample_type='first', sample_size=5)
             elif file_type == 'parquet':
-                schema_query = f"DESCRIBE (SELECT * FROM read_parquet('{file_path}') LIMIT 10)"
-                sample_query = f"SELECT * FROM read_parquet('{file_path}') LIMIT 5"
+                schema_query = get_sql('describe_parquet', file_path=file_path)
+                sample_query = get_sql('read_parquet_sample', file_path=file_path, sample_type='first', sample_size=5)
             elif file_type == 'json':
-                schema_query = f"DESCRIBE (SELECT * FROM read_json_auto('{file_path}') LIMIT 10)"
-                sample_query = f"SELECT * FROM read_json_auto('{file_path}') LIMIT 5"
-            elif file_type == 'excel':
-                # For Excel, use pandas but limit rows
-                df_sample = pd.read_excel(file_path, nrows=10)
-                con.register('temp_df', df_sample)
-                schema_query = "DESCRIBE temp_df"
-                sample_query = "SELECT * FROM temp_df LIMIT 5"
+                schema_query = get_sql('describe_json', file_path=file_path)
+                sample_query = get_sql('read_json_sample', file_path=file_path, sample_type='first', sample_size=5)
+            elif file_type == 'xlsx':
+                if _try_load_excel_extension(con):
+                    schema_query = get_sql('describe_xlsx', file_path=file_path)
+                    sample_query = get_sql('read_xlsx_sample', file_path=file_path, sample_type='first', sample_size=5)
+                else:
+                    df_sample = pd.read_excel(file_path, nrows=10)
+                    con.register('temp_df', df_sample)
+                    schema_query = get_sql('describe_table', table_name='temp_df')
+                    sample_query = get_sql('read_table_sample', table_name='temp_df', sample_type='first', sample_size=5)
+            elif file_type == 'xls':
+                raise HTTPException(
+                    status_code=400,
+                    detail=".xls files are not supported. Please convert to .xlsx or csv."
+                )
             else:
                 # Fallback to CSV
-                schema_query = f"DESCRIBE (SELECT * FROM read_csv_auto('{file_path}') LIMIT 10)"
-                sample_query = f"SELECT * FROM read_csv_auto('{file_path}') LIMIT 5"
+                schema_query = get_sql('describe_csv', file_path=file_path)
+                sample_query = get_sql('read_csv_sample', file_path=file_path, sample_type='first', sample_size=5)
 
             # Get column information
             columns_info = con.execute(schema_query).fetchall()
@@ -579,58 +617,43 @@ def read_file_with_duckdb_sample(file_path: str, sample_type: str = "random", sa
         try:
             # Build query based on file type and sample type
             if file_type == 'csv':
-                base_query = f"SELECT * FROM read_csv_auto('{file_path}')"
-
-                if sample_type == "random":
-                    query = f"{base_query} USING SAMPLE {sample_size} ROWS"
-                elif sample_type == "first":
-                    query = f"{base_query} LIMIT {sample_size}"
-                else:
-                    query = f"{base_query} USING SAMPLE {sample_size} ROWS"
-
+                query = get_sql('read_csv_sample', file_path=file_path, sample_type=sample_type, sample_size=sample_size)
             elif file_type == 'parquet':
-                base_query = f"SELECT * FROM read_parquet('{file_path}')"
-
-                if sample_type == "random":
-                    query = f"{base_query} USING SAMPLE {sample_size} ROWS"
-                elif sample_type == "first":
-                    query = f"{base_query} LIMIT {sample_size}"
-                else:
-                    query = f"{base_query} USING SAMPLE {sample_size} ROWS"
-
+                query = get_sql('read_parquet_sample', file_path=file_path, sample_type=sample_type, sample_size=sample_size)
             elif file_type == 'json':
-                base_query = f"SELECT * FROM read_json_auto('{file_path}')"
-
-                if sample_type == "random":
-                    query = f"{base_query} USING SAMPLE {sample_size} ROWS"
-                elif sample_type == "first":
-                    query = f"{base_query} LIMIT {sample_size}"
+                query = get_sql('read_json_sample', file_path=file_path, sample_type=sample_type, sample_size=sample_size)
+            elif file_type == 'xlsx':
+                if _try_load_excel_extension(con):
+                    query = get_sql('read_xlsx_sample', file_path=file_path, sample_type=sample_type, sample_size=sample_size)
                 else:
-                    query = f"{base_query} USING SAMPLE {sample_size} ROWS"
-
-            else:
-                # Excel files - use pandas with memory optimization
-                if file_type == 'excel':
-                    # Read only first few rows for schema detection and sampling
+                    # Fallback to limited pandas
                     df_sample = pd.read_excel(file_path, nrows=min(1000, sample_size * 10))
                     con.register('temp_df', df_sample)
-
-                    if sample_type == "random":
-                        query = f"SELECT * FROM temp_df USING SAMPLE {sample_size} ROWS"
-                    elif sample_type == "first":
-                        query = f"SELECT * FROM temp_df LIMIT {sample_size}"
-                    else:
-                        query = f"SELECT * FROM temp_df USING SAMPLE {sample_size} ROWS"
-                else:
-                    # Fallback to CSV
-                    base_query = f"SELECT * FROM read_csv_auto('{file_path}')"
-                    query = f"{base_query} USING SAMPLE {sample_size} ROWS"
+                    query = get_sql('read_table_sample', table_name='temp_df', sample_type=sample_type, sample_size=sample_size)
+            elif file_type == 'xls':
+                raise HTTPException(
+                    status_code=400,
+                    detail=".xls files are not supported. Please convert to .xlsx or csv."
+                )
+            else:
+                # Fallback to CSV
+                query = get_sql('read_csv_sample', file_path=file_path, sample_type=sample_type, sample_size=sample_size)
 
             # Execute the optimized query
             result = con.execute(query).fetchall()
 
-            # Get column names by describing the query result
-            describe_query = f"DESCRIBE ({query})"
+            # Get column names using describe on base source (schema is same regardless of sampling)
+            if file_type == 'csv':
+                describe_query = get_sql('describe_csv', file_path=file_path)
+            elif file_type == 'parquet':
+                describe_query = get_sql('describe_parquet', file_path=file_path)
+            elif file_type == 'json':
+                describe_query = get_sql('describe_json', file_path=file_path)
+            elif file_type == 'xlsx' and _try_load_excel_extension(con):
+                describe_query = get_sql('describe_xlsx', file_path=file_path)
+            else:
+                # fallback path for temp_df
+                describe_query = get_sql('describe_table', table_name='temp_df')
             column_names = [desc[0] for desc in con.execute(describe_query).fetchall()]
 
             # Convert to list of dictionaries

@@ -2,9 +2,11 @@ import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from .fingerprint import file_fingerprint_md5
 
 # Schema folder path - now using user-specific directories
 BASE_DIR = Path.home() / ".inquira"
+SCHEMAS_SUBDIR = "schemas"
 
 class SchemaColumn:
     def __init__(self, name: str, description: str, data_type: str = "", sample_values: Optional[List[Any]] = None):
@@ -58,45 +60,80 @@ class SchemaFile:
             updated_at=data.get("updated_at") or None
         )
 
-def get_schema_filename(user_id: str) -> str:
-    """Generate a filename for the schema based on user ID"""
-    return f"{user_id}_schema.json"
+def get_schema_filename(user_id: str, data_filepath: str) -> str:
+    """Generate a per-file schema filename using a fingerprint of the data file"""
+    fingerprint = file_fingerprint_md5(data_filepath)
+    return f"{user_id}_{fingerprint}_schema.json"
 
 def get_user_schema_dir(user_id: str) -> Path:
     """Get the schema directory for a specific user"""
-    user_dir = BASE_DIR / user_id
+    user_dir = BASE_DIR / user_id / SCHEMAS_SUBDIR
     user_dir.mkdir(parents=True, exist_ok=True)
     return user_dir
 
 def save_schema(user_id: str, schema: SchemaFile) -> str:
-    """Save a schema to a JSON file"""
+    """Save a schema to a JSON file (per-file fingerprint)"""
     schema_dir = get_user_schema_dir(user_id)
-    filename = get_schema_filename(user_id)
+    filename = get_schema_filename(user_id, schema.filepath)
     filepath = schema_dir / filename
 
-    # Update the updated_at timestamp
+    # Update timestamps and enrich with file metadata for freshness checks
     schema.updated_at = datetime.now().isoformat()
+    try:
+        p = Path(schema.filepath)
+        st = p.stat()
+        extra = {
+            "file_fingerprint": file_fingerprint_md5(schema.filepath),
+            "source_mtime": getattr(st, "st_mtime_ns", int(st.st_mtime * 1e9)),
+            "file_size": st.st_size,
+        }
+    except Exception:
+        extra = {}
+
+    data = schema.to_dict()
+    data.update(extra)
 
     with open(filepath, 'w') as f:
-        json.dump(schema.to_dict(), f, indent=2)
+        json.dump(data, f, indent=2)
 
     return str(filepath)
 
 def load_schema(user_id: str, data_filepath: str) -> Optional[SchemaFile]:
-    """Load a schema from a JSON file"""
+    """Load a schema for a specific data file.
+
+    Uses per-file fingerprinted filenames only. Performs freshness check against
+    current file mtime/size when metadata exists. No legacy fallback.
+    """
     schema_dir = get_user_schema_dir(user_id)
-    filename = get_schema_filename(user_id)
+    filename = get_schema_filename(user_id, data_filepath)
     filepath = schema_dir / filename
 
-    if not filepath.exists():
-        return None
+    # Try hashed schema first
+    if filepath.exists():
+        try:
+            with open(filepath, 'r') as f:
+                data = json.load(f)
 
-    try:
-        with open(filepath, 'r') as f:
-            data = json.load(f)
-        return SchemaFile.from_dict(data)
-    except (json.JSONDecodeError, KeyError):
-        return None
+            # Freshness check using metadata if present
+            try:
+                p = Path(data_filepath)
+                st = p.stat()
+                saved_mtime = data.get("source_mtime")
+                saved_size = data.get("file_size")
+                if saved_mtime is not None and saved_size is not None:
+                    current_mtime = getattr(st, "st_mtime_ns", int(st.st_mtime * 1e9))
+                    current_size = st.st_size
+                    if int(saved_mtime) != int(current_mtime) or int(saved_size) != int(current_size):
+                        return None
+            except Exception:
+                # If we cannot verify, assume usable
+                pass
+
+            return SchemaFile.from_dict(data)
+        except (json.JSONDecodeError, KeyError):
+            return None
+
+    return None
 
 def list_user_schemas(user_id: str) -> List[Dict[str, Any]]:
     """List all schemas for a user"""
@@ -123,9 +160,9 @@ def list_user_schemas(user_id: str) -> List[Dict[str, Any]]:
     return schemas
 
 def delete_schema(user_id: str, data_filepath: str) -> bool:
-    """Delete a schema file"""
+    """Delete a schema file for the specific data file"""
     schema_dir = get_user_schema_dir(user_id)
-    filename = get_schema_filename(user_id)
+    filename = get_schema_filename(user_id, data_filepath)
     filepath = schema_dir / filename
 
     if filepath.exists():

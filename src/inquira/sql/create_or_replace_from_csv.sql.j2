@@ -1,0 +1,3 @@
+CREATE OR REPLACE TABLE {{ table_name | sql_ident }} AS
+SELECT * FROM read_csv_auto('{{ file_path | sql_quote }}')
+

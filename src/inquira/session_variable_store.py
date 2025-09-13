@@ -98,7 +98,8 @@ class SessionVariableStore:
                 del self._store[session_key]
 
             if expired_sessions:
-                print(f"Cleaned up {len(expired_sessions)} expired sessions")
+                from .logger import logprint
+                logprint(f"Cleaned up {len(expired_sessions)} expired sessions")
 
     def get_session_info(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get information about a user's session"""

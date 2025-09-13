@@ -176,7 +176,7 @@ npm run dev
 ```bash
 # Supported formats:
 # - CSV files (.csv)
-# - Excel files (.xlsx, .xls)
+# - Excel files (.xlsx)
 # - Parquet files (.parquet)
 # - DuckDB databases (.db)
 ```
@@ -474,12 +474,9 @@ curl -H "Authorization: Bearer YOUR_KEY" \
      https://generativelanguage.googleapis.com/v1/models
 ```
 
-#### **4. Memory Issues**
-```bash
-# For large datasets, increase memory
-export PYTHONPATH=/usr/local/lib/python3.10
-# Or use chunked processing
-```
+#### **4. Memory / Large Files**
+- DuckDB connections are capped at ~500MB memory with on‑disk spill to avoid loading entire files.
+- `.xlsx` uses DuckDB excel extension when available; `.xls` is not supported. Convert `.xls` to `.xlsx` or `.csv`.
 
 #### **5. Code Execution Timeouts**
 ```env
@@ -618,6 +615,20 @@ copies of the Software...
 - **Data Processing**: Pandas + DuckDB
 - **LLM**: Google Gemini API
 - **Packaging**: PyInstaller for desktop distribution
+
+## How Ingestion Works (Behind the Scenes)
+
+When you point Inquira at a data file, it performs a few background steps to make analysis fast and repeatable:
+
+- File fingerprinting: Inquira computes a stable fingerprint (MD5) of the file using its normalized path, size, and modified time. This identifies a specific file/version without reading the entire content.
+- DuckDB conversion with stable table names: The file is imported into a persistent DuckDB database under a stable table name derived from the filename (non-alphanumeric replaced with underscores, forced lowercase, and prefixed with `t_` if needed). If the file fingerprint changes (the file is edited or replaced), Inquira overwrites the same table name with the new data.
+- Per-file schemas: Inquira generates a schema JSON for each unique file fingerprint and stores it at `~/.inquira/{user_id}/schemas/{user_id}_{fingerprint}_schema.json`. If the file changes, a new schema is generated for the new fingerprint. Stored file metadata helps ensure schemas are fresh.
+- Dataset catalog: Inquira maintains a datasets catalog in SQLite at `~/.inquira/inquira.db` (table `datasets`) that tracks `user_id, file_path, file_hash, table_name, schema_path, file_size, source_mtime`.
+
+Notes and implications:
+- Changing a file in place (same path) updates the existing DuckDB table’s contents.
+- Moving/renaming a file produces a different fingerprint and will be treated as a new dataset.
+- Legacy behavior (a single schema per user) is supported for migration, but new schemas are per-file fingerprint.
 
 ## Development Setup
 
@@ -794,3 +805,23 @@ CODE_TIMEOUT=30
 ## License
 
 This project is licensed under the MIT License.
+#### **Settings & Rebuild Checks**
+
+- `GET /settings/view` – Merged settings + paths + file metadata (size, mtime/ctime) + dataset info (`table_name`, timestamps). Also returns a derived table name if the dataset hasn’t been created yet.
+- `GET /settings/check-update` – Non‑mutating check for whether a rebuild is needed. Reasons may include: `no_dataset_entry`, `source_missing`, `mtime_newer`, `size_changed`, `table_missing`.
+- `PUT /settings/set/data_path` – Saves the path and triggers background processing (DuckDB convert + schema + preview cache) with WebSocket progress. Use `/settings/set/data_path_simple` to only update the path without processing.
+- All persistent DuckDB connections use `memory_limit=500MB` with a per‑user temp directory for spill. This reduces peak memory pressure when ingesting large files.
+- Rebuild logic uses the `datasets` catalog in SQLite (`~/.inquira/inquira.db`) and also verifies the expected table exists in DuckDB, so manual table deletions are detected and fixed on the next run.
+---
+
+## Admin / Utilities
+
+CLI helpers at `src/inquira/utils/db_tools.py`:
+
+- List DuckDB tables (read‑only; falls back to catalog on lock):
+  - `python -m inquira.utils.db_tools list <user|username>`
+- List catalog tables (SQLite):
+  - `python -m inquira.utils.db_tools catalog <user|username>`
+- Delete a DuckDB table (requires closing app connections first):
+  - `python -m inquira.utils.db_tools delete <user|username> <table>`
+- Tip: If the DB is locked, call `POST /settings/close-connections` or stop the server, then retry.

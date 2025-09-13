@@ -3,6 +3,7 @@ from typing import Dict, Optional, Any
 from datetime import datetime
 from fastapi import WebSocket
 import logging
+from .logger import logprint
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +141,7 @@ class WebSocketManager:
 
     async def connect(self, user_id: str, websocket: WebSocket):
         """Accept and register a new WebSocket connection"""
-        print(f"🔌 [WebSocket] Establishing connection for user: {user_id}")
+        logprint(f"🔌 [WebSocket] Establishing connection for user: {user_id}")
         await websocket.accept()
         self.active_connections[user_id] = websocket
 
@@ -150,53 +151,53 @@ class WebSocketManager:
             "message": "Connected to Inquira processing service",
             "timestamp": datetime.now().isoformat()
         }
-        print(f"📤 [WebSocket] Sending welcome message to user {user_id}: {welcome_message}")
+        logprint(f"📤 [WebSocket] Sending welcome message to user {user_id}: {welcome_message}")
         await websocket.send_json(welcome_message)
 
-        print(f"✅ [WebSocket] Connection established for user: {user_id}")
+        logprint(f"✅ [WebSocket] Connection established for user: {user_id}")
         logger.info(f"WebSocket connection established for user: {user_id}")
 
     async def disconnect(self, user_id: str):
         """Remove a WebSocket connection"""
         if user_id in self.active_connections:
             del self.active_connections[user_id]
-            print(f"🔌 [WebSocket] Connection closed for user: {user_id}")
+            logprint(f"🔌 [WebSocket] Connection closed for user: {user_id}")
             logger.info(f"WebSocket connection closed for user: {user_id}")
         else:
-            print(f"⚠️ [WebSocket] Attempted to disconnect non-existent connection for user: {user_id}")
+            logprint(f"⚠️ [WebSocket] Attempted to disconnect non-existent connection for user: {user_id}")
 
     async def send_to_user(self, user_id: str, message: dict):
         """Send a message to a specific user"""
         if user_id in self.active_connections:
             try:
                 # Log the message being sent
-                print(f"📤 [WebSocket] Sending to user {user_id}: {message}")
+                logprint(f"📤 [WebSocket] Sending to user {user_id}: {message}")
                 logger.info(f"WebSocket message sent to user {user_id}: {message}")
 
                 await self.active_connections[user_id].send_json(message)
-                print(f"✅ [WebSocket] Message sent successfully to user {user_id}")
+                logprint(f"✅ [WebSocket] Message sent successfully to user {user_id}")
             except Exception as e:
-                print(f"❌ [WebSocket] Error sending message to user {user_id}: {e}")
+                logprint(f"❌ [WebSocket] Error sending message to user {user_id}: {e}", level="error")
                 logger.error(f"Error sending message to user {user_id}: {e}")
                 # Remove broken connection
                 await self.disconnect(user_id)
         else:
-            print(f"⚠️ [WebSocket] No active connection for user {user_id}")
-            print(f"🔍 [WebSocket] Active connections: {list(self.active_connections.keys())}")
+            logprint(f"⚠️ [WebSocket] No active connection for user {user_id}")
+            logprint(f"🔍 [WebSocket] Active connections: {list(self.active_connections.keys())}")
             logger.warning(f"No active WebSocket connection for user {user_id}")
 
     async def broadcast_progress(self, user_id: str, stage: str, progress: Optional[int] = None, message: Optional[str] = None):
         """Send progress update to user"""
-        print(f"📊 [WebSocket] Broadcasting progress to user {user_id}: stage={stage}, progress={progress}")
+        logprint(f"📊 [WebSocket] Broadcasting progress to user {user_id}: stage={stage}, progress={progress}")
         if user_id in self.active_connections:
-            print(f"📤 [WebSocket] Sending progress update to user {user_id}")
+            logprint(f"📤 [WebSocket] Sending progress update to user {user_id}")
             await self.progress_messenger.send_progress_update(
                 self.active_connections[user_id], stage, progress, message
             )
-            print(f"✅ [WebSocket] Progress update sent successfully to user {user_id}")
+            logprint(f"✅ [WebSocket] Progress update sent successfully to user {user_id}")
         else:
-            print(f"⚠️ [WebSocket] Cannot broadcast progress - no active connection for user {user_id}")
-            print(f"🔍 [WebSocket] Active connections: {list(self.active_connections.keys())}")
+            logprint(f"⚠️ [WebSocket] Cannot broadcast progress - no active connection for user {user_id}")
+            logprint(f"🔍 [WebSocket] Active connections: {list(self.active_connections.keys())}")
             logger.warning(f"No active WebSocket connection for user {user_id} during progress broadcast")
 
     def is_connected(self, user_id: str) -> bool:
@@ -205,7 +206,7 @@ class WebSocketManager:
 
     async def send_error(self, user_id: str, error_message: str):
         """Send error message to user"""
-        print(f"❌ [WebSocket] Sending error to user {user_id}: {error_message}")
+        logprint(f"❌ [WebSocket] Sending error to user {user_id}: {error_message}", level="error")
         await self.send_to_user(user_id, {
             "type": "error",
             "message": error_message,
@@ -214,14 +215,14 @@ class WebSocketManager:
 
     async def send_completion(self, user_id: str, result: dict):
         """Send completion message with results"""
-        print(f"✅ [WebSocket] Sending completion to user {user_id}")
-        print(f"🔍 [WebSocket] Completion result keys: {list(result.keys()) if isinstance(result, dict) else 'not dict'}")
+        logprint(f"✅ [WebSocket] Sending completion to user {user_id}")
+        logprint(f"🔍 [WebSocket] Completion result keys: {list(result.keys()) if isinstance(result, dict) else 'not dict'}")
         await self.send_to_user(user_id, {
             "type": "completed",
             "result": result,
             "timestamp": datetime.now().isoformat()
         })
-        print(f"✅ [WebSocket] Completion message sent to user {user_id}")
+        logprint(f"✅ [WebSocket] Completion message sent to user {user_id}")
 
 
 # Global WebSocket manager instance

@@ -7,6 +7,10 @@ from datetime import datetime, timedelta
 import duckdb
 import pandas as pd
 from .config_models import AppConfig
+from .sql_library import get_sql
+from .database import upsert_dataset, get_dataset_by_path
+from .fingerprint import file_fingerprint_md5
+from .logger import logprint
 
 
 class DatabaseManager:
@@ -18,8 +22,8 @@ class DatabaseManager:
     def __init__(self, config: AppConfig):
         self.config = config
         # Use user's home directory for persistent storage
-        self.base_dir = Path.home() / '.inquira'
-        self.databases_dir = self.base_dir / 'databases'
+        self.base_dir = Path.home() / ".inquira"
+        self.databases_dir = self.base_dir / "databases"
         self.databases_dir.mkdir(parents=True, exist_ok=True)
 
         # In-memory connection cache: {db_path: connection}
@@ -38,24 +42,36 @@ class DatabaseManager:
         # Check if database needs to be created/updated
         needs_recreation = self._should_recreate_database(db_path, file_path)
         if needs_recreation:
-            print(f"🔧 [Database] Creating/updating database for user {user_id}: {file_path}")
+            logprint(
+                f"🔧 [Database] Creating/updating database for user {user_id}: {file_path}"
+            )
             self._create_database(db_path, file_path)
         else:
-            print(f"♻️ [Database] Reusing existing database for user {user_id}: {file_path}")
+            logprint(
+                f"♻️ [Database] Reusing existing database for user {user_id}: {file_path}"
+            )
 
         # Get or create connection
         if str(db_path) not in self.connections:
-            print(f"🔌 [Database] Creating new connection to: {db_path}")
-            self.connections[str(db_path)] = duckdb.connect(str(db_path))
+            logprint(f"🔌 [Database] Creating new connection to: {db_path}")
+            # Enforce memory cap and enable disk spilling for safety
+            user_temp_dir = db_path.parent / "tmp"
+            user_temp_dir.mkdir(parents=True, exist_ok=True)
+            self.connections[str(db_path)] = duckdb.connect(
+                str(db_path),
+                config={"memory_limit": "500MB", "temp_directory": str(user_temp_dir)},
+            )
         else:
-            print(f"🔗 [Database] Reusing existing connection to: {db_path}")
+            logprint(f"🔗 [Database] Reusing existing connection to: {db_path}")
 
         # Update last accessed time
         self._update_last_accessed(db_path)
 
         return self.connections[str(db_path)]
 
-    def get_existing_connection(self, user_id: str) -> Optional[duckdb.DuckDBPyConnection]:
+    def get_existing_connection(
+        self, user_id: str
+    ) -> Optional[duckdb.DuckDBPyConnection]:
         """
         Get existing database connection for a user without creating new database.
         Returns None if database doesn't exist.
@@ -67,7 +83,13 @@ class DatabaseManager:
 
         # Get or create connection
         if str(db_path) not in self.connections:
-            self.connections[str(db_path)] = duckdb.connect(str(db_path))
+            # Enforce memory cap and enable disk spilling for safety
+            user_temp_dir = db_path.parent / "tmp"
+            user_temp_dir.mkdir(parents=True, exist_ok=True)
+            self.connections[str(db_path)] = duckdb.connect(
+                str(db_path),
+                config={"memory_limit": "500MB", "temp_directory": str(user_temp_dir)},
+            )
 
         # Update last accessed time
         self._update_last_accessed(db_path)
@@ -88,7 +110,7 @@ class DatabaseManager:
         # Use filename without extension, replace special chars with underscores
         filename = Path(file_path).stem
         # Replace any non-alphanumeric characters with underscores
-        table_name = ''.join(c if c.isalnum() else '_' for c in filename)
+        table_name = "".join(c if c.isalnum() else "_" for c in filename)
         # Ensure it starts with a letter
         if table_name and not table_name[0].isalpha():
             table_name = f"t_{table_name}"
@@ -98,141 +120,195 @@ class DatabaseManager:
         return table_name.lower()
 
     def _should_recreate_database(self, db_path: Path, file_path: str) -> bool:
-        """Check if table needs to be created/updated"""
+        """Check if DuckDB table needs to be created/updated using SQLite catalog and filesystem."""
         table_name = self._get_table_name(file_path)
 
         # Database doesn't exist
         if not db_path.exists():
-            print(f"📁 [Database] Database doesn't exist, creating: {db_path}")
+            logprint(f"📁 [Database] Database doesn't exist, creating: {db_path}")
             return True
 
-        # Source file doesn't exist
+        # Source file must exist
         if not os.path.exists(file_path):
-            print(f"❌ [Database] Source file doesn't exist: {file_path}")
+            logprint(
+                f"❌ [Database] Source file doesn't exist: {file_path}", level="error"
+            )
             return True
 
-        # Check metadata for table information
-        metadata = self._load_metadata(db_path)
-        if not metadata or 'tables' not in metadata:
-            print(f"📋 [Database] No metadata found, recreating database")
+        # Consult datasets catalog for this file
+        try:
+            from .database import get_dataset_by_path
+            user_id = db_path.parent.name
+            dataset = get_dataset_by_path(user_id, file_path)
+        except Exception:
+            dataset = None
+
+        if not dataset:
+            logprint(f"📋 [Database] No dataset catalog entry found, creating table '{table_name}'")
             return True
 
-        # Check if table exists in metadata
-        if table_name not in metadata['tables']:
-            print(f"📊 [Database] Table '{table_name}' not found in metadata, creating")
+        # Compare file modification time to cataloged source_mtime
+        try:
+            current_mtime = os.path.getmtime(file_path)
+            stored_mtime = float(dataset.get('source_mtime') or 0)
+        except Exception:
+            current_mtime = 0
+            stored_mtime = 0
+
+        if current_mtime > stored_mtime:
+            logprint(f"🔄 [Database] Source file updated since last ingest; recreating table '{table_name}'")
             return True
 
-        table_info = metadata['tables'][table_name]
-
-        # Check if source file was modified after table creation
-        source_mtime = os.path.getmtime(file_path)
-        table_creation_time = table_info.get('created_at', 0)
-
-        # Convert ISO string to timestamp if needed
-        if isinstance(table_creation_time, str):
-            try:
-                table_creation_time = datetime.fromisoformat(table_creation_time).timestamp()
-            except:
-                print(f"⚠️ [Database] Could not parse creation time, recreating")
+        # Also ensure the table actually exists in the DuckDB database
+        try:
+            conn = self.connections.get(str(db_path))
+            if conn is not None:
+                rows = conn.execute("SHOW TABLES").fetchall()
+            else:
+                # Open a lightweight read-only connection to check
+                user_temp_dir = db_path.parent / 'tmp'
+                user_temp_dir.mkdir(parents=True, exist_ok=True)
+                ro_conn = duckdb.connect(
+                    str(db_path),
+                    read_only=True,
+                    config={
+                        'memory_limit': '500MB',
+                        'temp_directory': str(user_temp_dir),
+                        'access_mode': 'READ_ONLY',
+                    }
+                )
+                try:
+                    rows = ro_conn.execute("SHOW TABLES").fetchall()
+                finally:
+                    ro_conn.close()
+            existing = {r[0] for r in rows}
+            if table_name not in existing:
+                logprint(f"🧹 [Database] Table '{table_name}' missing from DuckDB file; will recreate")
                 return True
+        except Exception as e:
+            # If we cannot verify, assume existing and proceed; other checks still guard correctness
+            logprint(f"⚠️ [Database] Could not verify table existence: {e}", level="warning")
 
-        # Compare modification times
-        if source_mtime > table_creation_time:
-            print(f"🔄 [Database] File modified after database creation:")
-            print(f"   File mtime: {datetime.fromtimestamp(source_mtime)}")
-            print(f"   DB created: {datetime.fromtimestamp(table_creation_time)}")
-            print(f"   Recreating database for: {file_path}")
-            return True
-        else:
-            print(f"✅ [Database] File unchanged, reusing existing database:")
-            print(f"   File: {file_path}")
-            print(f"   Table: {table_name}")
-            print(f"   Database: {db_path}")
-            return False
+        logprint(f"✅ [Database] Up-to-date; reusing table '{table_name}' in {db_path}")
+        return False
 
     def _create_database(self, db_path: Path, file_path: str):
         """Create or update DuckDB database with table for source file"""
         table_name = self._get_table_name(file_path)
-        print(f"🏗️ [Database] Creating/updating table '{table_name}' in database: {db_path}")
-        print(f"   Source file: {file_path}")
-        print(f"   File type: {self._get_file_type(file_path)}")
-        print(f"   File size: {os.path.getsize(file_path)} bytes")
+        logprint(
+            f"🏗️ [Database] Creating/updating table '{table_name}' in database: {db_path}"
+        )
+        logprint(f"   Source file: {file_path}")
+        logprint(f"   File type: {self._get_file_type(file_path)}")
+        logprint(f"   File size: {os.path.getsize(file_path)} bytes")
 
         # Create database if it doesn't exist
         db_exists = db_path.exists()
-        conn = duckdb.connect(str(db_path))
+        # Enforce memory cap and enable disk spilling for safety during creation
+        user_temp_dir = db_path.parent / "tmp"
+        user_temp_dir.mkdir(parents=True, exist_ok=True)
+        conn = duckdb.connect(
+            str(db_path),
+            config={"memory_limit": "500MB", "temp_directory": str(user_temp_dir)},
+        )
 
         try:
             # Generate table name from filename
             table_name = self._get_table_name(file_path)
 
-            # Check if table already exists
-            existing_tables = conn.execute("SHOW TABLES").fetchall()
-            table_names = [row[0] for row in existing_tables]
-
-            if table_name in table_names:
-                print(f"Table '{table_name}' already exists in database")
-                return
+            # We will create or replace the table to ensure freshness
 
             # Determine file type and create table
             file_type = self._get_file_type(file_path)
 
-            if file_type == 'csv':
-                conn.execute(f"""
-                    CREATE TABLE {table_name} AS
-                    SELECT * FROM read_csv_auto('{file_path}')
-                """)
-            elif file_type == 'parquet':
-                conn.execute(f"""
-                    CREATE TABLE {table_name} AS
-                    SELECT * FROM read_parquet('{file_path}')
-                """)
-            elif file_type == 'json':
-                conn.execute(f"""
-                    CREATE TABLE {table_name} AS
-                    SELECT * FROM read_json_auto('{file_path}')
-                """)
-            elif file_type in ['xlsx', 'xls']:
-                # Handle Excel files with pandas
-                df = pd.read_excel(file_path)
-                conn.register('temp_df', df)
-                conn.execute(f"CREATE TABLE {table_name} AS SELECT * FROM temp_df")
+            if file_type == "csv":
+                sql = get_sql(
+                    "create_or_replace_from_csv",
+                    table_name=table_name,
+                    file_path=file_path,
+                )
+                conn.execute(sql)
+            elif file_type == "parquet":
+                sql = get_sql(
+                    "create_or_replace_from_parquet",
+                    table_name=table_name,
+                    file_path=file_path,
+                )
+                conn.execute(sql)
+            elif file_type == "json":
+                sql = get_sql(
+                    "create_or_replace_from_json",
+                    table_name=table_name,
+                    file_path=file_path,
+                )
+                conn.execute(sql)
+            elif file_type == "xlsx":
+                # Prefer DuckDB excel extension for .xlsx; fallback to pandas if not available
+                try:
+                    conn.execute("LOAD excel")
+                except duckdb.Error:
+                    try:
+                        conn.execute("INSTALL excel")
+                        conn.execute("LOAD excel")
+                    except duckdb.Error:
+                        df = pd.read_excel(file_path)
+                        conn.register("temp_df", df)
+                        conn.execute(
+                            f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM temp_df"
+                        )
+                    else:
+                        sql = get_sql(
+                            "create_or_replace_from_xlsx",
+                            table_name=table_name,
+                            file_path=file_path,
+                        )
+                        conn.execute(sql)
+                else:
+                    sql = get_sql(
+                        "create_or_replace_from_xlsx",
+                        table_name=table_name,
+                        file_path=file_path,
+                    )
+                    conn.execute(sql)
+            elif file_type == "xls":
+                # Explicitly unsupported: do not attempt to ingest .xls
+                raise RuntimeError(".xls files are not supported. Please convert to .xlsx or csv.")
             else:
                 # Default to CSV
-                conn.execute(f"""
-                    CREATE TABLE {table_name} AS
-                    SELECT * FROM read_csv_auto('{file_path}')
-                """)
+                sql = get_sql(
+                    "create_or_replace_from_csv",
+                    table_name=table_name,
+                    file_path=file_path,
+                )
+                conn.execute(sql)
 
-            # Load or create metadata
-            if db_exists:
-                metadata = self._load_metadata(db_path) or {}
-                if 'tables' not in metadata:
-                    metadata['tables'] = {}
-            else:
-                metadata = {
-                    'database_created': datetime.now().isoformat(),
-                    'last_accessed': datetime.now().isoformat(),
-                    'tables': {}
-                }
+            # Compute stats and update catalog (SQLite)
+            row_count = (
+                conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone() or [0]
+            )[0]
 
-            # Add table metadata
-            table_info = {
-                'source_file': file_path,
-                'source_mtime': os.path.getmtime(file_path),
-                'created_at': datetime.now().isoformat(),
-                'file_size': os.path.getsize(file_path),
-                'row_count': (conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone() or [0])[0],
-                'file_type': file_type
-            }
-            metadata['tables'][table_name] = table_info
-            metadata['last_accessed'] = datetime.now().isoformat()
+            logprint(
+                f"✅ [Database] Successfully created table '{table_name}' with {row_count} rows"
+            )
+            logprint(f"   Database saved to: {db_path}")
 
-            self._save_metadata(db_path, metadata)
-            self.metadata_cache[str(db_path)] = metadata
-
-            print(f"✅ [Database] Successfully created table '{table_name}' with {table_info['row_count']} rows")
-            print(f"   Database saved to: {db_path}")
+            # Upsert datasets catalog record
+            try:
+                st = os.stat(file_path)
+                upsert_dataset(
+                    user_id=db_path.parent.name,
+                    file_path=file_path,
+                    table_name=table_name,
+                    file_size=st.st_size,
+                    source_mtime=getattr(st, "st_mtime", st.st_ctime),
+                    row_count=row_count,
+                    file_type=file_type,
+                )
+            except Exception as e:
+                logprint(
+                    f"⚠️ [Database] Failed to upsert dataset catalog: {e}",
+                    level="warning",
+                )
 
         finally:
             conn.close()
@@ -240,21 +316,25 @@ class DatabaseManager:
     def _get_file_type(self, file_path: str) -> str:
         """Determine file type from extension"""
         path = Path(file_path)
-        if path.suffix.lower() == '.csv':
-            return 'csv'
-        elif path.suffix.lower() == '.parquet':
-            return 'parquet'
-        elif path.suffix.lower() == '.json':
-            return 'json'
-        elif path.suffix.lower() in ['.xlsx', '.xls']:
-            return 'excel'
+        suf = path.suffix.lower()
+        if suf == ".csv":
+            return "csv"
+        elif suf == ".parquet":
+            return "parquet"
+        elif suf == ".json":
+            return "json"
+        elif suf == ".xlsx":
+            return "xlsx"
+        elif suf == ".xls":
+            return "xls"
         else:
-            return 'csv'  # Default
+            return "csv"  # Default
 
     def _load_metadata(self, db_path: Path) -> Optional[dict]:
-        """Load metadata for database"""
+        """Load metadata for database (migrates legacy filename if needed)"""
         user_id = db_path.parent.name
-        metadata_path = db_path.parent / f"{user_id}_schema.json"
+        metadata_path = db_path.parent / f"{user_id}_dbmeta.json"
+        legacy_path = db_path.parent / f"{user_id}_schema.json"
 
         # Check cache first
         if str(db_path) in self.metadata_cache:
@@ -262,11 +342,23 @@ class DatabaseManager:
 
         if metadata_path.exists():
             try:
-                with open(metadata_path, 'r') as f:
+                with open(metadata_path, "r") as f:
                     metadata = json.load(f)
                     self.metadata_cache[str(db_path)] = metadata
                     return metadata
             except:
+                return None
+
+        # Migrate legacy metadata file if present and looks like DB metadata
+        if legacy_path.exists():
+            try:
+                with open(legacy_path, "r") as f:
+                    legacy = json.load(f)
+                if isinstance(legacy, dict) and "tables" in legacy:
+                    self._save_metadata(db_path, legacy)
+                    self.metadata_cache[str(db_path)] = legacy
+                    return legacy
+            except Exception:
                 return None
 
         return None
@@ -274,15 +366,15 @@ class DatabaseManager:
     def _save_metadata(self, db_path: Path, metadata: dict):
         """Save metadata for database"""
         user_id = db_path.parent.name
-        metadata_path = db_path.parent / f"{user_id}_schema.json"
-        with open(metadata_path, 'w') as f:
+        metadata_path = db_path.parent / f"{user_id}_dbmeta.json"
+        with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=2)
 
     def _update_last_accessed(self, db_path: Path):
         """Update last accessed time for database"""
         metadata = self._load_metadata(db_path)
         if metadata:
-            metadata['last_accessed'] = datetime.now().isoformat()
+            metadata["last_accessed"] = datetime.now().isoformat()
             self._save_metadata(db_path, metadata)
 
     def close_connection(self, user_id: str, file_path: str):
@@ -301,7 +393,7 @@ class DatabaseManager:
         for db_file in self.base_dir.rglob("*_data.duckdb"):
             metadata = self._load_metadata(db_file)
             if metadata:
-                last_accessed = metadata.get('last_accessed')
+                last_accessed = metadata.get("last_accessed")
                 if last_accessed:
                     try:
                         last_accessed_dt = datetime.fromisoformat(last_accessed)
@@ -322,22 +414,24 @@ class DatabaseManager:
                         continue
 
     def get_database_info(self, user_id: str, file_path: str) -> Optional[dict]:
-        """Get information about a database"""
+        """Get information about a dataset from SQLite catalog"""
         db_path = self._get_database_path(user_id, file_path)
-        metadata = self._load_metadata(db_path)
-
-        if metadata:
+        try:
+            from .database import get_dataset_by_path
+            dataset = get_dataset_by_path(user_id, file_path)
+            if not dataset:
+                return None
             return {
-                'database_path': str(db_path),
-                'source_file': metadata.get('source_file'),
-                'created_at': metadata.get('created_at'),
-                'last_accessed': metadata.get('last_accessed'),
-                'file_size': metadata.get('file_size'),
-                'row_count': metadata.get('row_count'),
-                'file_type': metadata.get('file_type')
+                "database_path": str(db_path),
+                "source_file": dataset.get("file_path"),
+                "created_at": dataset.get("created_at"),
+                "last_accessed": dataset.get("updated_at"),
+                "file_size": dataset.get("file_size"),
+                "row_count": dataset.get("row_count"),
+                "file_type": dataset.get("file_type"),
             }
-
-        return None
+        except Exception:
+            return None
 
     def shutdown(self):
         """Clean shutdown - close all connections"""

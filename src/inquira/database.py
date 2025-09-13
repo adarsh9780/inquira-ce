@@ -3,6 +3,8 @@ import secrets
 from pathlib import Path
 from typing import Optional, Dict, Any
 import json
+from .fingerprint import file_fingerprint_md5
+from .logger import logprint
 
 # Database file path
 DB_PATH = Path.home() / ".inquira" / "inquira.db"
@@ -61,6 +63,41 @@ def init_database():
         )
     ''')
 
+    # Create datasets catalog table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS datasets (
+            id INTEGER PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            file_hash TEXT NOT NULL,
+            table_name TEXT NOT NULL,
+            schema_path TEXT,
+            file_size INTEGER,
+            source_mtime REAL,
+            -- New columns may be added via migration below
+            row_count INTEGER,
+            file_type TEXT,
+            last_accessed TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, file_hash),
+            FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Lightweight migrations: ensure optional columns exist
+    try:
+        cursor.execute("PRAGMA table_info(datasets)")
+        cols = {row[1] for row in cursor.fetchall()}
+        if 'row_count' not in cols:
+            cursor.execute("ALTER TABLE datasets ADD COLUMN row_count INTEGER")
+        if 'file_type' not in cols:
+            cursor.execute("ALTER TABLE datasets ADD COLUMN file_type TEXT")
+        if 'last_accessed' not in cols:
+            cursor.execute("ALTER TABLE datasets ADD COLUMN last_accessed TIMESTAMP")
+    except Exception:
+        pass
+
     conn.commit()
     conn.close()
 
@@ -69,7 +106,7 @@ def migrate_json_to_sqlite():
     users_file = Path.home() / ".inquira" / "users.json"
 
     if not users_file.exists():
-        print("No existing JSON data to migrate")
+        logprint("No existing JSON data to migrate")
         return
 
     try:
@@ -113,10 +150,10 @@ def migrate_json_to_sqlite():
         # Backup the old JSON file
         backup_file = users_file.with_suffix('.json.backup')
         users_file.rename(backup_file)
-        print(f"✅ Migration completed. Original file backed up as {backup_file}")
+        logprint(f"✅ Migration completed. Original file backed up as {backup_file}")
 
     except Exception as e:
-        print(f"❌ Migration failed: {e}")
+        logprint(f"❌ Migration failed: {e}", level="error")
 
 # Initialize database on module import
 init_database()
@@ -138,6 +175,125 @@ def create_user(user_id: str, username: str, password_hash: str, salt: str) -> b
         return True
     except sqlite3.IntegrityError:
         return False
+
+# Datasets catalog operations
+def upsert_dataset(
+    user_id: str,
+    file_path: str,
+    table_name: str,
+    file_size: int,
+    source_mtime: float,
+    row_count: int | None = None,
+    file_type: str | None = None,
+) -> bool:
+    """Insert or update a dataset record based on user+file_hash, including stats."""
+    try:
+        file_hash = file_fingerprint_md5(file_path)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO datasets (user_id, file_path, file_hash, table_name, file_size, source_mtime, row_count, file_type, last_accessed)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id, file_hash) DO UPDATE SET
+                file_path = excluded.file_path,
+                table_name = excluded.table_name,
+                file_size = excluded.file_size,
+                source_mtime = excluded.source_mtime,
+                row_count = COALESCE(excluded.row_count, datasets.row_count),
+                file_type = COALESCE(excluded.file_type, datasets.file_type),
+                last_accessed = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+        ''', (user_id, file_path, file_hash, table_name, file_size, source_mtime, row_count, file_type))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        logprint(f"Error upserting dataset: {e}", level="error")
+        return False
+
+def set_dataset_schema_path(user_id: str, file_path: str, schema_path: str) -> bool:
+    """Set schema_path for a dataset by user and file path (computed hash)"""
+    try:
+        file_hash = file_fingerprint_md5(file_path)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE datasets SET schema_path = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = ? AND file_hash = ?
+        ''', (schema_path, user_id, file_hash))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        logprint(f"Error updating dataset schema_path: {e}", level="error")
+        return False
+
+def touch_dataset_last_accessed(user_id: str, file_path: str) -> bool:
+    """Update last_accessed for a dataset to CURRENT_TIMESTAMP"""
+    try:
+        file_hash = file_fingerprint_md5(file_path)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE datasets SET last_accessed = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = ? AND file_hash = ?
+        ''', (user_id, file_hash))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        logprint(f"Error touching dataset last_accessed: {e}", level="error")
+        return False
+
+def get_dataset_by_path(user_id: str, file_path: str) -> Optional[Dict[str, Any]]:
+    try:
+        file_hash = file_fingerprint_md5(file_path)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, user_id, file_path, file_hash, table_name, schema_path,
+                   file_size, source_mtime, row_count, file_type, last_accessed,
+                   created_at, updated_at
+            FROM datasets WHERE user_id = ? AND file_hash = ?
+        ''', (user_id, file_hash))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return {
+                'id': row[0], 'user_id': row[1], 'file_path': row[2], 'file_hash': row[3],
+                'table_name': row[4], 'schema_path': row[5], 'file_size': row[6],
+                'source_mtime': row[7], 'row_count': row[8], 'file_type': row[9],
+                'last_accessed': row[10], 'created_at': row[11], 'updated_at': row[12]
+            }
+        return None
+    except Exception as e:
+        logprint(f"Error getting dataset: {e}", level="error")
+        return None
+
+def list_datasets(user_id: str) -> list[Dict[str, Any]]:
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, user_id, file_path, file_hash, table_name, schema_path,
+                   file_size, source_mtime, row_count, file_type, last_accessed,
+                   created_at, updated_at
+            FROM datasets WHERE user_id = ? ORDER BY updated_at DESC
+        ''', (user_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        result = []
+        for row in rows:
+            result.append({
+                'id': row[0], 'user_id': row[1], 'file_path': row[2], 'file_hash': row[3],
+                'table_name': row[4], 'schema_path': row[5], 'file_size': row[6],
+                'source_mtime': row[7], 'row_count': row[8], 'file_type': row[9],
+                'last_accessed': row[10], 'created_at': row[11], 'updated_at': row[12]
+            })
+        return result
+    except Exception as e:
+        logprint(f"Error listing datasets: {e}", level="error")
+        return []
     except Exception:
         return False
 
@@ -197,7 +353,7 @@ def update_user_password(user_id: str, new_password_hash: str, new_salt: str) ->
         conn.close()
         return True
     except Exception as e:
-        print(f"Error updating password: {e}")
+        logprint(f"Error updating password: {e}", level="error")
         return False
 
 # Settings operations
@@ -244,7 +400,7 @@ def save_user_settings(user_id: str, settings: Dict[str, Any]) -> bool:
         conn.close()
         return True
     except Exception as e:
-        print(f"Error saving settings: {e}")
+        logprint(f"Error saving settings: {e}", level="error")
         return False
 
 # Session operations
@@ -274,7 +430,7 @@ def create_session(session_id: str, user_id: str, session_data: Dict[str, Any]) 
         conn.close()
         return True
     except Exception as e:
-        print(f"Error creating session: {e}")
+        logprint(f"Error creating session: {e}", level="error")
         return False
 
 def get_session(session_id: str) -> Optional[Dict[str, Any]]:
@@ -327,7 +483,7 @@ def update_session(session_id: str, session_data: Dict[str, Any]) -> bool:
         conn.close()
         return True
     except Exception as e:
-        print(f"Error updating session: {e}")
+        logprint(f"Error updating session: {e}", level="error")
         return False
 
 def add_chat_message(session_id: str, message: Dict[str, Any]) -> bool:
@@ -358,7 +514,7 @@ def add_chat_message(session_id: str, message: Dict[str, Any]) -> bool:
         conn.close()
         return True
     except Exception as e:
-        print(f"Error adding chat message: {e}")
+        logprint(f"Error adding chat message: {e}", level="error")
         return False
 
 def delete_user_settings(user_id: str) -> bool:
@@ -371,7 +527,7 @@ def delete_user_settings(user_id: str) -> bool:
         conn.close()
         return True
     except Exception as e:
-        print(f"Error deleting settings: {e}")
+        logprint(f"Error deleting settings: {e}", level="error")
         return False
 
 def delete_user_account(user_id: str) -> bool:
@@ -392,5 +548,5 @@ def delete_user_account(user_id: str) -> bool:
             conn.close()
             return False
     except Exception as e:
-        print(f"Error deleting user account: {e}")
+        logprint(f"Error deleting user account: {e}", level="error")
         return False

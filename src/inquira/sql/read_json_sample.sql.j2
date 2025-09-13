@@ -1,0 +1,7 @@
+SELECT * FROM read_json_auto('{{ file_path | sql_quote }}')
+{% if sample_type == 'random' %}
+USING SAMPLE {{ sample_size }} ROWS
+{% elif sample_type == 'first' %}
+LIMIT {{ sample_size }}
+{% endif %}
+

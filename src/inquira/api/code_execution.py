@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request, Depends
+from ..logger import logprint
 from pydantic import BaseModel, Field
 from typing import Any, Optional, Dict
 
@@ -60,10 +61,10 @@ async def execute_code(
     import time
     start_time = time.time()
 
-    print(f"DEBUG: Received code: {request.code}")  # Debug print
+    logprint(f"DEBUG: Received code: {request.code}", level="debug")
 
     try:
-        print("DEBUG: Starting code execution")  # Debug print
+        logprint("DEBUG: Starting code execution", level="debug")
 
         # Get CodeWhisperer instance
         code_whisperer = get_code_whisperer(app_state)
@@ -77,13 +78,13 @@ async def execute_code(
                 db_connection = app_state.db_manager.get_connection(user_id, app_state.data_path)
                 # Inject the connection into CodeWhisperer as 'conn'
                 code_whisperer.set_cached_connection("conn", db_connection)
-                print(f"DEBUG: Injected database connection as 'conn' for user {user_id}")
+                logprint(f"DEBUG: Injected database connection as 'conn' for user {user_id}", level="debug")
             except Exception as e:
-                print(f"DEBUG: Could not inject database connection: {e}")
+                logprint(f"DEBUG: Could not inject database connection: {e}", level="debug")
 
         # Execute the code with user session
         result, error = code_whisperer.execute_with_timeout(request.code, current_user["user_id"])
-        print(f"DEBUG: Execution result - Result: {result}, Error: {error}")  # Debug print
+        logprint(f"DEBUG: Execution result - Result: {result}, Error: {error}", level="debug")
 
         execution_time = time.time() - start_time
 
@@ -96,7 +97,7 @@ async def execute_code(
 
     except Exception as e:
         execution_time = time.time() - start_time
-        print(f"DEBUG: Exception in endpoint: {e}")  # Debug print
+        logprint(f"DEBUG: Exception in endpoint: {e}", level="debug")
         import traceback
         traceback.print_exc()
         raise HTTPException(
@@ -182,9 +183,9 @@ async def execute_code_with_variables(
                 db_connection = app_state.db_manager.get_connection(user_id, app_state.data_path)
                 # Inject the connection into CodeWhisperer as 'conn'
                 code_whisperer.set_cached_connection("conn", db_connection)
-                print(f"DEBUG: Injected database connection as 'conn' for user {user_id}")
+                logprint(f"DEBUG: Injected database connection as 'conn' for user {user_id}", level="debug")
             except Exception as e:
-                print(f"DEBUG: Could not inject database connection: {e}")
+                logprint(f"DEBUG: Could not inject database connection: {e}", level="debug")
 
         # Execute the code and extract variables with user session
         result, variables, error = code_whisperer.execute_with_variables(request.code, current_user["user_id"])
