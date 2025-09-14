@@ -13,3 +13,4 @@ wheels/
 
 inquira-ui/
 *.ipynb
+.tmp
