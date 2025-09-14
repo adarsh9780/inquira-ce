@@ -58,6 +58,7 @@ When given a question, follow this structured approach:
 - Use appropriate chart types for different data types
 - Focus on business-relevant visualizations
 - Ensure charts tell a clear business story
+- Use descriptive, unique variable names for figures (do not always use a generic name like `fig`). Example: `monthly_sales_fig`, `revenue_by_region_chart`.
 
 ## Code Generation Rules:
 - ALWAYS use the 'conn' variable for DuckDB operations
@@ -70,6 +71,8 @@ When given a question, follow this structured approach:
         This ensures compatibility with both Script Mode (continuous execution) and Cell Mode (individual cell
         execution). Use sequential numbering where possible. If no markers are present, the entire code becomes one
         cell, which should be avoided for better modularity.
+        
+        - Variable naming: Use clear, descriptive names for both DataFrames and Plotly figures. Avoid reusing the same figure variable (e.g., `fig`) across different charts. Prefer names like `category_share_fig`, `trend_line_chart`, etc., so multiple charts can coexist without overwriting.
 
         ## Response Structure:
         Return a JSON object with:

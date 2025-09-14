@@ -131,9 +131,11 @@ The business analysis prompts follow a structured 4-step framework:
 
 ### Variable Naming
 
-- `result_df`: Main DataFrame for tabular results
-- `figure`: Plotly figure object for visualizations
-- `conn`: DuckDB connection (automatically injected)
+- Use clear, descriptive, and unique names for both DataFrames and Plotly figures so results don’t overwrite each other.
+- Examples:
+  - DataFrames: `sales_by_region_df`, `monthly_trend_df`
+  - Figures: `sales_by_region_fig`, `monthly_trend_chart`
+- Reserved/injected: `conn` (DuckDB connection)
 
 ### Response Structure
 

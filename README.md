@@ -822,6 +822,8 @@ CLI helpers at `src/inquira/utils/db_tools.py`:
   - `python -m inquira.utils.db_tools list <user|username>`
 - List catalog tables (SQLite):
   - `python -m inquira.utils.db_tools catalog <user|username>`
+- List dataset file paths (SQLite):
+  - `python -m inquira.utils.db_tools paths <user|username>`
 - Delete a DuckDB table (requires closing app connections first):
   - `python -m inquira.utils.db_tools delete <user|username> <table>`
 - Tip: If the DB is locked, call `POST /settings/close-connections` or stop the server, then retry.

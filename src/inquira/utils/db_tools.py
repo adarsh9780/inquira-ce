@@ -5,6 +5,7 @@ Functions:
 - list_duckdb_tables(user_id): List tables in the user's DuckDB database.
 - delete_duckdb_table(user_id, table_name): Drop a table from the user's DuckDB database.
 - list_sqlite_dataset_tables(user_id): List dataset table names recorded in SQLite for the user.
+- list_sqlite_dataset_paths(user_id): List dataset source file paths recorded in SQLite for the user.
 
 Safe to import and use from a shell/REPL. Does not modify app runtime state.
 """
@@ -126,10 +127,30 @@ def list_sqlite_dataset_tables(user_id: str) -> List[str]:
         con.close()
 
 
+def list_sqlite_dataset_paths(user_id: str) -> List[str]:
+    """Return a list of dataset source file paths for the user (from SQLite)."""
+    db_path = Path.home() / ".inquira" / "inquira.db"
+    if not db_path.exists():
+        return []
+
+    con = sqlite3.connect(str(db_path))
+    try:
+        cur = con.cursor()
+        cur.execute(
+            "SELECT file_path FROM datasets WHERE user_id = ? ORDER BY updated_at DESC",
+            (user_id,),
+        )
+        rows = cur.fetchall()
+        return [r[0] for r in rows if r and r[0]]
+    finally:
+        con.close()
+
+
 __all__ = [
     "list_duckdb_tables",
     "delete_duckdb_table",
     "list_sqlite_dataset_tables",
+    "list_sqlite_dataset_paths",
     "username_to_user_id",
 ]
 
@@ -164,7 +185,7 @@ if __name__ == "__main__":
     import sys
     args = sys.argv[1:]
     if not args:
-        print("Usage: python -m inquira.utils.db_tools <list|catalog|delete> <user|username> [table]")
+        print("Usage: python -m inquira.utils.db_tools <list|catalog|paths|delete> <user|username> [table]")
         sys.exit(1)
 
     cmd = args[0]
@@ -188,6 +209,8 @@ if __name__ == "__main__":
             sys.exit(3)
     elif cmd == "catalog":
         print("Catalog tables:", list_sqlite_dataset_tables(uid))
+    elif cmd == "paths":
+        print("Dataset paths:", list_sqlite_dataset_paths(uid))
     elif cmd == "delete":
         if len(args) < 3:
             print("Usage: python -m inquira.utils.db_tools delete <user|username> <table>")
@@ -201,5 +224,5 @@ if __name__ == "__main__":
             print("Hint: call POST /settings/close-connections or stop the server, then retry.")
             sys.exit(4)
     else:
-        print("Unknown command. Use list | catalog | delete")
+        print("Unknown command. Use list | catalog | paths | delete")
         sys.exit(1)
