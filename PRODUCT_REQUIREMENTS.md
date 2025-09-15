@@ -285,3 +285,22 @@ CSV/Parquet/JSON → DuckDB Database → Persistent Storage → Cached Connectio
 - **User Productivity**: 50% reduction in time spent on data analysis
 - **Error Reduction**: 80% reduction in analysis errors
 - **Cost Efficiency**: 60% reduction in infrastructure costs through optimization
+
+## Monetization Strategy
+
+- Community Edition (Free, MIT): Local-only, single workspace, file connectors, community model usage (Gemini/local), drives adoption.
+- Pro Individual ($15–30/user/month): Multi-model support (OpenAI/Anthropic/Ollama), offline/local mode, saved projects, versioned analyses, report/HTML exports, templates.
+- Team ($49–99/user/month): Shared workspaces, RBAC, collaboration and history, audit logs, SSO-lite, admin controls.
+- Enterprise (Custom): On‑prem/VPC deployment, SAML/SCIM, governance policies, DLP/redaction, private model routing, SLAs, training/support.
+- Add‑Ons: Managed LLM proxy with redaction and unified billing; premium connectors (Snowflake/BigQuery/Redshift/S3/GCS/JDBC); scheduling and alerts; template/plugin marketplace.
+- Licensing: Keep CE under MIT; ship Pro under commercial license with license key gating.
+- Distribution/GTM: Homebrew/winget packages, packaged desktop builds, ready-to-run dataset templates, content and partner integrations (e.g., DuckDB community).
+
+## Known Gaps & Risks (Aligned with README)
+
+- Hardcoded UI dev path can break packaged usage; replace with env override and autodetection.
+- Un‑sandboxed code execution needs restricted builtins and filesystem/network guardrails; consider containerized sandbox for Pro/Enterprise.
+- API keys stored in plaintext in SQLite settings; prefer OS keychain or encryption at rest.
+- Cookie `domain` fixed to `localhost` may break auth on other hosts; derive dynamically or omit for local dev.
+- Single LLM vendor (Gemini) limits adoption; add provider‑agnostic abstraction and local models.
+- Minimal automated tests; add integration/e2e coverage to reduce regression risk.

@@ -909,3 +909,34 @@ CLI helpers at `src/inquira/utils/db_tools.py`:
 - Delete a DuckDB table (requires closing app connections first):
   - `python -m inquira.utils.db_tools delete <user|username> <table>`
 - Tip: If the DB is locked, call `POST /settings/close-connections` or stop the server, then retry.
+
+---
+
+## 🚧 Work in Progress
+
+- UI path configuration: replace hardcoded dev UI path with an environment variable override and autodetection of packaged assets.
+  - Target: use `INQUIRA_DEV_UI` or fallback to bundled `frontend/dist`.
+  - Reference: `src/inquira/main.py:107`.
+- Authentication cookies: derive cookie `domain` dynamically from request host or omit for local dev.
+  - Improves compatibility with `127.0.0.1` and custom hosts.
+  - Reference: `src/inquira/api/auth.py:132`.
+- LLM provider abstraction: add OpenAI/Anthropic and local models (Ollama) alongside Gemini.
+  - Include “no data leaves device” mode for privacy‑sensitive users.
+- Code execution safeguards: introduce restricted builtins, filesystem/network guardrails, and time/memory limits; evaluate containerized sandboxing for Pro/Enterprise.
+  - Reference: execution path in `src/inquira/code_whisperer.py:61`.
+- Secrets handling: store API keys in OS keychain or encrypt at rest; avoid returning secrets over API.
+- Testing: add integration tests for key endpoints and code‑exec edge cases, plus e2e happy paths.
+- Connectors and automation: warehouse/cloud storage connectors (Snowflake, BigQuery, Redshift, S3/GCS/Azure) and scheduled jobs with alerts.
+- Enterprise features: SSO/SAML/SCIM, RBAC, audit logs, policy engine for code execution and data access.
+
+## ⚠️ Gaps & Risks
+
+- Hardcoded UI dev path may break packaged usage.
+  - Reference: `src/inquira/main.py:107`.
+- Un‑sandboxed `exec()` can run arbitrary code; needs guardrails/sandboxing.
+  - Reference: `src/inquira/code_whisperer.py:61`.
+- API keys stored in plaintext in SQLite settings; prefer keychain or encryption.
+- Cookie `domain` fixed to `localhost` can break auth on other hosts.
+  - Reference: `src/inquira/api/auth.py:132`.
+- Single LLM vendor (Gemini) limits adoption; add multi‑provider routing and local models.
+- Minimal automated tests increase regression risk.

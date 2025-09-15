@@ -14,3 +14,4 @@ wheels/
 inquira-ui/
 *.ipynb
 .tmp
+PRODUCT_REQUIREMENTS.md
