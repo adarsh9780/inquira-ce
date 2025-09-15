@@ -19,6 +19,43 @@
 
 ---
 
+## ⚡ Quick Install
+
+macOS/Linux (install once):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/install-inquira.sh | bash
+```
+
+Windows PowerShell (install once):
+
+```powershell
+irm https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/install-inquira.ps1 | iex
+```
+
+Run without installing (one-off):
+
+- macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/run-inquira.sh | bash`
+- Windows PowerShell: `irm https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/run-inquira.ps1 | iex`
+
+Notes:
+- No system Python required; `uv` installs automatically and fetches Python 3.12 if needed.
+- To pin a different release wheel, set `INQUIRA_WHEEL_URL` before running.
+- On Windows, if script execution is restricted, run: `Set-ExecutionPolicy -Scope Process Bypass -Force`
+
+## ▶️ Usage
+
+After installation, start Inquira from any terminal:
+
+```bash
+inquira
+```
+
+What happens:
+- Starts the FastAPI backend at `http://localhost:8000` and opens the UI at `/ui`.
+- First time usage: set your LLM API key in Settings.
+- Upload a dataset (CSV/Excel/Parquet/DuckDB) and start asking questions.
+
 ## 📋 Table of Contents
 
 - [🎯 What is Inquira?](#-what-is-inquira)

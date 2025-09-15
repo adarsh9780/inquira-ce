@@ -42,7 +42,7 @@ else {
 
 # Run from a released wheel (faster, reproducible)
 # Allow override via INQUIRA_WHEEL_URL env var if needed
-$WheelUrl = if ($env:INQUIRA_WHEEL_URL) { $env:INQUIRA_WHEEL_URL } else { 'https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.2-alpha/inquira_ce-0.4.2-py3-none-any.whl' }
+$WheelUrl = if ($env:INQUIRA_WHEEL_URL) { $env:INQUIRA_WHEEL_URL } else { 'https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.3-alpha/inquira_ce-0.4.3-py3-none-any.whl' }
 if ($useUvX) {
   uvx -p 3.12 --from $WheelUrl inquira @args
 } else {

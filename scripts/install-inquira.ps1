@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = 'Stop'
 
-$DefaultWheel = 'https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.2-alpha/inquira_ce-0.4.2-py3-none-any.whl'
+$DefaultWheel = 'https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.3-alpha/inquira_ce-0.4.3-py3-none-any.whl'
 $WheelUrl = if ($env:INQUIRA_WHEEL_URL) { $env:INQUIRA_WHEEL_URL } else { $DefaultWheel }
 
 Write-Host 'Installing uv (if needed)...'
