@@ -73,6 +73,7 @@ def replace_in_file(path: Path, url: str):
 def main():
     version = read_version()
     url = build_urls(version)
+    norm = pep440_normalize(version)
     changed = []
     for f in FILES:
         if replace_in_file(f, url):
@@ -82,7 +83,7 @@ def main():
         for c in changed:
             print(f" - {c.relative_to(ROOT)}")
         print(f"Project version: {version}")
-        print(f"Normalized (PEP 440): {url.split('/')[-1].split('-')[1]}")
+        print(f"Normalized (PEP 440): {norm}")
         print(f"URL: {url}")
     else:
         print("No changes needed; scripts already point to:")
@@ -95,7 +96,7 @@ def main():
         # 1) Shields version badge: replace the middle value
         readme_new = re.sub(
             r"(shields\.io/badge/Version-)([^-\?]+)(-blue\?style=for-the-badge)",
-            rf"\g<1>{version}\g<3>",
+            rf"\g<1>{norm}\g<3>",
             readme_new,
         )
         # 2) Replace any wheel download URLs to the normalized new one
@@ -107,12 +108,12 @@ def main():
         # 3) Update human-friendly text mentioning default version like "vX.Y.Z*"
         readme_new = re.sub(
             r"(uses a released wheel by default:\s*)v[^\s\.]+[\w\.-]*",
-            rf"\1v{version}",
+            rf"\1v{norm}",
             readme_new,
         )
         readme_new = re.sub(
             r"(default to the\s*)v[^\s\.]+[\w\.-]*",
-            rf"\1v{version}",
+            rf"\1v{norm}",
             readme_new,
         )
         if readme_new != readme:
