@@ -17,6 +17,10 @@
   <img src="https://img.shields.io/badge/FastAPI-00C853?style=for-the-badge&logo=fastapi" alt="FastAPI">
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Version-0.3.1-blue?style=for-the-badge" alt="Version">
+</p>
+
 ---
 
 ## ⚡ Quick Install
