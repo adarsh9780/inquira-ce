@@ -1,7 +1,7 @@
 # 🚀 Inquira - AI-Powered Data Analysis Tool
 
 <p align="center">
-  <img src="./logo/inquira_logo.svg" alt="Inquira Logo" width="100" height="100">
+  <img src="./src/inquira/logo/inquira_logo.svg" alt="Inquira Logo" width="100" height="100">
 </p>
 
 <p align="center">
