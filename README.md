@@ -19,6 +19,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Version-0.3.1-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-0.4.3a0-blue?style=for-the-badge" alt="Version">
 </p>
 
 ---
