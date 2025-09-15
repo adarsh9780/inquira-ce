@@ -11,6 +11,7 @@ FILES = [
     ROOT / "scripts" / "run-inquira.ps1",
     ROOT / "scripts" / "install-inquira.ps1",
 ]
+README = ROOT / "README.md"
 
 def read_version() -> str:
     text = PYPROJECT.read_text(encoding="utf-8")
@@ -86,6 +87,37 @@ def main():
     else:
         print("No changes needed; scripts already point to:")
         print(f"URL: {url}")
+
+    # Update README version badge and wheel references
+    if README.exists():
+        readme = README.read_text(encoding="utf-8")
+        readme_new = readme
+        # 1) Shields version badge: replace the middle value
+        readme_new = re.sub(
+            r"(shields\.io/badge/Version-)([^-\?]+)(-blue\?style=for-the-badge)",
+            rf"\g<1>{version}\g<3>",
+            readme_new,
+        )
+        # 2) Replace any wheel download URLs to the normalized new one
+        readme_new = re.sub(
+            r"https://github.com/adarsh9780/inquira-ce/releases/download/[^\s`]+/inquira_ce-[^\s`]+\.whl",
+            url,
+            readme_new,
+        )
+        # 3) Update human-friendly text mentioning default version like "vX.Y.Z*"
+        readme_new = re.sub(
+            r"(uses a released wheel by default:\s*)v[^\s\.]+[\w\.-]*",
+            rf"\1v{version}",
+            readme_new,
+        )
+        readme_new = re.sub(
+            r"(default to the\s*)v[^\s\.]+[\w\.-]*",
+            rf"\1v{version}",
+            readme_new,
+        )
+        if readme_new != readme:
+            README.write_text(readme_new, encoding="utf-8")
+            print("Updated README version badge and wheel links.")
 
 if __name__ == "__main__":
     main()

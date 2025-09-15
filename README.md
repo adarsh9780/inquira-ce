@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Active-success?style=for-the-badge" alt="Status">
-  <img src="https://img.shields.io/badge/Version-0.3.1-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-0.4.3-alpha-blue?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python" alt="Python">
   <img src="https://img.shields.io/badge/Vue.js-3-4FC08D?style=for-the-badge&logo=vue.js" alt="Vue.js">
@@ -345,7 +345,7 @@ inquira
 ```
 
 Notes:
-- The shim uses a released wheel by default: v0.4.2‑alpha.
+- The shim uses a released wheel by default: v0.4.3-alpha‑alpha.
 - Override the source by setting `INQUIRA_WHEEL_URL` before running `inquira`.
 - No system Python is required; uv fetches a Python 3.12 runtime as needed.
 
@@ -366,7 +366,7 @@ irm https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/run-i
 ```
 
 Notes:
-- The scripts default to the v0.4.2-alpha wheel: `https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.2-alpha/inquira_ce-0.4.2-py3-none-any.whl`. Override with `INQUIRA_WHEEL_URL` if needed.
+- The scripts default to the v0.4.3-alpha wheel: `https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.3a0/inquira_ce-0.4.3a0-py3-none-any.whl`. Override with `INQUIRA_WHEEL_URL` if needed.
 - When the package is published to PyPI, the scripts can be switched to `--from inquira-ce[==version]`.
 - uv downloads an isolated CPython 3.12 if you don’t have Python installed.
 - Behind a proxy, ensure your shell respects proxy env vars before running.
