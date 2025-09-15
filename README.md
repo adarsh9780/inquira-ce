@@ -289,6 +289,29 @@ sales_data,category,string,Product category,"Electronics,Clothing,Books"
 
 ## 🔧 Installation & Setup
 
+### ✅ Install Once (adds `inquira` to PATH)
+
+macOS/Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/install-inquira.sh | bash
+# then in a new terminal
+inquira
+```
+
+Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/install-inquira.ps1 | iex
+# then open a new terminal
+inquira
+```
+
+Notes:
+- The shim uses a released wheel by default: v0.4.2‑alpha.
+- Override the source by setting `INQUIRA_WHEEL_URL` before running `inquira`.
+- No system Python is required; uv fetches a Python 3.12 runtime as needed.
+
 ### 🟢 Option 0: Zero‑Install (curl | bash / irm)
 
 Run Inquira without preinstalling Python. The bootstrap script installs uv, fetches a Python 3.12 runtime if needed, and executes the `inquira` CLI from the released wheel artifact.
