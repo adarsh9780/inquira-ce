@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = 'Stop'
 
-$DefaultWheel = 'https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.3-alpha/inquira_ce-0.4.3-py3-none-any.whl'
+$DefaultWheel = 'https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.3a0/inquira_ce-0.4.3a0-py3-none-any.whl'
 $WheelUrl = if ($env:INQUIRA_WHEEL_URL) { $env:INQUIRA_WHEEL_URL } else { $DefaultWheel }
 
 Write-Host 'Installing uv (if needed)...'
@@ -18,8 +18,13 @@ foreach ($p in @($CargoBin, $LocalBin)) {
   if (Test-Path $p) {
     if (-not (($env:PATH -split ';') -contains $p)) {
       $env:PATH = "$p;$env:PATH"
-    }
-  }
+}
+}
+
+# Show version being installed (best-effort from wheel filename)
+$m = [regex]::Match($WheelUrl, 'inquira_ce-([^-]+)-')
+$ver = if ($m.Success) { $m.Groups[1].Value } else { 'unknown' }
+Write-Host "Installing Inquira shim for version $ver"
 }
 
 # Target bin dir for user-local shims
@@ -34,10 +39,13 @@ setlocal
 REM Ensure uv available (PowerShell installer)
 where uv >nul 2>nul || powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://astral.sh/uv/install.ps1 | iex"
 set "PATH=%USERPROFILE%\.local\bin;%USERPROFILE%\.cargo\bin;%PATH%"
-if "%INQUIRA_WHEEL_URL%"=="" set "INQUIRA_WHEEL_URL=__DEFAULT_WHEEL__"
+if "%INQUIRA_WHEEL_URL%"=="" set "INQUIRA_WHEEL_URL=https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.3a0/inquira_ce-0.4.3a0-py3-none-any.whl"
+for %%f in ("%INQUIRA_WHEEL_URL%") do set "_WHEEL_FILE=%%~nxf"
+for /f "tokens=2 delims=-" %%v in ("%_WHEEL_FILE%") do set "_INQ_VER=%%v"
+echo Inquira: launching version %_INQ_VER%
 uv -p 3.12 x --from "%INQUIRA_WHEEL_URL%" inquira %*
 '@
-$CmdContent = $CmdContent -replace '__DEFAULT_WHEEL__', [Regex]::Escape($WheelUrl)
+$CmdContent = $CmdContent -replace 'https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.3a0/inquira_ce-0.4.3a0-py3-none-any.whl', [Regex]::Escape($WheelUrl)
 Set-Content -Path $CmdPath -Value $CmdContent -Encoding ASCII
 
 # Persist user PATH entries: shim dir and common uv bins

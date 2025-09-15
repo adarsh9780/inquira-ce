@@ -42,7 +42,13 @@ else {
 
 # Run from a released wheel (faster, reproducible)
 # Allow override via INQUIRA_WHEEL_URL env var if needed
-$WheelUrl = if ($env:INQUIRA_WHEEL_URL) { $env:INQUIRA_WHEEL_URL } else { 'https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.3-alpha/inquira_ce-0.4.3-py3-none-any.whl' }
+$DefaultWheel = 'https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.3a0/inquira_ce-0.4.3a0-py3-none-any.whl'
+$WheelUrl = if ($env:INQUIRA_WHEEL_URL) { $env:INQUIRA_WHEEL_URL } else { $DefaultWheel }
+
+# Show version being launched (best-effort from wheel filename)
+$m = [regex]::Match($WheelUrl, 'inquira_ce-([^-]+)-')
+$ver = if ($m.Success) { $m.Groups[1].Value } else { 'unknown' }
+Write-Host "Inquira: launching version $ver"
 if ($useUvX) {
   uvx -p 3.12 --from $WheelUrl inquira @args
 } else {

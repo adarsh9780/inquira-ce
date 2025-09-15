@@ -123,7 +123,13 @@ def get_ui_dir() -> str:
     return dev_ui
 
 app.mount("/ui", StaticFiles(directory=get_ui_dir(), html=True), name="ui")
-app.mount("/logo", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "logo")), name="logo")
+
+# Mount logo directory if present; don't fail if missing in some wheels
+_logo_dir = os.path.join(os.path.dirname(__file__), "logo")
+try:
+    app.mount("/logo", StaticFiles(directory=_logo_dir, check_dir=False), name="logo")
+except Exception as e:
+    logprint(f"Logo static mount skipped: {e}", level="warning")
 
 # Configure CORS
 app.add_middleware(
@@ -240,9 +246,12 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
-    """Serve the favicon"""
-    from fastapi.responses import FileResponse
-    return FileResponse(os.path.join(os.path.dirname(__file__), "logo", "inquira_logo.svg"), media_type="image/svg+xml")
+    """Serve the favicon if available; otherwise no-content"""
+    from fastapi.responses import FileResponse, Response
+    logo_path = os.path.join(os.path.dirname(__file__), "logo", "inquira_logo.svg")
+    if os.path.exists(logo_path):
+        return FileResponse(logo_path, media_type="image/svg+xml")
+    return Response(status_code=204)
 
 @app.get("/", tags=["General"])
 async def root():

@@ -16,6 +16,14 @@ fi
 export PATH="$HOME/.cargo/bin:$PATH"
 
 # Run from a released wheel (faster, reproducible)
-# Allow override via INQUIRA_WHEEL_URL env var if needed
-WHEEL_URL="${INQUIRA_WHEEL_URL:-https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.3-alpha/inquira_ce-0.4.3-py3-none-any.whl}"
+# Pinned by default; override with INQUIRA_WHEEL_URL
+WHEEL_URL_DEFAULT="https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.3a0/inquira_ce-0.4.3a0-py3-none-any.whl"
+WHEEL_URL="${INQUIRA_WHEEL_URL:-$WHEEL_URL_DEFAULT}"
+
+# Show version being launched (best-effort from wheel filename)
+WHEEL_FILE="${WHEEL_URL##*/}"
+INQUIRA_VERSION="${WHEEL_FILE#inquira_ce-}"
+INQUIRA_VERSION="${INQUIRA_VERSION%%-*}"
+echo "Inquira: launching version ${INQUIRA_VERSION:-unknown}"
+
 exec uvx -p 3.12 --from "$WHEEL_URL" inquira "$@"
