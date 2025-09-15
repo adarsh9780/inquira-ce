@@ -1,6 +1,6 @@
 [project]
 name = "inquira-ce"
-version = "0.4.2"
+version = "0.4.3"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -33,4 +33,4 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-inquira = ["app_config.json", "frontend/dist/**/*"]
+inquira = ["app_config.json", "frontend/dist/**/*", "logo/*"]

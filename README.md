@@ -289,6 +289,28 @@ sales_data,category,string,Product category,"Electronics,Clothing,Books"
 
 ## 🔧 Installation & Setup
 
+### 🟢 Option 0: Zero‑Install (curl | bash / irm)
+
+Run Inquira without preinstalling Python. The bootstrap script installs uv, fetches a Python 3.12 runtime if needed, and executes the `inquira` CLI from the released wheel artifact.
+
+macOS/Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/run-inquira.sh | bash
+```
+
+Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/run-inquira.ps1 | iex
+```
+
+Notes:
+- The scripts default to the v0.4.2-alpha wheel: `https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.2-alpha/inquira_ce-0.4.2-py3-none-any.whl`. Override with `INQUIRA_WHEEL_URL` if needed.
+- When the package is published to PyPI, the scripts can be switched to `--from inquira-ce[==version]`.
+- uv downloads an isolated CPython 3.12 if you don’t have Python installed.
+- Behind a proxy, ensure your shell respects proxy env vars before running.
+
 ### 📦 **Option 1: Development Setup**
 
 #### **Prerequisites**
