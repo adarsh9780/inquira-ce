@@ -1,6 +1,6 @@
 [project]
 name = "inquira-ce"
-version = "0.4.4a0"
+version = "0.4.4a1"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -14,7 +14,6 @@ dependencies = [
     "plotly>=6.3.0",
     "pydantic>=2.11.7",
     "python-dotenv>=1.1.1",
-    "pywebview>=6.0",
     "scikit-learn>=1.7.1",
     "scipy>=1.16.1",
     "statsmodels>=0.14.5",
