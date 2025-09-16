@@ -1,6 +1,6 @@
 [project]
 name = "inquira-ce"
-version = "0.4.3-alpha"
+version = "0.4.4a0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"

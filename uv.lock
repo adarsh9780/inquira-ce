@@ -281,7 +281,7 @@ wheels = [
 
 [[package]]
 name = "inquira-ce"
-version = "0.4.3a0"
+version = "0.4.4a0"
 source = { editable = "." }
 dependencies = [
     { name = "duckdb" },

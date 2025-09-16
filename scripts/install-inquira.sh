@@ -4,7 +4,7 @@ set -euo pipefail
 # Install-once script: creates an `inquira` shim on PATH that runs via uv.
 # No system Python required.
 
-WHEEL_URL_DEFAULT="https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.3a0/inquira_ce-0.4.3a0-py3-none-any.whl"
+WHEEL_URL_DEFAULT="https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.4a0/inquira_ce-0.4.4a0-py3-none-any.whl"
 WHEEL_URL="${INQUIRA_WHEEL_URL:-$WHEEL_URL_DEFAULT}"
 
 # Show version being installed (best-effort from wheel filename)
@@ -21,8 +21,18 @@ fi
 # Ensure uv on PATH
 export PATH="$HOME/.cargo/bin:$PATH"
 
-# Target bin dir for user-local shims
-BIN_DIR="$HOME/.local/bin"
+# Parse flags: --local (install shim to current directory), or INQUIRA_INSTALL_DIR
+BIN_DIR_DEFAULT="$HOME/.local/bin"
+BIN_DIR="${INQUIRA_INSTALL_DIR:-}"
+if [ -z "${BIN_DIR}" ]; then
+  if [ "${1:-}" = "--local" ]; then
+    BIN_DIR="$PWD"
+    shift || true
+  else
+    BIN_DIR="$BIN_DIR_DEFAULT"
+  fi
+fi
+
 mkdir -p "$BIN_DIR"
 
 WRAPPER="$BIN_DIR/inquira"
@@ -38,7 +48,7 @@ fi
 export PATH="$HOME/.cargo/bin:$PATH"
 
 # Allow override at runtime (no auto-latest)
-WHEEL_URL_DEFAULT="https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.3a0/inquira_ce-0.4.3a0-py3-none-any.whl"
+WHEEL_URL_DEFAULT="https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.4a0/inquira_ce-0.4.4a0-py3-none-any.whl"
 WHEEL_URL="${INQUIRA_WHEEL_URL:-$WHEEL_URL_DEFAULT}"
 
 # Show version being launched (best-effort from wheel filename)
@@ -52,19 +62,23 @@ EOF
 
 chmod +x "$WRAPPER"
 
-# Add to PATH for future shells if missing
-case ":$PATH:" in
-  *":$BIN_DIR:"*) ;; # already present
-  *)
-    echo "Adding $BIN_DIR to your PATH in common profiles..."
-    for profile in "$HOME/.zprofile" "$HOME/.zshrc" "$HOME/.bash_profile" "$HOME/.bashrc"; do
-      [ -f "$profile" ] || touch "$profile"
-      if ! grep -qs "$BIN_DIR" "$profile"; then
-        printf '\nexport PATH="$HOME/.local/bin:\$PATH"\n' >> "$profile"
-      fi
-    done
-    ;;
-esac
+if [ "$BIN_DIR" = "$BIN_DIR_DEFAULT" ]; then
+  # Add to PATH for future shells if missing
+  case ":$PATH:" in
+    *":$BIN_DIR:"*) ;; # already present
+    *)
+      echo "Adding $BIN_DIR to your PATH in common profiles..."
+      for profile in "$HOME/.zprofile" "$HOME/.zshrc" "$HOME/.bash_profile" "$HOME/.bashrc"; do
+        [ -f "$profile" ] || touch "$profile"
+        if ! grep -qs "$BIN_DIR" "$profile"; then
+          printf '\nexport PATH="$HOME/.local/bin:\$PATH"\n' >> "$profile"
+        fi
+      done
+      ;;
+  esac
+  echo "Install complete. Open a new terminal and run: inquira"
+else
+  echo "Local install complete. Run using: ./inquira (in $BIN_DIR)"
+fi
 
-echo "Install complete. Open a new terminal and run: inquira"
 echo "To override the wheel URL, set INQUIRA_WHEEL_URL before running."

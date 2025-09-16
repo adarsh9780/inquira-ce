@@ -9,6 +9,7 @@ import time
 import os
 import uvicorn
 import asyncio
+import mimetypes
 from datetime import datetime
 from .api.generate_schema import router as schema_router
 from .api.chat import router as chat_router
@@ -88,6 +89,19 @@ app = FastAPI(
 
 # Route legacy print() to structured logger
 patch_print()
+
+# Force MIME type mappings to avoid Windows registry quirks
+mimetypes.add_type('application/javascript', '.js')
+mimetypes.add_type('text/javascript', '.mjs')
+mimetypes.add_type('text/css', '.css')
+mimetypes.add_type('application/json', '.json')
+mimetypes.add_type('application/json', '.map')
+mimetypes.add_type('image/svg+xml', '.svg')
+mimetypes.add_type('image/x-icon', '.ico')
+mimetypes.add_type('font/woff2', '.woff2')
+mimetypes.add_type('font/woff', '.woff')
+mimetypes.add_type('font/ttf', '.ttf')
+mimetypes.add_type('application/wasm', '.wasm')
 
 def get_ui_dir() -> str:
     """
