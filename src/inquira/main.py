@@ -20,6 +20,7 @@ from .api.datasets import router as datasets_router
 from .api.code_execution import router as code_execution_router
 from .api.api_key import router as api_key_router
 from .api.api_test import router as api_test_router
+from .api.system import router as system_router
 from .config_models import AppConfig
 from .websocket_manager import websocket_manager
 from .database_manager import DatabaseManager
@@ -172,6 +173,7 @@ app.include_router(schema_router)
 app.include_router(code_execution_router)
 app.include_router(api_test_router)
 app.include_router(datasets_router)
+app.include_router(system_router)
 
 # WebSocket endpoint for real-time processing updates
 @app.websocket("/ws/settings/{user_id}")
