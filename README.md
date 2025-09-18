@@ -358,7 +358,7 @@ inquira
 ```
 
 Notes:
-- The shim uses a released wheel by default: v0.4.5a1-alpha.
+- The shim uses a released wheel by default: v0.4.5a1
 - Override the source by setting `INQUIRA_WHEEL_URL` before running `inquira`.
 - No system Python is required; uv fetches a Python 3.12 runtime as needed.
 
