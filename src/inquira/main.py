@@ -28,7 +28,7 @@ from .database_manager import DatabaseManager
 from .session_variable_store import session_variable_store
 from .logger import logprint, patch_print
 
-APP_VERSION = "0.4.5a1"
+APP_VERSION = "0.4.5a2"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

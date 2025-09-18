@@ -6,13 +6,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 PYPROJECT = ROOT / "pyproject.toml"
 FILES = [
-    ROOT / "scripts" / "run-inquira.sh",
     ROOT / "scripts" / "install-inquira.sh",
-    ROOT / "scripts" / "run-inquira.ps1",
     ROOT / "scripts" / "install-inquira.ps1",
 ]
 README = ROOT / "README.md"
 MAIN = ROOT / "src" / "inquira" / "main.py"
+
 
 def read_version() -> str:
     text = PYPROJECT.read_text(encoding="utf-8")
@@ -20,6 +19,7 @@ def read_version() -> str:
     if not m:
         raise SystemExit("Could not find version in pyproject.toml")
     return m.group(1)
+
 
 def pep440_normalize(version: str) -> str:
     """Best-effort PEP 440 normalization for common prerelease forms.
@@ -49,12 +49,14 @@ def pep440_normalize(version: str) -> str:
         return f"{base}{label}{num}"
     return version
 
+
 def build_urls(version: str):
     norm = pep440_normalize(version)
     tag = f"v{norm}"
     wheel = f"inquira_ce-{norm}-py3-none-any.whl"
     url = f"https://github.com/adarsh9780/inquira-ce/releases/download/{tag}/{wheel}"
     return url
+
 
 def replace_in_file(path: Path, url: str):
     text = path.read_text(encoding="utf-8")
@@ -70,6 +72,7 @@ def replace_in_file(path: Path, url: str):
         path.write_text(text_new, encoding="utf-8")
         return True
     return False
+
 
 def main():
     version = read_version()
@@ -131,6 +134,7 @@ def main():
         if main_new != main_code:
             MAIN.write_text(main_new, encoding="utf-8")
             print("Updated src/inquira/main.py APP_VERSION.")
+
 
 if __name__ == "__main__":
     main()
