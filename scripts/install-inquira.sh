@@ -7,35 +7,62 @@ set -euo pipefail
 WHEEL_URL_DEFAULT="https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.5a1/inquira_ce-0.4.5a1-py3-none-any.whl"
 WHEEL_URL="${INQUIRA_WHEEL_URL:-$WHEEL_URL_DEFAULT}"
 
-# Show version being installed (best-effort from wheel filename)
+UPDATE=false
+BIN_DIR_DEFAULT="$HOME/.local/bin"
+BIN_DIR="${INQUIRA_INSTALL_DIR:-}"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --update)
+      UPDATE=true
+      shift
+      ;;
+    --local)
+      BIN_DIR="$PWD"
+      shift
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [ -z "${BIN_DIR}" ]; then
+  BIN_DIR="$BIN_DIR_DEFAULT"
+fi
+
+WRAPPER="$BIN_DIR/inquira"
+WRAPPER_ALREADY_PRESENT=false
+if [ -f "$WRAPPER" ]; then
+  WRAPPER_ALREADY_PRESENT=true
+fi
+
+if [ "$WRAPPER_ALREADY_PRESENT" = true ] && [ "$UPDATE" = false ]; then
+  echo "Inquira shim already present at $WRAPPER"
+  echo "Run with --update to refresh the shim."
+  exit 0
+fi
+
 WHEEL_FILE="${WHEEL_URL##*/}"
 INQUIRA_VERSION="${WHEEL_FILE#inquira_ce-}"
 INQUIRA_VERSION="${INQUIRA_VERSION%%-*}"
-echo "Installing Inquira shim for version ${INQUIRA_VERSION:-unknown}"
+
+if [ "$WRAPPER_ALREADY_PRESENT" = true ]; then
+  echo "Updating Inquira shim for version ${INQUIRA_VERSION:-unknown}"
+else
+  echo "Installing Inquira shim for version ${INQUIRA_VERSION:-unknown}"
+fi
 
 echo "Installing uv (if needed)..."
 if ! command -v uv >/dev/null 2>&1; then
   curl -fsSL https://astral.sh/uv/install.sh | sh
 fi
 
-# Ensure uv on PATH
 export PATH="$HOME/.cargo/bin:$PATH"
-
-# Parse flags: --local (install shim to current directory), or INQUIRA_INSTALL_DIR
-BIN_DIR_DEFAULT="$HOME/.local/bin"
-BIN_DIR="${INQUIRA_INSTALL_DIR:-}"
-if [ -z "${BIN_DIR}" ]; then
-  if [ "${1:-}" = "--local" ]; then
-    BIN_DIR="$PWD"
-    shift || true
-  else
-    BIN_DIR="$BIN_DIR_DEFAULT"
-  fi
-fi
 
 mkdir -p "$BIN_DIR"
 
-WRAPPER="$BIN_DIR/inquira"
 echo "Installing shim: $WRAPPER"
 cat > "$WRAPPER" <<'EOF'
 #!/usr/bin/env bash
@@ -76,9 +103,17 @@ if [ "$BIN_DIR" = "$BIN_DIR_DEFAULT" ]; then
       done
       ;;
   esac
-  echo "Install complete. Open a new terminal and run: inquira"
+  if [ "$WRAPPER_ALREADY_PRESENT" = true ]; then
+    echo "Update complete. Open a new terminal and run: inquira"
+  else
+    echo "Install complete. Open a new terminal and run: inquira"
+  fi
 else
-  echo "Local install complete. Run using: ./inquira (in $BIN_DIR)"
+  if [ "$WRAPPER_ALREADY_PRESENT" = true ]; then
+    echo "Local update complete. Run using: ./inquira (in $BIN_DIR)"
+  else
+    echo "Local install complete. Run using: ./inquira (in $BIN_DIR)"
+  fi
 fi
 
 echo "To override the wheel URL, set INQUIRA_WHEEL_URL before running."

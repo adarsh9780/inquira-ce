@@ -47,11 +47,6 @@ irm https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/insta
 # creates .\inquira.cmd in current directory (no PATH change)
 ```
 
-Run without installing (one-off):
-
-- macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/run-inquira.sh | bash`
-- Windows PowerShell: `irm https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/run-inquira.ps1 | iex`
-
 Notes:
 - No system Python required; `uv` installs automatically and fetches Python 3.12 if needed.
 - To pin a different release wheel, set `INQUIRA_WHEEL_URL` before running.
@@ -69,6 +64,18 @@ What happens:
 - Starts the FastAPI backend at `http://localhost:8000` and opens the UI at `/ui`.
 - First time usage: set your LLM API key in Settings.
 - Upload a dataset (CSV/Excel/Parquet/DuckDB) and start asking questions.
+
+### Command-line options
+
+- `inquira --no-file-dialog` — disable the native file picker endpoint if your environment cannot show OS dialogs.
+- `inquira --allow-file-dialog` — explicitly re-enable the native file picker even when disabled via environment.
+- Environment variable: set `INQUIRA_ALLOW_FILE_DIALOG` to `1`/`true` or `0`/`false` to choose the default behavior.
+
+### Add Inquira to your app launcher (optional)
+
+- **macOS**: create an Automator “Application” that runs `inquira`, save it to `/Applications`, then open *Get Info* on the bundle and paste an icon converted from `src/inquira/logo/inquira_logo.svg` (e.g. `sips -s format icns inquira_logo.svg --out inquira_logo.icns`).
+- **Windows**: make a shortcut pointing to `%USERPROFILE%\.local\bin\inquira.cmd` (or your local install path), convert the SVG to ICO (e.g. with Inkscape) and assign it from the shortcut’s *Properties → Change Icon...* dialog.
+- **Linux**: add `~/.local/share/applications/inquira.desktop` with `Exec=/home/you/.local/bin/inquira` and `Icon=/path/to/inquira_logo.svg`; mark it executable and update the launcher database (`update-desktop-database`).
 
 ## 📋 Table of Contents
 
