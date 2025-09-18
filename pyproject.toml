@@ -32,4 +32,10 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-inquira = ["app_config.json", "frontend/dist/**/*", "logo/*"]
+inquira = [
+    "app_config.json",
+    "frontend/dist/**/*",
+    "logo/*",
+    "prompts/*",
+    "sql/*",
+]
