@@ -137,6 +137,29 @@ The business analysis prompts follow a structured 4-step framework:
   - Figures: `sales_by_region_fig`, `monthly_trend_chart`
 - Reserved/injected: `conn` (DuckDB connection)
 
+### Result Dictionaries
+
+Generated code must populate three shared dictionaries so the UI and API can collect results:
+
+```python
+if 'dataframes' not in globals():
+    dataframes = {}
+if 'figures' not in globals():
+    figures = {}
+if 'scalars' not in globals():
+    scalars = {}
+
+scalars["row_count"] = int(row_count)
+figures["monthly_sales_fig"] = monthly_sales_fig.to_dict()
+dataframes["summary"] = summary_df
+```
+
+- `dataframes` must map names to `pandas.DataFrame` objects serialized with `to_json(orient="records")` or similar.
+- `figures` must contain Plotly figures converted to `dict`/JSON for the frontend.
+- `scalars` should hold lightweight numeric or textual KPIs.
+
+These globals are read by `CodeWhisperer.execute_with_variables`, so avoid renaming or shadowing them in generated code.
+
 ### Response Structure
 
 All prompts return structured JSON:

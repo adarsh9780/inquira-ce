@@ -105,7 +105,7 @@ CSV/Parquet/JSON → DuckDB Database → Persistent Storage → Cached Connectio
 #### API Integration
 
 - **RESTful Endpoints**: Comprehensive API for all backend services
-- **Authentication**: JWT-based authentication with refresh tokens
+- **Authentication**: Session-based authentication using HTTP-only cookies with 24-hour expiry
 - **Error Handling**: Client-side error handling and user feedback
 - **Caching**: Browser-side caching for improved performance
 
@@ -136,7 +136,7 @@ CSV/Parquet/JSON → DuckDB Database → Persistent Storage → Cached Connectio
 ### Optimization Features
 
 - **Database Caching**: Persistent DuckDB databases with smart invalidation
-- **Query Result Caching**: Cache frequently executed queries
+- **Query Result Caching**: (Planned) cache frequently executed queries
 - **Lazy Loading**: Load only required data subsets
 - **Background Processing**: Asynchronous database creation for large files
 
@@ -152,15 +152,15 @@ CSV/Parquet/JSON → DuckDB Database → Persistent Storage → Cached Connectio
 ### Data Security
 
 - **File Access Control**: User-specific file access permissions
-- **Database Encryption**: Optional encryption for sensitive data
+- **Database Encryption**: (Planned) optional encryption for sensitive data
 - **Audit Logging**: Comprehensive logging of all operations
 - **Data Sanitization**: Input validation and sanitization
 
 ### API Security
 
-- **Authentication**: JWT-based authentication with secure storage
-- **Authorization**: Role-based access control
-- **Rate Limiting**: Protection against abuse and DoS attacks
+- **Authentication**: Session-cookie authentication with secure storage of user credentials in SQLite
+- **Authorization**: (Planned) role-based access control
+- **Rate Limiting**: (Planned) protection against abuse and DoS attacks
 - **CORS Configuration**: Proper cross-origin resource sharing setup
 
 ## User Experience Requirements

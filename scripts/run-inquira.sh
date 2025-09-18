@@ -17,7 +17,7 @@ export PATH="$HOME/.cargo/bin:$PATH"
 
 # Run from a released wheel (faster, reproducible)
 # Pinned by default; override with INQUIRA_WHEEL_URL
-WHEEL_URL_DEFAULT="https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.4a1/inquira_ce-0.4.4a1-py3-none-any.whl"
+WHEEL_URL_DEFAULT="https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.5a1/inquira_ce-0.4.5a1-py3-none-any.whl"
 WHEEL_URL="${INQUIRA_WHEEL_URL:-$WHEEL_URL_DEFAULT}"
 
 # Show version being launched (best-effort from wheel filename)

@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Active-success?style=for-the-badge" alt="Status">
-  <img src="https://img.shields.io/badge/Version-0.4.4a1-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-0.4.5a1-blue?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python" alt="Python">
   <img src="https://img.shields.io/badge/Vue.js-3-4FC08D?style=for-the-badge&logo=vue.js" alt="Vue.js">
@@ -192,34 +192,31 @@ What happens:
 ## 🚀 Quick Start
 
 ### 📋 Prerequisites
-- **Node.js** 18+ and npm
 - **Python** 3.12+
 - **UV** (Python package manager)
 - **Google Gemini API Key**
+- *(Optional)* **Node.js** 18+ and npm if you plan to work on the separate UI repository.
 
 ### ⚡ 3-Step Setup
 
 ```bash
-# 1. Clone and install frontend
-git clone https://github.com/your-org/inquira.git
-cd inquira
-npm install
-
-# 2. Setup backend
-cd inquira  # Backend directory
+# 1. Install dependencies
 uv sync
 
-# 3. Start development servers
-# Terminal 1: Backend
+# 2. Launch the backend with the bundled UI assets
 uv run python -m src.inquira.main
 
-# Terminal 2: Frontend
-npm run dev
+# 3. Open Inquira
+# http://localhost:8000/ui opens automatically; start it manually if the browser did not pop up.
 ```
 
-**🎉 Ready!** Open `http://localhost:5173` and start analyzing data.
+Once the UI loads:
 
----
+1. Sign up for an account and then log in (sessions expire after 24 hours).
+2. Go to Settings → LLM and paste your Google Gemini API key.
+3. Add a dataset in Settings → Data Source. When calling the REST API directly, establish a WebSocket connection to `/ws/settings/{user_id}` before calling `/settings/set/data_path` so you receive progress events.
+4. Ask questions or use the `/chat` endpoint to generate analysis code.
+
 
 ## 📖 How to Use
 
@@ -359,11 +356,11 @@ inquira
 ```
 
 Notes:
-- The shim uses a released wheel by default: v0.4.4a1‑alpha.
+- The shim uses a released wheel by default: v0.4.5a1-alpha.
 - Override the source by setting `INQUIRA_WHEEL_URL` before running `inquira`.
 - No system Python is required; uv fetches a Python 3.12 runtime as needed.
 
-### 🟢 Option 0: Zero‑Install (curl | bash / irm)
+### 🟢 Option 0: Zero-Install (curl | bash / irm)
 
 Run Inquira without preinstalling Python. The bootstrap script installs uv, fetches a Python 3.12 runtime if needed, and executes the `inquira` CLI from the released wheel artifact.
 
@@ -380,136 +377,101 @@ irm https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/run-i
 ```
 
 Notes:
-- The scripts default to the v0.4.4a1 wheel: `https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.4a1/inquira_ce-0.4.4a1-py3-none-any.whl`. Override with `INQUIRA_WHEEL_URL` if needed.
+- The scripts default to the v0.4.5a1 wheel: `https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.5a1/inquira_ce-0.4.5a1-py3-none-any.whl`. Override with `INQUIRA_WHEEL_URL` if needed.
 - When the package is published to PyPI, the scripts can be switched to `--from inquira-ce[==version]`.
 - uv downloads an isolated CPython 3.12 if you don’t have Python installed.
 - Behind a proxy, ensure your shell respects proxy env vars before running.
 
-### 📦 **Option 1: Development Setup**
+### 📦 Option 1: Development Setup
 
 #### **Prerequisites**
-- Node.js 18+ and npm
-- Python 3.12+
-- UV package manager
-- Google Gemini API key
+- **Python** 3.12+
+- **UV** package manager
+- **Google Gemini API Key**
+- *(Optional)* **Node.js** 18+ and npm if you plan to work on the UI (`inquira-ui` repo).
 
 #### **Step-by-Step Installation**
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/your-org/inquira.git
-cd inquira
-
-# 2. Frontend setup
-npm install
-npm run dev  # Starts at http://localhost:5173
-
-# 3. Backend setup (new terminal)
-cd inquira  # Navigate to backend directory
+git clone https://github.com/adarsh9780/inquira-ce.git
+cd inquira-ce
 uv sync
-uv run python -m src.inquira.main  # Starts at http://localhost:8000
+uv run python -m src.inquira.main
 ```
 
-### 🖥️ **Option 2: Desktop Application**
+The repository ships prebuilt Vue assets under `src/inquira/frontend/dist`. If you need to change the UI, clone [adarsh9780/inquira-ui](https://github.com/adarsh9780/inquira-ui), run `npm install && npm run dev`, and update `get_ui_dir()` in `src/inquira/main.py` to point to your local `dist` folder while iterating.
 
-```bash
-# Build for your platform
-npm run build
-cd inquira
-uv run python -m src.inquira.build
+### 🖥️ Option 2: Desktop Packaging
 
-# Find executable in dist/ directory
-```
+Standalone installers are not yet published. If you experiment with PyInstaller or similar tooling, treat it as a custom build step—no official spec file is included today.
 
-### 🐳 **Option 3: Docker Deployment**
-
-```bash
-# Build and run with Docker
-docker build -t inquira .
-docker run -p 5173:5173 -p 8000:8000 inquira
-```
-
----
 
 ## 📚 API Documentation
 
-### 🔗 **Core Endpoints**
+### Authentication
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /auth/verify`
+- `GET /auth/profile`
+- `POST /auth/change-password`
+- `DELETE /auth/delete-account`
 
-#### **File Management**
-```http
-POST   /upload/data     # Upload data files
-POST   /upload/schema   # Upload schema files
-DELETE /upload/data/{id}    # Delete data file
-DELETE /upload/schema/{id}  # Delete schema file
-```
+### Settings & Data Sources
+- `POST /set-api-key`
+- `PUT /settings/set/api_key`
+- `PUT /settings/set/data_path`
+- `PUT /settings/set/data_path_simple`
+- `PUT /settings/set/context`
+- `GET /settings/get/data_path`
+- `GET /settings/get/context`
+- `GET /settings/check-update`
+- `GET /datasets/list`
+- `GET /datasets/lookup`
+- WebSocket: `/ws/settings/{user_id}` (must be connected before calling `/settings/set/data_path` to receive progress updates)
 
-#### **Analysis Engine**
-```http
-POST   /analyze         # Generate code from natural language
-POST   /execute         # Execute generated code
-GET    /health          # Health check
-```
+### Schema & Preview
+- `POST /schema/generate`
+- `GET /schema/load/{filepath}`
+- `POST /schema/save`
+- `GET /schema/list`
+- `GET /data/schema`
+- `GET /data/preview`
+- `POST /data/preview/refresh`
+- `DELETE /data/preview/cache`
 
-#### **Export & Logging**
-```http
-POST   /export/csv      # Export data as CSV
-POST   /export/chart    # Export chart as PNG/HTML
-POST   /log/question    # Log user questions
-GET    /log/questions   # Retrieve question history
-```
+### Analysis & Execution
+- `POST /chat`
+- `POST /execute/`
+- `POST /execute/with-variables`
+- `GET /execute/session-variables`
+- `DELETE /execute/session-variables`
 
-### 📝 **Example API Usage**
+### Utilities
+- `POST /system/open-file-dialog` (requires `INQUIRA_ALLOW_FILE_DIALOG=1` and localhost requests)
 
-```python
-import requests
+Refer to the FastAPI auto-generated docs at `http://localhost:8000/docs` for complete request/response schemas.
 
-# Analyze data with natural language
-response = requests.post('http://localhost:8000/analyze', json={
-    'question': 'Show me sales by category',
-    'data_file': 'sales.csv',
-    'schema_file': 'schema.csv',
-    'model': 'gemini-pro'
-})
-
-# Execute generated code
-result = requests.post('http://localhost:8000/execute', json={
-    'code': response.json()['code'],
-    'data_file': 'sales.csv'
-})
-```
-
----
 
 ## ⚙️ Configuration
 
 ### 🔧 **Environment Variables**
 
-Create `.env` file in backend directory:
+Create an optional `.env` file to control runtime behaviour:
 
 ```env
-# Server Configuration
-API_HOST=0.0.0.0
-API_PORT=8000
-DEBUG=True
-
-# File Handling
-UPLOAD_DIR=uploads
-MAX_FILE_SIZE=104857600  # 100MB
-ALLOWED_EXTENSIONS=csv,xlsx,xls,parquet,db
-
-# LLM Configuration
-GEMINI_API_KEY=your_api_key_here
-DEFAULT_MODEL=gemini-1.5-flash
-CODE_TIMEOUT=30
-
-# Security
-SECRET_KEY=your_secret_key
-CORS_ORIGINS=http://localhost:5173
-
 # Logging
-LOG_LEVEL=INFO
-LOG_DIR=logs
+LOG_LEVEL=INFO  # DEBUG for verbose output
+
+# Enable native file picker endpoint
+INQUIRA_ALLOW_FILE_DIALOG=1
+
+# Provide a default Gemini key when one is not stored in the DB
+GOOGLE_API_KEY=your_api_key_here
 ```
+
+Additional configuration (ports, paths, etc.) is managed through `src/inquira/config_models.py` and persisted per-user in the SQLite settings database.
+
 
 ### 🤖 **Supported LLM Models**
 
@@ -526,7 +488,7 @@ LOG_DIR=logs
 
 ### 🛡️ **Security Features**
 
-- **🔐 API Key Protection**: Keys never stored permanently
+- **🔐 API Key Storage**: Keys are saved in the local SQLite settings store per user and only shared with Google Gemini when sending requests.
 - **📁 File Validation**: Strict file type and size validation
 - **⚡ Sandboxed Execution**: Limited Python imports and execution
 - **🚫 No Cloud Storage**: All data remains local
