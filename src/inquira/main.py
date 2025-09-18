@@ -28,6 +28,8 @@ from .database_manager import DatabaseManager
 from .session_variable_store import session_variable_store
 from .logger import logprint, patch_print
 
+APP_VERSION = "0.4.5a1"
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage the lifecycle of the application"""
@@ -275,7 +277,7 @@ async def root():
     """
     Root endpoint to check if API is running
     """
-    return {"message": "Inquira is running", "version": "1.0.0"}
+    return {"message": "Inquira is running", "version": APP_VERSION}
 
 
 def run(argv: list[str] | None = None):
@@ -315,9 +317,9 @@ def run(argv: list[str] | None = None):
         time.sleep(2)  # Wait for server to start
         webbrowser.open(f"http://{HOST}:{PORT}{UI}")
 
+    logprint(f"Launching Inquira backend (v{APP_VERSION})")
     threading.Thread(target=open_browser, daemon=True).start()
 
-    
     uvicorn.run(
         app,
         host=HOST,

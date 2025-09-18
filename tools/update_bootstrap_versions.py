@@ -12,6 +12,7 @@ FILES = [
     ROOT / "scripts" / "install-inquira.ps1",
 ]
 README = ROOT / "README.md"
+MAIN = ROOT / "src" / "inquira" / "main.py"
 
 def read_version() -> str:
     text = PYPROJECT.read_text(encoding="utf-8")
@@ -119,6 +120,17 @@ def main():
         if readme_new != readme:
             README.write_text(readme_new, encoding="utf-8")
             print("Updated README version badge and wheel links.")
+
+    if MAIN.exists():
+        main_code = MAIN.read_text(encoding="utf-8")
+        main_new = re.sub(
+            r"APP_VERSION\s*=\s*\"[^\"]+\"",
+            f'APP_VERSION = "{version}"',
+            main_code,
+        )
+        if main_new != main_code:
+            MAIN.write_text(main_new, encoding="utf-8")
+            print("Updated src/inquira/main.py APP_VERSION.")
 
 if __name__ == "__main__":
     main()
