@@ -2,6 +2,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+import argparse
 import importlib.resources
 import webbrowser
 import threading
@@ -277,7 +278,35 @@ async def root():
     return {"message": "Inquira is running", "version": "1.0.0"}
 
 
-def run():
+def run(argv: list[str] | None = None):
+    parser = argparse.ArgumentParser(
+        prog="inquira",
+        description="Run the Inquira API and bundled UI",
+    )
+    parser.add_argument(
+        "--no-file-dialog",
+        dest="allow_file_dialog",
+        action="store_false",
+        help="Disable the native file picker endpoint",
+    )
+    parser.add_argument(
+        "--allow-file-dialog",
+        dest="allow_file_dialog",
+        action="store_true",
+        help="Explicitly enable the native file picker (overrides environment)",
+    )
+    args = parser.parse_args(argv)
+
+    env_flag = os.getenv("INQUIRA_ALLOW_FILE_DIALOG")
+    if args.allow_file_dialog is not None:
+        allow_file_dialog = args.allow_file_dialog
+    elif env_flag is not None:
+        allow_file_dialog = env_flag not in {"0", "false", "False"}
+    else:
+        allow_file_dialog = True  # default to enabled
+
+    app.state.allow_file_dialog = allow_file_dialog
+
     HOST = "localhost"
     PORT = 8000
     UI = "/ui"

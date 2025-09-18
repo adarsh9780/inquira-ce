@@ -217,6 +217,8 @@ Once the UI loads:
 3. Add a dataset in Settings → Data Source. When calling the REST API directly, establish a WebSocket connection to `/ws/settings/{user_id}` before calling `/settings/set/data_path` so you receive progress events.
 4. Ask questions or use the `/chat` endpoint to generate analysis code.
 
+Need to run the app on a headless box? Start it with `inquira --no-file-dialog` (or set `INQUIRA_ALLOW_FILE_DIALOG=0`) to turn off the native file picker endpoint.
+
 
 ## 📖 How to Use
 
@@ -448,7 +450,7 @@ Standalone installers are not yet published. If you experiment with PyInstaller 
 - `DELETE /execute/session-variables`
 
 ### Utilities
-- `POST /system/open-file-dialog` (requires `INQUIRA_ALLOW_FILE_DIALOG=1` and localhost requests)
+- `POST /system/open-file-dialog` (enabled by default; disable with `inquira --no-file-dialog` or `INQUIRA_ALLOW_FILE_DIALOG=0`; localhost requests only)
 
 Refer to the FastAPI auto-generated docs at `http://localhost:8000/docs` for complete request/response schemas.
 
@@ -463,8 +465,8 @@ Create an optional `.env` file to control runtime behaviour:
 # Logging
 LOG_LEVEL=INFO  # DEBUG for verbose output
 
-# Enable native file picker endpoint
-INQUIRA_ALLOW_FILE_DIALOG=1
+# Disable native file picker endpoint
+INQUIRA_ALLOW_FILE_DIALOG=0
 
 # Provide a default Gemini key when one is not stored in the DB
 GOOGLE_API_KEY=your_api_key_here

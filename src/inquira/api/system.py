@@ -88,11 +88,16 @@ async def open_file_dialog(request: Request):
     """Open a native OS file dialog on the local machine and return the absolute path.
 
     Safety/Scope:
-    - Only enabled when env var `INQUIRA_ALLOW_FILE_DIALOG=1` is set.
+    - Controlled by the CLI flag `--no-file-dialog` (default: enabled). Set env `INQUIRA_ALLOW_FILE_DIALOG=0` to disable when running in embedded contexts.
     - Only accepts requests from localhost (127.0.0.1/::1).
     - No file content is uploaded; only the absolute path string is returned.
     """
-    if os.getenv("INQUIRA_ALLOW_FILE_DIALOG") != "1":
+    allow_file_dialog = getattr(request.app.state, "allow_file_dialog", None)
+    if allow_file_dialog is None:
+        env_flag = os.getenv("INQUIRA_ALLOW_FILE_DIALOG")
+        allow_file_dialog = env_flag not in {None, "0", "false", "False"}
+
+    if not allow_file_dialog:
         raise HTTPException(status_code=403, detail="File dialog disabled")
 
     client = request.client.host if request and request.client else None
