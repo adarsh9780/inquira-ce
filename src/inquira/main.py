@@ -22,13 +22,15 @@ from .api.code_execution import router as code_execution_router
 from .api.api_key import router as api_key_router
 from .api.api_test import router as api_test_router
 from .api.system import router as system_router
+from .api.legal import router as legal_router
 from .config_models import AppConfig
 from .websocket_manager import websocket_manager
 from .database_manager import DatabaseManager
 from .session_variable_store import session_variable_store
 from .logger import logprint, patch_print
 
-APP_VERSION = "0.4.5a2"
+APP_VERSION = "0.4.6a0"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -71,7 +73,7 @@ async def lifespan(app: FastAPI):
     except asyncio.CancelledError:
         pass
 
-    if hasattr(app.state, 'db_manager'):
+    if hasattr(app.state, "db_manager"):
         app.state.db_manager.shutdown()
 
 
@@ -85,27 +87,25 @@ async def session_cleanup_worker():
             logprint(f"Error in session cleanup: {e}", level="error")
             await asyncio.sleep(60)  # Wait a minute before retrying
 
-app = FastAPI(
-    title="Inquira",
-    version="1.0.0",
-    lifespan=lifespan
-)
+
+app = FastAPI(title="Inquira", version="1.0.0", lifespan=lifespan)
 
 # Route legacy print() to structured logger
 patch_print()
 
 # Force MIME type mappings to avoid Windows registry quirks
-mimetypes.add_type('application/javascript', '.js')
-mimetypes.add_type('text/javascript', '.mjs')
-mimetypes.add_type('text/css', '.css')
-mimetypes.add_type('application/json', '.json')
-mimetypes.add_type('application/json', '.map')
-mimetypes.add_type('image/svg+xml', '.svg')
-mimetypes.add_type('image/x-icon', '.ico')
-mimetypes.add_type('font/woff2', '.woff2')
-mimetypes.add_type('font/woff', '.woff')
-mimetypes.add_type('font/ttf', '.ttf')
-mimetypes.add_type('application/wasm', '.wasm')
+mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("text/javascript", ".mjs")
+mimetypes.add_type("text/css", ".css")
+mimetypes.add_type("application/json", ".json")
+mimetypes.add_type("application/json", ".map")
+mimetypes.add_type("image/svg+xml", ".svg")
+mimetypes.add_type("image/x-icon", ".ico")
+mimetypes.add_type("font/woff2", ".woff2")
+mimetypes.add_type("font/woff", ".woff")
+mimetypes.add_type("font/ttf", ".ttf")
+mimetypes.add_type("application/wasm", ".wasm")
+
 
 def get_ui_dir() -> str:
     """
@@ -121,24 +121,34 @@ def get_ui_dir() -> str:
     :rtype: str
     """
     # --- variables at the top (per your standard) ---
-    packaged_ui = importlib.resources.files("inquira").joinpath("frontend", "dist")  # Traversable, not necessarily a Path
-    dev_ui = "/Users/adarshmaurya/Downloads/Projects/inquira-ui/dist"
-    logprint(f"Packaged UI path: {packaged_ui}")
-    logprint(f"Dev UI path: {dev_ui}")
+    packaged_ui = importlib.resources.files("inquira").joinpath("frontend", "dist")
 
-    # Prefer dev UI for debugging
-    logprint(f"Checking dev UI: {dev_ui}")
-    if os.path.exists(dev_ui):
-        logprint(f"Using dev UI: {dev_ui}")
-        return dev_ui
+    # 1) Optional override via environment variable for local UI builds
+    env_dev = os.getenv("INQUIRA_DEV_UI_DIR", "").strip()
+    if env_dev:
+        logprint(f"Env UI override (INQUIRA_DEV_UI_DIR): {env_dev}")
+        if os.path.isdir(env_dev):
+            return env_dev
+        else:
+            logprint(f"Env UI override path not found: {env_dev}", level="warning")
 
-    # Fallback to packaged UI
+    # 2) Prefer packaged UI shipped inside the wheel
     if packaged_ui.is_dir():
-        logprint(f"Got the UI from wheel: {packaged_ui}")
+        logprint(f"Using packaged UI: {packaged_ui}")
         return str(packaged_ui)
 
-    logprint(f"No UI found, using dev UI path: {dev_ui}")
-    return dev_ui
+    # 3) Fallback to repo local dist (src/frontend/dist) when running from source
+    repo_local = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+    )
+    logprint(f"Packaged UI missing; checking repo-local UI: {repo_local}")
+    if os.path.isdir(repo_local):
+        return repo_local
+
+    # 4) Last resort: return current working directory to avoid crash (unlikely)
+    logprint("No UI assets found; serving from CWD as last resort", level="warning")
+    return os.getcwd()
+
 
 app.mount("/ui", StaticFiles(directory=get_ui_dir(), html=True), name="ui")
 
@@ -158,7 +168,7 @@ app.add_middleware(
         "http://localhost:3000",  # Alternative dev port
         "http://127.0.0.1:3000",  # Alternative dev port
         "http://127.0.0.1:8000",
-        "http://localhost:8000"
+        "http://localhost:8000",
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -177,6 +187,8 @@ app.include_router(code_execution_router)
 app.include_router(api_test_router)
 app.include_router(datasets_router)
 app.include_router(system_router)
+app.include_router(legal_router)
+
 
 # WebSocket endpoint for real-time processing updates
 @app.websocket("/ws/settings/{user_id}")
@@ -187,19 +199,34 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
 
     # Check for common issues
     if user_id == "current_user":
-        logprint(f"⚠️ [WebSocket] WARNING: Frontend is using 'current_user' instead of actual user ID!")
-        logprint(f"💡 [WebSocket] Frontend should connect to: ws://localhost:8000/ws/settings/{user_id}")
-        logprint(f"💡 [WebSocket] But it's connecting to: ws://localhost:8000/ws/settings/current_user")
-        logprint(f"✅ [WebSocket] Accepting connection with 'current_user' for compatibility")
+        logprint(
+            "⚠️ [WebSocket] WARNING: Frontend is using 'current_user' instead of actual user ID!"
+        )
+        logprint(
+            f"💡 [WebSocket] Frontend should connect to: ws://localhost:8000/ws/settings/{user_id}"
+        )
+        logprint(
+            "💡 [WebSocket] But it's connecting to: ws://localhost:8000/ws/settings/current_user"
+        )
+        logprint(
+            "✅ [WebSocket] Accepting connection with 'current_user' for compatibility"
+        )
 
     await websocket_manager.connect(user_id, websocket)
     logprint(f"✅ [WebSocket] Connection established for user: {user_id}")
-    logprint(f"🔍 [WebSocket] Active connections after connect: {list(websocket_manager.active_connections.keys())}")
+    logprint(
+        f"🔍 [WebSocket] Active connections after connect: {list(websocket_manager.active_connections.keys())}"
+    )
 
     # Check for existing preview cache and create if missing
     try:
         from .database import get_user_settings
-        from .api.data_preview import get_cached_preview, set_cached_preview, read_file_with_duckdb_sample, SampleType
+        from .api.data_preview import (
+            get_cached_preview,
+            set_cached_preview,
+            read_file_with_duckdb_sample,
+            SampleType,
+        )
 
         # Get user's data path
         user_settings = get_user_settings(user_id) or {}
@@ -209,41 +236,65 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
             # Check cache status for all sample types and create cache if missing
             cache_status = {}
             for sample_type in [SampleType.random, SampleType.first]:
-                cached_data = get_cached_preview(app.state, user_id, sample_type.value, data_path)
+                cached_data = get_cached_preview(
+                    app.state, user_id, sample_type.value, data_path
+                )
 
                 if cached_data:
                     cache_status[sample_type.value] = "cached"
-                    logprint(f"✅ [WebSocket] Cache found for {user_id}:{sample_type.value}")
+                    logprint(
+                        f"✅ [WebSocket] Cache found for {user_id}:{sample_type.value}"
+                    )
                 else:
                     # Cache doesn't exist, create it asynchronously
-                    logprint(f"🔄 [WebSocket] Creating cache for {user_id}:{sample_type.value}")
+                    logprint(
+                        f"🔄 [WebSocket] Creating cache for {user_id}:{sample_type.value}"
+                    )
                     try:
-                        sample_data = read_file_with_duckdb_sample(data_path, sample_type.value, 100)
+                        sample_data = read_file_with_duckdb_sample(
+                            data_path, sample_type.value, 100
+                        )
                         response_data = {
                             "success": True,
                             "data": sample_data,
                             "row_count": len(sample_data),
                             "file_path": data_path,
                             "sample_type": sample_type.value,
-                            "message": f"Successfully loaded {len(sample_data)} {sample_type.value} sample rows"
+                            "message": f"Successfully loaded {len(sample_data)} {sample_type.value} sample rows",
                         }
-                        set_cached_preview(app.state, user_id, sample_type.value, data_path, response_data)
+                        set_cached_preview(
+                            app.state,
+                            user_id,
+                            sample_type.value,
+                            data_path,
+                            response_data,
+                        )
                         cache_status[sample_type.value] = "cached"
-                        logprint(f"✅ [WebSocket] Cache created for {user_id}:{sample_type.value} ({len(sample_data)} rows)")
+                        logprint(
+                            f"✅ [WebSocket] Cache created for {user_id}:{sample_type.value} ({len(sample_data)} rows)"
+                        )
                     except Exception as cache_error:
-                        logprint(f"❌ [WebSocket] Failed to create cache for {user_id}:{sample_type.value}: {str(cache_error)}", level="error")
+                        logprint(
+                            f"❌ [WebSocket] Failed to create cache for {user_id}:{sample_type.value}: {str(cache_error)}",
+                            level="error",
+                        )
                         cache_status[sample_type.value] = "error"
 
             # Send cache status to client
-            await websocket_manager.send_to_user(user_id, {
-                "type": "cache_status",
-                "data_path": data_path,
-                "cache_status": cache_status,
-                "message": f"Cache status checked for {data_path}",
-                "timestamp": datetime.now().isoformat()
-            })
+            await websocket_manager.send_to_user(
+                user_id,
+                {
+                    "type": "cache_status",
+                    "data_path": data_path,
+                    "cache_status": cache_status,
+                    "message": f"Cache status checked for {data_path}",
+                    "timestamp": datetime.now().isoformat(),
+                },
+            )
 
-            logprint(f"📊 [WebSocket] Cache status sent to user {user_id}: {cache_status}")
+            logprint(
+                f"📊 [WebSocket] Cache status sent to user {user_id}: {cache_status}"
+            )
 
     except Exception as e:
         logprint(f"⚠️ [WebSocket] Error checking cache status: {str(e)}", level="error")
@@ -267,10 +318,12 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
 async def favicon():
     """Serve the favicon if available; otherwise no-content"""
     from fastapi.responses import FileResponse, Response
+
     logo_path = os.path.join(os.path.dirname(__file__), "logo", "inquira_logo.svg")
     if os.path.exists(logo_path):
         return FileResponse(logo_path, media_type="image/svg+xml")
     return Response(status_code=204)
+
 
 @app.get("/", tags=["General"])
 async def root():
@@ -312,6 +365,7 @@ def run(argv: list[str] | None = None):
     HOST = "localhost"
     PORT = 8000
     UI = "/ui"
+
     # Open browser in a separate thread
     def open_browser():
         time.sleep(2)  # Wait for server to start
@@ -320,12 +374,8 @@ def run(argv: list[str] | None = None):
     logprint(f"Launching Inquira backend (v{APP_VERSION})")
     threading.Thread(target=open_browser, daemon=True).start()
 
-    uvicorn.run(
-        app,
-        host=HOST,
-        port=PORT,
-        reload=False
-    )
+    uvicorn.run(app, host=HOST, port=PORT, reload=False)
+
 
 if __name__ == "__main__":
     run()

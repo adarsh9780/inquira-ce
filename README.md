@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Active-success?style=for-the-badge" alt="Status">
-  <img src="https://img.shields.io/badge/Version-0.4.5a2-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-0.4.6a0-blue?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python" alt="Python">
   <img src="https://img.shields.io/badge/Vue.js-3-4FC08D?style=for-the-badge&logo=vue.js" alt="Vue.js">
@@ -185,7 +185,7 @@ What happens:
 ### 🎨 **User Interface**
 - ✅ Modern, intuitive desktop application
 - ✅ Dark/light theme support
-- ✅ Drag-and-drop file uploads
+- ✅ Local file selection (no server upload)
 - ✅ Real-time progress indicators
 
 ### 🔧 **Developer Experience**
@@ -365,7 +365,7 @@ inquira
 ```
 
 Notes:
-- The shim uses a released wheel by default: v0.4.5a2
+- The shim uses a released wheel by default: v0.4.6a0
 - Override the source by setting `INQUIRA_WHEEL_URL` before running `inquira`.
 - No system Python is required; uv fetches a Python 3.12 runtime as needed.
 
@@ -386,7 +386,7 @@ irm https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/run-i
 ```
 
 Notes:
-- The scripts default to the v0.4.5a2 wheel: `https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.5a2/inquira_ce-0.4.5a2-py3-none-any.whl`. Override with `INQUIRA_WHEEL_URL` if needed.
+- The scripts default to the v0.4.6a0 wheel: `https://github.com/adarsh9780/inquira-ce/releases/download/v0.4.6a0/inquira_ce-0.4.6a0-py3-none-any.whl`. Override with `INQUIRA_WHEEL_URL` if needed.
 - When the package is published to PyPI, the scripts can be switched to `--from inquira-ce[==version]`.
 - uv downloads an isolated CPython 3.12 if you don’t have Python installed.
 - Behind a proxy, ensure your shell respects proxy env vars before running.
@@ -408,7 +408,18 @@ uv sync
 uv run python -m src.inquira.main
 ```
 
-The repository ships prebuilt Vue assets under `src/inquira/frontend/dist`. If you need to change the UI, clone [adarsh9780/inquira-ui](https://github.com/adarsh9780/inquira-ui), run `npm install && npm run dev`, and update `get_ui_dir()` in `src/inquira/main.py` to point to your local `dist` folder while iterating.
+The repository ships prebuilt Vue assets under `src/inquira/frontend/dist`. If you need to change the UI, clone [adarsh9780/inquira-ui](https://github.com/adarsh9780/inquira-ui), build it, and point the backend to your local build using an environment override (no code changes needed):
+
+```bash
+# in one terminal: run the backend
+uv run python -m src.inquira.main
+
+# in another terminal: point to a local UI build
+export INQUIRA_DEV_UI_DIR=~/Downloads/Projects/inquira-ui/dist
+# then refresh http://localhost:8000/ui
+```
+
+If `INQUIRA_DEV_UI_DIR` is not set, the backend serves the packaged UI under `src/inquira/frontend/dist`.
 
 ### 🖥️ Option 2: Desktop Packaging
 
@@ -495,15 +506,15 @@ Additional configuration (ports, paths, etc.) is managed through `src/inquira/co
 
 ## 🔒 Security
 
-### 🛡️ **Security Features**
+### 🛡️ **Security Characteristics (Current)**
 
-- **🔐 API Key Storage**: Keys are saved in the local SQLite settings store per user and only shared with Google Gemini when sending requests.
-- **📁 File Validation**: Strict file type and size validation
-- **⚡ Sandboxed Execution**: Limited Python imports and execution
-- **🚫 No Cloud Storage**: All data remains local
-- **🔍 Input Sanitization**: All user inputs validated
-- **⏰ Execution Timeouts**: Prevents infinite loops
-- **📊 Audit Logging**: Complete activity tracking
+- **🔐 API Key Storage**: Keys are saved locally in a per-user SQLite settings store and only sent to the LLM provider for requests.
+- **📁 File Handling**: Data stays on device; you select local files rather than uploading to a server.
+- **⚠️ Code Execution**: Generated code executes locally in-process (no sandbox). It may access local files and the network.
+- **🚫 No Cloud Storage**: Application data is stored locally under `~/.inquira`.
+- **🔍 Input Validation**: User inputs and file types are validated where applicable.
+- **⏱️ Timeouts**: Hard execution timeouts are not yet enforced; long-running code can continue until finished.
+- **📊 Logging**: Local activity logging is available.
 
 ### ⚠️ **Security Best Practices**
 
@@ -545,11 +556,8 @@ curl -H "Authorization: Bearer YOUR_KEY" \
 - DuckDB connections are capped at ~500MB memory with on‑disk spill to avoid loading entire files.
 - `.xlsx` uses DuckDB excel extension when available; `.xls` is not supported. Convert `.xls` to `.xlsx` or `.csv`.
 
-#### **5. Code Execution Timeouts**
-```env
-# Increase timeout in .env
-CODE_TIMEOUT=60
-```
+#### **5. Code Execution Timeouts (planned)**
+Hard execution timeouts are not yet enforced in the CE build. Long‑running code will execute until completion. A configurable timeout will be added in a future release.
 
 ### 📊 **Performance Tuning**
 
@@ -631,18 +639,15 @@ copies of the Software...
 
 ### 📞 **Getting Help**
 
-- **📧 Email**: support@inquira.dev
-- **💬 Discord**: [Join our community](https://discord.gg/inquira)
-- **📖 Documentation**: [Full docs](https://docs.inquira.dev)
-- **🐛 Bug Reports**: [GitHub Issues](https://github.com/your-org/inquira/issues)
-- **💡 Feature Requests**: [GitHub Discussions](https://github.com/your-org/inquira/discussions)
+- **🐛 Bug Reports**: https://github.com/adarsh9780/inquira-ce/issues
+- **📖 Documentation**: Coming soon
+- **💬 Community**: Coming soon
 
 ### 📚 **Resources**
 
-- **🖥️ Live Demo**: [Try Inquira](https://demo.inquira.dev)
-- **📺 Tutorials**: [YouTube Channel](https://youtube.com/@inquira)
-- **📝 Blog**: [Latest Updates](https://blog.inquira.dev)
-- **📰 Newsletter**: [Stay Updated](https://newsletter.inquira.dev)
+- **🖥️ Live Demo**: Coming soon
+- **📺 Tutorials**: Coming soon
+- **📝 Blog**: Coming soon
 
 ### 🎯 **Roadmap**
 
@@ -659,9 +664,7 @@ copies of the Software...
 </p>
 
 <p align="center">
-  <a href="https://github.com/your-org/inquira">⭐ Star us on GitHub</a> •
-  <a href="https://twitter.com/inquira_dev">🐦 Follow on Twitter</a> •
-  <a href="https://discord.gg/inquira">💬 Join Discord</a>
+  <a href="https://github.com/adarsh9780/inquira-ce">⭐ Star the inquira-ce repo on GitHub</a>
 </p>
 
 ## Features
@@ -752,6 +755,8 @@ npm run dev
 The Vite dev server will proxy API calls to the FastAPI backend.
 
 ## API Endpoints
+
+Note: The following file upload endpoints reflect an older cloud-oriented workflow. In the current CE build, you select local files on your machine (no server upload). Treat these as future/legacy references.
 
 ### File Upload
 
@@ -899,9 +904,8 @@ CLI helpers at `src/inquira/utils/db_tools.py`:
 
 ## 🚧 Work in Progress
 
-- UI path configuration: replace hardcoded dev UI path with an environment variable override and autodetection of packaged assets.
-  - Target: use `INQUIRA_DEV_UI` or fallback to bundled `frontend/dist`.
-  - Reference: `src/inquira/main.py:107`.
+- UI path configuration: complete. Use `INQUIRA_DEV_UI_DIR` to point to a local UI build; otherwise the packaged `frontend/dist` is served.
+  - Reference: `src/inquira/main.py:109`.
 - Authentication cookies: derive cookie `domain` dynamically from request host or omit for local dev.
   - Improves compatibility with `127.0.0.1` and custom hosts.
   - Reference: `src/inquira/api/auth.py:132`.

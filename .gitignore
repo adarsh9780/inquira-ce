@@ -15,4 +15,6 @@ inquira-ui/
 *.ipynb
 .tmp
 PRODUCT_REQUIREMENTS.md
-todo.md
+project.md
+notebooks/*
+.env
