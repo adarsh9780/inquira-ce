@@ -1,4 +1,11 @@
 import axios from 'axios'
+import { getInquira } from './generatedApi'
+
+// ------------------------------------------------------------------
+// GLOBAL AXIOS CONFIGURATION
+// The generated client uses the global 'axios' instance.
+// We configure it here to maintain our interceptor logic.
+// ------------------------------------------------------------------
 
 function getDefaultApiBase() {
   if (typeof window === 'undefined') {
@@ -17,18 +24,14 @@ function getDefaultApiBase() {
 const resolvedEnvBase = (import.meta.env.VITE_API_BASE || '').trim()
 const apiBaseUrl = resolvedEnvBase || getDefaultApiBase()
 
-// Configure axios instance
-const api = axios.create({
-  baseURL: apiBaseUrl,
-  timeout: 360000, // 6 minutes (increased for manual cancel)
-  withCredentials: true, // Enable sending cookies with requests
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+// Configure GLOBAL axios defaults
+axios.defaults.baseURL = apiBaseUrl
+axios.defaults.timeout = 360000 // 6 minutes
+axios.defaults.withCredentials = true
+axios.defaults.headers.common['Content-Type'] = 'application/json'
 
 // Request interceptor
-api.interceptors.request.use(
+axios.interceptors.request.use(
   (config) => {
     // Add any auth headers or other common headers here
     return config
@@ -39,7 +42,7 @@ api.interceptors.request.use(
 )
 
 // Response interceptor
-api.interceptors.response.use(
+axios.interceptors.response.use(
   (response) => {
     return response.data
   },
@@ -66,24 +69,27 @@ api.interceptors.response.use(
   }
 )
 
+// Initialize the generated client
+const client = getInquira()
+
 export const apiService = {
   // Authentication endpoints
   async register(username, password) {
-    return api.post('/auth/register', { username, password })
+    return client.registerUserAuthRegisterPost({ username, password })
   },
 
   async login(username, password) {
-    return api.post('/auth/login', { username, password })
+    return client.loginUserAuthLoginPost({ username, password })
   },
 
   async logout() {
-    return api.post('/auth/logout')
+    return client.logoutUserAuthLogoutPost()
   },
 
   async verifyAuth() {
     console.log('🔍 Making verifyAuth request to /auth/verify')
     try {
-      const result = await api.get('/auth/verify')
+      const result = await client.verifyAuthAuthVerifyGet()
       console.log('✅ verifyAuth success:', result)
       return result
     } catch (error) {
@@ -106,7 +112,7 @@ export const apiService = {
   },
 
   async changePassword(currentPassword, newPassword, confirmPassword) {
-    return api.post('/auth/change-password', {
+    return client.changePasswordAuthChangePasswordPost({
       current_password: currentPassword,
       new_password: newPassword,
       confirm_password: confirmPassword
@@ -114,27 +120,24 @@ export const apiService = {
   },
 
   async deleteAccount(confirmationText, currentPassword) {
-    return api.delete('/auth/delete-account', {
-      data: {
-        confirmation_text: confirmationText,
-        current_password: currentPassword
-      }
+    return client.deleteAccountAuthDeleteAccountDelete({
+      confirmation_text: confirmationText,
+      current_password: currentPassword
     })
   },
 
   // Settings management
   async getSettings() {
-    return api.get('/settings/view')
+    return client.viewAllSettingsSettingsViewGet()
   },
 
   async getApiKey() {
-    return api.get('/settings/view/api_key')
+    return client.viewApikeySettingsViewApiKeyGet()
   },
 
   // Check whether data/schema update is needed
   async checkUpdate() {
-    // Allow backend to determine based on stored settings
-    return api.get('/settings/check-update')
+    return client.checkUpdateNeededSettingsCheckUpdateGet()
   },
 
   async setDataPath(dataPath) {
@@ -151,7 +154,7 @@ export const apiService = {
     }
 
     try {
-      const response = await api.put('/settings/set/data_path', { data_path: dataPath })
+      const response = await client.setDataPathSettingsSetDataPathPut({ data_path: dataPath })
       console.log('✅ [API] Data path set successfully:', response)
       return response
     } catch (error) {
@@ -172,17 +175,16 @@ export const apiService = {
   },
 
   async setContext(context) {
-    return api.put('/settings/set/context', { context: context })
+    return client.setContextSettingsSetContextPut({ context: context })
   },
 
   async setApiKeySettings(apiKey) {
-    return api.put('/settings/set/api_key', { api_key: apiKey })
+    return client.setApikeySettingsSetApiKeyPut({ api_key: apiKey })
   },
+
   // Data preview
   async getDataPreview(sampleType = 'random') {
-    return api.get('/data/preview', {
-      params: { sample_type: sampleType }
-    })
+    return client.getDataPreviewDataPreviewGet({ sample_type: sampleType })
   },
 
   // Generate schema with context
@@ -198,7 +200,7 @@ export const apiService = {
     }
 
     try {
-      const response = await api.post('/schema/generate', {
+      const response = await client.generateSchemaSchemaGeneratePost({
         filepath: filepath,
         context: context
       })
@@ -223,7 +225,8 @@ export const apiService = {
     }
 
     try {
-      const response = await api.get(`/schema/load/${encodeURIComponent(filepath)}`)
+      // NOTE: generated function takes filepath as an argument, separate from options
+      const response = await client.loadSchemaEndpointSchemaLoadFilepathGet(encodeURIComponent(filepath))
       console.log('✅ Schema loading successful')
       return response
     } catch (error) {
@@ -245,7 +248,7 @@ export const apiService = {
     }
 
     try {
-      const response = await api.post('/schema/save', {
+      const response = await client.saveSchemaEndpointSchemaSavePost({
         filepath: filepath,
         context: context,
         columns: columns
@@ -271,7 +274,7 @@ export const apiService = {
     }
 
     try {
-      const response = await api.get('/schema/list')
+      const response = await client.listSchemasEndpointSchemaListGet()
       console.log('✅ Schema listing successful')
       return response
     } catch (error) {
@@ -293,7 +296,7 @@ export const apiService = {
     }
 
     try {
-      const response = await api.get('/settings/paths')
+      const response = await client.getStoragePathsSettingsPathsGet()
       console.log('✅ Database paths retrieved successfully')
       return response
     } catch (error) {
@@ -304,19 +307,21 @@ export const apiService = {
 
   // Chat and analysis
   async analyzeData(data, signal = null) {
-    return api.post('/chat', data, { signal })
+    // data is typically { question, context, model, current_code }
+    return client.chatEndpointChatPost(data, { signal })
   },
 
   // Code execution
   async executeCode(code) {
-    return api.post('/execute/with-variables', { code: code })
+    // using the 'with-variables' endpoint as in original service
+    return client.executeCodeWithVariablesExecuteWithVariablesPost({ code: code })
   },
 
   // Health check
   async healthCheck() {
     console.log('🏥 [API] Checking backend health...')
     try {
-      const response = await api.get('/')
+      const response = await client.rootGet()
       console.log('✅ [API] Backend is healthy:', response)
       return response
     } catch (error) {
@@ -327,16 +332,14 @@ export const apiService = {
 
   // test gemini api
   async testGeminiApi(apiKey) {
-    return api.post('/api/test-gemini', {api_key: apiKey} )
+    return client.testGeminiApiKeyApiTestGeminiPost({ api_key: apiKey })
   },
 
   // System utilities
   async openFileDialog() {
     // Opens a native OS file picker via backend and returns { data_path }
-    // Backend route: POST /system/open-file-dialog
-    // Note: Requires INQUIRA_ALLOW_FILE_DIALOG=1 on backend and local request
     try {
-      const response = await api.post('/system/open-file-dialog')
+      const response = await client.openFileDialogSystemOpenFileDialogPost()
       return response
     } catch (error) {
       throw error
