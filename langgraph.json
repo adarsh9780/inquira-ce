@@ -1,0 +1,10 @@
+{
+  "python_version": "3.11",
+  "dependencies": [
+    "."
+  ],
+  "graphs": {
+    "pefi": "src.inquira.iagent:build_graph"
+  },
+  "env": ".env"
+}

@@ -1,0 +1,185 @@
+@import "tailwindcss";
+
+@theme {
+  /* Minimal Color Palette */
+  --color-white: #ffffff;
+  --color-gray-50: #f8f9fa;
+  --color-gray-100: #e9ecef;
+  --color-gray-200: #dee2e6;
+  --color-gray-300: #ced4da;
+  --color-gray-400: #adb5bd;
+  --color-gray-500: #6c757d;
+  --color-gray-600: #495057;
+  --color-gray-700: #343a40;
+  --color-gray-800: #212529;
+  --color-gray-900: #2b2d42; /* space_cadet */
+
+  --color-primary: #2b2d42; /* space_cadet */
+  --color-primary-50: #f8f9fa;
+  --color-primary-100: #e9ecef;
+  --color-primary-200: #ced0df;
+  --color-primary-300: #9da0bf;
+  --color-primary-400: #6d71a0;
+  --color-primary-500: #4a4d72;
+  --color-primary-600: #2b2d42;
+  --color-primary-700: #222334;
+  --color-primary-800: #191b27;
+  --color-primary-900: #08090d;
+
+  --color-accent: #8a89c0; /* cool_gray */
+  --color-accent-50: #f8f9fa;
+  --color-accent-100: #e8e8f3;
+  --color-accent-200: #d1d1e6;
+  --color-accent-300: #bab9da;
+  --color-accent-400: #a3a2cd;
+  --color-accent-500: #8a89c0;
+  --color-accent-600: #6160a9;
+  --color-accent-700: #474681;
+  --color-accent-800: #2f2e56;
+  --color-accent-900: #18172b;
+
+  --color-success: #659157; /* asparagus */
+  --color-error: #dc3545;
+  --color-warning: #ffc107;
+  --color-pastel: #ae8ca3; /* rose_quartz */
+  --color-pastel-50: #efe8ed;
+  --color-pastel-100: #dfd2db;
+  --color-pastel-200: #cfbbc8;
+  --color-pastel-300: #bfa4b6;
+  --color-pastel-400: #ae8ca3;
+  --color-pastel-500: #9d7590;
+  --color-pastel-600: #8c5e7d;
+  --color-pastel-700: #7b476a;
+  --color-pastel-800: #6a3057;
+  --color-pastel-900: #593944;
+  --color-pastel: #ae8ca3; /* rose_quartz */
+}
+
+/* Global styles for the Vue application */
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #08090d; /* space_cadet-100 */
+  background-color: #ffffff; /* white */
+}
+
+#app {
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Ensure proper text rendering */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Modern Minimal Design System */
+:root {
+  /* Core Colors */
+  --color-white: #ffffff;
+  --color-space-cadet: #2b2d42;
+  --color-cool-gray: #8a89c0;
+  --color-light-gray: #f8f9fa;
+  --color-border: #e9ecef;
+
+  /* Text Colors */
+  --text-primary: #2b2d42; /* space_cadet */
+  --text-secondary: #6c757d; /* muted */
+  --text-light: #ffffff; /* white */
+
+  /* Background Colors */
+  --bg-primary: #ffffff; /* white */
+  --bg-secondary: #f8f9fa; /* light gray */
+  --bg-dark: #2b2d42; /* space_cadet */
+
+  /* Interactive Colors */
+  --accent-primary: #8a89c0; /* cool_gray */
+  --accent-hover: #a3a2cd; /* cool_gray lighter */
+  --accent-active: #6160a9; /* cool_gray darker */
+
+  /* Status Colors */
+  --success: #659157; /* asparagus */
+  --error: #dc3545; /* clean red */
+  --warning: #ffc107; /* clean yellow */
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+
+  /* Spacing */
+  --spacing-xs: 0.5rem;
+  --spacing-sm: 0.75rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+}
+
+/* Typography Scale */
+.text-xs { font-size: 0.75rem; line-height: 1.5; }
+.text-sm { font-size: 0.875rem; line-height: 1.5; }
+.text-base { font-size: 1rem; line-height: 1.6; }
+.text-lg { font-size: 1.125rem; line-height: 1.6; }
+.text-xl { font-size: 1.25rem; line-height: 1.4; }
+.text-2xl { font-size: 1.5rem; line-height: 1.3; }
+.text-3xl { font-size: 1.875rem; line-height: 1.2; }
+
+/* Font Weights */
+.font-light { font-weight: 300; }
+.font-normal { font-weight: 400; }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+
+/* Custom Components */
+.btn-primary {
+  @apply bg-primary-600 text-white font-medium px-4 py-2 rounded-lg shadow-sm hover:bg-primary-700 hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2;
+}
+
+.btn-secondary {
+  @apply bg-gray-100 text-primary font-medium px-4 py-2 rounded-lg shadow-sm hover:bg-gray-200 hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2;
+}
+
+.card {
+  @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
+}
+
+.card-hover {
+  @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200;
+}
+
+/* AG Grid Theme */
+.ag-theme-alpine {
+  --ag-border-color: #e9ecef;
+  --ag-header-background-color: #f8f9fa;
+  --ag-odd-row-background-color: #ffffff;
+  --ag-even-row-background-color: #f8f9fa;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f8f9fa;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #adb5bd;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6c757d;
+}

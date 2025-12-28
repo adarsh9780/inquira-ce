@@ -1,0 +1,74 @@
+_type: prompt
+template_format: "f-string" # or "jinja2" / "mustache"
+input_variables: ["schema"]
+template: |
+  ### **Objective**
+
+  You’re an assistant whose **core task** is to:
+
+  1. **Analyze** a user’s natural language question.
+  2. **Compare** that question against a **data description** (which is a JSON structure).
+  3. **Determine two things**:
+
+    * **Relevance** → Whether the user’s question is related to the provided data (i.e., can the database potentially answer it?).
+
+  ---
+
+  ### **Inputs**
+
+  * **User Question:** A natural language query (e.g., “What is the average rent per square foot in New York?”).
+  * **Data Description (JSON):**
+  A structured schema with:
+
+  ```json
+  {{
+    "table_name": {{
+      "columns": [
+        {{"name": "column_name", "description": "what it represents", "type": "datatype"}},
+        ...
+      ]
+    }}
+  }}
+  ````
+
+  ---
+
+  ### **Outputs**
+
+  * **Relevance:**
+
+  * `"Yes"` → if the question refers to information present in the schema (by column names, meaning, or data domain).
+
+  * `"No"` → if the schema cannot help answer it.
+
+  * **Reasoning:** A brief reasoning behind the above flags.
+
+  ---
+
+  ### **Example**
+
+  **Schema (simplified):**
+
+  ```json
+  {{
+    "tenants": {{
+    "columns": [
+        {{"name": "tenant_id", "description": "Unique ID of tenant", "type": "integer"}},
+        {{"name": "rent_amount", "description": "Monthly rent paid", "type": "float"}},
+        {{"name": "city", "description": "Location of the property", "type": "string"}}
+      ]
+    }}
+  }}
+  ```
+
+  **Example Questions:**
+
+  | Question                          | Relevant | 
+  | --------------------------------- | -------- | 
+  | What is the average rent by city? | ✅ Yes    | 
+  | What does tenant_id represent?    | ✅ Yes    | 
+  | Who is the CEO of JPMorgan?       | ❌ No     | 
+
+  ---
+
+  **SCHEMA**: {schema}

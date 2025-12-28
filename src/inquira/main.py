@@ -1,33 +1,35 @@
-from fastapi import FastAPI, WebSocket
-from fastapi.staticfiles import StaticFiles
-from contextlib import asynccontextmanager
-from fastapi.middleware.cors import CORSMiddleware
 import argparse
+import asyncio
 import importlib.resources
-import webbrowser
+import mimetypes
+import os
 import threading
 import time
-import os
-import uvicorn
-import asyncio
-import mimetypes
+import webbrowser
+from contextlib import asynccontextmanager
 from datetime import datetime
-from .api.generate_schema import router as schema_router
-from .api.chat import router as chat_router
-from .api.auth import router as auth_router
-from .api.settings import router as settings_router
-from .api.data_preview import router as data_preview_router
-from .api.datasets import router as datasets_router
-from .api.code_execution import router as code_execution_router
+
+import uvicorn
+from fastapi import FastAPI, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
 from .api.api_key import router as api_key_router
 from .api.api_test import router as api_test_router
-from .api.system import router as system_router
+from .api.auth import router as auth_router
+from .api.chat import router as chat_router
+from .api.code_execution import router as code_execution_router
+from .api.data_preview import router as data_preview_router
+from .api.datasets import router as datasets_router
+from .api.generate_schema import router as schema_router
 from .api.legal import router as legal_router
+from .api.settings import router as settings_router
+from .api.system import router as system_router
 from .config_models import AppConfig
-from .websocket_manager import websocket_manager
 from .database_manager import DatabaseManager
-from .session_variable_store import session_variable_store
 from .logger import logprint, patch_print
+from .session_variable_store import session_variable_store
+from .websocket_manager import websocket_manager
 
 APP_VERSION = "0.4.6a0"
 
@@ -44,6 +46,15 @@ async def lifespan(app: FastAPI):
     app.state.context = None
     app.state.llm_service = None
     app.state.llm_initialized = False
+    
+    # Initialize LangGraph Agent
+    try:
+        from .agent.graph import build_graph
+        app.state.agent_graph = build_graph(checkpointer=None)
+        logprint("LangGraph agent initialized successfully")
+    except Exception as e:
+        logprint(f"Failed to initialize LangGraph agent: {e}", level="error")
+        app.state.agent_graph = None
 
     # Load merged configuration
     try:
@@ -220,13 +231,13 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
 
     # Check for existing preview cache and create if missing
     try:
-        from .database import get_user_settings
         from .api.data_preview import (
-            get_cached_preview,
-            set_cached_preview,
-            read_file_with_duckdb_sample,
             SampleType,
+            get_cached_preview,
+            read_file_with_duckdb_sample,
+            set_cached_preview,
         )
+        from .database import get_user_settings
 
         # Get user's data path
         user_settings = get_user_settings(user_id) or {}

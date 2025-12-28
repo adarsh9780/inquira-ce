@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inquira Terms &amp; Conditions</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: inherit;
+      color: inherit;
+    }
+
+    .layout {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 4rem;
+      line-height: 1.7;
+    }
+
+    h1, h2, h3 {
+      color: #0f172a;
+      line-height: 1.3;
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 4vw, 2.8rem);
+      margin-top: 0;
+    }
+
+    h2 {
+      font-size: clamp(1.4rem, 3vw, 1.9rem);
+      margin-top: 2rem;
+    }
+
+    h3 {
+      font-size: clamp(1.1rem, 2vw, 1.3rem);
+      margin-top: 1.5rem;
+    }
+
+    p {
+      margin-bottom: 1rem;
+    }
+
+    ul {
+      padding-left: 1.4rem;
+      margin-bottom: 1rem;
+    }
+
+    li {
+      margin-bottom: 0.5rem;
+    }
+
+    code {
+      background: #e2e8f0;
+      padding: 0.15rem 0.35rem;
+      border-radius: 0.35rem;
+      font-size: 0.95rem;
+    }
+
+    .meta {
+      font-size: 0.95rem;
+      color: #475569;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background-color: #ffffff;
+      border-radius: 1.25rem;
+      box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+      padding: 2.5rem;
+    }
+
+    @media (max-width: 640px) {
+      .layout {
+        padding: 2.25rem 1.1rem 3rem;
+      }
+
+      .card {
+        padding: 1.75rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="layout">
+    <article class="card">
+      <header>
+        <h1>Inquira Terms &amp; Conditions</h1>
+        <p class="meta">Last Updated: 2024-09-21</p>
+        <p>
+          These Terms &amp; Conditions ("Terms") govern your use of the Inquira Community Edition
+          ("Inquira", "the Software"). By using the Software, you agree to these Terms. If you do not
+          agree, do not use the Software.
+        </p>
+      </header>
+
+      <section>
+        <h2>1. Overview &amp; Scope</h2>
+        <ul>
+          <li>Inquira is a local, desktop-first data analysis tool that generates and executes Python/DuckDB code based on your natural-language prompts.</li>
+          <li>Community Edition runs on your machine. Inquira does not host or store your datasets on remote servers.</li>
+          <li>Some features interact with third-party Large Language Model (LLM) providers (e.g., Google Gemini) using your API key. This is optional but required for AI-assisted code generation and schema enrichment.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>2. Data Locations &amp; Storage</h2>
+        <p>The Software stores data only on your local device unless you explicitly configure third-party services.</p>
+        <ul>
+          <li>Application configuration and runtime data folder: <code>~/.inquira/</code> (user home directory)</li>
+          <li>Local database for application settings and catalog (SQLite): <code>~/.inquira/inquira.db</code></li>
+          <li>Per-user data (created by runtime operations):
+            <ul>
+              <li>DuckDB database file: <code>~/.inquira/{user_id}/{user_id}_data.duckdb</code></li>
+              <li>Schemas (JSON) and related assets: <code>~/.inquira/{user_id}/schemas/</code></li>
+              <li>Preview caches (currently pickle format): <code>~/.inquira/{user_id}/</code> with filenames like <code>{user_id}_preview_{sample_type}.pkl</code></li>
+              <li>Lightweight metadata files (JSON), if generated: <code>~/.inquira/{user_id}/*.json</code></li>
+            </ul>
+          </li>
+        </ul>
+        <p>You may remove Inquira’s local data at any time by deleting the <code>~/.inquira/</code> folder. This will erase all local settings, caches, and user records for the application.</p>
+      </section>
+
+      <section>
+        <h2>3. What We Collect (Locally)</h2>
+        <p>Inquira persists the following information on your device:</p>
+        <ul>
+          <li>User account data (local-only): randomly generated <code>user_id</code>, <code>username</code>, password hash + salt, timestamps.</li>
+          <li>Session cookie (local browser cookie): an HTTP-only session token used for authenticating to the local server.</li>
+          <li>Settings per user:
+            <ul>
+              <li>LLM API key (e.g., Google Gemini) if provided.</li>
+              <li>Data file path you select.</li>
+              <li>Optional domain “context”/notes about your dataset.</li>
+            </ul>
+          </li>
+          <li>Dataset catalog entries (per file) with metadata: file path, computed fingerprint, inferred table name, file size, modified time, row count, file type, and schema path.</li>
+          <li>Preview caches (small samples) for quicker UI previews.</li>
+          <li>Generated schema JSON files and related details (e.g., column names, inferred types, descriptions).</li>
+        </ul>
+        <p>No telemetry, analytics, or remote logging is performed by Inquira CE.</p>
+      </section>
+
+      <section>
+        <h2>4. What Is Sent to LLM Providers</h2>
+        <p>If you enable AI features by entering an LLM API key, Inquira sends only the information necessary to produce a useful response:</p>
+        <ul>
+          <li>Your prompt/question text.</li>
+          <li>Schema-related metadata (e.g., table/column names, inferred types, short column descriptions, limited sample values when generating descriptions), and optional dataset “context” you provide.</li>
+          <li>System and developer prompts required to instruct the model (templates included in the app).</li>
+        </ul>
+        <p><strong>What is NOT sent:</strong></p>
+        <ul>
+          <li>Your full dataset files.</li>
+          <li>Complete, large-scale row-level data. Inquira may derive tiny samples for descriptive purposes; these are limited and intended to avoid sending sensitive data. You control which files you point Inquira to, and you can avoid AI-driven schema enrichment if required.</li>
+        </ul>
+        <p>
+          Important: LLM providers process the input you send under their own terms and privacy policies. Review your provider’s documentation and configure data controls accordingly.
+        </p>
+      </section>
+
+      <section>
+        <h2>5. Code Execution &amp; Safety</h2>
+        <ul>
+          <li>Generated code executes locally, in-process, without a sandbox. This means code may access local files, environment variables, and network resources with your user’s permissions.</li>
+          <li>You are responsible for reviewing generated code before executing.</li>
+          <li>To keep data private, do not run Inquira in untrusted environments. Avoid opening unknown datasets or executing unreviewed code if you are unsure of its behavior.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>6. File Access &amp; Ingestion</h2>
+        <ul>
+          <li>You select local files; the app does not upload your files to a remote server.</li>
+          <li>Inquira converts selected files to a per-user DuckDB database for efficient querying. Tables are named based on file names.</li>
+          <li>When a source file changes, Inquira updates the corresponding DuckDB table.</li>
+          <li>For performance, small preview samples are cached locally. Currently this cache uses pickle format for speed; future versions may change to safer serialization formats.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>7. Cookies, Sessions, and Authentication</h2>
+        <ul>
+          <li>Local sessions are authenticated via an HTTP-only cookie set by the local server.</li>
+          <li>Sessions expire after approximately 24 hours.</li>
+          <li>User and session records are stored in the local SQLite database at <code>~/.inquira/inquira.db</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>8. Secrets (API Keys)</h2>
+        <ul>
+          <li>If set in the app, your LLM API key is stored in the local SQLite database and used only to call the LLM provider you’ve configured.</li>
+          <li>Alternatively, you may set the API key via environment variables and avoid persisting it locally.</li>
+          <li>Delete the key in Settings or remove <code>~/.inquira/</code> to purge local storage.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>9. Your Responsibilities</h2>
+        <ul>
+          <li>Ensure you have the rights to use the datasets you analyze.</li>
+          <li>Review and understand generated code before running it.</li>
+          <li>Configure and manage any third-party LLM accounts and their data controls.</li>
+          <li>Protect your device and local storage. Inquira CE does not provide encryption of local data by default.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>10. Deleting Data</h2>
+        <ul>
+          <li>Delete your user account from within the application to remove your local user and session data from the SQLite database.</li>
+          <li>To completely remove all local Inquira data, delete the entire <code>~/.inquira/</code> folder.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>11. Third-Party Services</h2>
+        <p>If you use LLM providers (e.g., Google Gemini), your prompts and associated metadata are subject to those providers’ terms and privacy policies. You are responsible for reviewing and accepting those terms with the provider.</p>
+      </section>
+
+      <section>
+        <h2>12. Warranty Disclaimer</h2>
+        <p>THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. YOU USE THE SOFTWARE AT YOUR OWN RISK.</p>
+      </section>
+
+      <section>
+        <h2>13. Limitation of Liability</h2>
+        <p>IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
+      </section>
+
+      <section>
+        <h2>14. Changes to These Terms</h2>
+        <p>We may update these Terms by publishing a new version with an updated “Last Updated” date. Continued use of the Software after changes indicates acceptance.</p>
+      </section>
+
+      <section>
+        <h2>15. Contact</h2>
+        <p>For issues or questions, please open an issue in the repository or consult the project README.</p>
+      </section>
+    </article>
+  </main>
+</body>
+</html>
