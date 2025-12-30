@@ -137,12 +137,7 @@ async function handleSubmit() {
       return
     }
 
-    if (!is_relevant) {
-      toast.warning('Query Not Relevant', 'Your query was determined to be not relevant to data analysis.')
-      appStore.setTerminalOutput('ℹ️ Query was determined to be not relevant to data analysis.')
-      appStore.setActiveTab('code')
-      return
-    }
+
 
     // Update the last message with the explanation
     appStore.updateLastMessageExplanation(explanation)

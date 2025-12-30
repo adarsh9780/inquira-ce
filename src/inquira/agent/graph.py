@@ -55,18 +55,30 @@ class MetaData(BaseModel):
 def merge_metadata(
     prev: MetaData | None, new: MetaData | Mapping[str, Any] | None
 ) -> MetaData | None:
-    if new is None and prev is None:
-        return None
-    if prev is None:
-        # First write: coerce whatever we got to MetaData
-        return new if isinstance(new, MetaData) else MetaData(**(new or {}))
+    try:
+        if new is None and prev is None:
+            return None
+        
+        # Helper to convert input to dict safely
+        def to_dict(obj):
+            if isinstance(obj, MetaData):
+                return obj.model_dump()
+            if isinstance(obj, dict):
+                return obj
+            return {} # Fallback for bad types (strings, etc)
 
-    # We have an existing MetaData; normalize new to dict and shallow-merge
-    new_dict = new.model_dump() if isinstance(new, MetaData) else dict(new or {})
-    merged = prev.model_dump() if isinstance(prev, MetaData) else dict(prev or {})
-    merged.update(new_dict)
-    # Re-validate to keep state as a MetaData instance
-    return MetaData(**merged)
+        prev_dict = to_dict(prev)
+        new_dict = to_dict(new)
+        
+        # Merge
+        merged = prev_dict.copy()
+        merged.update(new_dict)
+        
+        return MetaData(**merged)
+    except Exception as e:
+        # Fallback to prevent state corruption/crash
+        # We return a fresh MetaData to ensure the graph can continue
+        return prev if isinstance(prev, MetaData) else MetaData()
 
 
 class State(BaseModel):
@@ -75,6 +87,9 @@ class State(BaseModel):
     plan: str | None = Field(default=None)
     code: str | None = Field(default=None)
     active_schema: dict[str, Any] | None = Field(default=None)
+    previous_code: str = Field(
+        default="", description="previous code used as context for generation"
+    )
     current_code: str = Field(
         default="", description="current code which can provide LLM more context"
     )
@@ -85,6 +100,9 @@ class State(BaseModel):
 class InputSchema(BaseModel):
     messages: Annotated[list[AnyMessage], add_messages]
     active_schema: dict[str, Any] | None = Field(default=None)
+    previous_code: str = Field(
+        default="", description="previous code used as context for generation"
+    )
     current_code: str = Field(
         default="", description="current code which can provide LLM more context"
     )
@@ -223,7 +241,7 @@ class InquiraAgent:
             {
                 "messages": state.messages,
                 "schema": state.active_schema,
-                "current_code": state.current_code,
+                "current_code": state.previous_code,
             }
         )
         response = cast(Plan, response)
@@ -245,14 +263,15 @@ class InquiraAgent:
         # Serialize schema to string for the prompt
         schema_str = json.dumps(state.active_schema, indent=2) if state.active_schema else "{}"
 
-        model = self._get_model(config, "gemini-2.5-flash-lite")
+        # Upgrade model to ensure code generation capability
+        model = self._get_model(config, "gemini-2.5-flash")
         chain = prompt | model.with_structured_output(Code)
 
         response = chain.invoke(
             {
                 "messages": state.messages,
                 "plan": state.plan,
-                "current_code": state.current_code,
+                "current_code": state.previous_code,
                 "table_name": state.table_name or "data_table",
                 "schema": schema_str,
                 "data_path": state.data_path or "data.csv"
@@ -260,7 +279,11 @@ class InquiraAgent:
         )
         response = cast(Code, response)
 
-        return {"current_code": response.code, "code": response.code}
+        updates = {"code": response.code}
+        if response.code and response.code.strip():
+            updates["current_code"] = response.code
+            
+        return updates
 
     def noncode_generator(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         system_prompt_template = SystemMessagePromptTemplate.from_template_file(
@@ -278,7 +301,7 @@ class InquiraAgent:
             {
                 "messages": state.messages,
                 "schema": state.active_schema,
-                "current_code": state.current_code,
+                "current_code": state.previous_code,
             }
         )
 
@@ -372,7 +395,7 @@ class InquiraAgent:
         return builder.compile(checkpointer=checkpointer)
 
 
-def build_graph(checkpointer: Checkpointer) -> CompiledStateGraph:
+def build_graph(checkpointer: Checkpointer = None) -> CompiledStateGraph:
     graph = InquiraAgent()
     agent = graph.compile(checkpointer=checkpointer)
     return agent

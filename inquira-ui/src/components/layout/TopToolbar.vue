@@ -3,9 +3,7 @@
     <div class="flex items-center justify-between">
       <!-- Left Section: App Title -->
       <div class="flex items-center space-x-3 flex-shrink-0">
-        <div class="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden bg-gradient-to-br from-blue-600 to-purple-600">
-          <span class="text-4xl font-bold text-white select-none">Q</span>
-        </div>
+        <img :src="logo" alt="Inquira Logo" class="w-12 h-12 rounded-lg" />
         <div class="hidden sm:block">
           <h1 class="text-xl font-bold text-primary-900">Inquira</h1>
           <p class="text-sm text-primary-700">LLM-Powered Data Analysis</p>
@@ -197,6 +195,7 @@ import SettingsModal from '../modals/SettingsModal.vue'
 import ShortcutsModal from '../modals/ShortcutsModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import { CogIcon, ArrowRightOnRectangleIcon, UserIcon, CommandLineIcon, ChevronDownIcon, DocumentTextIcon } from '@heroicons/vue/24/outline'
+import logo from '../../assets/favicon.svg'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()

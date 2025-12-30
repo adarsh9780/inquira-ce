@@ -8,20 +8,30 @@ import time
 import webbrowser
 from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+import aiosqlite
 
-from .api.api_key import router as api_key_router
+# Monkey patch aiosqlite.Connection to add is_alive method
+# required by langgraph-checkpoint-sqlite v3.0.1+
+if not hasattr(aiosqlite.Connection, "is_alive"):
+    def is_alive(self):
+        return True
+    aiosqlite.Connection.is_alive = is_alive
+
+
 from .api.api_test import router as api_test_router
 from .api.auth import router as auth_router
 from .api.chat import router as chat_router
 from .api.code_execution import router as code_execution_router
 from .api.data_preview import router as data_preview_router
 from .api.datasets import router as datasets_router
-from .api.generate_schema import router as schema_router
+from .api.schemas import router as schema_router
 from .api.legal import router as legal_router
 from .api.settings import router as settings_router
 from .api.system import router as system_router
@@ -47,14 +57,35 @@ async def lifespan(app: FastAPI):
     app.state.llm_service = None
     app.state.llm_initialized = False
     
-    # Initialize LangGraph Agent
+    # Initialize LangGraph Agent with Persistence
     try:
         from .agent.graph import build_graph
-        app.state.agent_graph = build_graph(checkpointer=None)
-        logprint("LangGraph agent initialized successfully")
+        
+        # Use dedicated chat_history.db in the user's home directory
+        db_path = Path.home() / ".inquira" / "chat_history.db"
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # We need to store the checkpointer itself to close it later, 
+        # or we rely on the fact that build_graph uses it.
+        # However, AsyncSqliteSaver is an async context manager.
+        # We need to enter it to get the usable checkpointer.
+        
+        # AsyncSqliteSaver.from_conn_string returns an async context manager.
+        # We must assign the context manager to a variable, then await __aenter__()
+        # to get the *actual* checkpointer instance.
+        
+        checkpointer_cm = AsyncSqliteSaver.from_conn_string(str(db_path))
+        checkpointer = await checkpointer_cm.__aenter__()
+        
+        # Store context manager for cleanup, and checkpointer for reference (if needed)
+        app.state.checkpointer_cm = checkpointer_cm
+        
+        app.state.agent_graph = build_graph(checkpointer=checkpointer)
+        logprint(f"LangGraph agent initialized with persistence at: {db_path}")
     except Exception as e:
         logprint(f"Failed to initialize LangGraph agent: {e}", level="error")
         app.state.agent_graph = None
+        app.state.checkpointer_cm = None
 
     # Load merged configuration
     try:
@@ -86,6 +117,13 @@ async def lifespan(app: FastAPI):
 
     if hasattr(app.state, "db_manager"):
         app.state.db_manager.shutdown()
+
+    if hasattr(app.state, "checkpointer_cm") and app.state.checkpointer_cm:
+        logprint("Closing LangGraph checkpointer connection...")
+        try:
+            await app.state.checkpointer_cm.__aexit__(None, None, None)
+        except Exception as e:
+            logprint(f"Error closing checkpointer: {e}", level="error")
 
 
 async def session_cleanup_worker():
@@ -148,9 +186,9 @@ def get_ui_dir() -> str:
         logprint(f"Using packaged UI: {packaged_ui}")
         return str(packaged_ui)
 
-    # 3) Fallback to repo local dist (src/frontend/dist) when running from source
+    # 3) Fallback to repo local dist (src/inquira/frontend/dist) when running from source
     repo_local = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+        os.path.join(os.path.dirname(__file__), "frontend", "dist")
     )
     logprint(f"Packaged UI missing; checking repo-local UI: {repo_local}")
     if os.path.isdir(repo_local):
@@ -189,7 +227,7 @@ app.add_middleware(
 
 # Include all routers
 app.include_router(auth_router)
-app.include_router(api_key_router)
+
 app.include_router(chat_router)
 app.include_router(settings_router)
 app.include_router(data_preview_router)

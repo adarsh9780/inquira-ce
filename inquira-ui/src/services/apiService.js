@@ -200,7 +200,7 @@ export const apiService = {
     }
 
     try {
-      const response = await client.generateSchemaSchemaGeneratePost({
+      const response = await client.generateSchemaSchemasGeneratePost({
         filepath: filepath,
         context: context
       })
@@ -226,7 +226,7 @@ export const apiService = {
 
     try {
       // NOTE: generated function takes filepath as an argument, separate from options
-      const response = await client.loadSchemaEndpointSchemaLoadFilepathGet(encodeURIComponent(filepath))
+      const response = await client.loadSchemaEndpointSchemasLoadFilepathGet(encodeURIComponent(filepath))
       console.log('✅ Schema loading successful')
       return response
     } catch (error) {
@@ -248,7 +248,7 @@ export const apiService = {
     }
 
     try {
-      const response = await client.saveSchemaEndpointSchemaSavePost({
+      const response = await client.saveSchemaEndpointSchemasSavePost({
         filepath: filepath,
         context: context,
         columns: columns
@@ -274,7 +274,7 @@ export const apiService = {
     }
 
     try {
-      const response = await client.listSchemasEndpointSchemaListGet()
+      const response = await client.listSchemasEndpointSchemasListGet()
       console.log('✅ Schema listing successful')
       return response
     } catch (error) {
@@ -309,6 +309,10 @@ export const apiService = {
   async analyzeData(data, signal = null) {
     // data is typically { question, context, model, current_code }
     return client.chatEndpointChatPost(data, { signal })
+  },
+
+  async getHistory() {
+    return client.getChatHistoryHistoryGet()
   },
 
   // Code execution

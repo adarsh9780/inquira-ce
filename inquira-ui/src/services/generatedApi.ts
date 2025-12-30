@@ -10,11 +10,6 @@ import type {
   AxiosResponse
 } from 'axios';
 
-export interface APIKeyRequest {
-  /** Your Google Gemini API key for accessing the LLM service */
-  api_key: string;
-}
-
 export interface ApiKeyRequest {
   /** Google Gemini API key */
   api_key: string;
@@ -374,7 +369,7 @@ export type RefreshDataPreviewDataPreviewRefreshPost200 = { [key: string]: unkno
 
 export type ClearPreviewCacheDataPreviewCacheDelete200 = { [key: string]: unknown };
 
-export type GenerateSchemaSchemaGeneratePostParams = {
+export type GenerateSchemaSchemasGeneratePostParams = {
 model?: string;
 };
 
@@ -477,19 +472,6 @@ const deleteAccountAuthDeleteAccountDelete = <TData = AxiosResponse<unknown>>(
   }
 
 /**
- * Set the API key for LLM service
- * @summary Set Api Key
- */
-const setApiKeySetApiKeyPost = <TData = AxiosResponse<unknown>>(
-    aPIKeyRequest: APIKeyRequest, options?: AxiosRequestConfig
- ): Promise<TData> => {
-    return axios.post(
-      `/set-api-key`,
-      aPIKeyRequest,options
-    );
-  }
-
-/**
  * Data analysis chat endpoint that returns structured response with code and explanation
  * @summary Chat Endpoint
  */
@@ -499,6 +481,18 @@ const chatEndpointChatPost = <TData = AxiosResponse<DataAnalysisResponse>>(
     return axios.post(
       `/chat`,
       dataAnalysisRequest,options
+    );
+  }
+
+/**
+ * Get chat history for the current user and active data file.
+ * @summary Get Chat History
+ */
+const getChatHistoryHistoryGet = <TData = AxiosResponse<unknown>>(
+     options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/history`,options
     );
   }
 
@@ -701,12 +695,12 @@ const clearPreviewCacheDataPreviewCacheDelete = <TData = AxiosResponse<ClearPrev
 /**
  * @summary Generate Schema
  */
-const generateSchemaSchemaGeneratePost = <TData = AxiosResponse<unknown>>(
+const generateSchemaSchemasGeneratePost = <TData = AxiosResponse<unknown>>(
     generateSchemaRequest: GenerateSchemaRequest,
-    params?: GenerateSchemaSchemaGeneratePostParams, options?: AxiosRequestConfig
+    params?: GenerateSchemaSchemasGeneratePostParams, options?: AxiosRequestConfig
  ): Promise<TData> => {
     return axios.post(
-      `/schema/generate`,
+      `/schemas/generate`,
       generateSchemaRequest,{
     ...options,
         params: {...params, ...options?.params},}
@@ -720,11 +714,11 @@ If no schema exists yet, attempt to generate a minimal schema (without LLM)
 based on DuckDB DESCRIBE and sample values, then save and return it.
  * @summary Load Schema Endpoint
  */
-const loadSchemaEndpointSchemaLoadFilepathGet = <TData = AxiosResponse<unknown>>(
+const loadSchemaEndpointSchemasLoadFilepathGet = <TData = AxiosResponse<unknown>>(
     filepath: string, options?: AxiosRequestConfig
  ): Promise<TData> => {
     return axios.get(
-      `/schema/load/${filepath}`,options
+      `/schemas/load/${filepath}`,options
     );
   }
 
@@ -732,11 +726,11 @@ const loadSchemaEndpointSchemaLoadFilepathGet = <TData = AxiosResponse<unknown>>
  * Save a user-modified schema
  * @summary Save Schema Endpoint
  */
-const saveSchemaEndpointSchemaSavePost = <TData = AxiosResponse<unknown>>(
+const saveSchemaEndpointSchemasSavePost = <TData = AxiosResponse<unknown>>(
     saveSchemaRequest: SaveSchemaRequest, options?: AxiosRequestConfig
  ): Promise<TData> => {
     return axios.post(
-      `/schema/save`,
+      `/schemas/save`,
       saveSchemaRequest,options
     );
   }
@@ -745,11 +739,11 @@ const saveSchemaEndpointSchemaSavePost = <TData = AxiosResponse<unknown>>(
  * List all schemas for the current user
  * @summary List Schemas Endpoint
  */
-const listSchemasEndpointSchemaListGet = <TData = AxiosResponse<unknown>>(
+const listSchemasEndpointSchemasListGet = <TData = AxiosResponse<unknown>>(
      options?: AxiosRequestConfig
  ): Promise<TData> => {
     return axios.get(
-      `/schema/list`,options
+      `/schemas/list`,options
     );
   }
 
@@ -910,7 +904,7 @@ const rootGet = <TData = AxiosResponse<unknown>>(
     );
   }
 
-return {registerUserAuthRegisterPost,loginUserAuthLoginPost,logoutUserAuthLogoutPost,verifyAuthAuthVerifyGet,getUserProfileAuthProfileGet,changePasswordAuthChangePasswordPost,deleteAccountAuthDeleteAccountDelete,setApiKeySetApiKeyPost,chatEndpointChatPost,setDataPathSettingsSetDataPathPut,setContextSettingsSetContextPut,setDataPathSimpleSettingsSetDataPathSimplePut,setApikeySettingsSetApiKeyPut,viewDataPathSettingsViewDataPathGet,viewContextSettingsViewContextGet,viewApikeySettingsViewApiKeyGet,viewAllSettingsSettingsViewGet,getStoragePathsSettingsPathsGet,checkUpdateNeededSettingsCheckUpdateGet,closeDatabaseConnectionsSettingsCloseConnectionsPost,getDataSchemaDataSchemaGet,getDataPreviewDataPreviewGet,refreshDataPreviewDataPreviewRefreshPost,clearPreviewCacheDataPreviewCacheDelete,generateSchemaSchemaGeneratePost,loadSchemaEndpointSchemaLoadFilepathGet,saveSchemaEndpointSchemaSavePost,listSchemasEndpointSchemaListGet,executeCodeExecutePost,getSessionVariablesExecuteSessionVariablesGet,clearSessionVariablesExecuteSessionVariablesDelete,executeCodeWithVariablesExecuteWithVariablesPost,testGeminiApiKeyApiTestGeminiPost,lookupDatasetDatasetsLookupGet,listUserDatasetsDatasetsListGet,openFileDialogSystemOpenFileDialogPost,getTermsMarkdownLegalTermsGet,rootGet}};
+return {registerUserAuthRegisterPost,loginUserAuthLoginPost,logoutUserAuthLogoutPost,verifyAuthAuthVerifyGet,getUserProfileAuthProfileGet,changePasswordAuthChangePasswordPost,deleteAccountAuthDeleteAccountDelete,chatEndpointChatPost,getChatHistoryHistoryGet,setDataPathSettingsSetDataPathPut,setContextSettingsSetContextPut,setDataPathSimpleSettingsSetDataPathSimplePut,setApikeySettingsSetApiKeyPut,viewDataPathSettingsViewDataPathGet,viewContextSettingsViewContextGet,viewApikeySettingsViewApiKeyGet,viewAllSettingsSettingsViewGet,getStoragePathsSettingsPathsGet,checkUpdateNeededSettingsCheckUpdateGet,closeDatabaseConnectionsSettingsCloseConnectionsPost,getDataSchemaDataSchemaGet,getDataPreviewDataPreviewGet,refreshDataPreviewDataPreviewRefreshPost,clearPreviewCacheDataPreviewCacheDelete,generateSchemaSchemasGeneratePost,loadSchemaEndpointSchemasLoadFilepathGet,saveSchemaEndpointSchemasSavePost,listSchemasEndpointSchemasListGet,executeCodeExecutePost,getSessionVariablesExecuteSessionVariablesGet,clearSessionVariablesExecuteSessionVariablesDelete,executeCodeWithVariablesExecuteWithVariablesPost,testGeminiApiKeyApiTestGeminiPost,lookupDatasetDatasetsLookupGet,listUserDatasetsDatasetsListGet,openFileDialogSystemOpenFileDialogPost,getTermsMarkdownLegalTermsGet,rootGet}};
 export type RegisterUserAuthRegisterPostResult = AxiosResponse<UserResponse>
 export type LoginUserAuthLoginPostResult = AxiosResponse<unknown>
 export type LogoutUserAuthLogoutPostResult = AxiosResponse<unknown>
@@ -918,8 +912,8 @@ export type VerifyAuthAuthVerifyGetResult = AxiosResponse<unknown>
 export type GetUserProfileAuthProfileGetResult = AxiosResponse<unknown>
 export type ChangePasswordAuthChangePasswordPostResult = AxiosResponse<unknown>
 export type DeleteAccountAuthDeleteAccountDeleteResult = AxiosResponse<unknown>
-export type SetApiKeySetApiKeyPostResult = AxiosResponse<unknown>
 export type ChatEndpointChatPostResult = AxiosResponse<DataAnalysisResponse>
+export type GetChatHistoryHistoryGetResult = AxiosResponse<unknown>
 export type SetDataPathSettingsSetDataPathPutResult = AxiosResponse<unknown>
 export type SetContextSettingsSetContextPutResult = AxiosResponse<unknown>
 export type SetDataPathSimpleSettingsSetDataPathSimplePutResult = AxiosResponse<unknown>
@@ -935,10 +929,10 @@ export type GetDataSchemaDataSchemaGetResult = AxiosResponse<GetDataSchemaDataSc
 export type GetDataPreviewDataPreviewGetResult = AxiosResponse<GetDataPreviewDataPreviewGet200>
 export type RefreshDataPreviewDataPreviewRefreshPostResult = AxiosResponse<RefreshDataPreviewDataPreviewRefreshPost200>
 export type ClearPreviewCacheDataPreviewCacheDeleteResult = AxiosResponse<ClearPreviewCacheDataPreviewCacheDelete200>
-export type GenerateSchemaSchemaGeneratePostResult = AxiosResponse<unknown>
-export type LoadSchemaEndpointSchemaLoadFilepathGetResult = AxiosResponse<unknown>
-export type SaveSchemaEndpointSchemaSavePostResult = AxiosResponse<unknown>
-export type ListSchemasEndpointSchemaListGetResult = AxiosResponse<unknown>
+export type GenerateSchemaSchemasGeneratePostResult = AxiosResponse<unknown>
+export type LoadSchemaEndpointSchemasLoadFilepathGetResult = AxiosResponse<unknown>
+export type SaveSchemaEndpointSchemasSavePostResult = AxiosResponse<unknown>
+export type ListSchemasEndpointSchemasListGetResult = AxiosResponse<unknown>
 export type ExecuteCodeExecutePostResult = AxiosResponse<CodeExecutionResponse>
 export type GetSessionVariablesExecuteSessionVariablesGetResult = AxiosResponse<GetSessionVariablesExecuteSessionVariablesGet200>
 export type ClearSessionVariablesExecuteSessionVariablesDeleteResult = AxiosResponse<unknown>

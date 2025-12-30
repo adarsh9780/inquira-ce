@@ -9,7 +9,7 @@ const STORAGE_KEYS = {
 }
 
 export const useAppStore = defineStore('app', () => {
-  
+
   // Files
   const dataFilePath = ref('')
   const schemaFilePath = ref('')
@@ -32,7 +32,7 @@ export const useAppStore = defineStore('app', () => {
   const chatHistory = ref([])
   const currentQuestion = ref('')
   const currentExplanation = ref('')
-  
+
   // Analysis
   const generatedCode = ref('')
   const resultData = ref(null)
@@ -45,7 +45,7 @@ export const useAppStore = defineStore('app', () => {
   const isChatOverlayOpen = ref(true)
   const chatOverlayWidth = ref(0.25) // 25% of area
   const isSidebarCollapsed = ref(true)
-  
+
   // UI State
   const isLoading = ref(false)
   const isCodeRunning = ref(false)
@@ -60,7 +60,7 @@ export const useAppStore = defineStore('app', () => {
   const hasDataFile = computed(() => dataFilePath.value.trim() !== '')
   const hasSchemaFile = computed(() => schemaFilePath.value.trim() !== '' || isSchemaFileUploaded.value)
   const canAnalyze = computed(() => apiKey.value.trim() !== '' && dataFilePath.value.trim() !== '')
-  
+
   // Local Configuration Management
   function saveLocalConfig() {
     const config = {
@@ -82,7 +82,7 @@ export const useAppStore = defineStore('app', () => {
       console.error('❌ Failed to save configuration:', error)
     }
   }
-  
+
   function loadLocalConfig() {
     try {
       const configStr = localStorage.getItem(STORAGE_KEYS.CONFIG)
@@ -90,10 +90,10 @@ export const useAppStore = defineStore('app', () => {
         console.log('No local configuration found')
         return false
       }
-      
+
       const config = JSON.parse(configStr)
       console.log('Loading local configuration:', config)
-      
+
       // Restore API key and model
       if (config.apiKey) {
         apiKey.value = config.apiKey
@@ -101,7 +101,7 @@ export const useAppStore = defineStore('app', () => {
       if (config.selectedModel) {
         selectedModel.value = config.selectedModel
       }
-      
+
       // Restore data file path
       if (config.dataFilePath) {
         dataFilePath.value = config.dataFilePath
@@ -131,6 +131,12 @@ export const useAppStore = defineStore('app', () => {
       }
 
       console.log('Local configuration loaded successfully')
+
+      // Fetch history if data path is restored
+      if (dataFilePath.value) {
+        fetchChatHistory()
+      }
+
       return true
     } catch (error) {
       console.error('Failed to load local configuration:', error)
@@ -139,11 +145,11 @@ export const useAppStore = defineStore('app', () => {
       return false
     }
   }
-  
+
   function clearLocalConfig() {
     try {
       localStorage.removeItem(STORAGE_KEYS.CONFIG)
-      
+
       // Reset all configuration values
       apiKey.value = ''
       selectedModel.value = 'gemini-2.5-flash'
@@ -153,7 +159,7 @@ export const useAppStore = defineStore('app', () => {
       schemaFileId.value = ''
       isSchemaFileUploaded.value = false
       schemaContext.value = ''
-      
+
       console.log('Local configuration cleared')
       return true
     } catch (error) {
@@ -166,6 +172,9 @@ export const useAppStore = defineStore('app', () => {
   function setDataFilePath(path) {
     dataFilePath.value = path
     saveLocalConfig()
+    if (path) {
+      fetchChatHistory()
+    }
   }
 
   function setSchemaFilePath(path) {
@@ -187,12 +196,12 @@ export const useAppStore = defineStore('app', () => {
     isSchemaFileUploaded.value = uploaded
     saveLocalConfig()
   }
-  
+
   function setApiKey(key) {
     apiKey.value = key
     saveLocalConfig()
   }
-  
+
   function setSelectedModel(model) {
     selectedModel.value = model
     saveLocalConfig()
@@ -209,7 +218,7 @@ export const useAppStore = defineStore('app', () => {
   function setPythonFileContent(content) {
     pythonFileContent.value = content
   }
-  
+
   function addChatMessage(question, explanation) {
     // Add to local state
     chatHistory.value.push({
@@ -228,15 +237,73 @@ export const useAppStore = defineStore('app', () => {
       currentExplanation.value = explanation
     }
   }
-  
+
+  async function fetchChatHistory() {
+    console.log("🔍 fetchChatHistory called")
+    try {
+      const response = await apiService.getHistory()
+      console.log("🔍 fetchChatHistory raw response:", response)
+
+      // Handle response structure - axios interceptor returns response.data directly
+      const responseData = response.data || response
+      console.log("🔍 fetchChatHistory processed data:", responseData)
+
+      if (responseData) {
+        // Backend returns: { messages: [...], current_code: string }
+        const messages = responseData.messages || []
+        const currentCode = responseData.current_code || ''
+        console.log(`🔍 Found ${messages.length} messages and code length ${currentCode.length}`)
+
+        // Update code editor if we have persistent code
+        if (currentCode) {
+          setGeneratedCode(currentCode)
+          setPythonFileContent(currentCode)
+        } else {
+          setGeneratedCode('')
+          setPythonFileContent('')
+        }
+
+        // We need to parse the flat list of messages into Q&A pairs
+        const history = []
+        let currentPair = {}
+
+        messages.forEach((msg, index) => {
+          if (msg.role === 'user') {
+            if (currentPair.question) {
+              history.push({ ...currentPair, id: Date.now() + index, timestamp: new Date().toISOString() })
+            }
+            currentPair = { question: msg.content }
+          } else if (msg.role === 'assistant') {
+            if (currentPair.question) {
+              currentPair.explanation = msg.content
+              history.push({ ...currentPair, id: Date.now() + index, timestamp: new Date().toISOString() })
+              currentPair = {}
+            }
+          }
+        })
+
+        if (currentPair.question) {
+          history.push({ ...currentPair, id: Date.now(), timestamp: new Date().toISOString() })
+        }
+
+        console.log("🔍 updated chatHistory:", history)
+        chatHistory.value = history
+      } else {
+        console.warn("⚠️ fetchChatHistory: No data in response")
+      }
+    } catch (e) {
+      console.error("❌ Failed to fetch chat history", e)
+    }
+  }
+
   function setGeneratedCode(code) {
     generatedCode.value = code
   }
-  
+
   function setResultData(data) {
     resultData.value = data
   }
-  
+
   function setPlotlyFigure(figure) {
     plotlyFigure.value = figure
   }
@@ -256,7 +323,7 @@ export const useAppStore = defineStore('app', () => {
   function setTerminalOutput(output) {
     terminalOutput.value = output
   }
-  
+
   function setActiveTab(tab) {
     activeTab.value = tab
   }
@@ -272,7 +339,7 @@ export const useAppStore = defineStore('app', () => {
   function setSidebarCollapsed(collapsed) {
     isSidebarCollapsed.value = collapsed
   }
-  
+
   function setLoading(loading) {
     isLoading.value = loading
   }
@@ -343,7 +410,7 @@ export const useAppStore = defineStore('app', () => {
   function clearCellSelection() {
     selectedCellIds.value = []
   }
-  
+
   function resetSession() {
     chatHistory.value = []
     currentQuestion.value = ''
@@ -359,8 +426,8 @@ export const useAppStore = defineStore('app', () => {
     activeCellIndex.value = 0
     selectedCellIds.value = []
   }
-  
-  
+
+
   return {
     // State
     dataFilePath,
@@ -437,6 +504,7 @@ export const useAppStore = defineStore('app', () => {
     setSelectedCellIds,
     toggleCellSelection,
     clearCellSelection,
-    resetSession
+    resetSession,
+    fetchChatHistory
   }
 })

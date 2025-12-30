@@ -52,7 +52,7 @@ def get_api_key(current_user: dict = Depends(get_current_user)):
     return api_key
 
 
-router = APIRouter(prefix="/schema", tags=["Schema"])
+router = APIRouter(prefix="/schemas", tags=["Schemas"])
 
 
 class GenerateSchemaRequest(BaseModel):

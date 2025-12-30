@@ -10,7 +10,7 @@ export default defineConfig({
     tailwindcss()
   ],
   esbuild: {
-    drop: ['console', 'debugger']
+    // drop: ['console', 'debugger']
   },
   define: {
     global: 'globalThis',
@@ -48,8 +48,9 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: 'dist',
+    outDir: '../src/inquira/frontend/dist',
     assetsDir: 'assets',
+    emptyOutDir: true,
     chunkSizeWarningLimit: 1000, // Increase warning limit to 1000kb
     rollupOptions: {
       output: {

@@ -106,6 +106,12 @@ async function handleAuthenticated(userData) {
       }
     }
 
+    // Force fetch chat history to ensure it's loaded
+    if (settings.data_path) {
+        console.log("🔄 Force fetching chat history from App.vue")
+        appStore.fetchChatHistory()
+    }
+
     console.log('Settings loaded for authenticated user')
   } catch (error) {
     console.log('No existing settings found for user (this is normal for new users)')

@@ -38,8 +38,10 @@ template: |
   * **Relevance:**
 
   * `"Yes"` → if the question refers to information present in the schema (by column names, meaning, or data domain).
+     * **IMPORTANT**: Lean towards "Yes" if you are unsure.
+     * **IMPORTANT**: If the user asks to "explore the data", "show me samples", or "count rows", this IS relevant.
 
-  * `"No"` → if the schema cannot help answer it.
+  * `"No"` → ONLY if the schema is clearly completely unrelated (e.g. asking about "stock prices" when the table is "music_tracks" and no price column exists).
 
   * **Reasoning:** A brief reasoning behind the above flags.
 

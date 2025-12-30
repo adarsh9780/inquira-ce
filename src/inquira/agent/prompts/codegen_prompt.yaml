@@ -75,46 +75,14 @@ template: |
   - Ensure idempotence: recreate or overwrite variables rather than append blindly; guard optional steps with existence checks.
   - Keep imports minimal and standard (e.g., `import pandas as pd`, optional: `import plotly.express as px`).
   - No package installs or system changes.
+  - **PROHIBITED**: Do NOT use double braces `{{` or `}}` for dictionaries. Use standard single braces `{{` and `}}` (e.g., `my_dict = {{'key': 'value'}}`).
 
-  ### Data Handling & Performance
-  - Always consider data size and performance; avoid loading large datasets into memory.
-  - Before converting to Pandas dataframe:
-  - ensure data size is manageable (e.g., `LIMIT 100000`).
-  - consider filtering first in DuckDB.
-  - consider aggregating first in DuckDB.
-  - joins should be done in DuckDB, not in Pandas.
-  - Avoid operations that may lead to excessive memory usage or long runtimes.
-  - Keep DuckDB queries efficient and composable; use CTEs when needed.
-  - Keep duckdb queries readable and maintainable.
-  - If duckdb cannot express the transformation easily, use Pandas but keep steps small and efficient.
-  - Use `.query()` in Pandas for filtering instead of boolean indexing.
-  - Use `.assign()` in Pandas for adding/modifying columns instead of direct assignment.
-  - Use `.pipe()` in Pandas for chaining operations instead of nested calls.
-  - Use vectorized operations in Pandas instead of row-wise operations.
-  - Use built-in Pandas functions instead of custom functions where possible.
-  - Use chaining in Pandas to avoid intermediate variables.
-  - Avoid using `apply()` in Pandas unless absolutely necessary.
-  - Avoid using `iterrows()` or `itertuples()` in Pandas.
-
-  ### Performance Guardrails
-  - Prefer DuckDB over Pandas for filtering, aggregation, and joins.
-  - Use `LIMIT` for samples (e.g., 100 rows) and cap expensive operations (e.g., `LIMIT 5000` for descriptive stats).
-  - Push computation into SQL where possible.
-  - Avoid full scans unless necessary; paginate or aggregate.
-
-  ### Technical Guidelines
-  - **DuckDB Usage (Primary)**:
-  - Use for all querying, filtering, joins, and simple/medium aggregations.
-  - Leverage window and time functions where applicable.
-  - Keep queries composable and readable; use CTEs when needed.
-  - **Python/Pandas Usage (Secondary)**:
-  - Use only when DuckDB cannot easily express the transformation.
-  - Good for pivots, complex reshaping, and advanced statistics.
-  - Keep Pandas steps small and efficient.
-  - **Plotly Usage (Visualization)**:
-  - Create business-relevant visualizations that answer the question.
-  - Use descriptive, unique figure variable names (e.g., `monthly_sales_fig`, `revenue_by_region_chart`).
-  - Store serializable figures in the `figures` dict (`to_dict()` or `to_json()`).
+  ### Data Handling & Performance Strategy
+  - **Philosophy**: "DuckDB for Heavy Lifting, Pandas for Readability".
+  - **Memory Safety**: The dataset may be LARGER than memory. DO NOT load the raw table into a DataFrame.
+  - **Step 1 (DuckDB)**: Use SQL via `conn.sql(...)` to filter, join, and aggregate the raw data. Reduce the result set to a manageable size (e.g., < 100k rows) in the database engine.
+  - **Step 2 (Pandas)**: Convert the *reduced* result to Pandas (`.df()`) for final transformations, pivoting, and formatting, leveraging Pandas' superior readability and API.
+  - **Prohibited**: `df = conn.sql("SELECT * FROM table").df()` (This is unsafe/inefficient).
 
   ### Code Generation Rules
   - **MANDATORY**: ALWAYS begin your code with exactly this setup block (Cell 1). Do not omit it, even if you think it exists.
@@ -135,11 +103,9 @@ template: |
       pass
   ```
 
-  - **Generate FULL Code**: Output the entire script every time, including the setup block above and any new analysis cells.
-  - **IGNORE** the fact that `Current Code Context` is provided. Treat it as reference only. You must RE-WRITE the code from scratch.
-  - **MANDATORY**: Your output MUST start with the `import` statements in Cell 1. Do not start with `# cell 4` or partial snippets.
-  - ALWAYS use the `conn` variable for DuckDB operations where possible (via the alias `db` created above).
-  - Prefer DuckDB over Pandas when possible.
+  - **Generate FULL Code**: You must output the **COMPLETE** executable script every time.
+  - **Context Usage**: Use the `Current Code Context` to understand the previous state and maintain continuity, but do not just output diffs or snippets. RE-WRITE the entire script with your new enhancements included.
+  - **MANDATORY**: Your output MUST start with the `import` statements in Cell 1.
   - Generate self-contained, executable code with clear comments explaining the business logic.
   - Include proper error handling where it meaningfully improves robustness.
   - Include cell markers exactly: `# cell "number": "title"` (sequential).

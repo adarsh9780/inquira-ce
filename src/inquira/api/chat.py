@@ -133,14 +133,17 @@ async def chat_endpoint(
         if hasattr(app_state, "agent_graph") and app_state.agent_graph:
             # Prepare input for the agent
             user_msg = request.question
-            if request.current_code:
-                user_msg += f"\n\nCurrent Code Context:\n{request.current_code}"
             
             # Create input state
+            logprint(f"🔍 [Agent] Loaded Schema Keys: {list(schema.keys())}")
+            # Identify if this looks like cricket data
+            if "cricket" in str(schema).lower():
+                logprint("⚠️ [Agent] CRICKET DETECTED IN SCHEMA!", level="warning")
+            
             input_state = InputSchema(
                 messages=[HumanMessage(content=user_msg)],
                 active_schema=schema,
-                current_code=request.current_code,
+                previous_code=request.current_code, # Map user's current editor content to previous_code
                 table_name=table_name,
                 data_path=app_state.data_path
             )
@@ -148,7 +151,19 @@ async def chat_endpoint(
             # Invoke agent
             # Pass API key via configurable for dynamic model initialization
             api_key = app_state.api_key
-            config = {"configurable": {"api_key": api_key}}
+            # Invoke agent
+            # Pass API key via configurable for dynamic model initialization
+            api_key = app_state.api_key
+            
+            # Use user_id + data_path as thread_id for persistence
+            thread_id = f"{current_user['user_id']}:{app_state.data_path}"
+            
+            config = {
+                "configurable": {
+                    "api_key": api_key,
+                    "thread_id": thread_id
+                }
+            }
             
             logprint(f"🤖 [Agent] Question: {user_msg}")
             result = await app_state.agent_graph.ainvoke(input_state, config=config)
@@ -243,3 +258,106 @@ async def chat_endpoint(
         raise HTTPException(
             status_code=500, detail=f"Error processing analysis request: {str(e)}"
         )
+
+@router.get("/history")
+async def get_chat_history(
+    current_user: dict = Depends(get_current_user),
+    app_state=Depends(get_app_state),
+):
+    """
+    Get chat history for the current user and active data file.
+    """
+    # Load user settings into app_state so we have the correct data_path
+    load_user_settings_to_app_state(current_user["user_id"], app_state)
+
+    if not hasattr(app_state, "agent_graph") or not app_state.agent_graph:
+        return {"messages": [], "current_code": ""}
+
+    # Ensure data path is set to identify the thread
+    if not hasattr(app_state, "data_path") or app_state.data_path is None:
+        # If no data path is set, we can't retrieve history
+        return {"messages": [], "current_code": ""}
+
+    thread_id = f"{current_user['user_id']}:{app_state.data_path}"
+    config = {"configurable": {"thread_id": thread_id}}
+
+    try:
+        # Get the state from the graph
+        state = await app_state.agent_graph.aget_state(config)
+        
+        if not state.values:
+            return {"messages": [], "current_code": ""}
+            
+        messages = state.values.get("messages", [])
+        current_code = state.values.get("current_code", "")
+        
+        # Serialize messages to simple dict format for frontend
+        history = []
+        for msg in messages:
+            role = "user" if isinstance(msg, HumanMessage) else "assistant"
+            # Extract content - handle string or list of content parts
+            content = msg.content
+            if isinstance(content, list):
+                # Simple join for now, improve if needed for multimodal
+                content = "\\n".join([str(p) for p in content])
+            
+
+
+            history.append({
+                "role": role,
+                "content": str(content),
+                "type": msg.type
+            })
+            
+        # Attempt to reconstruct the rich explanation for the LAST assistant message
+        # because the 'plan' or 'metadata' in state corresponds to the latest interaction.
+        if history and history[-1]["role"] == "assistant":
+            # Logic mirrored from chat_endpoint to reconstruct 'explanation'
+            plan = state.values.get("plan")
+            code = state.values.get("code") or state.values.get("current_code")
+            metadata = state.values.get("metadata", {})
+            
+            # Handle metadata as dict or object
+            if hasattr(metadata, "dict"):
+                 metadata = metadata.dict()
+            elif hasattr(metadata, "model_dump"):
+                 metadata = metadata.model_dump()
+            
+            # Reconstruct explanation
+            explanation = ""
+            if plan:
+                explanation = plan
+            else:
+                is_safe_reason = metadata.get("safety_reasoning", "")
+                is_relevant_reason = metadata.get("relevancy_reasoning", "")
+                
+                parts = []
+                if is_safe_reason:
+                    parts.append(f"Safety Analysis: {is_safe_reason}")
+                if is_relevant_reason:
+                    parts.append(f"Relevancy Analysis: {is_relevant_reason}")
+                
+                if parts:
+                    explanation = "\n\n".join(parts)
+            
+            # If we successfully reconstructed a better explanation, use it
+            if explanation:
+                history[-1]["content"] = explanation
+
+        # Aggregate consecutive assistant messages to simplify frontend handling
+        aggregated_history = []
+        for msg in history:
+            if aggregated_history and msg["role"] == "assistant" and aggregated_history[-1]["role"] == "assistant":
+                # Append to previous message
+                aggregated_history[-1]["content"] += "\n\n" + msg["content"]
+            else:
+                # Start new message
+                aggregated_history.append(msg)
+
+        return {
+            "messages": aggregated_history,
+            "current_code": current_code
+        }
+    except Exception as e:
+        logprint(f"Error fetching chat history: {e}", level="error")
+        return {"messages": [], "current_code": ""}
