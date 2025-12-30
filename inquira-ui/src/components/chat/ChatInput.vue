@@ -131,8 +131,8 @@ async function handleSubmit() {
 
     // Check if the query is safe and relevant
     if (!is_safe) {
-      toast.error('Query Blocked', 'Your query was flagged as potentially unsafe and was not executed.')
-      appStore.setTerminalOutput('⚠️ Query was flagged as potentially unsafe and was not executed.')
+      // Show the rejection reason in the chat window so user understands why
+      appStore.updateLastMessageExplanation(explanation || 'Your query was flagged as potentially unsafe.')
       appStore.setActiveTab('code')
       return
     }

@@ -58,6 +58,7 @@ router = APIRouter(prefix="/schemas", tags=["Schemas"])
 class GenerateSchemaRequest(BaseModel):
     filepath: str = Field(description="filepath where the data is stored")
     context: Optional[str] = Field(None, description="optional context override")
+    force_regenerate: bool = Field(False, description="Force regeneration even if schema exists")
 
 
 class Column(BaseModel):
@@ -103,25 +104,27 @@ def _generate_schema_internal(
     api_key: str,
     app_state,
     model: str = "gemini-2.5-flash",
+    force_regenerate: bool = False,
 ) -> SchemaResponse:
-    # First, check if schema already exists
-    existing_schema = load_schema(user_id, filepath)
-    if existing_schema:
-        return SchemaResponse(
-            filepath=existing_schema.filepath,
-            context=existing_schema.context,
-            columns=[
-                SchemaColumnResponse(
-                    name=col.name,
-                    description=col.description,
-                    data_type=col.data_type,
-                    sample_values=col.sample_values,
-                )
-                for col in existing_schema.columns
-            ],
-            created_at=existing_schema.created_at,
-            updated_at=existing_schema.updated_at,
-        )
+    # First, check if schema already exists (skip if force_regenerate is True)
+    if not force_regenerate:
+        existing_schema = load_schema(user_id, filepath)
+        if existing_schema:
+            return SchemaResponse(
+                filepath=existing_schema.filepath,
+                context=existing_schema.context,
+                columns=[
+                    SchemaColumnResponse(
+                        name=col.name,
+                        description=col.description,
+                        data_type=col.data_type,
+                        sample_values=col.sample_values,
+                    )
+                    for col in existing_schema.columns
+                ],
+                created_at=existing_schema.created_at,
+                updated_at=existing_schema.updated_at,
+            )
 
     user_settings = get_user_settings(user_id)
     context = context or user_settings.get("context", "General data analysis")
@@ -310,6 +313,7 @@ def generate_schema(
     model: str = "gemini-2.5-flash",
 ):
     user_id = current_user["user_id"]
+    logprint(f"🔄 [Schema] Generate request for {request.filepath}, force={request.force_regenerate}")
     return _generate_schema_internal(
         user_id=user_id,
         filepath=request.filepath,
@@ -317,6 +321,7 @@ def generate_schema(
         api_key=current_api_key,
         app_state=app_state,
         model=model,
+        force_regenerate=request.force_regenerate,
     )
 
 

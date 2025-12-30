@@ -186,21 +186,10 @@ async def chat_endpoint(
                 # If code is present, use 'plan' as the explanation
                 explanation = result.get("plan", "") or "Code generated based on request."
             else:
-                # If no code, combine reasoning or use the last message
-                is_safe_reason = metadata.safety_reasoning if hasattr(metadata, "safety_reasoning") else metadata.get("safety_reasoning", "")
-                is_relevant_reason = metadata.relevancy_reasoning if hasattr(metadata, "relevancy_reasoning") else metadata.get("relevancy_reasoning", "")
-                
-                parts = []
-                if is_safe_reason:
-                    parts.append(f"Safety Analysis: {is_safe_reason}")
-                if is_relevant_reason:
-                    parts.append(f"Relevancy Analysis: {is_relevant_reason}")
-                
-                if parts:
-                    explanation = "\n\n".join(parts)
-                else:
-                    # Fallback to the last message if no metadata reasoning is available (e.g. general chit-chat)
-                    explanation = last_message or "No explanation provided."
+                # If no code, use the actual response from the agent (last message)
+                # The last message is the response from unsafe_rejector, general_purpose, or noncode_generator
+                # which contains the proper user-facing explanation
+                explanation = last_message or "No explanation provided."
             
             # Clean up potential code blocks in explanation if they leaked
             if not code and "```python" in explanation:

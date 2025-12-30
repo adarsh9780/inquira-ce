@@ -188,8 +188,8 @@ export const apiService = {
   },
 
   // Generate schema with context
-  async generateSchema(filepath, context = null) {
-    console.log('🔄 Generating schema for:', filepath)
+  async generateSchema(filepath, context = null, forceRegenerate = false) {
+    console.log('🔄 Generating schema for:', filepath, 'force:', forceRegenerate)
 
     // Verify authentication before schema generation
     try {
@@ -202,7 +202,8 @@ export const apiService = {
     try {
       const response = await client.generateSchemaSchemasGeneratePost({
         filepath: filepath,
-        context: context
+        context: context,
+        force_regenerate: forceRegenerate
       })
       console.log('✅ Schema generation successful')
       return response
@@ -226,7 +227,7 @@ export const apiService = {
 
     try {
       // NOTE: generated function takes filepath as an argument, separate from options
-      const response = await client.loadSchemaEndpointSchemasLoadFilepathGet(encodeURIComponent(filepath))
+      const response = await client.loadSchemaEndpointSchemasLoadFilepathGet(filepath)
       console.log('✅ Schema loading successful')
       return response
     } catch (error) {

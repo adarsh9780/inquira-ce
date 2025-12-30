@@ -420,6 +420,23 @@ async function saveDataSettings() {
   showProgress('Initializing...', 10)
 
   try {
+    // Ensure WebSocket is connected for real-time progress updates
+    if (!settingsWebSocket.isConnected) {
+      updateProgress('Establishing connection for progress updates...', 15)
+      try {
+        // Get user ID from auth store
+        const { useAuthStore } = await import('../../stores/authStore')
+        const authStore = useAuthStore()
+        if (authStore.userId) {
+          await settingsWebSocket.connect(authStore.userId)
+          console.log('✅ WebSocket reconnected for progress updates')
+        }
+      } catch (wsError) {
+        console.warn('⚠️ Could not establish WebSocket connection. Continuing without real-time updates:', wsError)
+        // Continue anyway - backend will work without WebSocket, just no real-time progress
+      }
+    }
+
     // Setup WebSocket progress handler
     settingsWebSocket.onProgress(handleProgressUpdate)
     // Gate: resolve when backend signals completion via WebSocket

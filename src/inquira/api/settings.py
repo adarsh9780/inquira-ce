@@ -127,13 +127,11 @@ async def set_data_path(
         # For now, allow this to work, but log the issue
     else:
         logprint(
-            f"❌ [Settings] No WebSocket connection found for user: {user_id}",
-            level="error",
+            f"⚠️ [Settings] No WebSocket connection found for user: {user_id}. Proceeding without real-time updates.",
+            level="warning",
         )
-        raise HTTPException(
-            status_code=400,
-            detail=f"WebSocket connection required for data processing. Please establish a WebSocket connection to /ws/settings/{user_id} before setting the data path. This allows real-time progress updates during file processing.",
-        )
+        # Continue without WebSocket - background processing will still work,
+        # just without real-time progress updates to the frontend
 
     # Save data path immediately
     user_settings = get_user_settings(user_id) or {}
@@ -898,7 +896,7 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
                 )
 
                 # Offload blocking generation to a thread
-                from .generate_schema import _generate_schema_internal
+                from .schemas import _generate_schema_internal
 
                 loop = asyncio.get_running_loop()
                 await loop.run_in_executor(

@@ -306,7 +306,24 @@ class InquiraAgent:
         return {"messages": [AIMessage(content=response.content)]}
 
     def general_purpose(self, state: State, config: RunnableConfig) -> dict[str, Any]:
-        system_prompt_template = """You are an helpful assistant, answer the question on less than 3 lines."""
+        system_prompt_template = """You are the AI assistant for **Inquira**, a data analysis platform.
+
+## About Inquira
+Inquira helps users analyze their uploaded data (CSV, Excel, Parquet, JSON) through natural language queries.
+The platform uses DuckDB for efficient querying, Pandas for transformations, and Plotly for visualizations.
+
+## Your Capabilities
+- Answer questions about the user's uploaded data
+- Generate Python code for data analysis and visualization
+- Provide statistical insights, aggregations, and business intelligence
+- Create charts and dashboards using Plotly
+
+## Guidelines
+- Be helpful, friendly, and concise
+- If asked about your capabilities, explain what Inquira can do
+- For questions unrelated to data analysis, politely redirect to data-focused tasks
+- Keep responses brief (2-4 sentences) unless more detail is genuinely needed"""
+
         prompt = ChatPromptTemplate.from_messages(
             [system_prompt_template, MessagesPlaceholder("messages")]
         )
@@ -319,11 +336,27 @@ class InquiraAgent:
         return {"messages": [AIMessage(content=response.content)]}
 
     def unsafe_rejector(self, state: State, config: RunnableConfig) -> dict[str, Any]:
+        reasoning = state.metadata.safety_reasoning or "The request was flagged as potentially unsafe."
+        
+        system_prompt_template = SystemMessagePromptTemplate.from_template_file(
+            get_prompt_path("unsafe_rejection_prompt.yaml"),
+            input_variables=["safety_reasoning"],
+        )
+        prompt = ChatPromptTemplate.from_messages(
+            [system_prompt_template, MessagesPlaceholder("messages")]
+        )
+
+        model = self._get_model(config, "gemini-2.5-flash-lite")
+        chain = prompt | model
+
+        response = chain.invoke({
+            "messages": state.messages,
+            "safety_reasoning": reasoning,
+        })
+
         return {
             "messages": [
-                AIMessage(
-                    content="The question is unsafe and thus will not be processed further."
-                )
+                AIMessage(content=response.content)
             ]
         }
 
