@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional, Tuple
 import hashlib
 
-from .config_models import AppConfig
+from ..core.config_models import AppConfig
 from .session_variable_store import session_variable_store
 
 class CodeExecutionError(Exception):

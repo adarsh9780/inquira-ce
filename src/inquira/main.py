@@ -35,11 +35,11 @@ from .api.schemas import router as schema_router
 from .api.legal import router as legal_router
 from .api.settings import router as settings_router
 from .api.system import router as system_router
-from .config_models import AppConfig
-from .database_manager import DatabaseManager
-from .logger import logprint, patch_print
-from .session_variable_store import session_variable_store
-from .websocket_manager import websocket_manager
+from .core.config_models import AppConfig
+from .database.database_manager import DatabaseManager
+from .core.logger import logprint, patch_print
+from .services.session_variable_store import session_variable_store
+from .services.websocket_manager import websocket_manager
 
 APP_VERSION = "0.4.6a0"
 
@@ -275,7 +275,7 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
             read_file_with_duckdb_sample,
             set_cached_preview,
         )
-        from .database import get_user_settings
+        from .database.database import get_user_settings
 
         # Get user's data path
         user_settings = get_user_settings(user_id) or {}

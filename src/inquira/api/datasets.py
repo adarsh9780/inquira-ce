@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from .auth import get_current_user
-from ..database import get_dataset_by_path, list_datasets
+from ..database.database import get_dataset_by_path, list_datasets
 
 
 router = APIRouter(prefix="/datasets", tags=["Datasets"])

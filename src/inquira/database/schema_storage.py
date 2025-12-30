@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from .fingerprint import file_fingerprint_md5
+from ..core.fingerprint import file_fingerprint_md5
 
 # Schema folder path - now using user-specific directories
 BASE_DIR = Path.home() / ".inquira"

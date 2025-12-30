@@ -7,8 +7,8 @@ from .auth import get_current_user
 from pathlib import Path
 from pathlib import Path
 from pathlib import Path
-from ..prompt_library import get_prompt
-from ..logger import logprint
+from ..core.prompt_library import get_prompt
+from ..core.logger import logprint
 from langchain_core.messages import HumanMessage
 from ..agent.graph import InputSchema
 from langchain_core.runnables import RunnableConfig
@@ -291,68 +291,81 @@ async def get_chat_history(
         messages = state.values.get("messages", [])
         current_code = state.values.get("current_code", "")
         
-        # Serialize messages to simple dict format for frontend
-        history = []
-        for msg in messages:
-            role = "user" if isinstance(msg, HumanMessage) else "assistant"
-            # Extract content - handle string or list of content parts
-            content = msg.content
-            if isinstance(content, list):
-                # Simple join for now, improve if needed for multimodal
-                content = "\\n".join([str(p) for p in content])
-            
-
-
-            history.append({
-                "role": role,
-                "content": str(content),
-                "type": msg.type
-            })
-            
-        # Attempt to reconstruct the rich explanation for the LAST assistant message
-        # because the 'plan' or 'metadata' in state corresponds to the latest interaction.
-        if history and history[-1]["role"] == "assistant":
-            # Logic mirrored from chat_endpoint to reconstruct 'explanation'
-            plan = state.values.get("plan")
-            code = state.values.get("code") or state.values.get("current_code")
-            metadata = state.values.get("metadata", {})
-            
-            # Handle metadata as dict or object
-            if hasattr(metadata, "dict"):
-                 metadata = metadata.dict()
-            elif hasattr(metadata, "model_dump"):
-                 metadata = metadata.model_dump()
-            
-            # Reconstruct explanation
-            explanation = ""
-            if plan:
-                explanation = plan
-            else:
-                is_safe_reason = metadata.get("safety_reasoning", "")
-                is_relevant_reason = metadata.get("relevancy_reasoning", "")
-                
-                parts = []
-                if is_safe_reason:
-                    parts.append(f"Safety Analysis: {is_safe_reason}")
-                if is_relevant_reason:
-                    parts.append(f"Relevancy Analysis: {is_relevant_reason}")
-                
-                if parts:
-                    explanation = "\n\n".join(parts)
-            
-            # If we successfully reconstructed a better explanation, use it
-            if explanation:
-                history[-1]["content"] = explanation
-
-        # Aggregate consecutive assistant messages to simplify frontend handling
+        # Process messages into Q&A pairs
+        # The state contains: HumanMessage, AIMessage (safety), AIMessage (relevancy), ...
+        # We want to pair each HumanMessage with a single meaningful response
+        
+        # Get plan from state - this is the best explanation when code was generated
+        plan = state.values.get("plan", "")
+        code = state.values.get("code") or state.values.get("current_code", "")
+        metadata = state.values.get("metadata", {})
+        
+        # Handle metadata as dict or object
+        if hasattr(metadata, "model_dump"):
+            metadata = metadata.model_dump()
+        elif hasattr(metadata, "dict"):
+            metadata = metadata.dict()
+        
+        # Build aggregated history - one entry per user question
         aggregated_history = []
-        for msg in history:
-            if aggregated_history and msg["role"] == "assistant" and aggregated_history[-1]["role"] == "assistant":
-                # Append to previous message
-                aggregated_history[-1]["content"] += "\n\n" + msg["content"]
+        
+        # Group messages: each user message followed by all AI messages until next user
+        i = 0
+        while i < len(messages):
+            msg = messages[i]
+            
+            if isinstance(msg, HumanMessage):
+                user_content = msg.content
+                if isinstance(user_content, list):
+                    user_content = "\n".join([str(p) for p in user_content])
+                
+                # Collect all subsequent AI messages until next HumanMessage
+                ai_messages = []
+                j = i + 1
+                while j < len(messages) and not isinstance(messages[j], HumanMessage):
+                    ai_msg = messages[j]
+                    content = ai_msg.content
+                    if isinstance(content, list):
+                        content = "\n".join([str(p) for p in content])
+                    ai_messages.append(str(content))
+                    j += 1
+                
+                # Determine the best explanation for this Q&A pair
+                # Check if this is the LAST user message (we have plan/code for it)
+                is_last_question = (j >= len(messages))
+                
+                if is_last_question and plan:
+                    # Use the plan as explanation for the last question
+                    explanation = plan
+                elif is_last_question and not plan and ai_messages:
+                    # No plan, use last AI message (could be general_purpose or noncode response)
+                    explanation = ai_messages[-1] if ai_messages else ""
+                elif ai_messages:
+                    # For older questions, use the last AI message in the group
+                    # This is imperfect but better than showing intermediate reasoning
+                    explanation = ai_messages[-1]
+                else:
+                    explanation = ""
+                
+                # Add user message
+                aggregated_history.append({
+                    "role": "user",
+                    "content": str(user_content),
+                    "type": "human"
+                })
+                
+                # Add assistant response if we have one
+                if explanation:
+                    aggregated_history.append({
+                        "role": "assistant", 
+                        "content": explanation,
+                        "type": "ai"
+                    })
+                
+                i = j  # Move to next user message
             else:
-                # Start new message
-                aggregated_history.append(msg)
+                # Skip orphaned AI messages at the start
+                i += 1
 
         return {
             "messages": aggregated_history,

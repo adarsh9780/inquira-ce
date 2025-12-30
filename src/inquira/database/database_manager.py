@@ -6,11 +6,11 @@ from typing import Dict, Optional, Any
 from datetime import datetime, timedelta
 import duckdb
 import pandas as pd
-from .config_models import AppConfig
+from ..core.config_models import AppConfig
 from .sql_library import get_sql
 from .database import upsert_dataset, get_dataset_by_path
-from .fingerprint import file_fingerprint_md5
-from .logger import logprint
+from ..core.fingerprint import file_fingerprint_md5
+from ..core.logger import logprint
 
 
 class DatabaseManager:

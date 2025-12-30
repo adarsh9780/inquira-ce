@@ -5,13 +5,13 @@ import secrets
 import uuid
 import logging
 from datetime import datetime, timedelta
-from ..database import (
+from ..database.database import (
     create_user, get_user_by_username, get_user_by_id,
     create_session, get_session,
     migrate_json_to_sqlite, update_user_password, delete_user_account
 )
-from ..config_models import AppConfig
-from ..logger import logprint
+from ..core.config_models import AppConfig
+from ..core.logger import logprint
 
 router = APIRouter(tags=["Authentication"])
 

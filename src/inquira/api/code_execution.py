@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException, Request, Depends
-from ..logger import logprint
+from ..core.logger import logprint
 from pydantic import BaseModel, Field
 from typing import Any, Optional, Dict
 
-from ..code_whisperer import CodeWhisperer
-from ..session_variable_store import session_variable_store
+from ..services.code_whisperer import CodeWhisperer
+from ..services.session_variable_store import session_variable_store
 from .auth import get_current_user
 
 router = APIRouter(prefix="/execute", tags=["Code Execution"])

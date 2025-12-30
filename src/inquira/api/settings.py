@@ -5,11 +5,11 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 from .auth import get_current_user, get_app_config
-from ..database import get_user_settings, save_user_settings, get_dataset_by_path
-from ..config_models import AppConfig
-from ..websocket_manager import websocket_manager
-from ..database_manager import DatabaseManager
-from ..logger import logprint
+from ..database.database import get_user_settings, save_user_settings, get_dataset_by_path
+from ..core.config_models import AppConfig
+from ..services.websocket_manager import websocket_manager
+from ..database.database_manager import DatabaseManager
+from ..core.logger import logprint
 
 
 def get_app_state(request: Request):
@@ -237,7 +237,7 @@ async def set_apikey(
     # Update app_state and try to initialize LLM service
     app_state.api_key = request.api_key
     try:
-        from ..llm_service import LLMService
+        from ..services.llm_service import LLMService
 
         app_state.llm_service = LLMService(api_key=request.api_key)
         app_state.llm_initialized = True
@@ -302,7 +302,7 @@ async def view_apikey(
         app_state.api_key = api_key
         # Try to initialize LLM service
         try:
-            from ..llm_service import LLMService
+            from ..services.llm_service import LLMService
 
             app_state.llm_service = LLMService(api_key=api_key)
             app_state.llm_initialized = True
@@ -373,7 +373,7 @@ async def view_all_settings(
         else:
             # Derive the would-be table name without creating the DB
             try:
-                from ..database_manager import DatabaseManager
+                from ..database.database_manager import DatabaseManager
 
                 dbm = DatabaseManager(config)
                 derived_table_name = dbm._get_table_name(data_path)
@@ -646,7 +646,7 @@ def load_user_settings_to_app_state(user_id: str, app_state):
     # Check if schema_path is missing but schema exists for the data_path
     if user_settings.get("data_path") and not user_settings.get("schema_path"):
         logprint(f"DEBUG: schema_path missing, checking for schema file", level="debug")
-        from ..schema_storage import (
+        from ..database.schema_storage import (
             load_schema,
             get_schema_filename,
             get_user_schema_dir,
@@ -675,7 +675,7 @@ def load_user_settings_to_app_state(user_id: str, app_state):
             app_state.api_key = user_settings["api_key"]
             # Try to initialize LLM service if API key is available
             try:
-                from ..llm_service import LLMService
+                from ..services.llm_service import LLMService
 
                 app_state.llm_service = LLMService(api_key=user_settings["api_key"])
                 app_state.llm_initialized = True
@@ -686,8 +686,8 @@ def load_user_settings_to_app_state(user_id: str, app_state):
         if user_settings.get("data_path"):
             app_state.data_path = user_settings["data_path"]
             # Generate table name from data path
-            from ..database_manager import DatabaseManager
-            from ..config_models import AppConfig
+            from ..database.database_manager import DatabaseManager
+            from ..core.config_models import AppConfig
 
             config = (
                 app_state.config

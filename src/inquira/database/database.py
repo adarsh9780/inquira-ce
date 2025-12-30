@@ -3,8 +3,8 @@ import secrets
 from pathlib import Path
 from typing import Optional, Dict, Any
 import json
-from .fingerprint import file_fingerprint_md5
-from .logger import logprint
+from ..core.fingerprint import file_fingerprint_md5
+from ..core.logger import logprint
 
 # Database file path
 DB_PATH = Path.home() / ".inquira" / "inquira.db"

@@ -3,7 +3,7 @@ from typing import Dict, Optional, Any
 from datetime import datetime
 from fastapi import WebSocket
 import logging
-from .logger import logprint
+from ..core.logger import logprint
 
 logger = logging.getLogger(__name__)
 
