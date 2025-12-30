@@ -25,7 +25,7 @@ from pathlib import Path
 
 def get_prompt_path(filename: str) -> Path:
     """Get absolute path to a prompt file"""
-    return Path(__file__).parent / "prompts" / filename
+    return Path(__file__).parent.parent / "core" / "prompts" / "yaml" / filename
 
 
 def load_json(filepath: str | Path):
@@ -165,7 +165,6 @@ class InquiraAgent:
                 "is_relevant": response.is_relevant,
                 "relevancy_reasoning": response.relevancy_reasoning,
             },
-            "messages": [AIMessage(content=response.relevancy_reasoning)],
         }
 
     def check_safety(self, state: State, config: RunnableConfig) -> dict[str, Any]:
@@ -194,7 +193,6 @@ class InquiraAgent:
                 "is_safe": response.is_safe,
                 "safety_reasoning": response.safety_reasoning,
             },
-            "messages": [AIMessage(content=response.safety_reasoning)],
         }
 
     def require_code(self, state: State, config: RunnableConfig) -> dict[str, Any]:

@@ -26,7 +26,7 @@ class PromptLibrary:
 
         # Get the prompts directory
         current_dir = Path(__file__).parent
-        prompts_dir = current_dir / "prompts"
+        prompts_dir = current_dir / "prompts" / "templates"
 
         if not prompts_dir.exists():
             raise FileNotFoundError(f"Prompts directory not found: {prompts_dir}")
@@ -48,7 +48,7 @@ class PromptLibrary:
             return cls._available_prompts
 
         current_dir = Path(__file__).parent
-        prompts_dir = current_dir / "prompts"
+        prompts_dir = current_dir / "prompts" / "templates"
 
         if not prompts_dir.exists():
             return []

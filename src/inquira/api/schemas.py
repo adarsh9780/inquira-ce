@@ -3,20 +3,20 @@ from typing import Any, List, Optional
 import duckdb
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from ..llm_service import LLMService
-from ..config_models import AppConfig
-from ..database_manager import DatabaseManager
+from ..services.llm_service import LLMService
+from ..core.config_models import AppConfig
+from ..database.database_manager import DatabaseManager
 
-from ..database import (
+from ..database.database import (
     get_dataset_by_path,
     get_user_settings,
     save_user_settings,
     set_dataset_schema_path,
 )
-from ..prompt_library import get_prompt
-from ..schema_storage import SchemaColumn, SchemaFile, load_schema, save_schema
+from ..core.prompt_library import get_prompt
+from ..database.schema_storage import SchemaColumn, SchemaFile, load_schema, save_schema
 from .auth import get_current_user
-from ..logger import logprint
+from ..core.logger import logprint
 
 
 def get_app_state(request: Request):
@@ -413,7 +413,7 @@ def load_schema_endpoint(
 
         # Persist schema path in datasets catalog
         try:
-            from ..database import set_dataset_schema_path
+            from ..database.database import set_dataset_schema_path
 
             set_dataset_schema_path(user_id, filepath, saved_path)
         except Exception:
@@ -483,7 +483,7 @@ def save_schema_endpoint(
 @router.get("/list")
 def list_schemas_endpoint(current_user: dict = Depends(get_current_user)):
     """List all schemas for the current user"""
-    from ..schema_storage import list_user_schemas
+    from ..database.schema_storage import list_user_schemas
 
     user_id = current_user["user_id"]
     return list_user_schemas(user_id)
