@@ -23,16 +23,29 @@ def get_app_state(request: Request):
     """Dependency to get app state"""
     return request.app.state
 
-def get_preview_cache_file_path(user_id: str, sample_type: str) -> Path:
-    """Get the file path for a user's preview cache file"""
+def get_preview_cache_file_path(user_id: str, sample_type: str, data_path: str = None) -> Path:
+    """Get the file path for a user's preview cache file
+    
+    Cache files are per-dataset by including a hash of the data_path in the filename.
+    This allows switching between datasets without invalidating caches.
+    """
+    import hashlib
     user_dir = get_user_schema_dir(user_id)
-    filename = f"{user_id}_preview_{sample_type}.pkl"
+    
+    # Include hash of data_path to make cache per-dataset
+    if data_path:
+        path_hash = hashlib.md5(data_path.encode()).hexdigest()[:12]
+        filename = f"{user_id}_preview_{sample_type}_{path_hash}.pkl"
+    else:
+        # Fallback for backward compatibility
+        filename = f"{user_id}_preview_{sample_type}.pkl"
+    
     return user_dir / filename
 
 def get_cached_preview(app_state, user_id: str, sample_type: str, data_path: str) -> Optional[Dict[str, Any]]:
     """Get cached preview data from pickle file if available"""
     try:
-        cache_file = get_preview_cache_file_path(user_id, sample_type)
+        cache_file = get_preview_cache_file_path(user_id, sample_type, data_path)
 
         if not cache_file.exists():
             return None
@@ -64,7 +77,7 @@ def get_cached_preview(app_state, user_id: str, sample_type: str, data_path: str
         logprint(f"⚠️ [Data Preview] Error loading cache file: {str(e)}", level="warning")
         # Try to clean up corrupted cache file
         try:
-            cache_file = get_preview_cache_file_path(user_id, sample_type)
+            cache_file = get_preview_cache_file_path(user_id, sample_type, data_path)
             if cache_file.exists():
                 cache_file.unlink()
         except:
@@ -74,7 +87,7 @@ def get_cached_preview(app_state, user_id: str, sample_type: str, data_path: str
 def set_cached_preview(app_state, user_id: str, sample_type: str, data_path: str, preview_data: Dict[str, Any]):
     """Cache preview data to pickle file"""
     try:
-        cache_file = get_preview_cache_file_path(user_id, sample_type)
+        cache_file = get_preview_cache_file_path(user_id, sample_type, data_path)
 
         # Ensure the user directory exists
         cache_file.parent.mkdir(parents=True, exist_ok=True)
@@ -102,12 +115,13 @@ def clear_user_preview_cache(app_state, user_id: str):
         user_dir = get_user_schema_dir(user_id)
         deleted_count = 0
 
-        # Delete all preview cache files for this user
-        for sample_type in ['random', 'first']:
-            cache_file = get_preview_cache_file_path(user_id, sample_type)
-            if cache_file.exists():
+        # Delete all preview cache files for this user (including ones with hash suffixes)
+        for cache_file in user_dir.glob(f"{user_id}_preview_*.pkl"):
+            try:
                 cache_file.unlink()
                 deleted_count += 1
+            except Exception:
+                pass
 
         logprint(f"🗑️ [Data Preview] Cleared {deleted_count} cached files for user: {user_id}")
 

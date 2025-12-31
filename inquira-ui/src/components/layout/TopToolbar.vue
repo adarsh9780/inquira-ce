@@ -11,6 +11,9 @@
         <div class="sm:hidden">
           <h1 class="text-lg font-bold text-primary-900">Inquira</h1>
         </div>
+
+        <!-- Dataset Switcher -->
+        <DatasetSwitcher @open-settings="openSettings" />
       </div>
 
       <!-- Right Section: User Controls Group -->
@@ -196,6 +199,7 @@ import ShortcutsModal from '../modals/ShortcutsModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import { CogIcon, ArrowRightOnRectangleIcon, UserIcon, CommandLineIcon, ChevronDownIcon, DocumentTextIcon } from '@heroicons/vue/24/outline'
 import logo from '../../assets/favicon.svg'
+import DatasetSwitcher from '../DatasetSwitcher.vue'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()

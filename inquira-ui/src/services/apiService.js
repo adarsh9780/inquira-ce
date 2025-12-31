@@ -349,6 +349,49 @@ export const apiService = {
     } catch (error) {
       throw error
     }
+  },
+
+  // Dataset management
+  async listDatasets() {
+    try {
+      const response = await client.listUserDatasetsDatasetsListGet()
+      console.log('📋 [API] Datasets loaded:', response)
+      return response
+    } catch (error) {
+      console.error('Failed to list datasets:', error)
+      return []
+    }
+  },
+
+  async setDataPathSimple(dataPath) {
+    // Set data path without triggering reprocessing
+    try {
+      const response = await client.setDataPathSimpleSettingsSetDataPathSimplePut({ data_path: dataPath })
+      return response
+    } catch (error) {
+      console.error('Failed to set data path (simple):', error)
+      throw error
+    }
+  },
+
+  async checkDatasetHealth(tableName) {
+    try {
+      const response = await client.checkDatasetHealthDatasetsHealthTableNameGet(tableName)
+      return response
+    } catch (error) {
+      console.error('Failed to check dataset health:', error)
+      throw error
+    }
+  },
+
+  async deleteDataset(tableName) {
+    try {
+      const response = await client.deleteDatasetEndpointDatasetsTableNameDelete(tableName)
+      return response
+    } catch (error) {
+      console.error('Failed to delete dataset:', error)
+      throw error
+    }
   }
 }
 

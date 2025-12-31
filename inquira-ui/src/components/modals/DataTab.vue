@@ -155,10 +155,54 @@
       </button>
     </div>
   </div>
+
+  <!-- Fullscreen Processing Overlay - Blocks all UI interaction -->
+  <Teleport to="body">
+    <div v-if="isProcessing" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div class="bg-white rounded-xl shadow-2xl p-8 max-w-lg w-full mx-4">
+        <!-- Header -->
+        <div class="text-center mb-6">
+          <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+            <svg class="w-8 h-8 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-gray-900">Processing Data</h3>
+          <p class="text-sm text-gray-500 mt-1">{{ progressMessage }}</p>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="space-y-3">
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              :style="{ width: progressPercent + '%' }"
+            ></div>
+          </div>
+          <div class="flex justify-between text-sm text-gray-600">
+            <span>{{ progressPercent }}%</span>
+            <span>{{ formatElapsedTime(elapsedTime) }}</span>
+          </div>
+        </div>
+
+        <!-- Warning -->
+        <div class="mt-6 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div class="flex items-start">
+            <ExclamationTriangleIcon class="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
+            <div>
+              <p class="text-sm font-medium text-yellow-800">Do not close or refresh this page</p>
+              <p class="text-xs text-yellow-700 mt-1">Interrupting this process may corrupt your data and require reprocessing.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { apiService } from '../../services/apiService'
 import { settingsWebSocket } from '../../services/websocketService'
@@ -536,6 +580,26 @@ onUnmounted(() => {
   stopTimer()
   if (settingsWebSocket) {
     settingsWebSocket.onProgress(null)
+  }
+  // Remove beforeunload handler
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+})
+
+// Beforeunload handler to warn user during processing
+function handleBeforeUnload(e) {
+  if (isProcessing.value) {
+    e.preventDefault()
+    e.returnValue = 'Data processing is in progress. Leaving may corrupt your data.'
+    return e.returnValue
+  }
+}
+
+// Watch isProcessing to add/remove beforeunload handler
+watch(isProcessing, (newVal) => {
+  if (newVal) {
+    window.addEventListener('beforeunload', handleBeforeUnload)
+  } else {
+    window.removeEventListener('beforeunload', handleBeforeUnload)
   }
 })
 

@@ -336,6 +336,11 @@ def load_schema_endpoint(
     If no schema exists yet, attempt to generate a minimal schema (without LLM)
     based on DuckDB DESCRIBE and sample values, then save and return it.
     """
+    # Normalize filepath - FastAPI strips leading slash from path params
+    # So "/Users/foo" becomes "Users/foo" - we need to restore it
+    if filepath and not filepath.startswith('/'):
+        filepath = '/' + filepath
+    
     user_id = current_user["user_id"]
     existing = load_schema(user_id, filepath)
 

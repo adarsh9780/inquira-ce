@@ -80,7 +80,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { previewService } from '../../services/previewService'
 // toasts are lightweight; reuse window.alert for now (or wire your ToastContainer)
 
@@ -159,11 +159,32 @@ function refreshCurrent() {
   else fetchSchemaData(true)
 }
 
+// Handle dataset switch event
+function handleDatasetSwitch() {
+  console.log('📢 Dataset switched - reloading preview data')
+  // Clear and reload all data
+  data.value = []
+  columns.value = []
+  schema.value = []
+  tableName.value = ''
+  error.value = ''
+  schemaError.value = ''
+  loadSettingsTableName().finally(() => {
+    fetchDataPreview(true) // Force refresh
+    fetchSchemaData(true)   // Force refresh
+  })
+}
+
 onMounted(() => {
   loadSettingsTableName().finally(() => {
     fetchDataPreview()
     fetchSchemaData()
   })
+  window.addEventListener('dataset-switched', handleDatasetSwitch)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('dataset-switched', handleDatasetSwitch)
 })
 
 function clearCache() {

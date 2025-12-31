@@ -262,8 +262,23 @@ async function regenerateSchema() {
   }
 }
 
+// Handle dataset switch event
+function handleDatasetSwitch() {
+  console.log('📢 Dataset switched - reloading schema')
+  schemaEdited.value = false
+  schema.value = []
+  schemaContext.value = ''
+  schemaError.value = ''
+  fetchSchemaData()
+}
+
 onMounted(() => {
   fetchSchemaData()
+  window.addEventListener('dataset-switched', handleDatasetSwitch)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('dataset-switched', handleDatasetSwitch)
 })
 
 function clearCache() {

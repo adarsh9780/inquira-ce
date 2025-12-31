@@ -294,7 +294,48 @@ def list_datasets(user_id: str) -> list[Dict[str, Any]]:
     except Exception as e:
         logprint(f"Error listing datasets: {e}", level="error")
         return []
-    except Exception:
+
+
+def get_dataset_by_table_name(user_id: str, table_name: str) -> Optional[Dict[str, Any]]:
+    """Get dataset by table_name"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, user_id, file_path, file_hash, table_name, schema_path,
+                   file_size, source_mtime, row_count, file_type, last_accessed,
+                   created_at, updated_at
+            FROM datasets WHERE user_id = ? AND table_name = ?
+        ''', (user_id, table_name))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return {
+                'id': row[0], 'user_id': row[1], 'file_path': row[2], 'file_hash': row[3],
+                'table_name': row[4], 'schema_path': row[5], 'file_size': row[6],
+                'source_mtime': row[7], 'row_count': row[8], 'file_type': row[9],
+                'last_accessed': row[10], 'created_at': row[11], 'updated_at': row[12]
+            }
+        return None
+    except Exception as e:
+        logprint(f"Error getting dataset by table_name: {e}", level="error")
+        return None
+
+
+def delete_dataset(user_id: str, table_name: str) -> bool:
+    """Delete a dataset record by user_id and table_name"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            DELETE FROM datasets WHERE user_id = ? AND table_name = ?
+        ''', (user_id, table_name))
+        deleted = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        return deleted
+    except Exception as e:
+        logprint(f"Error deleting dataset: {e}", level="error")
         return False
 
 def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
