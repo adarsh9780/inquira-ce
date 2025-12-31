@@ -100,7 +100,7 @@ async def lifespan(app: FastAPI):
     # Initialize database manager
     app.state.db_manager = DatabaseManager(app.state.config)
     logprint("Database manager initialized")
-
+    
     # Start session cleanup task
     cleanup_task = asyncio.create_task(session_cleanup_worker())
     logprint("Session cleanup worker started")

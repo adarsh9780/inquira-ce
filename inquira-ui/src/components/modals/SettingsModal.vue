@@ -188,6 +188,10 @@ const props = defineProps({
   isOpen: {
     type: Boolean,
     default: false
+  },
+  initialTab: {
+    type: String,
+    default: 'api' // 'api' | 'data' | 'account'
   }
 })
 
@@ -197,7 +201,14 @@ const appStore = useAppStore()
 const isLoadingSettings = ref(false)
 const isSavingSettings = ref(false)
 const settingsLoaded = ref(false)
-const activeTab = ref('api') // 'api' | 'data' | 'account'
+const activeTab = ref(props.initialTab)
+
+// Watch for modal opening to reset to initial tab
+watch(() => props.isOpen, (newVal) => {
+  if (newVal) {
+    activeTab.value = props.initialTab
+  }
+})
 
 // WebSocket and Progress State
 const isProgressModalVisible = ref(false)

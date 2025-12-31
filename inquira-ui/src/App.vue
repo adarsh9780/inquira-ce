@@ -72,6 +72,43 @@ async function handleAuthenticated(userData) {
     console.log('User settings:', settings)
 
     // Update app store with user settings, but preserve local state
+    // Check if backend indicates fresh/empty state but we have local settings
+    const isBackendEmpty = !settings.api_key && !settings.data_path
+    const hasLocalSettings = appStore.apiKey || appStore.dataFilePath
+
+    if (isBackendEmpty && hasLocalSettings) {
+      console.warn('⚠️ Backend reset detected. Attempting to reconcile state...')
+      
+      // 1. Try to restore API key if we have it locally
+      if (appStore.apiKey) {
+        try {
+          console.log('🔄 Restoring local API key to fresh backend...')
+          await apiService.setApiKey(appStore.apiKey)
+          // Don't show toast for successful restore to keep it seamless, or maybe a subtle one
+          const { toast } = await import('./composables/useToast')
+          toast.success('Session Restored', 'Your API key was restored to the new database.')
+        } catch (restoreError) {
+          console.error('❌ Failed to restore API key:', restoreError)
+        }
+      }
+
+      // 2. Clear data path/context regardless, as the file reference in DB is gone
+      // and we want to force user to re-select to ensure schema generation triggers correctly
+      if (appStore.dataFilePath) {
+        console.warn('🧹 Clearing local data path to match fresh backend.')
+        appStore.setDataFilePath('')
+        appStore.setSchemaContext('')
+        appStore.setIsSchemaFileUploaded(false)
+        appStore.setSchemaFileId(null)
+        
+        const { toast } = await import('./composables/useToast')
+        toast.info('Workspace Reset', 'Backend database was reset. Please re-select your dataset.')
+      }
+
+      // Continue to load other settings (which are empty/defaults now)
+      // We don't return here because we want the rest of the flow (e.g. chat history fetch) to run
+    }
+
     if (settings.api_key) {
       appStore.setApiKey(settings.api_key)
     } else {
@@ -114,8 +151,16 @@ async function handleAuthenticated(userData) {
 
     console.log('Settings loaded for authenticated user')
   } catch (error) {
-    console.log('No existing settings found for user (this is normal for new users)')
-    // This is expected for new users who haven't set up their settings yet
+    console.log('No existing settings found for user (or new user checking in)')
+    
+    // Also check here for desync if getSettings throws 404 or similar
+    // If we have local settings but backend says "no settings found", clear local
+    if (appStore.apiKey || appStore.dataFilePath) {
+      console.warn('⚠️ No backend settings found but local has data. Clearing local config.')
+      appStore.clearLocalConfig()
+      const { toast } = await import('./composables/useToast')
+      toast.info('Settings Reset', 'Backend database was reset. Local settings have been cleared.')
+    }
   }
 }
 

@@ -378,6 +378,20 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
         }
     return None
 
+
+def get_username_by_user_id(user_id: str) -> Optional[str]:
+    """Get username for a user_id (for folder path generation).
+    
+    This is a lightweight function used by path_utils for generating
+    username-based folder paths.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT username FROM users WHERE user_id = ?', (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return row[0] if row else None
+
 def update_user_password(user_id: str, new_password_hash: str, new_salt: str) -> bool:
     """Update user's password hash and salt"""
     try:

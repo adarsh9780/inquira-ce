@@ -65,14 +65,23 @@
 
     <!-- Tab Content -->
     <div class="relative flex-1 overflow-hidden bg-gray-50/50">
-      <!-- Chat Overlay (25% left) -->
+      <!-- Chat Overlay (Resizable) -->
       <div
         v-show="appStore.isChatOverlayOpen"
         class="absolute inset-y-0 left-0 bg-white border-r border-gray-200 shadow-xl z-20 flex flex-col"
         :style="{ width: `${Math.round(appStore.chatOverlayWidth * 100)}%` }"
       >
-        <div class="h-full p-3 sm:p-4">
+        <div class="h-full p-3 sm:p-4 overflow-hidden">
           <ChatTab />
+        </div>
+        
+        <!-- Resize Handle -->
+        <div
+          class="absolute top-0 right-0 w-1 h-full cursor-ew-resize group hover:bg-blue-400 transition-colors z-30"
+          @mousedown="startResize"
+        >
+          <!-- Visual indicator on hover -->
+          <div class="absolute inset-y-0 -left-1 -right-1 group-hover:bg-blue-400/20"></div>
         </div>
       </div>
 
@@ -240,6 +249,42 @@ function handleTabClick(id) {
 
 // Note: Tab shortcuts are now handled by TopToolbar.vue using Option+letter keys
 // This provides a unified shortcut system across the application
+
+// Chat panel resize logic
+const isResizing = ref(false)
+const containerRef = ref(null)
+
+function startResize(event) {
+  isResizing.value = true
+  document.addEventListener('mousemove', onResize)
+  document.addEventListener('mouseup', stopResize)
+  // Prevent text selection during drag
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'ew-resize'
+}
+
+function onResize(event) {
+  if (!isResizing.value) return
+  
+  // Get the container (relative flex-1 div)
+  const container = document.querySelector('.relative.flex-1.overflow-hidden')
+  if (!container) return
+  
+  const containerRect = container.getBoundingClientRect()
+  const newWidth = (event.clientX - containerRect.left) / containerRect.width
+  
+  // Clamp between 15% and 60%
+  const clampedWidth = Math.max(0.15, Math.min(0.60, newWidth))
+  appStore.setChatOverlayWidth(clampedWidth)
+}
+
+function stopResize() {
+  isResizing.value = false
+  document.removeEventListener('mousemove', onResize)
+  document.removeEventListener('mouseup', stopResize)
+  document.body.style.userSelect = ''
+  document.body.style.cursor = ''
+}
 
 // Event listeners setup
 </script>

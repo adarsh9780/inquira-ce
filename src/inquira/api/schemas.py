@@ -14,7 +14,13 @@ from ..database.database import (
     set_dataset_schema_path,
 )
 from ..core.prompt_library import get_prompt
-from ..database.schema_storage import SchemaColumn, SchemaFile, load_schema, save_schema
+from ..database.schema_storage import (
+    SchemaColumn, 
+    SchemaFile, 
+    load_schema, 
+    save_schema,
+    derive_table_name
+)
 from .auth import get_current_user
 from ..core.logger import logprint
 
@@ -85,7 +91,7 @@ class SchemaColumnResponse(BaseModel):
 
 class SchemaResponse(BaseModel):
     filepath: str
-    context: str
+    context: str = ""  # Default to empty string if None
     columns: List[SchemaColumnResponse]
     created_at: str
     updated_at: str
@@ -97,6 +103,24 @@ class SaveSchemaRequest(BaseModel):
     columns: List[SchemaColumnResponse]
 
 
+def _resolve_table_name(user_id: str, filepath: str, app_state) -> str:
+    """Helper to resolve table name using catalog or derivation"""
+    # 1. Try catalog
+    try:
+        ds = get_dataset_by_path(user_id, filepath)
+        if ds and ds.get("table_name"):
+            return ds["table_name"]
+    except Exception:
+        pass
+    
+    # 2. Try derivation helper
+    try:
+        return derive_table_name(filepath)
+    except Exception:
+        pass
+        
+    return "data_table"
+
 def _generate_schema_internal(
     user_id: str,
     filepath: str,
@@ -106,13 +130,18 @@ def _generate_schema_internal(
     model: str = "gemini-2.5-flash",
     force_regenerate: bool = False,
 ) -> SchemaResponse:
+    
+    # Resolve table name early
+    table_name = _resolve_table_name(user_id, filepath, app_state)
+
     # First, check if schema already exists (skip if force_regenerate is True)
     if not force_regenerate:
-        existing_schema = load_schema(user_id, filepath)
+        # Pass table_name for efficient lookup
+        existing_schema = load_schema(user_id, filepath, table_name=table_name)
         if existing_schema:
             return SchemaResponse(
                 filepath=existing_schema.filepath,
-                context=existing_schema.context,
+                context=existing_schema.context or "",
                 columns=[
                     SchemaColumnResponse(
                         name=col.name,
@@ -164,27 +193,6 @@ def _generate_schema_internal(
         # Fallback for frontend using "current_user"
         cached_connection = app_state.duckdb_connections["current_user"]
         logprint("⚠️ [Schema] Using 'current_user' cached connection (frontend issue)")
-
-    # Resolve the actual table name for this file
-    table_name = None
-    try:
-        ds = get_dataset_by_path(user_id, filepath)
-        if ds and ds.get("table_name"):
-            table_name = ds["table_name"]
-    except Exception:
-        table_name = None
-
-    if not table_name:
-        try:
-            cfg = (
-                app_state.config
-                if hasattr(app_state, "config") and app_state.config
-                else AppConfig()
-            )
-            dm = DatabaseManager(cfg)
-            table_name = dm._get_table_name(filepath)
-        except Exception:
-            table_name = "data_table"
 
     if cached_connection:
         # Use cached connection
@@ -270,7 +278,8 @@ def _generate_schema_internal(
 
     # Save the generated schema
     schema_file = SchemaFile(filepath=filepath, context=context, columns=schema_columns)
-    saved_schema_path = save_schema(user_id, schema_file)
+    # Use table_name for saving to correct folder
+    saved_schema_path = save_schema(user_id, schema_file, table_name=table_name)
 
     # Persist schema path in datasets catalog
     try:
@@ -342,12 +351,14 @@ def load_schema_endpoint(
         filepath = '/' + filepath
     
     user_id = current_user["user_id"]
-    existing = load_schema(user_id, filepath)
+    table_name = _resolve_table_name(user_id, filepath, app_state)
+    
+    existing = load_schema(user_id, filepath, table_name=table_name)
 
     if existing:
         return SchemaResponse(
             filepath=existing.filepath,
-            context=existing.context,
+            context=existing.context or "",
             columns=[
                 SchemaColumnResponse(
                     name=col.name,
@@ -373,12 +384,8 @@ def load_schema_endpoint(
 
         columns: list[Column] = []
         if connection is not None:
-            # Resolve table name similarly to generate_schema
-            try:
-                ds = get_dataset_by_path(user_id, filepath)
-                tbl = ds["table_name"] if ds and ds.get("table_name") else "data_table"
-            except Exception:
-                tbl = "data_table"
+            # We already have table_name derived
+            tbl = table_name
 
             desc = connection.execute(f"DESCRIBE {tbl}").fetchall()
             for row in desc:
@@ -419,7 +426,7 @@ def load_schema_endpoint(
         schema_file = SchemaFile(
             filepath=filepath, context="General data analysis", columns=schema_columns
         )
-        saved_path = save_schema(user_id, schema_file)
+        saved_path = save_schema(user_id, schema_file, table_name=table_name)
 
         # Persist schema path in datasets catalog
         try:
@@ -473,7 +480,8 @@ def save_schema_endpoint(
         filepath=request.filepath, context=request.context, columns=schema_columns
     )
 
-    saved_path = save_schema(user_id, schema_file)
+    table_name = _resolve_table_name(user_id, request.filepath, app_state)
+    saved_path = save_schema(user_id, schema_file, table_name=table_name)
 
     # Update user settings with the schema path
     current_settings = get_user_settings(user_id)

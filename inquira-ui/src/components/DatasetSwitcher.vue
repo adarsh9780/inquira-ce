@@ -19,12 +19,12 @@
     <!-- Dropdown -->
     <div
       v-if="isOpen"
-      class="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden"
+      class="absolute top-full left-0 mt-1 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden"
     >
-      <!-- Loading -->
+      <!-- Loading (Global) -->
       <div v-if="loading" class="p-3 text-center text-sm text-gray-500">
         <div class="animate-spin inline-block w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full mr-2"></div>
-        Loading datasets...
+        {{ loadingMessage }}
       </div>
 
       <!-- Empty State -->
@@ -34,22 +34,50 @@
       </div>
 
       <!-- Dataset List -->
-      <div v-else class="max-h-64 overflow-y-auto">
-        <button
+      <div v-else class="max-h-64 overflow-y-auto w-full">
+        <div
           v-for="ds in datasets"
           :key="ds.table_name"
-          @click="selectDataset(ds)"
-          class="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 transition-colors flex items-center justify-between"
-          :class="{ 'bg-blue-50': ds.data_path === currentDataPath }"
+          class="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 transition-colors flex items-center justify-between group"
+          :class="{ 'bg-blue-50': ds.file_path === currentDataPath }"
         >
-          <div class="flex-1 min-w-0">
+          <button 
+            @click="selectDataset(ds)"
+            class="flex-1 min-w-0 text-left focus:outline-none pr-2"
+          >
             <p class="font-medium text-gray-900 truncate" :title="ds.table_name">{{ ds.table_name }}</p>
-            <p class="text-xs text-gray-500 truncate" :title="ds.data_path">{{ formatPath(ds.data_path) }}</p>
+            <!-- Show full path as requested -->
+            <p class="text-xs text-gray-500 truncate" :title="ds.file_path">{{ ds.file_path }}</p>
+          </button>
+          
+          <div class="flex items-center space-x-1">
+            <svg v-if="ds.file_path === currentDataPath" class="w-4 h-4 text-blue-600 flex-shrink-0 mr-1" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+            
+            <!-- Refresh Button -->
+            <button 
+              @click.stop="promptRefresh(ds)"
+              class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+              title="Refresh Dataset"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            
+            <!-- Delete Button -->
+            <button 
+              @click.stop="promptDelete(ds)"
+              class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+              title="Delete Dataset"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
           </div>
-          <svg v-if="ds.data_path === currentDataPath" class="w-4 h-4 text-blue-600 flex-shrink-0 ml-2" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-          </svg>
-        </button>
+        </div>
       </div>
 
       <!-- Add New -->
@@ -63,6 +91,98 @@
           </svg>
           Add New Dataset
         </button>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div v-if="showDeleteModal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6" @click.stop>
+        <div class="flex items-center space-x-3 text-red-600 mb-4">
+          <div class="p-2 bg-red-100 rounded-full">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-gray-900">Delete Dataset?</h3>
+        </div>
+        
+        <p class="text-gray-600 mb-6">
+          Are you sure you want to delete <strong>{{ datasetToDelete?.table_name }}</strong>?
+          <br><br>
+          <span class="text-sm text-gray-500">
+            This will permanently remove:
+            <ul class="list-disc list-inside mt-1 ml-1">
+              <li>The DuckDB table</li>
+              <li>Schema file (schema.json)</li>
+              <li>Preview cache files</li>
+            </ul>
+          </span>
+        </p>
+
+        <div class="flex justify-end space-x-3">
+          <button 
+            @click="closeDeleteModal"
+            class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            :disabled="loading"
+          >
+            Cancel
+          </button>
+          
+          <button 
+            @click="confirmDelete"
+            class="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 flex items-center"
+            :disabled="loading"
+          >
+            <span v-if="loading" class="mr-2 animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
+            {{ loading ? 'Deleting...' : 'Delete Dataset' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Refresh Confirmation Modal -->
+    <div v-if="showRefreshModal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6" @click.stop>
+        <div class="flex items-center space-x-3 text-blue-600 mb-4">
+          <div class="p-2 bg-blue-100 rounded-full">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-gray-900">Refresh Dataset?</h3>
+        </div>
+        
+        <p class="text-gray-600 mb-6">
+          Refresh <strong>{{ datasetToRefresh?.table_name }}</strong> from source file?
+          <br><br>
+          <span class="text-sm text-gray-500">
+            This will:
+            <ul class="list-disc list-inside mt-1 ml-1">
+              <li>Reimport data from the original file</li>
+              <li>Regenerate the schema with AI</li>
+              <li>Create a backup (restored if refresh fails)</li>
+            </ul>
+          </span>
+        </p>
+
+        <div class="flex justify-end space-x-3">
+          <button 
+            @click="closeRefreshModal"
+            class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            :disabled="loading"
+          >
+            Cancel
+          </button>
+          
+          <button 
+            @click="confirmRefresh"
+            class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center"
+            :disabled="loading"
+          >
+            <span v-if="loading" class="mr-2 animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
+            {{ loading ? 'Refreshing...' : 'Refresh Dataset' }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -79,26 +199,39 @@ const emit = defineEmits(['open-settings'])
 const appStore = useAppStore()
 const isOpen = ref(false)
 const loading = ref(false)
+const loadingMessage = ref('Loading datasets...')
 const datasets = ref([])
+
+// Delete modal state
+const showDeleteModal = ref(false)
+const datasetToDelete = ref(null)
+
+// Refresh modal state
+const showRefreshModal = ref(false)
+const datasetToRefresh = ref(null)
 
 const currentDataPath = computed(() => appStore.dataFilePath)
 const currentDatasetName = computed(() => {
   if (!currentDataPath.value) return null
-  const ds = datasets.value.find(d => d.data_path === currentDataPath.value)
+  const ds = datasets.value.find(d => d.file_path === currentDataPath.value)
   return ds?.table_name || formatPath(currentDataPath.value)
 })
 
 function formatPath(path) {
   if (!path) return ''
   const parts = path.split('/')
-  return parts[parts.length - 1]
+  const filename = parts[parts.length - 1]
+  // Remove file extension for cleaner display
+  return filename.replace(/\.[^.]+$/, '')
 }
 
 async function loadDatasets() {
   loading.value = true
+  loadingMessage.value = 'Loading datasets...'
   try {
-    const list = await apiService.listDatasets()
-    datasets.value = list || []
+    const response = await apiService.listDatasets()
+    // Handle both wrapped and unwrapped responses
+    datasets.value = response.datasets || response || []
   } catch (error) {
     console.error('Failed to load datasets:', error)
     datasets.value = []
@@ -114,21 +247,140 @@ function toggleDropdown() {
   }
 }
 
+// Prompt for delete - opens modal
+function promptDelete(ds) {
+  datasetToDelete.value = ds
+  showDeleteModal.value = true
+}
+
+function closeDeleteModal() {
+  showDeleteModal.value = false
+  datasetToDelete.value = null
+}
+
+async function confirmDelete() {
+  if (!datasetToDelete.value) return
+  
+  const ds = datasetToDelete.value
+  const wasActiveDataset = currentDataPath.value?.trim() === ds.file_path?.trim()
+  
+  loading.value = true
+  try {
+    await apiService.deleteDataset(ds.table_name)
+    
+    // Close modal first
+    closeDeleteModal()
+    
+    // Reload list
+    await loadDatasets()
+    
+    const { toast } = await import('../composables/useToast.js')
+    
+    // If deleted dataset was active, we need to handle the switch
+    if (wasActiveDataset) {
+      if (datasets.value.length > 0) {
+        // Auto-switch to the first available dataset
+        const nextDataset = datasets.value[0]
+        console.log('🔄 Auto-switching to next dataset:', nextDataset.table_name)
+        await selectDataset(nextDataset)
+        toast.success('Switched Dataset', `Now viewing: ${nextDataset.table_name}`)
+      } else {
+        // No datasets left - clear state and show empty state
+        console.log('🗑️ No datasets remaining. Clearing workspace.')
+        appStore.setDataFilePath('')
+        appStore.setSchemaContext('')
+        appStore.setIsSchemaFileUploaded(false)
+        appStore.setSchemaFileId(null)
+        appStore.setGeneratedCode('')
+        appStore.setPythonFileContent('')
+        appStore.setResultData(null)
+        appStore.setPlotlyFigure(null)
+        appStore.setDataframes([])
+        appStore.setFigures([])
+        appStore.setScalars([])
+        appStore.setTerminalOutput('')
+        
+        // Dispatch event to notify Schema Editor to show empty state
+        window.dispatchEvent(new CustomEvent('dataset-switched', { detail: null }))
+        
+        toast.info('Workspace Cleared', 'No datasets remaining.')
+      }
+    } else {
+      // Deleted a non-active dataset, just show confirmation
+      toast.success('Dataset Deleted', `Removed: ${ds.table_name}`)
+    }
+
+    showDeleteModal.value = false
+  } catch (error) {
+    console.error('Failed to delete dataset:', error)
+    alert('Failed to delete dataset: ' + (error.response?.data?.detail || error.message))
+    closeDeleteModal()
+  } finally {
+    loading.value = false
+  }
+}
+
+// Prompt for refresh - opens modal
+function promptRefresh(ds) {
+  datasetToRefresh.value = ds
+  showRefreshModal.value = true
+}
+
+function closeRefreshModal() {
+  showRefreshModal.value = false
+  datasetToRefresh.value = null
+}
+
+async function confirmRefresh() {
+  if (!datasetToRefresh.value) return
+  
+  const ds = datasetToRefresh.value
+  loading.value = true
+  
+  try {
+    const result = await apiService.refreshDataset(ds.table_name)
+    
+    // Close modal
+    closeRefreshModal()
+    
+    // Clear caches to force refresh
+    previewService.clearPreviewCache()
+    
+    // Reload datasets list
+    await loadDatasets()
+    
+    // Show success message
+    const { toast } = await import('../composables/useToast.js')
+    toast.success(
+      'Dataset Refreshed', 
+      `${ds.table_name} updated with ${result.row_count || 'new'} rows${result.schema_regenerated ? ' and schema regenerated' : ''}`
+    )
+    
+    console.log('✅ Dataset refreshed:', result)
+  } catch (error) {
+    console.error('Failed to refresh dataset:', error)
+    alert('Failed to refresh dataset: ' + (error.response?.data?.detail || error.message))
+    closeRefreshModal()
+  } finally {
+    loading.value = false
+  }
+}
+
 async function selectDataset(ds) {
-  if (ds.data_path === currentDataPath.value) {
+  if (ds.file_path === currentDataPath.value) {
     isOpen.value = false
     return
   }
 
   try {
     // Use simple path update (no reprocessing)
-    await apiService.setDataPathSimple(ds.data_path)
+    await apiService.setDataPathSimple(ds.file_path)
     
     // Clear caches first
     previewService.clearPreviewCache()
     
     // Update app store - this also triggers fetchChatHistory
-    appStore.setDataFilePath(ds.data_path)
+    appStore.setDataFilePath(ds.file_path)
     
     // Clear code/results from previous dataset
     appStore.setGeneratedCode('')
@@ -142,7 +394,7 @@ async function selectDataset(ds) {
     
     // Emit custom event for other components (e.g., SchemaEditorTab) to refresh
     window.dispatchEvent(new CustomEvent('dataset-switched', { 
-      detail: { tableName: ds.table_name, dataPath: ds.data_path }
+      detail: { tableName: ds.table_name, dataPath: ds.file_path }
     }))
     
     console.log(`✅ Switched to dataset: ${ds.table_name}`)
@@ -155,11 +407,14 @@ async function selectDataset(ds) {
 
 function openSettings() {
   isOpen.value = false
-  emit('open-settings')
+  emit('open-settings', 'data') // Open directly to Data tab
 }
 
 // Close dropdown on outside click
 function handleClickOutside(event) {
+  // If verifying modal click, ignore
+  if (showDeleteModal.value) return 
+  
   const dropdown = event.target.closest('.relative')
   if (!dropdown) {
     isOpen.value = false

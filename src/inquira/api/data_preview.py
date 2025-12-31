@@ -9,9 +9,16 @@ from enum import Enum
 from datetime import datetime
 from .auth import get_current_user
 from ..database.database import get_user_settings
-from ..database.schema_storage import load_schema, get_user_schema_dir
+from ..database.schema_storage import load_schema, derive_table_name
 from ..core.logger import logprint
 from ..database.sql_library import get_sql
+from ..core.path_utils import (
+    get_preview_cache_path,
+    get_legacy_schemas_dir,
+    list_dataset_dirs,
+    PREVIEW_CACHE_PREFIX,
+    PREVIEW_CACHE_EXT
+)
 
 class SampleType(str, Enum):
     random = "random"
@@ -26,18 +33,25 @@ def get_app_state(request: Request):
 def get_preview_cache_file_path(user_id: str, sample_type: str, data_path: str = None) -> Path:
     """Get the file path for a user's preview cache file
     
-    Cache files are per-dataset by including a hash of the data_path in the filename.
-    This allows switching between datasets without invalidating caches.
+    Now uses per-dataset folders: ~/.inquira/{username}/{table_name}/preview_{sample_type}.pkl
     """
+    if data_path:
+        table_name = derive_table_name(data_path)
+        try:
+            return get_preview_cache_path(user_id, table_name, sample_type)
+        except Exception:
+            # Fallback path if user lookup fails (unlikely)
+            pass
+            
+    # Fallback to legacy path if no data_path or error
     import hashlib
-    user_dir = get_user_schema_dir(user_id)
+    user_dir = get_legacy_schemas_dir(user_id)
+    user_dir.mkdir(parents=True, exist_ok=True)
     
-    # Include hash of data_path to make cache per-dataset
     if data_path:
         path_hash = hashlib.md5(data_path.encode()).hexdigest()[:12]
         filename = f"{user_id}_preview_{sample_type}_{path_hash}.pkl"
     else:
-        # Fallback for backward compatibility
         filename = f"{user_id}_preview_{sample_type}.pkl"
     
     return user_dir / filename
@@ -111,22 +125,35 @@ def set_cached_preview(app_state, user_id: str, sample_type: str, data_path: str
 
 def clear_user_preview_cache(app_state, user_id: str):
     """Clear all cached preview data for a user by deleting pickle files"""
+    deleted_count = 0
+    
+    # 1. Clear from separate dataset dirs (New Structure)
     try:
-        user_dir = get_user_schema_dir(user_id)
-        deleted_count = 0
-
-        # Delete all preview cache files for this user (including ones with hash suffixes)
-        for cache_file in user_dir.glob(f"{user_id}_preview_*.pkl"):
-            try:
-                cache_file.unlink()
-                deleted_count += 1
-            except Exception:
-                pass
-
-        logprint(f"🗑️ [Data Preview] Cleared {deleted_count} cached files for user: {user_id}")
-
+        dataset_dirs = list_dataset_dirs(user_id)
+        for d in dataset_dirs:
+            for cache_file in d.glob(f"{PREVIEW_CACHE_PREFIX}*{PREVIEW_CACHE_EXT}"):
+                try:
+                    cache_file.unlink()
+                    deleted_count += 1
+                except Exception:
+                    pass
     except Exception as e:
-        logprint(f"❌ [Data Preview] Error clearing cache files: {str(e)}", level="error")
+         logprint(f"⚠️ [Data Preview] Error clearing new structure cache: {str(e)}", level="warning")
+
+    # 2. Clear from legacy schemas dir
+    try:
+        user_dir = get_legacy_schemas_dir(user_id)
+        if user_dir.exists():
+            for cache_file in user_dir.glob(f"{user_id}_preview_*.pkl"):
+                try:
+                    cache_file.unlink()
+                    deleted_count += 1
+                except Exception:
+                    pass
+    except Exception as e:
+        logprint(f"⚠️ [Data Preview] Error clearing legacy cache: {str(e)}", level="warning")
+
+    logprint(f"🗑️ [Data Preview] Cleared {deleted_count} cached files for user: {user_id}")
 
 def get_file_type(file_path: str) -> str:
     """Determine file type based on extension"""
@@ -265,8 +292,8 @@ def read_file_with_duckdb(file_path: str, sample_size: int = 100) -> List[Dict[s
             detail=f"Unexpected error reading file: {str(e)}"
         )
 
-
-
+# ... (Previous schema retrieval code is identical, except imports)
+# I will just write the rest of the file exactly as it was, but ensuring imports are correct.
 
 @router.get("/data/schema")
 async def get_data_schema(
@@ -288,7 +315,7 @@ async def get_data_schema(
                 detail="No data file path configured. Please set your data path in settings."
             )
 
-        # First, try to load existing schema
+        # First, try to load existing schema (will try both new and legacy internally)
         existing_schema = load_schema(user_id, data_path)
         if existing_schema:
             logprint(f"✅ [Data Preview] Using existing schema for: {data_path}")
@@ -361,7 +388,7 @@ async def get_data_preview(
             logprint(f"✅ [Data Preview] Returning cached preview for: {user_id}:{data_path}:{sample_type.value}")
             # Send cache hit message to WebSocket if connected
             try:
-                from ..websocket_manager import websocket_manager
+                from ..services.websocket_manager import websocket_manager
                 websocket_user_id = user_id if websocket_manager.is_connected(user_id) else ("current_user" if websocket_manager.is_connected("current_user") else None)
                 if websocket_user_id:
                     import asyncio
@@ -433,7 +460,7 @@ async def refresh_data_preview(
 
         # Send refresh start message to WebSocket if connected
         try:
-            from ..websocket_manager import websocket_manager
+            from ..services.websocket_manager import websocket_manager
             websocket_user_id = user_id if websocket_manager.is_connected(user_id) else ("current_user" if websocket_manager.is_connected("current_user") else None)
             if websocket_user_id:
                 import asyncio
@@ -468,7 +495,7 @@ async def refresh_data_preview(
 
         # Send refresh completion message to WebSocket if connected
         try:
-            from ..websocket_manager import websocket_manager
+            from ..services.websocket_manager import websocket_manager
             websocket_user_id = user_id if websocket_manager.is_connected(user_id) else ("current_user" if websocket_manager.is_connected("current_user") else None)
             if websocket_user_id:
                 import asyncio

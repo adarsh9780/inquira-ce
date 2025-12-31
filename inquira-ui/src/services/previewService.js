@@ -92,7 +92,13 @@ class PreviewService {
 
     schemaKeys.forEach(key => cacheService.delete(key))
 
-    console.log(`🗑️ Cleared ${dataPreviewKeys.length} data preview and ${schemaKeys.length} schema cache entries`)
+    // Also clear settings cache to ensure fresh data path is loaded
+    const settingsKeys = Array.from(cacheService.cache.keys())
+      .filter(key => key.startsWith('settings/'))
+
+    settingsKeys.forEach(key => cacheService.delete(key))
+
+    console.log(`🗑️ Cleared ${dataPreviewKeys.length} data preview, ${schemaKeys.length} schema, and ${settingsKeys.length} settings cache entries`)
   }
 
   // Clear cache for specific filepath

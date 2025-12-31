@@ -22,9 +22,8 @@ class DatabaseManager:
     def __init__(self, config: AppConfig):
         self.config = config
         # Use user's home directory for persistent storage
-        self.base_dir = Path.home() / ".inquira"
-        self.databases_dir = self.base_dir / "databases"
-        self.databases_dir.mkdir(parents=True, exist_ok=True)
+        from ..core.path_utils import BASE_DIR
+        self.base_dir = BASE_DIR
 
         # In-memory connection cache: {db_path: connection}
         self.connections: Dict[str, duckdb.DuckDBPyConnection] = {}
@@ -40,12 +39,12 @@ class DatabaseManager:
         db_path = self._get_database_path(user_id, file_path)
 
         # Check if database needs to be created/updated
-        needs_recreation = self._should_recreate_database(db_path, file_path)
+        needs_recreation = self._should_recreate_database(user_id, db_path, file_path)
         if needs_recreation:
             logprint(
                 f"🔧 [Database] Creating/updating database for user {user_id}: {file_path}"
             )
-            self._create_database(db_path, file_path)
+            self._create_database(user_id, db_path, file_path)
         else:
             logprint(
                 f"♻️ [Database] Reusing existing database for user {user_id}: {file_path}"
@@ -76,7 +75,8 @@ class DatabaseManager:
         Get existing database connection for a user without creating new database.
         Returns None if database doesn't exist.
         """
-        db_path = self.base_dir / user_id / f"{user_id}_data.duckdb"
+        from ..core.path_utils import get_database_path
+        db_path = get_database_path(user_id)
 
         if not db_path.exists():
             return None
@@ -98,12 +98,8 @@ class DatabaseManager:
 
     def _get_database_path(self, user_id: str, file_path: str) -> Path:
         """Generate consistent database file path"""
-        # Create user-specific directory
-        user_dir = self.base_dir / user_id
-        user_dir.mkdir(parents=True, exist_ok=True)
-
-        # Each user has one database file for all their data
-        return user_dir / f"{user_id}_data.duckdb"
+        from ..core.path_utils import get_database_path
+        return get_database_path(user_id)
 
     def _get_table_name(self, file_path: str) -> str:
         """Generate table name from file path"""
@@ -119,7 +115,7 @@ class DatabaseManager:
             table_name = "data_table"
         return table_name.lower()
 
-    def _should_recreate_database(self, db_path: Path, file_path: str) -> bool:
+    def _should_recreate_database(self, user_id: str, db_path: Path, file_path: str) -> bool:
         """Check if DuckDB table needs to be created/updated using SQLite catalog and filesystem."""
         table_name = self._get_table_name(file_path)
 
@@ -138,7 +134,7 @@ class DatabaseManager:
         # Consult datasets catalog for this file
         try:
             from .database import get_dataset_by_path
-            user_id = db_path.parent.name
+            # user_id is passed explicitly now
             dataset = get_dataset_by_path(user_id, file_path)
         except Exception:
             dataset = None
@@ -192,7 +188,7 @@ class DatabaseManager:
         logprint(f"✅ [Database] Up-to-date; reusing table '{table_name}' in {db_path}")
         return False
 
-    def _create_database(self, db_path: Path, file_path: str):
+    def _create_database(self, user_id: str, db_path: Path, file_path: str):
         """Create or update DuckDB database with table for source file"""
         table_name = self._get_table_name(file_path)
         logprint(
@@ -296,7 +292,7 @@ class DatabaseManager:
             try:
                 st = os.stat(file_path)
                 upsert_dataset(
-                    user_id=db_path.parent.name,
+                    user_id=user_id,
                     file_path=file_path,
                     table_name=table_name,
                     file_size=st.st_size,

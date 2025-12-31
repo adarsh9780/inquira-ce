@@ -141,7 +141,7 @@
     </div>
 
     <!-- Save Button -->
-    <div class="mt-8 pt-4 border-t border-gray-200">
+    <div class="mt-8 pt-4 border-t border-gray-200 space-y-3">
       <button
         @click="saveDataSettings"
         :disabled="!hasApiKey || isProcessing || !appStore.dataFilePath.trim()"
@@ -152,6 +152,19 @@
           Processing...
         </span>
         <span v-else>Save Data Settings</span>
+      </button>
+      
+      <!-- Refresh Data Button (only show when data is configured) -->
+      <button
+        v-if="appStore.dataFilePath.trim() && !isProcessing"
+        @click="refreshCurrentDataset"
+        :disabled="isRefreshing"
+        class="w-full px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+      >
+        <svg class="w-4 h-4 mr-2" :class="{ 'animate-spin': isRefreshing }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh Data from Source' }}</span>
       </button>
     </div>
   </div>
@@ -214,6 +227,9 @@ import {
   CheckCircleIcon
 } from '@heroicons/vue/24/outline'
 
+// Declare emits
+const emit = defineEmits(['dataSaved'])
+
 const appStore = useAppStore()
 
 // State
@@ -229,6 +245,7 @@ const messageType = ref('') // 'success' | 'error'
 const timerInterval = ref(null)
 const startTime = ref(null)
 const isPickingFile = ref(false)
+const isRefreshing = ref(false)
 
 // Computed
 const hasApiKey = computed(() => appStore.apiKey.trim() !== '')
@@ -463,6 +480,17 @@ async function saveDataSettings() {
   startTimer()
   showProgress('Initializing...', 10)
 
+  // Check if this is a NEW dataset (not in existing catalog)
+  let isNewDataset = true
+  try {
+    const existingDatasets = await apiService.listDatasets()
+    const datasets = existingDatasets.datasets || existingDatasets || []
+    isNewDataset = !datasets.some(ds => ds.file_path === dataPath)
+    console.log(`📋 [DataTab] Is new dataset: ${isNewDataset}`)
+  } catch (e) {
+    console.warn('Could not check existing datasets:', e)
+  }
+
   try {
     // Ensure WebSocket is connected for real-time progress updates
     if (!settingsWebSocket.isConnected) {
@@ -563,8 +591,16 @@ async function saveDataSettings() {
     // Clean up WebSocket handler
     settingsWebSocket.onProgress(null)
     hideProgress()
-    // Refresh update banner state silently so it reflects latest should_update
-    await checkForUpdate(true)
+    
+    // For NEW datasets, clear the update banner (no need to check for updates)
+    // For EXISTING datasets, refresh the update banner state
+    if (isNewDataset) {
+      updateInfo.value = null
+      console.log('📋 [DataTab] New dataset - cleared update banner')
+    } else {
+      // Refresh update banner state silently so it reflects latest should_update
+      await checkForUpdate(true)
+    }
   }
 }
 
@@ -573,6 +609,42 @@ async function rebuildNow() {
   if (isProcessing.value) return
   // Delegate to the primary save flow to ensure identical behavior
   await saveDataSettings()
+}
+
+// Refresh current dataset from source file
+async function refreshCurrentDataset() {
+  const dataPath = appStore.dataFilePath.trim()
+  if (!dataPath || isRefreshing.value) return
+  
+  // Get table name from path
+  const tableName = dataPath.split('/').pop().replace(/\.[^.]+$/, '')
+  
+  isRefreshing.value = true
+  clearMessage()
+  
+  try {
+    const result = await apiService.refreshDataset(tableName)
+    
+    // Clear caches
+    const { previewService } = await import('../../services/previewService')
+    previewService.clearPreviewCache()
+    
+    showMessage(
+      `Dataset refreshed: ${result.row_count || 'unknown'} rows${result.schema_regenerated ? ', schema regenerated' : ''}`,
+      'success'
+    )
+    
+    // Clear update banner since we just refreshed
+    updateInfo.value = null
+  } catch (error) {
+    console.error('Failed to refresh dataset:', error)
+    showMessage(
+      'Failed to refresh dataset: ' + (error.response?.data?.detail || error.message),
+      'error'
+    )
+  } finally {
+    isRefreshing.value = false
+  }
 }
 
 // Cleanup on unmount

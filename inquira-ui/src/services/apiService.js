@@ -386,10 +386,25 @@ export const apiService = {
 
   async deleteDataset(tableName) {
     try {
-      const response = await client.deleteDatasetEndpointDatasetsTableNameDelete(tableName)
+      // Use direct axios call to avoid issues with generated client update
+      const response = await axios.delete(`/datasets/${tableName}`)
       return response
     } catch (error) {
       console.error('Failed to delete dataset:', error)
+      throw error
+    }
+  },
+
+  async refreshDataset(tableName, regenerateSchema = true) {
+    try {
+      console.log(`🔄 [API] Refreshing dataset: ${tableName}`)
+      const response = await axios.post(`/datasets/${tableName}/refresh`, {
+        regenerate_schema: regenerateSchema
+      })
+      console.log('✅ [API] Dataset refreshed:', response)
+      return response
+    } catch (error) {
+      console.error('Failed to refresh dataset:', error)
       throw error
     }
   }

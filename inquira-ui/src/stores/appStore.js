@@ -72,6 +72,7 @@ export const useAppStore = defineStore('app', () => {
       schemaFileId: schemaFileId.value,
       isSchemaFileUploaded: isSchemaFileUploaded.value,
       schemaContext: schemaContext.value,
+      chatOverlayWidth: chatOverlayWidth.value,
       timestamp: new Date().toISOString()
     }
 
@@ -128,6 +129,11 @@ export const useAppStore = defineStore('app', () => {
       // Restore schema context
       if (config.schemaContext) {
         schemaContext.value = config.schemaContext
+      }
+
+      // Restore chat overlay width
+      if (config.chatOverlayWidth && config.chatOverlayWidth > 0.1 && config.chatOverlayWidth < 0.9) {
+        chatOverlayWidth.value = config.chatOverlayWidth
       }
 
       console.log('Local configuration loaded successfully')
@@ -334,7 +340,10 @@ export const useAppStore = defineStore('app', () => {
     isChatOverlayOpen.value = !!open
   }
   function setChatOverlayWidth(widthFraction) {
-    if (widthFraction > 0.1 && widthFraction < 0.9) chatOverlayWidth.value = widthFraction
+    if (widthFraction > 0.1 && widthFraction < 0.9) {
+      chatOverlayWidth.value = widthFraction
+      saveLocalConfig()
+    }
   }
   function setSidebarCollapsed(collapsed) {
     isSidebarCollapsed.value = collapsed

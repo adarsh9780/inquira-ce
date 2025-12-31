@@ -1,18 +1,17 @@
 <template>
   <header class="bg-gradient-to-r from-white to-gray-50 border-b border-pastel-500 px-4 sm:px-9 py-3 sm:py-4 shadow-sm">
     <div class="flex items-center justify-between">
-      <!-- Left Section: App Title -->
+      <!-- Left Section: Logo & Title -->
       <div class="flex items-center space-x-3 flex-shrink-0">
-        <img :src="logo" alt="Inquira Logo" class="w-12 h-12 rounded-lg" />
+        <img :src="logo" alt="Inquira Logo" class="w-10 h-10 rounded-lg" />
         <div class="hidden sm:block">
-          <h1 class="text-xl font-bold text-primary-900">Inquira</h1>
-          <p class="text-sm text-primary-700">LLM-Powered Data Analysis</p>
-        </div>
-        <div class="sm:hidden">
           <h1 class="text-lg font-bold text-primary-900">Inquira</h1>
+          <p class="text-xs text-primary-600">LLM-Powered Data Analysis</p>
         </div>
+      </div>
 
-        <!-- Dataset Switcher -->
+      <!-- Center Section: Dataset Switcher (Prominent) -->
+      <div class="flex-1 flex justify-center px-4">
         <DatasetSwitcher @open-settings="openSettings" />
       </div>
 
@@ -165,6 +164,7 @@
   <!-- Settings Modal -->
   <SettingsModal
     :is-open="isSettingsOpen"
+    :initial-tab="settingsInitialTab"
     @close="closeSettings"
   />
 
@@ -204,6 +204,7 @@ import DatasetSwitcher from '../DatasetSwitcher.vue'
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const isSettingsOpen = ref(false)
+const settingsInitialTab = ref('api') // 'api' | 'data' | 'account'
 // const isNewPreviewOpen = ref(false) // removed
 const isUserMenuOpen = ref(false)
 const isShortcutsOpen = ref(false)
@@ -266,13 +267,15 @@ onMounted(() => {
   setupWebSocketMonitoring()
 })
 
-function openSettings() {
+function openSettings(tab = 'api') {
+  settingsInitialTab.value = tab
   isSettingsOpen.value = true
   isUserMenuOpen.value = false // Close dropdown when opening settings
 }
 
 function closeSettings() {
   isSettingsOpen.value = false
+  settingsInitialTab.value = 'api' // Reset to default
 }
 
 

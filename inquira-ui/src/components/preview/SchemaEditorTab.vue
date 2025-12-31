@@ -51,11 +51,29 @@
       </div>
     </div>
     <div class="flex-1 min-h-0 overflow-auto bg-white rounded-lg border p-3">
-      <div v-if="schemaLoading && !isRegenerating" class="text-sm text-gray-500">
+      <!-- Empty State - No dataset selected -->
+      <div v-if="!hasActiveDataset && !schemaLoading" class="flex flex-col items-center justify-center h-full text-center py-12">
+        <div class="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+          <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+          </svg>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">No Dataset Selected</h3>
+        <p class="text-sm text-gray-500 max-w-xs">
+          Select a dataset from the dropdown above to view and edit its schema.
+        </p>
+      </div>
+      
+      <!-- Loading State -->
+      <div v-else-if="schemaLoading && !isRegenerating" class="text-sm text-gray-500">
         Loading schema...
       </div>
+      
+      <!-- Error State -->
       <div v-else-if="schemaError" class="text-sm text-red-600">{{ schemaError }}</div>
-      <div v-else>
+      
+      <!-- Schema Content -->
+      <div v-else-if="hasActiveDataset">
         <!-- Data Context/Description -->
         <div v-if="schemaContext" class="mb-4 p-3 bg-gray-50 rounded-lg border">
           <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Data Description</label>
@@ -93,9 +111,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { previewService } from '../../services/previewService'
 import { apiService } from '../../services/apiService'
+import { useAppStore } from '../../stores/appStore'
+
+const appStore = useAppStore()
 
 const schema = ref([])
 const schemaContext = ref('')
@@ -103,6 +124,11 @@ const schemaLoading = ref(false)
 const schemaError = ref('')
 const schemaEdited = ref(false)
 const isRegenerating = ref(false)
+
+// Computed to check if we have an active dataset
+const hasActiveDataset = computed(() => {
+  return appStore.dataFilePath && appStore.dataFilePath.trim() !== ''
+})
 
 // Progress tracking for modal
 const regenerationStatus = ref('Initializing...')
@@ -169,6 +195,33 @@ async function fetchSchemaData(forceRefresh = false) {
   } catch (e) {
     console.error('📋 [Schema] Failed to get settings:', e)
     schemaError.value = 'Failed to load schema'
+  } finally {
+    schemaLoading.value = false
+  }
+}
+
+// Fetch schema for a specific path (used when switching datasets to avoid settings race condition)
+async function fetchSchemaDataForPath(dataPath) {
+  if (schemaLoading.value || !dataPath) return
+  schemaLoading.value = true
+  schemaError.value = ''
+  schema.value = []
+  try {
+    console.log('📋 [Schema] Loading schema for path (direct):', dataPath)
+    // Force refresh to bypass cache
+    const existingSchema = await previewService.loadSchema(dataPath, true)
+    console.log('📋 [Schema] Response:', existingSchema)
+    if (existingSchema && existingSchema.columns) {
+      console.log('📋 [Schema] Loaded', existingSchema.columns.length, 'columns')
+      schema.value = existingSchema.columns
+      schemaContext.value = existingSchema.context || ''
+    } else {
+      console.warn('📋 [Schema] No columns in response:', existingSchema)
+      schemaError.value = 'Schema has no columns. Try clicking Refresh or Regenerate.'
+    }
+  } catch (loadError) {
+    console.error('📋 [Schema] Failed to load schema:', loadError)
+    schemaError.value = `Failed to load schema: ${loadError.message || 'Unknown error'}`
   } finally {
     schemaLoading.value = false
   }
@@ -263,13 +316,42 @@ async function regenerateSchema() {
 }
 
 // Handle dataset switch event
-function handleDatasetSwitch() {
-  console.log('📢 Dataset switched - reloading schema')
+function handleDatasetSwitch(event) {
+  // Get path from event detail, or fallback to appStore
+  const newDataPath = event?.detail?.dataPath
+  console.log('📢 Dataset switched event:', event)
+  console.log('📢 Event detail:', event?.detail)
+  console.log('📢 Data path from event:', newDataPath)
+  
   schemaEdited.value = false
   schema.value = []
   schemaContext.value = ''
   schemaError.value = ''
-  fetchSchemaData()
+  
+  // Clear cache to force fresh load from backend
+  previewService.clearPreviewCache()
+  
+  // If event.detail is null, the last dataset was deleted - show empty state
+  if (event?.detail === null) {
+    console.log('📢 Last dataset deleted - showing empty state')
+    return // Let the empty state UI show
+  }
+  
+  // If we have the new path from the event, use it directly
+  if (newDataPath) {
+    console.log('📢 Using path from event:', newDataPath)
+    fetchSchemaDataForPath(newDataPath)
+  } else {
+    // Fallback: try to get from appStore (should be set before event is dispatched)
+    const appStorePath = appStore.dataFilePath
+    console.log('📢 No path in event, trying appStore:', appStorePath)
+    if (appStorePath) {
+      fetchSchemaDataForPath(appStorePath)
+    } else {
+      // No dataset selected - show empty state
+      console.log('📢 No active dataset - showing empty state')
+    }
+  }
 }
 
 onMounted(() => {

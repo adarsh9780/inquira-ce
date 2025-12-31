@@ -10,6 +10,12 @@ from ..core.config_models import AppConfig
 from ..services.websocket_manager import websocket_manager
 from ..database.database_manager import DatabaseManager
 from ..core.logger import logprint
+from ..core.path_utils import (
+    get_schema_path,
+    get_preview_cache_path,
+    get_database_path,
+    get_username_for_user
+)
 
 
 def get_app_state(request: Request):
@@ -406,18 +412,16 @@ async def view_all_settings(
 async def get_storage_paths(current_user: dict = Depends(get_current_user)):
     """Get the paths where schema and database files are stored"""
     user_id = current_user["user_id"]
-
-    # Base directory for user data
-    base_dir = Path.home() / ".inquira" / user_id
-
-    # Schemas directory (per-file schemas are stored here)
-    schema_path = base_dir / "schemas"
-
-    # Database file path
-    database_path = base_dir / f"{user_id}_data.duckdb"
-
+    
+    # We use path_utils to get canonical paths
+    # Note: For schema path, we return the base user dir as schemas are now distributed
+    from ..core.path_utils import get_user_dir, get_database_path
+    
+    base_dir = get_user_dir(user_id)
+    database_path = get_database_path(user_id)
+    
     return PathsResponse(
-        schema_path=str(schema_path),
+        schema_path=str(base_dir), # conceptually schemas are under here
         database_path=str(database_path),
         base_directory=str(base_dir),
     )
@@ -641,30 +645,6 @@ def load_user_settings_to_app_state(user_id: str, app_state):
     user_settings = get_user_settings(user_id)
     logprint(f"DEBUG: user_settings = {user_settings}", level="debug")
 
-    # Check if schema_path is missing but schema exists for the data_path
-    if user_settings.get("data_path") and not user_settings.get("schema_path"):
-        logprint(f"DEBUG: schema_path missing, checking for schema file", level="debug")
-        from ..database.schema_storage import (
-            load_schema,
-            get_schema_filename,
-            get_user_schema_dir,
-        )
-
-        schema_file = load_schema(user_id, user_settings["data_path"])
-        logprint(
-            f"DEBUG: schema_file loaded = {schema_file is not None}", level="debug"
-        )
-        if schema_file:
-            # Schema exists, update settings with the path
-            schema_dir = get_user_schema_dir(user_id)
-            filename = get_schema_filename(user_id, user_settings["data_path"])
-            schema_path = str(schema_dir / filename)
-            logprint(f"DEBUG: updating schema_path to {schema_path}", level="debug")
-            user_settings["schema_path"] = schema_path
-            # Save the updated settings
-            save_user_settings(user_id, user_settings)
-            logprint(f"DEBUG: settings saved with schema_path", level="debug")
-
     # Only load settings into app_state if user has existing settings
     if user_settings and any(user_settings.values()):
         logprint(f"DEBUG: loading settings into app_state", level="debug")
@@ -683,25 +663,36 @@ def load_user_settings_to_app_state(user_id: str, app_state):
 
         if user_settings.get("data_path"):
             app_state.data_path = user_settings["data_path"]
+            
             # Generate table name from data path
-            from ..database.database_manager import DatabaseManager
-            from ..core.config_models import AppConfig
-
-            config = (
-                app_state.config
-                if hasattr(app_state, "config") and app_state.config
-                else AppConfig()
-            )
-            db_manager = DatabaseManager(config)
-            table_name = db_manager._get_table_name(user_settings["data_path"])
+            from ..database.schema_storage import derive_table_name
+            table_name = derive_table_name(user_settings["data_path"])
             app_state.table_name = table_name
             logprint(f"DEBUG: app_state.table_name set to {table_name}", level="debug")
-        if user_settings.get("schema_path"):
-            app_state.schema_path = user_settings["schema_path"]
+            
+            # Determine Schema Path
+            # 1. New standard path
+            from ..core.path_utils import get_schema_path
+            s_path = get_schema_path(user_id, table_name)
+            
+            # 2. If it doesn't exist, check legacy? 
+            if not s_path.exists():
+                 from ..database.schema_storage import get_legacy_schemas_dir, get_schema_filename
+                 legacy_dir = get_legacy_schemas_dir(user_id)
+                 legacy_file = get_schema_filename(user_id, user_settings["data_path"])
+                 legacy_path = legacy_dir / legacy_file
+                 if legacy_path.exists():
+                     app_state.schema_path = str(legacy_path)
+                 else:
+                     app_state.schema_path = str(s_path) # Default to new standard even if missing
+            else:
+                app_state.schema_path = str(s_path)
+                
             logprint(
                 f"DEBUG: app_state.schema_path set to {app_state.schema_path}",
                 level="debug",
             )
+            
         if user_settings.get("context"):
             app_state.context = user_settings["context"]
 
