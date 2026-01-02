@@ -161,7 +161,7 @@ def load_schema(user_id: str, data_filepath: str, table_name: Optional[str] = No
 
     # 1. Try New Structure
     try:
-        schema_path = get_schema_path(user_id, table_name)
+        schema_path = get_schema_path(user_id, table_name, create=False)
         if schema_path.exists():
             with open(schema_path, 'r') as f:
                 data = json.load(f)
@@ -272,7 +272,7 @@ def delete_schema(user_id: str, data_filepath: str, table_name: Optional[str] = 
         
     # 1. New Structure
     try:
-        schema_path = get_schema_path(user_id, table_name)
+        schema_path = get_schema_path(user_id, table_name, create=False)
         if schema_path.exists():
             schema_path.unlink()
             deleted = True

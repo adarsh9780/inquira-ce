@@ -41,6 +41,9 @@ SCHEMA_FILENAME = "schema.json"
 PREVIEW_CACHE_PREFIX = "preview_"
 PREVIEW_CACHE_EXT = ".pkl"
 
+# DuckDB temporary/cache directory (hidden by default)
+DUCKDB_CACHE_DIR = ".duckdb_cache"
+
 # Sample types for preview caching
 SAMPLE_TYPE_RANDOM = "random"
 SAMPLE_TYPE_FIRST = "first"
@@ -105,6 +108,24 @@ def get_database_path(user_id: str) -> Path:
     return get_user_dir(user_id) / f"{username}{DUCKDB_SUFFIX}"
 
 
+def get_duckdb_cache_dir(user_id: str, create: bool = True) -> Path:
+    """Get the DuckDB temporary/cache directory for a user.
+    
+    This directory is used by DuckDB for disk spilling when memory limits are exceeded.
+    
+    Args:
+        user_id: The user's UUID
+        create: Whether to create the directory if it doesn't exist
+    
+    Returns:
+        Path to ~/.inquira/{username}/.duckdb_cache/
+    """
+    cache_dir = get_user_dir(user_id) / DUCKDB_CACHE_DIR
+    if create:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
+
+
 def get_dataset_dir(user_id: str, table_name: str, create: bool = True) -> Path:
     """Get the directory for a specific dataset.
     
@@ -122,26 +143,34 @@ def get_dataset_dir(user_id: str, table_name: str, create: bool = True) -> Path:
     return dataset_dir
 
 
-def get_schema_path(user_id: str, table_name: str) -> Path:
+def get_schema_path(user_id: str, table_name: str, create: bool = True) -> Path:
     """Get the schema.json path for a dataset.
+    
+    Args:
+        user_id: The user's UUID
+        table_name: The DuckDB table name for this dataset
+        create: Whether to create the directory if it doesn't exist
     
     Returns:
         Path to ~/.inquira/{username}/{table_name}/schema.json
     """
-    return get_dataset_dir(user_id, table_name) / SCHEMA_FILENAME
+    return get_dataset_dir(user_id, table_name, create=create) / SCHEMA_FILENAME
 
 
-def get_preview_cache_path(user_id: str, table_name: str, sample_type: str) -> Path:
+def get_preview_cache_path(user_id: str, table_name: str, sample_type: str, create: bool = True) -> Path:
     """Get the preview cache path for a dataset.
     
     Args:
+        user_id: The user's UUID
+        table_name: The DuckDB table name for this dataset
         sample_type: One of SAMPLE_TYPE_RANDOM or SAMPLE_TYPE_FIRST
+        create: Whether to create the directory if it doesn't exist
     
     Returns:
         Path to ~/.inquira/{username}/{table_name}/preview_{sample_type}.pkl
     """
     filename = f"{PREVIEW_CACHE_PREFIX}{sample_type}{PREVIEW_CACHE_EXT}"
-    return get_dataset_dir(user_id, table_name) / filename
+    return get_dataset_dir(user_id, table_name, create=create) / filename
 
 
 # =============================================================================

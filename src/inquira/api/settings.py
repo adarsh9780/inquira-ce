@@ -898,6 +898,7 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
                         context=context_val,
                         api_key=api_key_val,
                         app_state=app_state,
+                        force_regenerate=True,  # Always regenerate with LLM for new datasets
                     ),
                 )
 

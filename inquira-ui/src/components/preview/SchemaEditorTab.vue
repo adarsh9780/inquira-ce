@@ -74,6 +74,25 @@
       
       <!-- Schema Content -->
       <div v-else-if="hasActiveDataset">
+        <!-- Schema Generating Banner -->
+        <div v-if="isSchemaBeingGenerated" class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <div class="flex items-center gap-3">
+            <div class="flex-shrink-0">
+              <svg class="w-5 h-5 text-amber-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <h4 class="text-sm font-medium text-amber-800">Schema Generation in Progress</h4>
+              <p class="text-xs text-amber-600 mt-0.5">
+                AI is analyzing your data to generate meaningful column descriptions. This usually takes 10-30 seconds. 
+                The page will automatically refresh when ready.
+              </p>
+            </div>
+          </div>
+        </div>
+        
         <!-- Data Context/Description -->
         <div v-if="schemaContext" class="mb-4 p-3 bg-gray-50 rounded-lg border">
           <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Data Description</label>
@@ -130,6 +149,18 @@ const hasActiveDataset = computed(() => {
   return appStore.dataFilePath && appStore.dataFilePath.trim() !== ''
 })
 
+// Computed to check if schema has empty descriptions (being generated in background)
+const isSchemaBeingGenerated = computed(() => {
+  if (!schema.value || schema.value.length === 0) return false
+  // Check if all descriptions are empty and context is empty
+  const allEmpty = schema.value.every(col => !col.description || col.description.trim() === '')
+  const emptyContext = !schemaContext.value || schemaContext.value.trim() === ''
+  return allEmpty && emptyContext
+})
+
+// Auto-poll interval for schema refresh when being generated
+let schemaPollingInterval = null
+
 // Progress tracking for modal
 const regenerationStatus = ref('Initializing...')
 const regenerationProgress = ref(0)
@@ -162,7 +193,69 @@ function formatElapsedTime(ms) {
 
 onUnmounted(() => {
   stopTimer()
+  stopSchemaPolling()
 })
+
+// Auto-poll for schema updates when initially empty
+let pollingAttempts = 0
+const MAX_POLLING_ATTEMPTS = 20 // Stop after ~60 seconds (20 * 3s)
+
+function startSchemaPolling() {
+  if (schemaPollingInterval) return
+  pollingAttempts = 0
+  console.log('🔄 [Schema] Starting auto-poll for schema updates (max 60s)')
+  schemaPollingInterval = setInterval(async () => {
+    pollingAttempts++
+    
+    // Stop if schema generation is complete
+    if (!isSchemaBeingGenerated.value) {
+      console.log('✅ [Schema] Schema generation complete, stopping poll')
+      stopSchemaPolling()
+      return
+    }
+    
+    // Stop after max attempts
+    if (pollingAttempts >= MAX_POLLING_ATTEMPTS) {
+      console.log('⚠️ [Schema] Max polling attempts reached, stopping poll. Click Regenerate to try again.')
+      stopSchemaPolling()
+      return
+    }
+    
+    console.log(`🔄 [Schema] Polling for updated schema... (attempt ${pollingAttempts}/${MAX_POLLING_ATTEMPTS})`)
+    await silentFetchSchema() // Silent refresh without loading state
+  }, 3000) // Poll every 3 seconds
+}
+
+function stopSchemaPolling() {
+  if (schemaPollingInterval) {
+    clearInterval(schemaPollingInterval)
+    schemaPollingInterval = null
+    pollingAttempts = 0
+  }
+}
+
+// Silent fetch for background polling - doesn't show loading state or clear existing data
+async function silentFetchSchema() {
+  try {
+    const settings = await previewService.getSettings(true)
+    if (!settings.data_path) return
+    
+    const existingSchema = await previewService.loadSchema(settings.data_path, true)
+    if (existingSchema && existingSchema.columns) {
+      // Check if descriptions are now filled (generation complete)
+      const hasDescriptions = existingSchema.columns.some(col => col.description && col.description.trim() !== '')
+      if (hasDescriptions || (existingSchema.context && existingSchema.context.trim() !== '')) {
+        console.log('✅ [Schema] Poll found completed schema with descriptions!')
+        schema.value = existingSchema.columns
+        schemaContext.value = existingSchema.context || ''
+        stopSchemaPolling()
+      }
+    }
+  } catch (e) {
+    console.warn('🔄 [Schema] Silent poll failed:', e)
+    // Don't show error - just continue polling
+  }
+}
 
 async function fetchSchemaData(forceRefresh = false) {
   if (schemaLoading.value) return
@@ -184,6 +277,11 @@ async function fetchSchemaData(forceRefresh = false) {
         console.log('📋 [Schema] Loaded', existingSchema.columns.length, 'columns')
         schema.value = existingSchema.columns
         schemaContext.value = existingSchema.context || ''
+        
+        // Start polling if schema is still being generated
+        if (isSchemaBeingGenerated.value) {
+          startSchemaPolling()
+        }
       } else {
         console.warn('📋 [Schema] No columns in response:', existingSchema)
         schemaError.value = 'Schema has no columns. Try clicking Refresh.'

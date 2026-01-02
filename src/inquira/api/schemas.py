@@ -372,87 +372,11 @@ def load_schema_endpoint(
             updated_at=existing.updated_at,
         )
 
-    # Minimal auto-generation without LLM as a fallback
-    try:
-        # Prefer using cached DuckDB connection if available
-        connection = None
-        if hasattr(app_state, "duckdb_connections"):
-            key = f"{user_id}:{filepath}"
-            connection = app_state.duckdb_connections.get(
-                key
-            ) or app_state.duckdb_connections.get("current_user")
-
-        columns: list[Column] = []
-        if connection is not None:
-            # We already have table_name derived
-            tbl = table_name
-
-            desc = connection.execute(f"DESCRIBE {tbl}").fetchall()
-            for row in desc:
-                col_name = row[0]
-                col_type = row[1]
-                sample_rows = connection.execute(
-                    f'SELECT DISTINCT "{col_name}" FROM {tbl} LIMIT 10'
-                ).fetchall()
-                sample_values = [s[0] for s in sample_rows]
-                columns.append(
-                    Column(name=col_name, dtype=col_type, samples=sample_values)
-                )
-        else:
-            # File-based describe/sample
-            desc = duckdb.sql(f'describe "{filepath}"').fetchall()
-            for row in desc:
-                col_name = row[0]
-                col_type = row[1]
-                sample_rows = duckdb.sql(
-                    f"select distinct \"{col_name}\" from '{filepath}' limit 10"
-                ).fetchall()
-                sample_values = [s[0] for s in sample_rows]
-                columns.append(
-                    Column(name=col_name, dtype=col_type, samples=sample_values)
-                )
-
-        # Build minimal SchemaFile with generic context
-        schema_columns = [
-            SchemaColumn(
-                name=c.name,
-                description="",  # Minimal fallback without LLM
-                data_type=c.dtype,
-                sample_values=c.samples,
-            )
-            for c in columns
-        ]
-
-        schema_file = SchemaFile(
-            filepath=filepath, context="General data analysis", columns=schema_columns
-        )
-        saved_path = save_schema(user_id, schema_file, table_name=table_name)
-
-        # Persist schema path in datasets catalog
-        try:
-            from ..database.database import set_dataset_schema_path
-
-            set_dataset_schema_path(user_id, filepath, saved_path)
-        except Exception:
-            pass
-
-        return SchemaResponse(
-            filepath=filepath,
-            context=schema_file.context,
-            columns=[
-                SchemaColumnResponse(
-                    name=col.name,
-                    description=col.description,
-                    data_type=col.data_type,
-                    sample_values=col.sample_values,
-                )
-                for col in schema_columns
-            ],
-            created_at=schema_file.created_at,
-            updated_at=schema_file.updated_at,
-        )
-    except Exception:
-        raise HTTPException(status_code=404, detail="Schema not found")
+    # No schema exists - return 404
+    # The schema will be generated when user clicks "Save Data Settings"
+    # which triggers the proper background processing flow
+    logprint(f"ℹ️ [Schema] No existing schema found for {filepath}")
+    raise HTTPException(status_code=404, detail="Schema not found. Save data settings to generate schema.")
 
 
 @router.post("/save")

@@ -18,6 +18,8 @@ import re
 import duckdb
 import sqlite3
 
+from ..core.path_utils import DUCKDB_CACHE_DIR
+
 
 def _user_base_dir(user_id: str) -> Path:
     return Path.home() / ".inquira" / user_id
@@ -48,7 +50,7 @@ def list_duckdb_tables(user_id: str) -> List[str]:
         raise FileNotFoundError(f"DuckDB file not found: {db_path}")
 
     # Ensure temp dir exists for spill
-    tmp_dir = _user_base_dir(user_id) / "tmp"
+    tmp_dir = _user_base_dir(user_id) / DUCKDB_CACHE_DIR
     tmp_dir.mkdir(parents=True, exist_ok=True)
 
     # Open in read-only mode to avoid conflicting with a write lock
@@ -83,7 +85,7 @@ def delete_duckdb_table(user_id: str, table_name: str) -> bool:
         raise FileNotFoundError(f"DuckDB file not found: {db_path}")
 
     # Ensure temp dir exists for spill
-    tmp_dir = _user_base_dir(user_id) / "tmp"
+    tmp_dir = _user_base_dir(user_id) / DUCKDB_CACHE_DIR
     tmp_dir.mkdir(parents=True, exist_ok=True)
 
     ident = _sql_ident(table_name)

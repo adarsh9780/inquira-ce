@@ -481,14 +481,40 @@ async function saveDataSettings() {
   showProgress('Initializing...', 10)
 
   // Check if this is a NEW dataset (not in existing catalog)
+  // This determines whether we need to generate schema
   let isNewDataset = true
+  let existingDatasetInfo = null
   try {
     const existingDatasets = await apiService.listDatasets()
     const datasets = existingDatasets.datasets || existingDatasets || []
-    isNewDataset = !datasets.some(ds => ds.file_path === dataPath)
-    console.log(`📋 [DataTab] Is new dataset: ${isNewDataset}`)
+    existingDatasetInfo = datasets.find(ds => ds.file_path === dataPath)
+    isNewDataset = !existingDatasetInfo
+    console.log(`📋 [DataTab] Is new dataset: ${isNewDataset}`, existingDatasetInfo ? `(existing: ${existingDatasetInfo.table_name})` : '')
   } catch (e) {
     console.warn('Could not check existing datasets:', e)
+  }
+
+  // Determine if we need to generate schema for THIS specific file
+  // Don't rely on updateInfo which was computed for the PREVIOUS file path
+  let needsSchemaGeneration = true
+  if (!isNewDataset && existingDatasetInfo) {
+    // Dataset exists - check if schema exists by trying to load it
+    try {
+      const existingSchema = await apiService.loadSchema(dataPath)
+      if (existingSchema && existingSchema.columns && existingSchema.columns.length > 0) {
+        // Schema exists and has columns - check if it has descriptions
+        const hasDescriptions = existingSchema.columns.some(col => col.description && col.description.trim())
+        if (hasDescriptions) {
+          needsSchemaGeneration = false
+          console.log('📋 [DataTab] Schema with descriptions already exists - skipping regeneration')
+        } else {
+          console.log('📋 [DataTab] Schema exists but missing descriptions - will regenerate')
+        }
+      }
+    } catch (schemaErr) {
+      // Schema doesn't exist or can't be loaded - need to generate
+      console.log('📋 [DataTab] No existing schema found - will generate')
+    }
   }
 
   try {
@@ -551,10 +577,11 @@ async function saveDataSettings() {
     // Save context
     await apiService.setContext(appStore.schemaContext.trim())
 
-    // Generate and save schema only if update is needed
-    const skipUpdate = updateInfo.value && updateInfo.value.should_update === false
-    if (skipUpdate) {
-      updateProgress('No update needed; skipping schema regeneration', 80)
+    // Generate and save schema only if needed for THIS specific file
+    // Previously used updateInfo which was stale (based on old file path)
+    if (!needsSchemaGeneration) {
+      updateProgress('Schema already exists; skipping regeneration', 80)
+      console.log('📋 [DataTab] Skipping schema generation - valid schema already exists')
     } else {
       await generateAndSaveSchema()
       // Keep progress visible and follow backend WebSocket until completion

@@ -11,6 +11,7 @@ from .sql_library import get_sql
 from .database import upsert_dataset, get_dataset_by_path
 from ..core.fingerprint import file_fingerprint_md5
 from ..core.logger import logprint
+from ..core.path_utils import get_duckdb_cache_dir
 
 
 class DatabaseManager:
@@ -54,8 +55,7 @@ class DatabaseManager:
         if str(db_path) not in self.connections:
             logprint(f"🔌 [Database] Creating new connection to: {db_path}")
             # Enforce memory cap and enable disk spilling for safety
-            user_temp_dir = db_path.parent / "tmp"
-            user_temp_dir.mkdir(parents=True, exist_ok=True)
+            user_temp_dir = get_duckdb_cache_dir(user_id)
             self.connections[str(db_path)] = duckdb.connect(
                 str(db_path),
                 config={"memory_limit": "500MB", "temp_directory": str(user_temp_dir)},
@@ -84,8 +84,7 @@ class DatabaseManager:
         # Get or create connection
         if str(db_path) not in self.connections:
             # Enforce memory cap and enable disk spilling for safety
-            user_temp_dir = db_path.parent / "tmp"
-            user_temp_dir.mkdir(parents=True, exist_ok=True)
+            user_temp_dir = get_duckdb_cache_dir(user_id)
             self.connections[str(db_path)] = duckdb.connect(
                 str(db_path),
                 config={"memory_limit": "500MB", "temp_directory": str(user_temp_dir)},
@@ -162,8 +161,7 @@ class DatabaseManager:
                 rows = conn.execute("SHOW TABLES").fetchall()
             else:
                 # Open a lightweight read-only connection to check
-                user_temp_dir = db_path.parent / 'tmp'
-                user_temp_dir.mkdir(parents=True, exist_ok=True)
+                user_temp_dir = get_duckdb_cache_dir(user_id)
                 ro_conn = duckdb.connect(
                     str(db_path),
                     read_only=True,
@@ -201,8 +199,7 @@ class DatabaseManager:
         # Create database if it doesn't exist
         db_exists = db_path.exists()
         # Enforce memory cap and enable disk spilling for safety during creation
-        user_temp_dir = db_path.parent / "tmp"
-        user_temp_dir.mkdir(parents=True, exist_ok=True)
+        user_temp_dir = get_duckdb_cache_dir(user_id)
         conn = duckdb.connect(
             str(db_path),
             config={"memory_limit": "500MB", "temp_directory": str(user_temp_dir)},

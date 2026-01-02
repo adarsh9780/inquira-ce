@@ -128,56 +128,107 @@ def delete_dataset_endpoint(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete a dataset and its associated files (schema, cache, DuckDB table)"""
+    from datetime import datetime
+    
+    # Debug log file for tracing delete operations
+    debug_log_path = Path.home() / ".inquira" / "logs" / "delete_debug.log"
+    debug_log_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    def debug_log(msg: str):
+        with open(debug_log_path, "a") as f:
+            f.write(f"[{datetime.now().isoformat()}] {msg}\n")
+        logprint(msg)
+    
     user_id = current_user["user_id"]
+    debug_log(f"🗑️ DELETE START: table_name={table_name}, user_id={user_id}")
+    
     ds = get_dataset_by_table_name(user_id, table_name)
     
     if not ds:
+        debug_log(f"❌ DELETE FAILED: Dataset '{table_name}' not found in catalog")
         raise HTTPException(status_code=404, detail=f"Dataset '{table_name}' not found")
+    
+    debug_log(f"📋 Found dataset: file_path={ds.get('file_path')}, schema_path={ds.get('schema_path')}")
     
     deleted_files = []
     
     # 1. Clean up new structure: ~/.inquira/{username}/{table_name}/
     try:
-        dataset_dir = get_dataset_dir(user_id, table_name)
+        dataset_dir = get_dataset_dir(user_id, table_name, create=False)  # Don't create!
+        debug_log(f"📂 Dataset dir path: {dataset_dir}")
+        debug_log(f"📂 Dataset dir exists: {dataset_dir.exists()}")
+        
         if dataset_dir.exists():
+            # List contents before delete
+            contents = list(dataset_dir.iterdir())
+            debug_log(f"📂 Directory contents before delete: {[str(c) for c in contents]}")
+            
             # Delete contents
             import shutil
             shutil.rmtree(dataset_dir)
             deleted_files.append(f"Directory: {dataset_dir}")
+            debug_log(f"✅ Deleted directory: {dataset_dir}")
+            
+            # Verify deletion
+            debug_log(f"📂 Directory exists after delete: {dataset_dir.exists()}")
+        else:
+            debug_log(f"⚠️ Dataset directory does not exist: {dataset_dir}")
     except Exception as e:
+        debug_log(f"❌ Failed to delete dataset directory: {e}")
         logprint(f"⚠️ [Datasets] Failed to delete dataset directory: {e}", level="warning")
 
     # 2. Delete schema file if referenced explicitly (legacy or new)
     if ds.get("schema_path"):
         schema_path = Path(ds["schema_path"])
+        debug_log(f"📋 Schema path from catalog: {schema_path}")
+        debug_log(f"📋 Schema file exists: {schema_path.exists()}")
         if schema_path.exists():
             try:
                 schema_path.unlink()
                 deleted_files.append(str(schema_path))
-            except Exception:
-                pass
+                debug_log(f"✅ Deleted schema file: {schema_path}")
+            except Exception as e:
+                debug_log(f"❌ Failed to delete schema file: {e}")
     
-    # 3. Delete preview cache files (Legacy cleanup)
-    # New ones are inside dataset_dir so handled by shutil.rmtree above
+    # 3. Delete legacy schema files
     try:
-        cache_dir = get_legacy_schemas_dir(user_id)
-        # We don't have exact hash for legacy previews here without calculating it from data_path
-        # But we can try to guess or just skip if not critical. 
-        # Actually, let's look for matching fingerprints if we knew them.
-        pass
-    except Exception:
-        pass
+        from ..database.schema_storage import get_schema_filename, get_legacy_schemas_dir as get_legacy_dir
+        legacy_dir = get_legacy_dir(user_id)
+        if ds.get("file_path"):
+            legacy_filename = get_schema_filename(user_id, ds["file_path"])
+            legacy_schema_path = legacy_dir / legacy_filename
+            debug_log(f"📋 Legacy schema path: {legacy_schema_path}")
+            debug_log(f"📋 Legacy schema exists: {legacy_schema_path.exists()}")
+            if legacy_schema_path.exists():
+                legacy_schema_path.unlink()
+                deleted_files.append(f"Legacy schema: {legacy_schema_path}")
+                debug_log(f"✅ Deleted legacy schema: {legacy_schema_path}")
+    except Exception as e:
+        debug_log(f"⚠️ Legacy schema cleanup error: {e}")
     
     # 4. Drop table from DuckDB
     try:
         db_path = get_database_path(user_id)
+        debug_log(f"🗄️ DuckDB path: {db_path}")
+        debug_log(f"🗄️ DuckDB exists: {db_path.exists()}")
         if db_path.exists():
             conn = duckdb.connect(str(db_path))
+            
+            # List tables before drop
+            tables_before = conn.execute("SHOW TABLES").fetchall()
+            debug_log(f"🗄️ Tables before drop: {[t[0] for t in tables_before]}")
+            
             conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+            
+            # List tables after drop
+            tables_after = conn.execute("SHOW TABLES").fetchall()
+            debug_log(f"🗄️ Tables after drop: {[t[0] for t in tables_after]}")
+            
             conn.close()
             deleted_files.append(f"DuckDB table: {table_name}")
+            debug_log(f"✅ Dropped DuckDB table: {table_name}")
     except Exception as e:
-        # Log but continue - table might already be gone
+        debug_log(f"❌ Failed to drop table: {e}")
         logprint(f"⚠️ [Datasets] Failed to drop table: {e}", level="warning")
     
     # 4.5 Check if this was the active dataset and clear settings if so
@@ -186,21 +237,22 @@ def delete_dataset_endpoint(
         settings = get_user_settings(user_id)
         active_path = settings.get("data_path")
         
-        # ds["file_path"] comes from the catalog lookup at start of function
         if active_path and ds.get("file_path") and active_path == ds["file_path"]:
-            logprint(f"🧹 [Datasets] Deleting active dataset. Clearing user settings.", level="info")
+            debug_log(f"🧹 Deleting active dataset. Clearing user settings.")
             settings["data_path"] = None
             settings["schema_path"] = None
-            settings["context"] = None # Optional: also clear context? User might want to keep it? 
-                                     # User said "local storage is deleted automatically" - keeping context for a *new* file might be desired?
-                                     # But if I delete the file associated with context, context is likely stale. 
-                                     # Let's clear it to be safe and "clean".
+            settings["context"] = None
             save_user_settings(user_id, settings)
+            debug_log(f"✅ User settings cleared")
     except Exception as e:
+        debug_log(f"⚠️ Failed to clear user settings: {e}")
         logprint(f"⚠️ [Datasets] Failed to clear user settings: {e}", level="warning")
 
     # 5. Delete from datasets catalog
     success = delete_dataset(user_id, table_name)
+    debug_log(f"📋 Catalog delete result: {success}")
+    
+    debug_log(f"🗑️ DELETE COMPLETE: deleted_files={deleted_files}")
     
     if success:
         return DatasetDeleteResponse(
