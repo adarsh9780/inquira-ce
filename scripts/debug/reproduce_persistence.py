@@ -18,7 +18,7 @@ if not hasattr(aiosqlite.Connection, "is_alive"):
         return True
     aiosqlite.Connection.is_alive = is_alive
 
-from src.inquira.agent.graph import build_graph, InputSchema
+from src.app.agent.graph import build_graph, InputSchema
 
 # Mock environment variables if needed
 os.environ["GOOGLE_API_KEY"] = "fake_key"
@@ -32,7 +32,7 @@ async def test_persistence():
     async with AsyncSqliteSaver.from_conn_string(db_path) as checkpointer:
         
         # Actually, simpler: define a minimal graph with the SAME State class to test persistence behavior.
-        from src.inquira.agent.graph import State, OutputSchema, MetaData
+        from src.app.agent.graph import State, OutputSchema, MetaData
         from langgraph.graph import StateGraph, START, END
         
         def node_a(state: State):

@@ -2,7 +2,7 @@
 import asyncio
 import aiosqlite
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-from src.inquira.agent.graph import build_graph
+from src.app.agent.graph import build_graph
 
 # Monkey patch aiosqlite.Connection
 if not hasattr(aiosqlite.Connection, "is_alive"):

@@ -1,10 +1,10 @@
 
 import asyncio
 from langgraph.graph import StateGraph, START, END
-from src.inquira.agent.graph import State, InputSchema, OutputSchema
+from src.app.agent.graph import State, InputSchema, OutputSchema
 from langchain_core.messages import HumanMessage
 
-# We will use the EXACT State definition from src.inquira.agent.graph
+# We will use the EXACT State definition from src.app.agent.graph
 # which we import above.
 
 def node_a_plan(state: State):

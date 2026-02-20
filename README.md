@@ -57,27 +57,27 @@ If you want to contribute or build from source:
 ### 1. Backend Setup
 ```bash
 git clone https://github.com/adarsh9780/inquira-ce.git
-cd inquira-ce
+cd inquira-ce/backend
 uv sync
-uv run python -m src.inquira.main
+uv run python main.py
 ```
 The app will start at `http://localhost:8000/ui`.
 
 ### 2. Frontend Setup (Optional)
-The backend includes pre-built frontend assets in `src/inquira/frontend/dist`. To modify the UI:
+The backend includes pre-built frontend assets in `backend/app/frontend/dist`. To modify the UI:
 
-1.  Navigate to `inquira-ui/`.
+1.  Navigate to `frontend/`.
 2.  Install & Run:
     ```bash
-    cd inquira-ui
+    cd frontend
     npm install
     npm run dev
     ```
 3.  Link to backend:
     ```bash
     # In backend terminal
-    export INQUIRA_DEV_UI_DIR=$(pwd)/inquira-ui/dist
-    uv run python -m src.inquira.main
+    export INQUIRA_DEV_UI_DIR=$(pwd)/../frontend/dist
+    uv run python main.py
     ```
 
 ---

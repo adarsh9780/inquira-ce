@@ -6,10 +6,6 @@ dist/
 wheels/
 *.egg-info
 
-# Virtual environments
-.venv
-.env
-
 
 # Frontend
 node_modules/
@@ -26,3 +22,8 @@ PRODUCT_REQUIREMENTS.md
 project.md
 notebooks/*
 .env
+.langgraph_api
+.pytest_cache
+.venv
+.vscode
+commit_message.txt

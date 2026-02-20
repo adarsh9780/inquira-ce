@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
-from inquira.agent.graph import build_graph, InputSchema
+from app.agent.graph import build_graph, InputSchema
 
 # Load env
 env_path = Path(__file__).resolve().parents[2] / ".env"

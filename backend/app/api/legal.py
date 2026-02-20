@@ -13,7 +13,7 @@ async def get_terms_markdown():
     `inquira/legal/terms.md`.
     """
     try:
-        terms_path = importlib.resources.files("inquira").joinpath("legal", "terms.md")
+        terms_path = importlib.resources.files("app").joinpath("legal", "terms.md")
         content = terms_path.read_text(encoding="utf-8")
         return Response(content, media_type="text/markdown; charset=utf-8")
     except Exception as e:
@@ -23,4 +23,3 @@ async def get_terms_markdown():
             media_type="text/plain; charset=utf-8",
             status_code=500,
         )
-

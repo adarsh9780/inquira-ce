@@ -112,7 +112,7 @@ def delete_duckdb_table(user_id: str, table_name: str) -> bool:
 
 def list_sqlite_dataset_tables(user_id: str) -> List[str]:
     """Return a list of table names recorded in SQLite datasets for the user."""
-    db_path = Path.home() / ".inquira" / "inquira.db"
+    db_path = Path.home() / ".inquira" / "app.db"
     if not db_path.exists():
         return []
 
@@ -131,7 +131,7 @@ def list_sqlite_dataset_tables(user_id: str) -> List[str]:
 
 def list_sqlite_dataset_paths(user_id: str) -> List[str]:
     """Return a list of dataset source file paths for the user (from SQLite)."""
-    db_path = Path.home() / ".inquira" / "inquira.db"
+    db_path = Path.home() / ".inquira" / "app.db"
     if not db_path.exists():
         return []
 
@@ -170,7 +170,7 @@ def username_to_user_id(username: str) -> Optional[str]:
         return user["user_id"] if user else None
     except Exception:
         # Fallback: direct SQLite query
-        db_path = Path.home() / ".inquira" / "inquira.db"
+        db_path = Path.home() / ".inquira" / "app.db"
         if not db_path.exists():
             return None
         con = sqlite3.connect(str(db_path))
@@ -187,7 +187,7 @@ if __name__ == "__main__":
     import sys
     args = sys.argv[1:]
     if not args:
-        print("Usage: python -m inquira.utils.db_tools <list|catalog|paths|delete> <user|username> [table]")
+        print("Usage: python -m app.utils.db_tools <list|catalog|paths|delete> <user|username> [table]")
         sys.exit(1)
 
     cmd = args[0]
@@ -215,7 +215,7 @@ if __name__ == "__main__":
         print("Dataset paths:", list_sqlite_dataset_paths(uid))
     elif cmd == "delete":
         if len(args) < 3:
-            print("Usage: python -m inquira.utils.db_tools delete <user|username> <table>")
+            print("Usage: python -m app.utils.db_tools delete <user|username> <table>")
             sys.exit(1)
         table = args[2]
         try:

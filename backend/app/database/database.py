@@ -7,7 +7,7 @@ from ..core.fingerprint import file_fingerprint_md5
 from ..core.logger import logprint
 
 # Database file path
-DB_PATH = Path.home() / ".inquira" / "inquira.db"
+DB_PATH = Path.home() / ".inquira" / "app.db"
 
 
 def get_db_connection():

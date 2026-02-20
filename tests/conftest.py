@@ -4,8 +4,8 @@ from httpx import AsyncClient, ASGITransport
 from pathlib import Path
 import tempfile
 import os
-from inquira.main import app
-from inquira.config_models import AppConfig
+from app.main import app
+from app.config_models import AppConfig
 
 @pytest_asyncio.fixture(scope="function")
 async def client():
@@ -23,7 +23,7 @@ async def client():
         # Ideally we inject a test config.
         
         # NOTE: For this initial harness, we will trust the default config 
-        # but beware it uses ~/.inquira. 
+        # but beware it uses ~/.app. 
         # TODO: Mock AppConfig.get_user_config_path to use tmpdir
         
         transport = ASGITransport(app=app)

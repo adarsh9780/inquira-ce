@@ -7,8 +7,8 @@ current_dir = Path(__file__).resolve().parent
 src_dir = current_dir.parents[1]
 sys.path.append(str(src_dir))
 
-from inquira.api.auth import hash_password, generate_salt
-from inquira.database.database import get_user_by_username, update_user_password, get_db_connection
+from app.api.auth import hash_password, generate_salt
+from app.database.database import get_user_by_username, update_user_password, get_db_connection
 
 def reset_password(username: str, new_password: str):
     """Reset password for a user"""

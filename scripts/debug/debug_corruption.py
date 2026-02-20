@@ -11,7 +11,7 @@ if not hasattr(aiosqlite.Connection, "is_alive"):
         return True
     aiosqlite.Connection.is_alive = is_alive
 
-from src.inquira.agent.graph import State, MetaData
+from src.app.agent.graph import State, MetaData
 # We don't need local merge_metadata anymore as it is defined in the module
 
 async def test_corruption():

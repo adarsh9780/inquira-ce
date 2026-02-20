@@ -6,8 +6,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 PYPROJECT = ROOT / "pyproject.toml"
 FILES = [
-    ROOT / "scripts" / "install-inquira.sh",
-    ROOT / "scripts" / "install-inquira.ps1",
+    ROOT / "scripts" / "install-app.sh",
+    ROOT / "scripts" / "install-app.ps1",
 ]
 README = ROOT / "README.md"
 MAIN = ROOT / "src" / "inquira" / "main.py"

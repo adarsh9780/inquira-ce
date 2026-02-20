@@ -11,7 +11,7 @@ if not hasattr(aiosqlite.Connection, "is_alive"):
         return True
     aiosqlite.Connection.is_alive = is_alive
 
-from src.inquira.agent.graph import State, InputSchema
+from src.app.agent.graph import State, InputSchema
 
 async def simulate_get_chat_history_logic(state_values):
     """
@@ -110,7 +110,7 @@ async def diagnose():
         # We can't just 'put' state easily without a graph run in LangGraph usually,
         # but we can simulate the graph run or just run a mock graph.
         
-        from src.inquira.agent.graph import State, OutputSchema
+        from src.app.agent.graph import State, OutputSchema
         from langgraph.graph import StateGraph, START, END
         
         def mock_node(state: State):

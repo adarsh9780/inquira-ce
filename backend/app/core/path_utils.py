@@ -12,7 +12,7 @@ This module provides:
 - Per-dataset subfolder management (schema + cache)
 
 USAGE:
-    from inquira.core.path_utils import (
+    from app.core.path_utils import (
         BASE_DIR, CATALOG_DB_NAME,
         get_user_dir, get_database_path, get_schema_path, get_preview_cache_path
     )
@@ -30,7 +30,7 @@ from functools import lru_cache
 BASE_DIR = Path.home() / ".inquira"
 
 # Main SQLite catalog database filename
-CATALOG_DB_NAME = "inquira.db"
+CATALOG_DB_NAME = "app.db"
 CATALOG_DB_PATH = BASE_DIR / CATALOG_DB_NAME
 
 # DuckDB file suffix pattern (username-based)

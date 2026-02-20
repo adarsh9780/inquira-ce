@@ -3,7 +3,7 @@ import asyncio
 import os
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.memory import MemorySaver
-from src.inquira.agent.graph import State, InputSchema, OutputSchema
+from src.app.agent.graph import State, InputSchema, OutputSchema
 from langgraph.graph import StateGraph, START, END
 
 async def test_kwargs_persistence():

@@ -20,8 +20,10 @@ import aiosqlite
 # Monkey patch aiosqlite.Connection to add is_alive method
 # required by langgraph-checkpoint-sqlite v3.0.1+
 if not hasattr(aiosqlite.Connection, "is_alive"):
+
     def is_alive(self):
         return True
+
     aiosqlite.Connection.is_alive = is_alive
 
 
@@ -56,30 +58,30 @@ async def lifespan(app: FastAPI):
     app.state.context = None
     app.state.llm_service = None
     app.state.llm_initialized = False
-    
+
     # Initialize LangGraph Agent with Persistence
     try:
         from .agent.graph import build_graph
-        
+
         # Use dedicated chat_history.db in the user's home directory
         db_path = Path.home() / ".inquira" / "chat_history.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # We need to store the checkpointer itself to close it later, 
+
+        # We need to store the checkpointer itself to close it later,
         # or we rely on the fact that build_graph uses it.
         # However, AsyncSqliteSaver is an async context manager.
         # We need to enter it to get the usable checkpointer.
-        
+
         # AsyncSqliteSaver.from_conn_string returns an async context manager.
         # We must assign the context manager to a variable, then await __aenter__()
         # to get the *actual* checkpointer instance.
-        
+
         checkpointer_cm = AsyncSqliteSaver.from_conn_string(str(db_path))
         checkpointer = await checkpointer_cm.__aenter__()
-        
+
         # Store context manager for cleanup, and checkpointer for reference (if needed)
         app.state.checkpointer_cm = checkpointer_cm
-        
+
         app.state.agent_graph = build_graph(checkpointer=checkpointer)
         logprint(f"LangGraph agent initialized with persistence at: {db_path}")
     except Exception as e:
@@ -100,7 +102,7 @@ async def lifespan(app: FastAPI):
     # Initialize database manager
     app.state.db_manager = DatabaseManager(app.state.config)
     logprint("Database manager initialized")
-    
+
     # Start session cleanup task
     cleanup_task = asyncio.create_task(session_cleanup_worker())
     logprint("Session cleanup worker started")
@@ -170,7 +172,7 @@ def get_ui_dir() -> str:
     :rtype: str
     """
     # --- variables at the top (per your standard) ---
-    packaged_ui = importlib.resources.files("inquira").joinpath("frontend", "dist")
+    packaged_ui = importlib.resources.files("app").joinpath("frontend", "dist")
 
     # 1) Optional override via environment variable for local UI builds
     env_dev = os.getenv("INQUIRA_DEV_UI_DIR", "").strip()
