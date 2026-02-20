@@ -5,7 +5,11 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 from .auth import get_current_user, get_app_config
-from ..database.database import get_user_settings, save_user_settings, get_dataset_by_path
+from ..database.database import (
+    get_user_settings,
+    save_user_settings,
+    get_dataset_by_path,
+)
 from ..core.config_models import AppConfig
 from ..services.websocket_manager import websocket_manager
 from ..database.database_manager import DatabaseManager
@@ -14,7 +18,7 @@ from ..core.path_utils import (
     get_schema_path,
     get_preview_cache_path,
     get_database_path,
-    get_username_for_user
+    get_username_for_user,
 )
 
 
@@ -246,7 +250,7 @@ async def set_apikey(
         app_state.llm_service = LLMService(api_key=request.api_key)
         app_state.llm_initialized = True
         status = "initialized"
-        logprint(f"✅ [Settings] LLM service initialized successfully")
+        logprint("✅ [Settings] LLM service initialized successfully")
     except Exception as e:
         app_state.llm_service = None
         app_state.llm_initialized = False
@@ -310,7 +314,7 @@ async def view_apikey(
 
             app_state.llm_service = LLMService(api_key=api_key)
             app_state.llm_initialized = True
-            logprint(f"✅ [Settings] LLM service initialized successfully")
+            logprint("✅ [Settings] LLM service initialized successfully")
         except Exception as e:
             app_state.llm_service = None
             app_state.llm_initialized = False
@@ -412,16 +416,16 @@ async def view_all_settings(
 async def get_storage_paths(current_user: dict = Depends(get_current_user)):
     """Get the paths where schema and database files are stored"""
     user_id = current_user["user_id"]
-    
+
     # We use path_utils to get canonical paths
     # Note: For schema path, we return the base user dir as schemas are now distributed
     from ..core.path_utils import get_user_dir, get_database_path
-    
+
     base_dir = get_user_dir(user_id)
     database_path = get_database_path(user_id)
-    
+
     return PathsResponse(
-        schema_path=str(base_dir), # conceptually schemas are under here
+        schema_path=str(base_dir),  # conceptually schemas are under here
         database_path=str(database_path),
         base_directory=str(base_dir),
     )
@@ -663,36 +667,44 @@ def load_user_settings_to_app_state(user_id: str, app_state):
 
         if user_settings.get("data_path"):
             app_state.data_path = user_settings["data_path"]
-            
+
             # Generate table name from data path
             from ..database.schema_storage import derive_table_name
+
             table_name = derive_table_name(user_settings["data_path"])
             app_state.table_name = table_name
             logprint(f"DEBUG: app_state.table_name set to {table_name}", level="debug")
-            
+
             # Determine Schema Path
             # 1. New standard path
             from ..core.path_utils import get_schema_path
+
             s_path = get_schema_path(user_id, table_name)
-            
-            # 2. If it doesn't exist, check legacy? 
+
+            # 2. If it doesn't exist, check legacy?
             if not s_path.exists():
-                 from ..database.schema_storage import get_legacy_schemas_dir, get_schema_filename
-                 legacy_dir = get_legacy_schemas_dir(user_id)
-                 legacy_file = get_schema_filename(user_id, user_settings["data_path"])
-                 legacy_path = legacy_dir / legacy_file
-                 if legacy_path.exists():
-                     app_state.schema_path = str(legacy_path)
-                 else:
-                     app_state.schema_path = str(s_path) # Default to new standard even if missing
+                from ..database.schema_storage import (
+                    get_legacy_schemas_dir,
+                    get_schema_filename,
+                )
+
+                legacy_dir = get_legacy_schemas_dir(user_id)
+                legacy_file = get_schema_filename(user_id, user_settings["data_path"])
+                legacy_path = legacy_dir / legacy_file
+                if legacy_path.exists():
+                    app_state.schema_path = str(legacy_path)
+                else:
+                    app_state.schema_path = str(
+                        s_path
+                    )  # Default to new standard even if missing
             else:
                 app_state.schema_path = str(s_path)
-                
+
             logprint(
                 f"DEBUG: app_state.schema_path set to {app_state.schema_path}",
                 level="debug",
             )
-            
+
         if user_settings.get("context"):
             app_state.context = user_settings["context"]
 
@@ -1196,7 +1208,7 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
                 ],
             },
         )
-        logprint(f"✅ [Settings] Completion message sent successfully")
+        logprint("✅ [Settings] Completion message sent successfully")
 
     except Exception as e:
         await websocket_manager.send_error(

@@ -180,6 +180,11 @@ export const useAppStore = defineStore('app', () => {
     saveLocalConfig()
     if (path) {
       fetchChatHistory()
+    } else {
+      // Clear chat history when no dataset is selected
+      chatHistory.value = []
+      generatedCode.value = ''
+      pythonFileContent.value = ''
     }
   }
 

@@ -15,11 +15,11 @@ from ..database.database import (
 )
 from ..core.prompt_library import get_prompt
 from ..database.schema_storage import (
-    SchemaColumn, 
-    SchemaFile, 
-    load_schema, 
+    SchemaColumn,
+    SchemaFile,
+    load_schema,
     save_schema,
-    derive_table_name
+    derive_table_name,
 )
 from .auth import get_current_user
 from ..core.logger import logprint
@@ -64,7 +64,9 @@ router = APIRouter(prefix="/schemas", tags=["Schemas"])
 class GenerateSchemaRequest(BaseModel):
     filepath: str = Field(description="filepath where the data is stored")
     context: Optional[str] = Field(None, description="optional context override")
-    force_regenerate: bool = Field(False, description="Force regeneration even if schema exists")
+    force_regenerate: bool = Field(
+        False, description="Force regeneration even if schema exists"
+    )
 
 
 class Column(BaseModel):
@@ -112,14 +114,15 @@ def _resolve_table_name(user_id: str, filepath: str, app_state) -> str:
             return ds["table_name"]
     except Exception:
         pass
-    
+
     # 2. Try derivation helper
     try:
         return derive_table_name(filepath)
     except Exception:
         pass
-        
+
     return "data_table"
+
 
 def _generate_schema_internal(
     user_id: str,
@@ -130,7 +133,6 @@ def _generate_schema_internal(
     model: str = "gemini-2.5-flash",
     force_regenerate: bool = False,
 ) -> SchemaResponse:
-    
     # Resolve table name early
     table_name = _resolve_table_name(user_id, filepath, app_state)
 
@@ -220,24 +222,38 @@ def _generate_schema_internal(
                 columns.append(c)
 
         except Exception as e:
-            logprint(f"❌ [Schema] Error using cached connection: {str(e)}", level="error")
+            logprint(
+                f"❌ [Schema] Error using cached connection: {str(e)}", level="error"
+            )
             raise HTTPException(
                 status_code=500, detail=f"Error accessing cached database: {str(e)}"
             )
     else:
-        description = duckdb.sql(f'describe "{filepath}"').fetchall()
-        columns = []
-        for row in description:
-            column_name = row[0]
-            column_type = row[1]
-
-            samples = duckdb.sql(
-                f"select distinct \"{column_name}\" from '{filepath}' limit 10"
+        # Use explicit connection instead of duckdb.sql() to avoid race conditions
+        # duckdb.sql() uses a shared in-memory connection that can have state issues
+        try:
+            conn = duckdb.connect()
+            description = conn.execute(
+                f'DESCRIBE SELECT * FROM "{filepath}"'
             ).fetchall()
-            samples = [s[0] for s in samples]
+            columns = []
+            for row in description:
+                column_name = row[0]
+                column_type = row[1]
 
-            c = Column(name=column_name, dtype=column_type, samples=samples)
-            columns.append(c)
+                samples = conn.execute(
+                    f"SELECT DISTINCT \"{column_name}\" FROM '{filepath}' LIMIT 10"
+                ).fetchall()
+                samples = [s[0] for s in samples]
+
+                c = Column(name=column_name, dtype=column_type, samples=samples)
+                columns.append(c)
+            conn.close()
+        except Exception as e:
+            logprint(f"❌ [Schema] DuckDB error reading file: {str(e)}", level="error")
+            raise HTTPException(
+                status_code=500, detail=f"Error reading data file: {str(e)}"
+            )
 
     # Format columns for the prompt
     columns_text = "\n".join(
@@ -285,7 +301,9 @@ def _generate_schema_internal(
     try:
         set_dataset_schema_path(user_id, filepath, saved_schema_path)
     except Exception as e:
-        logprint(f"⚠️ [Schema] Failed to update dataset schema_path: {e}", level="warning")
+        logprint(
+            f"⚠️ [Schema] Failed to update dataset schema_path: {e}", level="warning"
+        )
 
     # Update user settings with the schema path
     current_settings = get_user_settings(user_id)
@@ -322,7 +340,9 @@ def generate_schema(
     model: str = "gemini-2.5-flash",
 ):
     user_id = current_user["user_id"]
-    logprint(f"🔄 [Schema] Generate request for {request.filepath}, force={request.force_regenerate}")
+    logprint(
+        f"🔄 [Schema] Generate request for {request.filepath}, force={request.force_regenerate}"
+    )
     return _generate_schema_internal(
         user_id=user_id,
         filepath=request.filepath,
@@ -347,12 +367,12 @@ def load_schema_endpoint(
     """
     # Normalize filepath - FastAPI strips leading slash from path params
     # So "/Users/foo" becomes "Users/foo" - we need to restore it
-    if filepath and not filepath.startswith('/'):
-        filepath = '/' + filepath
-    
+    if filepath and not filepath.startswith("/"):
+        filepath = "/" + filepath
+
     user_id = current_user["user_id"]
     table_name = _resolve_table_name(user_id, filepath, app_state)
-    
+
     existing = load_schema(user_id, filepath, table_name=table_name)
 
     if existing:
@@ -376,7 +396,10 @@ def load_schema_endpoint(
     # The schema will be generated when user clicks "Save Data Settings"
     # which triggers the proper background processing flow
     logprint(f"ℹ️ [Schema] No existing schema found for {filepath}")
-    raise HTTPException(status_code=404, detail="Schema not found. Save data settings to generate schema.")
+    raise HTTPException(
+        status_code=404,
+        detail="Schema not found. Save data settings to generate schema.",
+    )
 
 
 @router.post("/save")

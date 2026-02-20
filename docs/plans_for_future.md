@@ -1,0 +1,4 @@
+- [ ] We should take a look at the Inquira Langgraph agent and try to truncate the conversation history after a certain number of messages. We should also try to summarise the conversation if it exceeds a certain length.
+- [ ] Right now, we have to make sure that the agent/graph is not trying to solve all queries in the conversation history.
+- [ ] Implement a queue system for the Inquira tool.
+- [ ] We should also try to implement a parallel execution system so that users can work on multiple queries spanning multiple datasets at the same time.

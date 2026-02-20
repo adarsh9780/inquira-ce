@@ -1,5 +1,5 @@
 <template>
-  <div class="relative">
+  <div ref="containerRef" class="relative">
     <button
       @click="toggleDropdown"
       class="flex items-center space-x-2 px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -197,6 +197,7 @@ import { previewService } from '../services/previewService'
 const emit = defineEmits(['open-settings'])
 
 const appStore = useAppStore()
+const containerRef = ref(null)
 const isOpen = ref(false)
 const loading = ref(false)
 const loadingMessage = ref('Loading datasets...')
@@ -412,11 +413,11 @@ function openSettings() {
 
 // Close dropdown on outside click
 function handleClickOutside(event) {
-  // If verifying modal click, ignore
-  if (showDeleteModal.value) return 
-  
-  const dropdown = event.target.closest('.relative')
-  if (!dropdown) {
+  // If a modal is open, ignore click-outside
+  if (showDeleteModal.value || showRefreshModal.value) return
+
+  // If click is outside this component's container, close the dropdown
+  if (containerRef.value && !containerRef.value.contains(event.target)) {
     isOpen.value = false
   }
 }
