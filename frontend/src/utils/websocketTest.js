@@ -1,6 +1,6 @@
 // WebSocket testing utilities for development
 export const testWebSocketConnection = async (userId = 'test_user') => {
-  console.log('🧪 Testing WebSocket connection...')
+  console.debug('🧪 Testing WebSocket connection...')
 
   try {
     // Import the WebSocket service
@@ -13,12 +13,12 @@ export const testWebSocketConnection = async (userId = 'test_user') => {
     let completionResult = null
 
     settingsWebSocket.onProgress((data) => {
-      console.log('📊 Progress update:', data)
+      console.debug('📊 Progress update:', data)
       progressUpdates.push(data)
     })
 
     settingsWebSocket.onComplete((result) => {
-      console.log('✅ Test completed:', result)
+      console.debug('✅ Test completed:', result)
       completionResult = result
     })
 
@@ -28,12 +28,12 @@ export const testWebSocketConnection = async (userId = 'test_user') => {
     })
 
     settingsWebSocket.onConnection((connected) => {
-      console.log('🔗 Connection state changed:', connected ? 'Connected' : 'Disconnected')
+      console.debug('🔗 Connection state changed:', connected ? 'Connected' : 'Disconnected')
     })
 
     // Mock backend connection acknowledgment and progress messages for testing
     setTimeout(() => {
-      console.log('🧪 Simulating backend connection acknowledgment...')
+      console.debug('🧪 Simulating backend connection acknowledgment...')
 
       // First send connection acknowledgment
       settingsWebSocket.testHandleMessage({
@@ -44,7 +44,7 @@ export const testWebSocketConnection = async (userId = 'test_user') => {
 
       // Then simulate progress messages
       setTimeout(() => {
-        console.log('🧪 Simulating backend progress messages...')
+        console.debug('🧪 Simulating backend progress messages...')
 
         const mockMessages = [
           { type: 'progress', stage: 'starting', message: '🚀 Starting data processing pipeline...', timestamp: new Date().toISOString() },
@@ -64,12 +64,12 @@ export const testWebSocketConnection = async (userId = 'test_user') => {
     }, 1000)
 
     // Attempt connection
-    console.log('🔌 Connecting to WebSocket...')
+    console.debug('🔌 Connecting to WebSocket...')
     await settingsWebSocket.connect(userId)
     connectionResult = 'connected'
 
     // Send test data
-    console.log('📤 Sending test settings data...')
+    console.debug('📤 Sending test settings data...')
     const testSettings = {
       api_key: 'test_api_key_123',
       data_path: '/test/data.csv',
@@ -103,43 +103,43 @@ window.testWebSocket = testWebSocketConnection
 
 // Test backend connectivity and authentication
 window.testBackendConnection = async () => {
-  console.log('🔍 Testing backend connection and authentication...')
+  console.debug('🔍 Testing backend connection and authentication...')
 
   try {
     // Import API service
     const { apiService } = await import('../services/apiService')
 
     // Test 1: Health check
-    console.log('🏥 Testing backend health...')
+    console.debug('🏥 Testing backend health...')
     try {
       const health = await apiService.healthCheck()
-      console.log('✅ Backend is healthy:', health)
+      console.debug('✅ Backend is healthy:', health)
     } catch (error) {
       console.error('❌ Backend health check failed:', error.response?.status, error.response?.data)
       return { success: false, error: 'Backend not accessible' }
     }
 
     // Test 2: Authentication check
-    console.log('🔐 Testing authentication...')
+    console.debug('🔐 Testing authentication...')
     try {
       const auth = await apiService.verifyAuth()
-      console.log('✅ Authentication successful:', auth)
+      console.debug('✅ Authentication successful:', auth)
     } catch (error) {
       console.error('❌ Authentication failed:', error.response?.status, error.response?.data)
       return { success: false, error: 'Authentication failed', status: error.response?.status }
     }
 
     // Test 3: Settings endpoint
-    console.log('⚙️ Testing settings endpoint...')
+    console.debug('⚙️ Testing settings endpoint...')
     try {
       const settings = await apiService.getSettings()
-      console.log('✅ Settings retrieved:', settings)
+      console.debug('✅ Settings retrieved:', settings)
     } catch (error) {
       console.error('❌ Settings retrieval failed:', error.response?.status, error.response?.data)
       return { success: false, error: 'Settings endpoint failed', status: error.response?.status }
     }
 
-    console.log('🎉 All backend tests passed!')
+    console.debug('🎉 All backend tests passed!')
     return { success: true, message: 'Backend connection and authentication working' }
 
   } catch (error) {
@@ -148,6 +148,6 @@ window.testBackendConnection = async () => {
   }
 }
 
-console.log('🧪 Test utilities loaded:')
-console.log('  - testWebSocket() - Test WebSocket connection')
-console.log('  - testBackendConnection() - Test backend connectivity and auth')
+console.debug('🧪 Test utilities loaded:')
+console.debug('  - testWebSocket() - Test WebSocket connection')
+console.debug('  - testBackendConnection() - Test backend connectivity and auth')

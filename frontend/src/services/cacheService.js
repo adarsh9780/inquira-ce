@@ -54,11 +54,10 @@ class CacheService {
   // Get or set cache entry
   async getOrSet(key, fetcher, expiryMs = this.defaultExpiry) {
     if (this.has(key)) {
-      console.log(`📋 Cache hit for: ${key}`)
       return this.get(key)
     }
 
-    console.log(`🔄 Cache miss for: ${key}, fetching fresh data`)
+
     try {
       const data = await fetcher()
       this.set(key, data, expiryMs)
@@ -71,7 +70,6 @@ class CacheService {
 
   // Force refresh cache entry
   async refresh(key, fetcher, expiryMs = this.defaultExpiry) {
-    console.log(`🔄 Force refresh for: ${key}`)
     try {
       const data = await fetcher()
       this.set(key, data, expiryMs)

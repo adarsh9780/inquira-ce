@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional, Any
 from pathlib import Path
@@ -449,3 +450,43 @@ def refresh_dataset_endpoint(
         raise HTTPException(
             status_code=500, detail=f"Refresh failed: {str(e)}. Original data restored."
         )
+
+
+@router.get("/database/download")
+def download_database(current_user: dict = Depends(get_current_user)):
+    """
+    Download the user's main DuckDB database file.
+    Crucial for Pyodide frontend to fetch the entire database connection remotely via HTTP Range Requests.
+    """
+    user_id = current_user["user_id"]
+    db_path = get_database_path(user_id)
+
+    if not db_path.exists():
+        raise HTTPException(status_code=404, detail="Database file missing on disk")
+
+    filename = db_path.name
+    return FileResponse(
+        path=db_path, filename=filename, media_type="application/octet-stream"
+    )
+
+
+@router.get("/{table_name}/download")
+def download_dataset(table_name: str, current_user: dict = Depends(get_current_user)):
+    """
+    Download the raw dataset file.
+    Crucial for Pyodide frontend to fetch the data locally into DuckDB-Wasm.
+    """
+    user_id = current_user["user_id"]
+    ds = get_dataset_by_table_name(user_id, table_name)
+
+    if not ds or not ds.get("file_path"):
+        raise HTTPException(status_code=404, detail=f"Dataset '{table_name}' not found")
+
+    file_path = Path(ds["file_path"])
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Dataset file missing on disk")
+
+    filename = file_path.name
+    return FileResponse(
+        path=file_path, filename=filename, media_type="application/octet-stream"
+    )

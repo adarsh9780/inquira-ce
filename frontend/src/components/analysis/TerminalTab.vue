@@ -188,7 +188,7 @@ async function copyOutput() {
 
   try {
     await navigator.clipboard.writeText(formattedOutput.value)
-    console.log('Terminal output copied to clipboard')
+    console.debug('Terminal output copied to clipboard')
     // You could add a toast notification here
   } catch (error) {
     console.error('Failed to copy terminal output:', error)

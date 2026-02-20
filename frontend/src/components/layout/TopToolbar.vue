@@ -249,7 +249,7 @@ function setupWebSocketMonitoring() {
   // Monitor connection status
   const unsubscribe = settingsWebSocket.onConnection((connected) => {
     isWebSocketConnected.value = connected
-    console.log('WebSocket connection status changed:', connected)
+    console.debug('WebSocket connection status changed:', connected)
   })
 
   // Set initial status
@@ -327,17 +327,12 @@ function cancelLogout() {
 
 // Global shortcut helper functions
 function focusChatInput() {
-  console.log('focusChatInput called')
   // Find and focus the chat input textarea
   const chatInput = document.querySelector('textarea[placeholder*="Ask a question"]')
-  console.log('Chat input found:', chatInput)
   if (chatInput) {
     chatInput.focus()
     // Scroll into view if needed
     chatInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    console.log('Chat input focused')
-  } else {
-    console.log('Chat input not found')
   }
 }
 
@@ -373,7 +368,7 @@ function focusCodeEditorAtEnd() {
       codeEditor.dispatchEvent(endKeyEvent)
     } catch (error) {
       // Fallback: just focus the editor
-      console.log('Could not move cursor to end of line:', error)
+      console.debug('Could not move cursor to end of line:', error)
     }
   }
 }
@@ -423,7 +418,7 @@ function downloadCode() {
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
 
-    console.log('Python code downloaded successfully')
+    console.debug('Python code downloaded successfully')
   } catch (error) {
     console.error('Failed to download code:', error)
   }
@@ -455,7 +450,6 @@ function isInInputField() {
 
 // Keyboard shortcuts - Caps Lock + key combinations for cross-platform compatibility
 function handleKeydown(event) {
-  console.log('Key pressed:', event.key, 'Code:', event.code)
 
   // Don't handle Enter key - let it go to editors
   if (event.key === 'Enter') {
@@ -466,20 +460,20 @@ function handleKeydown(event) {
 
   // Handle Escape key to exit input fields and close modals/dropdowns
   if (event.key === 'Escape') {
-    console.log('Escape pressed')
+    console.debug('Escape pressed')
 
     // Escape key handling for modal/dropdown closing
 
     // Close modals in priority order (most recent first)
     if (isLogoutConfirmOpen.value) {
-      console.log('Closing logout confirmation modal')
+      console.debug('Closing logout confirmation modal')
       cancelLogout()
       event.preventDefault()
       return
     }
 
     if (isShortcutsOpen.value) {
-      console.log('Closing shortcuts modal')
+      console.debug('Closing shortcuts modal')
       closeShortcuts()
       event.preventDefault()
       return
@@ -488,7 +482,7 @@ function handleKeydown(event) {
     // Preview modal removed
 
     if (isSettingsOpen.value) {
-      console.log('Closing settings modal')
+      console.debug('Closing settings modal')
       closeSettings()
       event.preventDefault()
       return
@@ -496,7 +490,6 @@ function handleKeydown(event) {
 
     // Close dropdowns
     if (isUserMenuOpen.value) {
-      console.log('Closing user menu dropdown')
       isUserMenuOpen.value = false
       event.preventDefault()
       return
@@ -505,7 +498,6 @@ function handleKeydown(event) {
     // Exit input fields
     const activeElement = document.activeElement
     if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.contentEditable === 'true')) {
-      console.log('Blurring input field')
       activeElement.blur()
       event.preventDefault()
       return
@@ -514,49 +506,48 @@ function handleKeydown(event) {
 
   // Only handle shortcuts when not in input fields
   if (isInInputField()) {
-    console.log('In input field, allowing normal typing')
     return
   }
 
   // Single-letter shortcuts (no modifier keys needed) - only when NOT in input fields
   if (!event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
     const key = event.key.toLowerCase()
-    console.log('Processing single-letter shortcut:', key)
+    console.debug('Processing single-letter shortcut:', key)
 
     switch (key) {
       case 'c':
-        console.log('c: Switching to code tab')
+        console.debug('c: Switching to code tab')
         event.preventDefault()
         appStore.setActiveTab('code')
         break
       case 't':
-        console.log('t: Switching to table tab')
+        console.debug('t: Switching to table tab')
         event.preventDefault()
         appStore.setActiveTab('table')
         break
       case 'i':
-        console.log('i: Focusing chat input')
+        console.debug('i: Focusing chat input')
         event.preventDefault()
         focusChatInput()
         break
       case 'w':
-        console.log('w: Focusing code editor at end')
+        console.debug('w: Focusing code editor at end')
         event.preventDefault()
         focusCodeEditorAtEnd()
         break
       case 'r':
-        console.log('r: Running code')
+        console.debug('r: Running code')
         event.preventDefault()
         runCode()
         break
       case 'g':
-        console.log('g: Downloading Python code')
+        console.debug('g: Downloading Python code')
         event.preventDefault()
         downloadCode()
         break
       case 'h':
         // 'h' toggles Chat overlay
-        console.log('h: Toggle chat overlay')
+        console.debug('h: Toggle chat overlay')
         event.preventDefault()
         appStore.toggleChatOverlay()
         if (appStore.isChatOverlayOpen) {
@@ -564,38 +555,38 @@ function handleKeydown(event) {
         }
         break
       case 'f':
-        console.log('f: Switching to figure tab')
+        console.debug('f: Switching to figure tab')
         event.preventDefault()
         appStore.setActiveTab('figure')
         break
       case 'v':
-        console.log('v: Switching to preview tab')
+        console.debug('v: Switching to preview tab')
         event.preventDefault()
         appStore.setActiveTab('preview')
         break
       case 'e':
-        console.log('e: Switching to schema editor tab')
+        console.debug('e: Switching to schema editor tab')
         event.preventDefault()
         appStore.setActiveTab('schema-editor')
         break
       case 'o':
-        console.log('o: Switching to terminal tab')
+        console.debug('o: Switching to terminal tab')
         event.preventDefault()
         appStore.setActiveTab('terminal')
         break
       case ',':
-        console.log(',: Opening settings')
+        console.debug(',: Opening settings')
         event.preventDefault()
         openSettings()
         break
       case 'k':
-        console.log('k: Opening shortcuts')
+        console.debug('k: Opening shortcuts')
         event.preventDefault()
         openShortcuts()
         break
       // Modal shortcuts removed; use v/e for tabs
       case 'n':
-        console.log('n: Toggle notebook mode')
+        console.debug('n: Toggle notebook mode')
         event.preventDefault()
         // This will be handled by the code tab component
         // We need to emit an event or use a global method
@@ -606,7 +597,7 @@ function handleKeydown(event) {
         break
       default:
         // Not a shortcut key, allow normal typing (don't prevent default)
-        console.log('Not a shortcut key, allowing normal typing')
+        console.debug('Not a shortcut key, allowing normal typing')
         return
     }
   }

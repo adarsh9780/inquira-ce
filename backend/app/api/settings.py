@@ -118,14 +118,14 @@ async def set_data_path(
     user_id = current_user["user_id"]
 
     # Check if user has an active WebSocket connection
-    logprint(f"🔍 [Settings] Checking WebSocket connection for user: {user_id}")
+    logprint(f"🔍 [Settings] Checking WebSocket connection for user: {user_id}", level="debug")
     logprint(
         f"🔍 [Settings] Active connections: {list(websocket_manager.active_connections.keys())}"
     )
 
     # Check for the actual user_id first
     if websocket_manager.is_connected(user_id):
-        logprint(f"✅ [Settings] WebSocket connection verified for user: {user_id}")
+        logprint(f"✅ [Settings] WebSocket connection verified for user: {user_id}", level="debug")
     # Temporary workaround: Check if frontend is using "current_user" instead of actual user_id
     elif websocket_manager.is_connected("current_user"):
         logprint(
@@ -225,13 +225,13 @@ async def set_apikey(
 ):
     """Set the API key"""
     user_id = current_user["user_id"]
-    logprint(f"🔑 [Settings] Setting API key for user: {user_id}")
+    logprint(f"🔑 [Settings] Setting API key for user: {user_id}", level="debug")
     logprint(
         f"🔑 [Settings] API key length: {len(request.api_key) if request.api_key else 0}"
     )
 
     user_settings = get_user_settings(user_id) or {}
-    logprint(f"🔑 [Settings] Current settings before update: {user_settings}")
+    logprint(f"🔑 [Settings] Current settings before update: {user_settings}", level="debug")
 
     user_settings["api_key"] = request.api_key
     success = save_user_settings(user_id, user_settings)
@@ -240,7 +240,7 @@ async def set_apikey(
         logprint("❌ [Settings] Failed to save API key to database", level="error")
         raise HTTPException(status_code=500, detail="Failed to save API key")
 
-    logprint("✅ [Settings] API key saved successfully to database")
+    logprint("✅ [Settings] API key saved successfully to database", level="debug")
 
     # Update app_state and try to initialize LLM service
     app_state.api_key = request.api_key
@@ -250,12 +250,12 @@ async def set_apikey(
         app_state.llm_service = LLMService(api_key=request.api_key)
         app_state.llm_initialized = True
         status = "initialized"
-        logprint("✅ [Settings] LLM service initialized successfully")
+        logprint("✅ [Settings] LLM service initialized successfully", level="debug")
     except Exception as e:
         app_state.llm_service = None
         app_state.llm_initialized = False
         status = "saved"
-        logprint(f"⚠️ [Settings] LLM service initialization failed: {str(e)}")
+        logprint(f"⚠️ [Settings] LLM service initialization failed: {str(e)}", level="debug")
 
     return {"message": "API key updated successfully", "status": status}
 
@@ -297,13 +297,13 @@ async def view_apikey(
 ):
     """View the current API key"""
     user_id = current_user["user_id"]
-    logprint(f"🔍 [Settings] Viewing API key for user: {user_id}")
+    logprint(f"🔍 [Settings] Viewing API key for user: {user_id}", level="debug")
 
     user_settings = get_user_settings(user_id) or {}
-    logprint(f"🔍 [Settings] Current settings: {user_settings}")
+    logprint(f"🔍 [Settings] Current settings: {user_settings}", level="debug")
 
     api_key = user_settings.get("api_key")
-    logprint(f"🔍 [Settings] API key status: {'Set' if api_key else 'Not set'}")
+    logprint(f"🔍 [Settings] API key status: {'Set' if api_key else 'Not set'}", level="debug")
 
     # Load into app_state if needed
     if api_key:
@@ -314,11 +314,11 @@ async def view_apikey(
 
             app_state.llm_service = LLMService(api_key=api_key)
             app_state.llm_initialized = True
-            logprint("✅ [Settings] LLM service initialized successfully")
+            logprint("✅ [Settings] LLM service initialized successfully", level="debug")
         except Exception as e:
             app_state.llm_service = None
             app_state.llm_initialized = False
-            logprint(f"❌ [Settings] LLM service initialization failed: {str(e)}")
+            logprint(f"❌ [Settings] LLM service initialization failed: {str(e)}", level="debug")
 
     return ApiKeyResponse(api_key=api_key)
 
@@ -715,7 +715,7 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
     """Background task to process data path with granular WebSocket updates for each step"""
     # Determine which user_id to use for WebSocket messages
     # If frontend is using "current_user", we need to send messages there
-    logprint(f"🔍 [Background] Checking WebSocket connections for user: {user_id}")
+    logprint(f"🔍 [Background] Checking WebSocket connections for user: {user_id}", level="debug")
     logprint(
         f"🔍 [Background] Active connections: {list(websocket_manager.active_connections.keys())}"
     )
@@ -927,7 +927,7 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
                 return {"status": "success", "task": "schema_generation"}
 
             except Exception as e:
-                logprint(f"❌ [Settings] Schema generation failed: {str(e)}")
+                logprint(f"❌ [Settings] Schema generation failed: {str(e)}", level="debug")
                 await websocket_manager.send_to_user(
                     websocket_user_id,
                     {
@@ -1086,7 +1086,7 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
                 return {"status": "error", "task": "preview_cache", "error": str(e)}
 
         # Run schema generation and preview caching in parallel
-        logprint(f"🚀 [Settings] Starting parallel tasks for user: {websocket_user_id}")
+        logprint(f"🚀 [Settings] Starting parallel tasks for user: {websocket_user_id}", level="debug")
         schema_task = generate_schema_task()
         preview_task = populate_preview_cache_task()
 
@@ -1114,8 +1114,8 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
         logprint(
             f"📊 [Settings] Parallel processing results for user {websocket_user_id}:"
         )
-        logprint(f"   Schema: {schema_result}")
-        logprint(f"   Preview: {preview_result}")
+        logprint(f"   Schema: {schema_result}", level="debug")
+        logprint(f"   Preview: {preview_result}", level="debug")
 
         # Send final status update
         schema_status = (
@@ -1208,7 +1208,7 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
                 ],
             },
         )
-        logprint("✅ [Settings] Completion message sent successfully")
+        logprint("✅ [Settings] Completion message sent successfully", level="debug")
 
     except Exception as e:
         await websocket_manager.send_error(

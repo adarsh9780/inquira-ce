@@ -305,7 +305,7 @@ async function handleSubmit() {
         }, 1500)
       } else {
         // Login failed - display error message on the card
-        console.log('Login failed with error:', authStore.error)
+        console.debug('Login failed with error:', authStore.error)
         // Show the error message directly to ensure it's visible on the card
         if (authStore.error) {
           showMessage(authStore.error, 'error')
@@ -331,7 +331,7 @@ async function handleSubmit() {
         }, 2000)
       } else {
         // Registration failed - display error message on the card
-        console.log('Registration failed with error:', authStore.error)
+        console.debug('Registration failed with error:', authStore.error)
         // Show the error message directly to ensure it's visible on the card
         if (authStore.error) {
           showMessage(authStore.error, 'error')

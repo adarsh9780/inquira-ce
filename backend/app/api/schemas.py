@@ -33,14 +33,15 @@ def get_app_state(request: Request):
 def get_api_key(current_user: dict = Depends(get_current_user)):
     """Dependency to get API key from user settings or environment"""
     user_id = current_user["user_id"]
-    logprint(f"🔍 [API Key] Retrieving API key for user: {user_id}")
+    logprint(f"🔍 [API Key] Retrieving API key for user: {user_id}", level="debug")
 
     user_settings = get_user_settings(user_id)
-    logprint(f"🔍 [API Key] User settings retrieved: {user_settings}")
+    logprint(f"🔍 [API Key] User settings retrieved: {user_settings}", level="debug")
 
     api_key = user_settings.get("api_key")
     logprint(
-        f"🔍 [API Key] API key from settings: {'***' + api_key[-4:] if api_key else 'None'}"
+        f"🔍 [API Key] API key from settings: {'***' + api_key[-4:] if api_key else 'None'}",
+        level="debug",
     )
 
     if not api_key:
@@ -49,11 +50,13 @@ def get_api_key(current_user: dict = Depends(get_current_user)):
 
         api_key = os.getenv("GOOGLE_API_KEY", "")
         logprint(
-            f"🔍 [API Key] API key from environment: {'***' + api_key[-4:] if api_key else 'None'}"
+            f"🔍 [API Key] API key from environment: {'***' + api_key[-4:] if api_key else 'None'}",
+            level="debug",
         )
 
     logprint(
-        f"🔍 [API Key] Final API key status: {'Available' if api_key else 'Not available'}"
+        f"🔍 [API Key] Final API key status: {'Available' if api_key else 'Not available'}",
+        level="debug",
     )
     return api_key
 
@@ -159,8 +162,10 @@ def _generate_schema_internal(
 
     user_settings = get_user_settings(user_id)
     context = context or user_settings.get("context", "General data analysis")
-    logprint(f"🔑 [Schema] API key available: {'Yes' if api_key else 'No'}")
-    logprint(f"📝 [Schema] Context: {context}")
+    logprint(
+        f"🔑 [Schema] API key available: {'Yes' if api_key else 'No'}", level="debug"
+    )
+    logprint(f"📝 [Schema] Context: {context}", level="debug")
 
     # Check if API key is available before proceeding
     if not api_key:
@@ -187,14 +192,20 @@ def _generate_schema_internal(
         and connection_key in app_state.duckdb_connections
     ):
         cached_connection = app_state.duckdb_connections[connection_key]
-        logprint(f"✅ [Schema] Using cached DuckDB connection for: {connection_key}")
+        logprint(
+            f"✅ [Schema] Using cached DuckDB connection for: {connection_key}",
+            level="debug",
+        )
     elif (
         hasattr(app_state, "duckdb_connections")
         and "current_user" in app_state.duckdb_connections
     ):
         # Fallback for frontend using "current_user"
         cached_connection = app_state.duckdb_connections["current_user"]
-        logprint("⚠️ [Schema] Using 'current_user' cached connection (frontend issue)")
+        logprint(
+            "⚠️ [Schema] Using 'current_user' cached connection (frontend issue)",
+            level="debug",
+        )
 
     if cached_connection:
         # Use cached connection
@@ -204,7 +215,8 @@ def _generate_schema_internal(
                 f"SELECT COUNT(*) FROM {table_name}"
             ).fetchone()
             logprint(
-                f"✅ [Schema] Cached connection test successful, rows: {test_result[0]}"
+                f"✅ [Schema] Cached connection test successful, rows: {test_result[0]}",
+                level="debug",
             )
 
             description = cached_connection.execute(f"DESCRIBE {table_name}").fetchall()
@@ -341,7 +353,8 @@ def generate_schema(
 ):
     user_id = current_user["user_id"]
     logprint(
-        f"🔄 [Schema] Generate request for {request.filepath}, force={request.force_regenerate}"
+        f"🔄 [Schema] Generate request for {request.filepath}, force={request.force_regenerate}",
+        level="debug",
     )
     return _generate_schema_internal(
         user_id=user_id,
@@ -351,6 +364,152 @@ def generate_schema(
         app_state=app_state,
         model=model,
         force_regenerate=request.force_regenerate,
+    )
+
+
+class ColumnInput(BaseModel):
+    name: str
+    dtype: str
+    samples: List[Any] = Field(default_factory=list)
+
+
+class GenerateFromColumnsRequest(BaseModel):
+    """Request body for browser-native schema generation.
+    The frontend sends column metadata directly from DuckDB-WASM
+    instead of a file path the backend would read.
+    """
+
+    table_name: str = Field(description="DuckDB table name (e.g. 'ball_by_ball_ipl')")
+    columns: List[ColumnInput] = Field(
+        description="Columns with name, dtype, sample values"
+    )
+    context: Optional[str] = Field(None, description="User context for the LLM")
+
+
+@router.post("/generate-from-columns")
+def generate_schema_from_columns(
+    request: GenerateFromColumnsRequest,
+    current_user: dict = Depends(get_current_user),
+    current_api_key: str = Depends(get_api_key),
+    app_state=Depends(get_app_state),
+):
+    """Generate schema descriptions from column metadata sent by the frontend.
+
+    This endpoint does NOT access any files — the frontend's DuckDB-WASM
+    has already ingested the data and sends column info directly.
+    The backend only runs the LLM to produce human-readable descriptions.
+    """
+    user_id = current_user["user_id"]
+    table_name = request.table_name
+    filepath = f"browser://{table_name}"  # Virtual path for storage
+    logprint(
+        f"🔄 [Schema] Generate-from-columns request: table={table_name}", level="debug"
+    )
+
+    # Check for existing schema
+    existing = load_schema(user_id, filepath, table_name=table_name)
+    if existing and existing.columns:
+        has_descriptions = any(
+            col.description.strip() for col in existing.columns if col.description
+        )
+        if has_descriptions:
+            logprint(
+                f"📋 [Schema] Returning existing schema for {table_name}", level="debug"
+            )
+            return SchemaResponse(
+                filepath=existing.filepath,
+                context=existing.context or "",
+                columns=[
+                    SchemaColumnResponse(
+                        name=col.name,
+                        description=col.description,
+                        data_type=col.data_type,
+                        sample_values=col.sample_values,
+                    )
+                    for col in existing.columns
+                ],
+                created_at=existing.created_at,
+                updated_at=existing.updated_at,
+            )
+
+    # Validate API key
+    if not current_api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="API key not set. Please set your API key in settings.",
+        )
+
+    # Initialize LLM
+    try:
+        llm_service = LLMService(api_key=current_api_key)
+    except Exception as e:
+        raise HTTPException(
+            status_code=503, detail=f"LLM service not available: {str(e)}"
+        )
+
+    # Get context
+    user_settings = get_user_settings(user_id)
+    context = request.context or user_settings.get("context", "General data analysis")
+
+    # Build columns for prompt
+    columns = [
+        Column(name=c.name, dtype=c.dtype, samples=c.samples) for c in request.columns
+    ]
+
+    columns_text = "\n".join(
+        [f"- {col.name} ({col.dtype}): {col.samples[:3]}" for col in columns]
+    )
+
+    prompt = get_prompt("schema_generation", context=context, columns_text=columns_text)
+
+    # LLM generates descriptions
+    schema_response = llm_service.ask(
+        user_query=prompt, structured_output_format=SchemaList
+    )
+
+    # Merge LLM descriptions with column metadata
+    schema_columns = []
+    schemas_list = (
+        schema_response.schemas
+        if hasattr(schema_response, "schemas")
+        else (schema_response if isinstance(schema_response, list) else [])
+    )
+    for schema_item in schemas_list:
+        matching = next((c for c in columns if c.name == schema_item.name), None)
+        if matching:
+            schema_columns.append(
+                SchemaColumn(
+                    name=schema_item.name,
+                    description=schema_item.description,
+                    data_type=matching.dtype,
+                    sample_values=matching.samples,
+                )
+            )
+
+    # Save
+    schema_file = SchemaFile(filepath=filepath, context=context, columns=schema_columns)
+    saved_path = save_schema(user_id, schema_file, table_name=table_name)
+
+    # Update user settings
+    current_settings = get_user_settings(user_id)
+    current_settings["schema_path"] = saved_path
+    save_user_settings(user_id, current_settings)
+    app_state.schema_path = saved_path
+
+    return SchemaResponse(
+        filepath=filepath,
+        context=context,
+        columns=[
+            SchemaColumnResponse(
+                name=col.name,
+                description=col.description,
+                data_type=col.data_type,
+                sample_values=col.sample_values,
+            )
+            for col in schema_columns
+        ],
+        created_at=schema_file.created_at,
+        updated_at=schema_file.updated_at,
     )
 
 
@@ -395,7 +554,7 @@ def load_schema_endpoint(
     # No schema exists - return 404
     # The schema will be generated when user clicks "Save Data Settings"
     # which triggers the proper background processing flow
-    logprint(f"ℹ️ [Schema] No existing schema found for {filepath}")
+    logprint(f"ℹ️ [Schema] No existing schema found for {filepath}", level="debug")
     raise HTTPException(
         status_code=404,
         detail="Schema not found. Save data settings to generate schema.",

@@ -59,7 +59,7 @@ def get_app_config(request: Request) -> AppConfig:
 def get_current_user(request: Request) -> dict:
     """Get current user from session cookie"""
     session_token = request.cookies.get("session_token")
-    logprint(f"Cookies received: {dict(request.cookies)}")
+    logprint(f"Cookies received: {dict(request.cookies)}", level="debug")
     if not session_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -78,7 +78,7 @@ def get_current_user(request: Request) -> dict:
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
-    logprint(f"👤 [Auth] Authenticated user: {user['user_id']} (username: {user['username']})")
+    logprint(f"👤 [Auth] Authenticated user: {user['user_id']} (username: {user['username']})", level="debug")
     return user
 
 @router.post("/auth/register", response_model=UserResponse)

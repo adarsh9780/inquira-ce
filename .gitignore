@@ -27,3 +27,6 @@ notebooks/*
 .venv
 .vscode
 commit_message.txt
+
+# Pyodide offline dependencies
+backend/app/static/pyodide/

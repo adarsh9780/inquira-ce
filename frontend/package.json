@@ -16,6 +16,7 @@
     "@codemirror/search": "^6.5.11",
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.38.1",
+    "@duckdb/duckdb-wasm": "^1.33.1-dev18.0",
     "@headlessui/vue": "^1.7.23",
     "@heroicons/vue": "^2.2.0",
     "@tailwindcss/vite": "^4.1.11",
@@ -27,13 +28,15 @@
     "markdown-it": "^14.1.0",
     "pinia": "^3.0.3",
     "plotly.js-dist-min": "^3.0.3",
+    "pyodide": "^0.27.2",
     "tailwindcss": "^4.1.11",
     "vue": "^3.5.17"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.0",
     "orval": "^7.17.2",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vite-plugin-node-polyfills": "^0.25.0"
   },
   "overrides": {
     "@codemirror/matchbrackets": "npm:@codemirror/language",

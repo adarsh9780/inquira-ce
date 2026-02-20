@@ -58,22 +58,22 @@ def merge_metadata(
     try:
         if new is None and prev is None:
             return None
-        
+
         # Helper to convert input to dict safely
         def to_dict(obj):
             if isinstance(obj, MetaData):
                 return obj.model_dump()
             if isinstance(obj, dict):
                 return obj
-            return {} # Fallback for bad types (strings, etc)
+            return {}  # Fallback for bad types (strings, etc)
 
         prev_dict = to_dict(prev)
         new_dict = to_dict(new)
-        
+
         # Merge
         merged = prev_dict.copy()
         merged.update(new_dict)
-        
+
         return MetaData(**merged)
     except Exception as e:
         # Fallback to prevent state corruption/crash
@@ -127,14 +127,15 @@ class InquiraAgent:
     def _get_model(self, config: RunnableConfig, model_name: str = "gemini-2.5-flash"):
         """Get model instance with API key from config"""
         api_key = config.get("configurable", {}).get("api_key")
-        
+
         # If API key is provided, set it in env for Google GenAI to pick up
         # or pass it if the specific init_chat_model supports it.
         # google-genai usually looks at GOOGLE_API_KEY env var.
         if api_key:
             import os
+
             os.environ["GOOGLE_API_KEY"] = api_key
-            
+
         return init_chat_model(f"google_genai:{model_name}")
 
     def check_relevancy(self, state: State, config: RunnableConfig) -> dict[str, Any]:
@@ -252,14 +253,29 @@ class InquiraAgent:
 
         system_prompt_template = SystemMessagePromptTemplate.from_template_file(
             get_prompt_path("codegen_prompt.yaml"),
-            input_variables=["plan", "current_code", "table_name", "schema", "data_path"],
+            input_variables=[
+                "plan",
+                "current_code",
+                "table_name",
+                "schema",
+                "data_path",
+            ],
         )
         prompt = ChatPromptTemplate.from_messages(
             [system_prompt_template, MessagesPlaceholder("messages")]
         )
-        
+
         # Serialize schema to string for the prompt
-        schema_str = json.dumps(state.active_schema, indent=2) if state.active_schema else "{}"
+        schema_str = (
+            json.dumps(state.active_schema, indent=2) if state.active_schema else "{}"
+        )
+
+        # Create the HTTP download URL for the web assembly duckdb client
+        download_url = (
+            f"/api/datasets/{state.table_name}/download"
+            if state.table_name
+            else "data.csv"
+        )
 
         # Upgrade model to ensure code generation capability
         model = self._get_model(config, "gemini-2.5-flash")
@@ -272,7 +288,7 @@ class InquiraAgent:
                 "current_code": state.previous_code,
                 "table_name": state.table_name or "data_table",
                 "schema": schema_str,
-                "data_path": state.data_path or "data.csv"
+                "data_path": download_url,
             }
         )
         response = cast(Code, response)
@@ -280,7 +296,7 @@ class InquiraAgent:
         updates = {"code": response.code}
         if response.code and response.code.strip():
             updates["current_code"] = response.code
-            
+
         return updates
 
     def noncode_generator(self, state: State, config: RunnableConfig) -> dict[str, Any]:
@@ -336,8 +352,11 @@ The platform uses DuckDB for efficient querying, Pandas for transformations, and
         return {"messages": [AIMessage(content=response.content)]}
 
     def unsafe_rejector(self, state: State, config: RunnableConfig) -> dict[str, Any]:
-        reasoning = state.metadata.safety_reasoning or "The request was flagged as potentially unsafe."
-        
+        reasoning = (
+            state.metadata.safety_reasoning
+            or "The request was flagged as potentially unsafe."
+        )
+
         system_prompt_template = SystemMessagePromptTemplate.from_template_file(
             get_prompt_path("unsafe_rejection_prompt.yaml"),
             input_variables=["safety_reasoning"],
@@ -349,16 +368,14 @@ The platform uses DuckDB for efficient querying, Pandas for transformations, and
         model = self._get_model(config, "gemini-2.5-flash-lite")
         chain = prompt | model
 
-        response = chain.invoke({
-            "messages": state.messages,
-            "safety_reasoning": reasoning,
-        })
+        response = chain.invoke(
+            {
+                "messages": state.messages,
+                "safety_reasoning": reasoning,
+            }
+        )
 
-        return {
-            "messages": [
-                AIMessage(content=response.content)
-            ]
-        }
+        return {"messages": [AIMessage(content=response.content)]}
 
     def compile(self, checkpointer=None) -> CompiledStateGraph:
         builder = StateGraph(

@@ -161,7 +161,7 @@ function refreshCurrent() {
 
 // Handle dataset switch event
 function handleDatasetSwitch() {
-  console.log('📢 Dataset switched - reloading preview data')
+  console.debug('📢 Dataset switched - reloading preview data')
   // Clear and reload all data
   data.value = []
   columns.value = []
@@ -191,7 +191,7 @@ function clearCache() {
   try {
     previewService.clearPreviewCache()
     // replace with toast.success if available
-    console.log('Preview cache cleared')
+    console.debug('Preview cache cleared')
   } catch (e) {
     console.warn('Failed to clear cache')
   }

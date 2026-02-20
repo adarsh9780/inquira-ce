@@ -87,10 +87,10 @@ export const apiService = {
   },
 
   async verifyAuth() {
-    console.log('🔍 Making verifyAuth request to /auth/verify')
+    console.debug('🔍 Making verifyAuth request to /auth/verify')
     try {
       const result = await client.verifyAuthAuthVerifyGet()
-      console.log('✅ verifyAuth success:', result)
+      console.debug('✅ verifyAuth success:', result)
       return result
     } catch (error) {
       console.error('❌ verifyAuth failed:', error.response?.status, error.response?.data)
@@ -141,13 +141,13 @@ export const apiService = {
   },
 
   async setDataPath(dataPath) {
-    console.log('📤 [API] Setting data path:', dataPath)
+    console.debug('📤 [API] Setting data path:', dataPath)
 
     // First verify authentication
     try {
-      console.log('🔐 [API] Verifying authentication...')
+      console.debug('🔐 [API] Verifying authentication...')
       await this.verifyAuth()
-      console.log('✅ [API] Authentication verified')
+      console.debug('✅ [API] Authentication verified')
     } catch (authError) {
       console.error('❌ [API] Authentication failed:', authError.response?.data)
       throw new Error('Authentication required. Please log in first.')
@@ -155,7 +155,7 @@ export const apiService = {
 
     try {
       const response = await client.setDataPathSettingsSetDataPathPut({ data_path: dataPath })
-      console.log('✅ [API] Data path set successfully:', response)
+      console.debug('✅ [API] Data path set successfully:', response)
       return response
     } catch (error) {
       console.error('❌ [API] Failed to set data path:', error.response?.data)
@@ -189,7 +189,7 @@ export const apiService = {
 
   // Generate schema with context
   async generateSchema(filepath, context = null, forceRegenerate = false) {
-    console.log('🔄 Generating schema for:', filepath, 'force:', forceRegenerate)
+    console.debug('🔄 Generating schema for:', filepath, 'force:', forceRegenerate)
 
     // Verify authentication before schema generation
     try {
@@ -205,7 +205,7 @@ export const apiService = {
         context: context,
         force_regenerate: forceRegenerate
       })
-      console.log('✅ Schema generation successful')
+      console.debug('✅ Schema generation successful')
       return response
     } catch (error) {
       console.error('❌ Schema generation failed:', error.response?.data)
@@ -213,9 +213,40 @@ export const apiService = {
     }
   },
 
+  /**
+   * Generate schema descriptions from column metadata (browser-native flow).
+   * The frontend sends columns from DuckDB-WASM directly — no file path needed.
+   */
+  async generateSchemaFromColumns(tableName, columns, context = null) {
+    console.debug('🔄 Generating schema from columns for table:', tableName)
+
+    try {
+      await this.verifyAuth()
+    } catch (authError) {
+      throw new Error('Authentication required for schema generation')
+    }
+
+    try {
+      const { default: axios } = await import('axios')
+      const baseUrl = client.defaults?.baseURL || (import.meta.env.VITE_API_BASE || '')
+      const response = await axios.post(`${baseUrl}/schemas/generate-from-columns`, {
+        table_name: tableName,
+        columns: columns,
+        context: context
+      }, {
+        withCredentials: true
+      })
+      console.debug('✅ Schema from columns generation successful')
+      return response.data
+    } catch (error) {
+      console.error('❌ Schema from columns generation failed:', error.response?.data)
+      throw error
+    }
+  },
+
   // Load existing schema
   async loadSchema(filepath) {
-    console.log('📂 Loading schema for:', filepath)
+    console.debug('📂 Loading schema for:', filepath)
 
     // Verify authentication before loading schema
     try {
@@ -228,7 +259,7 @@ export const apiService = {
     try {
       // NOTE: generated function takes filepath as an argument, separate from options
       const response = await client.loadSchemaEndpointSchemasLoadFilepathGet(filepath)
-      console.log('✅ Schema loading successful')
+      console.debug('✅ Schema loading successful')
       return response
     } catch (error) {
       console.error('❌ Schema loading failed:', error.response?.data)
@@ -238,7 +269,7 @@ export const apiService = {
 
   // Save schema
   async saveSchema(filepath, context, columns) {
-    console.log('💾 Saving schema for:', filepath)
+    console.debug('💾 Saving schema for:', filepath)
 
     // Verify authentication before saving schema
     try {
@@ -254,7 +285,7 @@ export const apiService = {
         context: context,
         columns: columns
       })
-      console.log('✅ Schema saving successful')
+      console.debug('✅ Schema saving successful')
       return response
     } catch (error) {
       console.error('❌ Schema saving failed:', error.response?.data)
@@ -264,7 +295,7 @@ export const apiService = {
 
   // List schemas
   async listSchemas() {
-    console.log('📋 Listing schemas')
+    console.debug('📋 Listing schemas')
 
     // Verify authentication before listing schemas
     try {
@@ -276,7 +307,7 @@ export const apiService = {
 
     try {
       const response = await client.listSchemasEndpointSchemasListGet()
-      console.log('✅ Schema listing successful')
+      console.debug('✅ Schema listing successful')
       return response
     } catch (error) {
       console.error('❌ Schema listing failed:', error.response?.data)
@@ -286,7 +317,7 @@ export const apiService = {
 
   // Get database and schema paths
   async getDatabasePaths() {
-    console.log('📂 Getting database paths')
+    console.debug('📂 Getting database paths')
 
     // Verify authentication before getting paths
     try {
@@ -298,7 +329,7 @@ export const apiService = {
 
     try {
       const response = await client.getStoragePathsSettingsPathsGet()
-      console.log('✅ Database paths retrieved successfully')
+      console.debug('✅ Database paths retrieved successfully')
       return response
     } catch (error) {
       console.error('❌ Failed to get database paths:', error.response?.data)
@@ -316,18 +347,12 @@ export const apiService = {
     return client.getChatHistoryHistoryGet()
   },
 
-  // Code execution
-  async executeCode(code) {
-    // using the 'with-variables' endpoint as in original service
-    return client.executeCodeWithVariablesExecuteWithVariablesPost({ code: code })
-  },
-
   // Health check
   async healthCheck() {
-    console.log('🏥 [API] Checking backend health...')
+    console.debug('🏥 [API] Checking backend health...')
     try {
       const response = await client.rootGet()
-      console.log('✅ [API] Backend is healthy:', response)
+      console.debug('✅ [API] Backend is healthy:', response)
       return response
     } catch (error) {
       console.error('❌ [API] Backend health check failed:', error.response?.status)
@@ -355,7 +380,7 @@ export const apiService = {
   async listDatasets() {
     try {
       const response = await client.listUserDatasetsDatasetsListGet()
-      console.log('📋 [API] Datasets loaded:', response)
+      console.debug('📋 [API] Datasets loaded:', response)
       return response
     } catch (error) {
       console.error('Failed to list datasets:', error)
@@ -397,11 +422,11 @@ export const apiService = {
 
   async refreshDataset(tableName, regenerateSchema = true) {
     try {
-      console.log(`🔄 [API] Refreshing dataset: ${tableName}`)
+      console.debug(`🔄 [API] Refreshing dataset: ${tableName}`)
       const response = await axios.post(`/datasets/${tableName}/refresh`, {
         regenerate_schema: regenerateSchema
       })
-      console.log('✅ [API] Dataset refreshed:', response)
+      console.debug('✅ [API] Dataset refreshed:', response)
       return response
     } catch (error) {
       console.error('Failed to refresh dataset:', error)

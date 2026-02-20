@@ -88,35 +88,41 @@
     <div class="space-y-6">
       <!-- Data File Path Input -->
       <div>
-        <label for="data-file-path" class="block text-sm font-medium text-gray-700 mb-2">
-          Data File Path
+        <label for="data-file-input" class="block text-sm font-medium text-gray-700 mb-2">
+          Data File
         </label>
-        <div class="max-w-md flex items-center space-x-2">
-          <input
-            id="data-file-path"
-            type="text"
-            :value="appStore.dataFilePath"
-            @input="handleDataFilePathChange"
-            @change="tryPrefillContextFromExistingSchema"
-            :disabled="isProcessing || isPickingFile"
-            placeholder="Enter path to data file (e.g., /path/to/data.csv)"
-            class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-          <button
-            type="button"
-            @click="browseForDataFile"
-            :disabled="isProcessing || isPickingFile"
-            class="px-3 py-2 text-sm bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span v-if="!isPickingFile">Browse</span>
-            <span v-else class="inline-flex items-center">
-              <div class="animate-spin rounded-full h-4 w-4 border-2 border-gray-500 border-t-transparent mr-2"></div>
-              Opening…
+        <div class="max-w-md">
+          <div class="flex items-center space-x-2">
+            <label
+              class="flex-1 flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm cursor-pointer hover:bg-gray-50 transition-colors"
+              :class="{ 'opacity-50 cursor-not-allowed': isProcessing || isPickingFile }"
+            >
+              <input
+                id="data-file-input"
+                ref="fileInputRef"
+                type="file"
+                accept=".csv,.parquet,.xlsx,.json,.tsv"
+                @change="handleFileSelected"
+                :disabled="isProcessing || isPickingFile"
+                class="hidden"
+              />
+              <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <span v-if="!appStore.dataFilePath" class="text-gray-500">Choose a file...</span>
+              <span v-else class="text-gray-900 truncate">{{ appStore.dataFilePath }}</span>
+            </label>
+            <span v-if="isPickingFile" class="inline-flex items-center text-sm text-blue-600">
+              <div class="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent mr-2"></div>
+              Ingesting…
             </span>
-          </button>
+          </div>
         </div>
         <p class="mt-1 text-xs text-gray-500">
-          Supported formats: CSV, Excel, Parquet, DuckDB
+          Supported formats: CSV, Parquet, Excel (.xlsx), JSON, TSV
+        </p>
+        <p v-if="ingestedColumns.length" class="mt-1 text-xs text-green-600">
+          ✅ {{ ingestedColumns.length }} columns loaded into DuckDB
         </p>
       </div>
 
@@ -218,6 +224,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { apiService } from '../../services/apiService'
+import { duckdbService } from '../../services/duckdbService'
 import { settingsWebSocket } from '../../services/websocketService'
 import { previewService } from '../../services/previewService'
 import { toast } from '../../composables/useToast'
@@ -246,6 +253,9 @@ const timerInterval = ref(null)
 const startTime = ref(null)
 const isPickingFile = ref(false)
 const isRefreshing = ref(false)
+const ingestedColumns = ref([])  // columns from DuckDB-WASM ingestion
+const ingestedTableName = ref('') // DuckDB table name
+const fileInputRef = ref(null)   // ref for the <input type="file">
 
 // Computed
 const hasApiKey = computed(() => appStore.apiKey.trim() !== '')
@@ -317,29 +327,32 @@ function clearMessage() {
   messageType.value = ''
 }
 
-// Native file dialog via backend
-async function browseForDataFile() {
-  clearMessage()
-  isPickingFile.value = true
+// Browser file picker — ingest directly into DuckDB-WASM
+async function handleFileSelected(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  clearMessage();
+  isPickingFile.value = true;
+
   try {
-    const resp = await apiService.openFileDialog()
-    if (resp && resp.data_path) {
-      appStore.setDataFilePath(resp.data_path)
-      // Attempt to prefill context if schema exists
-      await tryPrefillContextFromExistingSchema()
-    } else {
-      showMessage('No file selected.', 'error')
-    }
+    // Ingest file lazily into DuckDB-WASM via registerFileHandle
+    const { tableName, columns, rowCount } = await duckdbService.ingestFile(file);
+
+    // Store in appStore and local state
+    appStore.setDataFilePath(file.name);
+    ingestedColumns.value = columns;
+    ingestedTableName.value = tableName;
+
+    showMessage(`Loaded "${file.name}" → table "${tableName}" (${rowCount} rows, ${columns.length} columns)`, 'success');
+
+    // Attempt to prefill context if schema exists
+    await tryPrefillContextFromExistingSchema();
   } catch (error) {
-    if (error.response?.status === 403) {
-      showMessage('Native file picker is disabled by the backend. Set INQUIRA_ALLOW_FILE_DIALOG=1 and try again.', 'error')
-    } else if (error.response?.status === 400) {
-      showMessage('No file selected.', 'error')
-    } else {
-      showMessage('Failed to open file dialog. Please enter the path manually.', 'error')
-    }
+    console.error('File ingestion failed:', error);
+    showMessage(`Failed to load file: ${error.message}`, 'error');
   } finally {
-    isPickingFile.value = false
+    isPickingFile.value = false;
   }
 }
 
@@ -422,28 +435,45 @@ function handleProgressUpdate(data) {
   }
 }
 
-// Schema generation with progress
+// Schema generation using column metadata from DuckDB-WASM
 async function generateAndSaveSchema() {
   try {
-    updateProgress('Generating schema...', 60)
+    updateProgress('Fetching sample data from DuckDB...', 50)
 
-    const schemaData = await apiService.generateSchema(
-      appStore.dataFilePath.trim(),
+    // Get sample values from DuckDB-WASM for each column
+    const columnsWithSamples = []
+    for (const col of ingestedColumns.value) {
+      try {
+        const samples = await duckdbService.query(
+          `SELECT DISTINCT "${col.name}" FROM ${ingestedTableName.value} LIMIT 10`
+        )
+        columnsWithSamples.push({
+          name: col.name,
+          dtype: col.type,
+          samples: samples.map(row => {
+            const v = Object.values(row)[0]
+            // DuckDB-WASM/Arrow returns BigInt for integers; JSON.stringify can't handle it
+            return typeof v === 'bigint' ? Number(v) : v
+          })
+        })
+      } catch (e) {
+        columnsWithSamples.push({ name: col.name, dtype: col.type, samples: [] })
+      }
+    }
+
+    updateProgress('Generating AI descriptions...', 60)
+
+    const schemaData = await apiService.generateSchemaFromColumns(
+      ingestedTableName.value,
+      columnsWithSamples,
       appStore.schemaContext.trim() || null
     )
 
     updateProgress('Saving schema...', 80)
 
     if (schemaData && schemaData.columns) {
-      const saveResponse = await apiService.saveSchema(
-        appStore.dataFilePath.trim(),
-        appStore.schemaContext.trim() || null,
-        schemaData.columns
-      )
-
       appStore.setIsSchemaFileUploaded(true)
-      appStore.setSchemaFileId(saveResponse.id || appStore.dataFilePath.trim())
-
+      appStore.setSchemaFileId(schemaData.filepath || ingestedTableName.value)
       updateProgress('Schema saved successfully', 100)
     } else {
       updateProgress('Schema generation incomplete', 100)
@@ -454,7 +484,8 @@ async function generateAndSaveSchema() {
   }
 }
 
-// Main save function
+// Main save function — ingestion already done by handleFileSelected.
+// This only saves context + generates LLM schema descriptions.
 async function saveDataSettings() {
   // Validate API key
   if (!hasApiKey.value) {
@@ -462,172 +493,57 @@ async function saveDataSettings() {
     return
   }
 
-  // Validate data file path
+  // Validate that a file has been ingested
   const dataPath = appStore.dataFilePath.trim()
   if (!dataPath) {
-    showMessage('Data file path is required.', 'error')
+    showMessage('Please select a data file first.', 'error')
     return
   }
 
-  // Validate file extension
-  const validExtensions = ['.csv', '.xlsx', '.parquet', '.db', '.duckdb']
-  if (!validExtensions.some(ext => dataPath.endsWith(ext))) {
-    showMessage('Please enter a valid file path with supported format (.csv, .xlsx, .xls, .parquet, .db, .duckdb)', 'error')
+  if (ingestedColumns.value.length === 0) {
+    showMessage('No columns detected. Please re-select the data file.', 'error')
     return
   }
 
   clearMessage()
   startTimer()
-  showProgress('Initializing...', 10)
+  showProgress('Saving context...', 20)
 
-  // Check if this is a NEW dataset (not in existing catalog)
-  // This determines whether we need to generate schema
-  let isNewDataset = true
-  let existingDatasetInfo = null
   try {
-    const existingDatasets = await apiService.listDatasets()
-    const datasets = existingDatasets.datasets || existingDatasets || []
-    existingDatasetInfo = datasets.find(ds => ds.file_path === dataPath)
-    isNewDataset = !existingDatasetInfo
-    console.log(`📋 [DataTab] Is new dataset: ${isNewDataset}`, existingDatasetInfo ? `(existing: ${existingDatasetInfo.table_name})` : '')
-  } catch (e) {
-    console.warn('Could not check existing datasets:', e)
-  }
+    // Save context to backend
+    await apiService.setContext(appStore.schemaContext.trim())
 
-  // Determine if we need to generate schema for THIS specific file
-  // Don't rely on updateInfo which was computed for the PREVIOUS file path
-  let needsSchemaGeneration = true
-  if (!isNewDataset && existingDatasetInfo) {
-    // Dataset exists - check if schema exists by trying to load it
+    // Check if schema with descriptions already exists
+    let needsSchemaGeneration = true
     try {
       const existingSchema = await apiService.loadSchema(dataPath)
-      if (existingSchema && existingSchema.columns && existingSchema.columns.length > 0) {
-        // Schema exists and has columns - check if it has descriptions
-        const hasDescriptions = existingSchema.columns.some(col => col.description && col.description.trim())
+      if (existingSchema?.columns?.length > 0) {
+        const hasDescriptions = existingSchema.columns.some(col => col.description?.trim())
         if (hasDescriptions) {
           needsSchemaGeneration = false
-          console.log('📋 [DataTab] Schema with descriptions already exists - skipping regeneration')
-        } else {
-          console.log('📋 [DataTab] Schema exists but missing descriptions - will regenerate')
+          console.debug('📋 [DataTab] Schema with descriptions already exists - skipping regeneration')
         }
       }
     } catch (schemaErr) {
-      // Schema doesn't exist or can't be loaded - need to generate
-      console.log('📋 [DataTab] No existing schema found - will generate')
-    }
-  }
-
-  try {
-    // Ensure WebSocket is connected for real-time progress updates
-    if (!settingsWebSocket.isConnected) {
-      updateProgress('Establishing connection for progress updates...', 15)
-      try {
-        // Get user ID from auth store
-        const { useAuthStore } = await import('../../stores/authStore')
-        const authStore = useAuthStore()
-        if (authStore.userId) {
-          await settingsWebSocket.connect(authStore.userId)
-          console.log('✅ WebSocket reconnected for progress updates')
-        }
-      } catch (wsError) {
-        console.warn('⚠️ Could not establish WebSocket connection. Continuing without real-time updates:', wsError)
-        // Continue anyway - backend will work without WebSocket, just no real-time progress
-      }
+      // No existing schema — need to generate
+      console.debug('📋 [DataTab] No existing schema found - will generate')
     }
 
-    // Setup WebSocket progress handler
-    settingsWebSocket.onProgress(handleProgressUpdate)
-    // Gate: resolve when backend signals completion via WebSocket
-    const waitForWsCompletion = () => new Promise((resolve, reject) => {
-      const TIMEOUT_MS = 15 * 60 * 1000 // 15 minutes safety timeout
-      let timer = setTimeout(() => {
-        // Timeout: resolve to allow UI to continue, but log
-        console.warn('WebSocket completion timeout; continuing UI flow')
-        cleanup()
-        resolve('timeout')
-      }, TIMEOUT_MS)
-
-      const onComplete = () => {
-        cleanup()
-        resolve('completed')
-      }
-      const onError = (err) => {
-        cleanup()
-        reject(err || new Error('WebSocket reported error'))
-      }
-
-      function cleanup() {
-        clearTimeout(timer)
-        // Unsubscribe
-        settingsWebSocket.onComplete(null)
-        settingsWebSocket.onError(null)
-      }
-
-      settingsWebSocket.onComplete(onComplete)
-      settingsWebSocket.onError(onError)
-    })
-
-    updateProgress('Saving data path...', 20)
-
-    // Save data path
-    await apiService.setDataPath(dataPath)
-
-    updateProgress('Saving context...', 40)
-
-    // Save context
-    await apiService.setContext(appStore.schemaContext.trim())
-
-    // Generate and save schema only if needed for THIS specific file
-    // Previously used updateInfo which was stale (based on old file path)
     if (!needsSchemaGeneration) {
       updateProgress('Schema already exists; skipping regeneration', 80)
-      console.log('📋 [DataTab] Skipping schema generation - valid schema already exists')
     } else {
       await generateAndSaveSchema()
-      // Keep progress visible and follow backend WebSocket until completion
-      updateProgress('Finalizing update…', 90)
-      try {
-        await waitForWsCompletion()
-      } catch (wsErr) {
-        console.error('❌ WebSocket reported error during update:', wsErr)
-        throw wsErr
-      }
-      updateProgress('Clearing cache...', 95)
-      // Clear preview cache for fresh data only when we actually updated
-      previewService.clearPreviewCache()
     }
 
-    updateProgress('Data settings saved successfully!', 100)
-
-    showMessage('Data settings saved successfully! Data preview is ready for instant loading.', 'success')
+    updateProgress('Data settings saved!', 100)
+    showMessage('Data settings saved! Your data is ready for analysis.', 'success')
 
   } catch (error) {
     console.error('❌ Failed to save data settings:', error)
-
-    let errorMessage = 'Failed to save data settings. Please try again.'
-    if (error.response?.status === 400) {
-      errorMessage = error.response?.data?.detail || 'Invalid data file path. Please check that the file exists and is accessible.'
-    } else if (error.response?.status === 404) {
-      errorMessage = 'Data file not found. Please check the file path and ensure the file exists.'
-    } else if (error.response?.status === 403) {
-      errorMessage = 'Access denied to data file. Please check file permissions.'
-    }
-
-    showMessage(errorMessage, 'error')
+    showMessage(`Failed to save settings: ${error.message || 'Please try again.'}`, 'error')
   } finally {
-    // Clean up WebSocket handler
-    settingsWebSocket.onProgress(null)
     hideProgress()
-    
-    // For NEW datasets, clear the update banner (no need to check for updates)
-    // For EXISTING datasets, refresh the update banner state
-    if (isNewDataset) {
-      updateInfo.value = null
-      console.log('📋 [DataTab] New dataset - cleared update banner')
-    } else {
-      // Refresh update banner state silently so it reflects latest should_update
-      await checkForUpdate(true)
-    }
+    updateInfo.value = null
   }
 }
 
@@ -702,8 +618,24 @@ watch(isProcessing, (newVal) => {
   }
 })
 
-// Run update check when the Data tab mounts
-onMounted(() => {
+// Run update check and auto-detect DuckDB tables when the Data tab mounts
+onMounted(async () => {
   checkForUpdate()
+
+  // Auto-detect if tables already exist in DuckDB-WASM
+  try {
+    const tables = await duckdbService.getTableNames()
+    if (tables.length > 0 && appStore.dataFilePath) {
+      // Table already loaded from a previous file selection
+      const tableName = tables[0]
+      ingestedTableName.value = tableName
+      const cols = await duckdbService.describeTable(tableName)
+      ingestedColumns.value = cols
+      console.debug(`📋 [DataTab] Auto-detected existing table: ${tableName} (${cols.length} columns)`)
+    }
+  } catch (e) {
+    // DuckDB may not be initialized yet — that's fine
+    console.debug('📋 [DataTab] No existing DuckDB tables detected')
+  }
 })
 </script>

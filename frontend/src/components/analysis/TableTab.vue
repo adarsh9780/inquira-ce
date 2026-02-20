@@ -235,7 +235,7 @@ async function downloadCsv() {
     link.click()
     document.body.removeChild(link)
 
-    console.log('CSV downloaded successfully')
+    console.debug('CSV downloaded successfully')
 
   } catch (error) {
     console.error('Failed to download CSV:', error)

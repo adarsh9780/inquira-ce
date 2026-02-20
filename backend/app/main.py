@@ -30,7 +30,6 @@ if not hasattr(aiosqlite.Connection, "is_alive"):
 from .api.api_test import router as api_test_router
 from .api.auth import router as auth_router
 from .api.chat import router as chat_router
-from .api.code_execution import router as code_execution_router
 from .api.data_preview import router as data_preview_router
 from .api.datasets import router as datasets_router
 from .api.schemas import router as schema_router
@@ -203,6 +202,17 @@ def get_ui_dir() -> str:
 
 app.mount("/ui", StaticFiles(directory=get_ui_dir(), html=True), name="ui")
 
+# Mount Pyodide locally so it works behind corporate proxies without reaching out to JSdelivr
+_pyodide_dir = os.path.join(os.path.dirname(__file__), "static", "pyodide")
+try:
+    app.mount(
+        "/assets/pyodide",
+        StaticFiles(directory=_pyodide_dir, check_dir=False),
+        name="pyodide",
+    )
+except Exception as e:
+    logprint(f"Pyodide static mount skipped: {e}", level="warning")
+
 # Mount logo directory if present; don't fail if missing in some wheels
 _logo_dir = os.path.join(os.path.dirname(__file__), "logo")
 try:
@@ -234,7 +244,6 @@ app.include_router(chat_router)
 app.include_router(settings_router)
 app.include_router(data_preview_router)
 app.include_router(schema_router)
-app.include_router(code_execution_router)
 app.include_router(api_test_router)
 app.include_router(datasets_router)
 app.include_router(system_router)

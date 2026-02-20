@@ -59,6 +59,7 @@
 import { ref, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import apiService from '../../services/apiService'
+import pyodideService from '../../services/pyodideService'
 import { toast } from '../../composables/useToast'
 import {
   PaperAirplaneIcon,
@@ -111,7 +112,7 @@ async function handleSubmit() {
     }
 
     // Log the request for debugging
-    console.log('📤 Sending request to /chat endpoint:', requestData)
+    console.debug('📤 Sending request to /chat endpoint:', requestData)
 
     // Set up timeout timers
     warningTimer = setTimeout(() => {
@@ -143,6 +144,55 @@ async function handleSubmit() {
     appStore.updateLastMessageExplanation(explanation)
     appStore.setGeneratedCode(code)
 
+    // Execute the code locally if code was generated
+    if (code && code.trim()) {
+      try {
+        appStore.setTerminalOutput('Executing with Python WebAssembly...\n')
+        
+        // Execute the code in Pyodide
+        const result = await pyodideService.executePython(code)
+        
+        if (result.success) {
+           appStore.addHistoricalCodeBlock(code) // Save it so we can restore on reload
+           
+           if (result.stdout || result.stderr) {
+              appStore.setTerminalOutput(result.stdout + '\n' + result.stderr)
+           } else {
+              appStore.setTerminalOutput('Execution successful. No terminal output.')
+           }
+           
+           // Based on what type of result Wasm returns, populate the UI
+           if (result.resultType === 'dict' && result.result?.data && result.result?.layout) {
+              // Plotly figure
+              appStore.setPlotlyFigure(result.result)
+              appStore.setResultData(null)
+              appStore.setActiveTab('chart')
+           } else if (result.resultType === 'dict' && result.result?.columns && result.result?.data) {
+              // Pandas DataFrame format
+              appStore.setResultData(result.result)
+              appStore.setPlotlyFigure(null)
+              appStore.setActiveTab('table')
+           } else {
+              // Bare code logic
+              appStore.setActiveTab('code')
+           }
+
+        } else {
+           // Execution failed locally
+           appStore.setTerminalOutput('Error executing code:\n' + result.error)
+           appStore.setActiveTab('code')
+           toast.error('Execution Failed', 'The generated code failed to run locally.')
+        }
+        
+      } catch (err) {
+        console.error('Pyodide execution error:', err)
+        appStore.setTerminalOutput('Critical error running WebAssembly: ' + err.message)
+        appStore.setActiveTab('code')
+      }
+    } else {
+      appStore.setActiveTab('code')
+    }
+
     // Trigger scroll to bottom after message is added
     setTimeout(() => {
       // Find the scrollable container directly
@@ -152,20 +202,7 @@ async function handleSubmit() {
       }
     }, 200)
 
-    // Determine which tab to show based on available results
-    if (response.figure) {
-      // If there's a chart, show the chart tab
-      appStore.setActiveTab('chart')
-    } else if (response.result_df) {
-      // If there's table data, show the table tab
-      appStore.setActiveTab('table')
-    } else {
-      // Otherwise show the code tab
-      appStore.setActiveTab('code')
-    }
 
-    // Clear any previous terminal output
-    appStore.setTerminalOutput('')
 
   } catch (error) {
     console.error('Analysis failed:', error)

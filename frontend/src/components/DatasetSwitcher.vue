@@ -282,12 +282,12 @@ async function confirmDelete() {
       if (datasets.value.length > 0) {
         // Auto-switch to the first available dataset
         const nextDataset = datasets.value[0]
-        console.log('🔄 Auto-switching to next dataset:', nextDataset.table_name)
+        console.debug('🔄 Auto-switching to next dataset:', nextDataset.table_name)
         await selectDataset(nextDataset)
         toast.success('Switched Dataset', `Now viewing: ${nextDataset.table_name}`)
       } else {
         // No datasets left - clear state and show empty state
-        console.log('🗑️ No datasets remaining. Clearing workspace.')
+        console.debug('🗑️ No datasets remaining. Clearing workspace.')
         appStore.setDataFilePath('')
         appStore.setSchemaContext('')
         appStore.setIsSchemaFileUploaded(false)
@@ -357,7 +357,7 @@ async function confirmRefresh() {
       `${ds.table_name} updated with ${result.row_count || 'new'} rows${result.schema_regenerated ? ' and schema regenerated' : ''}`
     )
     
-    console.log('✅ Dataset refreshed:', result)
+    console.debug('✅ Dataset refreshed:', result)
   } catch (error) {
     console.error('Failed to refresh dataset:', error)
     alert('Failed to refresh dataset: ' + (error.response?.data?.detail || error.message))
@@ -398,7 +398,7 @@ async function selectDataset(ds) {
       detail: { tableName: ds.table_name, dataPath: ds.file_path }
     }))
     
-    console.log(`✅ Switched to dataset: ${ds.table_name}`)
+    console.debug(`✅ Switched to dataset: ${ds.table_name}`)
   } catch (error) {
     console.error('Failed to switch dataset:', error)
   } finally {

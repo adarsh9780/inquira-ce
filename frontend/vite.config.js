@@ -35,7 +35,8 @@ export default defineConfig({
       'markdown-it',
       'dompurify',
       'plotly.js-dist-min'
-    ]
+    ],
+    exclude: ['pyodide']
   },
   server: {
     proxy: {

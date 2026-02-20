@@ -33,6 +33,9 @@ export const useAppStore = defineStore('app', () => {
   const currentQuestion = ref('')
   const currentExplanation = ref('')
 
+  // Wasm Execution State
+  const historicalCodeBlocks = ref([]) // Tracks successfully executed code snippets
+
   // Analysis
   const generatedCode = ref('')
   const resultData = ref(null)
@@ -73,12 +76,12 @@ export const useAppStore = defineStore('app', () => {
       isSchemaFileUploaded: isSchemaFileUploaded.value,
       schemaContext: schemaContext.value,
       chatOverlayWidth: chatOverlayWidth.value,
+      historicalCodeBlocks: historicalCodeBlocks.value,
       timestamp: new Date().toISOString()
     }
 
     try {
       localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config))
-      console.log('✅ Configuration saved to localStorage:', config)
     } catch (error) {
       console.error('❌ Failed to save configuration:', error)
     }
@@ -88,12 +91,10 @@ export const useAppStore = defineStore('app', () => {
     try {
       const configStr = localStorage.getItem(STORAGE_KEYS.CONFIG)
       if (!configStr) {
-        console.log('No local configuration found')
         return false
       }
 
       const config = JSON.parse(configStr)
-      console.log('Loading local configuration:', config)
 
       // Restore API key and model
       if (config.apiKey) {
@@ -136,7 +137,12 @@ export const useAppStore = defineStore('app', () => {
         chatOverlayWidth.value = config.chatOverlayWidth
       }
 
-      console.log('Local configuration loaded successfully')
+      // Restore historical code blocks for Pyodide
+      if (config.historicalCodeBlocks) {
+        historicalCodeBlocks.value = config.historicalCodeBlocks
+      }
+
+
 
       // Fetch history if data path is restored
       if (dataFilePath.value) {
@@ -165,8 +171,8 @@ export const useAppStore = defineStore('app', () => {
       schemaFileId.value = ''
       isSchemaFileUploaded.value = false
       schemaContext.value = ''
+      historicalCodeBlocks.value = []
 
-      console.log('Local configuration cleared')
       return true
     } catch (error) {
       console.error('Failed to clear local configuration:', error)
@@ -250,20 +256,14 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function fetchChatHistory() {
-    console.log("🔍 fetchChatHistory called")
     try {
       const response = await apiService.getHistory()
-      console.log("🔍 fetchChatHistory raw response:", response)
-
-      // Handle response structure - axios interceptor returns response.data directly
       const responseData = response.data || response
-      console.log("🔍 fetchChatHistory processed data:", responseData)
 
       if (responseData) {
         // Backend returns: { messages: [...], current_code: string }
         const messages = responseData.messages || []
         const currentCode = responseData.current_code || ''
-        console.log(`🔍 Found ${messages.length} messages and code length ${currentCode.length}`)
 
         // Update code editor if we have persistent code
         if (currentCode) {
@@ -297,7 +297,7 @@ export const useAppStore = defineStore('app', () => {
           history.push({ ...currentPair, id: Date.now(), timestamp: new Date().toISOString() })
         }
 
-        console.log("🔍 updated chatHistory:", history)
+
         chatHistory.value = history
       } else {
         console.warn("⚠️ fetchChatHistory: No data in response")
@@ -439,6 +439,15 @@ export const useAppStore = defineStore('app', () => {
     notebookCells.value = []
     activeCellIndex.value = 0
     selectedCellIds.value = []
+    historicalCodeBlocks.value = []
+    saveLocalConfig()
+  }
+
+  function addHistoricalCodeBlock(code) {
+    if (code && code.trim()) {
+      historicalCodeBlocks.value.push(code)
+      saveLocalConfig()
+    }
   }
 
 
@@ -473,6 +482,7 @@ export const useAppStore = defineStore('app', () => {
     notebookCells,
     activeCellIndex,
     selectedCellIds,
+    historicalCodeBlocks,
 
     // Computed
     hasDataFile,
@@ -519,6 +529,7 @@ export const useAppStore = defineStore('app', () => {
     toggleCellSelection,
     clearCellSelection,
     resetSession,
-    fetchChatHistory
+    fetchChatHistory,
+    addHistoricalCodeBlock
   }
 })

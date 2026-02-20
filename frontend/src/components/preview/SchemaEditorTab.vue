@@ -203,25 +203,25 @@ const MAX_POLLING_ATTEMPTS = 20 // Stop after ~60 seconds (20 * 3s)
 function startSchemaPolling() {
   if (schemaPollingInterval) return
   pollingAttempts = 0
-  console.log('🔄 [Schema] Starting auto-poll for schema updates (max 60s)')
+  console.debug('🔄 [Schema] Starting auto-poll for schema updates (max 60s)')
   schemaPollingInterval = setInterval(async () => {
     pollingAttempts++
     
     // Stop if schema generation is complete
     if (!isSchemaBeingGenerated.value) {
-      console.log('✅ [Schema] Schema generation complete, stopping poll')
+      console.debug('✅ [Schema] Schema generation complete, stopping poll')
       stopSchemaPolling()
       return
     }
     
     // Stop after max attempts
     if (pollingAttempts >= MAX_POLLING_ATTEMPTS) {
-      console.log('⚠️ [Schema] Max polling attempts reached, stopping poll. Click Regenerate to try again.')
+      console.debug('⚠️ [Schema] Max polling attempts reached, stopping poll. Click Regenerate to try again.')
       stopSchemaPolling()
       return
     }
     
-    console.log(`🔄 [Schema] Polling for updated schema... (attempt ${pollingAttempts}/${MAX_POLLING_ATTEMPTS})`)
+    console.debug(`🔄 [Schema] Polling for updated schema... (attempt ${pollingAttempts}/${MAX_POLLING_ATTEMPTS})`)
     await silentFetchSchema() // Silent refresh without loading state
   }, 3000) // Poll every 3 seconds
 }
@@ -245,7 +245,7 @@ async function silentFetchSchema() {
       // Check if descriptions are now filled (generation complete)
       const hasDescriptions = existingSchema.columns.some(col => col.description && col.description.trim() !== '')
       if (hasDescriptions || (existingSchema.context && existingSchema.context.trim() !== '')) {
-        console.log('✅ [Schema] Poll found completed schema with descriptions!')
+        console.debug('✅ [Schema] Poll found completed schema with descriptions!')
         schema.value = existingSchema.columns
         schemaContext.value = existingSchema.context || ''
         stopSchemaPolling()
@@ -264,17 +264,17 @@ async function fetchSchemaData(forceRefresh = false) {
   schema.value = []
   try {
     const settings = await previewService.getSettings(forceRefresh)
-    console.log('📋 [Schema] Settings loaded:', settings.data_path)
+    console.debug('📋 [Schema] Settings loaded:', settings.data_path)
     if (!settings.data_path) {
       schemaError.value = 'Please configure your data file path in settings first.'
       return
     }
     try {
-      console.log('📋 [Schema] Loading schema for:', settings.data_path, 'forceRefresh:', forceRefresh)
+      console.debug('📋 [Schema] Loading schema for:', settings.data_path, 'forceRefresh:', forceRefresh)
       const existingSchema = await previewService.loadSchema(settings.data_path, forceRefresh)
-      console.log('📋 [Schema] Response:', existingSchema)
+      console.debug('📋 [Schema] Response:', existingSchema)
       if (existingSchema && existingSchema.columns) {
-        console.log('📋 [Schema] Loaded', existingSchema.columns.length, 'columns')
+        console.debug('📋 [Schema] Loaded', existingSchema.columns.length, 'columns')
         schema.value = existingSchema.columns
         schemaContext.value = existingSchema.context || ''
         
@@ -305,12 +305,12 @@ async function fetchSchemaDataForPath(dataPath) {
   schemaError.value = ''
   schema.value = []
   try {
-    console.log('📋 [Schema] Loading schema for path (direct):', dataPath)
+    console.debug('📋 [Schema] Loading schema for path (direct):', dataPath)
     // Force refresh to bypass cache
     const existingSchema = await previewService.loadSchema(dataPath, true)
-    console.log('📋 [Schema] Response:', existingSchema)
+    console.debug('📋 [Schema] Response:', existingSchema)
     if (existingSchema && existingSchema.columns) {
-      console.log('📋 [Schema] Loaded', existingSchema.columns.length, 'columns')
+      console.debug('📋 [Schema] Loaded', existingSchema.columns.length, 'columns')
       schema.value = existingSchema.columns
       schemaContext.value = existingSchema.context || ''
     } else {
@@ -341,7 +341,7 @@ async function saveSchema() {
     }
     await apiService.saveSchema(settings.data_path, schemaContext.value || null, schema.value)
     schemaEdited.value = false
-    console.log('Schema saved successfully')
+    console.debug('Schema saved successfully')
   } catch (e) {
     console.error('Failed to save schema:', e)
     schemaError.value = 'Failed to save schema'
@@ -372,11 +372,11 @@ async function regenerateSchema() {
 
     regenerationStatus.value = 'Analyzing data columns with AI...'
     regenerationProgress.value = 30
-    console.log('🔄 [Schema] Regenerating schema with LLM for:', settings.data_path)
+    console.debug('🔄 [Schema] Regenerating schema with LLM for:', settings.data_path)
 
     // Call generateSchema which uses LLM to create proper descriptions (force=true to regenerate)
     const generatedSchema = await apiService.generateSchema(settings.data_path, null, true)
-    console.log('🔄 [Schema] Generated:', generatedSchema)
+    console.debug('🔄 [Schema] Generated:', generatedSchema)
 
     if (generatedSchema && generatedSchema.columns) {
       regenerationStatus.value = `Saving ${generatedSchema.columns.length} column descriptions...`
@@ -384,7 +384,7 @@ async function regenerateSchema() {
 
       // Save the generated schema
       await apiService.saveSchema(settings.data_path, generatedSchema.context || null, generatedSchema.columns)
-      console.log('✅ [Schema] Saved regenerated schema')
+      console.debug('✅ [Schema] Saved regenerated schema')
 
       regenerationStatus.value = 'Finalizing...'
       regenerationProgress.value = 95
@@ -396,7 +396,7 @@ async function regenerateSchema() {
       
       regenerationProgress.value = 100
       regenerationStatus.value = `✅ Generated ${generatedSchema.columns.length} descriptions!`
-      console.log('✅ [Schema] Loaded', generatedSchema.columns.length, 'columns with descriptions')
+      console.debug('✅ [Schema] Loaded', generatedSchema.columns.length, 'columns with descriptions')
       
       // Brief pause to show success message
       await new Promise(resolve => setTimeout(resolve, 500))
@@ -417,9 +417,9 @@ async function regenerateSchema() {
 function handleDatasetSwitch(event) {
   // Get path from event detail, or fallback to appStore
   const newDataPath = event?.detail?.dataPath
-  console.log('📢 Dataset switched event:', event)
-  console.log('📢 Event detail:', event?.detail)
-  console.log('📢 Data path from event:', newDataPath)
+  console.debug('📢 Dataset switched event:', event)
+  console.debug('📢 Event detail:', event?.detail)
+  console.debug('📢 Data path from event:', newDataPath)
   
   schemaEdited.value = false
   schema.value = []
@@ -431,23 +431,23 @@ function handleDatasetSwitch(event) {
   
   // If event.detail is null, the last dataset was deleted - show empty state
   if (event?.detail === null) {
-    console.log('📢 Last dataset deleted - showing empty state')
+    console.debug('📢 Last dataset deleted - showing empty state')
     return // Let the empty state UI show
   }
   
   // If we have the new path from the event, use it directly
   if (newDataPath) {
-    console.log('📢 Using path from event:', newDataPath)
+    console.debug('📢 Using path from event:', newDataPath)
     fetchSchemaDataForPath(newDataPath)
   } else {
     // Fallback: try to get from appStore (should be set before event is dispatched)
     const appStorePath = appStore.dataFilePath
-    console.log('📢 No path in event, trying appStore:', appStorePath)
+    console.debug('📢 No path in event, trying appStore:', appStorePath)
     if (appStorePath) {
       fetchSchemaDataForPath(appStorePath)
     } else {
       // No dataset selected - show empty state
-      console.log('📢 No active dataset - showing empty state')
+      console.debug('📢 No active dataset - showing empty state')
     }
   }
 }
@@ -464,7 +464,7 @@ onUnmounted(() => {
 function clearCache() {
   try {
     previewService.clearPreviewCache()
-    console.log('Preview cache cleared')
+    console.debug('Preview cache cleared')
   } catch (e) {
     console.warn('Failed to clear cache')
   }

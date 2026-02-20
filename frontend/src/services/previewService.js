@@ -98,7 +98,7 @@ class PreviewService {
 
     settingsKeys.forEach(key => cacheService.delete(key))
 
-    console.log(`🗑️ Cleared ${dataPreviewKeys.length} data preview, ${schemaKeys.length} schema, and ${settingsKeys.length} settings cache entries`)
+    console.debug(`🗑️ Cleared ${dataPreviewKeys.length} data preview, ${schemaKeys.length} schema, and ${settingsKeys.length} settings cache entries`)
   }
 
   // Clear cache for specific filepath
@@ -113,7 +113,7 @@ class PreviewService {
     }
 
     keysToDelete.forEach(key => cacheService.delete(key))
-    console.log(`🗑️ Cleared ${keysToDelete.length} cache entries for file: ${filepath}`)
+    console.debug(`🗑️ Cleared ${keysToDelete.length} cache entries for file: ${filepath}`)
   }
 
   // Get cache statistics

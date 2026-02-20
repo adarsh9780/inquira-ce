@@ -155,7 +155,6 @@ async function testApiKey() {
     const res = await apiService.testGeminiApi(key)
     message.value = res?.detail || 'Successfully connected to Gemini API.'
     messageType.value = 'success'
-    console.log('✅ Gemini API test success:', res)
   } catch (error) {
     console.error('❌ Gemini API test failed:', error)
     const errorMessage = error.response?.data?.detail || error.data?.detail || error.message || 'Failed to validate API key.'

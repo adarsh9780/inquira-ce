@@ -18,7 +18,7 @@ class FactService {
       }
       this.facts = await response.json()
       this.isLoaded = true
-      console.log(`✅ Loaded ${this.facts.length} human body facts`)
+      console.debug(`✅ Loaded ${this.facts.length} human body facts`)
     } catch (error) {
       console.error('❌ Failed to load facts:', error)
       // Fallback facts in case JSON loading fails
@@ -62,7 +62,7 @@ class FactService {
       }
     }, 5000) // 5 seconds
 
-    console.log('🎯 Started fact rotation every 5 seconds')
+    console.debug('🎯 Started fact rotation every 5 seconds')
   }
 
   // Stop fact rotation
@@ -70,7 +70,7 @@ class FactService {
     if (this.intervalId) {
       clearInterval(this.intervalId)
       this.intervalId = null
-      console.log('🛑 Stopped fact rotation')
+      console.debug('🛑 Stopped fact rotation')
     }
   }
 

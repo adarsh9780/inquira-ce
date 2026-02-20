@@ -233,27 +233,27 @@ function closeModal() {
 
 // Tab event handlers
 function handleApiSaved(data) {
-  console.log('API settings saved:', data)
+  console.debug('API settings saved:', data)
   // Could emit an event or update local state if needed
 }
 
 function handleApiTested(data) {
-  console.log('API key tested:', data)
+  console.debug('API key tested:', data)
   // Could emit an event or update local state if needed
 }
 
 function handleDataSaved(data) {
-  console.log('Data settings saved:', data)
+  console.debug('Data settings saved:', data)
   // Could emit an event or update local state if needed
 }
 
 function handlePasswordChanged(data) {
-  console.log('Password changed:', data)
+  console.debug('Password changed:', data)
   // Could emit an event or update local state if needed
 }
 
 function handleAccountDeleted(data) {
-  console.log('Account deleted:', data)
+  console.debug('Account deleted:', data)
   // Could emit an event or update local state if needed
 }
 
@@ -271,7 +271,7 @@ async function startFactRotation() {
       currentFact.value = newFact
     })
 
-    console.log('🎯 Started fact rotation every 5 seconds for WebSocket connection')
+    console.debug('🎯 Started fact rotation every 5 seconds for WebSocket connection')
   } catch (error) {
     console.error('❌ Failed to start fact rotation:', error)
   }
@@ -280,7 +280,6 @@ async function startFactRotation() {
 function stopFactRotation() {
   factService.stopRotation()
   currentFact.value = ''
-  console.log('🛑 Stopped fact rotation')
 }
 
 // WebSocket event handlers
@@ -307,7 +306,7 @@ function setupWebSocketHandlers() {
 
   unsubscribeConnection.value = settingsWebSocket.onConnection((connected) => {
     isWebSocketConnected.value = connected
-    console.log('WebSocket connection state changed:', connected)
+    console.debug('WebSocket connection state changed:', connected)
 
     // Start fact rotation when WebSocket connects
     if (connected) {
@@ -337,7 +336,7 @@ function updateProgressStep(data) {
 }
 
 function handleSaveComplete(result) {
-  console.log('Settings save completed:', result)
+  console.debug('Settings save completed:', result)
 
   // Update progress message for completion
   currentProgressMessage.value = 'All settings saved successfully'
@@ -349,7 +348,7 @@ function handleSaveComplete(result) {
       await generateAndSaveSchema()
 
       // Clear old preview cache and prefetch new data for faster loading when user opens preview modal
-      console.log('🔄 Clearing old cache and prefetching new data preview and schema...')
+      console.debug('🔄 Clearing old cache and prefetching new data preview and schema...')
 
       // Update progress message for prefetching
       currentProgressMessage.value = 'Preparing data preview for faster loading...'
@@ -360,7 +359,7 @@ function handleSaveComplete(result) {
       // Prefetch data preview
       try {
         await previewService.getDataPreview('random', false) // Use cached version, don't force refresh
-        console.log('✅ Data preview prefetched successfully')
+        console.debug('✅ Data preview prefetched successfully')
       } catch (prefetchError) {
         console.warn('⚠️ Data preview prefetch failed, but settings save was successful:', prefetchError)
         // Don't show error to user - prefetch failure shouldn't affect settings save success
@@ -370,7 +369,7 @@ function handleSaveComplete(result) {
       if (appStore.dataFilePath.trim()) {
         try {
           await previewService.loadSchema(appStore.dataFilePath.trim(), false) // Use cached version, don't force refresh
-          console.log('✅ Schema data prefetched successfully')
+          console.debug('✅ Schema data prefetched successfully')
         } catch (schemaPrefetchError) {
           console.warn('⚠️ Schema prefetch failed, but settings save was successful:', schemaPrefetchError)
           // Don't show error to user - prefetch failure shouldn't affect settings save success
@@ -438,7 +437,7 @@ function handleSaveError(error) {
 }
 
 function handleProgressCancel() {
-  console.log('User cancelled progress')
+  console.debug('User cancelled progress')
 
   // Stop fact rotation
   stopFactRotation()
@@ -469,7 +468,7 @@ async function fetchSettings() {
   try {
     // Fetch main settings
     const settings = await apiService.getSettings()
-    console.log('Fetched settings:', settings)
+    console.debug('Fetched settings:', settings)
 
     // Update app store with backend settings
     if (settings.api_key) {
@@ -501,15 +500,15 @@ async function generateAndSaveSchema() {
   try {
     // Only attempt schema generation if we have a valid data file path
     if (!appStore.dataFilePath.trim()) {
-      console.log('ℹ️ Skipping schema generation - no data file path provided')
+      console.debug('ℹ️ Skipping schema generation - no data file path provided')
       return
     }
 
     // Verify authentication is still valid before schema generation
-    console.log('🔐 Verifying authentication for schema generation...')
+    console.debug('🔐 Verifying authentication for schema generation...')
     try {
       await apiService.verifyAuth()
-      console.log('✅ Authentication verified for schema generation')
+      console.debug('✅ Authentication verified for schema generation')
     } catch (authError) {
       console.error('❌ Authentication failed for schema generation:', authError)
       toast.warning('Schema Generation Skipped', 'Authentication expired. You can generate schema manually later.')
@@ -518,11 +517,11 @@ async function generateAndSaveSchema() {
 
     // Check if schema already exists to avoid unnecessary regeneration
     try {
-      console.log('🔍 Checking if schema already exists...')
+      console.debug('🔍 Checking if schema already exists...')
       const existingSchema = await apiService.loadSchema(appStore.dataFilePath.trim())
 
       if (existingSchema && existingSchema.fields && existingSchema.fields.length > 0) {
-        console.log('✅ Schema already exists, skipping regeneration')
+        console.debug('✅ Schema already exists, skipping regeneration')
 
         // Update store to reflect existing schema
         appStore.setIsSchemaFileUploaded(true)
@@ -533,10 +532,10 @@ async function generateAndSaveSchema() {
       }
     } catch (error) {
       // Schema doesn't exist, continue with generation
-      console.log('ℹ️ Schema does not exist, proceeding with generation')
+      console.debug('ℹ️ Schema does not exist, proceeding with generation')
     }
 
-    console.log('🔄 Generating schema...')
+    console.debug('🔄 Generating schema...')
 
     // Generate schema using the saved data file path and context
     const schemaData = await apiService.generateSchema(
@@ -544,7 +543,7 @@ async function generateAndSaveSchema() {
       appStore.schemaContext.trim() || null
     )
 
-    console.log('✅ Schema generated successfully:', schemaData)
+    console.debug('✅ Schema generated successfully:', schemaData)
 
     // Save the generated schema
     if (schemaData && schemaData.columns) {
@@ -554,7 +553,7 @@ async function generateAndSaveSchema() {
         schemaData.columns
       )
 
-      console.log('💾 Schema saved successfully:', saveResponse)
+      console.debug('💾 Schema saved successfully:', saveResponse)
 
       // Update the store to reflect that schema is now available
       appStore.setIsSchemaFileUploaded(true)

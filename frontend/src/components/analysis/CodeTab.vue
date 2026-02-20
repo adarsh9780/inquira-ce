@@ -266,6 +266,7 @@ import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { useAuthStore } from '../../stores/authStore'
 import apiService from '../../services/apiService'
+import pyodideService from '../../services/pyodideService'
 import { toast } from '../../composables/useToast'
 import NotebookCell from './NotebookCell.vue'
 
@@ -326,20 +327,20 @@ function getDatabasePath() {
 // Fetch database paths from API
 async function fetchDatabasePaths() {
   try {
-    console.log('🔄 Fetching database paths from API (/settings/paths)...')
+    console.debug('🔄 Fetching database paths from API (/settings/paths)...')
     const paths = await apiService.getDatabasePaths()
     databasePaths.value = paths
-    console.log('✅ Database paths fetched successfully:', paths)
-    console.log('📁 Database path that will be used in code editor:', paths?.database_path)
-    console.log('📁 Schema path:', paths?.schema_path)
-    console.log('📁 Base directory:', paths?.base_directory)
+    console.debug('✅ Database paths fetched successfully:', paths)
+    console.debug('📁 Database path that will be used in code editor:', paths?.database_path)
+    console.debug('📁 Schema path:', paths?.schema_path)
+    console.debug('📁 Base directory:', paths?.base_directory)
   } catch (error) {
     console.error('❌ Failed to fetch database paths from /settings/paths:', error)
     console.error('❌ Error details:', error.response?.data || error.message)
     console.error('❌ Error status:', error.response?.status)
     // Don't use fallback paths - let the code template handle the case where dbPath is null
     databasePaths.value = null
-    console.log('⚠️ No database paths available, will use fallback file-based approach')
+    console.debug('⚠️ No database paths available, will use fallback file-based approach')
   }
 }
 
@@ -567,7 +568,7 @@ onMounted(async () => {
   // Load default code if no code exists or only has minimal content
   const currentContent = appStore.pythonFileContent.trim()
   if (!currentContent || currentContent === '# Python code for data analysis') {
-    console.log('Loading default code template')
+    console.debug('Loading default code template')
     appStore.setPythonFileContent(defaultCodeTemplate.value)
   }
 
@@ -617,12 +618,12 @@ watch(() => appStore.pythonFileContent, (newContent) => {
 
 // Watch for notebook mode changes to ensure editor is properly initialized
 watch(() => appStore.isNotebookMode, async (newMode, oldMode) => {
-  console.log('🔄 MODE SWITCH:', { newMode, oldMode, currentMode: appStore.isNotebookMode })
+  console.debug('🔄 MODE SWITCH:', { newMode, oldMode, currentMode: appStore.isNotebookMode })
 
   if (newMode === false && oldMode === true) {
-    console.log('🔄 Switching to script mode - checking editor state...')
-    console.log('🔍 Editor exists:', !!editor)
-    console.log('🔍 Editor container exists:', !!editorContainer.value)
+    console.debug('🔄 Switching to script mode - checking editor state...')
+    console.debug('🔍 Editor exists:', !!editor)
+    console.debug('🔍 Editor container exists:', !!editorContainer.value)
 
     // Switching from notebook mode to script mode
     // Ensure editor is initialized and updated with the combined content
@@ -630,32 +631,32 @@ watch(() => appStore.isNotebookMode, async (newMode, oldMode) => {
 
     // Wait a bit more for DOM to be fully ready
     setTimeout(async () => {
-      console.log('⏰ After delay - Editor:', !!editor, 'Container:', !!editorContainer.value)
+      console.debug('⏰ After delay - Editor:', !!editor, 'Container:', !!editorContainer.value)
 
       if (!editor && editorContainer.value) {
-        console.log('📝 Initializing new editor...')
+        console.debug('📝 Initializing new editor...')
         await initializeEditor()
       } else if (editor) {
-        console.log('🔄 Updating existing editor content...')
+        console.debug('🔄 Updating existing editor content...')
 
         // CRITICAL FIX: Re-attach the editor DOM to the container
         setTimeout(() => {
           const container = editorContainer.value
-          console.log('🔍 Editor DOM before reattach:', editor.dom)
-          console.log('🔍 Container before reattach:', container)
-          console.log('🔍 Container children before:', container?.children)
+          console.debug('🔍 Editor DOM before reattach:', editor.dom)
+          console.debug('🔍 Container before reattach:', container)
+          console.debug('🔍 Container children before:', container?.children)
 
           if (container && editor.dom) {
             // Check if editor DOM is already in the container
             if (!container.contains(editor.dom)) {
-              console.log('🔄 Re-attaching editor DOM to container...')
+              console.debug('🔄 Re-attaching editor DOM to container...')
               // Clear container first
               container.innerHTML = ''
               // Re-attach the editor DOM
               container.appendChild(editor.dom)
-              console.log('✅ Editor DOM re-attached to container')
+              console.debug('✅ Editor DOM re-attached to container')
             } else {
-              console.log('ℹ️ Editor DOM already in container')
+              console.debug('ℹ️ Editor DOM already in container')
             }
 
             // Force visibility
@@ -663,18 +664,18 @@ watch(() => appStore.isNotebookMode, async (newMode, oldMode) => {
             editor.dom.style.visibility = 'visible'
             editor.dom.style.opacity = '1'
 
-            console.log('🔍 Container children after reattach:', container.children)
-            console.log('🔍 Editor DOM after reattach:', editor.dom)
+            console.debug('🔍 Container children after reattach:', container.children)
+            console.debug('🔍 Editor DOM after reattach:', editor.dom)
           }
 
           updateEditorContent()
         }, 50)
       } else {
-        console.log('⚠️ Editor container not ready')
+        console.debug('⚠️ Editor container not ready')
         // Retry after another delay
         setTimeout(async () => {
           if (!editor && editorContainer.value) {
-            console.log('📝 Retrying editor initialization...')
+            console.debug('📝 Retrying editor initialization...')
             await initializeEditor()
           }
         }, 100)
@@ -700,7 +701,7 @@ watch(() => defaultCodeTemplate.value, (newTemplate) => {
   // Only update if the current content is still the default template
   const currentContent = appStore.pythonFileContent.trim()
   if (isDefaultEditorContent(currentContent) && newTemplate !== currentContent) {
-    console.log('Updating editor with new default code template')
+    console.debug('Updating editor with new default code template')
     appStore.setPythonFileContent(newTemplate)
   }
 })
@@ -711,7 +712,7 @@ watch(() => appStore.dataFilePath, (newPath, oldPath) => {
     // Only update if the current content is still the default template
     const currentContent = appStore.pythonFileContent.trim()
     if (isDefaultEditorContent(currentContent)) {
-      console.log('Updating code template due to data file path change')
+      console.debug('Updating code template due to data file path change')
       appStore.setPythonFileContent(defaultCodeTemplate.value)
     } else {
       // Try to update just the table_name assignment in existing code
@@ -719,7 +720,6 @@ watch(() => appStore.dataFilePath, (newPath, oldPath) => {
       const tableName = backendTable || getTableName(newPath)
       const updated = replaceTableNameInCode(appStore.pythonFileContent, tableName)
       if (updated !== appStore.pythonFileContent) {
-        console.log('Synced table_name in existing code due to data path change')
         appStore.setPythonFileContent(updated)
         updateEditorContent()
       } else {
@@ -736,7 +736,7 @@ watch(() => databasePaths.value, (newPaths) => {
     // Only update if the current content is still the default template
     const currentContent = appStore.pythonFileContent.trim()
     if (isDefaultEditorContent(currentContent)) {
-      console.log('Updating code template due to database paths change')
+      console.debug('Updating code template due to database paths change')
       appStore.setPythonFileContent(defaultCodeTemplate.value)
     }
   }
@@ -745,18 +745,18 @@ watch(() => databasePaths.value, (newPaths) => {
 // Watch for user changes and refetch database paths
 watch(() => authStore.userId, async (newUserId, oldUserId) => {
   if (newUserId !== oldUserId && newUserId) {
-    console.log('User changed, refetching database paths')
+    console.debug('User changed, refetching database paths')
     await fetchDatabasePaths()
   }
 })
 
 async function initializeEditor() {
   if (!editorContainer.value) {
-    console.log('❌ Editor container not found')
+    console.debug('❌ Editor container not found')
     return
   }
 
-  console.log('📝 Initializing CodeMirror editor...', editorContainer.value)
+  console.debug('📝 Initializing CodeMirror editor...', editorContainer.value)
 
   try {
     const extensions = [
@@ -816,7 +816,7 @@ async function initializeEditor() {
       parent: editorContainer.value
     })
 
-    console.log('✅ CodeMirror editor initialized successfully', editor)
+    console.debug('✅ CodeMirror editor initialized successfully', editor)
 
   } catch (error) {
     console.error('❌ Failed to initialize CodeMirror Editor:', error)
@@ -867,7 +867,27 @@ async function runCode() {
         appStore.updateNotebookCell(cell.id, { isRunning: true, output: '' })
 
         try {
-          const response = await apiService.executeCode(cell.content)
+          const start = performance.now()
+          const pyResponse = await pyodideService.executePython(cell.content)
+          const execTime = (performance.now() - start) / 1000
+
+          const response = {
+            execution_time: execTime,
+            output: pyResponse.stdout + (pyResponse.stderr ? '\n' + pyResponse.stderr : ''),
+            error: pyResponse.success ? null : (pyResponse.error || 'Execution failed'),
+            variables: { dataframes: {}, figures: {}, scalars: {} }
+          }
+
+          if (pyResponse.success && pyResponse.result !== undefined && pyResponse.result !== null) {
+            if (pyResponse.resultType === 'DataFrame' || (typeof pyResponse.result === 'object' && pyResponse.result.columns && pyResponse.result.data)) {
+              response.variables.dataframes['result'] = pyResponse.result
+            } else if (pyResponse.resultType === 'Figure' || (typeof pyResponse.result === 'object' && pyResponse.result.data && pyResponse.result.layout)) {
+              response.variables.figures['result'] = pyResponse.result
+            } else {
+              response.variables.scalars['result'] = pyResponse.result
+            }
+          }
+
           let output = ''
 
           // Show execution time if available
@@ -987,7 +1007,26 @@ async function runCode() {
       const code = appStore.pythonFileContent
 
       // Execute code using the API service
-      const response = await apiService.executeCode(code)
+      const start = performance.now()
+      const pyResponse = await pyodideService.executePython(code)
+      const execTime = (performance.now() - start) / 1000
+
+      const response = {
+        execution_time: execTime,
+        output: pyResponse.stdout + (pyResponse.stderr ? '\n' + pyResponse.stderr : ''),
+        error: pyResponse.success ? null : (pyResponse.error || 'Execution failed'),
+        variables: { dataframes: {}, figures: {}, scalars: {} }
+      }
+
+      if (pyResponse.success && pyResponse.result !== undefined && pyResponse.result !== null) {
+        if (pyResponse.resultType === 'DataFrame' || (typeof pyResponse.result === 'object' && pyResponse.result.columns && pyResponse.result.data)) {
+          response.variables.dataframes['result'] = pyResponse.result
+        } else if (pyResponse.resultType === 'Figure' || (typeof pyResponse.result === 'object' && pyResponse.result.data && pyResponse.result.layout)) {
+          response.variables.figures['result'] = pyResponse.result
+        } else {
+          response.variables.scalars['result'] = pyResponse.result
+        }
+      }
 
       // Handle the response - always show raw output in terminal
       let terminalMessage = ''
@@ -1151,7 +1190,7 @@ function downloadCode() {
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
 
-    console.log('Python code downloaded successfully')
+    console.debug('Python code downloaded successfully')
   } catch (error) {
     console.error('Failed to download code:', error)
   }

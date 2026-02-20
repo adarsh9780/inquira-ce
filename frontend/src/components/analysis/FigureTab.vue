@@ -303,7 +303,7 @@ async function downloadPng() {
       filename: filename
     })
 
-    console.log('PNG downloaded successfully')
+    console.debug('PNG downloaded successfully')
 
   } catch (error) {
     console.error('Failed to download PNG:', error)
@@ -349,7 +349,7 @@ async function downloadHtml() {
     link.click()
     document.body.removeChild(link)
     
-    console.log('HTML downloaded successfully')
+    console.debug('HTML downloaded successfully')
     
   } catch (error) {
     console.error('Failed to download HTML:', error)

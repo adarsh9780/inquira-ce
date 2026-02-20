@@ -26,14 +26,11 @@ export const useAuthStore = defineStore('auth', () => {
       if (result && result.user) {
         user.value = result.user
         isAuthenticated.value = true
-        console.log('✅ User authenticated:', result.user)
       } else {
-        console.log('❌ Invalid auth response structure:', result)
         user.value = null
         isAuthenticated.value = false
       }
     } catch (err) {
-      console.log('❌ User not authenticated:', err.message)
       user.value = null
       isAuthenticated.value = false
       // Don't set error.value for auth check failures - this is expected for unauthenticated users
@@ -56,7 +53,6 @@ export const useAuthStore = defineStore('auth', () => {
       }
       isAuthenticated.value = true
       error.value = ''
-      console.log('✅ Login successful:', user.value)
       return true
     } catch (error) {
       console.error('❌ Login failed:', error)
@@ -84,7 +80,6 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const result = await apiService.register(username, password)
-      console.log('✅ Registration successful:', result)
       return true
     } catch (error) {
       console.error('❌ Registration failed:', error)
@@ -112,16 +107,13 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       await apiService.logout()
 
-      // Disconnect WebSocket before clearing auth state
       if (settingsWebSocket.isPersistentMode) {
-        console.log('🔌 Disconnecting WebSocket during logout')
         settingsWebSocket.disconnectPersistent()
       }
 
       user.value = null
       isAuthenticated.value = false
       error.value = ''
-      console.log('✅ Logout successful')
     } catch (error) {
       console.error('❌ Logout failed:', error)
 
@@ -145,7 +137,6 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const result = await apiService.changePassword(currentPassword, newPassword, confirmPassword)
-      console.log('✅ Password changed successfully:', result)
       return true
     } catch (error) {
       console.error('❌ Password change failed:', error)
@@ -173,11 +164,8 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const result = await apiService.deleteAccount(confirmationText, currentPassword)
-      console.log('✅ Account deleted successfully:', result)
 
-      // Disconnect WebSocket before clearing auth state
       if (settingsWebSocket.isPersistentMode) {
-        console.log('🔌 Disconnecting WebSocket during account deletion')
         settingsWebSocket.disconnectPersistent()
       }
 

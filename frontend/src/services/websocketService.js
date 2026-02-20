@@ -57,32 +57,25 @@ class SettingsWebSocket {
 
     return new Promise((resolve, reject) => {
       const wsUrl = buildWsUrl(`/ws/settings/${userId}`)
-      console.log('🔌 Connecting to WebSocket:', wsUrl)
-
       this.socket = new WebSocket(wsUrl)
       this.connectionAcknowledged = false
 
       this.socket.onopen = () => {
-        console.log('✅ Settings WebSocket opened, waiting for backend acknowledgment...')
         this.reconnectAttempts = 0
 
         // For debugging - let's also consider the WebSocket as "connected" when it opens
         // This will make the indicator green even if backend doesn't send acknowledgment
-        console.log('🔄 WebSocket opened - marking as connected for UI purposes')
         this.isConnected = true
         this.notifyConnectionListeners(true)
       }
 
       this.socket.onmessage = (event) => {
-        console.log('📨 WebSocket message received:', event.data)
         try {
           const data = JSON.parse(event.data)
-          console.log('📨 Parsed message:', data)
           this.handleMessage(data)
 
           // Check for connection acknowledgment
           if (data.type === 'connected') {
-            console.log('✅ Backend acknowledged WebSocket connection')
             this.isConnected = true
             this.connectionAcknowledged = true
             this.notifyConnectionListeners(true)
@@ -94,7 +87,6 @@ class SettingsWebSocket {
       }
 
       this.socket.onclose = (event) => {
-        console.log('❌ Settings WebSocket closed:', event.code, event.reason)
         this.isConnected = false
         this.notifyConnectionListeners(false)
         this.handleReconnect()
@@ -122,11 +114,11 @@ class SettingsWebSocket {
   // Persistent connection management
   connectPersistent(userId) {
     if (this.isPersistentMode) {
-      console.log('Persistent connection already active')
+      console.debug('Persistent connection already active')
       return Promise.resolve()
     }
 
-    console.log('Starting persistent WebSocket connection for user:', userId)
+    console.debug('Starting persistent WebSocket connection for user:', userId)
     this.isPersistentMode = true
     this.userId = userId
     this.reconnectAttempts = 0
@@ -135,7 +127,7 @@ class SettingsWebSocket {
   }
 
   disconnectPersistent() {
-    console.log('Stopping persistent WebSocket connection')
+    console.debug('Stopping persistent WebSocket connection')
     this.isPersistentMode = false
     this.userId = null
     this.stopReconnectTimer()
@@ -151,7 +143,7 @@ class SettingsWebSocket {
 
     return this.connect(this.userId)
       .then(() => {
-        console.log('✅ Persistent connection established')
+        console.debug('✅ Persistent connection established')
         this.reconnectAttempts = 0
         this.stopReconnectTimer()
       })
@@ -167,11 +159,11 @@ class SettingsWebSocket {
 
     this.stopReconnectTimer()
 
-    console.log(`Scheduling reconnection in ${this.reconnectInterval / 1000} seconds...`)
+    console.debug(`Scheduling reconnection in ${this.reconnectInterval / 1000} seconds...`)
 
     this.reconnectTimer = setTimeout(() => {
       if (this.isPersistentMode) {
-        console.log('🔄 Attempting to reconnect...')
+        console.debug('🔄 Attempting to reconnect...')
         this.attemptConnection().catch(() => {
           // Error already logged in attemptConnection
         })
@@ -187,11 +179,11 @@ class SettingsWebSocket {
   }
 
   handleMessage(data) {
-    console.log('WebSocket message received:', data)
+    console.debug('WebSocket message received:', data)
 
     switch (data.type) {
       case 'connected':
-        console.log('WebSocket connection confirmed')
+        console.debug('WebSocket connection confirmed')
         if (this.progressCallback) {
           this.progressCallback({
             type: 'connected',
@@ -226,24 +218,24 @@ class SettingsWebSocket {
         break
 
       default:
-        console.log('Unknown message type:', data.type)
+        console.debug('Unknown message type:', data.type)
     }
   }
 
   handleReconnect() {
     if (this.isPersistentMode) {
       // Use persistent reconnection logic
-      console.log('Connection lost, scheduling persistent reconnection...')
+      console.debug('Connection lost, scheduling persistent reconnection...')
       this.scheduleReconnect()
     } else {
       // Use legacy reconnection logic for non-persistent mode
       if (this.reconnectAttempts < this.maxReconnectAttempts) {
         this.reconnectAttempts++
-        console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`)
+        console.debug(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`)
 
         setTimeout(() => {
           // Legacy reconnection - just log for now
-          console.log('Legacy reconnection attempt completed')
+          console.debug('Legacy reconnection attempt completed')
         }, 1000 * this.reconnectAttempts)
       } else {
         console.error('Max reconnection attempts reached')
@@ -262,7 +254,7 @@ class SettingsWebSocket {
   startSettingsSave(settings) {
     // The backend expects individual API calls, not a single WebSocket message
     // We'll use the existing API endpoints but with WebSocket monitoring
-    console.log('WebSocket monitoring started for settings save')
+    console.debug('WebSocket monitoring started for settings save')
   }
 
   onProgress(callback) {
@@ -278,7 +270,7 @@ class SettingsWebSocket {
   }
 
   onConnection(callback) {
-    if (typeof callback !== 'function') return () => {}
+    if (typeof callback !== 'function') return () => { }
     this.connectionListeners.add(callback)
     // Immediately notify current connection state
     callback(this.isConnected)
