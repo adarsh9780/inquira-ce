@@ -434,7 +434,7 @@ def run(argv: list[str] | None = None):
     logprint(f"Launching Inquira backend (v{APP_VERSION})")
     threading.Thread(target=open_browser, daemon=True).start()
 
-    uvicorn.run(app, host=HOST, port=PORT, reload=False)
+    uvicorn.run(app, host=HOST, port=PORT, reload=False, access_log=False)
 
 
 if __name__ == "__main__":
