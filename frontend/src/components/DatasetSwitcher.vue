@@ -234,14 +234,15 @@ function formatPath(path) {
 }
 
 async function loadDatasets() {
-  if (!appStore.activeWorkspaceId) {
+  const activeWorkspace = appStore.workspaces.find((ws) => ws.id === appStore.activeWorkspaceId)
+  if (!activeWorkspace) {
     datasets.value = []
     return
   }
   loading.value = true
   loadingMessage.value = 'Loading datasets...'
   try {
-    const response = await apiService.v1ListDatasets(appStore.activeWorkspaceId)
+    const response = await apiService.v1ListDatasets(activeWorkspace.id)
     const workspaceDatasets = response?.datasets || []
     const catalogDatasets = workspaceDatasets.map((item) => ({
       ...item,

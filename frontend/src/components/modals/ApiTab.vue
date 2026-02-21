@@ -167,7 +167,6 @@ async function testApiKey() {
 
 async function saveApiSettings() {
   const apiKey = appStore.apiKey.trim()
-  const selectedModel = appStore.selectedModel
 
   // Validate API key
   if (!apiKey) {
@@ -183,13 +182,10 @@ async function saveApiSettings() {
     // Test API key first
     await testApiKey()
 
-    // If test was successful, save settings
+    // If test was successful, persist locally for v1 runtime.
     if (messageType.value === 'success') {
       await apiService.setApiKeySettings(apiKey)
-      // Note: Model settings might need a separate endpoint
-      // await apiService.setModelSettings(selectedModel)
-
-      message.value = 'API settings saved successfully.'
+      message.value = 'API settings saved locally.'
       messageType.value = 'success'
     }
   } catch (error) {

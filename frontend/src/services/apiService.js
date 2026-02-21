@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { getInquira } from './generatedApi'
+import { v1Api } from './contracts/v1Api'
 import { parseSseBuffer } from '../utils/sseParser'
 import { disableStreamingForUnsupportedStatus, isStreamingEnabled } from '../utils/streamingCapability'
 
@@ -49,7 +50,15 @@ axios.interceptors.response.use(
     return response.data
   },
   (error) => {
-    console.error('API Error:', error)
+    const status = error?.response?.status
+    const url = String(error?.config?.url || '')
+    const isExpectedAuthCheckFailure =
+      status === 401 &&
+      (url.includes('/api/v1/auth/me') || url.includes('/api/v1/auth/login') || url.includes('/api/v1/auth/logout'))
+
+    if (!isExpectedAuthCheckFailure) {
+      console.error('API Error:', error)
+    }
 
     // Add more specific error information
     if (error.response) {
@@ -89,9 +98,9 @@ export const apiService = {
   },
 
   async verifyAuth() {
-    console.debug('🔍 Making verifyAuth request to /auth/verify')
+    console.debug('🔍 Making verifyAuth request to /api/v1/auth/me')
     try {
-      const result = await client.verifyAuthAuthVerifyGet()
+      const result = await this.v1GetCurrentUser()
       console.debug('✅ verifyAuth success:', result)
       return result
     } catch (error) {
@@ -130,7 +139,14 @@ export const apiService = {
 
   // Settings management
   async getSettings() {
-    return client.viewAllSettingsSettingsViewGet()
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    return {
+      api_key: appStore.apiKey || null,
+      data_path: appStore.schemaFileId || appStore.dataFilePath || null,
+      context: appStore.schemaContext || '',
+      table_name: appStore.ingestedTableName || null
+    }
   },
 
   async getApiKey() {
@@ -139,49 +155,32 @@ export const apiService = {
 
   // Check whether data/schema update is needed
   async checkUpdate() {
-    return client.checkUpdateNeededSettingsCheckUpdateGet()
+    return {
+      should_update: false,
+      reasons: [],
+      dataset_updated_at: null
+    }
   },
 
   async setDataPath(dataPath) {
-    console.debug('📤 [API] Setting data path:', dataPath)
-
-    // First verify authentication
-    try {
-      console.debug('🔐 [API] Verifying authentication...')
-      await this.verifyAuth()
-      console.debug('✅ [API] Authentication verified')
-    } catch (authError) {
-      console.error('❌ [API] Authentication failed:', authError.response?.data)
-      throw new Error('Authentication required. Please log in first.')
-    }
-
-    try {
-      const response = await client.setDataPathSettingsSetDataPathPut({ data_path: dataPath })
-      console.debug('✅ [API] Data path set successfully:', response)
-      return response
-    } catch (error) {
-      console.error('❌ [API] Failed to set data path:', error.response?.data)
-
-      // Provide more specific error messages
-      if (error.response?.status === 401) {
-        throw new Error('Authentication expired. Please log in again.')
-      } else if (error.response?.status === 403) {
-        throw new Error('Access denied. You may not have permission to save settings.')
-      } else if (error.response?.status === 400) {
-        const errorDetail = error.response?.data?.detail || 'Invalid request data'
-        throw new Error(`Bad request: ${errorDetail}`)
-      }
-
-      throw error
-    }
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    appStore.setDataFilePath(dataPath || '')
+    return { detail: 'Data path saved locally.' }
   },
 
   async setContext(context) {
-    return client.setContextSettingsSetContextPut({ context: context })
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    appStore.setSchemaContext(context || '')
+    return { detail: 'Context saved locally.' }
   },
 
   async setApiKeySettings(apiKey) {
-    return client.setApikeySettingsSetApiKeyPut({ api_key: apiKey })
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    appStore.setApiKey(apiKey || '')
+    return { detail: 'API key saved locally.' }
   },
 
   // Data preview
@@ -319,23 +318,10 @@ export const apiService = {
 
   // Get database and schema paths
   async getDatabasePaths() {
-    console.debug('📂 Getting database paths')
-
-    // Verify authentication before getting paths
-    try {
-      await this.verifyAuth()
-    } catch (authError) {
-      console.error('❌ Authentication failed for getting database paths')
-      throw new Error('Authentication required for getting database paths')
-    }
-
-    try {
-      const response = await client.getStoragePathsSettingsPathsGet()
-      console.debug('✅ Database paths retrieved successfully')
-      return response
-    } catch (error) {
-      console.error('❌ Failed to get database paths:', error.response?.data)
-      throw error
+    return {
+      database_path: null,
+      schema_path: null,
+      base_directory: null
     }
   },
 
@@ -456,14 +442,10 @@ export const apiService = {
   },
 
   async setDataPathSimple(dataPath) {
-    // Set data path without triggering reprocessing
-    try {
-      const response = await client.setDataPathSimpleSettingsSetDataPathSimplePut({ data_path: dataPath })
-      return response
-    } catch (error) {
-      console.error('Failed to set data path (simple):', error)
-      throw error
-    }
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    appStore.setDataFilePath(dataPath || '')
+    return { detail: 'Data path saved locally.' }
   },
 
   async checkDatasetHealth(tableName) {
@@ -515,81 +497,81 @@ export const apiService = {
 
   // V1 Workspace APIs
   async v1ListWorkspaces() {
-    return axios.get('/api/v1/workspaces')
+    return v1Api.workspaces.list()
   },
 
   async v1CreateWorkspace(name) {
-    return axios.post('/api/v1/workspaces', { name })
+    return v1Api.workspaces.create(name)
   },
 
   async v1ActivateWorkspace(workspaceId) {
-    return axios.put(`/api/v1/workspaces/${workspaceId}/activate`)
+    return v1Api.workspaces.activate(workspaceId)
   },
 
   async v1DeleteWorkspace(workspaceId) {
-    return axios.delete(`/api/v1/workspaces/${workspaceId}`)
+    return v1Api.workspaces.remove(workspaceId)
   },
 
   async v1ListWorkspaceDeletionJobs() {
-    return axios.get('/api/v1/workspaces/deletions')
+    return v1Api.workspaces.deletions()
   },
 
   async v1GetWorkspaceDeletionJob(jobId) {
-    return axios.get(`/api/v1/workspaces/deletions/${jobId}`)
+    return v1Api.workspaces.deletionById(jobId)
   },
 
   async v1ListDatasets(workspaceId) {
-    return axios.get(`/api/v1/workspaces/${workspaceId}/datasets`)
+    return v1Api.datasets.list(workspaceId)
   },
 
   async v1AddDataset(workspaceId, sourcePath) {
-    return axios.post(`/api/v1/workspaces/${workspaceId}/datasets`, { source_path: sourcePath })
+    return v1Api.datasets.add(workspaceId, sourcePath)
   },
 
   async v1SyncBrowserDataset(workspaceId, payload) {
-    return axios.post(`/api/v1/workspaces/${workspaceId}/datasets/browser-sync`, payload)
+    return v1Api.datasets.syncBrowser(workspaceId, payload)
   },
 
   async v1ListConversations(workspaceId, limit = 50) {
-    return axios.get(`/api/v1/workspaces/${workspaceId}/conversations`, { params: { limit } })
+    return v1Api.conversations.list(workspaceId, limit)
   },
 
   async v1CreateConversation(workspaceId, title = null) {
-    return axios.post(`/api/v1/workspaces/${workspaceId}/conversations`, { title })
+    return v1Api.conversations.create(workspaceId, title)
   },
 
   async v1ClearConversation(conversationId) {
-    return axios.post(`/api/v1/conversations/${conversationId}/clear`)
+    return v1Api.conversations.clear(conversationId)
   },
 
   async v1DeleteConversation(conversationId) {
-    return axios.delete(`/api/v1/conversations/${conversationId}`)
+    return v1Api.conversations.remove(conversationId)
   },
 
   async v1ListTurns(conversationId, limit = 5, before = null) {
     const params = { limit }
     if (before) params.before = before
-    return axios.get(`/api/v1/conversations/${conversationId}/turns`, { params })
+    return v1Api.conversations.turns(conversationId, params)
   },
 
   async v1Analyze(payload) {
-    return axios.post('/api/v1/chat/analyze', payload)
+    return v1Api.chat.analyze(payload)
   },
 
   async v1GetCurrentUser() {
-    return axios.get('/api/v1/auth/me')
+    return v1Api.auth.me()
   },
 
   async v1Register(username, password) {
-    return axios.post('/api/v1/auth/register', { username, password })
+    return v1Api.auth.register(username, password)
   },
 
   async v1Login(username, password) {
-    return axios.post('/api/v1/auth/login', { username, password })
+    return v1Api.auth.login(username, password)
   },
 
   async v1Logout() {
-    return axios.post('/api/v1/auth/logout')
+    return v1Api.auth.logout()
   }
 }
 

@@ -20,3 +20,11 @@ test('chat submit path enforces workspace dataset sync without legacy setDataPat
   assert.equal(source.includes('ensureBackendSchemaReadyForChat'), false)
   assert.equal(source.includes('apiService.setDataPathSimple('), false)
 })
+
+test('v1 runtime avoids legacy settings check-update endpoint calls', () => {
+  const servicePath = resolve(process.cwd(), 'src/services/apiService.js')
+  const source = readFileSync(servicePath, 'utf-8')
+
+  assert.equal(source.includes('checkUpdateNeededSettingsCheckUpdateGet'), false)
+  assert.equal(source.includes('should_update: false'), true)
+})

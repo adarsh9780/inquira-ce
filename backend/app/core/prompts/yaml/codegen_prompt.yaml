@@ -39,5 +39,6 @@ template: |
   df = await query(f"SELECT * FROM {{table_name}} LIMIT 100")
   ```
   - Keep SQL readable (use CTEs for complex steps).
+  - Guard against divide-by-zero in SQL calculations; use `NULLIF(denominator, 0)` or equivalent safe expressions.
   - Respect existing context in `Current Code Context`; avoid re-defining everything unless needed.
   - Generate self-contained, valid Python code.

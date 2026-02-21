@@ -70,11 +70,15 @@ export const useAppStore = defineStore('app', () => {
   // Computed
   const hasDataFile = computed(() => dataFilePath.value.trim() !== '')
   const hasSchemaFile = computed(() => schemaFilePath.value.trim() !== '' || isSchemaFileUploaded.value)
+  const hasWorkspace = computed(() => {
+    const activeId = activeWorkspaceId.value.trim()
+    if (!activeId) return false
+    return workspaces.value.some((ws) => ws.id === activeId)
+  })
   const canAnalyze = computed(() => {
     if (apiKey.value.trim() === '') return false
-    return activeWorkspaceId.value.trim() !== ''
+    return hasWorkspace.value
   })
-  const hasWorkspace = computed(() => activeWorkspaceId.value.trim() !== '')
 
   // Local Configuration Management
   function saveLocalConfig() {

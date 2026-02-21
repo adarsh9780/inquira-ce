@@ -141,10 +141,22 @@ async def query(sql):
         print(df)
     """
     from js import _duckdb_query
-    # _duckdb_query is async JS — calling it returns a JsProxy wrapping a Promise
-    js_promise = _duckdb_query(sql)
-    # Await the JS Promise from Python
-    js_result = await js_promise
+    try:
+        # _duckdb_query is async JS — calling it returns a JsProxy wrapping a Promise
+        js_promise = _duckdb_query(sql)
+        # Await the JS Promise from Python
+        js_result = await js_promise
+    except Exception as exc:
+        sql_text = str(sql or "").strip().replace("\\n", " ")
+        if len(sql_text) > 240:
+            sql_text = sql_text[:240] + "..."
+        raise RuntimeError(
+            "DuckDB query failed: "
+            + str(exc)
+            + " | SQL: "
+            + sql_text
+            + " | Tip: if the query divides values, use NULLIF(denominator, 0)."
+        ) from exc
     # Convert JS proxy to Python list of dicts
     rows = js_result.to_py() if hasattr(js_result, 'to_py') else list(js_result)
     return pd.DataFrame(rows)

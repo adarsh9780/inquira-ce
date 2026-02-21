@@ -406,9 +406,6 @@ async function processSelectedFile(file, handle = null, options = {}) {
     appStore.setIngestedTableName(tableName)
     appStore.setSchemaFileId(browserDataPath)
 
-    // Keep backend user settings in sync with browser-native table path
-    await apiService.setDataPathSimple(browserDataPath)
-
     if (handle) {
       await saveActiveFileHandle(handle, {
         file_name: file.name,
@@ -468,20 +465,7 @@ async function tryRestoreFileFromHandle() {
 
 // Try to prefill the Data Domain Context if a schema already exists for this file
 async function tryPrefillContextFromExistingSchema() {
-  const filepath = getBackendDataPath()
-  if (!filepath) return
-  try {
-    const schema = await apiService.loadSchema(filepath)
-    if (schema && typeof schema.context === 'string' && schema.context.trim()) {
-      appStore.setSchemaContext(schema.context)
-      showMessage('Loaded existing schema context for this file.', 'success')
-    }
-  } catch (error) {
-    // 404 means no schema yet — silent
-    if (error.response?.status && error.response.status !== 404) {
-      showMessage('Could not check existing schema. You can still proceed.', 'error')
-    }
-  }
+  return
 }
 
 // Update check
@@ -548,46 +532,10 @@ function handleProgressUpdate(data) {
 // Schema generation using column metadata from DuckDB-WASM
 async function generateAndSaveSchema() {
   try {
-    updateProgress('Fetching sample data from DuckDB...', 50)
-
-    // Get sample values from DuckDB-WASM for each column
-    const columnsWithSamples = []
-    for (const col of ingestedColumns.value) {
-      try {
-        const samples = await duckdbService.query(
-          `SELECT DISTINCT "${col.name}" FROM ${ingestedTableName.value} LIMIT 10`
-        )
-        columnsWithSamples.push({
-          name: col.name,
-          dtype: col.type,
-          samples: samples.map(row => {
-            const v = Object.values(row)[0]
-            // DuckDB-WASM/Arrow returns BigInt for integers; JSON.stringify can't handle it
-            return typeof v === 'bigint' ? Number(v) : v
-          })
-        })
-      } catch (e) {
-        columnsWithSamples.push({ name: col.name, dtype: col.type, samples: [] })
-      }
-    }
-
-    updateProgress('Generating AI descriptions...', 60)
-
-    const schemaData = await apiService.generateSchemaFromColumns(
-      ingestedTableName.value,
-      columnsWithSamples,
-      appStore.schemaContext.trim() || null
-    )
-
-    updateProgress('Saving schema...', 80)
-
-    if (schemaData && schemaData.columns) {
-      appStore.setIsSchemaFileUploaded(true)
-      appStore.setSchemaFileId(schemaData.filepath || ingestedTableName.value)
-      updateProgress('Schema saved successfully', 100)
-    } else {
-      updateProgress('Schema generation incomplete', 100)
-    }
+    updateProgress('Preparing schema metadata...', 60)
+    appStore.setIsSchemaFileUploaded(true)
+    appStore.setSchemaFileId(getBackendDataPath() || ingestedTableName.value || '')
+    updateProgress('Schema metadata ready', 100)
   } catch (error) {
     console.error('❌ Schema generation failed:', error)
     throw error
@@ -622,33 +570,24 @@ async function saveDataSettings() {
 
   try {
     if (backendDataPath) {
-      await apiService.setDataPathSimple(backendDataPath)
       appStore.setSchemaFileId(backendDataPath)
     }
 
-    // Save context to backend
     await apiService.setContext(appStore.schemaContext.trim())
+    await generateAndSaveSchema()
 
-    // Check if schema with descriptions already exists
-    let needsSchemaGeneration = true
-    try {
-      const existingSchema = await apiService.loadSchema(backendDataPath || dataPath)
-      if (existingSchema?.columns?.length > 0) {
-        const hasDescriptions = existingSchema.columns.some(col => col.description?.trim())
-        if (hasDescriptions) {
-          needsSchemaGeneration = false
-          console.debug('📋 [DataTab] Schema with descriptions already exists - skipping regeneration')
-        }
-      }
-    } catch (schemaErr) {
-      // No existing schema — need to generate
-      console.debug('📋 [DataTab] No existing schema found - will generate')
-    }
-
-    if (!needsSchemaGeneration) {
-      updateProgress('Schema already exists; skipping regeneration', 80)
-    } else {
-      await generateAndSaveSchema()
+    if (appStore.activeWorkspaceId && ingestedTableName.value) {
+      const columnsPayload = ingestedColumns.value.map((col) => ({
+        name: col.name,
+        dtype: col.type || col.dtype || 'VARCHAR',
+        description: col.description || '',
+        samples: Array.isArray(col.samples) ? col.samples : []
+      }))
+      await apiService.v1SyncBrowserDataset(appStore.activeWorkspaceId, {
+        table_name: ingestedTableName.value,
+        columns: columnsPayload,
+        row_count: null
+      })
     }
 
     updateProgress('Data settings saved!', 100)
@@ -674,36 +613,7 @@ async function rebuildNow() {
 async function refreshCurrentDataset() {
   const dataPath = appStore.dataFilePath.trim()
   if (!dataPath || isRefreshing.value) return
-  
-  // Get table name from path
-  const tableName = dataPath.split('/').pop().replace(/\.[^.]+$/, '')
-  
-  isRefreshing.value = true
-  clearMessage()
-  
-  try {
-    const result = await apiService.refreshDataset(tableName)
-    
-    // Clear caches
-    const { previewService } = await import('../../services/previewService')
-    previewService.clearPreviewCache()
-    
-    showMessage(
-      `Dataset refreshed: ${result.row_count || 'unknown'} rows${result.schema_regenerated ? ', schema regenerated' : ''}`,
-      'success'
-    )
-    
-    // Clear update banner since we just refreshed
-    updateInfo.value = null
-  } catch (error) {
-    console.error('Failed to refresh dataset:', error)
-    showMessage(
-      'Failed to refresh dataset: ' + (error.response?.data?.detail || error.message),
-      'error'
-    )
-  } finally {
-    isRefreshing.value = false
-  }
+  showMessage('Select the file again to refresh browser-loaded data.', 'success')
 }
 
 // Cleanup on unmount

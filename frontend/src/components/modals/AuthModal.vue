@@ -199,7 +199,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'authenticated'])
 
 const authStore = useAuthStore()
 const isLoginMode = ref(true)
