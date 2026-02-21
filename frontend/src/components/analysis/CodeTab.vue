@@ -266,7 +266,7 @@ import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { useAuthStore } from '../../stores/authStore'
 import apiService from '../../services/apiService'
-import pyodideService from '../../services/pyodideService'
+import executionService from '../../services/executionService'
 import { toast } from '../../composables/useToast'
 import NotebookCell from './NotebookCell.vue'
 
@@ -868,7 +868,7 @@ async function runCode() {
 
         try {
           const start = performance.now()
-          const pyResponse = await pyodideService.executePython(cell.content)
+          const pyResponse = await executionService.executePython(cell.content)
           const execTime = (performance.now() - start) / 1000
 
           const response = {
@@ -1008,7 +1008,7 @@ async function runCode() {
 
       // Execute code using the API service
       const start = performance.now()
-      const pyResponse = await pyodideService.executePython(code)
+      const pyResponse = await executionService.executePython(code)
       const execTime = (performance.now() - start) / 1000
 
       const response = {

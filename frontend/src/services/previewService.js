@@ -1,8 +1,7 @@
 import { apiService } from './apiService'
 import { cacheService } from './cacheService'
 import { useAppStore } from '../stores/appStore'
-import { duckdbService } from './duckdbService'
-import { buildPreviewSql, isBrowserDataPath } from '../utils/previewRouting'
+import { isBrowserDataPath } from '../utils/previewRouting'
 
 class PreviewService {
   constructor() {
@@ -11,54 +10,17 @@ class PreviewService {
   }
 
   async getBrowserPreview(sampleType = 'random') {
-    const appStore = useAppStore()
-    const tableName = appStore.ingestedTableName
-    if (!tableName) {
-      return {
-        success: true,
-        data: [],
-        row_count: 0,
-        sample_type: sampleType,
-        message: 'No browser table loaded yet.'
-      }
-    }
+    // In Tauri mode, all data lives on the backend — no browser DuckDB.
+    // Route through the standard API preview.
     try {
-      const tables = await duckdbService.getTableNames()
-      if (!tables.includes(tableName)) {
-        return {
-          success: true,
-          data: [],
-          row_count: 0,
-          sample_type: sampleType,
-          message: 'Browser table is not loaded in this session.'
-        }
-      }
-
-      const sql = buildPreviewSql(tableName, sampleType, 100)
-      const rows = await duckdbService.query(sql)
-      const data = rows.map((row) => {
-        const out = {}
-        for (const [key, value] of Object.entries(row)) {
-          out[key] = typeof value === 'bigint' ? Number(value) : value
-        }
-        return out
-      })
-
-      return {
-        success: true,
-        data,
-        row_count: data.length,
-        file_path: `browser://${tableName}`,
-        sample_type: sampleType,
-        message: `Loaded ${data.length} ${sampleType} sample rows from browser DuckDB.`
-      }
+      return await apiService.getDataPreview(sampleType)
     } catch (_error) {
       return {
         success: true,
         data: [],
         row_count: 0,
         sample_type: sampleType,
-        message: 'Browser engine is still initializing. Please try preview again.'
+        message: 'Data preview is handled by the backend.'
       }
     }
   }

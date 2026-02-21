@@ -234,13 +234,9 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { apiService } from '../../services/apiService'
-import { duckdbService } from '../../services/duckdbService'
 import { settingsWebSocket } from '../../services/websocketService'
 import { previewService } from '../../services/previewService'
-import { saveActiveFileHandle, getActiveFileHandleRecord, clearActiveFileHandle } from '../../services/fileHandleStore'
 import { toast } from '../../composables/useToast'
-import { buildBrowserDataPath } from '../../utils/chatBootstrap'
-import { supportsPersistentFileHandles, isLikelyStaleHandleError } from '../../utils/fileHandleSupport'
 import {
   DocumentArrowUpIcon,
   ExclamationTriangleIcon,
@@ -273,15 +269,11 @@ const fileInputRef = ref(null)   // ref for the <input type="file">
 
 // Computed
 const hasApiKey = computed(() => appStore.apiKey.trim() !== '')
-const canPersistHandles = computed(() => supportsPersistentFileHandles())
 
 const updateNeeded = computed(() => {
   return !!(updateInfo.value && updateInfo.value.should_update === true)
 })
 
-function getBackendDataPath() {
-  return buildBrowserDataPath(ingestedTableName.value)
-}
 
 const messageTypeClass = computed(() => {
   return messageType.value === 'success'
@@ -346,120 +338,73 @@ function clearMessage() {
   messageType.value = ''
 }
 
-// Browser file picker — ingest directly into DuckDB-WASM
-async function handleFileSelected(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  await processSelectedFile(file, null)
-  event.target.value = ''
-}
-
+// File picker — uses Tauri native dialog or falls back to <input type="file">
 async function openFilePicker() {
-  if (canPersistHandles.value) {
+  // Try Tauri native dialog first
+  if (window.__TAURI_INTERNALS__) {
     try {
-      const [handle] = await window.showOpenFilePicker({
-        multiple: false,
-        types: [
-          {
-            description: 'Data files',
-            accept: {
-              'text/csv': ['.csv', '.tsv'],
-              'application/json': ['.json'],
-              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-              'application/parquet': ['.parquet'],
-              'application/octet-stream': ['.parquet']
-            }
-          }
-        ]
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const filePath = await open({
+        filters: [{ name: 'Data', extensions: ['csv', 'parquet', 'xlsx', 'json', 'tsv', 'duckdb'] }]
       })
-      const file = await handle.getFile()
-      await processSelectedFile(file, handle)
+      if (filePath) {
+        await processSelectedPath(filePath)
+      }
       return
-    } catch (error) {
-      if (error?.name === 'AbortError') return
-      console.error('System file picker failed, falling back to input:', error)
+    } catch (err) {
+      console.error('Tauri dialog failed, falling back:', err)
     }
   }
-
+  // Browser fallback
   fileInputRef.value?.click()
 }
 
-async function processSelectedFile(file, handle = null, options = {}) {
-  const { restoring = false } = options
+async function handleFileSelected(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  await processSelectedFileUpload(file)
+  event.target.value = ''
+}
+
+// Tauri path: send the absolute file path to backend
+async function processSelectedPath(filePath) {
   clearMessage()
-  if (restoring) {
-    isRestoringFile.value = true
-  } else {
-    isPickingFile.value = true
-  }
-
+  isPickingFile.value = true
   try {
-    // Ingest file lazily into DuckDB-WASM via registerFileHandle
-    const { tableName, columns, rowCount } = await duckdbService.ingestFile(file)
-    const browserDataPath = buildBrowserDataPath(tableName)
-
-    // Store in appStore and local state
-    appStore.setDataFilePath(browserDataPath)
-    ingestedColumns.value = columns
-    ingestedTableName.value = tableName
-    appStore.setIngestedColumns(columns)
-    appStore.setIngestedTableName(tableName)
-    appStore.setSchemaFileId(browserDataPath)
-
-    if (handle) {
-      await saveActiveFileHandle(handle, {
-        file_name: file.name,
-        table_name: tableName
-      })
-    } else {
-      // Input fallback cannot persist a durable file handle
-      await clearActiveFileHandle()
-    }
-
-    showMessage(`Loaded "${file.name}" → table "${tableName}" (${rowCount} rows, ${columns.length} columns)`, 'success')
-
-    // Attempt to prefill context if schema exists
-    await tryPrefillContextFromExistingSchema()
+    const result = await apiService.uploadDataPath(filePath)
+    appStore.setDataFilePath(filePath)
+    ingestedTableName.value = result.table_name || filePath.split('/').pop().split('.')[0]
+    ingestedColumns.value = result.columns || []
+    appStore.setIngestedColumns(ingestedColumns.value)
+    appStore.setIngestedTableName(ingestedTableName.value)
+    appStore.setSchemaFileId(filePath)
+    showMessage(`Loaded "${filePath.split('/').pop()}" → table "${ingestedTableName.value}" (${result.row_count || '?'} rows, ${ingestedColumns.value.length} columns)`, 'success')
   } catch (error) {
-    console.error('File ingestion failed:', error)
+    console.error('File path loading failed:', error)
     showMessage(`Failed to load file: ${error.message}`, 'error')
   } finally {
     isPickingFile.value = false
-    isRestoringFile.value = false
   }
 }
 
-async function tryRestoreFileFromHandle() {
-  if (!canPersistHandles.value) return false
-
+// Browser fallback: upload the File object to backend
+async function processSelectedFileUpload(file) {
+  clearMessage()
+  isPickingFile.value = true
   try {
-    const record = await getActiveFileHandleRecord()
-    const handle = record?.handle
-    if (!handle) return false
-
-    let permission = 'prompt'
-    if (typeof handle.queryPermission === 'function') {
-      permission = await handle.queryPermission({ mode: 'read' })
-    }
-    if (permission !== 'granted' && typeof handle.requestPermission === 'function') {
-      permission = await handle.requestPermission({ mode: 'read' })
-    }
-    if (permission !== 'granted') {
-      showMessage('Please reselect your data file to restore access.', 'error')
-      return false
-    }
-
-    const file = await handle.getFile()
-    await processSelectedFile(file, handle, { restoring: true })
-    return true
+    const result = await apiService.uploadFile(file)
+    appStore.setDataFilePath(result.file_path || file.name)
+    ingestedTableName.value = result.table_name || file.name.split('.')[0]
+    ingestedColumns.value = result.columns || []
+    appStore.setIngestedColumns(ingestedColumns.value)
+    appStore.setIngestedTableName(ingestedTableName.value)
+    appStore.setSchemaFileId(result.file_path || file.name)
+    showMessage(`Loaded "${file.name}" → table "${ingestedTableName.value}" (${result.row_count || '?'} rows, ${ingestedColumns.value.length} columns)`, 'success')
   } catch (error) {
-    if (isLikelyStaleHandleError(error)) {
-      await clearActiveFileHandle()
-      showMessage('Saved file reference is no longer valid. Please reselect your data file.', 'error')
-      return false
-    }
-    console.error('Failed to restore file from saved handle:', error)
-    return false
+    console.error('File upload failed:', error)
+    showMessage(`Failed to load file: ${error.message}`, 'error')
+  } finally {
+    isPickingFile.value = false
   }
 }
 
@@ -529,12 +474,12 @@ function handleProgressUpdate(data) {
   }
 }
 
-// Schema generation using column metadata from DuckDB-WASM
+// Schema generation
 async function generateAndSaveSchema() {
   try {
     updateProgress('Preparing schema metadata...', 60)
     appStore.setIsSchemaFileUploaded(true)
-    appStore.setSchemaFileId(getBackendDataPath() || ingestedTableName.value || '')
+    appStore.setSchemaFileId(ingestedTableName.value || '')
     updateProgress('Schema metadata ready', 100)
   } catch (error) {
     console.error('❌ Schema generation failed:', error)
@@ -553,7 +498,6 @@ async function saveDataSettings() {
 
   // Validate that a file has been ingested
   const dataPath = appStore.dataFilePath.trim()
-  const backendDataPath = getBackendDataPath()
   if (!dataPath) {
     showMessage('Please select a data file first.', 'error')
     return
@@ -569,8 +513,8 @@ async function saveDataSettings() {
   showProgress('Saving context...', 20)
 
   try {
-    if (backendDataPath) {
-      appStore.setSchemaFileId(backendDataPath)
+    if (ingestedTableName.value) {
+      appStore.setSchemaFileId(appStore.dataFilePath)
     }
 
     await apiService.setContext(appStore.schemaContext.trim())
@@ -648,27 +592,10 @@ watch(isProcessing, (newVal) => {
 onMounted(async () => {
   checkForUpdate()
 
-  const restored = await tryRestoreFileFromHandle()
-  if (restored) {
-    return
-  }
-
-  // Auto-detect if tables already exist in DuckDB-WASM
-  try {
-    const tables = await duckdbService.getTableNames()
-    if (tables.length > 0 && appStore.dataFilePath) {
-      // Table already loaded from a previous file selection
-      const tableName = appStore.ingestedTableName || tables[0]
-      ingestedTableName.value = tableName
-      const cols = await duckdbService.describeTable(tableName)
-      ingestedColumns.value = cols
-      appStore.setIngestedTableName(tableName)
-      appStore.setIngestedColumns(cols)
-      console.debug(`📋 [DataTab] Auto-detected existing table: ${tableName} (${cols.length} columns)`)
-    }
-  } catch (e) {
-    // DuckDB may not be initialized yet — that's fine
-    console.debug('📋 [DataTab] No existing DuckDB tables detected')
+  // Pre-populate from existing appStore state
+  if (appStore.ingestedTableName) {
+    ingestedTableName.value = appStore.ingestedTableName
+    ingestedColumns.value = appStore.ingestedColumns || []
   }
 })
 </script>

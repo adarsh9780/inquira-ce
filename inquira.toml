@@ -1,0 +1,26 @@
+# Inquira Configuration
+# =====================
+# User-editable settings for Python environment and proxy configuration.
+# This file is read by the Tauri launcher on startup.
+
+[python]
+# Python version to install via UV (only used on first launch)
+version = "3.12"
+
+# Set this if you're behind a corporate proxy or using JFrog/Nexus/Artifactory
+# index-url = "https://your-company.jfrog.io/artifactory/api/pypi/pypi-remote/simple"
+
+# Set this to use a pre-installed Python instead of UV-managed one
+# python-path = "/usr/local/bin/python3.12"
+
+[proxy]
+# Uncomment and set these if you're behind a corporate proxy
+# http-proxy = "http://proxy.company.com:8080"
+# https-proxy = "http://proxy.company.com:8080"
+# no-proxy = "localhost,127.0.0.1"
+
+[backend]
+# Port for the FastAPI backend server
+port = 8000
+# Host to bind the backend server to
+host = "localhost"

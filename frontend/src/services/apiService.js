@@ -325,6 +325,20 @@ export const apiService = {
     }
   },
 
+  // Code execution (server-side)
+  async executeCode(code, timeout = 60) {
+    const response = await fetch(`${apiBaseUrl.replace(/\/+$/, '')}/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, timeout })
+    })
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}))
+      throw new Error(detail.detail || `Execution request failed (${response.status})`)
+    }
+    return response.json()
+  },
+
   // Chat and analysis
   async analyzeData(data, signal = null) {
     // data is typically { question, context, model, current_code }

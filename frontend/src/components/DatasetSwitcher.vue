@@ -194,8 +194,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../stores/appStore'
 import { apiService } from '../services/apiService'
 import { previewService } from '../services/previewService'
-import { duckdbService } from '../services/duckdbService'
-import { buildBrowserDataPath, inferTableNameFromDataPath } from '../utils/chatBootstrap'
+import { inferTableNameFromDataPath } from '../utils/chatBootstrap'
 import { mergeDatasetSources } from '../utils/datasetCatalogMerge'
 
 const emit = defineEmits(['open-settings'])
@@ -248,15 +247,9 @@ async function loadDatasets() {
       ...item,
       file_path: item.source_path,
     }))
-    let runtimeTables = []
-    try {
-      runtimeTables = await duckdbService.getTableNames()
-    } catch (_err) {
-      runtimeTables = []
-    }
     datasets.value = mergeDatasetSources({
       catalogDatasets,
-      runtimeTables,
+      runtimeTables: [],
       currentDataPath: currentDataPath.value
     })
   } catch (error) {
@@ -326,7 +319,7 @@ async function selectDataset(ds) {
     const tableName = (ds.table_name || inferTableNameFromDataPath(ds.file_path || '')).trim()
     appStore.setIngestedTableName(tableName)
     appStore.setIngestedColumns([])
-    appStore.setSchemaFileId(buildBrowserDataPath(tableName))
+    appStore.setSchemaFileId(ds.file_path || tableName)
     
     // Clear code/results from previous dataset
     appStore.setGeneratedCode('')

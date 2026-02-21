@@ -62,11 +62,9 @@
 import { ref, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import apiService from '../../services/apiService'
-import pyodideService from '../../services/pyodideService'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { buildBrowserDataPath, inferTableNameFromDataPath } from '../../utils/chatBootstrap'
-import { ensureBrowserTableReady } from '../../utils/browserTableRecovery'
 import {
   PaperAirplaneIcon,
   ExclamationTriangleIcon
@@ -187,32 +185,6 @@ async function handleSubmit() {
       appStore.setSchemaFileId(buildBrowserDataPath(expectedTableName))
     }
 
-    if (expectedTableName && isBrowserVirtualPath(appStore.dataFilePath || appStore.schemaFileId)) {
-      try {
-        const tableHealth = await ensureBrowserTableReady({
-          expectedTableName
-        })
-        if (tableHealth.recovered) {
-          appStore.setIngestedTableName(tableHealth.tableName)
-          if (Array.isArray(tableHealth.columns) && tableHealth.columns.length > 0) {
-            appStore.setIngestedColumns(tableHealth.columns)
-          }
-          appStore.setDataFilePath(buildBrowserDataPath(tableHealth.tableName))
-          appStore.setSchemaFileId(buildBrowserDataPath(tableHealth.tableName))
-        }
-      } catch (browserTableError) {
-        if (isRecoverableBrowserTableError(browserTableError)) {
-          // Continue in general/workspace mode instead of failing the request.
-          appStore.setDataFilePath('')
-          appStore.setSchemaFileId('')
-          appStore.setIngestedTableName('')
-          appStore.setIngestedColumns([])
-        } else {
-          throw browserTableError
-        }
-      }
-    }
-
     // Get current Python file content if available
     const userCode = appStore.pythonFileContent || null
 
@@ -299,49 +271,20 @@ async function handleSubmit() {
     appStore.updateLastMessageExplanation(explanation)
     appStore.setGeneratedCode(code)
 
-    // Execute the code locally if code was generated
+    // Display the generated code and any execution results from the backend
     if (code && code.trim()) {
-      try {
-        appStore.setTerminalOutput('Executing with Python WebAssembly...\n')
-        
-        // Execute the code in Pyodide
-        const result = await pyodideService.executePython(code)
-        
-        if (result.success) {
-           appStore.addHistoricalCodeBlock(code) // Save it so we can restore on reload
-           
-           if (result.stdout || result.stderr) {
-              appStore.setTerminalOutput(result.stdout + '\n' + result.stderr)
-           } else {
-              appStore.setTerminalOutput('Execution successful. No terminal output.')
-           }
-           
-           // Based on what type of result Wasm returns, populate the UI
-           if (result.resultType === 'dict' && result.result?.data && result.result?.layout) {
-              // Plotly figure
-              appStore.setPlotlyFigure(result.result)
-              appStore.setResultData(null)
-              appStore.setActiveTab('chart')
-           } else if (result.resultType === 'dict' && result.result?.columns && result.result?.data) {
-              // Pandas DataFrame format
-              appStore.setResultData(result.result)
-              appStore.setPlotlyFigure(null)
-              appStore.setActiveTab('table')
-           } else {
-              // Bare code logic
-              appStore.setActiveTab('code')
-           }
+      appStore.setTerminalOutput(response.stdout || response.terminal_output || 'Code generated successfully.')
 
-        } else {
-           // Execution failed locally
-           appStore.setTerminalOutput('Error executing code:\n' + result.error)
-           appStore.setActiveTab('code')
-           toast.error('Execution Failed', 'The generated code failed to run locally.')
-        }
-        
-      } catch (err) {
-        console.error('Pyodide execution error:', err)
-        appStore.setTerminalOutput('Critical error running WebAssembly: ' + err.message)
+      // Check for result data from server-side execution
+      if (response.plotly_figure || (response.result?.data && response.result?.layout)) {
+        appStore.setPlotlyFigure(response.plotly_figure || response.result)
+        appStore.setResultData(null)
+        appStore.setActiveTab('chart')
+      } else if (response.result?.columns && response.result?.data) {
+        appStore.setResultData(response.result)
+        appStore.setPlotlyFigure(null)
+        appStore.setActiveTab('table')
+      } else {
         appStore.setActiveTab('code')
       }
     } else {

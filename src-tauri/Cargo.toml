@@ -1,0 +1,26 @@
+[package]
+name = "inquira"
+version = "0.4.6"
+description = "AI-Powered Data Analysis Tool"
+authors = ["Adarsh Maurya"]
+license = "MIT"
+repository = "https://github.com/adarsh9780/inquira-ce"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.4" }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+toml = "0.8"
+tauri = { version = "2.10.0", features = ["protocol-asset"] }
+tauri-plugin-log = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"

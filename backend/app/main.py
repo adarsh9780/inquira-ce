@@ -30,6 +30,7 @@ from .api.schemas import router as schema_router
 from .api.legal import router as legal_router
 from .api.settings import router as settings_router
 from .api.system import router as system_router
+from .api.execute import router as execute_router
 from .v1.api.router import router as v1_router
 from .v1.db.init import init_v1_database
 from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
@@ -173,6 +174,8 @@ app.add_middleware(
         "http://127.0.0.1:3000",  # Alternative dev port
         "http://127.0.0.1:8000",
         "http://localhost:8000",
+        "https://tauri.localhost",  # Tauri webview
+        "tauri://localhost",  # Tauri webview (custom protocol)
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -191,6 +194,7 @@ app.include_router(api_test_router)
 app.include_router(datasets_router)
 app.include_router(system_router)
 app.include_router(legal_router)
+app.include_router(execute_router)
 app.include_router(v1_router)
 
 
