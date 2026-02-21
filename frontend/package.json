@@ -27,6 +27,8 @@
     "codemirror": "^6.0.2",
     "dompurify": "^3.2.6",
     "markdown-it": "^14.1.0",
+    "markdown-it-katex": "^2.0.3",
+    "katex": "^0.16.11",
     "pinia": "^3.0.3",
     "plotly.js-dist-min": "^3.0.3",
     "pyodide": "^0.27.2",

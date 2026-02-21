@@ -34,6 +34,11 @@ export const useAppStore = defineStore('app', () => {
   const chatHistory = ref([])
   const currentQuestion = ref('')
   const currentExplanation = ref('')
+  const workspaces = ref([])
+  const activeWorkspaceId = ref('')
+  const conversations = ref([])
+  const activeConversationId = ref('')
+  const turnsNextCursor = ref(null)
 
   // Wasm Execution State
   const historicalCodeBlocks = ref([]) // Tracks successfully executed code snippets
@@ -64,7 +69,10 @@ export const useAppStore = defineStore('app', () => {
   // Computed
   const hasDataFile = computed(() => dataFilePath.value.trim() !== '')
   const hasSchemaFile = computed(() => schemaFilePath.value.trim() !== '' || isSchemaFileUploaded.value)
-  const canAnalyze = computed(() => apiKey.value.trim() !== '' && dataFilePath.value.trim() !== '')
+  const canAnalyze = computed(() => {
+    if (apiKey.value.trim() === '') return false
+    return dataFilePath.value.trim() !== '' || activeWorkspaceId.value.trim() !== ''
+  })
 
   // Local Configuration Management
   function saveLocalConfig() {
@@ -79,6 +87,8 @@ export const useAppStore = defineStore('app', () => {
       ingestedTableName: ingestedTableName.value,
       ingestedColumns: ingestedColumns.value,
       schemaContext: schemaContext.value,
+      activeWorkspaceId: activeWorkspaceId.value,
+      activeConversationId: activeConversationId.value,
       chatOverlayWidth: chatOverlayWidth.value,
       historicalCodeBlocks: historicalCodeBlocks.value,
       timestamp: new Date().toISOString()
@@ -141,6 +151,12 @@ export const useAppStore = defineStore('app', () => {
       if (config.schemaContext) {
         schemaContext.value = config.schemaContext
       }
+      if (config.activeWorkspaceId) {
+        activeWorkspaceId.value = config.activeWorkspaceId
+      }
+      if (config.activeConversationId) {
+        activeConversationId.value = config.activeConversationId
+      }
 
       // Restore chat overlay width
       if (config.chatOverlayWidth && config.chatOverlayWidth > 0.1 && config.chatOverlayWidth < 0.9) {
@@ -175,6 +191,8 @@ export const useAppStore = defineStore('app', () => {
       ingestedTableName.value = ''
       ingestedColumns.value = []
       schemaContext.value = ''
+      activeWorkspaceId.value = ''
+      activeConversationId.value = ''
       historicalCodeBlocks.value = []
 
       return true
@@ -321,6 +339,116 @@ export const useAppStore = defineStore('app', () => {
     } catch (e) {
       console.error("❌ Failed to fetch chat history", e)
     }
+  }
+
+  function setWorkspaces(items) {
+    workspaces.value = Array.isArray(items) ? items : []
+  }
+
+  function setActiveWorkspaceId(workspaceId) {
+    activeWorkspaceId.value = workspaceId || ''
+    saveLocalConfig()
+  }
+
+  function setConversations(items) {
+    conversations.value = Array.isArray(items) ? items : []
+  }
+
+  function setActiveConversationId(conversationId) {
+    activeConversationId.value = conversationId || ''
+    turnsNextCursor.value = null
+    saveLocalConfig()
+  }
+
+  function prependChatHistoryFromTurns(turns) {
+    if (!Array.isArray(turns) || turns.length === 0) return
+    const mapped = turns.map((turn) => ({
+      id: turn.id,
+      question: turn.user_text,
+      explanation: turn.assistant_text,
+      toolEvents: turn.tool_events || null,
+      timestamp: turn.created_at || new Date().toISOString()
+    }))
+    chatHistory.value = [...mapped.reverse(), ...chatHistory.value]
+  }
+
+  async function fetchWorkspaces() {
+    const response = await apiService.v1ListWorkspaces()
+    const items = response?.workspaces || []
+    workspaces.value = items
+    if (!activeWorkspaceId.value && items.length > 0) {
+      const active = items.find((w) => w.is_active) || items[0]
+      activeWorkspaceId.value = active.id
+      saveLocalConfig()
+    }
+  }
+
+  async function createWorkspace(name) {
+    const ws = await apiService.v1CreateWorkspace(name)
+    await fetchWorkspaces()
+    return ws
+  }
+
+  async function activateWorkspace(workspaceId) {
+    await apiService.v1ActivateWorkspace(workspaceId)
+    activeWorkspaceId.value = workspaceId
+    conversations.value = []
+    activeConversationId.value = ''
+    chatHistory.value = []
+    turnsNextCursor.value = null
+    saveLocalConfig()
+  }
+
+  async function fetchConversations() {
+    if (!activeWorkspaceId.value) return
+    const response = await apiService.v1ListConversations(activeWorkspaceId.value, 50)
+    conversations.value = response?.conversations || []
+    if (!activeConversationId.value && conversations.value.length > 0) {
+      activeConversationId.value = conversations.value[0].id
+    }
+  }
+
+  async function createConversation(title = null) {
+    if (!activeWorkspaceId.value) return null
+    const conv = await apiService.v1CreateConversation(activeWorkspaceId.value, title)
+    await fetchConversations()
+    activeConversationId.value = conv.id
+    chatHistory.value = []
+    turnsNextCursor.value = null
+    saveLocalConfig()
+    return conv
+  }
+
+  async function fetchConversationTurns({ reset = true } = {}) {
+    if (!activeConversationId.value) return
+    const response = await apiService.v1ListTurns(
+      activeConversationId.value,
+      5,
+      reset ? null : turnsNextCursor.value
+    )
+    const turns = response?.turns || []
+    if (reset) {
+      chatHistory.value = []
+    }
+    prependChatHistoryFromTurns(turns)
+    turnsNextCursor.value = response?.next_cursor || null
+  }
+
+  async function clearActiveConversation() {
+    if (!activeConversationId.value) return
+    await apiService.v1ClearConversation(activeConversationId.value)
+    chatHistory.value = []
+    turnsNextCursor.value = null
+  }
+
+  async function deleteActiveConversation() {
+    if (!activeConversationId.value) return
+    await apiService.v1DeleteConversation(activeConversationId.value)
+    const deletedId = activeConversationId.value
+    conversations.value = conversations.value.filter((c) => c.id !== deletedId)
+    activeConversationId.value = conversations.value[0]?.id || ''
+    chatHistory.value = []
+    turnsNextCursor.value = null
   }
 
   function setGeneratedCode(code) {
@@ -483,6 +611,11 @@ export const useAppStore = defineStore('app', () => {
     chatHistory,
     currentQuestion,
     currentExplanation,
+    workspaces,
+    activeWorkspaceId,
+    conversations,
+    activeConversationId,
+    turnsNextCursor,
     generatedCode,
     resultData,
     plotlyFigure,
@@ -524,6 +657,18 @@ export const useAppStore = defineStore('app', () => {
     setPythonFileContent,
     addChatMessage,
     updateLastMessageExplanation,
+    setWorkspaces,
+    setActiveWorkspaceId,
+    setConversations,
+    setActiveConversationId,
+    fetchWorkspaces,
+    createWorkspace,
+    activateWorkspace,
+    fetchConversations,
+    createConversation,
+    fetchConversationTurns,
+    clearActiveConversation,
+    deleteActiveConversation,
     setGeneratedCode,
     setResultData,
     setPlotlyFigure,

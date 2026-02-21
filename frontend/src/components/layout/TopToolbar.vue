@@ -11,7 +11,8 @@
       </div>
 
       <!-- Center Section: Dataset Switcher (Prominent) -->
-      <div class="flex-1 flex justify-center px-4">
+      <div class="flex-1 flex justify-center px-4 items-center space-x-3">
+        <WorkspaceSwitcher />
         <DatasetSwitcher @open-settings="openSettings" />
       </div>
 
@@ -200,6 +201,7 @@ import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import { CogIcon, ArrowRightOnRectangleIcon, UserIcon, CommandLineIcon, ChevronDownIcon, DocumentTextIcon } from '@heroicons/vue/24/outline'
 import logo from '../../assets/favicon.svg'
 import DatasetSwitcher from '../DatasetSwitcher.vue'
+import WorkspaceSwitcher from '../WorkspaceSwitcher.vue'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()

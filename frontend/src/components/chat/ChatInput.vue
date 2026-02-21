@@ -212,25 +212,40 @@ async function handleSubmit() {
     }, 300000) // 5 minutes
 
     let response
-    try {
-      response = await apiService.analyzeDataStream(requestData, {
-        signal,
-        onEvent: (evt) => {
-          if (evt.event === 'status' && evt.data?.message) {
-            appStore.updateLastMessageExplanation(evt.data.message)
-            return
-          }
-          if (evt.event === 'node' && evt.data?.node) {
-            appStore.updateLastMessageExplanation(`Running: ${evt.data.node}...`)
-          }
-        }
+    if (appStore.activeWorkspaceId) {
+      response = await apiService.v1Analyze({
+        workspace_id: appStore.activeWorkspaceId,
+        conversation_id: appStore.activeConversationId || null,
+        question: questionText,
+        current_code: appStore.pythonFileContent || '',
+        model: appStore.selectedModel,
+        context: appStore.schemaContext.trim() || null
       })
-    } catch (streamError) {
-      // Backward-compatible fallback if streaming endpoint is unavailable.
-      if (streamError?.status === 404 || streamError?.status === 405) {
-        response = await apiService.analyzeData(requestData, signal)
-      } else {
-        throw streamError
+      if (response?.conversation_id && response.conversation_id !== appStore.activeConversationId) {
+        appStore.setActiveConversationId(response.conversation_id)
+        await appStore.fetchConversations()
+      }
+    } else {
+      try {
+        response = await apiService.analyzeDataStream(requestData, {
+          signal,
+          onEvent: (evt) => {
+            if (evt.event === 'status' && evt.data?.message) {
+              appStore.updateLastMessageExplanation(evt.data.message)
+              return
+            }
+            if (evt.event === 'node' && evt.data?.node) {
+              appStore.updateLastMessageExplanation(`Running: ${evt.data.node}...`)
+            }
+          }
+        })
+      } catch (streamError) {
+        // Backward-compatible fallback if streaming endpoint is unavailable.
+        if (streamError?.status === 404 || streamError?.status === 405) {
+          response = await apiService.analyzeData(requestData, signal)
+        } else {
+          throw streamError
+        }
       }
     }
 

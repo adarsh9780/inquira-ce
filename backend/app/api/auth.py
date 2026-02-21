@@ -80,8 +80,8 @@ def get_current_user(request: Request) -> dict:
     return user
 
 @router.post("/auth/register", response_model=UserResponse)
-async def register_user(request: UserRegisterRequest):
-    """Register a new user"""
+async def register_user(request: UserRegisterRequest, response: Response, config: AppConfig = Depends(get_app_config)):
+    """Register a new user and immediately log them in via session cookie."""
     # Check if username already exists
     existing_user = get_user_by_username(request.username)
     if existing_user:
@@ -95,6 +95,22 @@ async def register_user(request: UserRegisterRequest):
     success = create_user(user_id, request.username, hashed_password, salt)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to create user")
+
+    # Auto-login after successful signup
+    session_token = generate_session_token()
+    session_data = {
+        "user_id": user_id,
+        "created_at": datetime.now().isoformat()
+    }
+    create_session(session_token, user_id, session_data)
+    response.set_cookie(
+        key="session_token",
+        value=session_token,
+        httponly=True,
+        max_age=86400,
+        samesite="lax",
+        secure=config.SECURE
+    )
 
     return UserResponse(
         user_id=user_id,

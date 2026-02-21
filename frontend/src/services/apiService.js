@@ -511,6 +511,57 @@ export const apiService = {
       console.error('Failed to download dataset blob:', error)
       throw error
     }
+  },
+
+  // V1 Workspace APIs
+  async v1ListWorkspaces() {
+    return axios.get('/api/v1/workspaces')
+  },
+
+  async v1CreateWorkspace(name) {
+    return axios.post('/api/v1/workspaces', { name })
+  },
+
+  async v1ActivateWorkspace(workspaceId) {
+    return axios.put(`/api/v1/workspaces/${workspaceId}/activate`)
+  },
+
+  async v1DeleteWorkspace(workspaceId) {
+    return axios.delete(`/api/v1/workspaces/${workspaceId}`)
+  },
+
+  async v1ListDatasets(workspaceId) {
+    return axios.get(`/api/v1/workspaces/${workspaceId}/datasets`)
+  },
+
+  async v1AddDataset(workspaceId, sourcePath) {
+    return axios.post(`/api/v1/workspaces/${workspaceId}/datasets`, { source_path: sourcePath })
+  },
+
+  async v1ListConversations(workspaceId, limit = 50) {
+    return axios.get(`/api/v1/workspaces/${workspaceId}/conversations`, { params: { limit } })
+  },
+
+  async v1CreateConversation(workspaceId, title = null) {
+    return axios.post(`/api/v1/workspaces/${workspaceId}/conversations`, { title })
+  },
+
+  async v1ClearConversation(conversationId) {
+    return axios.post(`/api/v1/conversations/${conversationId}/clear`)
+  },
+
+  async v1DeleteConversation(conversationId) {
+    return axios.delete(`/api/v1/conversations/${conversationId}`)
+  },
+
+  async v1ListTurns(conversationId, limit = 5, before = null) {
+    const params = { limit }
+    if (before) params.before = before
+    return axios.get(`/api/v1/conversations/${conversationId}/turns`, { params })
+  },
+
+  async v1Analyze(payload) {
+    return axios.post('/api/v1/chat/analyze', payload)
   }
 }
 

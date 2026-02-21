@@ -30,6 +30,9 @@ from .api.schemas import router as schema_router
 from .api.legal import router as legal_router
 from .api.settings import router as settings_router
 from .api.system import router as system_router
+from .v1.api.router import router as v1_router
+from .v1.db.init import init_v1_database
+from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
 from .core.config_models import AppConfig
 from .database.database_manager import DatabaseManager
 from .core.logger import logprint, patch_print
@@ -51,6 +54,7 @@ async def lifespan(app: FastAPI):
     app.state.context = None
     app.state.llm_service = None
     app.state.llm_initialized = False
+    app.state.workspace_langgraph_manager = WorkspaceLangGraphManager()
 
     # Initialize LangGraph Agent with Persistence
     try:
@@ -96,6 +100,13 @@ async def lifespan(app: FastAPI):
     app.state.db_manager = DatabaseManager(app.state.config)
     logprint("Database manager initialized")
 
+    # Initialize v1 ORM database schema
+    try:
+        await init_v1_database()
+        logprint("API v1 ORM schema initialized")
+    except Exception as e:
+        logprint(f"Failed to initialize API v1 ORM schema: {e}", level="error")
+
     # Start session cleanup task
     cleanup_task = asyncio.create_task(session_cleanup_worker())
     logprint("Session cleanup worker started")
@@ -112,6 +123,12 @@ async def lifespan(app: FastAPI):
 
     if hasattr(app.state, "db_manager"):
         app.state.db_manager.shutdown()
+
+    if hasattr(app.state, "workspace_langgraph_manager") and app.state.workspace_langgraph_manager:
+        try:
+            await app.state.workspace_langgraph_manager.shutdown()
+        except Exception as e:
+            logprint(f"Error closing workspace LangGraph manager: {e}", level="error")
 
     if hasattr(app.state, "checkpointer_cm") and app.state.checkpointer_cm:
         logprint("Closing LangGraph checkpointer connection...")
@@ -165,6 +182,7 @@ app.include_router(api_test_router)
 app.include_router(datasets_router)
 app.include_router(system_router)
 app.include_router(legal_router)
+app.include_router(v1_router)
 
 
 # WebSocket endpoint for real-time processing updates
