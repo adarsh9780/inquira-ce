@@ -2,6 +2,12 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 
+const crossOriginIsolationHeaders = {
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Embedder-Policy': 'require-corp',
+  'Cross-Origin-Resource-Policy': 'cross-origin'
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   base: './',
@@ -39,6 +45,7 @@ export default defineConfig({
     exclude: ['pyodide']
   },
   server: {
+    headers: crossOriginIsolationHeaders,
     proxy: {
       '/upload': 'http://localhost:8000',
       '/analyze': 'http://localhost:8000',
@@ -47,6 +54,9 @@ export default defineConfig({
       '/log': 'http://localhost:8000',
       '/health': 'http://localhost:8000'
     }
+  },
+  preview: {
+    headers: crossOriginIsolationHeaders
   },
   build: {
     outDir: '../src/inquira/frontend/dist',
