@@ -339,26 +339,30 @@ export const apiService = {
     return response.json()
   },
 
-  // File data loading — sends absolute path to backend for CSV→DuckDB conversion
+  // File data loading — inspect file for columns, then trigger background DuckDB conversion
   async uploadDataPath(filePath) {
-    const response = await fetch(`${apiBaseUrl.replace(/\/+$/, '')}/settings/set/data_path`, {
+    // Step 1: Inspect file header (fast, synchronous)
+    const inspectRes = await fetch(`${apiBaseUrl.replace(/\/+$/, '')}/data/inspect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ file_path: filePath })
+    })
+    if (!inspectRes.ok) {
+      const detail = await inspectRes.json().catch(() => ({}))
+      throw new Error(detail.detail || `Failed to inspect file (${inspectRes.status})`)
+    }
+    const result = await inspectRes.json()
+
+    // Step 2: Trigger background DuckDB conversion (fire-and-forget)
+    fetch(`${apiBaseUrl.replace(/\/+$/, '')}/settings/set/data_path`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ data_path: filePath })
-    })
-    if (!response.ok) {
-      const detail = await response.json().catch(() => ({}))
-      throw new Error(detail.detail || `Failed to set data path (${response.status})`)
-    }
-    const result = await response.json()
-    // Normalize response for DataTab.vue
-    return {
-      table_name: result.table_name || filePath.split('/').pop().replace(/\.[^.]+$/, ''),
-      columns: result.columns || [],
-      row_count: result.row_count,
-      file_path: filePath,
-    }
+    }).catch(() => { }) // Don't block on this
+
+    return result
   },
 
   // Browser fallback — same endpoint, uses file name as path

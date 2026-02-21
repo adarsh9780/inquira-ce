@@ -31,6 +31,7 @@ from .api.legal import router as legal_router
 from .api.settings import router as settings_router
 from .api.system import router as system_router
 from .api.execute import router as execute_router
+from .api.data_inspect import router as data_inspect_router
 from .v1.api.router import router as v1_router
 from .v1.db.init import init_v1_database
 from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
@@ -195,6 +196,7 @@ app.include_router(datasets_router)
 app.include_router(system_router)
 app.include_router(legal_router)
 app.include_router(execute_router)
+app.include_router(data_inspect_router)
 app.include_router(v1_router)
 
 
