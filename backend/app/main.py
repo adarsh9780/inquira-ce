@@ -433,8 +433,15 @@ def run(argv: list[str] | None = None):
 
     logprint(f"Launching Inquira backend (v{APP_VERSION})")
     threading.Thread(target=open_browser, daemon=True).start()
+    access_log = False
+    try:
+        default_config_path = os.path.join(os.path.dirname(__file__), "app_config.json")
+        cfg = AppConfig.load_merged_config(default_config_path)
+        access_log = bool(cfg.LOGGING.uvicorn_access_log)
+    except Exception:
+        access_log = False
 
-    uvicorn.run(app, host=HOST, port=PORT, reload=False, access_log=False)
+    uvicorn.run(app, host=HOST, port=PORT, reload=False, access_log=access_log)
 
 
 if __name__ == "__main__":

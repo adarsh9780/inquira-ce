@@ -1,3 +1,9 @@
-{ 
-  "SECURE": true
+{
+  "SECURE": true,
+  "LOGGING": {
+    "console_level": "ERROR",
+    "file_level": "DEBUG",
+    "color_errors": true,
+    "uvicorn_access_log": false
+  }
 }

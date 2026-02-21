@@ -570,6 +570,7 @@ version = "0.4.6a0"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
+    { name = "colorama" },
     { name = "duckdb" },
     { name = "fastapi" },
     { name = "google-genai" },
@@ -594,6 +595,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.21.0" },
+    { name = "colorama", specifier = ">=0.4.6" },
     { name = "duckdb", specifier = ">=1.3.2" },
     { name = "fastapi", specifier = ">=0.119.1" },
     { name = "google-genai", specifier = ">=1.32.0" },

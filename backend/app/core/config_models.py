@@ -3,6 +3,13 @@ from typing import List, Any
 import json
 from pathlib import Path
 
+class LoggingConfig(BaseModel):
+    """Runtime logging controls."""
+    console_level: str = Field(default="ERROR")
+    file_level: str = Field(default="DEBUG")
+    color_errors: bool = Field(default=True)
+    uvicorn_access_log: bool = Field(default=False)
+
 class AppConfig(BaseModel):
     """Configuration model for the FastAPI application"""
 
@@ -10,6 +17,7 @@ class AppConfig(BaseModel):
     SECURE: bool = Field(
         default=False,
         description="For cookies, use False for development and for production use True")
+    LOGGING: LoggingConfig = Field(default_factory=LoggingConfig)
 
     @classmethod
     def from_json_file(cls, file_path: str) -> "AppConfig":
