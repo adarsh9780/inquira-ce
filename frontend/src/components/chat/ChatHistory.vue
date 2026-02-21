@@ -133,7 +133,8 @@ const SCROLL_THRESHOLD_PX = 100
 const md = new MarkdownIt({
   html: false,
   linkify: true,
-  typographer: true
+  typographer: true,
+  breaks: true
 })
 md.use(markdownItKatex)
 
@@ -190,7 +191,10 @@ async function copyExplanation(explanation) {
 
 function renderMarkdown(text) {
   if (!text) return ''
-  const html = md.render(text)
+  const normalized = String(text)
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+  const html = md.render(normalized)
   return DOMPurify.sanitize(html)
 }
 

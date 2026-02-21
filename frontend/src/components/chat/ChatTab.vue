@@ -1,35 +1,51 @@
 <template>
   <div class="flex h-full bg-white rounded-xl overflow-hidden">
-    <div class="w-64 border-r border-gray-100 flex flex-col bg-gray-50/70">
-      <div class="p-3 border-b border-gray-100 flex items-center justify-between">
-        <h3 class="text-sm font-semibold text-gray-700">Conversations</h3>
-        <button class="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700" @click="createConversation">
-          New
-        </button>
-      </div>
-      <div class="flex-1 overflow-auto p-2 space-y-1">
-        <button
-          v-for="conv in appStore.conversations"
-          :key="conv.id"
-          class="w-full text-left px-2 py-2 rounded text-sm"
-          :class="conv.id === appStore.activeConversationId ? 'bg-blue-100 text-blue-800' : 'hover:bg-gray-100 text-gray-700'"
-          @click="selectConversation(conv.id)"
-        >
-          <p class="font-medium truncate">{{ conv.title || 'Conversation' }}</p>
-        </button>
-      </div>
-      <div class="p-2 border-t border-gray-100 flex gap-2">
-        <button class="text-xs px-2 py-1 rounded bg-amber-100 text-amber-800 hover:bg-amber-200" @click="clearConversation">
-          Clear
-        </button>
-        <button class="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200" @click="deleteConversation">
-          Delete
-        </button>
-      </div>
-    </div>
-
     <div class="flex-1 flex flex-col">
-      <!-- Chat History -->
+      <div class="border-b border-gray-100 bg-white px-3 py-2 sm:px-4">
+        <div class="flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <p class="text-[11px] uppercase tracking-wide text-gray-500">Conversation</p>
+            <h3 class="truncate text-sm font-semibold text-gray-800">{{ activeConversationTitle }}</h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+              @click="createConversation"
+            >
+              New
+            </button>
+            <button
+              type="button"
+              class="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="!appStore.activeConversationId"
+              @click="clearConversation"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              class="rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="!appStore.activeConversationId"
+              @click="deleteConversation"
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              class="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+              title="Conversation history"
+              @click="openConversationHistory"
+            >
+              <span class="relative inline-block h-4 w-4 align-middle">
+                <ArrowPathIcon class="h-4 w-4 text-gray-500" />
+                <ClockIcon class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-white text-gray-500" />
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div class="flex-1 overflow-y-auto bg-gray-50/30" data-chat-scroll-container>
         <div v-if="appStore.chatHistory.length === 0" class="flex items-center justify-center h-full px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-2 sm:pb-3 lg:pb-4">
           <div class="text-center max-w-md">
@@ -48,30 +64,45 @@
         </div>
       </div>
 
-      <!-- Chat Input -->
       <div class="flex-shrink-0 border-t border-gray-100 bg-white pt-2 sm:pt-3">
         <ChatInput />
       </div>
     </div>
   </div>
+
+  <ConversationHistoryModal
+    :is-open="isConversationHistoryOpen"
+    :conversations="appStore.conversations"
+    :active-conversation-id="appStore.activeConversationId"
+    @close="isConversationHistoryOpen = false"
+    @select="selectConversationFromHistory"
+  />
 </template>
 
 <script setup>
-import { onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import ChatHistory from './ChatHistory.vue'
 import ChatInput from './ChatInput.vue'
-import { ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
+import ConversationHistoryModal from './ConversationHistoryModal.vue'
+import { ChatBubbleLeftRightIcon, ArrowPathIcon, ClockIcon } from '@heroicons/vue/24/outline'
 import { toast } from '../../composables/useToast'
+import { extractApiErrorMessage } from '../../utils/apiError'
 
 const appStore = useAppStore()
+const isConversationHistoryOpen = ref(false)
+
+const activeConversationTitle = computed(() => {
+  const active = appStore.conversations.find((conv) => conv.id === appStore.activeConversationId)
+  return active?.title || 'New Conversation'
+})
 
 async function createConversation() {
   try {
     await appStore.createConversation()
     await appStore.fetchConversationTurns({ reset: true })
   } catch (error) {
-    toast.error('Conversation Error', error.message || 'Failed to create conversation')
+    toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to create conversation'))
   }
 }
 
@@ -80,17 +111,41 @@ async function selectConversation(conversationId) {
   await appStore.fetchConversationTurns({ reset: true })
 }
 
+async function selectConversationFromHistory(conversationId) {
+  await selectConversation(conversationId)
+  isConversationHistoryOpen.value = false
+}
+
 async function clearConversation() {
   if (!appStore.activeConversationId) return
-  await appStore.clearActiveConversation()
+  try {
+    await appStore.clearActiveConversation()
+  } catch (error) {
+    toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to clear conversation'))
+  }
 }
 
 async function deleteConversation() {
   if (!appStore.activeConversationId) return
-  await appStore.deleteActiveConversation()
-  if (appStore.activeConversationId) {
-    await appStore.fetchConversationTurns({ reset: true })
+  try {
+    await appStore.deleteActiveConversation()
+    if (appStore.activeConversationId) {
+      await appStore.fetchConversationTurns({ reset: true })
+    }
+  } catch (error) {
+    toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to delete conversation'))
   }
+}
+
+async function openConversationHistory() {
+  try {
+    if (appStore.activeWorkspaceId) {
+      await appStore.fetchConversations()
+    }
+  } catch (_error) {
+    // Keep dialog usable with already loaded list.
+  }
+  isConversationHistoryOpen.value = true
 }
 
 onMounted(async () => {

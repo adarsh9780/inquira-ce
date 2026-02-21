@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db.session import get_db_session
 from ..schemas.auth import AuthUserResponse, LoginRequest, RegisterRequest
 from ..services.auth_service import AuthService
+from .deps import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["V1 Authentication"])
 
@@ -58,3 +59,13 @@ async def login_user(
         secure=False,
     )
     return AuthUserResponse(user_id=user_id, username=payload.username, plan=plan)
+
+
+@router.get("/me", response_model=AuthUserResponse)
+async def get_current_user_profile(current_user=Depends(get_current_user)):
+    """Return authenticated user profile and plan for UI rendering."""
+    return AuthUserResponse(
+        user_id=current_user.id,
+        username=current_user.username,
+        plan=current_user.plan.value,
+    )

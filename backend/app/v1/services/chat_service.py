@@ -26,6 +26,16 @@ class ChatService:
     """Runs analysis and persists chat turns."""
 
     @staticmethod
+    def _derive_conversation_title(question: str) -> str:
+        """Build readable conversation title from first question text."""
+        normalized = " ".join((question or "").strip().split())
+        if not normalized:
+            return "New Conversation"
+        if len(normalized) <= 60:
+            return normalized
+        return f"{normalized[:57]}..."
+
+    @staticmethod
     async def _load_schema(filepath: str) -> dict[str, Any]:
         """Load JSON schema from disk with async-compatible boundary."""
         schema_path = Path(filepath)
@@ -64,7 +74,7 @@ class ChatService:
                 session=session,
                 user_id=user.id,
                 workspace_id=workspace_id,
-                title=None,
+                title=ChatService._derive_conversation_title(question),
             )
             conversation_id = conversation.id
 
@@ -133,6 +143,8 @@ class ChatService:
         }
 
         seq_no = await ConversationRepository.next_seq_no(session, conversation_id)
+        if seq_no == 1 and (conversation.title or "").strip().lower() == "new conversation":
+            conversation.title = ChatService._derive_conversation_title(question)
         turn = await ConversationRepository.create_turn(
             session=session,
             conversation_id=conversation_id,

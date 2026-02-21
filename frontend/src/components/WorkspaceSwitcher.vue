@@ -14,7 +14,7 @@
     <div v-if="isOpen" class="absolute top-full left-0 mt-1 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
       <div class="p-2 border-b border-gray-100 flex justify-between items-center">
         <span class="text-xs text-gray-500">Workspaces</span>
-        <button class="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700" @click="createWorkspace">New</button>
+        <button class="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700" @click="openCreateDialog">New</button>
       </div>
 
       <div v-if="appStore.workspaces.length === 0" class="p-3 text-sm text-center text-gray-500">No workspaces yet</div>
@@ -38,17 +38,31 @@
       </div>
     </div>
   </div>
+
+  <WorkspaceCreateModal
+    :is-open="isCreateDialogOpen"
+    :is-submitting="isCreatingWorkspace"
+    :plan="authStore.planLabel"
+    @close="closeCreateDialog"
+    @submit="createWorkspace"
+  />
 </template>
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAppStore } from '../stores/appStore'
+import { useAuthStore } from '../stores/authStore'
 import { toast } from '../composables/useToast'
 import { apiService } from '../services/apiService'
+import { extractApiErrorMessage } from '../utils/apiError'
+import WorkspaceCreateModal from './modals/WorkspaceCreateModal.vue'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const isOpen = ref(false)
 const containerRef = ref(null)
+const isCreateDialogOpen = ref(false)
+const isCreatingWorkspace = ref(false)
 
 const activeWorkspaceName = computed(() => {
   const active = appStore.workspaces.find((w) => w.id === appStore.activeWorkspaceId)
@@ -72,14 +86,28 @@ async function activateWorkspace(workspaceId) {
   }
 }
 
-async function createWorkspace() {
-  const name = window.prompt('Workspace name')
+function openCreateDialog() {
+  isOpen.value = false
+  isCreateDialogOpen.value = true
+}
+
+function closeCreateDialog() {
+  if (isCreatingWorkspace.value) return
+  isCreateDialogOpen.value = false
+}
+
+async function createWorkspace(name) {
   if (!name) return
+  isCreatingWorkspace.value = true
   try {
     await appStore.createWorkspace(name)
     await appStore.fetchWorkspaces()
+    isCreateDialogOpen.value = false
+    isOpen.value = false
   } catch (error) {
-    toast.error('Workspace Error', error.message || 'Failed to create workspace')
+    toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to create workspace'))
+  } finally {
+    isCreatingWorkspace.value = false
   }
 }
 
@@ -89,7 +117,7 @@ async function deleteWorkspace(workspaceId) {
     await apiService.v1DeleteWorkspace(workspaceId)
     await appStore.fetchWorkspaces()
   } catch (error) {
-    toast.error('Workspace Error', error.message || 'Failed to delete workspace')
+    toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to delete workspace'))
   }
 }
 
@@ -103,10 +131,6 @@ onMounted(async () => {
   document.addEventListener('click', handleClickOutside)
   try {
     await appStore.fetchWorkspaces()
-    if (appStore.workspaces.length === 0) {
-      await appStore.createWorkspace('Default Workspace')
-      await appStore.fetchWorkspaces()
-    }
   } catch (_error) {
     // ignore on initial load when v1 isn't configured yet
   }

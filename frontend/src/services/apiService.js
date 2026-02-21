@@ -562,6 +562,10 @@ export const apiService = {
 
   async v1Analyze(payload) {
     return axios.post('/api/v1/chat/analyze', payload)
+  },
+
+  async v1GetCurrentUser() {
+    return axios.get('/api/v1/auth/me')
   }
 }
 

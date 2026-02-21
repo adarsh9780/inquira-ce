@@ -97,6 +97,7 @@
             </div>
             <div class="hidden md:block text-left">
               <p class="text-sm font-semibold text-primary">{{ authStore.username }}</p>
+              <p class="text-xs text-gray-500">{{ authStore.planLabel }} plan</p>
             </div>
             <ChevronDownIcon class="h-3.5 w-3.5 text-gray-400" />
           </button>
@@ -115,7 +116,7 @@
                 </div>
                 <div>
                   <p class="text-sm font-semibold text-white">{{ authStore.username }}</p>
-                  <p class="text-xs text-pastel-100">Logged in</p>
+                  <p class="text-xs text-pastel-100">{{ authStore.planLabel }} plan</p>
                 </div>
               </div>
             </div>

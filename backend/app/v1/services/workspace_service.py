@@ -36,7 +36,10 @@ class WorkspaceService:
 
         count = await WorkspaceRepository.count_for_user(session, user.id)
         if user.plan.value == "FREE" and count >= 1:
-            raise HTTPException(status_code=403, detail="Free plan supports only one workspace")
+            raise HTTPException(
+                status_code=403,
+                detail="You are on the Free plan and can create only 1 workspace. Upgrade your plan to create more.",
+            )
 
         is_active = 1 if count == 0 else 0
         placeholder_id = "temp"
