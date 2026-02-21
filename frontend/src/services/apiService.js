@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { getInquira } from './generatedApi'
+import { parseSseBuffer } from '../utils/sseParser'
 
 // ------------------------------------------------------------------
 // GLOBAL AXIOS CONFIGURATION
@@ -341,6 +342,66 @@ export const apiService = {
   async analyzeData(data, signal = null) {
     // data is typically { question, context, model, current_code }
     return client.chatEndpointChatPost(data, { signal })
+  },
+
+  async analyzeDataStream(data, { signal = null, onEvent = null } = {}) {
+    const url = `${apiBaseUrl.replace(/\/+$/, '')}/chat/stream`
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify(data),
+      signal
+    })
+
+    if (!response.ok) {
+      let detail = `Request failed with status ${response.status}`
+      try {
+        const text = await response.text()
+        if (text) detail = text
+      } catch (_) {
+        // keep default detail
+      }
+      const err = new Error(detail)
+      err.status = response.status
+      throw err
+    }
+
+    if (!response.body) {
+      throw new Error('Streaming not supported by browser/runtime.')
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let finalPayload = null
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const { events, remainder } = parseSseBuffer(buffer)
+      buffer = remainder
+
+      for (const evt of events) {
+        if (onEvent) onEvent(evt)
+        if (evt.event === 'final') {
+          finalPayload = evt.data
+        } else if (evt.event === 'error') {
+          const detail = evt.data?.detail || 'Streaming analysis failed.'
+          const err = new Error(detail)
+          err.status = evt.data?.status_code || 500
+          throw err
+        }
+      }
+    }
+
+    if (!finalPayload) {
+      throw new Error('Stream ended without final analysis payload.')
+    }
+    return finalPayload
   },
 
   async getHistory() {

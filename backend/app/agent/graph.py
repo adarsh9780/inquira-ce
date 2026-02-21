@@ -21,6 +21,7 @@ from collections.abc import Iterator
 
 import json
 from pathlib import Path
+from .code_guard import guard_code
 
 
 def get_prompt_path(filename: str) -> Path:
@@ -95,6 +96,9 @@ class State(BaseModel):
     )
     table_name: str | None = Field(default=None)
     data_path: str | None = Field(default=None)
+    code_guard_feedback: str = Field(default="")
+    code_guard_retries: int = Field(default=0)
+    guard_status: str = Field(default="ok")
 
 
 class InputSchema(BaseModel):
@@ -299,6 +303,63 @@ class InquiraAgent:
 
         return updates
 
+    def retry_code_generator(self, state: State, config: RunnableConfig) -> dict[str, Any]:
+        class Code(BaseModel):
+            code: str | None
+
+        system_prompt_template = SystemMessagePromptTemplate.from_template_file(
+            get_prompt_path("codegen_prompt.yaml"),
+            input_variables=[
+                "plan",
+                "current_code",
+                "table_name",
+                "schema",
+                "data_path",
+            ],
+        )
+        prompt = ChatPromptTemplate.from_messages(
+            [system_prompt_template, MessagesPlaceholder("messages")]
+        )
+
+        schema_str = (
+            json.dumps(state.active_schema, indent=2) if state.active_schema else "{}"
+        )
+        download_url = (
+            f"/api/datasets/{state.table_name}/download"
+            if state.table_name
+            else "data.csv"
+        )
+
+        model = self._get_model(config, "gemini-2.5-flash")
+        chain = prompt | model.with_structured_output(Code)
+        retry_feedback = state.code_guard_feedback or (
+            "Use await query(...) and avoid python duckdb/ibis connections."
+        )
+        retry_messages = list(state.messages) + [
+            HumanMessage(
+                content=(
+                    "Code validation failed. Regenerate code using browser bridge rules only.\n"
+                    f"Validator feedback: {retry_feedback}"
+                )
+            )
+        ]
+        response = chain.invoke(
+            {
+                "messages": retry_messages,
+                "plan": state.plan,
+                "current_code": state.code or state.previous_code,
+                "table_name": state.table_name or "data_table",
+                "schema": schema_str,
+                "data_path": download_url,
+            }
+        )
+        response = cast(Code, response)
+
+        updates = {"code": response.code}
+        if response.code and response.code.strip():
+            updates["current_code"] = response.code
+        return updates
+
     def noncode_generator(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         system_prompt_template = SystemMessagePromptTemplate.from_template_file(
             get_prompt_path("noncode_prompt.yaml"),
@@ -320,6 +381,40 @@ class InquiraAgent:
         )
 
         return {"messages": [AIMessage(content=response.content)]}
+
+    def code_guard(self, state: State, config: RunnableConfig) -> dict[str, Any]:
+        # First pass: strict validation and deterministic rewrites without fallback.
+        strict_result = guard_code(
+            state.code or "", table_name=state.table_name, allow_fallback=False
+        )
+        if not strict_result.blocked:
+            return {
+                "code": strict_result.code,
+                "current_code": strict_result.code,
+                "guard_status": "ok",
+                "code_guard_feedback": "",
+            }
+
+        # One retry with validator feedback to preserve user intent.
+        retries = int(state.code_guard_retries or 0)
+        if retries < 1 and strict_result.should_retry:
+            return {
+                "guard_status": "retry",
+                "code_guard_retries": retries + 1,
+                "code_guard_feedback": strict_result.reason or "",
+            }
+
+        # Final pass: deterministic fallback guarantees executable bridge-safe code.
+        final_result = guard_code(
+            state.code or "", table_name=state.table_name, allow_fallback=True
+        )
+        updates: dict[str, Any] = {
+            "code": final_result.code,
+            "current_code": final_result.code,
+            "guard_status": "ok",
+            "code_guard_feedback": "",
+        }
+        return updates
 
     def general_purpose(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         system_prompt_template = """You are the AI assistant for **Inquira**, a data analysis platform.
@@ -387,6 +482,8 @@ The platform uses DuckDB for efficient querying, Pandas for transformations, and
         builder.add_node("require_code", self.require_code)
         builder.add_node("create_plan", self.create_plan)
         builder.add_node("code_generator", self.code_generator)
+        builder.add_node("retry_code_generator", self.retry_code_generator)
+        builder.add_node("code_guard", self.code_guard)
         builder.add_node("noncode_generator", self.noncode_generator)
         builder.add_node("general_purpose", self.general_purpose)
         builder.add_node("unsafe_rejector", self.unsafe_rejector)
@@ -430,8 +527,18 @@ The platform uses DuckDB for efficient querying, Pandas for transformations, and
         )
 
         builder.add_edge("create_plan", "code_generator")
+        builder.add_edge("code_generator", "code_guard")
+        def code_guard_router(state: State):
+            if state.guard_status == "retry":
+                return "retry"
+            return "ok"
 
-        builder.add_edge("code_generator", END)
+        builder.add_conditional_edges(
+            "code_guard",
+            code_guard_router,
+            {"retry": "retry_code_generator", "ok": END},
+        )
+        builder.add_edge("retry_code_generator", "code_guard")
         builder.add_edge("general_purpose", END)
         builder.add_edge("unsafe_rejector", END)
 

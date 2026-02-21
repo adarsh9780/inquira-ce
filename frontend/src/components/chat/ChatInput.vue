@@ -189,8 +189,28 @@ async function handleSubmit() {
       abortController.abort()
     }, 300000) // 5 minutes
 
-    // Call the analysis API with abort signal
-    const response = await apiService.analyzeData(requestData, signal)
+    let response
+    try {
+      response = await apiService.analyzeDataStream(requestData, {
+        signal,
+        onEvent: (evt) => {
+          if (evt.event === 'status' && evt.data?.message) {
+            appStore.updateLastMessageExplanation(evt.data.message)
+            return
+          }
+          if (evt.event === 'node' && evt.data?.node) {
+            appStore.updateLastMessageExplanation(`Running: ${evt.data.node}...`)
+          }
+        }
+      })
+    } catch (streamError) {
+      // Backward-compatible fallback if streaming endpoint is unavailable.
+      if (streamError?.status === 404 || streamError?.status === 405) {
+        response = await apiService.analyzeData(requestData, signal)
+      } else {
+        throw streamError
+      }
+    }
 
     // Parse the response with new format
     const { is_safe, is_relevant, code, explanation } = response

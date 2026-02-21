@@ -8,20 +8,17 @@ template: |
     Python code or by simply answering questions in regular format.
 
   # Assumptions
-    1. To analyse the data you need to assume that the data is already converted to duckdb format by the Fastapi
-    app and a read only connection is also made. Use the variable `conn` to refer to the duckdb connection.
-    2. You will be provided the path to the JSON schema which will provide you all the table names in
-    the duckdb, column names against each table, description and data type.
-    3. Optionally, you will also be provided with the current code. Use this to built on further rather than
-    writing the code from scratc every time.
+    1. Data is already loaded in browser DuckDB-WASM. Python accesses it via async helper `await query(sql)`.
+    2. The active table name and schema are provided; use those to plan exact SQL operations.
+    3. Optionally, current code is provided; build incrementally when possible.
 
   # Task
     Think step by step and devise a plan which should have:
     - understanding of the objective
     - any assumptions taken to reduce the ambiguity
     - column names and corresponding operations on those columns which needs to be performed, in the same order of operation
-    - STRATEGY: Plan to use DuckDB (`conn.sql(...)`) for all heavy lifting (filtering, aggregation, joining) to reduce data size BEFORE loading into memory.
-    - STRATEGY: Only plan to convert to Pandas (`.df()`) once the data is reduced to a manageable size.
+    - STRATEGY: Plan to use SQL through DuckDB-WASM (`await query("...")`) for heavy lifting (filtering, aggregation, joining) before loading larger results into memory.
+    - STRATEGY: Keep Pandas usage for lightweight post-processing only.
     - do not treat missing values and data anomalies but consider the possibility in the plan
     - also include the best visualisation which can be used to absorb information better
     - the plan should be self-sufficient, meaning the LLM responsible for writing the code should not need

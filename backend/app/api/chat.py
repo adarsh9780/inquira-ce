@@ -1,17 +1,15 @@
 from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Any
 import json
 from .settings import load_user_settings_to_app_state
 from .auth import get_current_user
-from pathlib import Path
-from pathlib import Path
 from pathlib import Path
 from ..core.prompt_library import get_prompt
 from ..core.logger import logprint
 from langchain_core.messages import HumanMessage
 from ..agent.graph import InputSchema
-from langchain_core.runnables import RunnableConfig
 
 router = APIRouter(tags=["Chat"])
 
@@ -62,6 +60,134 @@ class DataAnalysisResponse(BaseModel):
     )
 
 
+def _validate_analysis_preconditions(app_state) -> None:
+    if not hasattr(app_state, "api_key") or app_state.api_key is None:
+        raise HTTPException(
+            status_code=401, detail="API key not set. Please set your API key first."
+        )
+
+    if (
+        not hasattr(app_state, "llm_initialized")
+        or not app_state.llm_initialized
+        or not hasattr(app_state, "llm_service")
+        or app_state.llm_service is None
+    ):
+        raise HTTPException(
+            status_code=503,
+            detail="LLM service not available. Please check your API key.",
+        )
+
+    if not hasattr(app_state, "schema_path") or app_state.schema_path is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Schema path not configured. Please set your data path and context using /settings/set/filepath and /settings/set/context endpoints.",
+        )
+
+    if not hasattr(app_state, "data_path") or app_state.data_path is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Data path not configured. Please set your data path using /settings/set/filepath endpoint.",
+        )
+
+
+def _build_data_analysis_response(result: dict[str, Any]) -> DataAnalysisResponse:
+    final_messages = result.get("messages", [])
+    last_message = final_messages[-1].content if final_messages else ""
+
+    metadata = result.get("metadata", {})
+    is_safe = (
+        metadata.is_safe if hasattr(metadata, "is_safe") else metadata.get("is_safe", True)
+    )
+    is_relevant = (
+        metadata.is_relevant
+        if hasattr(metadata, "is_relevant")
+        else metadata.get("is_relevant", True)
+    )
+
+    code = result.get("current_code", "") or result.get("code", "")
+    if code:
+        explanation = result.get("plan", "") or "Code generated based on request."
+    else:
+        explanation = last_message or "No explanation provided."
+
+    if not code and "```python" in explanation:
+        import re
+
+        code_match = re.search(r"```python\n(.*?)```", explanation, re.DOTALL)
+        if code_match:
+            code = code_match.group(1)
+
+    return DataAnalysisResponse(
+        is_safe=bool(is_safe),
+        is_relevant=bool(is_relevant),
+        code=code or "",
+        explanation=str(explanation),
+    )
+
+
+async def _run_agent_analysis(
+    request: DataAnalysisRequest,
+    current_user: dict,
+    app_state,
+    schema: dict[str, Any],
+    table_name: str,
+) -> DataAnalysisResponse:
+    user_msg = request.question
+    logprint(f"🔍 [Agent] Loaded Schema Keys: {list(schema.keys())}")
+    if "cricket" in str(schema).lower():
+        logprint("⚠️ [Agent] CRICKET DETECTED IN SCHEMA!", level="warning")
+
+    input_state = InputSchema(
+        messages=[HumanMessage(content=user_msg)],
+        active_schema=schema,
+        previous_code=request.current_code,
+        table_name=table_name,
+        data_path=app_state.data_path,
+    )
+    thread_id = f"{current_user['user_id']}:{app_state.data_path}"
+    config = {"configurable": {"api_key": app_state.api_key, "thread_id": thread_id}}
+
+    logprint(f"🤖 [Agent] Question: {user_msg}")
+    result = await app_state.agent_graph.ainvoke(input_state, config=config)
+    logprint(f"🤖 [Agent] Raw Output:\n{json.dumps(result, default=str, indent=2)}")
+
+    response_obj = _build_data_analysis_response(result)
+    logprint(f"🤖 [Agent] Final Response:\n{response_obj.model_dump_json(indent=2)}")
+    return response_obj
+
+
+async def _run_legacy_analysis(
+    request: DataAnalysisRequest,
+    app_state,
+    schema: dict[str, Any],
+    table_name: str,
+) -> DataAnalysisResponse:
+    system_instruction = get_prompt(
+        "business_analysis_system",
+        table_name=table_name,
+        schema=schema,
+        data_path=app_state.data_path,
+        current_code=request.current_code,
+    )
+    app_state.llm_service.create_chat_client(
+        system_instruction=system_instruction, model=request.model
+    )
+    user_question = get_prompt(
+        "business_analysis_user", question=request.question, table_name=table_name
+    )
+    response = app_state.llm_service.chat(user_question)
+    if response is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to parse response from LLM. The response could not be structured as expected.",
+        )
+    return DataAnalysisResponse(**response.dict())
+
+
+def _to_sse(event: str, payload: dict[str, Any]) -> str:
+    return f"event: {event}\ndata: {json.dumps(payload, default=str)}\n\n"
+
+
 def load_schema(filepath: str | Path) -> dict:
     path = Path(filepath)
     if not path.exists():
@@ -93,153 +219,23 @@ async def chat_endpoint(
     # Load user settings into app_state if they exist
     load_user_settings_to_app_state(current_user["user_id"], app_state)
 
-    if not hasattr(app_state, "api_key") or app_state.api_key is None:
-        raise HTTPException(
-            status_code=401, detail="API key not set. Please set your API key first."
-        )
-
-    if (
-        not hasattr(app_state, "llm_initialized")
-        or not app_state.llm_initialized
-        or not hasattr(app_state, "llm_service")
-        or app_state.llm_service is None
-    ):
-        raise HTTPException(
-            status_code=503,
-            detail="LLM service not available. Please check your API key.",
-        )
+    _validate_analysis_preconditions(app_state)
 
     try:
-        # Check if required settings are available
-        if not hasattr(app_state, "schema_path") or app_state.schema_path is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Schema path not configured. Please set your data path and context using /settings/set/filepath and /settings/set/context endpoints.",
-            )
-
-        if not hasattr(app_state, "data_path") or app_state.data_path is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Data path not configured. Please set your data path using /settings/set/filepath endpoint.",
-            )
-
-        # Build context from user settings stored in app_state
         schema = load_schema(app_state.schema_path)
-
-        # Get table name from app state
         table_name = getattr(app_state, "table_name", "your_table_name")
 
-        # --- LANGGRAPH AGENT INTEGRATION ---
         if hasattr(app_state, "agent_graph") and app_state.agent_graph:
-            # Prepare input for the agent
-            user_msg = request.question
-            
-            # Create input state
-            logprint(f"🔍 [Agent] Loaded Schema Keys: {list(schema.keys())}")
-            # Identify if this looks like cricket data
-            if "cricket" in str(schema).lower():
-                logprint("⚠️ [Agent] CRICKET DETECTED IN SCHEMA!", level="warning")
-            
-            input_state = InputSchema(
-                messages=[HumanMessage(content=user_msg)],
-                active_schema=schema,
-                previous_code=request.current_code, # Map user's current editor content to previous_code
+            return await _run_agent_analysis(
+                request=request,
+                current_user=current_user,
+                app_state=app_state,
+                schema=schema,
                 table_name=table_name,
-                data_path=app_state.data_path
             )
-            
-            # Invoke agent
-            # Pass API key via configurable for dynamic model initialization
-            api_key = app_state.api_key
-            # Invoke agent
-            # Pass API key via configurable for dynamic model initialization
-            api_key = app_state.api_key
-            
-            # Use user_id + data_path as thread_id for persistence
-            thread_id = f"{current_user['user_id']}:{app_state.data_path}"
-            
-            config = {
-                "configurable": {
-                    "api_key": api_key,
-                    "thread_id": thread_id
-                }
-            }
-            
-            logprint(f"🤖 [Agent] Question: {user_msg}")
-            result = await app_state.agent_graph.ainvoke(input_state, config=config)
-            
-            # Log raw output as requested
-            logprint(f"🤖 [Agent] Raw Output:\n{json.dumps(result, default=str, indent=2)}")
-            
-            # Extract results from state
-            final_messages = result.get("messages", [])
-            last_message = final_messages[-1].content if final_messages else ""
-            
-            metadata = result.get("metadata", {})
-            # metadata is a MetaData object or dict
-            is_safe = metadata.is_safe if hasattr(metadata, "is_safe") else metadata.get("is_safe", True)
-            is_relevant = metadata.is_relevant if hasattr(metadata, "is_relevant") else metadata.get("is_relevant", True)
-            
-            code = result.get("current_code", "") or result.get("code", "")
-            
-            if code:
-                # If code is present, use 'plan' as the explanation
-                explanation = result.get("plan", "") or "Code generated based on request."
-            else:
-                # If no code, use the actual response from the agent (last message)
-                # The last message is the response from unsafe_rejector, general_purpose, or noncode_generator
-                # which contains the proper user-facing explanation
-                explanation = last_message or "No explanation provided."
-            
-            # Clean up potential code blocks in explanation if they leaked
-            if not code and "```python" in explanation:
-                 import re
-                 code_match = re.search(r"```python\n(.*?)```", explanation, re.DOTALL)
-                 if code_match:
-                     code = code_match.group(1)
-            
-            response_obj = DataAnalysisResponse(
-                is_safe=bool(is_safe),
-                is_relevant=bool(is_relevant),
-                code=code or "",
-                explanation=str(explanation)
-            )
-            
-            logprint(f"🤖 [Agent] Final Response:\n{response_obj.model_dump_json(indent=2)}")
-            return response_obj
-            
-        # --- FALLBACK TO LEGACY LLM SERVICE ---
-
-        # Create system instruction for business analysis
-        system_instruction = get_prompt(
-            "business_analysis_system",
-            table_name=table_name,
-            schema=schema,
-            data_path=app_state.data_path,
-            current_code=request.current_code,
+        return await _run_legacy_analysis(
+            request=request, app_state=app_state, schema=schema, table_name=table_name
         )
-
-        # Create chat client with data analysis instruction
-        app_state.llm_service.create_chat_client(
-            system_instruction=system_instruction, model=request.model
-        )
-
-        # Format the user question
-        user_question = get_prompt(
-            "business_analysis_user", question=request.question, table_name=table_name
-        )
-
-        # Get response from LLM
-        response = app_state.llm_service.chat(user_question)
-
-        if response is None:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to parse response from LLM. The response could not be structured as expected.",
-            )
-
-        # response is a CodeOutput instance, convert to DataAnalysisResponse
-        return DataAnalysisResponse(**response.dict())
 
     except HTTPException:
         # Preserve intentional HTTP status codes (e.g., 400/401/404)
@@ -250,6 +246,85 @@ async def chat_endpoint(
         raise HTTPException(
             status_code=500, detail=f"Error processing analysis request: {str(e)}"
         )
+
+
+@router.post("/chat/stream")
+async def chat_stream_endpoint(
+    request: DataAnalysisRequest,
+    http_request: Request,
+    current_user: dict = Depends(get_current_user),
+    app_state=Depends(get_app_state),
+):
+    load_user_settings_to_app_state(current_user["user_id"], app_state)
+    _validate_analysis_preconditions(app_state)
+    schema = load_schema(app_state.schema_path)
+    table_name = getattr(app_state, "table_name", "your_table_name")
+
+    async def event_generator():
+        try:
+            yield _to_sse("status", {"stage": "start", "message": "Starting analysis"})
+
+            if hasattr(app_state, "agent_graph") and app_state.agent_graph:
+                user_msg = request.question
+                input_state = InputSchema(
+                    messages=[HumanMessage(content=user_msg)],
+                    active_schema=schema,
+                    previous_code=request.current_code,
+                    table_name=table_name,
+                    data_path=app_state.data_path,
+                )
+                thread_id = f"{current_user['user_id']}:{app_state.data_path}"
+                config = {
+                    "configurable": {
+                        "api_key": app_state.api_key,
+                        "thread_id": thread_id,
+                    }
+                }
+
+                aggregated: dict[str, Any] = {}
+                async for step in app_state.agent_graph.astream(input_state, config=config):
+                    if await http_request.is_disconnected():
+                        return
+                    for node_name, payload in step.items():
+                        if isinstance(payload, dict):
+                            aggregated.update(payload)
+                        yield _to_sse(
+                            "node",
+                            {"node": node_name, "message": f"{node_name} completed"},
+                        )
+
+                # If checkpointer is enabled, state has the canonical merged output.
+                try:
+                    final_state = await app_state.agent_graph.aget_state(config)
+                    if getattr(final_state, "values", None):
+                        aggregated = final_state.values
+                except Exception:
+                    pass
+
+                final_response = _build_data_analysis_response(aggregated)
+                yield _to_sse("final", final_response.model_dump())
+                return
+
+            final_response = await _run_legacy_analysis(
+                request=request, app_state=app_state, schema=schema, table_name=table_name
+            )
+            yield _to_sse("final", final_response.model_dump())
+        except HTTPException as e:
+            yield _to_sse("error", {"detail": e.detail, "status_code": e.status_code})
+        except Exception as e:
+            import traceback
+
+            logprint(
+                f"❌ [Agent] Stream error processing analysis request:\n{traceback.format_exc()}",
+                level="error",
+            )
+            yield _to_sse("error", {"detail": str(e), "status_code": 500})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
 
 @router.get("/history")
 async def get_chat_history(
