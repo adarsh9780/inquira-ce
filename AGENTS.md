@@ -1,5 +1,13 @@
-1. always update commit message file present in root directory whenever any change is made by the agent. overwrite the file if the previous commit message is same as the content of the file, else append the new changes to the file.
-2. Whenever the user brings a bug report, always create a test case so that we can prevent the same bug from happening in the future.
-3. default should be `uv`, fallback to `python3` or `python`.
-4. if you think the user asked changes might not be a good idea, you should always point it out with your reasons.
-5. Always explain your points in layman terms with examples.
+# Agent Protocol
+
+## Commit & Testing Procedures
+
+1. Always update the `commit_message` file in the root directory whenever a change is made.
+2. Overwrite the file if the previous git commit message matches the current content of the `commit_message`; otherwise, append the new changes.
+3. For every bug and feature we add or report, create a dedicated test case to prevent regressions.
+
+## Environment & Communication
+
+1. Use `uv` as the default package manager, falling back to `python3` or `python` if necessary.
+2. If a requested change seems suboptimal, point it out and provide a rationale.
+3. Always explain technical points in layman's terms with clear examples.

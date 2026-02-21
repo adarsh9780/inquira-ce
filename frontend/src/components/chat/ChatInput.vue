@@ -64,6 +64,7 @@ import { duckdbService } from '../../services/duckdbService'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { buildBrowserDataPath, hasUsableIngestedColumns } from '../../utils/chatBootstrap'
+import { ensureBrowserTableReady } from '../../utils/browserTableRecovery'
 import {
   PaperAirplaneIcon,
   ExclamationTriangleIcon
@@ -162,6 +163,20 @@ async function handleSubmit() {
   let cancelTimer = null
 
   try {
+    const tableHealth = await ensureBrowserTableReady({
+      expectedTableName: appStore.ingestedTableName
+    })
+    if (tableHealth.recovered) {
+      appStore.setIngestedTableName(tableHealth.tableName)
+      if (Array.isArray(tableHealth.columns) && tableHealth.columns.length > 0) {
+        appStore.setIngestedColumns(tableHealth.columns)
+      }
+      if (tableHealth.fileName) {
+        appStore.setDataFilePath(tableHealth.fileName)
+      }
+      appStore.setSchemaFileId(buildBrowserDataPath(tableHealth.tableName))
+    }
+
     // Get current Python file content if available
     const userCode = appStore.pythonFileContent || null
 
