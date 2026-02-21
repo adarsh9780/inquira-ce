@@ -193,6 +193,7 @@ fn start_backend(
         "-m",
         "app.main",
     ])
+    .current_dir(backend_dir)
     .env("UV_PROJECT_ENVIRONMENT", venv_path.to_str().unwrap())
     .env("INQUIRA_PORT", port.to_string());
 

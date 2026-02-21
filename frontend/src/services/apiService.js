@@ -339,6 +339,32 @@ export const apiService = {
     return response.json()
   },
 
+  // File data loading — sends absolute path to backend for CSV→DuckDB conversion
+  async uploadDataPath(filePath) {
+    const response = await fetch(`${apiBaseUrl.replace(/\/+$/, '')}/settings/set/data_path`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data_path: filePath })
+    })
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}))
+      throw new Error(detail.detail || `Failed to set data path (${response.status})`)
+    }
+    const result = await response.json()
+    // Normalize response for DataTab.vue
+    return {
+      table_name: result.table_name || filePath.split('/').pop().replace(/\.[^.]+$/, ''),
+      columns: result.columns || [],
+      row_count: result.row_count,
+      file_path: filePath,
+    }
+  },
+
+  // Browser fallback — same endpoint, uses file name as path
+  async uploadFile(file) {
+    return this.uploadDataPath(file.name)
+  },
+
   // Chat and analysis
   async analyzeData(data, signal = null) {
     // data is typically { question, context, model, current_code }

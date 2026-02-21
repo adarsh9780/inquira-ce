@@ -15,7 +15,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Optional
 
-from app.utils.log import logprint
+from app.core.logger import logprint
 
 
 # Wrapper script injected around user code to capture the last expression result.
