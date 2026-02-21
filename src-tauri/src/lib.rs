@@ -195,7 +195,8 @@ fn start_backend(
     ])
     .current_dir(backend_dir)
     .env("UV_PROJECT_ENVIRONMENT", venv_path.to_str().unwrap())
-    .env("INQUIRA_PORT", port.to_string());
+    .env("INQUIRA_PORT", port.to_string())
+    .env("INQUIRA_DESKTOP", "1");
 
     apply_proxy_env(&mut cmd, config);
 

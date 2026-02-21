@@ -57,19 +57,35 @@ def get_app_config(request: Request) -> AppConfig:
     return request.app.state.config
 
 def get_current_user(request: Request) -> dict:
-    """Get current user from session cookie"""
+    """Get current user from session cookie.
+    
+    In desktop mode (INQUIRA_DESKTOP=1), falls back to a default local user
+    if no session cookie is present, so the app works without login.
+    """
+    import os
+    
     session_token = request.cookies.get("session_token")
+    
+    # Desktop mode fallback — no login required
+    if not session_token and os.environ.get("INQUIRA_DESKTOP") == "1":
+        return _get_or_create_desktop_user()
+    
     if not session_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     session_data = get_session(session_token)
 
     if not session_data:
+        # In desktop mode, fall back even if session is invalid
+        if os.environ.get("INQUIRA_DESKTOP") == "1":
+            return _get_or_create_desktop_user()
         raise HTTPException(status_code=401, detail="Invalid session")
 
     # Check if session is expired (24 hours)
     session_created = datetime.fromisoformat(session_data["created_at"])
     if datetime.now() - session_created > timedelta(hours=24):
+        if os.environ.get("INQUIRA_DESKTOP") == "1":
+            return _get_or_create_desktop_user()
         raise HTTPException(status_code=401, detail="Session expired")
 
     user = get_user_by_id(session_data["user_id"])
@@ -78,6 +94,26 @@ def get_current_user(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="User not found")
 
     return user
+
+
+_DESKTOP_USER_ID = "desktop-local-user"
+
+def _get_or_create_desktop_user() -> dict:
+    """Return (or auto-create) the default desktop user."""
+    user = get_user_by_id(_DESKTOP_USER_ID)
+    if user:
+        return user
+    # Auto-create once
+    salt = generate_salt()
+    hashed = hash_password("desktop", salt)
+    create_user(_DESKTOP_USER_ID, "local", hashed, salt)
+    return {
+        "user_id": _DESKTOP_USER_ID,
+        "username": "local",
+        "created_at": datetime.now().isoformat(),
+        "salt": salt,
+        "password_hash": hashed,
+    }
 
 @router.post("/auth/register", response_model=UserResponse)
 async def register_user(request: UserRegisterRequest, response: Response, config: AppConfig = Depends(get_app_config)):

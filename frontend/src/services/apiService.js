@@ -344,6 +344,7 @@ export const apiService = {
     const response = await fetch(`${apiBaseUrl.replace(/\/+$/, '')}/settings/set/data_path`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ data_path: filePath })
     })
     if (!response.ok) {
