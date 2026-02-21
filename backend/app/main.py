@@ -1,11 +1,6 @@
 import argparse
 import asyncio
-import importlib.resources
-import mimetypes
 import os
-import threading
-import time
-import webbrowser
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -13,7 +8,6 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import aiosqlite
 
@@ -142,83 +136,6 @@ app = FastAPI(title="Inquira", version="1.0.0", lifespan=lifespan)
 
 # Route legacy print() to structured logger
 patch_print()
-
-# Force MIME type mappings to avoid Windows registry quirks
-mimetypes.add_type("application/javascript", ".js")
-mimetypes.add_type("text/javascript", ".mjs")
-mimetypes.add_type("text/css", ".css")
-mimetypes.add_type("application/json", ".json")
-mimetypes.add_type("application/json", ".map")
-mimetypes.add_type("image/svg+xml", ".svg")
-mimetypes.add_type("image/x-icon", ".ico")
-mimetypes.add_type("font/woff2", ".woff2")
-mimetypes.add_type("font/woff", ".woff")
-mimetypes.add_type("font/ttf", ".ttf")
-mimetypes.add_type("application/wasm", ".wasm")
-
-
-def get_ui_dir() -> str:
-    """
-    Locate the UI directory for StaticFiles.
-
-    Logic
-    --------------
-    Prefer the packaged UI shipped inside the wheel (``inquira/ui``). If not
-    present (e.g., running from the repo before building the wheel), fall back
-    to the local dev output at ``frontend/dist``.
-
-    :returns: Absolute path to a directory that FastAPI/Starlette can serve.
-    :rtype: str
-    """
-    # --- variables at the top (per your standard) ---
-    packaged_ui = importlib.resources.files("app").joinpath("frontend", "dist")
-
-    # 1) Optional override via environment variable for local UI builds
-    env_dev = os.getenv("INQUIRA_DEV_UI_DIR", "").strip()
-    if env_dev:
-        logprint(f"Env UI override (INQUIRA_DEV_UI_DIR): {env_dev}")
-        if os.path.isdir(env_dev):
-            return env_dev
-        else:
-            logprint(f"Env UI override path not found: {env_dev}", level="warning")
-
-    # 2) Prefer packaged UI shipped inside the wheel
-    if packaged_ui.is_dir():
-        logprint(f"Using packaged UI: {packaged_ui}")
-        return str(packaged_ui)
-
-    # 3) Fallback to repo local dist (src/inquira/frontend/dist) when running from source
-    repo_local = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "frontend", "dist")
-    )
-    logprint(f"Packaged UI missing; checking repo-local UI: {repo_local}")
-    if os.path.isdir(repo_local):
-        return repo_local
-
-    # 4) Last resort: return current working directory to avoid crash (unlikely)
-    logprint("No UI assets found; serving from CWD as last resort", level="warning")
-    return os.getcwd()
-
-
-app.mount("/ui", StaticFiles(directory=get_ui_dir(), html=True), name="ui")
-
-# Mount Pyodide locally so it works behind corporate proxies without reaching out to JSdelivr
-_pyodide_dir = os.path.join(os.path.dirname(__file__), "static", "pyodide")
-try:
-    app.mount(
-        "/assets/pyodide",
-        StaticFiles(directory=_pyodide_dir, check_dir=False),
-        name="pyodide",
-    )
-except Exception as e:
-    logprint(f"Pyodide static mount skipped: {e}", level="warning")
-
-# Mount logo directory if present; don't fail if missing in some wheels
-_logo_dir = os.path.join(os.path.dirname(__file__), "logo")
-try:
-    app.mount("/logo", StaticFiles(directory=_logo_dir, check_dir=False), name="logo")
-except Exception as e:
-    logprint(f"Logo static mount skipped: {e}", level="warning")
 
 # Configure CORS
 app.add_middleware(
@@ -393,12 +310,8 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
-    """Serve the favicon if available; otherwise no-content"""
-    from fastapi.responses import FileResponse, Response
-
-    logo_path = os.path.join(os.path.dirname(__file__), "logo", "inquira_logo.svg")
-    if os.path.exists(logo_path):
-        return FileResponse(logo_path, media_type="image/svg+xml")
+    """No favicon endpoint while static files are disabled."""
+    from fastapi.responses import Response
     return Response(status_code=204)
 
 
@@ -441,15 +354,8 @@ def run(argv: list[str] | None = None):
 
     HOST = "localhost"
     PORT = 8000
-    UI = "/ui"
-
-    # Open browser in a separate thread
-    def open_browser():
-        time.sleep(2)  # Wait for server to start
-        webbrowser.open(f"http://{HOST}:{PORT}{UI}")
 
     logprint(f"Launching Inquira backend (v{APP_VERSION})")
-    threading.Thread(target=open_browser, daemon=True).start()
     access_log = False
     uvicorn_log_level = "error"
     try:
