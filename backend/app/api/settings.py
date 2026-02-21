@@ -941,6 +941,22 @@ async def process_data_path_background(data_path: str, user_id: str, app_state):
         async def populate_preview_cache_task():
             """Task to populate preview cache"""
             try:
+                if isinstance(data_path, str) and data_path.startswith("browser://"):
+                    await websocket_manager.send_to_user(
+                        websocket_user_id,
+                        {
+                            "type": "progress",
+                            "stage": "caching_preview",
+                            "message": "Skipping backend preview cache for browser-native dataset.",
+                        },
+                    )
+                    return {
+                        "status": "skipped",
+                        "task": "preview_cache",
+                        "cached_count": 0,
+                        "reason": "browser_native_dataset",
+                    }
+
                 await websocket_manager.send_to_user(
                     websocket_user_id,
                     {

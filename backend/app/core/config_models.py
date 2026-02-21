@@ -9,6 +9,7 @@ class LoggingConfig(BaseModel):
     file_level: str = Field(default="DEBUG")
     color_errors: bool = Field(default=True)
     uvicorn_access_log: bool = Field(default=False)
+    uvicorn_log_level: str = Field(default="error")
 
 class AppConfig(BaseModel):
     """Configuration model for the FastAPI application"""

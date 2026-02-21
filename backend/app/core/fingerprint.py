@@ -15,6 +15,13 @@ def file_fingerprint_md5(path: str, include_inode: bool = True, sample_bytes: in
     - inode and birth/ctime when available
     - optional light content sample (first/last N bytes)
     """
+    # Browser-native virtual datasets have no filesystem metadata.
+    # Fingerprint deterministically from the virtual path itself.
+    if isinstance(path, str) and path.startswith("browser://"):
+        h = hashlib.md5()
+        h.update(f"virtual|{path}".encode("utf-8"))
+        return h.hexdigest()
+
     p = Path(path)
     st = p.stat()
 
@@ -52,4 +59,3 @@ def file_fingerprint_md5(path: str, include_inode: bool = True, sample_bytes: in
     h = hashlib.md5()
     h.update("|".join(parts).encode("utf-8"))
     return h.hexdigest()
-

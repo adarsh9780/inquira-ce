@@ -293,6 +293,23 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
         data_path = user_settings.get("data_path")
 
         if data_path:
+            if isinstance(data_path, str) and data_path.startswith("browser://"):
+                # Browser-native datasets are previewed client-side.
+                await websocket_manager.send_to_user(
+                    user_id,
+                    {
+                        "type": "cache_status",
+                        "data_path": data_path,
+                        "cache_status": {
+                            SampleType.random.value: "skipped",
+                            SampleType.first.value: "skipped",
+                        },
+                        "message": "Preview cache skipped for browser-native dataset (handled in frontend runtime).",
+                        "timestamp": datetime.now().isoformat(),
+                    },
+                )
+                return
+
             # Check cache status for all sample types and create cache if missing
             cache_status = {}
             for sample_type in [SampleType.random, SampleType.first]:
@@ -434,14 +451,24 @@ def run(argv: list[str] | None = None):
     logprint(f"Launching Inquira backend (v{APP_VERSION})")
     threading.Thread(target=open_browser, daemon=True).start()
     access_log = False
+    uvicorn_log_level = "error"
     try:
         default_config_path = os.path.join(os.path.dirname(__file__), "app_config.json")
         cfg = AppConfig.load_merged_config(default_config_path)
         access_log = bool(cfg.LOGGING.uvicorn_access_log)
+        uvicorn_log_level = str(cfg.LOGGING.uvicorn_log_level or "error").lower()
     except Exception:
         access_log = False
+        uvicorn_log_level = "error"
 
-    uvicorn.run(app, host=HOST, port=PORT, reload=False, access_log=access_log)
+    uvicorn.run(
+        app,
+        host=HOST,
+        port=PORT,
+        reload=False,
+        access_log=access_log,
+        log_level=uvicorn_log_level,
+    )
 
 
 if __name__ == "__main__":

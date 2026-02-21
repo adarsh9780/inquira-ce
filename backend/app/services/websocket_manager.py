@@ -2,10 +2,7 @@ import asyncio
 from typing import Dict, Optional, Any
 from datetime import datetime
 from fastapi import WebSocket
-import logging
 from ..core.logger import logprint
-
-logger = logging.getLogger(__name__)
 
 class ProgressMessenger:
     """Manages progress messages for WebSocket communication"""
@@ -129,7 +126,7 @@ class ProgressMessenger:
         try:
             await websocket.send_json(update_data)
         except Exception as e:
-            logger.error(f"Error sending WebSocket message: {e}")
+            logprint(f"Error sending WebSocket message: {e}", level="error")
 
 
 class WebSocketManager:
@@ -155,14 +152,12 @@ class WebSocketManager:
         await websocket.send_json(welcome_message)
 
         logprint(f"✅ [WebSocket] Connection established for user: {user_id}")
-        logger.info(f"WebSocket connection established for user: {user_id}")
 
     async def disconnect(self, user_id: str):
         """Remove a WebSocket connection"""
         if user_id in self.active_connections:
             del self.active_connections[user_id]
             logprint(f"🔌 [WebSocket] Connection closed for user: {user_id}")
-            logger.info(f"WebSocket connection closed for user: {user_id}")
         else:
             logprint(f"⚠️ [WebSocket] Attempted to disconnect non-existent connection for user: {user_id}")
 
@@ -172,19 +167,16 @@ class WebSocketManager:
             try:
                 # Log the message being sent
                 logprint(f"📤 [WebSocket] Sending to user {user_id}: {message}")
-                logger.info(f"WebSocket message sent to user {user_id}: {message}")
 
                 await self.active_connections[user_id].send_json(message)
                 logprint(f"✅ [WebSocket] Message sent successfully to user {user_id}")
             except Exception as e:
                 logprint(f"❌ [WebSocket] Error sending message to user {user_id}: {e}", level="error")
-                logger.error(f"Error sending message to user {user_id}: {e}")
                 # Remove broken connection
                 await self.disconnect(user_id)
         else:
             logprint(f"⚠️ [WebSocket] No active connection for user {user_id}")
             logprint(f"🔍 [WebSocket] Active connections: {list(self.active_connections.keys())}")
-            logger.warning(f"No active WebSocket connection for user {user_id}")
 
     async def broadcast_progress(self, user_id: str, stage: str, progress: Optional[int] = None, message: Optional[str] = None):
         """Send progress update to user"""
@@ -198,7 +190,6 @@ class WebSocketManager:
         else:
             logprint(f"⚠️ [WebSocket] Cannot broadcast progress - no active connection for user {user_id}")
             logprint(f"🔍 [WebSocket] Active connections: {list(self.active_connections.keys())}")
-            logger.warning(f"No active WebSocket connection for user {user_id} during progress broadcast")
 
     def is_connected(self, user_id: str) -> bool:
         """Check if user has an active WebSocket connection"""
