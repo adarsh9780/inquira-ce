@@ -499,6 +499,18 @@ export const apiService = {
       console.error('Failed to refresh dataset:', error)
       throw error
     }
+  },
+
+  async downloadDatasetBlob(tableName) {
+    try {
+      const response = await axios.get(`/datasets/${tableName}/download`, {
+        responseType: 'blob'
+      })
+      return response
+    } catch (error) {
+      console.error('Failed to download dataset blob:', error)
+      throw error
+    }
   }
 }
 

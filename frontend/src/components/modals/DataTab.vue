@@ -396,17 +396,18 @@ async function processSelectedFile(file, handle = null, options = {}) {
   try {
     // Ingest file lazily into DuckDB-WASM via registerFileHandle
     const { tableName, columns, rowCount } = await duckdbService.ingestFile(file)
+    const browserDataPath = buildBrowserDataPath(tableName)
 
     // Store in appStore and local state
-    appStore.setDataFilePath(file.name)
+    appStore.setDataFilePath(browserDataPath)
     ingestedColumns.value = columns
     ingestedTableName.value = tableName
     appStore.setIngestedColumns(columns)
     appStore.setIngestedTableName(tableName)
-    appStore.setSchemaFileId(buildBrowserDataPath(tableName))
+    appStore.setSchemaFileId(browserDataPath)
 
     // Keep backend user settings in sync with browser-native table path
-    await apiService.setDataPathSimple(buildBrowserDataPath(tableName))
+    await apiService.setDataPathSimple(browserDataPath)
 
     if (handle) {
       await saveActiveFileHandle(handle, {

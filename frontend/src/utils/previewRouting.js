@@ -1,5 +1,11 @@
 export function isBrowserDataPath(dataPath) {
-  return typeof dataPath === 'string' && dataPath.startsWith('browser://')
+  if (typeof dataPath !== 'string') return false
+  const value = dataPath.trim()
+  return (
+    value.startsWith('browser://') ||
+    value.startsWith('browser:/') ||
+    value.startsWith('/browser:/')
+  )
 }
 
 export function buildPreviewSql(tableName, sampleType = 'random', sampleSize = 100) {

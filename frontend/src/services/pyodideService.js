@@ -1,6 +1,7 @@
 import { loadPyodide } from 'pyodide';
-import apiService from './apiService';
-import { duckdbService } from './duckdbService';
+import apiService from './apiService.js';
+import { duckdbService } from './duckdbService.js';
+import { ensureExecutionTableReady } from '../utils/executionTableGuard.js';
 
 class PyodideService {
     constructor() {
@@ -202,6 +203,7 @@ print("Pyodide pre-warming complete.")
 
         try {
             console.debug('Executing Python snippet...');
+            await ensureExecutionTableReady();
 
             // Standardize the code (e.g., catching final expression output natively in Pyodide REPL style)
             // Usually, just running it works if the script explicitly prints or if we capture the last expression.

@@ -63,7 +63,7 @@ import pyodideService from '../../services/pyodideService'
 import { duckdbService } from '../../services/duckdbService'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { buildBrowserDataPath, hasUsableIngestedColumns } from '../../utils/chatBootstrap'
+import { buildBrowserDataPath, hasUsableIngestedColumns, inferTableNameFromDataPath } from '../../utils/chatBootstrap'
 import { ensureBrowserTableReady } from '../../utils/browserTableRecovery'
 import {
   PaperAirplaneIcon,
@@ -163,17 +163,24 @@ async function handleSubmit() {
   let cancelTimer = null
 
   try {
+    const expectedTableName = (
+      appStore.ingestedTableName ||
+      inferTableNameFromDataPath(appStore.dataFilePath)
+    ).trim()
+    if (expectedTableName && expectedTableName !== appStore.ingestedTableName) {
+      appStore.setIngestedTableName(expectedTableName)
+      appStore.setSchemaFileId(buildBrowserDataPath(expectedTableName))
+    }
+
     const tableHealth = await ensureBrowserTableReady({
-      expectedTableName: appStore.ingestedTableName
+      expectedTableName
     })
     if (tableHealth.recovered) {
       appStore.setIngestedTableName(tableHealth.tableName)
       if (Array.isArray(tableHealth.columns) && tableHealth.columns.length > 0) {
         appStore.setIngestedColumns(tableHealth.columns)
       }
-      if (tableHealth.fileName) {
-        appStore.setDataFilePath(tableHealth.fileName)
-      }
+      appStore.setDataFilePath(buildBrowserDataPath(tableHealth.tableName))
       appStore.setSchemaFileId(buildBrowserDataPath(tableHealth.tableName))
     }
 

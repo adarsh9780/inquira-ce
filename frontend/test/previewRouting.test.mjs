@@ -5,6 +5,8 @@ import { buildPreviewSql, isBrowserDataPath } from '../src/utils/previewRouting.
 
 test('isBrowserDataPath detects browser virtual paths', () => {
   assert.equal(isBrowserDataPath('browser://sales_data'), true)
+  assert.equal(isBrowserDataPath('browser:/sales_data'), true)
+  assert.equal(isBrowserDataPath('/browser:/sales_data'), true)
   assert.equal(isBrowserDataPath('/tmp/sales.csv'), false)
 })
 

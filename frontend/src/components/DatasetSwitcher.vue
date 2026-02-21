@@ -193,6 +193,9 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../stores/appStore'
 import { apiService } from '../services/apiService'
 import { previewService } from '../services/previewService'
+import { duckdbService } from '../services/duckdbService'
+import { buildBrowserDataPath, inferTableNameFromDataPath } from '../utils/chatBootstrap'
+import { mergeDatasetSources } from '../utils/datasetCatalogMerge'
 
 const emit = defineEmits(['open-settings'])
 
@@ -214,8 +217,11 @@ const datasetToRefresh = ref(null)
 const currentDataPath = computed(() => appStore.dataFilePath)
 const currentDatasetName = computed(() => {
   if (!currentDataPath.value) return null
-  const ds = datasets.value.find(d => d.file_path === currentDataPath.value)
-  return ds?.table_name || formatPath(currentDataPath.value)
+  const inferredTableName = inferTableNameFromDataPath(currentDataPath.value)
+  if (inferredTableName && datasets.value.some(d => d.table_name === inferredTableName)) {
+    return inferredTableName
+  }
+  return formatPath(currentDataPath.value)
 })
 
 function formatPath(path) {
@@ -231,8 +237,18 @@ async function loadDatasets() {
   loadingMessage.value = 'Loading datasets...'
   try {
     const response = await apiService.listDatasets()
-    // Handle both wrapped and unwrapped responses
-    datasets.value = response.datasets || response || []
+    const catalogDatasets = response?.datasets || response || []
+    let runtimeTables = []
+    try {
+      runtimeTables = await duckdbService.getTableNames()
+    } catch (_err) {
+      runtimeTables = []
+    }
+    datasets.value = mergeDatasetSources({
+      catalogDatasets,
+      runtimeTables,
+      currentDataPath: currentDataPath.value
+    })
   } catch (error) {
     console.error('Failed to load datasets:', error)
     datasets.value = []
@@ -382,6 +398,10 @@ async function selectDataset(ds) {
     
     // Update app store - this also triggers fetchChatHistory
     appStore.setDataFilePath(ds.file_path)
+    const tableName = (ds.table_name || inferTableNameFromDataPath(ds.file_path || '')).trim()
+    appStore.setIngestedTableName(tableName)
+    appStore.setIngestedColumns([])
+    appStore.setSchemaFileId(buildBrowserDataPath(tableName))
     
     // Clear code/results from previous dataset
     appStore.setGeneratedCode('')

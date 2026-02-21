@@ -45,8 +45,34 @@ test('ensureBrowserTableReady throws clear error when no saved handle exists', a
         expectedTableName: 'ball_by_ball_ipl',
         duckdb: { getTableNames: async () => [] },
         canPersistHandles: true,
-        getHandleRecord: async () => null
+        getHandleRecord: async () => null,
+        recoverFromRemote: async () => {
+          throw new Error('remote unavailable')
+        }
       }),
     /No saved data file handle found/
   )
+})
+
+test('ensureBrowserTableReady can recover missing table from backend dataset blob', async () => {
+  const result = await ensureBrowserTableReady({
+    expectedTableName: 'ball_by_ball_ipl',
+    duckdb: {
+      getTableNames: async () => [],
+      ingestFile: async () => ({
+        tableName: 'ball_by_ball_ipl',
+        columns: [{ name: 'runs', type: 'INTEGER' }]
+      })
+    },
+    canPersistHandles: false,
+    recoverFromRemote: async () => ({
+      tableName: 'ball_by_ball_ipl',
+      columns: [{ name: 'runs', type: 'INTEGER' }],
+      fileName: 'ball_by_ball_ipl.csv'
+    })
+  })
+
+  assert.equal(result.recovered, true)
+  assert.equal(result.tableName, 'ball_by_ball_ipl')
+  assert.equal(result.fileName, 'ball_by_ball_ipl.csv')
 })
