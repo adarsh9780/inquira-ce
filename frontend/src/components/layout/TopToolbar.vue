@@ -24,7 +24,7 @@
             class="w-3 h-3 rounded-full cursor-help transition-all duration-200 hover:scale-110"
             :class="getStatusDotClasses"
             title="Click to open Settings"
-            @click="openSettings"
+            @click="openSettings()"
           ></div>
 
           <!-- Hover Tooltip -->
@@ -123,7 +123,7 @@
 
             <div class="py-1">
               <button
-                @click="openSettings"
+                @click="openSettings()"
                 class="flex items-center w-full px-4 py-2.5 text-sm text-primary hover:bg-gray-50 hover:text-primary transition-colors"
               >
                 <CogIcon class="h-4 w-4 mr-3 text-gray-500" />
@@ -271,7 +271,8 @@ onMounted(() => {
 })
 
 function openSettings(tab = 'api') {
-  settingsInitialTab.value = tab
+  const normalizedTab = typeof tab === 'string' ? tab.toLowerCase() : 'api'
+  settingsInitialTab.value = ['api', 'data', 'account'].includes(normalizedTab) ? normalizedTab : 'api'
   isSettingsOpen.value = true
   isUserMenuOpen.value = false // Close dropdown when opening settings
 }

@@ -530,12 +530,24 @@ export const apiService = {
     return axios.delete(`/api/v1/workspaces/${workspaceId}`)
   },
 
+  async v1ListWorkspaceDeletionJobs() {
+    return axios.get('/api/v1/workspaces/deletions')
+  },
+
+  async v1GetWorkspaceDeletionJob(jobId) {
+    return axios.get(`/api/v1/workspaces/deletions/${jobId}`)
+  },
+
   async v1ListDatasets(workspaceId) {
     return axios.get(`/api/v1/workspaces/${workspaceId}/datasets`)
   },
 
   async v1AddDataset(workspaceId, sourcePath) {
     return axios.post(`/api/v1/workspaces/${workspaceId}/datasets`, { source_path: sourcePath })
+  },
+
+  async v1SyncBrowserDataset(workspaceId, payload) {
+    return axios.post(`/api/v1/workspaces/${workspaceId}/datasets/browser-sync`, payload)
   },
 
   async v1ListConversations(workspaceId, limit = 50) {
@@ -566,6 +578,18 @@ export const apiService = {
 
   async v1GetCurrentUser() {
     return axios.get('/api/v1/auth/me')
+  },
+
+  async v1Register(username, password) {
+    return axios.post('/api/v1/auth/register', { username, password })
+  },
+
+  async v1Login(username, password) {
+    return axios.post('/api/v1/auth/login', { username, password })
+  },
+
+  async v1Logout() {
+    return axios.post('/api/v1/auth/logout')
   }
 }
 

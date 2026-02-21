@@ -9,6 +9,7 @@ import asyncio
 import json
 from pathlib import Path
 from typing import Any
+from typing import cast
 
 from fastapi import HTTPException
 from langchain_core.messages import HumanMessage
@@ -44,7 +45,7 @@ class ChatService:
 
         def _read() -> dict[str, Any]:
             with schema_path.open("r", encoding="utf-8") as file:
-                return json.load(file)
+                return cast(dict[str, Any], json.load(file))
 
         return await asyncio.to_thread(_read)
 
@@ -59,6 +60,9 @@ class ChatService:
         current_code: str,
         model: str,
         context: str | None,
+        table_name_override: str | None = None,
+        active_schema_override: dict[str, Any] | None = None,
+        api_key: str | None = None,
     ) -> tuple[dict[str, Any], str, str]:
         """Run one analysis cycle and persist resulting turn.
 
@@ -70,26 +74,93 @@ class ChatService:
             raise HTTPException(status_code=404, detail="Workspace not found")
 
         if conversation_id is None:
-            conversation = await ConversationService.create_conversation(
+            created_conversation = await ConversationService.create_conversation(
                 session=session,
                 user_id=user.id,
                 workspace_id=workspace_id,
                 title=ChatService._derive_conversation_title(question),
             )
-            conversation_id = conversation.id
+            conversation_id = created_conversation.id
 
         conversation = await ConversationRepository.get_conversation(session, conversation_id)
         if conversation is None or conversation.workspace_id != workspace_id:
             raise HTTPException(status_code=404, detail="Conversation not found in workspace")
 
-        latest_dataset = await DatasetRepository.get_latest_for_workspace(session, workspace_id)
-        if latest_dataset is None:
-            raise HTTPException(status_code=400, detail="No dataset available in workspace")
+        schema: dict[str, Any] | None = None
+        table_name: str | None = None
+        data_path: str | None = None
 
-        if not latest_dataset.schema_path:
-            raise HTTPException(status_code=400, detail="Schema is missing for active dataset")
+        def _normalize_table_name(raw: str) -> str:
+            return "".join(c if c.isalnum() or c == "_" else "_" for c in raw.strip()).lower()
 
-        schema = await ChatService._load_schema(latest_dataset.schema_path)
+        # Hard invariant: if client selected a table, it must already exist in
+        # workspace dataset catalog with persisted schema metadata.
+        if table_name_override and str(table_name_override).strip():
+            requested_table = _normalize_table_name(str(table_name_override))
+            if not requested_table:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Dataset preflight failed: selected table name is invalid.",
+                )
+
+            selected_dataset = await DatasetRepository.get_for_workspace_table(
+                session=session,
+                workspace_id=workspace_id,
+                table_name=requested_table,
+            )
+            if selected_dataset is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Dataset preflight failed: selected table is not synced to workspace. "
+                        "Please reselect your dataset in the Data tab."
+                    ),
+                )
+
+            table_name = selected_dataset.table_name
+            data_path = selected_dataset.source_path
+            if not selected_dataset.schema_path:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Dataset preflight failed: schema metadata is missing for selected table. "
+                        "Please reselect your dataset in the Data tab."
+                    ),
+                )
+            try:
+                schema = await ChatService._load_schema(selected_dataset.schema_path)
+            except HTTPException as exc:
+                if exc.status_code == 404:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "Dataset preflight failed: schema file is unavailable for selected table. "
+                            "Please reselect your dataset in the Data tab."
+                        ),
+                    ) from exc
+                raise
+
+            # Prefer explicit active schema for current browser session when provided,
+            # but only after server-side preflight validates synced dataset metadata.
+            if active_schema_override and isinstance(active_schema_override, dict):
+                override_table = str(active_schema_override.get("table_name", "")).strip().lower()
+                if not override_table or override_table == table_name:
+                    schema = active_schema_override
+                    if not schema.get("table_name"):
+                        schema["table_name"] = table_name
+
+        if schema is None:
+            latest_dataset = await DatasetRepository.get_latest_for_workspace(session, workspace_id)
+            if latest_dataset is not None:
+                table_name = latest_dataset.table_name
+                data_path = latest_dataset.source_path
+                if latest_dataset.schema_path:
+                    schema = await ChatService._load_schema(latest_dataset.schema_path)
+
+        if schema is None:
+            # Workspace chat remains available as a general-purpose assistant
+            # even when no dataset is attached yet.
+            schema = {"table_name": table_name or "", "columns": []}
 
         memory_path = WorkspaceStorageService.build_agent_memory_path(user.username, workspace_id)
         graph = await langgraph_manager.get_graph(workspace_id, memory_path)
@@ -99,8 +170,8 @@ class ChatService:
             active_schema=schema,
             previous_code=current_code,
             current_code=current_code,
-            table_name=latest_dataset.table_name,
-            data_path=latest_dataset.source_path,
+            table_name=table_name,
+            data_path=data_path,
         )
         thread_id = f"{user.id}:{workspace_id}:{conversation_id}"
         config = {
@@ -110,11 +181,6 @@ class ChatService:
             }
         }
 
-        # API key is still fetched from legacy settings for now to avoid hard break.
-        from ...database.database import get_user_settings
-
-        settings = get_user_settings(user.id) or {}
-        api_key = settings.get("api_key")
         if not api_key:
             raise HTTPException(status_code=401, detail="API key not configured")
         config["configurable"]["api_key"] = api_key

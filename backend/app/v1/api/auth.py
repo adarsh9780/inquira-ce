@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_db_session
+from ..schemas.common import MessageResponse
 from ..schemas.auth import AuthUserResponse, LoginRequest, RegisterRequest
 from ..services.auth_service import AuthService
 from .deps import get_current_user
@@ -69,3 +70,17 @@ async def get_current_user_profile(current_user=Depends(get_current_user)):
         username=current_user.username,
         plan=current_user.plan.value,
     )
+
+
+@router.post("/logout", response_model=MessageResponse)
+async def logout_user(
+    request: Request,
+    response: Response,
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Logout user by deleting current v1 session token and clearing cookie."""
+    session_token = request.cookies.get("session_token")
+    if session_token:
+        await AuthService.logout(session, session_token)
+    response.delete_cookie("session_token")
+    return MessageResponse(message="Logout successful")

@@ -37,11 +37,14 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = ''
 
     try {
-      const result = await apiService.verifyAuth()
-      if (result && result.user) {
-        user.value = result.user
+      const profile = await apiService.v1GetCurrentUser()
+      if (profile && profile.user_id) {
+        user.value = {
+          user_id: profile.user_id,
+          username: profile.username
+        }
         isAuthenticated.value = true
-        await refreshPlan()
+        plan.value = profile.plan || 'FREE'
       } else {
         user.value = null
         isAuthenticated.value = false
@@ -64,14 +67,13 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = ''
 
     try {
-      const result = await apiService.login(username, password)
+      const result = await apiService.v1Login(username, password)
       user.value = {
         user_id: result.user_id,
-        username: username
+        username: result.username || username
       }
       isAuthenticated.value = true
       plan.value = result.plan || 'FREE'
-      await refreshPlan()
       error.value = ''
       return true
     } catch (error) {
@@ -99,14 +101,13 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = ''
 
     try {
-      const result = await apiService.register(username, password)
+      const result = await apiService.v1Register(username, password)
       user.value = {
         user_id: result.user_id,
         username: result.username || username
       }
       isAuthenticated.value = true
       plan.value = result.plan || 'FREE'
-      await refreshPlan()
       error.value = ''
       return true
     } catch (error) {
@@ -133,7 +134,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading.value = true
 
     try {
-      await apiService.logout()
+      await apiService.v1Logout()
 
       if (settingsWebSocket.isPersistentMode) {
         settingsWebSocket.disconnectPersistent()

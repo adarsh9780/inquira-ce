@@ -39,16 +39,19 @@
           <ExclamationTriangleIcon class="h-5 w-5 text-error" />
         </div>
         <div>
-          <h4 class="text-sm font-semibold text-error mb-2">API Key Required</h4>
-          <p class="text-sm text-gray-700 mb-3">You need to provide your Gemini API key to start chatting:</p>
+          <h4 class="text-sm font-semibold text-error mb-2">Setup Required</h4>
+          <p class="text-sm text-gray-700 mb-3">Before chatting, complete this setup:</p>
           <ul class="space-y-2 text-sm text-gray-700">
+            <li class="flex items-center space-x-2">
+              <div class="w-1.5 h-1.5 rounded-full bg-error"></div>
+              <span>Create or select a workspace from the header dropdown</span>
+            </li>
             <li class="flex items-center space-x-2">
               <div class="w-1.5 h-1.5 rounded-full bg-error"></div>
               <span>Enter your Gemini API key in Settings</span>
             </li>
           </ul>
-          <p class="text-xs text-gray-600 mt-3">Data and schema files are optional - you can chat about general topics without them.</p>
-          <p class="text-xs text-gray-600">Click the Settings button in the top toolbar to add your API key.</p>
+          <p class="text-xs text-gray-600 mt-3">Click the Settings button in the top toolbar to add your API key.</p>
         </div>
       </div>
     </div>
@@ -60,10 +63,9 @@ import { ref, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import apiService from '../../services/apiService'
 import pyodideService from '../../services/pyodideService'
-import { duckdbService } from '../../services/duckdbService'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { buildBrowserDataPath, hasUsableIngestedColumns, inferTableNameFromDataPath } from '../../utils/chatBootstrap'
+import { buildBrowserDataPath, inferTableNameFromDataPath } from '../../utils/chatBootstrap'
 import { ensureBrowserTableReady } from '../../utils/browserTableRecovery'
 import {
   PaperAirplaneIcon,
@@ -81,63 +83,76 @@ const canSend = computed(() => {
          !appStore.isLoading
 })
 
-async function buildColumnsWithSamples(tableName, columns) {
-  const result = []
-  for (const col of columns) {
-    const columnName = col?.name
-    const columnType = col?.type || col?.dtype || 'VARCHAR'
-    if (!columnName) continue
-
-    try {
-      const rows = await duckdbService.query(
-        `SELECT DISTINCT "${columnName}" AS sample FROM ${tableName} LIMIT 5`
-      )
-      const samples = rows.map((row) => {
-        const value = row.sample
-        return typeof value === 'bigint' ? Number(value) : value
-      })
-      result.push({ name: columnName, dtype: columnType, samples })
-    } catch (_err) {
-      result.push({ name: columnName, dtype: columnType, samples: [] })
-    }
-  }
-  return result
+function isBrowserVirtualPath(path) {
+  const normalized = String(path || '').toLowerCase()
+  return normalized.startsWith('browser://') || normalized.startsWith('browser:/') || normalized.startsWith('/browser:/')
 }
 
-async function ensureBackendSchemaReadyForChat() {
-  const tableName = appStore.ingestedTableName
-  const backendDataPath = buildBrowserDataPath(tableName)
-  if (!backendDataPath) return
+function isRecoverableBrowserTableError(error) {
+  const message = String(error?.message || '')
+  return (
+    message.includes('Dataset is not loaded in this browser session') ||
+    message.includes('No saved data file handle found') ||
+    message.includes('Saved file reference is stale') ||
+    message.includes('Data file permission was not granted') ||
+    message.includes('Dataset could not be loaded in this browser session')
+  )
+}
 
-  await apiService.setDataPathSimple(backendDataPath)
+async function ensureWorkspaceDatasetReady() {
+  if (!appStore.activeWorkspaceId || !appStore.dataFilePath) return
+  const tableName = (
+    appStore.ingestedTableName ||
+    inferTableNameFromDataPath(appStore.schemaFileId) ||
+    inferTableNameFromDataPath(appStore.dataFilePath)
+  ).trim()
+  if (!tableName) {
+    throw new Error('Dataset sync failed: missing selected table name.')
+  }
 
-  if (appStore.schemaContext.trim()) {
-    await apiService.setContext(appStore.schemaContext.trim())
+  if (isBrowserVirtualPath(appStore.dataFilePath) || isBrowserVirtualPath(appStore.schemaFileId)) {
+    const columns = Array.isArray(appStore.ingestedColumns) ? appStore.ingestedColumns : []
+    await apiService.v1SyncBrowserDataset(appStore.activeWorkspaceId, {
+      table_name: tableName,
+      columns,
+      row_count: null
+    })
+    return
   }
 
   try {
-    await apiService.loadSchema(backendDataPath)
-    appStore.setIsSchemaFileUploaded(true)
-    appStore.setSchemaFileId(backendDataPath)
+    await apiService.v1AddDataset(appStore.activeWorkspaceId, appStore.dataFilePath)
     return
-  } catch (error) {
-    if (error.response?.status !== 404) {
-      throw error
+  } catch (_error) {
+    throw new Error('Dataset sync failed: selected file could not be attached to workspace.')
+  }
+}
+
+function buildActiveSchemaPayload() {
+  const tableName = (
+    appStore.ingestedTableName ||
+    inferTableNameFromDataPath(appStore.schemaFileId) ||
+    inferTableNameFromDataPath(appStore.dataFilePath)
+  ).trim()
+
+  if (!tableName) return { tableName: null, activeSchema: null }
+
+  const columns = (Array.isArray(appStore.ingestedColumns) ? appStore.ingestedColumns : [])
+    .filter((col) => col?.name)
+    .map((col) => ({
+      name: col.name,
+      dtype: col.type || col.dtype || 'VARCHAR',
+      description: col.description || '',
+      samples: Array.isArray(col.samples) ? col.samples : []
+    }))
+
+  return {
+    tableName,
+    activeSchema: {
+      table_name: tableName,
+      columns
     }
   }
-
-  if (!hasUsableIngestedColumns(appStore.ingestedColumns)) {
-    return
-  }
-
-  const columnsWithSamples = await buildColumnsWithSamples(tableName, appStore.ingestedColumns)
-  await apiService.generateSchemaFromColumns(
-    tableName,
-    columnsWithSamples,
-    appStore.schemaContext.trim() || null
-  )
-  appStore.setIsSchemaFileUploaded(true)
-  appStore.setSchemaFileId(backendDataPath)
 }
 
 async function handleSubmit() {
@@ -172,16 +187,30 @@ async function handleSubmit() {
       appStore.setSchemaFileId(buildBrowserDataPath(expectedTableName))
     }
 
-    const tableHealth = await ensureBrowserTableReady({
-      expectedTableName
-    })
-    if (tableHealth.recovered) {
-      appStore.setIngestedTableName(tableHealth.tableName)
-      if (Array.isArray(tableHealth.columns) && tableHealth.columns.length > 0) {
-        appStore.setIngestedColumns(tableHealth.columns)
+    if (expectedTableName && isBrowserVirtualPath(appStore.dataFilePath || appStore.schemaFileId)) {
+      try {
+        const tableHealth = await ensureBrowserTableReady({
+          expectedTableName
+        })
+        if (tableHealth.recovered) {
+          appStore.setIngestedTableName(tableHealth.tableName)
+          if (Array.isArray(tableHealth.columns) && tableHealth.columns.length > 0) {
+            appStore.setIngestedColumns(tableHealth.columns)
+          }
+          appStore.setDataFilePath(buildBrowserDataPath(tableHealth.tableName))
+          appStore.setSchemaFileId(buildBrowserDataPath(tableHealth.tableName))
+        }
+      } catch (browserTableError) {
+        if (isRecoverableBrowserTableError(browserTableError)) {
+          // Continue in general/workspace mode instead of failing the request.
+          appStore.setDataFilePath('')
+          appStore.setSchemaFileId('')
+          appStore.setIngestedTableName('')
+          appStore.setIngestedColumns([])
+        } else {
+          throw browserTableError
+        }
       }
-      appStore.setDataFilePath(buildBrowserDataPath(tableHealth.tableName))
-      appStore.setSchemaFileId(buildBrowserDataPath(tableHealth.tableName))
     }
 
     // Get current Python file content if available
@@ -198,8 +227,8 @@ async function handleSubmit() {
     // Log the request for debugging
     console.debug('📤 Sending request to /chat endpoint:', requestData)
 
-    // Keep backend session aligned with browser-native dataset and schema before chat
-    await ensureBackendSchemaReadyForChat()
+    // Hard invariant: selected dataset must be synced to the active workspace before analyze.
+    await ensureWorkspaceDatasetReady()
 
     // Set up timeout timers
     warningTimer = setTimeout(() => {
@@ -213,13 +242,17 @@ async function handleSubmit() {
 
     let response
     if (appStore.activeWorkspaceId) {
+      const schemaPayload = buildActiveSchemaPayload()
       response = await apiService.v1Analyze({
         workspace_id: appStore.activeWorkspaceId,
         conversation_id: appStore.activeConversationId || null,
         question: questionText,
         current_code: appStore.pythonFileContent || '',
         model: appStore.selectedModel,
-        context: appStore.schemaContext.trim() || null
+        context: appStore.schemaContext.trim() || null,
+        table_name: schemaPayload.tableName,
+        active_schema: schemaPayload.activeSchema,
+        api_key: appStore.apiKey || null
       })
       if (response?.conversation_id && response.conversation_id !== appStore.activeConversationId) {
         appStore.setActiveConversationId(response.conversation_id)

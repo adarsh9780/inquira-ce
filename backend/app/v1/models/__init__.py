@@ -3,7 +3,7 @@
 from .conversation import Conversation, Turn
 from .enums import UserPlan
 from .user import User, UserSession
-from .workspace import Workspace, WorkspaceDataset
+from .workspace import Workspace, WorkspaceDataset, WorkspaceDeletionJob
 
 __all__ = [
     "User",
@@ -11,6 +11,7 @@ __all__ = [
     "UserPlan",
     "Workspace",
     "WorkspaceDataset",
+    "WorkspaceDeletionJob",
     "Conversation",
     "Turn",
 ]

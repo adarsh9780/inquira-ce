@@ -15,7 +15,17 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", settings.database_url)
+
+def _normalize_alembic_url(database_url: str) -> str:
+    """Map async runtime DB URLs to sync dialect URLs for Alembic engine."""
+    if database_url.startswith("sqlite+aiosqlite://"):
+        return database_url.replace("sqlite+aiosqlite://", "sqlite://", 1)
+    if database_url.startswith("postgresql+asyncpg://"):
+        return database_url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
+    return database_url
+
+
+config.set_main_option("sqlalchemy.url", _normalize_alembic_url(settings.database_url))
 
 target_metadata = Base.metadata
 

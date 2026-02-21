@@ -38,7 +38,7 @@ class WorkspaceStorageService:
         """Create workspace directories and return workspace root path."""
         workspace_dir = WorkspaceStorageService.build_workspace_dir(username, workspace_id)
 
-        async def _create() -> None:
+        def _create() -> None:
             workspace_dir.mkdir(parents=True, exist_ok=True)
             (workspace_dir / "context").mkdir(parents=True, exist_ok=True)
             (workspace_dir / "meta").mkdir(parents=True, exist_ok=True)
@@ -51,7 +51,7 @@ class WorkspaceStorageService:
         """Delete the workspace directory recursively."""
         workspace_dir = WorkspaceStorageService.build_workspace_dir(username, workspace_id)
 
-        async def _delete() -> None:
+        def _delete() -> None:
             if workspace_dir.exists():
                 shutil.rmtree(workspace_dir)
 

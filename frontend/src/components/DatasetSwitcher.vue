@@ -3,13 +3,14 @@
     <button
       @click="toggleDropdown"
       class="flex items-center space-x-2 px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-      :disabled="loading"
+      :disabled="loading || !appStore.hasWorkspace"
+      :title="!appStore.hasWorkspace ? 'Create a workspace to enable datasets' : currentDatasetName"
     >
       <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
       </svg>
       <span class="max-w-[150px] truncate" :title="currentDatasetName">
-        {{ currentDatasetName || 'Select Dataset' }}
+        {{ appStore.hasWorkspace ? (currentDatasetName || 'Select Dataset') : 'Select Workspace First' }}
       </span>
       <svg class="w-4 h-4 text-gray-400" :class="{ 'rotate-180': isOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -18,7 +19,7 @@
 
     <!-- Dropdown -->
     <div
-      v-if="isOpen"
+      v-if="isOpen && appStore.hasWorkspace"
       class="absolute top-full left-0 mt-1 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden"
     >
       <!-- Loading (Global) -->
@@ -189,7 +190,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../stores/appStore'
 import { apiService } from '../services/apiService'
 import { previewService } from '../services/previewService'
@@ -233,11 +234,19 @@ function formatPath(path) {
 }
 
 async function loadDatasets() {
+  if (!appStore.activeWorkspaceId) {
+    datasets.value = []
+    return
+  }
   loading.value = true
   loadingMessage.value = 'Loading datasets...'
   try {
-    const response = await apiService.listDatasets()
-    const catalogDatasets = response?.datasets || response || []
+    const response = await apiService.v1ListDatasets(appStore.activeWorkspaceId)
+    const workspaceDatasets = response?.datasets || []
+    const catalogDatasets = workspaceDatasets.map((item) => ({
+      ...item,
+      file_path: item.source_path,
+    }))
     let runtimeTables = []
     try {
       runtimeTables = await duckdbService.getTableNames()
@@ -258,6 +267,7 @@ async function loadDatasets() {
 }
 
 function toggleDropdown() {
+  if (!appStore.hasWorkspace) return
   isOpen.value = !isOpen.value
   if (isOpen.value) {
     loadDatasets()
@@ -277,64 +287,9 @@ function closeDeleteModal() {
 
 async function confirmDelete() {
   if (!datasetToDelete.value) return
-  
-  const ds = datasetToDelete.value
-  const wasActiveDataset = currentDataPath.value?.trim() === ds.file_path?.trim()
-  
-  loading.value = true
-  try {
-    await apiService.deleteDataset(ds.table_name)
-    
-    // Close modal first
-    closeDeleteModal()
-    
-    // Reload list
-    await loadDatasets()
-    
-    const { toast } = await import('../composables/useToast.js')
-    
-    // If deleted dataset was active, we need to handle the switch
-    if (wasActiveDataset) {
-      if (datasets.value.length > 0) {
-        // Auto-switch to the first available dataset
-        const nextDataset = datasets.value[0]
-        console.debug('🔄 Auto-switching to next dataset:', nextDataset.table_name)
-        await selectDataset(nextDataset)
-        toast.success('Switched Dataset', `Now viewing: ${nextDataset.table_name}`)
-      } else {
-        // No datasets left - clear state and show empty state
-        console.debug('🗑️ No datasets remaining. Clearing workspace.')
-        appStore.setDataFilePath('')
-        appStore.setSchemaContext('')
-        appStore.setIsSchemaFileUploaded(false)
-        appStore.setSchemaFileId(null)
-        appStore.setGeneratedCode('')
-        appStore.setPythonFileContent('')
-        appStore.setResultData(null)
-        appStore.setPlotlyFigure(null)
-        appStore.setDataframes([])
-        appStore.setFigures([])
-        appStore.setScalars([])
-        appStore.setTerminalOutput('')
-        
-        // Dispatch event to notify Schema Editor to show empty state
-        window.dispatchEvent(new CustomEvent('dataset-switched', { detail: null }))
-        
-        toast.info('Workspace Cleared', 'No datasets remaining.')
-      }
-    } else {
-      // Deleted a non-active dataset, just show confirmation
-      toast.success('Dataset Deleted', `Removed: ${ds.table_name}`)
-    }
-
-    showDeleteModal.value = false
-  } catch (error) {
-    console.error('Failed to delete dataset:', error)
-    alert('Failed to delete dataset: ' + (error.response?.data?.detail || error.message))
-    closeDeleteModal()
-  } finally {
-    loading.value = false
-  }
+  const { toast } = await import('../composables/useToast.js')
+  closeDeleteModal()
+  toast.info('Not Available Yet', 'Dataset deletion is not part of the v1 workspace API yet.')
 }
 
 // Prompt for refresh - opens modal
@@ -350,37 +305,9 @@ function closeRefreshModal() {
 
 async function confirmRefresh() {
   if (!datasetToRefresh.value) return
-  
-  const ds = datasetToRefresh.value
-  loading.value = true
-  
-  try {
-    const result = await apiService.refreshDataset(ds.table_name)
-    
-    // Close modal
-    closeRefreshModal()
-    
-    // Clear caches to force refresh
-    previewService.clearPreviewCache()
-    
-    // Reload datasets list
-    await loadDatasets()
-    
-    // Show success message
-    const { toast } = await import('../composables/useToast.js')
-    toast.success(
-      'Dataset Refreshed', 
-      `${ds.table_name} updated with ${result.row_count || 'new'} rows${result.schema_regenerated ? ' and schema regenerated' : ''}`
-    )
-    
-    console.debug('✅ Dataset refreshed:', result)
-  } catch (error) {
-    console.error('Failed to refresh dataset:', error)
-    alert('Failed to refresh dataset: ' + (error.response?.data?.detail || error.message))
-    closeRefreshModal()
-  } finally {
-    loading.value = false
-  }
+  const { toast } = await import('../composables/useToast.js')
+  closeRefreshModal()
+  toast.info('Not Available Yet', 'Dataset refresh is not part of the v1 workspace API yet.')
 }
 
 async function selectDataset(ds) {
@@ -390,13 +317,10 @@ async function selectDataset(ds) {
   }
 
   try {
-    // Use simple path update (no reprocessing)
-    await apiService.setDataPathSimple(ds.file_path)
-    
     // Clear caches first
     previewService.clearPreviewCache()
-    
-    // Update app store - this also triggers fetchChatHistory
+
+    // Update local workspace-scoped dataset selection state.
     appStore.setDataFilePath(ds.file_path)
     const tableName = (ds.table_name || inferTableNameFromDataPath(ds.file_path || '')).trim()
     appStore.setIngestedTableName(tableName)
@@ -444,11 +368,24 @@ function handleClickOutside(event) {
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
-  // Load datasets on mount to show current selection
-  loadDatasets()
+  if (appStore.hasWorkspace) {
+    loadDatasets()
+  }
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
 })
+
+watch(
+  () => appStore.hasWorkspace,
+  async (hasWorkspace) => {
+    if (!hasWorkspace) {
+      isOpen.value = false
+      datasets.value = []
+      return
+    }
+    await loadDatasets()
+  }
+)
 </script>

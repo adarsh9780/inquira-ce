@@ -22,30 +22,59 @@ class PreviewService {
         message: 'No browser table loaded yet.'
       }
     }
-
-    const sql = buildPreviewSql(tableName, sampleType, 100)
-    const rows = await duckdbService.query(sql)
-    const data = rows.map((row) => {
-      const out = {}
-      for (const [key, value] of Object.entries(row)) {
-        out[key] = typeof value === 'bigint' ? Number(value) : value
+    try {
+      const tables = await duckdbService.getTableNames()
+      if (!tables.includes(tableName)) {
+        return {
+          success: true,
+          data: [],
+          row_count: 0,
+          sample_type: sampleType,
+          message: 'Browser table is not loaded in this session.'
+        }
       }
-      return out
-    })
 
-    return {
-      success: true,
-      data,
-      row_count: data.length,
-      file_path: `browser://${tableName}`,
-      sample_type: sampleType,
-      message: `Loaded ${data.length} ${sampleType} sample rows from browser DuckDB.`
+      const sql = buildPreviewSql(tableName, sampleType, 100)
+      const rows = await duckdbService.query(sql)
+      const data = rows.map((row) => {
+        const out = {}
+        for (const [key, value] of Object.entries(row)) {
+          out[key] = typeof value === 'bigint' ? Number(value) : value
+        }
+        return out
+      })
+
+      return {
+        success: true,
+        data,
+        row_count: data.length,
+        file_path: `browser://${tableName}`,
+        sample_type: sampleType,
+        message: `Loaded ${data.length} ${sampleType} sample rows from browser DuckDB.`
+      }
+    } catch (_error) {
+      return {
+        success: true,
+        data: [],
+        row_count: 0,
+        sample_type: sampleType,
+        message: 'Browser engine is still initializing. Please try preview again.'
+      }
     }
   }
 
   // Get data preview with caching
   async getDataPreview(sampleType = 'random', forceRefresh = false) {
     const appStore = useAppStore()
+    if (!appStore.hasWorkspace) {
+      return {
+        success: true,
+        data: [],
+        row_count: 0,
+        sample_type: sampleType,
+        message: 'Create a workspace to start previewing data.'
+      }
+    }
     const dataPath = appStore.schemaFileId || appStore.dataFilePath
 
     if (isBrowserDataPath(dataPath)) {

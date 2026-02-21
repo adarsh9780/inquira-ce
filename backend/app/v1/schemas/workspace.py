@@ -26,3 +26,20 @@ class WorkspaceListResponse(BaseModel):
     """List workspaces response."""
 
     workspaces: list[WorkspaceResponse]
+
+
+class WorkspaceDeletionJobResponse(BaseModel):
+    """Workspace deletion job status payload."""
+
+    job_id: str
+    workspace_id: str
+    status: str
+    error_message: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class WorkspaceDeletionJobListResponse(BaseModel):
+    """List active deletion jobs response."""
+
+    jobs: list[WorkspaceDeletionJobResponse]

@@ -11,6 +11,14 @@ class DatasetAddRequest(BaseModel):
     source_path: str = Field(min_length=1)
 
 
+class BrowserDatasetSyncRequest(BaseModel):
+    """Sync browser-loaded table metadata into workspace dataset catalog."""
+
+    table_name: str = Field(min_length=1)
+    columns: list[dict] = Field(default_factory=list)
+    row_count: int | None = None
+
+
 class DatasetResponse(BaseModel):
     """Workspace dataset response."""
 

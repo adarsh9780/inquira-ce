@@ -56,3 +56,21 @@ class WorkspaceDataset(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     workspace = relationship("Workspace", back_populates="datasets")
+
+
+class WorkspaceDeletionJob(Base):
+    """Asynchronous workspace deletion job tracker."""
+
+    __tablename__ = "v1_workspace_deletion_jobs"
+    __table_args__ = (
+        Index("ix_v1_ws_delete_jobs_user_created", "user_id", "created_at"),
+        Index("ix_v1_ws_delete_jobs_workspace_status", "workspace_id", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("v1_users.id", ondelete="CASCADE"), index=True, nullable=False)
+    workspace_id: Mapped[str] = mapped_column(String(36), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued")
+    error_message: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

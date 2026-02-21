@@ -21,3 +21,18 @@ class DatasetRepository:
             .limit(1)
         )
         return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_for_workspace_table(
+        session: AsyncSession,
+        workspace_id: str,
+        table_name: str,
+    ) -> WorkspaceDataset | None:
+        """Return dataset metadata for one table within a workspace."""
+        result = await session.execute(
+            select(WorkspaceDataset).where(
+                WorkspaceDataset.workspace_id == workspace_id,
+                WorkspaceDataset.table_name == table_name,
+            )
+        )
+        return result.scalar_one_or_none()

@@ -33,6 +33,7 @@ from .api.system import router as system_router
 from .v1.api.router import router as v1_router
 from .v1.db.init import init_v1_database
 from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
+from .v1.services.workspace_deletion_service import WorkspaceDeletionService
 from .core.config_models import AppConfig
 from .database.database_manager import DatabaseManager
 from .core.logger import logprint, patch_print
@@ -55,6 +56,7 @@ async def lifespan(app: FastAPI):
     app.state.llm_service = None
     app.state.llm_initialized = False
     app.state.workspace_langgraph_manager = WorkspaceLangGraphManager()
+    app.state.workspace_deletion_service = WorkspaceDeletionService()
 
     # Initialize LangGraph Agent with Persistence
     try:
@@ -106,6 +108,7 @@ async def lifespan(app: FastAPI):
         logprint("API v1 ORM schema initialized")
     except Exception as e:
         logprint(f"Failed to initialize API v1 ORM schema: {e}", level="error")
+        raise
 
     # Start session cleanup task
     cleanup_task = asyncio.create_task(session_cleanup_worker())
@@ -129,6 +132,12 @@ async def lifespan(app: FastAPI):
             await app.state.workspace_langgraph_manager.shutdown()
         except Exception as e:
             logprint(f"Error closing workspace LangGraph manager: {e}", level="error")
+
+    if hasattr(app.state, "workspace_deletion_service") and app.state.workspace_deletion_service:
+        try:
+            await app.state.workspace_deletion_service.shutdown()
+        except Exception as e:
+            logprint(f"Error closing workspace deletion service: {e}", level="error")
 
     if hasattr(app.state, "checkpointer_cm") and app.state.checkpointer_cm:
         logprint("Closing LangGraph checkpointer connection...")

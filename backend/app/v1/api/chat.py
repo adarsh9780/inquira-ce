@@ -31,6 +31,9 @@ async def analyze(
         current_code=payload.current_code,
         model=payload.model,
         context=payload.context,
+        table_name_override=payload.table_name,
+        active_schema_override=payload.active_schema,
+        api_key=payload.api_key,
     )
 
     return AnalyzeResponse(

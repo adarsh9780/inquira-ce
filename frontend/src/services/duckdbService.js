@@ -26,7 +26,7 @@ class DuckDBService {
      * Boot the DuckDB-WASM worker. Safe to call multiple times.
      */
     async initialize() {
-        if (this.db) return this.db;
+        if (this.db && this.conn) return this.db;
         if (this._initPromise) return this._initPromise;
 
         this._initPromise = this._boot();
@@ -64,6 +64,8 @@ class DuckDBService {
             return this.db;
         } catch (err) {
             console.error('[DuckDB-WASM] Init failed:', err);
+            this.db = null;
+            this.conn = null;
             this._initPromise = null;
             throw err;
         }
@@ -164,6 +166,7 @@ class DuckDBService {
      */
     async getTableNames() {
         await this.initialize();
+        if (!this.conn) return [];
         const result = await this.conn.query(`SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'`);
         return result.toArray().map(row => row.table_name);
     }

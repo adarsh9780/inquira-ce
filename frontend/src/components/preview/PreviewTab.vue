@@ -82,9 +82,11 @@
 <script setup>
 import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { previewService } from '../../services/previewService'
+import { useAppStore } from '../../stores/appStore'
 // toasts are lightweight; reuse window.alert for now (or wire your ToastContainer)
 
 const activeTab = ref('data')
+const appStore = useAppStore()
 const tableName = ref('')
 const sampleType = ref('random')
 const data = ref([])
@@ -103,6 +105,12 @@ function tabBtn(tab) {
 }
 
 async function fetchDataPreview(forceRefresh = false) {
+  if (!appStore.hasWorkspace) {
+    data.value = []
+    columns.value = []
+    error.value = ''
+    return
+  }
   if (isLoading.value) return
   isLoading.value = true
   error.value = ''

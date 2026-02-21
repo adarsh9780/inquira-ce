@@ -12,6 +12,9 @@ class AnalyzeRequest(BaseModel):
     current_code: str = ""
     model: str = "gemini-2.5-flash"
     context: str | None = None
+    table_name: str | None = None
+    active_schema: dict | None = None
+    api_key: str | None = None
 
 
 class AnalyzeResponse(BaseModel):

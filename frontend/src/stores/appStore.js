@@ -35,6 +35,7 @@ export const useAppStore = defineStore('app', () => {
   const currentQuestion = ref('')
   const currentExplanation = ref('')
   const workspaces = ref([])
+  const workspaceDeletionJobs = ref([])
   const activeWorkspaceId = ref('')
   const conversations = ref([])
   const activeConversationId = ref('')
@@ -71,8 +72,9 @@ export const useAppStore = defineStore('app', () => {
   const hasSchemaFile = computed(() => schemaFilePath.value.trim() !== '' || isSchemaFileUploaded.value)
   const canAnalyze = computed(() => {
     if (apiKey.value.trim() === '') return false
-    return dataFilePath.value.trim() !== '' || activeWorkspaceId.value.trim() !== ''
+    return activeWorkspaceId.value.trim() !== ''
   })
+  const hasWorkspace = computed(() => activeWorkspaceId.value.trim() !== '')
 
   // Local Configuration Management
   function saveLocalConfig() {
@@ -206,9 +208,7 @@ export const useAppStore = defineStore('app', () => {
   function setDataFilePath(path) {
     dataFilePath.value = path
     saveLocalConfig()
-    if (path) {
-      fetchChatHistory()
-    } else {
+    if (!path) {
       // Clear chat history when no dataset is selected
       chatHistory.value = []
       generatedCode.value = ''
@@ -345,6 +345,10 @@ export const useAppStore = defineStore('app', () => {
     workspaces.value = Array.isArray(items) ? items : []
   }
 
+  function setWorkspaceDeletionJobs(items) {
+    workspaceDeletionJobs.value = Array.isArray(items) ? items : []
+  }
+
   function setActiveWorkspaceId(workspaceId) {
     activeWorkspaceId.value = workspaceId || ''
     saveLocalConfig()
@@ -376,9 +380,27 @@ export const useAppStore = defineStore('app', () => {
     const response = await apiService.v1ListWorkspaces()
     const items = response?.workspaces || []
     workspaces.value = items
+    await fetchWorkspaceDeletionJobs()
     if (!activeWorkspaceId.value && items.length > 0) {
       const active = items.find((w) => w.is_active) || items[0]
       activeWorkspaceId.value = active.id
+      saveLocalConfig()
+    }
+    if (activeWorkspaceId.value && !items.some((ws) => ws.id === activeWorkspaceId.value)) {
+      activeWorkspaceId.value = items[0]?.id || ''
+      activeConversationId.value = ''
+      chatHistory.value = []
+      turnsNextCursor.value = null
+      saveLocalConfig()
+    }
+
+    // Workspace-first guard: when user has no workspace, dataset selection must be cleared.
+    if (items.length === 0 && (dataFilePath.value || ingestedTableName.value || schemaFileId.value)) {
+      dataFilePath.value = ''
+      ingestedTableName.value = ''
+      ingestedColumns.value = []
+      schemaFileId.value = ''
+      isSchemaFileUploaded.value = false
       saveLocalConfig()
     }
   }
@@ -390,6 +412,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function activateWorkspace(workspaceId) {
+    if (workspaceDeletionJobs.value.some((job) => job.workspace_id === workspaceId)) return
     await apiService.v1ActivateWorkspace(workspaceId)
     activeWorkspaceId.value = workspaceId
     conversations.value = []
@@ -449,6 +472,79 @@ export const useAppStore = defineStore('app', () => {
     activeConversationId.value = conversations.value[0]?.id || ''
     chatHistory.value = []
     turnsNextCursor.value = null
+  }
+
+  async function fetchWorkspaceDeletionJobs() {
+    const response = await apiService.v1ListWorkspaceDeletionJobs()
+    workspaceDeletionJobs.value = response?.jobs || []
+    workspaceDeletionJobs.value.forEach((job) => {
+      if (job?.job_id) {
+        pollWorkspaceDeletionJob(job.job_id)
+      }
+    })
+  }
+
+  function upsertWorkspaceDeletionJob(job) {
+    const idx = workspaceDeletionJobs.value.findIndex((item) => item.job_id === job.job_id)
+    if (idx >= 0) {
+      workspaceDeletionJobs.value[idx] = job
+    } else {
+      workspaceDeletionJobs.value.push(job)
+    }
+  }
+
+  function removeWorkspaceDeletionJob(jobId) {
+    workspaceDeletionJobs.value = workspaceDeletionJobs.value.filter((job) => job.job_id !== jobId)
+  }
+
+  async function deleteWorkspaceAsync(workspaceId) {
+    const job = await apiService.v1DeleteWorkspace(workspaceId)
+    upsertWorkspaceDeletionJob(job)
+    if (activeWorkspaceId.value === workspaceId) {
+      activeWorkspaceId.value = ''
+      activeConversationId.value = ''
+      chatHistory.value = []
+      turnsNextCursor.value = null
+      saveLocalConfig()
+    }
+    pollWorkspaceDeletionJob(job.job_id)
+    return job
+  }
+
+  const deletionPollers = new Map()
+
+  function pollWorkspaceDeletionJob(jobId, timeoutMs = 300000) {
+    if (!jobId || deletionPollers.has(jobId)) return
+    const startedAt = Date.now()
+
+    const poll = async () => {
+      try {
+        const job = await apiService.v1GetWorkspaceDeletionJob(jobId)
+        upsertWorkspaceDeletionJob(job)
+        if (job.status === 'completed' || job.status === 'failed') {
+          deletionPollers.delete(jobId)
+          removeWorkspaceDeletionJob(jobId)
+          await fetchWorkspaces()
+          return
+        }
+
+        if (Date.now() - startedAt > timeoutMs) {
+          deletionPollers.delete(jobId)
+          return
+        }
+
+        const timer = setTimeout(poll, 2000)
+        deletionPollers.set(jobId, timer)
+      } catch (_error) {
+        deletionPollers.delete(jobId)
+      }
+    }
+
+    poll()
+  }
+
+  function trackWorkspaceDeletionJob(jobId) {
+    pollWorkspaceDeletionJob(jobId)
   }
 
   function setGeneratedCode(code) {
@@ -612,6 +708,7 @@ export const useAppStore = defineStore('app', () => {
     currentQuestion,
     currentExplanation,
     workspaces,
+    workspaceDeletionJobs,
     activeWorkspaceId,
     conversations,
     activeConversationId,
@@ -639,6 +736,7 @@ export const useAppStore = defineStore('app', () => {
     hasDataFile,
     hasSchemaFile,
     canAnalyze,
+    hasWorkspace,
 
     // Actions
     saveLocalConfig,
@@ -658,11 +756,15 @@ export const useAppStore = defineStore('app', () => {
     addChatMessage,
     updateLastMessageExplanation,
     setWorkspaces,
+    setWorkspaceDeletionJobs,
     setActiveWorkspaceId,
     setConversations,
     setActiveConversationId,
     fetchWorkspaces,
+    fetchWorkspaceDeletionJobs,
+    trackWorkspaceDeletionJob,
     createWorkspace,
+    deleteWorkspaceAsync,
     activateWorkspace,
     fetchConversations,
     createConversation,

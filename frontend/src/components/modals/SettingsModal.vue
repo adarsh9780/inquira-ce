@@ -203,10 +203,15 @@ const isSavingSettings = ref(false)
 const settingsLoaded = ref(false)
 const activeTab = ref(props.initialTab)
 
+function normalizeTab(tab) {
+  const candidate = typeof tab === 'string' ? tab.toLowerCase() : 'api'
+  return ['api', 'data', 'account'].includes(candidate) ? candidate : 'api'
+}
+
 // Watch for modal opening to reset to initial tab
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
-    activeTab.value = props.initialTab
+    activeTab.value = normalizeTab(props.initialTab)
   }
 })
 

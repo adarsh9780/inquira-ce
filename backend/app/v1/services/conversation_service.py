@@ -7,7 +7,7 @@ import json
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Conversation, Turn, Workspace
+from ..models import Conversation, Workspace
 from ..repositories.conversation_repository import ConversationRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .cursor_service import decode_cursor, encode_cursor

@@ -26,3 +26,11 @@ def get_langgraph_manager(request: Request):
     if manager is None:
         raise HTTPException(status_code=500, detail="Workspace LangGraph manager not initialized")
     return manager
+
+
+def get_workspace_deletion_service(request: Request):
+    """Return shared workspace deletion service from app state."""
+    service = getattr(request.app.state, "workspace_deletion_service", None)
+    if service is None:
+        raise HTTPException(status_code=500, detail="Workspace deletion service not initialized")
+    return service

@@ -85,7 +85,10 @@ class DatasetService:
                 else:
                     raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_type}")
 
-                row_count = int(con.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0])
+                row_value = con.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+                if row_value is None:
+                    raise HTTPException(status_code=500, detail="Failed to compute row count after ingest")
+                row_count = int(row_value[0])
                 schema_rows = con.execute(f"DESCRIBE {table_name}").fetchall()
                 schema = {
                     "table_name": table_name,
@@ -140,6 +143,86 @@ class DatasetService:
                 source_mtime=source_mtime,
                 row_count=row_count,
                 file_type=file_type,
+            )
+            session.add(dataset)
+
+        await session.commit()
+        await session.refresh(dataset)
+        return dataset
+
+    @staticmethod
+    async def sync_browser_dataset(
+        session: AsyncSession,
+        user,
+        workspace_id: str,
+        table_name: str,
+        columns: list[dict],
+        row_count: int | None = None,
+    ) -> WorkspaceDataset:
+        """Persist browser table metadata/schema into workspace catalog."""
+        workspace = await WorkspaceRepository.get_by_id(session, workspace_id, user.id)
+        if workspace is None:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        normalized_table = "".join(c if c.isalnum() or c == "_" else "_" for c in table_name.strip()).lower()
+        if not normalized_table:
+            raise HTTPException(status_code=400, detail="Invalid browser table name")
+
+        source_path = f"browser://{normalized_table}"
+        fingerprint = DatasetService._source_fingerprint(source_path)
+
+        schema = {
+            "table_name": normalized_table,
+            "columns": [
+                {
+                    "name": str(col.get("name", "")).strip(),
+                    "dtype": str(col.get("dtype") or col.get("type") or "VARCHAR"),
+                    "description": str(col.get("description", "")),
+                    "samples": col.get("samples", []) if isinstance(col.get("samples", []), list) else [],
+                }
+                for col in (columns or [])
+                if str(col.get("name", "")).strip()
+            ],
+        }
+
+        def _write_schema() -> str:
+            schema_dir = Path(workspace.duckdb_path).parent / "meta"
+            schema_dir.mkdir(parents=True, exist_ok=True)
+            schema_path = schema_dir / f"{normalized_table}_schema.json"
+            with schema_path.open("w", encoding="utf-8") as file:
+                json.dump(schema, file, indent=2)
+            return str(schema_path)
+
+        schema_path = await asyncio.to_thread(_write_schema)
+
+        existing_result = await session.execute(
+            select(WorkspaceDataset).where(
+                WorkspaceDataset.workspace_id == workspace_id,
+                WorkspaceDataset.table_name == normalized_table,
+            )
+        )
+        existing = existing_result.scalar_one_or_none()
+
+        if existing:
+            existing.source_path = source_path
+            existing.source_fingerprint = fingerprint
+            existing.schema_path = schema_path
+            existing.file_size = None
+            existing.source_mtime = None
+            existing.row_count = row_count
+            existing.file_type = "browser"
+            dataset = existing
+        else:
+            dataset = WorkspaceDataset(
+                workspace_id=workspace_id,
+                source_path=source_path,
+                source_fingerprint=fingerprint,
+                table_name=normalized_table,
+                schema_path=schema_path,
+                file_size=None,
+                source_mtime=None,
+                row_count=row_count,
+                file_type="browser",
             )
             session.add(dataset)
 

@@ -18,6 +18,7 @@ class V1Settings:
     database_url: str
     reset_enabled: bool
     reset_token: str
+    allow_schema_bootstrap: bool
 
     @staticmethod
     def load() -> "V1Settings":
@@ -35,6 +36,7 @@ class V1Settings:
             database_url=os.getenv("INQUIRA_DB_URL", default_db),
             reset_enabled=os.getenv("INQUIRA_ENABLE_RESET", "0") == "1",
             reset_token=os.getenv("INQUIRA_RESET_TOKEN", ""),
+            allow_schema_bootstrap=os.getenv("INQUIRA_ALLOW_SCHEMA_BOOTSTRAP", "0") == "1",
         )
 
 

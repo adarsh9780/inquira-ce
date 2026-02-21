@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import User, Workspace
+from ..repositories.workspace_deletion_repository import WorkspaceDeletionRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .workspace_storage_service import WorkspaceStorageService
 
@@ -21,7 +22,10 @@ class WorkspaceService:
     @staticmethod
     async def list_user_workspaces(session: AsyncSession, user_id: str) -> list[Workspace]:
         """Return user workspaces sorted by recency."""
-        return await WorkspaceRepository.list_for_user(session, user_id)
+        workspaces = await WorkspaceRepository.list_for_user(session, user_id)
+        active_jobs = await WorkspaceDeletionRepository.list_active_for_user(session, user_id)
+        deleting_workspace_ids = {job.workspace_id for job in active_jobs}
+        return [ws for ws in workspaces if ws.id not in deleting_workspace_ids]
 
     @staticmethod
     async def create_workspace(session: AsyncSession, user: User, name: str) -> Workspace:
