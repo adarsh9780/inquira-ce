@@ -27,13 +27,15 @@
 
       <div v-if="appStore.workspaces.length === 0" class="p-3 text-sm text-center text-gray-500">No workspaces yet</div>
       <div v-else class="max-h-64 overflow-auto">
-        <button
+        <div
           v-for="ws in appStore.workspaces"
           :key="ws.id"
-          class="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
-          :class="ws.id === appStore.activeWorkspaceId ? 'bg-blue-50' : ''"
-          :disabled="isWorkspaceDeleting(ws.id)"
-          @click="activateWorkspace(ws.id)"
+          class="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between cursor-pointer"
+          :class="[
+            ws.id === appStore.activeWorkspaceId ? 'bg-blue-50' : '',
+            isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : ''
+          ]"
+          @click="!isWorkspaceDeleting(ws.id) && activateWorkspace(ws.id)"
         >
           <span class="truncate" :class="isWorkspaceDeleting(ws.id) ? 'text-gray-400' : ''">{{ ws.name }}</span>
           <button
@@ -43,7 +45,7 @@
           >
             Delete
           </button>
-        </button>
+        </div>
       </div>
     </div>
   </div>

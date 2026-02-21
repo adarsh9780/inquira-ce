@@ -16,9 +16,10 @@ function getDefaultApiBase() {
   }
 
   if (import.meta.env.DEV) {
-    const { protocol, hostname } = window.location
+    const { hostname } = window.location
     const port = '8000'
-    return `${protocol}//${hostname}:${port}`
+    // Force http protocol for backend as tauri:// won't reach Python server
+    return `http://${hostname || 'localhost'}:${port}`
   }
 
   return window.location.origin
@@ -327,9 +328,11 @@ export const apiService = {
 
   // Code execution (server-side)
   async executeCode(code, timeout = 60) {
+    console.debug('🚀 [API] Executing code...', { timeout })
     const response = await fetch(`${apiBaseUrl.replace(/\/+$/, '')}/execute`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ code, timeout })
     })
     if (!response.ok) {
@@ -341,6 +344,7 @@ export const apiService = {
 
   // File data loading — inspect file for columns, then trigger background DuckDB conversion
   async uploadDataPath(filePath) {
+    console.debug('📂 [API] Inspecting file path:', filePath)
     // Step 1: Inspect file header (fast, synchronous)
     const inspectRes = await fetch(`${apiBaseUrl.replace(/\/+$/, '')}/data/inspect`, {
       method: 'POST',
@@ -350,17 +354,20 @@ export const apiService = {
     })
     if (!inspectRes.ok) {
       const detail = await inspectRes.json().catch(() => ({}))
+      console.error('❌ [API] Inspection failed:', detail)
       throw new Error(detail.detail || `Failed to inspect file (${inspectRes.status})`)
     }
     const result = await inspectRes.json()
+    console.debug('✅ [API] Inspection result:', result)
 
     // Step 2: Trigger background DuckDB conversion (fire-and-forget)
+    console.debug('⚙️ [API] Triggering background conversion...')
     fetch(`${apiBaseUrl.replace(/\/+$/, '')}/settings/set/data_path`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ data_path: filePath })
-    }).catch(() => { }) // Don't block on this
+    }).catch(err => console.warn('⚠️ [API] Background conversion trigger warning:', err))
 
     return result
   },

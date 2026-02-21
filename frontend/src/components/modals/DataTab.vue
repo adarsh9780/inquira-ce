@@ -128,9 +128,6 @@
         <p class="mt-1 text-xs text-gray-500">
           Supported formats: CSV, Parquet, Excel (.xlsx), JSON, TSV
         </p>
-        <p v-if="canPersistHandles" class="mt-1 text-xs text-gray-500">
-          File access is remembered for this browser profile, so reloads can restore automatically.
-        </p>
         <p v-if="ingestedColumns.length" class="mt-1 text-xs text-green-600">
           ✅ {{ ingestedColumns.length }} columns loaded into DuckDB
         </p>
@@ -596,6 +593,20 @@ onMounted(async () => {
   if (appStore.ingestedTableName) {
     ingestedTableName.value = appStore.ingestedTableName
     ingestedColumns.value = appStore.ingestedColumns || []
+  }
+
+  // Auto-fetch columns if missing but path exists (common on reload)
+  if (appStore.dataFilePath && ingestedColumns.value.length === 0) {
+    console.debug('🚀 [DataTab] Columns missing but path exists. Auto-fetching metadata...', appStore.dataFilePath)
+    try {
+      const result = await apiService.uploadDataPath(appStore.dataFilePath)
+      ingestedTableName.value = result.table_name || ingestedTableName.value
+      ingestedColumns.value = result.columns || []
+      appStore.setIngestedColumns(ingestedColumns.value)
+      appStore.setIngestedTableName(ingestedTableName.value)
+    } catch (error) {
+      console.warn('⚠️ [DataTab] Auto-fetch failed on mount:', error)
+    }
   }
 })
 </script>
