@@ -16,6 +16,8 @@ export const useAppStore = defineStore('app', () => {
   const dataFileId = ref('')
   const schemaFileId = ref('')
   const isSchemaFileUploaded = ref(false)
+  const ingestedTableName = ref('')
+  const ingestedColumns = ref([])
 
   // LLM Configuration
   const selectedModel = ref('gemini-2.5-flash')
@@ -74,6 +76,8 @@ export const useAppStore = defineStore('app', () => {
       dataFileId: dataFileId.value,
       schemaFileId: schemaFileId.value,
       isSchemaFileUploaded: isSchemaFileUploaded.value,
+      ingestedTableName: ingestedTableName.value,
+      ingestedColumns: ingestedColumns.value,
       schemaContext: schemaContext.value,
       chatOverlayWidth: chatOverlayWidth.value,
       historicalCodeBlocks: historicalCodeBlocks.value,
@@ -126,6 +130,12 @@ export const useAppStore = defineStore('app', () => {
       if (config.isSchemaFileUploaded !== undefined) {
         isSchemaFileUploaded.value = config.isSchemaFileUploaded
       }
+      if (config.ingestedTableName) {
+        ingestedTableName.value = config.ingestedTableName
+      }
+      if (Array.isArray(config.ingestedColumns)) {
+        ingestedColumns.value = config.ingestedColumns
+      }
 
       // Restore schema context
       if (config.schemaContext) {
@@ -170,6 +180,8 @@ export const useAppStore = defineStore('app', () => {
       dataFileId.value = ''
       schemaFileId.value = ''
       isSchemaFileUploaded.value = false
+      ingestedTableName.value = ''
+      ingestedColumns.value = []
       schemaContext.value = ''
       historicalCodeBlocks.value = []
 
@@ -191,6 +203,8 @@ export const useAppStore = defineStore('app', () => {
       chatHistory.value = []
       generatedCode.value = ''
       pythonFileContent.value = ''
+      ingestedTableName.value = ''
+      ingestedColumns.value = []
     }
   }
 
@@ -211,6 +225,16 @@ export const useAppStore = defineStore('app', () => {
 
   function setIsSchemaFileUploaded(uploaded) {
     isSchemaFileUploaded.value = uploaded
+    saveLocalConfig()
+  }
+
+  function setIngestedTableName(tableName) {
+    ingestedTableName.value = tableName || ''
+    saveLocalConfig()
+  }
+
+  function setIngestedColumns(columns) {
+    ingestedColumns.value = Array.isArray(columns) ? columns : []
     saveLocalConfig()
   }
 
@@ -458,6 +482,8 @@ export const useAppStore = defineStore('app', () => {
     dataFileId,
     schemaFileId,
     isSchemaFileUploaded,
+    ingestedTableName,
+    ingestedColumns,
     selectedModel,
     apiKey,
     schemaContext,
@@ -498,6 +524,8 @@ export const useAppStore = defineStore('app', () => {
     setDataFileId,
     setSchemaFileId,
     setIsSchemaFileUploaded,
+    setIngestedTableName,
+    setIngestedColumns,
     setApiKey,
     setSelectedModel,
     setSchemaContext,

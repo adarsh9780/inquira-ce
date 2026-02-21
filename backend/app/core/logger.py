@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -10,10 +9,6 @@ LOG_DIR = Path.home() / ".inquira" / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 _configured = False
-
-
-def _get_env_level(default: str = "INFO") -> str:
-    return os.getenv("LOG_LEVEL", default).upper()
 
 
 def init_logger() -> None:
@@ -39,7 +34,8 @@ def init_logger() -> None:
 
     _logger.remove()
 
-    level = _get_env_level()
+    console_level = "ERROR"
+    file_level = "DEBUG"
 
     # Console sink (pretty), non-blocking
     _logger.add(
@@ -48,7 +44,7 @@ def init_logger() -> None:
         backtrace=False,
         diagnose=False,
         enqueue=True,  # non-blocking
-        level=level,
+        level=console_level,
         filter=lambda record: record["extra"].get("to_console", True),
         format=(
             "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
@@ -65,7 +61,7 @@ def init_logger() -> None:
         rotation="10 MB",          # size-based rotation
         retention="14 days",       # keep last 14 days
         compression="zip",         # compress old logs
-        level=level,
+        level=file_level,
         enqueue=True,
         filter=lambda record: record["extra"].get("to_file", True),
         serialize=True,            # JSON output

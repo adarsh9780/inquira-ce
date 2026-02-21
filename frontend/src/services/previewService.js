@@ -1,5 +1,8 @@
 import { apiService } from './apiService'
 import { cacheService } from './cacheService'
+import { useAppStore } from '../stores/appStore'
+import { duckdbService } from './duckdbService'
+import { buildPreviewSql, isBrowserDataPath } from '../utils/previewRouting'
 
 class PreviewService {
   constructor() {
@@ -7,8 +10,55 @@ class PreviewService {
     this.schemaCacheExpiry = 15 * 60 * 1000 // 15 minutes for schema data
   }
 
+  async getBrowserPreview(sampleType = 'random') {
+    const appStore = useAppStore()
+    const tableName = appStore.ingestedTableName
+    if (!tableName) {
+      return {
+        success: true,
+        data: [],
+        row_count: 0,
+        sample_type: sampleType,
+        message: 'No browser table loaded yet.'
+      }
+    }
+
+    const sql = buildPreviewSql(tableName, sampleType, 100)
+    const rows = await duckdbService.query(sql)
+    const data = rows.map((row) => {
+      const out = {}
+      for (const [key, value] of Object.entries(row)) {
+        out[key] = typeof value === 'bigint' ? Number(value) : value
+      }
+      return out
+    })
+
+    return {
+      success: true,
+      data,
+      row_count: data.length,
+      file_path: `browser://${tableName}`,
+      sample_type: sampleType,
+      message: `Loaded ${data.length} ${sampleType} sample rows from browser DuckDB.`
+    }
+  }
+
   // Get data preview with caching
   async getDataPreview(sampleType = 'random', forceRefresh = false) {
+    const appStore = useAppStore()
+    const dataPath = appStore.schemaFileId || appStore.dataFilePath
+
+    if (isBrowserDataPath(dataPath)) {
+      const localKey = cacheService.generateKey('data/preview/local', {
+        sampleType,
+        table: appStore.ingestedTableName || ''
+      })
+      if (forceRefresh) {
+        return cacheService.refresh(localKey, () => this.getBrowserPreview(sampleType), this.cacheExpiry)
+      }
+      return cacheService.getOrSet(localKey, () => this.getBrowserPreview(sampleType), this.cacheExpiry)
+    }
+
     const cacheKey = cacheService.generateKey('data/preview', { sampleType })
 
     if (forceRefresh) {

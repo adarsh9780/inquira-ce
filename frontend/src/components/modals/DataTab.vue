@@ -93,33 +93,43 @@
         </label>
         <div class="max-w-md">
           <div class="flex items-center space-x-2">
-            <label
-              class="flex-1 flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm cursor-pointer hover:bg-gray-50 transition-colors"
-              :class="{ 'opacity-50 cursor-not-allowed': isProcessing || isPickingFile }"
+            <button
+              type="button"
+              @click="openFilePicker"
+              class="flex-1 flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm cursor-pointer hover:bg-gray-50 transition-colors text-left"
+              :class="{ 'opacity-50 cursor-not-allowed': isProcessing || isPickingFile || isRestoringFile }"
+              :disabled="isProcessing || isPickingFile || isRestoringFile"
             >
-              <input
-                id="data-file-input"
-                ref="fileInputRef"
-                type="file"
-                accept=".csv,.parquet,.xlsx,.json,.tsv"
-                @change="handleFileSelected"
-                :disabled="isProcessing || isPickingFile"
-                class="hidden"
-              />
               <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
               <span v-if="!appStore.dataFilePath" class="text-gray-500">Choose a file...</span>
               <span v-else class="text-gray-900 truncate">{{ appStore.dataFilePath }}</span>
-            </label>
+            </button>
+            <input
+              id="data-file-input"
+              ref="fileInputRef"
+              type="file"
+              accept=".csv,.parquet,.xlsx,.json,.tsv"
+              @change="handleFileSelected"
+              :disabled="isProcessing || isPickingFile || isRestoringFile"
+              class="hidden"
+            />
             <span v-if="isPickingFile" class="inline-flex items-center text-sm text-blue-600">
               <div class="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent mr-2"></div>
               Ingesting…
+            </span>
+            <span v-if="isRestoringFile" class="inline-flex items-center text-sm text-blue-600">
+              <div class="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent mr-2"></div>
+              Restoring…
             </span>
           </div>
         </div>
         <p class="mt-1 text-xs text-gray-500">
           Supported formats: CSV, Parquet, Excel (.xlsx), JSON, TSV
+        </p>
+        <p v-if="canPersistHandles" class="mt-1 text-xs text-gray-500">
+          File access is remembered for this browser profile, so reloads can restore automatically.
         </p>
         <p v-if="ingestedColumns.length" class="mt-1 text-xs text-green-600">
           ✅ {{ ingestedColumns.length }} columns loaded into DuckDB
@@ -227,7 +237,10 @@ import { apiService } from '../../services/apiService'
 import { duckdbService } from '../../services/duckdbService'
 import { settingsWebSocket } from '../../services/websocketService'
 import { previewService } from '../../services/previewService'
+import { saveActiveFileHandle, getActiveFileHandleRecord, clearActiveFileHandle } from '../../services/fileHandleStore'
 import { toast } from '../../composables/useToast'
+import { buildBrowserDataPath } from '../../utils/chatBootstrap'
+import { supportsPersistentFileHandles, isLikelyStaleHandleError } from '../../utils/fileHandleSupport'
 import {
   DocumentArrowUpIcon,
   ExclamationTriangleIcon,
@@ -253,16 +266,22 @@ const timerInterval = ref(null)
 const startTime = ref(null)
 const isPickingFile = ref(false)
 const isRefreshing = ref(false)
+const isRestoringFile = ref(false)
 const ingestedColumns = ref([])  // columns from DuckDB-WASM ingestion
 const ingestedTableName = ref('') // DuckDB table name
 const fileInputRef = ref(null)   // ref for the <input type="file">
 
 // Computed
 const hasApiKey = computed(() => appStore.apiKey.trim() !== '')
+const canPersistHandles = computed(() => supportsPersistentFileHandles())
 
 const updateNeeded = computed(() => {
   return !!(updateInfo.value && updateInfo.value.should_update === true)
 })
+
+function getBackendDataPath() {
+  return buildBrowserDataPath(ingestedTableName.value)
+}
 
 const messageTypeClass = computed(() => {
   return messageType.value === 'success'
@@ -331,34 +350,124 @@ function clearMessage() {
 async function handleFileSelected(event) {
   const file = event.target.files?.[0];
   if (!file) return;
+  await processSelectedFile(file, null)
+  event.target.value = ''
+}
 
-  clearMessage();
-  isPickingFile.value = true;
+async function openFilePicker() {
+  if (canPersistHandles.value) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        multiple: false,
+        types: [
+          {
+            description: 'Data files',
+            accept: {
+              'text/csv': ['.csv', '.tsv'],
+              'application/json': ['.json'],
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+              'application/parquet': ['.parquet'],
+              'application/octet-stream': ['.parquet']
+            }
+          }
+        ]
+      })
+      const file = await handle.getFile()
+      await processSelectedFile(file, handle)
+      return
+    } catch (error) {
+      if (error?.name === 'AbortError') return
+      console.error('System file picker failed, falling back to input:', error)
+    }
+  }
+
+  fileInputRef.value?.click()
+}
+
+async function processSelectedFile(file, handle = null, options = {}) {
+  const { restoring = false } = options
+  clearMessage()
+  if (restoring) {
+    isRestoringFile.value = true
+  } else {
+    isPickingFile.value = true
+  }
 
   try {
     // Ingest file lazily into DuckDB-WASM via registerFileHandle
-    const { tableName, columns, rowCount } = await duckdbService.ingestFile(file);
+    const { tableName, columns, rowCount } = await duckdbService.ingestFile(file)
 
     // Store in appStore and local state
-    appStore.setDataFilePath(file.name);
-    ingestedColumns.value = columns;
-    ingestedTableName.value = tableName;
+    appStore.setDataFilePath(file.name)
+    ingestedColumns.value = columns
+    ingestedTableName.value = tableName
+    appStore.setIngestedColumns(columns)
+    appStore.setIngestedTableName(tableName)
+    appStore.setSchemaFileId(buildBrowserDataPath(tableName))
 
-    showMessage(`Loaded "${file.name}" → table "${tableName}" (${rowCount} rows, ${columns.length} columns)`, 'success');
+    // Keep backend user settings in sync with browser-native table path
+    await apiService.setDataPathSimple(buildBrowserDataPath(tableName))
+
+    if (handle) {
+      await saveActiveFileHandle(handle, {
+        file_name: file.name,
+        table_name: tableName
+      })
+    } else {
+      // Input fallback cannot persist a durable file handle
+      await clearActiveFileHandle()
+    }
+
+    showMessage(`Loaded "${file.name}" → table "${tableName}" (${rowCount} rows, ${columns.length} columns)`, 'success')
 
     // Attempt to prefill context if schema exists
-    await tryPrefillContextFromExistingSchema();
+    await tryPrefillContextFromExistingSchema()
   } catch (error) {
-    console.error('File ingestion failed:', error);
-    showMessage(`Failed to load file: ${error.message}`, 'error');
+    console.error('File ingestion failed:', error)
+    showMessage(`Failed to load file: ${error.message}`, 'error')
   } finally {
-    isPickingFile.value = false;
+    isPickingFile.value = false
+    isRestoringFile.value = false
+  }
+}
+
+async function tryRestoreFileFromHandle() {
+  if (!canPersistHandles.value) return false
+
+  try {
+    const record = await getActiveFileHandleRecord()
+    const handle = record?.handle
+    if (!handle) return false
+
+    let permission = 'prompt'
+    if (typeof handle.queryPermission === 'function') {
+      permission = await handle.queryPermission({ mode: 'read' })
+    }
+    if (permission !== 'granted' && typeof handle.requestPermission === 'function') {
+      permission = await handle.requestPermission({ mode: 'read' })
+    }
+    if (permission !== 'granted') {
+      showMessage('Please reselect your data file to restore access.', 'error')
+      return false
+    }
+
+    const file = await handle.getFile()
+    await processSelectedFile(file, handle, { restoring: true })
+    return true
+  } catch (error) {
+    if (isLikelyStaleHandleError(error)) {
+      await clearActiveFileHandle()
+      showMessage('Saved file reference is no longer valid. Please reselect your data file.', 'error')
+      return false
+    }
+    console.error('Failed to restore file from saved handle:', error)
+    return false
   }
 }
 
 // Try to prefill the Data Domain Context if a schema already exists for this file
 async function tryPrefillContextFromExistingSchema() {
-  const filepath = appStore.dataFilePath.trim()
+  const filepath = getBackendDataPath()
   if (!filepath) return
   try {
     const schema = await apiService.loadSchema(filepath)
@@ -495,6 +604,7 @@ async function saveDataSettings() {
 
   // Validate that a file has been ingested
   const dataPath = appStore.dataFilePath.trim()
+  const backendDataPath = getBackendDataPath()
   if (!dataPath) {
     showMessage('Please select a data file first.', 'error')
     return
@@ -510,13 +620,18 @@ async function saveDataSettings() {
   showProgress('Saving context...', 20)
 
   try {
+    if (backendDataPath) {
+      await apiService.setDataPathSimple(backendDataPath)
+      appStore.setSchemaFileId(backendDataPath)
+    }
+
     // Save context to backend
     await apiService.setContext(appStore.schemaContext.trim())
 
     // Check if schema with descriptions already exists
     let needsSchemaGeneration = true
     try {
-      const existingSchema = await apiService.loadSchema(dataPath)
+      const existingSchema = await apiService.loadSchema(backendDataPath || dataPath)
       if (existingSchema?.columns?.length > 0) {
         const hasDescriptions = existingSchema.columns.some(col => col.description?.trim())
         if (hasDescriptions) {
@@ -622,15 +737,22 @@ watch(isProcessing, (newVal) => {
 onMounted(async () => {
   checkForUpdate()
 
+  const restored = await tryRestoreFileFromHandle()
+  if (restored) {
+    return
+  }
+
   // Auto-detect if tables already exist in DuckDB-WASM
   try {
     const tables = await duckdbService.getTableNames()
     if (tables.length > 0 && appStore.dataFilePath) {
       // Table already loaded from a previous file selection
-      const tableName = tables[0]
+      const tableName = appStore.ingestedTableName || tables[0]
       ingestedTableName.value = tableName
       const cols = await duckdbService.describeTable(tableName)
       ingestedColumns.value = cols
+      appStore.setIngestedTableName(tableName)
+      appStore.setIngestedColumns(cols)
       console.debug(`📋 [DataTab] Auto-detected existing table: ${tableName} (${cols.length} columns)`)
     }
   } catch (e) {

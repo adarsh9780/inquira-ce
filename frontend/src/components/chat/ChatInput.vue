@@ -60,7 +60,10 @@ import { ref, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import apiService from '../../services/apiService'
 import pyodideService from '../../services/pyodideService'
+import { duckdbService } from '../../services/duckdbService'
 import { toast } from '../../composables/useToast'
+import { extractApiErrorMessage } from '../../utils/apiError'
+import { buildBrowserDataPath, hasUsableIngestedColumns } from '../../utils/chatBootstrap'
 import {
   PaperAirplaneIcon,
   ExclamationTriangleIcon
@@ -76,6 +79,65 @@ const canSend = computed(() => {
          question.value.length <= 1000 &&
          !appStore.isLoading
 })
+
+async function buildColumnsWithSamples(tableName, columns) {
+  const result = []
+  for (const col of columns) {
+    const columnName = col?.name
+    const columnType = col?.type || col?.dtype || 'VARCHAR'
+    if (!columnName) continue
+
+    try {
+      const rows = await duckdbService.query(
+        `SELECT DISTINCT "${columnName}" AS sample FROM ${tableName} LIMIT 5`
+      )
+      const samples = rows.map((row) => {
+        const value = row.sample
+        return typeof value === 'bigint' ? Number(value) : value
+      })
+      result.push({ name: columnName, dtype: columnType, samples })
+    } catch (_err) {
+      result.push({ name: columnName, dtype: columnType, samples: [] })
+    }
+  }
+  return result
+}
+
+async function ensureBackendSchemaReadyForChat() {
+  const tableName = appStore.ingestedTableName
+  const backendDataPath = buildBrowserDataPath(tableName)
+  if (!backendDataPath) return
+
+  await apiService.setDataPathSimple(backendDataPath)
+
+  if (appStore.schemaContext.trim()) {
+    await apiService.setContext(appStore.schemaContext.trim())
+  }
+
+  try {
+    await apiService.loadSchema(backendDataPath)
+    appStore.setIsSchemaFileUploaded(true)
+    appStore.setSchemaFileId(backendDataPath)
+    return
+  } catch (error) {
+    if (error.response?.status !== 404) {
+      throw error
+    }
+  }
+
+  if (!hasUsableIngestedColumns(appStore.ingestedColumns)) {
+    return
+  }
+
+  const columnsWithSamples = await buildColumnsWithSamples(tableName, appStore.ingestedColumns)
+  await apiService.generateSchemaFromColumns(
+    tableName,
+    columnsWithSamples,
+    appStore.schemaContext.trim() || null
+  )
+  appStore.setIsSchemaFileUploaded(true)
+  appStore.setSchemaFileId(backendDataPath)
+}
 
 async function handleSubmit() {
   if (!canSend.value) return
@@ -113,6 +175,9 @@ async function handleSubmit() {
 
     // Log the request for debugging
     console.debug('📤 Sending request to /chat endpoint:', requestData)
+
+    // Keep backend session aligned with browser-native dataset and schema before chat
+    await ensureBackendSchemaReadyForChat()
 
     // Set up timeout timers
     warningTimer = setTimeout(() => {
@@ -219,6 +284,9 @@ async function handleSubmit() {
       // Request was cancelled
       errorTitle = 'Request Cancelled'
       errorMessage = 'Your query was cancelled due to timeout.'
+    } else if (error.response?.status === 400) {
+      errorTitle = 'Invalid Request'
+      errorMessage = extractApiErrorMessage(error, 'The request is invalid. Please review your dataset and schema setup.')
     } else if (error.response?.status === 401) {
       errorTitle = 'Authentication Error'
       errorMessage = 'Please check your API key and try again.'
@@ -240,7 +308,8 @@ async function handleSubmit() {
     }
 
     toast.error(errorTitle, errorMessage)
-    appStore.setTerminalOutput(`Error: ${error.message || 'Failed to analyze data'}`)
+    appStore.setTerminalOutput(`Error: ${errorMessage}`)
+    appStore.updateLastMessageExplanation(errorMessage)
 
     // Ensure code editor is visible even on error
     appStore.setActiveTab('code')

@@ -194,6 +194,12 @@ def read_file_with_duckdb(file_path: str, sample_size: int = 100) -> List[Dict[s
     Optimized to avoid loading entire files into memory
     """
     try:
+        if isinstance(file_path, str) and file_path.startswith("browser://"):
+            raise HTTPException(
+                status_code=400,
+                detail="Browser-native datasets are previewed in the frontend runtime."
+            )
+
         file_type = get_file_type(file_path)
 
         # Check if file exists
@@ -266,6 +272,8 @@ def read_file_with_duckdb(file_path: str, sample_size: int = 100) -> List[Dict[s
         finally:
             con.close()
 
+    except HTTPException:
+        raise
     except duckdb.Error as e:
         raise HTTPException(
             status_code=400,
@@ -552,6 +560,12 @@ def get_file_schema(file_path: str) -> List[Dict[str, Any]]:
     Optimized to avoid loading entire files into memory
     """
     try:
+        if isinstance(file_path, str) and file_path.startswith("browser://"):
+            raise HTTPException(
+                status_code=400,
+                detail="Browser-native datasets are schema-managed through /schemas endpoints."
+            )
+
         file_type = get_file_type(file_path)
 
         # Check if file exists
@@ -626,6 +640,8 @@ def get_file_schema(file_path: str) -> List[Dict[str, Any]]:
         finally:
             con.close()
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -638,6 +654,12 @@ def read_file_with_duckdb_sample(file_path: str, sample_type: str = "random", sa
     Optimized to avoid loading entire files into memory
     """
     try:
+        if isinstance(file_path, str) and file_path.startswith("browser://"):
+            raise HTTPException(
+                status_code=400,
+                detail="Browser-native datasets are previewed in the frontend runtime."
+            )
+
         file_type = get_file_type(file_path)
 
         # Check if file exists
@@ -717,6 +739,8 @@ def read_file_with_duckdb_sample(file_path: str, sample_type: str = "random", sa
         finally:
             con.close()
 
+    except HTTPException:
+        raise
     except duckdb.Error as e:
         raise HTTPException(
             status_code=400,

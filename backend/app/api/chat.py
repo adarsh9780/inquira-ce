@@ -241,6 +241,9 @@ async def chat_endpoint(
         # response is a CodeOutput instance, convert to DataAnalysisResponse
         return DataAnalysisResponse(**response.dict())
 
+    except HTTPException:
+        # Preserve intentional HTTP status codes (e.g., 400/401/404)
+        raise
     except Exception as e:
         import traceback
         logprint(f"❌ [Agent] Error processing analysis request:\n{traceback.format_exc()}", level="error")
