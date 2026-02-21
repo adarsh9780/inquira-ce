@@ -4,6 +4,7 @@ use std::process::{Child, Command};
 use std::sync::Mutex;
 
 use serde::Deserialize;
+use tauri::Emitter;
 use tauri::Manager;
 
 // ─────────────────────────────────────────────────────────────────────
@@ -281,7 +282,10 @@ pub fn run() {
 
             Ok(())
         })
-        .on_event(|app, event| {
+        .invoke_handler(tauri::generate_handler![get_backend_url])
+        .build(tauri::generate_context!())
+        .expect("error while building Inquira")
+        .run(|app, event| {
             // Kill the backend process when the app exits
             if let tauri::RunEvent::Exit = event {
                 if let Some(state) = app.try_state::<BackendProcess>() {
@@ -293,8 +297,5 @@ pub fn run() {
                     }
                 }
             }
-        })
-        .invoke_handler(tauri::generate_handler![get_backend_url])
-        .run(tauri::generate_context!())
-        .expect("error while running Inquira");
+        });
 }
