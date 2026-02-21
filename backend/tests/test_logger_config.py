@@ -71,3 +71,11 @@ def test_should_emit_respects_levels():
     assert logger_module._should_emit("ERROR", "ERROR") is True
     assert logger_module._should_emit("CRITICAL", "ERROR") is True
     assert logger_module._should_emit("DEBUG", "ERROR") is False
+
+
+def test_logging_config_defaults_keep_uvicorn_visible():
+    from app.core.config_models import LoggingConfig
+
+    cfg = LoggingConfig()
+    assert cfg.uvicorn_access_log is True
+    assert cfg.uvicorn_log_level == "info"

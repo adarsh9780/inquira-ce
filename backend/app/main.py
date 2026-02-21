@@ -356,16 +356,16 @@ def run(argv: list[str] | None = None):
     PORT = 8000
 
     logprint(f"Launching Inquira backend (v{APP_VERSION})")
-    access_log = False
-    uvicorn_log_level = "error"
+    access_log = True
+    uvicorn_log_level = "info"
     try:
         default_config_path = os.path.join(os.path.dirname(__file__), "app_config.json")
         cfg = AppConfig.load_merged_config(default_config_path)
         access_log = bool(cfg.LOGGING.uvicorn_access_log)
-        uvicorn_log_level = str(cfg.LOGGING.uvicorn_log_level or "error").lower()
+        uvicorn_log_level = str(cfg.LOGGING.uvicorn_log_level or "info").lower()
     except Exception:
-        access_log = False
-        uvicorn_log_level = "error"
+        access_log = True
+        uvicorn_log_level = "info"
 
     uvicorn.run(
         app,

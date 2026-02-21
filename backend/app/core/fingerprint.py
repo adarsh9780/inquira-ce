@@ -3,6 +3,23 @@ import os
 from pathlib import Path
 
 
+def _normalize_virtual_browser_path(path: str) -> str:
+    value = str(path or "").strip()
+    if (
+        len(value) >= 2
+        and value[0] == value[-1]
+        and value[0] in {"'", '"'}
+    ):
+        value = value[1:-1].strip()
+    if value.startswith("/browser://"):
+        value = value[1:]
+    if value.startswith("/browser:/"):
+        value = value[1:]
+    if value.startswith("browser:/") and not value.startswith("browser://"):
+        value = value.replace("browser:/", "browser://", 1)
+    return value
+
+
 def file_fingerprint_md5(path: str, include_inode: bool = True, sample_bytes: int = 0) -> str:
     """
     Compute a deterministic MD5 fingerprint for a file based on normalized path
@@ -17,9 +34,10 @@ def file_fingerprint_md5(path: str, include_inode: bool = True, sample_bytes: in
     """
     # Browser-native virtual datasets have no filesystem metadata.
     # Fingerprint deterministically from the virtual path itself.
-    if isinstance(path, str) and path.startswith("browser://"):
+    normalized_virtual = _normalize_virtual_browser_path(path)
+    if normalized_virtual.startswith("browser://"):
         h = hashlib.md5()
-        h.update(f"virtual|{path}".encode("utf-8"))
+        h.update(f"virtual|{normalized_virtual}".encode("utf-8"))
         return h.hexdigest()
 
     p = Path(path)

@@ -316,6 +316,16 @@ def get_dataset_by_path(user_id: str, file_path: str) -> Optional[Dict[str, Any]
                 "updated_at": row[12],
             }
         return None
+    except FileNotFoundError as e:
+        normalized = str(file_path or "").strip().lower()
+        if "browser:" in normalized:
+            logprint(
+                f"Skipping dataset filesystem lookup for browser virtual path: {file_path}",
+                level="debug",
+            )
+            return None
+        logprint(f"Error getting dataset: {e}", level="error")
+        return None
     except Exception as e:
         logprint(f"Error getting dataset: {e}", level="error")
         return None

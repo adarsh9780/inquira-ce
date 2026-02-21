@@ -4,7 +4,7 @@
     "console_level": "ERROR",
     "file_level": "DEBUG",
     "color_errors": true,
-    "uvicorn_access_log": false,
-    "uvicorn_log_level": "error"
+    "uvicorn_access_log": true,
+    "uvicorn_log_level": "info"
   }
 }
