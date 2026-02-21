@@ -81,6 +81,7 @@ import { useAuthStore } from './stores/authStore'
 import { apiService } from './services/apiService'
 import { settingsWebSocket } from './services/websocketService'
 import pyodideService from './services/pyodideService'
+import { shouldInitializeRuntime } from './utils/runtimeGate'
 import AuthModal from './components/modals/AuthModal.vue'
 import TopToolbar from './components/layout/TopToolbar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
@@ -97,6 +98,47 @@ const pyodideLoading = reactive({
   step: 0,
   message: 'Loading Python runtime...'
 })
+const runtimeInitialized = ref(false)
+
+async function initializeRuntimeIfNeeded() {
+  if (!shouldInitializeRuntime(authStore.isAuthenticated, runtimeInitialized.value)) {
+    return
+  }
+
+  try {
+    pyodideLoading.active = true
+    pyodideLoading.step = 0
+    pyodideLoading.message = 'Loading Python runtime...'
+
+    console.debug('Starting Pyodide initialization...')
+    await pyodideService.initialize({
+      onProgress: (stage) => {
+        if (stage === 'packages') {
+          pyodideLoading.step = 1
+          pyodideLoading.message = 'Installing Python packages (pandas, pyarrow, plotly)...'
+        } else if (stage === 'duckdb') {
+          pyodideLoading.step = 2
+          pyodideLoading.message = 'Starting DuckDB analysis engine...'
+        } else if (stage === 'bridge') {
+          pyodideLoading.step = 3
+          pyodideLoading.message = 'Connecting Python to data engine...'
+        }
+      }
+    })
+
+    // Restore historical state if any
+    if (appStore.historicalCodeBlocks && appStore.historicalCodeBlocks.length > 0) {
+      pyodideLoading.message = 'Restoring previous session...'
+      await pyodideService.restoreState(appStore.historicalCodeBlocks)
+    }
+
+    runtimeInitialized.value = true
+  } catch (pyError) {
+    console.error('Failed to initialize Pyodide:', pyError)
+  } finally {
+    pyodideLoading.active = false
+  }
+}
 
 async function handleAuthenticated(userData) {
 
@@ -204,6 +246,8 @@ async function handleAuthenticated(userData) {
       toast.info('Settings Reset', 'Backend database was reset. Local settings have been cleared.')
     }
   }
+
+  await initializeRuntimeIfNeeded()
 }
 
 function handleAuthClose() {
@@ -223,40 +267,6 @@ onMounted(async () => {
     // If authenticated, load user settings and establish WebSocket
     if (authStore.isAuthenticated) {
       await handleAuthenticated(authStore.user)
-    }
-
-    // Initialize Pyodide Runtime with loading dialog
-    try {
-      pyodideLoading.active = true
-      pyodideLoading.step = 0
-      pyodideLoading.message = 'Loading Python runtime...'
-
-      console.debug('Starting Pyodide initialization...')
-      // Step 1: Load Pyodide
-      await pyodideService.initialize({
-        onProgress: (stage) => {
-          if (stage === 'packages') {
-            pyodideLoading.step = 1
-            pyodideLoading.message = 'Installing Python packages (pandas, pyarrow, plotly)...'
-          } else if (stage === 'duckdb') {
-            pyodideLoading.step = 2
-            pyodideLoading.message = 'Starting DuckDB analysis engine...'
-          } else if (stage === 'bridge') {
-            pyodideLoading.step = 3
-            pyodideLoading.message = 'Connecting Python to data engine...'
-          }
-        }
-      })
-
-      // Restore historical state if any
-      if (appStore.historicalCodeBlocks && appStore.historicalCodeBlocks.length > 0) {
-        pyodideLoading.message = 'Restoring previous session...'
-        await pyodideService.restoreState(appStore.historicalCodeBlocks)
-      }
-    } catch (pyError) {
-      console.error('Failed to initialize Pyodide:', pyError)
-    } finally {
-      pyodideLoading.active = false
     }
     
   } catch (error) {

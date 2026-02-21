@@ -151,14 +151,6 @@ export const useAppStore = defineStore('app', () => {
       if (config.historicalCodeBlocks) {
         historicalCodeBlocks.value = config.historicalCodeBlocks
       }
-
-
-
-      // Fetch history if data path is restored
-      if (dataFilePath.value) {
-        fetchChatHistory()
-      }
-
       return true
     } catch (error) {
       console.error('Failed to load local configuration:', error)
