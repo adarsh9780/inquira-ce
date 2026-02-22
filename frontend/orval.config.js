@@ -7,7 +7,7 @@ export default {
             mock: false,
         },
         input: {
-            target: 'http://localhost:8000/openapi.json',
+            target: './openapi.json',
         },
     },
 };

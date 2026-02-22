@@ -15,7 +15,7 @@ class PreviewService {
   }
 
   // Get data preview with caching
-  async getDataPreview(sampleType = 'random', forceRefresh = false) {
+  async getDataPreview(sampleType = 'random', forceRefresh = false, tableNameOverride = null) {
     const appStore = useAppStore()
     if (!appStore.hasWorkspace) {
       return {
@@ -27,7 +27,11 @@ class PreviewService {
       }
     }
     const dataPath = appStore.schemaFileId || appStore.dataFilePath
-    const tableName = (appStore.ingestedTableName || inferTableNameFromDataPath(dataPath || '')).trim()
+    const tableName = (
+      tableNameOverride ||
+      appStore.ingestedTableName ||
+      inferTableNameFromDataPath(dataPath || '')
+    ).trim()
     if (!tableName) {
       return {
         success: true,
@@ -83,10 +87,14 @@ class PreviewService {
   }
 
   // Load schema with caching
-  async loadSchema(filepath, forceRefresh = false) {
+  async loadSchema(filepath, forceRefresh = false, tableNameOverride = null) {
     const appStore = useAppStore()
     const dataPath = filepath || appStore.schemaFileId || appStore.dataFilePath
-    const tableName = (appStore.ingestedTableName || inferTableNameFromDataPath(dataPath || '')).trim()
+    const tableName = (
+      tableNameOverride ||
+      appStore.ingestedTableName ||
+      inferTableNameFromDataPath(dataPath || '')
+    ).trim()
     if (!appStore.activeWorkspaceId || !tableName) {
       return { table_name: '', columns: [] }
     }

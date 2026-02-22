@@ -1,0 +1,15 @@
+Regenerate frontend API client from local OpenAPI export and add Gemini test endpoint fallback for 404 route drift
+Fix schema/preview dataset-switch flow by using selected table name and auto-regenerating schema (with progress modal) on 422/empty schema
+Fix misleading schema status banner: stop inferring active generation from blank descriptions and show actionable hint instead
+Implement real v1 schema regeneration endpoint (LLM-backed) and wire Schema Editor Regenerate button to it
+Fix v1 schema regenerate endpoint crash by adding missing asyncio import (prevents 500/CORS-like network errors)
+Harden Tauri dev backend lifecycle: kill stale app.main listeners on startup and launch backend directly via venv python to prevent orphaned uv child processes
+Add Tauri local session snapshot persistence (load on mount, debounced autosave, flush on unload) to restore workspace/dataset/conversation/editor UI state between restarts
+Add config-driven execution provider routing (local_subprocess/local_safe_runner) with TOML/env resolution for future E2B/Piston swaps
+Bootstrap and persist isolated runner venv under app data for local_safe_runner, with first-run package install + runner python env wiring to backend
+Add regression tests for execution provider selection and TOML-driven executor behavior
+Add configurable safe-py-runner install source strategy (PyPI/GitHub/local) with automatic fallback order PyPI -> GitHub -> local
+Expose runner source knobs in inquira.toml so publication state can switch without code changes
+Fix Tauri dev config resolution so execution provider is read from repo inquira.toml (enables local_safe_runner bootstrap instead of silently defaulting to local_subprocess)
+Add startup diagnostics and explicit TOML parse-error logging for execution-provider config to prevent silent fallback to local_subprocess
+Make runner bootstrap auto-reconcile on config changes by storing desired package/source state marker instead of one-time flag (supports adding pinned packages without manual venv deletion)

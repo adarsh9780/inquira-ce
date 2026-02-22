@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "generate-client": "orval",
+    "export-openapi": "uv run --project ../backend python ../backend/scripts/export_openapi.py ./openapi.json",
+    "generate-client": "npm run export-openapi && orval",
     "test": "node --test test/**/*.test.mjs"
   },
   "dependencies": {

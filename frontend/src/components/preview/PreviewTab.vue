@@ -104,7 +104,7 @@ function tabBtn(tab) {
   ]
 }
 
-async function fetchDataPreview(forceRefresh = false) {
+async function fetchDataPreview(forceRefresh = false, tableNameOverride = null) {
   if (!appStore.hasWorkspace) {
     data.value = []
     columns.value = []
@@ -117,7 +117,7 @@ async function fetchDataPreview(forceRefresh = false) {
   data.value = []
   columns.value = []
   try {
-    const response = await previewService.getDataPreview(sampleType.value, forceRefresh)
+    const response = await previewService.getDataPreview(sampleType.value, forceRefresh, tableNameOverride)
     if (response.success) {
       data.value = response.data
       if (data.value.length > 0) columns.value = Object.keys(data.value[0])
@@ -131,7 +131,7 @@ async function fetchDataPreview(forceRefresh = false) {
   }
 }
 
-async function fetchSchemaData(forceRefresh = false) {
+async function fetchSchemaData(forceRefresh = false, tableNameOverride = null) {
   if (schemaLoading.value) return
   schemaLoading.value = true
   schemaError.value = ''
@@ -143,7 +143,7 @@ async function fetchSchemaData(forceRefresh = false) {
       return
     }
     try {
-      const existingSchema = await previewService.loadSchema(settings.data_path, forceRefresh)
+      const existingSchema = await previewService.loadSchema(settings.data_path, forceRefresh, tableNameOverride)
       if (existingSchema && existingSchema.columns) {
         schema.value = existingSchema.columns
       }
@@ -168,8 +168,9 @@ function refreshCurrent() {
 }
 
 // Handle dataset switch event
-function handleDatasetSwitch() {
+function handleDatasetSwitch(event) {
   console.debug('📢 Dataset switched - reloading preview data')
+  const tableNameOverride = event?.detail?.tableName || appStore.ingestedTableName || null
   // Clear and reload all data
   data.value = []
   columns.value = []
@@ -178,8 +179,8 @@ function handleDatasetSwitch() {
   error.value = ''
   schemaError.value = ''
   loadSettingsTableName().finally(() => {
-    fetchDataPreview(true) // Force refresh
-    fetchSchemaData(true)   // Force refresh
+    fetchDataPreview(true, tableNameOverride) // Force refresh
+    fetchSchemaData(true, tableNameOverride)   // Force refresh
   })
 }
 

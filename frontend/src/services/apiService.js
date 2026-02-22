@@ -374,7 +374,22 @@ export const apiService = {
 
   // test gemini api
   async testGeminiApi(apiKey) {
-    return axios.post('/api/v1/admin/test-gemini', { api_key: apiKey })
+    try {
+      // Prefer generated endpoint names from both old and current OpenAPI specs.
+      const generatedCall =
+        client.testGeminiApiKeyApiV1AdminTestGeminiPost || client.testGeminiApiKeyApiTestGeminiPost
+      if (typeof generatedCall === 'function') {
+        return generatedCall({ api_key: apiKey })
+      }
+
+      return axios.post('/api/v1/admin/test-gemini', { api_key: apiKey })
+    } catch (error) {
+      // Fallback to v1 admin route when backend omits legacy route.
+      if (error?.response?.status === 404) {
+        return axios.post('/api/v1/admin/test-gemini', { api_key: apiKey })
+      }
+      throw error
+    }
   },
 
   // System utilities
@@ -513,6 +528,13 @@ export const apiService = {
 
   async v1SaveDatasetSchema(workspaceId, tableName, payload) {
     return axios.post(`/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema`, payload)
+  },
+
+  async v1RegenerateDatasetSchema(workspaceId, tableName, payload = {}) {
+    return axios.post(
+      `/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema/regenerate`,
+      payload
+    )
   },
 
   async v1ListSchemas(workspaceId) {

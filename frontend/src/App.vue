@@ -128,7 +128,7 @@ function handleAuthClose() {
 onMounted(async () => {
   setupTauriListener()
   try {
-    appStore.loadLocalConfig()
+    await appStore.loadLocalConfig()
     await authStore.checkAuth()
     if (authStore.isAuthenticated) {
       await handleAuthenticated(authStore.user)
@@ -140,6 +140,7 @@ onMounted(async () => {
 
 // Warn user about data loss on refresh/close when data is loaded
 function handleBeforeUnload(e) {
+  void appStore.flushLocalConfig?.()
   if (appStore.dataFilePath) {
     e.preventDefault()
     e.returnValue = '' // Required for Chrome
@@ -149,6 +150,7 @@ window.addEventListener('beforeunload', handleBeforeUnload)
 
 // Cleanup on unmount
 onUnmounted(() => {
+  void appStore.flushLocalConfig?.()
   window.removeEventListener('beforeunload', handleBeforeUnload)
   // Disconnect persistent WebSocket connection
   if (settingsWebSocket.isPersistentMode) {

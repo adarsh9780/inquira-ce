@@ -12,10 +12,13 @@ import json
 import os
 import subprocess
 import tempfile
+import sys
+import asyncio
 from pathlib import Path
 from typing import Any, Optional
 
 from app.core.logger import logprint
+from app.services.execution_config import load_execution_runtime_config
 
 
 # Wrapper script injected around user code to capture the last expression result.
@@ -126,49 +129,34 @@ async def execute_code(
         script_path = f.name
 
     try:
-        import sys
-        
-        # Use subprocess.PIPE for stdin to prevent Bad file descriptor errors
-        # during init_sys_streams on certain platforms/background workers.
-        result = subprocess.run(
-            [sys.executable, script_path],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=working_dir,
-            stdin=subprocess.PIPE,
-        )
+        config = load_execution_runtime_config()
+        provider = config.provider.strip().lower()
 
-        stdout_raw = result.stdout
-        stderr_raw = result.stderr
+        if provider == "local_subprocess":
+            return await asyncio.to_thread(
+                _run_in_subprocess,
+                script_path=script_path,
+                timeout=timeout,
+                working_dir=working_dir,
+            )
 
-        # Parse the structured result from our wrapper
-        parsed_result = None
-        result_type = None
-        clean_stdout = stdout_raw
-
-        if "__INQUIRA_RESULT__" in stdout_raw:
-            parts = stdout_raw.split("__INQUIRA_RESULT__", 1)
-            clean_stdout = parts[0]
-            try:
-                payload = json.loads(parts[1].strip())
-                clean_stdout = payload.get("stdout", clean_stdout)
-                stderr_raw = payload.get("stderr", stderr_raw) or stderr_raw
-                if payload.get("result"):
-                    result_type = payload["result"].get("type")
-                    parsed_result = payload["result"].get("data")
-            except (json.JSONDecodeError, IndexError):
-                pass
-
-        success = result.returncode == 0 and not stderr_raw.strip()
+        if provider == "local_safe_runner":
+            return await asyncio.to_thread(
+                _run_in_safe_runner,
+                script=wrapper,
+                timeout=timeout,
+            )
 
         return {
-            "success": success,
-            "stdout": clean_stdout.strip(),
-            "stderr": stderr_raw.strip(),
-            "error": stderr_raw.strip() if not success else None,
-            "result": parsed_result,
-            "result_type": result_type,
+            "success": False,
+            "stdout": "",
+            "stderr": "",
+            "error": (
+                f"Unsupported execution provider '{config.provider}'. "
+                "Supported values: local_subprocess, local_safe_runner."
+            ),
+            "result": None,
+            "result_type": None,
         }
 
     except subprocess.TimeoutExpired:
@@ -196,3 +184,110 @@ async def execute_code(
             os.unlink(script_path)
         except OSError:
             pass
+
+
+def _parse_wrapped_output(stdout_raw: str, stderr_raw: str, returncode: int) -> dict[str, Any]:
+    parsed_result = None
+    result_type = None
+    clean_stdout = stdout_raw
+
+    if "__INQUIRA_RESULT__" in stdout_raw:
+        parts = stdout_raw.split("__INQUIRA_RESULT__", 1)
+        clean_stdout = parts[0]
+        try:
+            payload = json.loads(parts[1].strip())
+            clean_stdout = payload.get("stdout", clean_stdout)
+            stderr_raw = payload.get("stderr", stderr_raw) or stderr_raw
+            if payload.get("result"):
+                result_type = payload["result"].get("type")
+                parsed_result = payload["result"].get("data")
+        except (json.JSONDecodeError, IndexError):
+            pass
+
+    success = returncode == 0 and not stderr_raw.strip()
+    clean_stderr = stderr_raw.strip()
+    return {
+        "success": success,
+        "stdout": clean_stdout.strip(),
+        "stderr": clean_stderr,
+        "error": clean_stderr if not success else None,
+        "result": parsed_result,
+        "result_type": result_type,
+    }
+
+
+def _run_in_subprocess(script_path: str, timeout: int, working_dir: str) -> dict[str, Any]:
+    result = subprocess.run(
+        [sys.executable, script_path],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        cwd=working_dir,
+        stdin=subprocess.PIPE,
+    )
+    return _parse_wrapped_output(
+        stdout_raw=result.stdout,
+        stderr_raw=result.stderr,
+        returncode=result.returncode,
+    )
+
+
+def _run_in_safe_runner(script: str, timeout: int) -> dict[str, Any]:
+    config = load_execution_runtime_config()
+    policy_cfg = config.runner_policy
+
+    if config.runner_project_path:
+        local_src = Path(config.runner_project_path).expanduser().resolve() / "src"
+        if local_src.exists():
+            src_path = str(local_src)
+            if src_path not in sys.path:
+                sys.path.insert(0, src_path)
+
+    try:
+        from safe_py_runner import RunnerPolicy, run_code
+    except Exception as e:
+        msg = (
+            "Execution provider 'local_safe_runner' is enabled but safe_py_runner "
+            f"could not be imported: {e}"
+        )
+        return {
+            "success": False,
+            "stdout": "",
+            "stderr": msg,
+            "error": msg,
+            "result": None,
+            "result_type": None,
+        }
+
+    effective_timeout = max(1, min(timeout, policy_cfg.timeout_seconds))
+    policy = RunnerPolicy(
+        timeout_seconds=effective_timeout,
+        memory_limit_mb=max(64, int(policy_cfg.memory_limit_mb)),
+        max_output_kb=max(32, int(policy_cfg.max_output_kb)),
+        blocked_imports=policy_cfg.blocked_imports,
+        blocked_builtins=policy_cfg.blocked_builtins,
+    )
+
+    runner_result = run_code(
+        code=script,
+        input_data={},
+        policy=policy,
+        python_executable=config.runner_python_executable,
+    )
+
+    if not runner_result.ok:
+        msg = runner_result.error or runner_result.stderr or "Execution failed"
+        return {
+            "success": False,
+            "stdout": runner_result.stdout.strip(),
+            "stderr": runner_result.stderr.strip(),
+            "error": msg,
+            "result": None,
+            "result_type": None,
+        }
+
+    return _parse_wrapped_output(
+        stdout_raw=runner_result.stdout,
+        stderr_raw=runner_result.stderr,
+        returncode=0,
+    )

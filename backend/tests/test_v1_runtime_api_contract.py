@@ -10,3 +10,4 @@ def test_openapi_contains_v1_runtime_routes():
     assert "/api/v1/workspaces/{workspace_id}/paths" in paths
     assert "/api/v1/workspaces/{workspace_id}/datasets/{table_name}/preview" in paths
     assert "/api/v1/workspaces/{workspace_id}/datasets/{table_name}/schema" in paths
+    assert "/api/v1/workspaces/{workspace_id}/datasets/{table_name}/schema/regenerate" in paths

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { apiService } from '../services/apiService'
+import { localStateService } from '../services/localStateService'
 
 export const useAppStore = defineStore('app', () => {
 
@@ -78,7 +79,80 @@ export const useAppStore = defineStore('app', () => {
   })
 
   let preferenceSyncTimer = null
+  let localStateSyncTimer = null
   let suppressPreferenceSync = false
+  const LOCAL_SNAPSHOT_VERSION = 1
+
+  function buildLocalStateSnapshot() {
+    return {
+      version: LOCAL_SNAPSHOT_VERSION,
+      updated_at: new Date().toISOString(),
+      ui: {
+        active_tab: activeTab.value || 'code',
+        chat_overlay_open: !!isChatOverlayOpen.value,
+        chat_overlay_width: Number(chatOverlayWidth.value || 0.25),
+        is_sidebar_collapsed: !!isSidebarCollapsed.value,
+        hide_shortcuts_modal: !!hideShortcutsModal.value
+      },
+      session: {
+        active_workspace_id: activeWorkspaceId.value || '',
+        active_dataset_path: dataFilePath.value || '',
+        active_table_name: ingestedTableName.value || '',
+        active_conversation_id: activeConversationId.value || ''
+      },
+      editor: {
+        generated_code: generatedCode.value || '',
+        python_file_content: pythonFileContent.value || ''
+      }
+    }
+  }
+
+  function applyLocalStateSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') return false
+    const ui = snapshot.ui || {}
+    const sessionState = snapshot.session || {}
+    const editor = snapshot.editor || {}
+
+    if (typeof ui.active_tab === 'string' && ui.active_tab.trim()) {
+      activeTab.value = ui.active_tab
+    }
+    if (typeof ui.chat_overlay_open === 'boolean') {
+      isChatOverlayOpen.value = ui.chat_overlay_open
+    }
+    if (typeof ui.chat_overlay_width === 'number' && ui.chat_overlay_width > 0.1 && ui.chat_overlay_width < 0.9) {
+      chatOverlayWidth.value = ui.chat_overlay_width
+    }
+    if (typeof ui.is_sidebar_collapsed === 'boolean') {
+      isSidebarCollapsed.value = ui.is_sidebar_collapsed
+    }
+    if (typeof ui.hide_shortcuts_modal === 'boolean') {
+      hideShortcutsModal.value = ui.hide_shortcuts_modal
+    }
+
+    if (typeof sessionState.active_workspace_id === 'string') {
+      activeWorkspaceId.value = sessionState.active_workspace_id
+    }
+    if (typeof sessionState.active_dataset_path === 'string') {
+      dataFilePath.value = sessionState.active_dataset_path
+    }
+    if (typeof sessionState.active_table_name === 'string') {
+      ingestedTableName.value = sessionState.active_table_name
+    }
+    if (typeof sessionState.active_conversation_id === 'string') {
+      activeConversationId.value = sessionState.active_conversation_id
+    }
+
+    if (typeof editor.generated_code === 'string') {
+      generatedCode.value = editor.generated_code
+    }
+    if (typeof editor.python_file_content === 'string') {
+      pythonFileContent.value = editor.python_file_content
+    } else if (typeof editor.generated_code === 'string') {
+      pythonFileContent.value = editor.generated_code
+    }
+
+    return true
+  }
 
   function schedulePreferenceSync() {
     if (suppressPreferenceSync) return
@@ -104,10 +178,24 @@ export const useAppStore = defineStore('app', () => {
 
   function saveLocalConfig() {
     schedulePreferenceSync()
+    if (localStateSyncTimer) clearTimeout(localStateSyncTimer)
+    localStateSyncTimer = setTimeout(() => {
+      void localStateService.saveSnapshot(buildLocalStateSnapshot())
+    }, 250)
   }
 
-  function loadLocalConfig() {
-    return false
+  async function flushLocalConfig() {
+    if (localStateSyncTimer) {
+      clearTimeout(localStateSyncTimer)
+      localStateSyncTimer = null
+    }
+    await localStateService.saveSnapshot(buildLocalStateSnapshot())
+  }
+
+  async function loadLocalConfig() {
+    const snapshot = await localStateService.loadSnapshot()
+    if (!snapshot) return false
+    return applyLocalStateSnapshot(snapshot)
   }
 
   function clearLocalConfig() {
@@ -210,6 +298,7 @@ export const useAppStore = defineStore('app', () => {
   // Python File Management (simplified to single file)
   function setPythonFileContent(content) {
     pythonFileContent.value = content
+    saveLocalConfig()
   }
 
   function addChatMessage(question, explanation) {
@@ -502,6 +591,7 @@ export const useAppStore = defineStore('app', () => {
 
   function setGeneratedCode(code) {
     generatedCode.value = code
+    saveLocalConfig()
   }
 
   function setResultData(data) {
@@ -530,12 +620,15 @@ export const useAppStore = defineStore('app', () => {
 
   function setActiveTab(tab) {
     activeTab.value = tab
+    saveLocalConfig()
   }
   function toggleChatOverlay() {
     isChatOverlayOpen.value = !isChatOverlayOpen.value
+    saveLocalConfig()
   }
   function setChatOverlayOpen(open) {
     isChatOverlayOpen.value = !!open
+    saveLocalConfig()
   }
   function setChatOverlayWidth(widthFraction) {
     if (widthFraction > 0.1 && widthFraction < 0.9) {
@@ -744,6 +837,7 @@ export const useAppStore = defineStore('app', () => {
     // Actions
     saveLocalConfig,
     loadLocalConfig,
+    flushLocalConfig,
     clearLocalConfig,
     setDataFilePath,
     setSchemaFilePath,
