@@ -110,11 +110,15 @@ async function ensureWorkspaceDatasetReady() {
   }
 
   if (isBrowserVirtualPath(appStore.dataFilePath) || isBrowserVirtualPath(appStore.schemaFileId)) {
-    const columns = Array.isArray(appStore.ingestedColumns) ? appStore.ingestedColumns : []
+    const columns = (Array.isArray(appStore.ingestedColumns) ? appStore.ingestedColumns : []).map((col) => ({
+      ...col,
+      samples: appStore.allowSchemaSampleValues && Array.isArray(col?.samples) ? col.samples : []
+    }))
     await apiService.v1SyncBrowserDataset(appStore.activeWorkspaceId, {
       table_name: tableName,
       columns,
-      row_count: null
+      row_count: null,
+      allow_sample_values: appStore.allowSchemaSampleValues
     })
     return
   }
@@ -142,7 +146,7 @@ function buildActiveSchemaPayload() {
       name: col.name,
       dtype: col.type || col.dtype || 'VARCHAR',
       description: col.description || '',
-      samples: Array.isArray(col.samples) ? col.samples : []
+      samples: appStore.allowSchemaSampleValues && Array.isArray(col.samples) ? col.samples : []
     }))
 
   return {

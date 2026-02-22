@@ -185,12 +185,14 @@ class ChatService:
             current_code=current_code,
             table_name=table_name,
             data_path=data_path,
+            context=context or "",
         )
         thread_id = f"{user.id}:{workspace_id}:{conversation_id}"
         config = {
             "configurable": {
                 "api_key": api_key,
                 "thread_id": thread_id,
+                "model": model,
             }
         }
         if not api_key:
@@ -307,12 +309,14 @@ class ChatService:
             current_code=current_code,
             table_name=table_name,
             data_path=data_path,
+            context=context or "",
         )
         thread_id = f"{user.id}:{workspace_id}:{conversation_id}"
         config = {
             "configurable": {
                 "api_key": api_key,
                 "thread_id": thread_id,
+                "model": model,
             }
         }
         if not api_key:

@@ -14,7 +14,7 @@ class GeminiTestResponse(BaseModel):
     error_message: Optional[str] = None
 
 @router.post("/api/test-gemini")
-async def test_gemini_api_key(request: GeminiTestRequest):
+async def verify_gemini_api_key(request: GeminiTestRequest):
     """
     Test a Google Gemini API key by making a simple test request.
 

@@ -531,7 +531,8 @@ async function saveDataSettings() {
       await apiService.v1SyncBrowserDataset(appStore.activeWorkspaceId, {
         table_name: ingestedTableName.value,
         columns: columnsPayload,
-        row_count: null
+        row_count: null,
+        allow_sample_values: appStore.allowSchemaSampleValues
       })
     }
 

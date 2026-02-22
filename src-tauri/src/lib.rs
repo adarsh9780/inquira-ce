@@ -175,6 +175,7 @@ fn start_backend(
     backend_dir: &PathBuf,
     venv_path: &PathBuf,
     config: &InquiraConfig,
+    inquira_toml_path: &PathBuf,
 ) -> Result<Child, String> {
     let port = config
         .backend
@@ -196,7 +197,8 @@ fn start_backend(
     .current_dir(backend_dir)
     .env("UV_PROJECT_ENVIRONMENT", venv_path.to_str().unwrap())
     .env("INQUIRA_PORT", port.to_string())
-    .env("INQUIRA_DESKTOP", "1");
+    .env("INQUIRA_DESKTOP", "1")
+    .env("INQUIRA_TOML_PATH", inquira_toml_path.to_string_lossy().to_string());
 
     apply_proxy_env(&mut cmd, config);
 
@@ -268,7 +270,15 @@ pub fn run() {
 
             // Phase 2: Start the backend
             app.emit("backend-status", "Starting backend...").ok();
-            match start_backend(&uv_bin, &backend_dir, &venv_path, &config) {
+            let runtime_config_path = if config_path.exists() {
+                config_path.clone()
+            } else {
+                backend_dir
+                    .parent()
+                    .unwrap_or(&backend_dir)
+                    .join("inquira.toml")
+            };
+            match start_backend(&uv_bin, &backend_dir, &venv_path, &config, &runtime_config_path) {
                 Ok(child) => {
                     log::info!("Backend process started (PID: {})", child.id());
                     let state = app.state::<BackendProcess>();

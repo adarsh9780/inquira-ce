@@ -100,6 +100,7 @@ class State(BaseModel):
     )
     table_name: str | None = Field(default=None)
     data_path: str | None = Field(default=None)
+    context: str = Field(default="")
     code_guard_feedback: str = Field(default="")
     code_guard_retries: int = Field(default=0)
     guard_status: str = Field(default="ok")
@@ -116,6 +117,7 @@ class InputSchema(BaseModel):
     )
     table_name: str | None = Field(default=None)
     data_path: str | None = Field(default=None)
+    context: str = Field(default="")
 
 
 class OutputSchema(BaseModel):
@@ -126,6 +128,7 @@ class OutputSchema(BaseModel):
     # We might want to pass these through
     table_name: str | None = Field(default=None)
     data_path: str | None = Field(default=None)
+    context: str | None = Field(default=None)
 
 
 class InquiraAgent:
@@ -134,7 +137,9 @@ class InquiraAgent:
 
     def _get_model(self, config: RunnableConfig, model_name: str = "gemini-2.5-flash"):
         """Get model instance with API key from config"""
-        api_key = config.get("configurable", {}).get("api_key")
+        configurable = config.get("configurable", {})
+        api_key = configurable.get("api_key")
+        selected_model = str(configurable.get("model") or "").strip()
 
         # If API key is provided, set it in env for Google GenAI to pick up
         # or pass it if the specific init_chat_model supports it.
@@ -144,7 +149,11 @@ class InquiraAgent:
 
             os.environ["GOOGLE_API_KEY"] = api_key
 
-        return init_chat_model(f"google_genai:{model_name}")
+        effective_model = model_name
+        if selected_model and model_name == "gemini-2.5-flash":
+            effective_model = selected_model
+
+        return init_chat_model(f"google_genai:{effective_model}")
 
     def check_relevancy(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         class IsRelevant(BaseModel):
@@ -235,7 +244,7 @@ class InquiraAgent:
 
         system_prompt_template = SystemMessagePromptTemplate.from_template_file(
             get_prompt_path("create_plan_prompt.yaml"),
-            input_variables=["schema", "current_code"],
+            input_variables=["schema", "current_code", "context"],
         )
         prompt = ChatPromptTemplate.from_messages(
             [system_prompt_template, MessagesPlaceholder("messages")]
@@ -249,6 +258,7 @@ class InquiraAgent:
                 "messages": state.messages,
                 "schema": state.active_schema,
                 "current_code": state.previous_code,
+                "context": state.context or "",
             }
         )
         response = cast(Plan, response)
@@ -267,6 +277,7 @@ class InquiraAgent:
                 "table_name",
                 "schema",
                 "data_path",
+                "context",
             ],
         )
         prompt = ChatPromptTemplate.from_messages(
@@ -293,6 +304,7 @@ class InquiraAgent:
                 "table_name": state.table_name or "data_table",
                 "schema": schema_str,
                 "data_path": data_path,
+                "context": state.context or "",
             }
         )
         response = cast(Code, response)
@@ -325,6 +337,7 @@ class InquiraAgent:
                 "table_name",
                 "schema",
                 "data_path",
+                "context",
             ],
         )
         prompt = ChatPromptTemplate.from_messages(
@@ -357,6 +370,7 @@ class InquiraAgent:
                 "table_name": state.table_name or "data_table",
                 "schema": schema_str,
                 "data_path": data_path,
+                "context": state.context or "",
             }
         )
         response = cast(Code, response)
@@ -380,7 +394,7 @@ class InquiraAgent:
     def noncode_generator(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         system_prompt_template = SystemMessagePromptTemplate.from_template_file(
             get_prompt_path("noncode_prompt.yaml"),
-            input_variables=["schema", "current_code"],
+            input_variables=["schema", "current_code", "context"],
         )
         prompt = ChatPromptTemplate.from_messages(
             [system_prompt_template, MessagesPlaceholder("messages")]
@@ -394,6 +408,7 @@ class InquiraAgent:
                 "messages": state.messages,
                 "schema": state.active_schema,
                 "current_code": state.previous_code,
+                "context": state.context or "",
             }
         )
 

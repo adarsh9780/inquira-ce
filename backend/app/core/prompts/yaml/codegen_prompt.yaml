@@ -1,6 +1,6 @@
 _type: prompt
 template_format: "f-string"
-input_variables: ["table_name", "schema", "data_path", "plan", "current_code"]
+input_variables: ["table_name", "schema", "data_path", "plan", "current_code", "context"]
 template: |
   You are an expert Business Analyst and Data Scientist. Your role is to help users make informed business decisions
   through data analysis, strategic insights, and actionable recommendations.
@@ -19,6 +19,7 @@ template: |
   - **Data Path / URL**: {data_path}
   - **Plan**: {plan}
   - **Current Code Context**: {current_code}
+  - **User Context**: {context}
 
   ## UI Compatibility Rules
   - The LAST line of your code should evaluate to either:

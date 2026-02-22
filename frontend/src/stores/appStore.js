@@ -25,6 +25,7 @@ export const useAppStore = defineStore('app', () => {
 
   // Schema Context
   const schemaContext = ref('')
+  const allowSchemaSampleValues = ref(false)
 
 
   // Single Python File per Session (simplified)
@@ -83,20 +84,11 @@ export const useAppStore = defineStore('app', () => {
   // Local Configuration Management
   function saveLocalConfig() {
     const config = {
-      apiKey: apiKey.value,
       selectedModel: selectedModel.value,
-      dataFilePath: dataFilePath.value,
-      schemaFilePath: schemaFilePath.value,
-      dataFileId: dataFileId.value,
-      schemaFileId: schemaFileId.value,
-      isSchemaFileUploaded: isSchemaFileUploaded.value,
-      ingestedTableName: ingestedTableName.value,
-      ingestedColumns: ingestedColumns.value,
       schemaContext: schemaContext.value,
-      activeWorkspaceId: activeWorkspaceId.value,
-      activeConversationId: activeConversationId.value,
+      allowSchemaSampleValues: allowSchemaSampleValues.value,
       chatOverlayWidth: chatOverlayWidth.value,
-      historicalCodeBlocks: historicalCodeBlocks.value,
+      isSidebarCollapsed: isSidebarCollapsed.value,
       timestamp: new Date().toISOString()
     }
 
@@ -116,62 +108,24 @@ export const useAppStore = defineStore('app', () => {
 
       const config = JSON.parse(configStr)
 
-      // Restore API key and model
-      if (config.apiKey) {
-        apiKey.value = config.apiKey
-      }
       if (config.selectedModel) {
         selectedModel.value = config.selectedModel
-      }
-
-      // Restore data file path
-      if (config.dataFilePath) {
-        dataFilePath.value = config.dataFilePath
-      }
-
-      // Restore schema file path
-      if (config.schemaFilePath) {
-        schemaFilePath.value = config.schemaFilePath
-      }
-
-      // Restore file IDs
-      if (config.dataFileId) {
-        dataFileId.value = config.dataFileId
-      }
-      if (config.schemaFileId) {
-        schemaFileId.value = config.schemaFileId
-      }
-
-      // Restore schema upload status
-      if (config.isSchemaFileUploaded !== undefined) {
-        isSchemaFileUploaded.value = config.isSchemaFileUploaded
-      }
-      if (config.ingestedTableName) {
-        ingestedTableName.value = config.ingestedTableName
-      }
-      if (Array.isArray(config.ingestedColumns)) {
-        ingestedColumns.value = config.ingestedColumns
       }
 
       // Restore schema context
       if (config.schemaContext) {
         schemaContext.value = config.schemaContext
       }
-      if (config.activeWorkspaceId) {
-        activeWorkspaceId.value = config.activeWorkspaceId
-      }
-      if (config.activeConversationId) {
-        activeConversationId.value = config.activeConversationId
+      if (typeof config.allowSchemaSampleValues === 'boolean') {
+        allowSchemaSampleValues.value = config.allowSchemaSampleValues
       }
 
       // Restore chat overlay width
       if (config.chatOverlayWidth && config.chatOverlayWidth > 0.1 && config.chatOverlayWidth < 0.9) {
         chatOverlayWidth.value = config.chatOverlayWidth
       }
-
-      // Restore historical code blocks for Pyodide
-      if (config.historicalCodeBlocks) {
-        historicalCodeBlocks.value = config.historicalCodeBlocks
+      if (typeof config.isSidebarCollapsed === 'boolean') {
+        isSidebarCollapsed.value = config.isSidebarCollapsed
       }
       return true
     } catch (error) {
@@ -197,6 +151,7 @@ export const useAppStore = defineStore('app', () => {
       ingestedTableName.value = ''
       ingestedColumns.value = []
       schemaContext.value = ''
+      allowSchemaSampleValues.value = false
       activeWorkspaceId.value = ''
       activeConversationId.value = ''
       historicalCodeBlocks.value = []
@@ -264,6 +219,11 @@ export const useAppStore = defineStore('app', () => {
 
   function setSchemaContext(context) {
     schemaContext.value = context
+    saveLocalConfig()
+  }
+
+  function setAllowSchemaSampleValues(enabled) {
+    allowSchemaSampleValues.value = !!enabled
     saveLocalConfig()
   }
 
@@ -718,6 +678,7 @@ export const useAppStore = defineStore('app', () => {
     selectedModel,
     apiKey,
     schemaContext,
+    allowSchemaSampleValues,
     pythonFileContent,
     chatHistory,
     currentQuestion,
@@ -767,6 +728,7 @@ export const useAppStore = defineStore('app', () => {
     setApiKey,
     setSelectedModel,
     setSchemaContext,
+    setAllowSchemaSampleValues,
     setPythonFileContent,
     addChatMessage,
     updateLastMessageExplanation,

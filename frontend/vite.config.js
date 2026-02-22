@@ -36,6 +36,11 @@ export default defineConfig({
     ]
   },
   server: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Resource-Policy': 'cross-origin'
+    },
     proxy: {
       '/upload': 'http://localhost:8000',
       '/analyze': 'http://localhost:8000',
@@ -43,6 +48,13 @@ export default defineConfig({
       '/export': 'http://localhost:8000',
       '/log': 'http://localhost:8000',
       '/health': 'http://localhost:8000'
+    }
+  },
+  preview: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Resource-Policy': 'cross-origin'
     }
   },
   build: {

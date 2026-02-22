@@ -1,6 +1,6 @@
 _type: prompt
 template_format: "f-string" # or "f-strings" / "mustache"
-input_variables: ["schema", "current_code"]
+input_variables: ["schema", "current_code", "context"]
 template: |
   <role>
     You are an expert Data Analyst with huge experience in doing Statistical Analysis, Descriptive Analysis
@@ -15,3 +15,4 @@ template: |
   ## Data Context
   **Plan**: {schema}
   **CODE**: {current_code}
+  **USER CONTEXT**: {context}

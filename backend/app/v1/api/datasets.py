@@ -79,6 +79,7 @@ async def sync_browser_workspace_dataset(
         table_name=payload.table_name,
         columns=payload.columns,
         row_count=payload.row_count,
+        allow_sample_values=payload.allow_sample_values,
     )
     return DatasetResponse(
         id=ds.id,

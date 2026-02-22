@@ -158,6 +158,7 @@ class DatasetService:
         table_name: str,
         columns: list[dict],
         row_count: int | None = None,
+        allow_sample_values: bool = False,
     ) -> WorkspaceDataset:
         """Persist browser table metadata/schema into workspace catalog."""
         workspace = await WorkspaceRepository.get_by_id(session, workspace_id, user.id)
@@ -178,7 +179,11 @@ class DatasetService:
                     "name": str(col.get("name", "")).strip(),
                     "dtype": str(col.get("dtype") or col.get("type") or "VARCHAR"),
                     "description": str(col.get("description", "")),
-                    "samples": col.get("samples", []) if isinstance(col.get("samples", []), list) else [],
+                    "samples": (
+                        col.get("samples", [])
+                        if allow_sample_values and isinstance(col.get("samples", []), list)
+                        else []
+                    ),
                 }
                 for col in (columns or [])
                 if str(col.get("name", "")).strip()

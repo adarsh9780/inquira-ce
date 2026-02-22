@@ -239,7 +239,7 @@ export const apiService = {
         name: col.name,
         dtype: col.dtype || col.type || 'VARCHAR',
         description: col.description || '',
-        samples: Array.isArray(col.samples) ? col.samples : []
+        samples: appStore.allowSchemaSampleValues && Array.isArray(col.samples) ? col.samples : []
       }))
     })
   },

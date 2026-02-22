@@ -17,6 +17,7 @@ class BrowserDatasetSyncRequest(BaseModel):
     table_name: str = Field(min_length=1)
     columns: list[dict] = Field(default_factory=list)
     row_count: int | None = None
+    allow_sample_values: bool = False
 
 
 class DatasetResponse(BaseModel):
