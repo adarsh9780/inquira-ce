@@ -54,7 +54,7 @@
         </div>
         <div class="mt-2 flex items-center justify-between">
           <p class="text-xs text-gray-500">
-            Your API key is stored locally and never shared.
+            Your API key is stored in your OS keychain.
             <a
               href="https://aistudio.google.com/app/apikey"
               target="_blank"
@@ -79,6 +79,10 @@
           </button>
         </div>
       </div>
+
+      <p v-if="appStore.apiKeyConfigured" class="text-xs text-green-700">
+        A key is already configured in secure storage.
+      </p>
 
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -205,10 +209,11 @@ async function saveApiSettings() {
     // Test API key first
     await testApiKey()
 
-    // If test was successful, persist locally for v1 runtime.
+    // If test was successful, persist securely for v1 runtime.
     if (messageType.value === 'success') {
       await apiService.setApiKeySettings(apiKey)
-      message.value = 'API settings saved locally.'
+      appStore.setApiKeyConfigured(true)
+      message.value = 'API key saved securely in OS keychain.'
       messageType.value = 'success'
     }
   } catch (error) {

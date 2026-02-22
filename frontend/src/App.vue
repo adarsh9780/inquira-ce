@@ -106,6 +106,7 @@ async function handleAuthenticated(userData) {
   try {
     await authStore.refreshPlan()
     await appStore.fetchWorkspaces()
+    await appStore.loadUserPreferences()
     if (appStore.activeWorkspaceId) {
       await appStore.fetchConversations()
       if (appStore.activeConversationId) {

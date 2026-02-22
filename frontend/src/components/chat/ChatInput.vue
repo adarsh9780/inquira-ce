@@ -220,7 +220,7 @@ async function handleSubmit() {
           context: appStore.schemaContext.trim() || null,
           table_name: schemaPayload.tableName,
           active_schema: schemaPayload.activeSchema,
-          api_key: appStore.apiKey || null
+          api_key: null
         },
         {
           signal,
@@ -247,7 +247,7 @@ async function handleSubmit() {
           context: appStore.schemaContext.trim() || null,
           table_name: schemaPayload.tableName,
           active_schema: schemaPayload.activeSchema,
-          api_key: appStore.apiKey || null
+          api_key: null
         })
       } else {
         throw streamError

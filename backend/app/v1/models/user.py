@@ -27,6 +27,7 @@ class User(Base):
 
     workspaces = relationship("Workspace", back_populates="user", cascade="all, delete-orphan")
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
+    preferences = relationship("UserPreferences", back_populates="user", cascade="all, delete-orphan", uselist=False)
 
 
 class UserSession(Base):

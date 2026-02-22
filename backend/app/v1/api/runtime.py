@@ -66,6 +66,23 @@ def _normalize_table_name(raw: str) -> str:
     return "".join(c if c.isalnum() or c == "_" else "_" for c in raw.strip()).lower()
 
 
+def _table_exists_in_workspace_db(duckdb_path: str, table_name: str) -> bool:
+    con = duckdb.connect(duckdb_path)
+    try:
+        row = con.execute(
+            """
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'main' AND lower(table_name) = ?
+            LIMIT 1
+            """,
+            [table_name.lower()],
+        ).fetchone()
+        return row is not None
+    finally:
+        con.close()
+
+
 async def _require_workspace_access(
     session: AsyncSession,
     user_id: str,
@@ -134,10 +151,10 @@ async def get_workspace_dataset_schema(
         workspace_id=workspace_id,
         table_name=normalized,
     )
-    if dataset is None:
-        raise HTTPException(status_code=404, detail="Dataset not found")
+    if dataset is None and not _table_exists_in_workspace_db(workspace.duckdb_path, normalized):
+        raise HTTPException(status_code=404, detail="Dataset table not found")
 
-    if dataset.schema_path:
+    if dataset is not None and dataset.schema_path:
         schema_path = Path(dataset.schema_path)
         if schema_path.exists():
             with schema_path.open("r", encoding="utf-8") as f:
@@ -187,12 +204,14 @@ async def save_workspace_dataset_schema(
         workspace_id=workspace_id,
         table_name=normalized,
     )
-    if dataset is None:
-        raise HTTPException(status_code=404, detail="Dataset not found")
 
     meta_dir = Path(workspace.duckdb_path).parent / "meta"
     meta_dir.mkdir(parents=True, exist_ok=True)
-    schema_path = Path(dataset.schema_path) if dataset.schema_path else meta_dir / f"{normalized}_schema.json"
+    schema_path = (
+        Path(dataset.schema_path)
+        if dataset is not None and dataset.schema_path
+        else meta_dir / f"{normalized}_schema.json"
+    )
     schema_doc = {
         "table_name": normalized,
         "context": payload.context or "",
@@ -201,8 +220,9 @@ async def save_workspace_dataset_schema(
     with schema_path.open("w", encoding="utf-8") as f:
         json.dump(schema_doc, f, indent=2)
 
-    dataset.schema_path = str(schema_path)
-    await session.commit()
+    if dataset is not None:
+        dataset.schema_path = str(schema_path)
+        await session.commit()
 
     return DatasetSchemaResponse(
         table_name=normalized,
@@ -233,8 +253,8 @@ async def get_workspace_dataset_preview(
         workspace_id=workspace_id,
         table_name=normalized,
     )
-    if dataset is None:
-        raise HTTPException(status_code=404, detail="Dataset not found")
+    if dataset is None and not _table_exists_in_workspace_db(workspace.duckdb_path, normalized):
+        raise HTTPException(status_code=404, detail="Dataset table not found")
 
     con = duckdb.connect(workspace.duckdb_path)
     try:

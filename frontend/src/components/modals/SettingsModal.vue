@@ -222,7 +222,7 @@ const isWebSocketConnected = ref(false)
 const currentFact = ref('')
 
 // Computed properties
-const hasApiKey = computed(() => appStore.apiKey.trim() !== '')
+const hasApiKey = computed(() => appStore.apiKeyConfigured)
 
 
 function closeModal() {
@@ -476,9 +476,7 @@ async function fetchSettings() {
     console.debug('Fetched settings:', settings)
 
     // Update app store with backend settings
-    if (settings.api_key) {
-      appStore.setApiKey(settings.api_key)
-    }
+    appStore.setApiKeyConfigured(!!settings.api_key_present)
     if (settings.data_path) {
       appStore.setDataFilePath(settings.data_path)
     }

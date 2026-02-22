@@ -144,7 +144,8 @@ export const apiService = {
     const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
     return {
-      api_key: appStore.apiKey || null,
+      api_key: null,
+      api_key_present: !!appStore.apiKeyConfigured,
       data_path: appStore.schemaFileId || appStore.dataFilePath || null,
       context: appStore.schemaContext || '',
       table_name: appStore.ingestedTableName || null
@@ -168,21 +169,22 @@ export const apiService = {
     const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
     appStore.setDataFilePath(dataPath || '')
-    return { detail: 'Data path saved locally.' }
+    return { detail: 'Data path saved.' }
   },
 
   async setContext(context) {
     const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
     appStore.setSchemaContext(context || '')
-    return { detail: 'Context saved locally.' }
+    return { detail: 'Context saved.' }
   },
 
   async setApiKeySettings(apiKey) {
     const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
-    appStore.setApiKey(apiKey || '')
-    return { detail: 'API key saved locally.' }
+    await this.v1SetApiKey(apiKey || '')
+    appStore.setApiKeyConfigured(true)
+    return { detail: 'API key saved securely.' }
   },
 
   // Data preview
@@ -479,6 +481,22 @@ export const apiService = {
 
   async v1ListDatasets(workspaceId) {
     return v1Api.datasets.list(workspaceId)
+  },
+
+  async v1GetPreferences() {
+    return v1Api.preferences.get()
+  },
+
+  async v1UpdatePreferences(payload) {
+    return v1Api.preferences.update(payload)
+  },
+
+  async v1SetApiKey(apiKey) {
+    return v1Api.preferences.setApiKey(apiKey)
+  },
+
+  async v1DeleteApiKey() {
+    return v1Api.preferences.deleteApiKey()
   },
 
   async v1GetWorkspacePaths(workspaceId) {

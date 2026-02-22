@@ -315,15 +315,24 @@ async function selectDataset(ds) {
   }
 
   try {
+    let selectedPath = ds.file_path
+    let selectedTableName = (ds.table_name || inferTableNameFromDataPath(ds.file_path || '')).trim()
+
+    // Ensure workspace catalog/table state is hydrated before preview/schema refresh.
+    if (appStore.activeWorkspaceId && ds.file_path && !String(ds.file_path).startsWith('browser://')) {
+      const syncedDataset = await apiService.v1AddDataset(appStore.activeWorkspaceId, ds.file_path)
+      selectedPath = syncedDataset?.source_path || selectedPath
+      selectedTableName = (syncedDataset?.table_name || selectedTableName).trim()
+    }
+
     // Clear caches first
     previewService.clearPreviewCache()
 
     // Update local workspace-scoped dataset selection state.
-    appStore.setDataFilePath(ds.file_path)
-    const tableName = (ds.table_name || inferTableNameFromDataPath(ds.file_path || '')).trim()
-    appStore.setIngestedTableName(tableName)
+    appStore.setDataFilePath(selectedPath)
+    appStore.setIngestedTableName(selectedTableName)
     appStore.setIngestedColumns([])
-    appStore.setSchemaFileId(ds.file_path || tableName)
+    appStore.setSchemaFileId(selectedPath || selectedTableName)
     
     // Clear code/results from previous dataset
     appStore.setGeneratedCode('')
@@ -337,10 +346,10 @@ async function selectDataset(ds) {
     
     // Emit custom event for other components (e.g., SchemaEditorTab) to refresh
     window.dispatchEvent(new CustomEvent('dataset-switched', { 
-      detail: { tableName: ds.table_name, dataPath: ds.file_path }
+      detail: { tableName: selectedTableName, dataPath: selectedPath }
     }))
-    
-    console.debug(`✅ Switched to dataset: ${ds.table_name}`)
+
+    console.debug(`✅ Switched to dataset: ${selectedTableName}`)
   } catch (error) {
     console.error('Failed to switch dataset:', error)
   } finally {

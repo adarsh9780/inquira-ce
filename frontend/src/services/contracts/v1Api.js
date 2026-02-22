@@ -26,6 +26,12 @@ export const v1Api = {
     syncBrowser: (workspaceId, payload) =>
       axios.post(`/api/v1/workspaces/${workspaceId}/datasets/browser-sync`, payload)
   },
+  preferences: {
+    get: () => axios.get('/api/v1/preferences'),
+    update: (payload) => axios.put('/api/v1/preferences', payload),
+    setApiKey: (apiKey) => axios.put('/api/v1/preferences/api-key', { api_key: apiKey }),
+    deleteApiKey: () => axios.delete('/api/v1/preferences/api-key')
+  },
   conversations: {
     list: (workspaceId, limit = 50) =>
       axios.get(`/api/v1/workspaces/${workspaceId}/conversations`, { params: { limit } }),

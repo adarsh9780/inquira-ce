@@ -2,12 +2,6 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { apiService } from '../services/apiService'
 
-// Local storage keys
-const STORAGE_KEYS = {
-  CONFIG: 'llm-analysis-config',
-  SESSION: 'llm-analysis-session-id'
-}
-
 export const useAppStore = defineStore('app', () => {
 
   // Files
@@ -22,6 +16,7 @@ export const useAppStore = defineStore('app', () => {
   // LLM Configuration
   const selectedModel = ref('gemini-2.5-flash')
   const apiKey = ref('')
+  const apiKeyConfigured = ref(false)
 
   // Schema Context
   const schemaContext = ref('')
@@ -57,6 +52,7 @@ export const useAppStore = defineStore('app', () => {
   const isChatOverlayOpen = ref(true)
   const chatOverlayWidth = ref(0.25) // 25% of area
   const isSidebarCollapsed = ref(true)
+  const hideShortcutsModal = ref(false)
 
   // UI State
   const isLoading = ref(false)
@@ -77,71 +73,48 @@ export const useAppStore = defineStore('app', () => {
     return workspaces.value.some((ws) => ws.id === activeId)
   })
   const canAnalyze = computed(() => {
-    if (apiKey.value.trim() === '') return false
+    if (!apiKeyConfigured.value) return false
     return hasWorkspace.value
   })
 
-  // Local Configuration Management
-  function saveLocalConfig() {
-    const config = {
-      selectedModel: selectedModel.value,
-      schemaContext: schemaContext.value,
-      allowSchemaSampleValues: allowSchemaSampleValues.value,
-      chatOverlayWidth: chatOverlayWidth.value,
-      isSidebarCollapsed: isSidebarCollapsed.value,
-      timestamp: new Date().toISOString()
-    }
+  let preferenceSyncTimer = null
+  let suppressPreferenceSync = false
 
-    try {
-      localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config))
-    } catch (error) {
-      console.error('❌ Failed to save configuration:', error)
-    }
+  function schedulePreferenceSync() {
+    if (suppressPreferenceSync) return
+    if (preferenceSyncTimer) clearTimeout(preferenceSyncTimer)
+    preferenceSyncTimer = setTimeout(async () => {
+      try {
+        await apiService.v1UpdatePreferences({
+          selected_model: selectedModel.value,
+          schema_context: schemaContext.value,
+          allow_schema_sample_values: allowSchemaSampleValues.value,
+          chat_overlay_width: chatOverlayWidth.value,
+          is_sidebar_collapsed: isSidebarCollapsed.value,
+          hide_shortcuts_modal: hideShortcutsModal.value,
+          active_workspace_id: activeWorkspaceId.value || '',
+          active_dataset_path: dataFilePath.value || '',
+          active_table_name: ingestedTableName.value || ''
+        })
+      } catch (_error) {
+        // Best-effort sync. Keep UI responsive even if backend is unavailable.
+      }
+    }, 150)
+  }
+
+  function saveLocalConfig() {
+    schedulePreferenceSync()
   }
 
   function loadLocalConfig() {
-    try {
-      const configStr = localStorage.getItem(STORAGE_KEYS.CONFIG)
-      if (!configStr) {
-        return false
-      }
-
-      const config = JSON.parse(configStr)
-
-      if (config.selectedModel) {
-        selectedModel.value = config.selectedModel
-      }
-
-      // Restore schema context
-      if (config.schemaContext) {
-        schemaContext.value = config.schemaContext
-      }
-      if (typeof config.allowSchemaSampleValues === 'boolean') {
-        allowSchemaSampleValues.value = config.allowSchemaSampleValues
-      }
-
-      // Restore chat overlay width
-      if (config.chatOverlayWidth && config.chatOverlayWidth > 0.1 && config.chatOverlayWidth < 0.9) {
-        chatOverlayWidth.value = config.chatOverlayWidth
-      }
-      if (typeof config.isSidebarCollapsed === 'boolean') {
-        isSidebarCollapsed.value = config.isSidebarCollapsed
-      }
-      return true
-    } catch (error) {
-      console.error('Failed to load local configuration:', error)
-      // Clear corrupted config
-      localStorage.removeItem(STORAGE_KEYS.CONFIG)
-      return false
-    }
+    return false
   }
 
   function clearLocalConfig() {
     try {
-      localStorage.removeItem(STORAGE_KEYS.CONFIG)
-
       // Reset all configuration values
       apiKey.value = ''
+      apiKeyConfigured.value = false
       selectedModel.value = 'gemini-2.5-flash'
       dataFilePath.value = ''
       schemaFilePath.value = ''
@@ -155,6 +128,8 @@ export const useAppStore = defineStore('app', () => {
       activeWorkspaceId.value = ''
       activeConversationId.value = ''
       historicalCodeBlocks.value = []
+      hideShortcutsModal.value = false
+      schedulePreferenceSync()
 
       return true
     } catch (error) {
@@ -209,7 +184,10 @@ export const useAppStore = defineStore('app', () => {
 
   function setApiKey(key) {
     apiKey.value = key
-    saveLocalConfig()
+  }
+
+  function setApiKeyConfigured(configured) {
+    apiKeyConfigured.value = !!configured
   }
 
   function setSelectedModel(model) {
@@ -567,6 +545,12 @@ export const useAppStore = defineStore('app', () => {
   }
   function setSidebarCollapsed(collapsed) {
     isSidebarCollapsed.value = collapsed
+    saveLocalConfig()
+  }
+
+  function setHideShortcutsModal(hidden) {
+    hideShortcutsModal.value = !!hidden
+    saveLocalConfig()
   }
 
   function setLoading(loading) {
@@ -665,6 +649,47 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  async function loadUserPreferences() {
+    try {
+      suppressPreferenceSync = true
+      const prefs = await apiService.v1GetPreferences()
+      if (prefs?.selected_model) selectedModel.value = prefs.selected_model
+      if (typeof prefs?.schema_context === 'string') schemaContext.value = prefs.schema_context
+      if (typeof prefs?.allow_schema_sample_values === 'boolean') {
+        allowSchemaSampleValues.value = prefs.allow_schema_sample_values
+      }
+      if (
+        typeof prefs?.chat_overlay_width === 'number' &&
+        prefs.chat_overlay_width > 0.1 &&
+        prefs.chat_overlay_width < 0.9
+      ) {
+        chatOverlayWidth.value = prefs.chat_overlay_width
+      }
+      if (typeof prefs?.is_sidebar_collapsed === 'boolean') {
+        isSidebarCollapsed.value = prefs.is_sidebar_collapsed
+      }
+      if (typeof prefs?.hide_shortcuts_modal === 'boolean') {
+        hideShortcutsModal.value = prefs.hide_shortcuts_modal
+      }
+      if (typeof prefs?.api_key_present === 'boolean') {
+        apiKeyConfigured.value = prefs.api_key_present
+      }
+      if (prefs?.active_workspace_id) {
+        activeWorkspaceId.value = prefs.active_workspace_id
+      }
+      if (prefs?.active_dataset_path) {
+        dataFilePath.value = prefs.active_dataset_path
+      }
+      if (prefs?.active_table_name) {
+        ingestedTableName.value = prefs.active_table_name
+      }
+    } catch (_error) {
+      // Continue with defaults if preference fetch fails.
+    } finally {
+      suppressPreferenceSync = false
+    }
+  }
+
 
   return {
     // State
@@ -677,6 +702,7 @@ export const useAppStore = defineStore('app', () => {
     ingestedColumns,
     selectedModel,
     apiKey,
+    apiKeyConfigured,
     schemaContext,
     allowSchemaSampleValues,
     pythonFileContent,
@@ -700,6 +726,7 @@ export const useAppStore = defineStore('app', () => {
     isChatOverlayOpen,
     chatOverlayWidth,
     isSidebarCollapsed,
+    hideShortcutsModal,
     isLoading,
     isCodeRunning,
     isNotebookMode,
@@ -726,6 +753,7 @@ export const useAppStore = defineStore('app', () => {
     setIngestedTableName,
     setIngestedColumns,
     setApiKey,
+    setApiKeyConfigured,
     setSelectedModel,
     setSchemaContext,
     setAllowSchemaSampleValues,
@@ -761,6 +789,8 @@ export const useAppStore = defineStore('app', () => {
     setChatOverlayOpen,
     setChatOverlayWidth,
     setSidebarCollapsed,
+    setHideShortcutsModal,
+    loadUserPreferences,
     setLoading,
     setCodeRunning,
     setNotebookMode,

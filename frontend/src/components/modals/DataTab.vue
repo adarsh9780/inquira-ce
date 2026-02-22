@@ -265,7 +265,7 @@ const ingestedTableName = ref('') // DuckDB table name
 const fileInputRef = ref(null)   // ref for the <input type="file">
 
 // Computed
-const hasApiKey = computed(() => appStore.apiKey.trim() !== '')
+const hasApiKey = computed(() => appStore.apiKeyConfigured)
 
 const updateNeeded = computed(() => {
   return !!(updateInfo.value && updateInfo.value.should_update === true)

@@ -59,11 +59,11 @@
               </div>
 
               <!-- API Key Status -->
-              <div class="flex items-center space-x-2 p-2 rounded border" :class="appStore.apiKey ? 'border-success/20 bg-success/10' : 'border-error/20 bg-error/10'">
-                <div class="w-2 h-2 rounded-full" :class="appStore.apiKey ? 'bg-success' : 'bg-error'"></div>
+              <div class="flex items-center space-x-2 p-2 rounded border" :class="appStore.apiKeyConfigured ? 'border-success/20 bg-success/10' : 'border-error/20 bg-error/10'">
+                <div class="w-2 h-2 rounded-full" :class="appStore.apiKeyConfigured ? 'bg-success' : 'bg-error'"></div>
                 <div>
-                  <p class="text-xs font-medium" :class="appStore.apiKey ? 'text-primary' : 'text-error'">API Key</p>
-                  <p class="text-xs" :class="appStore.apiKey ? 'text-primary' : 'text-error'">{{ appStore.apiKey ? 'Configured' : 'Required' }}</p>
+                  <p class="text-xs font-medium" :class="appStore.apiKeyConfigured ? 'text-primary' : 'text-error'">API Key</p>
+                  <p class="text-xs" :class="appStore.apiKeyConfigured ? 'text-primary' : 'text-error'">{{ appStore.apiKeyConfigured ? 'Configured' : 'Required' }}</p>
                 </div>
               </div>
 
@@ -216,7 +216,7 @@ const isWebSocketConnected = ref(false)
 
 // Computed property to check if configuration is complete
 const isConfigurationComplete = computed(() => {
-  return appStore.apiKey && appStore.hasDataFile && isWebSocketConnected.value
+  return appStore.apiKeyConfigured && appStore.hasDataFile && isWebSocketConnected.value
 })
 
 // Computed property for status dot classes with blinking animation
@@ -237,8 +237,7 @@ const getStatusDotClasses = computed(() => {
 function autoShowShortcutsModal() {
   // Only show if user is authenticated and hasn't opted out
   if (authStore.isAuthenticated) {
-    const hasOptedOut = localStorage.getItem('shortcuts-modal-hide') === 'true'
-    if (!hasOptedOut) {
+    if (!appStore.hideShortcutsModal) {
       // Show modal after a short delay to let the page load first
       setTimeout(() => {
         isShortcutsOpen.value = true

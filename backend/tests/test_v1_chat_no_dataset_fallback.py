@@ -174,4 +174,72 @@ async def test_chat_prefers_client_table_schema_override(monkeypatch):
     assert captured["schema"]["columns"][0]["name"] == "batter"
 
 
+@pytest.mark.asyncio
+async def test_chat_uses_keychain_api_key_when_payload_key_missing(monkeypatch):
+    captured = {}
+
+    async def fake_get_workspace(_session, _workspace_id, _user_id):
+        return SimpleNamespace(id="ws-1")
+
+    async def fake_create_conversation(*, session, user_id, workspace_id, title):
+        return SimpleNamespace(id="conv-3", title=title)
+
+    async def fake_get_latest_dataset(_session, _workspace_id):
+        return None
+
+    async def fake_get_graph(_workspace_id, _memory_path):
+        class _Graph:
+            async def ainvoke(self, input_state, config=None):
+                captured["api_key"] = config["configurable"].get("api_key")
+                return {"metadata": {"is_safe": True, "is_relevant": True}, "plan": "ok", "current_code": ""}
+
+        return _Graph()
+
+    async def fake_next_seq_no(_session, _conversation_id):
+        return 1
+
+    async def fake_create_turn(*, session, **kwargs):
+        return SimpleNamespace(id="turn-3")
+
+    monkeypatch.setattr("app.v1.services.chat_service.WorkspaceRepository.get_by_id", fake_get_workspace)
+    monkeypatch.setattr("app.v1.services.chat_service.ConversationService.create_conversation", fake_create_conversation)
+    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_latest_for_workspace", fake_get_latest_dataset)
+    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_for_workspace_table", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
+    monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
+    monkeypatch.setattr("app.v1.services.chat_service.SecretStorageService.get_api_key", lambda _uid: "key-from-keychain")
+
+    session = SimpleNamespace()
+
+    async def _commit():
+        return None
+
+    session.commit = _commit
+
+    async def _execute(*_args, **_kwargs):
+        class _Result:
+            def scalar_one_or_none(self):
+                return None
+        return _Result()
+
+    session.execute = _execute
+
+    langgraph_manager = SimpleNamespace(get_graph=fake_get_graph)
+    user = SimpleNamespace(id="u1", username="alice")
+
+    _response, _conversation_id, _turn_id = await ChatService.analyze_and_persist_turn(
+        session=session,
+        langgraph_manager=langgraph_manager,
+        user=user,
+        workspace_id="ws-1",
+        conversation_id=None,
+        question="hello",
+        current_code="",
+        model="gemini-2.5-flash",
+        context=None,
+        api_key=None,
+    )
+
+    assert captured["api_key"] == "key-from-keychain"
+
 

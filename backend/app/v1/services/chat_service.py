@@ -20,6 +20,7 @@ from ..repositories.conversation_repository import ConversationRepository
 from ..repositories.dataset_repository import DatasetRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .conversation_service import ConversationService
+from .secret_storage_service import SecretStorageService
 from .workspace_storage_service import WorkspaceStorageService
 from ...core.logger import logprint
 
@@ -195,7 +196,9 @@ class ChatService:
                 "model": model,
             }
         }
-        if not api_key:
+        resolved_api_key = (api_key or "").strip() or (SecretStorageService.get_api_key(user.id) or "")
+        config["configurable"]["api_key"] = resolved_api_key
+        if not resolved_api_key:
             raise HTTPException(status_code=401, detail="API key not configured")
 
         result = await graph.ainvoke(input_state, config=config)
@@ -319,7 +322,9 @@ class ChatService:
                 "model": model,
             }
         }
-        if not api_key:
+        resolved_api_key = (api_key or "").strip() or (SecretStorageService.get_api_key(user.id) or "")
+        config["configurable"]["api_key"] = resolved_api_key
+        if not resolved_api_key:
             raise HTTPException(status_code=401, detail="API key not configured")
 
         aggregated: dict[str, Any] = {}
