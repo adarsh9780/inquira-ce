@@ -6,10 +6,16 @@ from app.services import code_executor
 from app.services.execution_config import load_execution_runtime_config
 
 
+@pytest.fixture(autouse=True)
+def _clear_execution_config_cache():
+    load_execution_runtime_config.cache_clear()
+    yield
+    load_execution_runtime_config.cache_clear()
+
+
 @pytest.mark.asyncio
 async def test_execute_code_uses_local_subprocess_provider(monkeypatch, tmp_path):
     monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "local_subprocess")
-    load_execution_runtime_config.cache_clear()
 
     captured = {"called": False}
 
@@ -47,7 +53,6 @@ async def test_execute_code_uses_local_subprocess_provider(monkeypatch, tmp_path
 @pytest.mark.asyncio
 async def test_execute_code_uses_safe_runner_provider(monkeypatch, tmp_path):
     monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "local_safe_runner")
-    load_execution_runtime_config.cache_clear()
 
     captured = {"called": False}
 
@@ -92,7 +97,6 @@ provider = "local_subprocess"
     )
     monkeypatch.delenv("INQUIRA_EXECUTION_PROVIDER", raising=False)
     monkeypatch.setenv("INQUIRA_TOML_PATH", str(cfg))
-    load_execution_runtime_config.cache_clear()
 
     def fake_subprocess(script_path: str, timeout: int, working_dir: str):
         return {
@@ -130,7 +134,6 @@ provider = "local_subprocess"
 @pytest.mark.asyncio
 async def test_execute_code_rejects_unknown_provider(monkeypatch, tmp_path):
     monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "piston")
-    load_execution_runtime_config.cache_clear()
 
     result = await code_executor.execute_code(
         code="result = 3",
