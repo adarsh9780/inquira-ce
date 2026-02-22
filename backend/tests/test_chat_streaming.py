@@ -24,3 +24,17 @@ def test_build_data_analysis_response_prefers_plan_when_code_present():
     assert response.is_relevant is True
     assert "await query" in response.code
     assert response.explanation == "This is the planned explanation"
+
+
+def test_build_data_analysis_response_surfaces_guard_feedback_when_code_blocked():
+    result = {
+        "metadata": {"is_safe": True, "is_relevant": True},
+        "current_code": "",
+        "code_guard_feedback": "Legacy `await query(...)` bridge detected.",
+        "plan": "This plan should not be used when code is blocked",
+        "messages": [],
+    }
+    response = _build_data_analysis_response(result)
+    assert response.code == ""
+    assert "could not generate executable code" in response.explanation
+    assert "Legacy `await query(...)` bridge detected." in response.explanation

@@ -611,7 +611,7 @@ export const apiService = {
   },
 
   async v1Analyze(payload) {
-    return v1Api.chat.analyze(payload).then((res) => res.data)
+    return v1Api.chat.analyze(payload)
   },
 
   async v1AnalyzeStream(payload, { signal = null, onEvent = null } = {}) {

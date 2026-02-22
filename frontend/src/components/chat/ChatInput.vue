@@ -290,7 +290,8 @@ async function handleSubmit() {
     }
 
     // Parse the response with new format
-    const { is_safe, is_relevant, code, explanation } = response
+    const { is_safe, is_relevant, code, current_code, explanation } = response
+    const finalCode = (code ?? current_code ?? '').toString()
 
     // Check if the query is safe and relevant
     if (!is_safe) {
@@ -304,10 +305,14 @@ async function handleSubmit() {
 
     // Update the last message with the explanation
     appStore.updateLastMessageExplanation(explanation)
-    appStore.setGeneratedCode(code)
+    appStore.setGeneratedCode(finalCode)
+    // Write directly to editor state so UI updates even if generatedCode watcher misses this cycle.
+    if (finalCode.trim()) {
+      appStore.setPythonFileContent(finalCode)
+    }
 
     // Display the generated code and any execution results from the backend
-    if (code && code.trim()) {
+    if (finalCode && finalCode.trim()) {
       appStore.setTerminalOutput(response.stdout || response.terminal_output || 'Code generated successfully.')
 
       // Check for result data from server-side execution

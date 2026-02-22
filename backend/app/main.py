@@ -41,6 +41,7 @@ from .database.database_manager import DatabaseManager
 from .core.logger import logprint, patch_print
 from .services.session_variable_store import session_variable_store
 from .services.websocket_manager import websocket_manager
+from .services.tracing import init_phoenix_tracing
 
 APP_VERSION = "0.4.6a0"
 
@@ -49,6 +50,7 @@ APP_VERSION = "0.4.6a0"
 async def lifespan(app: FastAPI):
     """Manage the lifecycle of the application"""
     logprint("API server started. Authentication system initialized.")
+    init_phoenix_tracing()
 
     # Initialize app state with None values
     app.state.api_key = None

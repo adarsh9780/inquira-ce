@@ -1,11 +1,11 @@
 <template>
   <div class="flex h-full bg-white rounded-xl overflow-hidden">
     <div class="flex-1 flex flex-col">
-      <div class="border-b border-gray-100 bg-white px-3 py-2 sm:px-4 flex items-center justify-between gap-4">
+      <div class="border-b border-gray-100 bg-white px-3 py-2 sm:px-4 flex flex-wrap items-center gap-2">
         <div class="flex-1 min-w-0 flex items-center gap-2 group">
-          <div v-if="!isEditingTitle" class="flex items-center gap-2 overflow-hidden">
+          <div v-if="!isEditingTitle" class="min-w-0 flex items-center gap-2 overflow-hidden">
             <h3 
-              class="truncate text-sm font-bold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
+              class="min-w-0 truncate text-sm font-bold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
               @click="startEditingTitle"
               title="Click to rename"
             >
@@ -31,8 +31,8 @@
           </div>
         </div>
 
-        <div class="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-          <div class="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100">
+        <div class="ml-auto flex items-center gap-1 sm:gap-1.5 flex-shrink-0 max-w-full">
+          <div class="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100 overflow-x-auto">
             <button
               type="button"
               class="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-white hover:text-blue-600 transition-all hover:shadow-sm"

@@ -30,7 +30,8 @@ template: |
   ## Code Generation Rules (ANTI-HALLUCINATION)
   - You MUST write your own data connection logic. There is NO "pre-provided query function".
   - NEVER use or generate the code `await query(...)`. It does not exist in this environment. 
-  - ALWAYS initialize the connection using `duckdb.connect()` and load the data.
+  - If `Current Code Context` contains `await query(...)`, you MUST replace it with `conn.sql(...).fetchdf()` before adding new logic.
+  - ALWAYS initialize or reuse a DuckDB connection using `duckdb.connect()`.
 
   **MANDATORY SETUP PATTERN:**
   ```python
@@ -48,8 +49,8 @@ template: |
   except NameError:
       conn = duckdb.connect()
 
-  # Use DuckDB to load the data file lazily
-  duckdb_rel = con.read_csv(data_path) # or read_parquet
+  # Query the already-registered backend table
+  duckdb_rel = conn.sql(f"SELECT * FROM {table_name} LIMIT 100").pl()
   
   # Wrap the DuckDB relation in Narwhals for analysis
   df = nw.from_native(duckdb_rel)

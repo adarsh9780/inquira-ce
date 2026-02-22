@@ -220,12 +220,19 @@ class ChatService:
             metadata = metadata.dict()
 
         code = result.get("current_code", "") or result.get("code", "") or ""
-        explanation = result.get("plan", "") or ""
+        code_guard_feedback = result.get("code_guard_feedback", "") or ""
+        explanation = result.get("plan", "") if code else ""
 
-        final_messages = result.get("messages", [])
-        if not explanation and final_messages:
-            last_message = final_messages[-1]
-            explanation = str(getattr(last_message, "content", ""))
+        if not code and code_guard_feedback:
+            explanation = (
+                "I could not generate executable code that passed validation.\n"
+                f"Reason: {code_guard_feedback}"
+            )
+        else:
+            final_messages = result.get("messages", [])
+            if not explanation and final_messages:
+                last_message = final_messages[-1]
+                explanation = str(getattr(last_message, "content", ""))
 
         return {
             "is_safe": bool(metadata.get("is_safe", True)),
@@ -316,6 +323,15 @@ class ChatService:
             for node_name, payload in step.items():
                 if isinstance(payload, dict):
                     aggregated.update(payload)
+                if node_name == "code_guard":
+                    logprint(
+                        "[V1 Chat] code_guard node",
+                        level="INFO",
+                        request_id=thread_id,
+                        guard_status=aggregated.get("guard_status"),
+                        retry_count=aggregated.get("code_guard_retries", 0),
+                        feedback=aggregated.get("code_guard_feedback", ""),
+                    )
                 yield {"event": "node", "data": {"node": node_name, "message": f"{node_name} completed"}}
 
         # Final state merge if checkpointer is active
@@ -327,6 +343,16 @@ class ChatService:
             pass
 
         response_payload = ChatService._build_response_payload(aggregated)
+        logprint(
+            "[V1 Chat] final response summary",
+            level="INFO",
+            request_id=thread_id,
+            has_code=bool((response_payload.get("code", "") or "").strip()),
+            code_len=len(response_payload.get("code", "") or ""),
+            has_await_query=("await query(" in (response_payload.get("code", "") or "")),
+            guard_status=aggregated.get("guard_status", ""),
+            guard_feedback=aggregated.get("code_guard_feedback", ""),
+        )
         
         # Persist once at the end
         turn_id = await ChatService._persist_turn(

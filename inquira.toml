@@ -24,3 +24,11 @@ version = "3.12"
 port = 8000
 # Host to bind the backend server to
 host = "localhost"
+
+[backend.phoenix]
+# Enable Phoenix tracing for LangGraph/LangChain (used by backend startup)
+enabled = false
+# Phoenix project name shown in UI
+project = "inquira-dev"
+# Local Phoenix collector endpoint (OTLP HTTP)
+endpoint = "http://127.0.0.1:6006/v1/traces"

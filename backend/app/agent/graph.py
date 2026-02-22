@@ -22,6 +22,10 @@ from collections.abc import Iterator
 import json
 from pathlib import Path
 from .code_guard import guard_code
+from ..core.logger import logprint
+
+
+MAX_CODE_GUARD_RETRIES = 2
 
 
 def get_prompt_path(filename: str) -> Path:
@@ -274,12 +278,8 @@ class InquiraAgent:
             json.dumps(state.active_schema, indent=2) if state.active_schema else "{}"
         )
 
-        # Create the HTTP download URL for the web assembly duckdb client
-        download_url = (
-            f"/api/datasets/{state.table_name}/download"
-            if state.table_name
-            else "data.csv"
-        )
+        # Use real backend data path for desktop/server-side execution.
+        data_path = state.data_path or "data.csv"
 
         # Upgrade model to ensure code generation capability
         model = self._get_model(config, "gemini-2.5-flash")
@@ -292,7 +292,7 @@ class InquiraAgent:
                 "current_code": state.previous_code,
                 "table_name": state.table_name or "data_table",
                 "schema": schema_str,
-                "data_path": download_url,
+                "data_path": data_path,
             }
         )
         response = cast(Code, response)
@@ -300,6 +300,16 @@ class InquiraAgent:
         updates = {"code": response.code}
         if response.code and response.code.strip():
             updates["current_code"] = response.code
+
+        thread_id = config.get("configurable", {}).get("thread_id", "-")
+        generated = (response.code or "").strip()
+        logprint(
+            "[Agent] code_generator produced candidate code",
+            level="DEBUG",
+            request_id=thread_id,
+            code_len=len(generated),
+            has_await_query=("await query(" in generated),
+        )
 
         return updates
 
@@ -324,11 +334,7 @@ class InquiraAgent:
         schema_str = (
             json.dumps(state.active_schema, indent=2) if state.active_schema else "{}"
         )
-        download_url = (
-            f"/api/datasets/{state.table_name}/download"
-            if state.table_name
-            else "data.csv"
-        )
+        data_path = state.data_path or "data.csv"
 
         model = self._get_model(config, "gemini-2.5-flash")
         chain = prompt | model.with_structured_output(Code)
@@ -350,7 +356,7 @@ class InquiraAgent:
                 "current_code": state.code or state.previous_code,
                 "table_name": state.table_name or "data_table",
                 "schema": schema_str,
-                "data_path": download_url,
+                "data_path": data_path,
             }
         )
         response = cast(Code, response)
@@ -358,6 +364,17 @@ class InquiraAgent:
         updates = {"code": response.code}
         if response.code and response.code.strip():
             updates["current_code"] = response.code
+
+        thread_id = config.get("configurable", {}).get("thread_id", "-")
+        generated = (response.code or "").strip()
+        logprint(
+            "[Agent] retry_code_generator produced candidate code",
+            level="DEBUG",
+            request_id=thread_id,
+            code_len=len(generated),
+            has_await_query=("await query(" in generated),
+            retry_count=int(state.code_guard_retries or 0),
+        )
         return updates
 
     def noncode_generator(self, state: State, config: RunnableConfig) -> dict[str, Any]:
@@ -383,8 +400,21 @@ class InquiraAgent:
         return {"messages": [AIMessage(content=response.content)]}
 
     def code_guard(self, state: State, config: RunnableConfig) -> dict[str, Any]:
-        result = guard_code(state.code or "", table_name=state.table_name)
+        # Preserve visibility into model output: if retry generation returns empty code,
+        # fall back to the last non-empty candidate in current_code.
+        candidate_code = state.code if (state.code or "").strip() else state.current_code
+        result = guard_code(candidate_code or "", table_name=state.table_name)
+        thread_id = config.get("configurable", {}).get("thread_id", "-")
+        retries = int(state.code_guard_retries or 0)
+
         if not result.blocked:
+            logprint(
+                "[Agent] code_guard accepted candidate code",
+                level="DEBUG",
+                request_id=thread_id,
+                code_len=len(result.code or ""),
+                retry_count=retries,
+            )
             return {
                 "code": result.code,
                 "current_code": result.code,
@@ -392,18 +422,33 @@ class InquiraAgent:
                 "code_guard_feedback": "",
             }
 
-        retries = int(state.code_guard_retries or 0)
-        if retries < 1 and result.should_retry:
+        if retries < MAX_CODE_GUARD_RETRIES and result.should_retry:
+            logprint(
+                "[Agent] code_guard rejected candidate code and requested retry",
+                level="WARNING",
+                request_id=thread_id,
+                retry_count=retries,
+                max_retries=MAX_CODE_GUARD_RETRIES,
+                reason=result.reason or "",
+            )
             return {
                 "guard_status": "retry",
                 "code_guard_retries": retries + 1,
                 "code_guard_feedback": result.reason or "",
             }
 
+        logprint(
+            "[Agent] code_guard failed closed after retry exhaustion",
+            level="ERROR",
+            request_id=thread_id,
+            retry_count=retries,
+            max_retries=MAX_CODE_GUARD_RETRIES,
+            reason=result.reason or "",
+        )
         return {
-            "code": result.code,
-            "current_code": result.code,
-            "guard_status": "ok",
+            "code": "",
+            "current_code": "",
+            "guard_status": "failed",
             "code_guard_feedback": result.reason or "",
         }
 
@@ -522,12 +567,14 @@ The platform uses DuckDB for efficient querying, Pandas for transformations, and
         def code_guard_router(state: State):
             if state.guard_status == "retry":
                 return "retry"
+            if state.guard_status == "failed":
+                return "failed"
             return "ok"
 
         builder.add_conditional_edges(
             "code_guard",
             code_guard_router,
-            {"retry": "retry_code_generator", "ok": END},
+            {"retry": "retry_code_generator", "failed": END, "ok": END},
         )
         builder.add_edge("retry_code_generator", "code_guard")
         builder.add_edge("general_purpose", END)

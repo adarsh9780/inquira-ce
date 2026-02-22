@@ -1,4 +1,3 @@
-import re
 from dataclasses import dataclass
 
 
@@ -22,6 +21,18 @@ def guard_code(
             blocked=True,
             should_retry=True,
             reason="Empty code.",
+        )
+
+    if "await query(" in raw:
+        return CodeGuardResult(
+            code=raw,
+            changed=False,
+            blocked=True,
+            should_retry=True,
+            reason=(
+                "Legacy `await query(...)` bridge detected. "
+                "Use `conn.sql(...).fetchdf()` with a backend DuckDB connection."
+            ),
         )
 
     return CodeGuardResult(code=raw, changed=False, blocked=False, reason=None)

@@ -10,4 +10,7 @@ test('chat tab uses compact header controls and history modal', () => {
   assert.equal(source.includes('ConversationHistoryModal'), true)
   assert.equal(source.includes('title="Conversation history"'), true)
   assert.equal(source.includes('<h3 class="text-sm font-semibold text-gray-700">Conversations</h3>'), false)
+  assert.equal(source.includes('flex flex-wrap items-center'), true)
+  assert.equal(source.includes('overflow-x-auto'), true)
+  assert.equal(source.includes('class="min-w-0 truncate text-sm font-bold text-gray-900'), true)
 })
