@@ -11,7 +11,8 @@
       </div>
 
       <!-- Center Section: Dataset Switcher (Prominent) -->
-      <div class="flex-1 flex justify-center px-4">
+      <div class="flex-1 flex justify-center px-4 items-center space-x-3">
+        <WorkspaceSwitcher />
         <DatasetSwitcher @open-settings="openSettings" />
       </div>
 
@@ -23,7 +24,7 @@
             class="w-3 h-3 rounded-full cursor-help transition-all duration-200 hover:scale-110"
             :class="getStatusDotClasses"
             title="Click to open Settings"
-            @click="openSettings"
+            @click="openSettings()"
           ></div>
 
           <!-- Hover Tooltip -->
@@ -58,11 +59,11 @@
               </div>
 
               <!-- API Key Status -->
-              <div class="flex items-center space-x-2 p-2 rounded border" :class="appStore.apiKey ? 'border-success/20 bg-success/10' : 'border-error/20 bg-error/10'">
-                <div class="w-2 h-2 rounded-full" :class="appStore.apiKey ? 'bg-success' : 'bg-error'"></div>
+              <div class="flex items-center space-x-2 p-2 rounded border" :class="appStore.apiKeyConfigured ? 'border-success/20 bg-success/10' : 'border-error/20 bg-error/10'">
+                <div class="w-2 h-2 rounded-full" :class="appStore.apiKeyConfigured ? 'bg-success' : 'bg-error'"></div>
                 <div>
-                  <p class="text-xs font-medium" :class="appStore.apiKey ? 'text-primary' : 'text-error'">API Key</p>
-                  <p class="text-xs" :class="appStore.apiKey ? 'text-primary' : 'text-error'">{{ appStore.apiKey ? 'Configured' : 'Required' }}</p>
+                  <p class="text-xs font-medium" :class="appStore.apiKeyConfigured ? 'text-primary' : 'text-error'">API Key</p>
+                  <p class="text-xs" :class="appStore.apiKeyConfigured ? 'text-primary' : 'text-error'">{{ appStore.apiKeyConfigured ? 'Configured' : 'Required' }}</p>
                 </div>
               </div>
 
@@ -96,6 +97,7 @@
             </div>
             <div class="hidden md:block text-left">
               <p class="text-sm font-semibold text-primary">{{ authStore.username }}</p>
+              <p class="text-xs text-gray-500">{{ authStore.planLabel }} plan</p>
             </div>
             <ChevronDownIcon class="h-3.5 w-3.5 text-gray-400" />
           </button>
@@ -114,14 +116,14 @@
                 </div>
                 <div>
                   <p class="text-sm font-semibold text-white">{{ authStore.username }}</p>
-                  <p class="text-xs text-pastel-100">Logged in</p>
+                  <p class="text-xs text-pastel-100">{{ authStore.planLabel }} plan</p>
                 </div>
               </div>
             </div>
 
             <div class="py-1">
               <button
-                @click="openSettings"
+                @click="openSettings()"
                 class="flex items-center w-full px-4 py-2.5 text-sm text-primary hover:bg-gray-50 hover:text-primary transition-colors"
               >
                 <CogIcon class="h-4 w-4 mr-3 text-gray-500" />
@@ -200,6 +202,7 @@ import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import { CogIcon, ArrowRightOnRectangleIcon, UserIcon, CommandLineIcon, ChevronDownIcon, DocumentTextIcon } from '@heroicons/vue/24/outline'
 import logo from '../../assets/favicon.svg'
 import DatasetSwitcher from '../DatasetSwitcher.vue'
+import WorkspaceSwitcher from '../WorkspaceSwitcher.vue'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -213,7 +216,7 @@ const isWebSocketConnected = ref(false)
 
 // Computed property to check if configuration is complete
 const isConfigurationComplete = computed(() => {
-  return appStore.apiKey && appStore.hasDataFile && isWebSocketConnected.value
+  return appStore.apiKeyConfigured && appStore.hasDataFile && isWebSocketConnected.value
 })
 
 // Computed property for status dot classes with blinking animation
@@ -234,8 +237,7 @@ const getStatusDotClasses = computed(() => {
 function autoShowShortcutsModal() {
   // Only show if user is authenticated and hasn't opted out
   if (authStore.isAuthenticated) {
-    const hasOptedOut = localStorage.getItem('shortcuts-modal-hide') === 'true'
-    if (!hasOptedOut) {
+    if (!appStore.hideShortcutsModal) {
       // Show modal after a short delay to let the page load first
       setTimeout(() => {
         isShortcutsOpen.value = true
@@ -268,7 +270,8 @@ onMounted(() => {
 })
 
 function openSettings(tab = 'api') {
-  settingsInitialTab.value = tab
+  const normalizedTab = typeof tab === 'string' ? tab.toLowerCase() : 'api'
+  settingsInitialTab.value = ['api', 'data', 'account'].includes(normalizedTab) ? normalizedTab : 'api'
   isSettingsOpen.value = true
   isUserMenuOpen.value = false // Close dropdown when opening settings
 }

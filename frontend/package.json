@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "generate-client": "orval",
+    "export-openapi": "uv run --project ../backend python ../backend/scripts/export_openapi.py ./openapi.json",
+    "generate-client": "npm run export-openapi && orval",
     "test": "node --test test/**/*.test.mjs"
   },
   "dependencies": {
@@ -17,27 +18,29 @@
     "@codemirror/search": "^6.5.11",
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.38.1",
-    "@duckdb/duckdb-wasm": "^1.33.1-dev18.0",
     "@headlessui/vue": "^1.7.23",
     "@heroicons/vue": "^2.2.0",
     "@tailwindcss/vite": "^4.1.11",
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
+    "@tauri-apps/plugin-fs": "^2.4.5",
     "ag-grid-community": "^34.1.0",
     "ag-grid-vue3": "^34.1.0",
     "axios": "^1.11.0",
     "codemirror": "^6.0.2",
     "dompurify": "^3.2.6",
+    "katex": "^0.16.11",
     "markdown-it": "^14.1.0",
+    "markdown-it-katex": "^2.0.3",
     "pinia": "^3.0.3",
     "plotly.js-dist-min": "^3.0.3",
-    "pyodide": "^0.27.2",
     "tailwindcss": "^4.1.11",
     "vue": "^3.5.17"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.0",
     "orval": "^7.17.2",
-    "vite": "^7.0.4",
-    "vite-plugin-node-polyfills": "^0.25.0"
+    "vite": "^7.0.4"
   },
   "overrides": {
     "@codemirror/matchbrackets": "npm:@codemirror/language",

@@ -266,7 +266,7 @@ import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { useAuthStore } from '../../stores/authStore'
 import apiService from '../../services/apiService'
-import pyodideService from '../../services/pyodideService'
+import executionService from '../../services/executionService'
 import { toast } from '../../composables/useToast'
 import NotebookCell from './NotebookCell.vue'
 
@@ -470,34 +470,31 @@ const defaultCodeTemplate = computed(() => {
   const backendTable = settingsInfo?.value?.table_name || settingsInfo?.value?.data_table_name || settingsInfo?.value?.table || null
   const tableName = backendTable || getTableName(originalFilepath)
 
-  // Default template (DuckDB .sql API) — assumes a table exists named table_name
+  // Default template (DuckDB to Narwhals API)
   return `# cell 1: Load and explore data
-import pandas as pd
-import duckdb as db
+import duckdb
+import narwhals as nw
+import plotly.express as px
 
-# Load data into a table with the filename as table name
+# Establish connection and set table name
 table_name = "${tableName}"
-
-# If a connection object named 'conn' exists, use it as 'db' for .sql calls
 try:
     conn  # type: ignore  # noqa
-    db = conn
-except Exception:
-    pass
+except NameError:
+    conn = duckdb.connect(r"${dbPath || ''}") if "${dbPath || ''}".strip() else duckdb.connect()
 
 # cell 2: Quick sample
-result_df = db.sql(f"SELECT * FROM {table_name} LIMIT 100").fetchdf()
-result_df
+# Use DuckDB for lazy evaluation, then convert to a Narwhals-compatible DataFrame
+lazy_query = conn.sql(f"SELECT * FROM {table_name} LIMIT 10")
+df = nw.from_native(lazy_query.pl(), eager=True)
+df
 
-# cell 3: Schema + summary (DuckDB + pandas.describe)
-schema_df = db.sql(f"DESCRIBE SELECT * FROM {table_name}").fetchdf()
-row_count_df = db.sql(f"SELECT COUNT(*) AS rows FROM {table_name}").fetchdf()
-# Use a capped sample size for describe to avoid huge scans
-summary_sample = db.sql(f"SELECT * FROM {table_name} LIMIT 5000").fetchdf()
-summary_df = summary_sample.describe(include='all').transpose()
+# cell 3: Schema + summary
+# Use DuckDB for efficient aggregations and metadata extraction
+schema_df = nw.from_native(conn.sql(f"DESCRIBE SELECT * FROM {table_name}").pl(), eager=True)
+row_count_df = nw.from_native(conn.sql(f"SELECT COUNT(*) AS rows FROM {table_name}").pl(), eager=True)
 
-# Display schema and summary
-schema_df, row_count_df, summary_df
+schema_df, row_count_df
 `
 })
 
@@ -714,18 +711,6 @@ watch(() => appStore.dataFilePath, (newPath, oldPath) => {
     if (isDefaultEditorContent(currentContent)) {
       console.debug('Updating code template due to data file path change')
       appStore.setPythonFileContent(defaultCodeTemplate.value)
-    } else {
-      // Try to update just the table_name assignment in existing code
-      const backendTable = settingsInfo?.value?.table_name || settingsInfo?.value?.data_table_name || settingsInfo?.value?.table || null
-      const tableName = backendTable || getTableName(newPath)
-      const updated = replaceTableNameInCode(appStore.pythonFileContent, tableName)
-      if (updated !== appStore.pythonFileContent) {
-        appStore.setPythonFileContent(updated)
-        updateEditorContent()
-      } else {
-        // No direct match; call silent sync to handle edge cases (and future settings refresh)
-        syncTableNameInCode(true)
-      }
     }
   }
 })
@@ -868,7 +853,7 @@ async function runCode() {
 
         try {
           const start = performance.now()
-          const pyResponse = await pyodideService.executePython(cell.content)
+          const pyResponse = await executionService.executePython(cell.content)
           const execTime = (performance.now() - start) / 1000
 
           const response = {
@@ -1008,7 +993,7 @@ async function runCode() {
 
       // Execute code using the API service
       const start = performance.now()
-      const pyResponse = await pyodideService.executePython(code)
+      const pyResponse = await executionService.executePython(code)
       const execTime = (performance.now() - start) / 1000
 
       const response = {

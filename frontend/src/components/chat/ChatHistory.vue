@@ -1,5 +1,15 @@
 <template>
   <div ref="chatContainer" data-chat-scroll-container class="space-y-6" style="min-height: 200px;" role="log" aria-live="polite" aria-relevant="additions" :aria-busy="appStore.isLoading">
+    <div v-if="appStore.activeConversationId && appStore.turnsNextCursor" class="flex justify-center">
+      <button
+        type="button"
+        class="text-xs px-3 py-1.5 rounded border border-gray-300 bg-white hover:bg-gray-50"
+        @click="loadMoreTurns"
+      >
+        Load more
+      </button>
+    </div>
+
     <!-- Loading indicator for first message when no history yet -->
     <div v-if="appStore.isLoading && appStore.chatHistory.length === 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
       <div class="flex items-center space-x-3 text-blue-600 bg-blue-50 px-4 py-3 rounded-xl shadow-sm">
@@ -40,6 +50,10 @@
           <div class="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none prose-pre:overflow-x-auto prose-pre:break-words">
             <div v-html="renderMarkdown(message.explanation)"></div>
           </div>
+          <details v-if="message.toolEvents && message.toolEvents.length" class="mt-3 border border-gray-200 rounded p-2">
+            <summary class="text-xs text-gray-600 cursor-pointer">Tool and node details</summary>
+            <pre class="text-xs text-gray-700 whitespace-pre-wrap mt-2">{{ formatToolEvents(message.toolEvents) }}</pre>
+          </details>
         </div>
         <div class="flex items-center justify-end mt-1 px-4">
           <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
@@ -90,9 +104,11 @@ import {
   DocumentDuplicateIcon
 } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
+import markdownItKatex from 'markdown-it-katex'
 import DOMPurify from 'dompurify'
 import { formatTimestamp } from '../../utils/dateUtils'
 import { toast } from '../../composables/useToast'
+import 'katex/dist/katex.min.css'
 
 // Configure DOMPurify to add security attributes to links
 DOMPurify.addHook('afterSanitizeAttributes', function(node) {
@@ -117,8 +133,10 @@ const SCROLL_THRESHOLD_PX = 100
 const md = new MarkdownIt({
   html: false,
   linkify: true,
-  typographer: true
+  typographer: true,
+  breaks: true
 })
+md.use(markdownItKatex)
 
 // Initialize shouldAutoScroll and setup listeners on mount
 onMounted(() => {
@@ -173,8 +191,27 @@ async function copyExplanation(explanation) {
 
 function renderMarkdown(text) {
   if (!text) return ''
-  const html = md.render(text)
+  const normalized = String(text)
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+  const html = md.render(normalized)
   return DOMPurify.sanitize(html)
+}
+
+function formatToolEvents(events) {
+  try {
+    return JSON.stringify(events, null, 2)
+  } catch (_error) {
+    return String(events)
+  }
+}
+
+async function loadMoreTurns() {
+  try {
+    await appStore.fetchConversationTurns({ reset: false })
+  } catch (error) {
+    console.error('Failed to load more turns:', error)
+  }
 }
 
 function isNearBottom() {

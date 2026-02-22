@@ -77,11 +77,14 @@
         
         <!-- Resize Handle -->
         <div
-          class="absolute top-0 right-0 w-1 h-full cursor-ew-resize group hover:bg-blue-400 transition-colors z-30"
+          class="absolute top-0 right-0 w-1.5 h-full cursor-ew-resize group z-30 flex items-center justify-center translate-x-1/2"
           @mousedown="startResize"
         >
-          <!-- Visual indicator on hover -->
-          <div class="absolute inset-y-0 -left-1 -right-1 group-hover:bg-blue-400/20"></div>
+          <!-- The handle itself -->
+          <div class="h-12 w-1 rounded-full bg-gray-200 group-hover:bg-blue-400 group-active:bg-blue-600 transition-colors"></div>
+          
+          <!-- Large hit area -->
+          <div class="absolute inset-y-0 -left-2 -right-2 bg-transparent group-hover:bg-blue-500/5 transition-all duration-150 rounded-lg"></div>
         </div>
       </div>
 
@@ -275,10 +278,13 @@ function onResize(event) {
   
   // Clamp between 15% and 60%
   const clampedWidth = Math.max(0.15, Math.min(0.60, newWidth))
-  appStore.setChatOverlayWidth(clampedWidth)
+  appStore.chatOverlayWidth = clampedWidth
 }
 
 function stopResize() {
+  if (isResizing.value) {
+    appStore.saveLocalConfig()
+  }
   isResizing.value = false
   document.removeEventListener('mousemove', onResize)
   document.removeEventListener('mouseup', stopResize)

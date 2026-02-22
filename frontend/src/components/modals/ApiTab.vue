@@ -54,7 +54,7 @@
         </div>
         <div class="mt-2 flex items-center justify-between">
           <p class="text-xs text-gray-500">
-            Your API key is stored locally and never shared.
+            Your API key is stored in your OS keychain.
             <a
               href="https://aistudio.google.com/app/apikey"
               target="_blank"
@@ -78,6 +78,28 @@
             </span>
           </button>
         </div>
+      </div>
+
+      <p v-if="appStore.apiKeyConfigured" class="text-xs text-green-700">
+        A key is already configured in secure storage.
+      </p>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Schema Privacy
+        </label>
+        <label class="inline-flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+          <input
+            type="checkbox"
+            class="mt-0.5"
+            :checked="appStore.allowSchemaSampleValues"
+            @change="handleSampleSharingChange"
+          />
+          <span>Allow sample values in schema generation prompts</span>
+        </label>
+        <p class="mt-1 text-xs text-gray-500">
+          Off by default. When disabled, sample cell values are stripped before schema metadata is saved.
+        </p>
       </div>
     </div>
 
@@ -135,6 +157,11 @@ function handleApiKeyChange(event) {
   clearMessage()
 }
 
+function handleSampleSharingChange(event) {
+  appStore.setAllowSchemaSampleValues(event.target.checked)
+  clearMessage()
+}
+
 function clearMessage() {
   message.value = ''
   messageType.value = ''
@@ -167,7 +194,6 @@ async function testApiKey() {
 
 async function saveApiSettings() {
   const apiKey = appStore.apiKey.trim()
-  const selectedModel = appStore.selectedModel
 
   // Validate API key
   if (!apiKey) {
@@ -183,13 +209,11 @@ async function saveApiSettings() {
     // Test API key first
     await testApiKey()
 
-    // If test was successful, save settings
+    // If test was successful, persist securely for v1 runtime.
     if (messageType.value === 'success') {
       await apiService.setApiKeySettings(apiKey)
-      // Note: Model settings might need a separate endpoint
-      // await apiService.setModelSettings(selectedModel)
-
-      message.value = 'API settings saved successfully.'
+      appStore.setApiKeyConfigured(true)
+      message.value = 'API key saved securely in OS keychain.'
       messageType.value = 'success'
     }
   } catch (error) {

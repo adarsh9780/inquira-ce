@@ -1,0 +1,62 @@
+# Inquira Configuration
+# =====================
+# User-editable settings for Python environment and proxy configuration.
+# This file is read by the Tauri launcher on startup.
+
+[python]
+# Python version to install via UV (only used on first launch)
+version = "3.12"
+
+# Set this if you're behind a corporate proxy or using JFrog/Nexus/Artifactory
+# index-url = "https://your-company.jfrog.io/artifactory/api/pypi/pypi-remote/simple"
+
+# Set this to use a pre-installed Python instead of UV-managed one
+# python-path = "/usr/local/bin/python3.12"
+
+[proxy]
+# Uncomment and set these if you're behind a corporate proxy
+# http-proxy = "http://proxy.company.com:8080"
+# https-proxy = "http://proxy.company.com:8080"
+# no-proxy = "localhost,127.0.0.1"
+
+[backend]
+# Port for the FastAPI backend server
+port = 8000
+# Host to bind the backend server to
+host = "localhost"
+
+[execution]
+# Switch execution backend without code changes.
+# Supported values: "local_subprocess", "local_safe_runner", "e2b", "piston"
+provider = "local_safe_runner"
+
+[execution.runner]
+# Name of the dedicated code-runner virtual environment folder under app data (~/.inquira/*)
+venv-name = ".runner-venv"
+# Optional local checkout path for editable install of safe-py-runner.
+project-path = "/Users/adarshmaurya/Downloads/Projects/safe-py-runner"
+# safe-py-runner install source: "auto", "pypi", "github", "local"
+# "auto" tries PyPI -> GitHub -> local path (final fallback).
+safe-py-runner-source = "auto"
+# Package name (PyPI source)
+safe-py-runner-pypi = "safe-py-runner"
+# Git URL/ref (GitHub source)
+safe-py-runner-github = "git+https://github.com/adarsh9780/safe-py-runner.git"
+# Local path override (local source/fallback). If omitted, project-path is used.
+# safe-py-runner-local-path = "/Users/adarshmaurya/Downloads/Projects/safe-py-runner"
+# Optional package list installed into the runner venv (excluding safe-py-runner).
+packages = ["narwhals", "duckdb", "pandas", "plotly", "pyarrow", "polars"]
+# Optional runtime guardrails for safe-py-runner.
+timeout-seconds = 60
+memory-limit-mb = 512
+max-output-kb = 512
+# blocked-imports = ["socket", "subprocess"]
+# blocked-builtins = ["open", "exec", "eval"]
+
+[backend.phoenix]
+# Enable Phoenix tracing for LangGraph/LangChain (used by backend startup)
+enabled = false
+# Phoenix project name shown in UI
+project = "inquira-dev"
+# Local Phoenix collector endpoint (OTLP HTTP)
+endpoint = "http://127.0.0.1:6006/v1/traces"

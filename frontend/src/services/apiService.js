@@ -1,7 +1,9 @@
 import axios from 'axios'
 import { getInquira } from './generatedApi'
+import { v1Api } from './contracts/v1Api'
 import { parseSseBuffer } from '../utils/sseParser'
 import { disableStreamingForUnsupportedStatus, isStreamingEnabled } from '../utils/streamingCapability'
+import { inferTableNameFromDataPath } from '../utils/chatBootstrap'
 
 // ------------------------------------------------------------------
 // GLOBAL AXIOS CONFIGURATION
@@ -15,9 +17,10 @@ function getDefaultApiBase() {
   }
 
   if (import.meta.env.DEV) {
-    const { protocol, hostname } = window.location
+    const { hostname } = window.location
     const port = '8000'
-    return `${protocol}//${hostname}:${port}`
+    // Force http protocol for backend as tauri:// won't reach Python server
+    return `http://${hostname || 'localhost'}:${port}`
   }
 
   return window.location.origin
@@ -49,7 +52,15 @@ axios.interceptors.response.use(
     return response.data
   },
   (error) => {
-    console.error('API Error:', error)
+    const status = error?.response?.status
+    const url = String(error?.config?.url || '')
+    const isExpectedAuthCheckFailure =
+      status === 401 &&
+      (url.includes('/api/v1/auth/me') || url.includes('/api/v1/auth/login') || url.includes('/api/v1/auth/logout'))
+
+    if (!isExpectedAuthCheckFailure) {
+      console.error('API Error:', error)
+    }
 
     // Add more specific error information
     if (error.response) {
@@ -89,9 +100,9 @@ export const apiService = {
   },
 
   async verifyAuth() {
-    console.debug('🔍 Making verifyAuth request to /auth/verify')
+    console.debug('🔍 Making verifyAuth request to /api/v1/auth/me')
     try {
-      const result = await client.verifyAuthAuthVerifyGet()
+      const result = await this.v1GetCurrentUser()
       console.debug('✅ verifyAuth success:', result)
       return result
     } catch (error) {
@@ -130,7 +141,15 @@ export const apiService = {
 
   // Settings management
   async getSettings() {
-    return client.viewAllSettingsSettingsViewGet()
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    return {
+      api_key: null,
+      api_key_present: !!appStore.apiKeyConfigured,
+      data_path: appStore.schemaFileId || appStore.dataFilePath || null,
+      context: appStore.schemaContext || '',
+      table_name: appStore.ingestedTableName || null
+    }
   },
 
   async getApiKey() {
@@ -139,80 +158,71 @@ export const apiService = {
 
   // Check whether data/schema update is needed
   async checkUpdate() {
-    return client.checkUpdateNeededSettingsCheckUpdateGet()
+    return {
+      should_update: false,
+      reasons: [],
+      dataset_updated_at: null
+    }
   },
 
   async setDataPath(dataPath) {
-    console.debug('📤 [API] Setting data path:', dataPath)
-
-    // First verify authentication
-    try {
-      console.debug('🔐 [API] Verifying authentication...')
-      await this.verifyAuth()
-      console.debug('✅ [API] Authentication verified')
-    } catch (authError) {
-      console.error('❌ [API] Authentication failed:', authError.response?.data)
-      throw new Error('Authentication required. Please log in first.')
-    }
-
-    try {
-      const response = await client.setDataPathSettingsSetDataPathPut({ data_path: dataPath })
-      console.debug('✅ [API] Data path set successfully:', response)
-      return response
-    } catch (error) {
-      console.error('❌ [API] Failed to set data path:', error.response?.data)
-
-      // Provide more specific error messages
-      if (error.response?.status === 401) {
-        throw new Error('Authentication expired. Please log in again.')
-      } else if (error.response?.status === 403) {
-        throw new Error('Access denied. You may not have permission to save settings.')
-      } else if (error.response?.status === 400) {
-        const errorDetail = error.response?.data?.detail || 'Invalid request data'
-        throw new Error(`Bad request: ${errorDetail}`)
-      }
-
-      throw error
-    }
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    appStore.setDataFilePath(dataPath || '')
+    return { detail: 'Data path saved.' }
   },
 
   async setContext(context) {
-    return client.setContextSettingsSetContextPut({ context: context })
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    appStore.setSchemaContext(context || '')
+    return { detail: 'Context saved.' }
   },
 
   async setApiKeySettings(apiKey) {
-    return client.setApikeySettingsSetApiKeyPut({ api_key: apiKey })
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    await this.v1SetApiKey(apiKey || '')
+    appStore.setApiKeyConfigured(true)
+    return { detail: 'API key saved securely.' }
   },
 
   // Data preview
   async getDataPreview(sampleType = 'random') {
-    return client.getDataPreviewDataPreviewGet({ sample_type: sampleType })
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    if (!appStore.activeWorkspaceId || !appStore.ingestedTableName) {
+      return {
+        success: true,
+        data: [],
+        row_count: 0,
+        sample_type: sampleType,
+        message: 'Select a workspace dataset to preview.'
+      }
+    }
+    return this.v1GetDatasetPreview(
+      appStore.activeWorkspaceId,
+      appStore.ingestedTableName,
+      sampleType,
+      100
+    )
   },
 
   // Generate schema with context
   async generateSchema(filepath, context = null, forceRegenerate = false) {
-    console.debug('🔄 Generating schema for:', filepath, 'force:', forceRegenerate)
-
-    // Verify authentication before schema generation
-    try {
-      await this.verifyAuth()
-    } catch (authError) {
-      console.error('❌ Authentication failed for schema generation')
-      throw new Error('Authentication required for schema generation')
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    const workspaceId = appStore.activeWorkspaceId
+    const tableName = (appStore.ingestedTableName || inferTableNameFromDataPath(filepath || appStore.dataFilePath || '')).trim()
+    if (!workspaceId || !tableName) {
+      throw new Error('Select a workspace dataset before generating schema.')
     }
-
-    try {
-      const response = await client.generateSchemaSchemasGeneratePost({
-        filepath: filepath,
-        context: context,
-        force_regenerate: forceRegenerate
-      })
-      console.debug('✅ Schema generation successful')
-      return response
-    } catch (error) {
-      console.error('❌ Schema generation failed:', error.response?.data)
-      throw error
-    }
+    const schema = await this.v1GetDatasetSchema(workspaceId, tableName)
+    if (!context) return schema
+    return this.v1SaveDatasetSchema(workspaceId, tableName, {
+      context,
+      columns: schema.columns || []
+    })
   },
 
   /**
@@ -220,194 +230,137 @@ export const apiService = {
    * The frontend sends columns from DuckDB-WASM directly — no file path needed.
    */
   async generateSchemaFromColumns(tableName, columns, context = null) {
-    console.debug('🔄 Generating schema from columns for table:', tableName)
-
-    try {
-      await this.verifyAuth()
-    } catch (authError) {
-      throw new Error('Authentication required for schema generation')
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    if (!appStore.activeWorkspaceId) {
+      throw new Error('Create/select a workspace before generating schema.')
     }
-
-    try {
-      const { default: axios } = await import('axios')
-      const baseUrl = client.defaults?.baseURL || (import.meta.env.VITE_API_BASE || '')
-      const response = await axios.post(`${baseUrl}/schemas/generate-from-columns`, {
-        table_name: tableName,
-        columns: columns,
-        context: context
-      }, {
-        withCredentials: true
-      })
-      console.debug('✅ Schema from columns generation successful')
-      return response.data
-    } catch (error) {
-      console.error('❌ Schema from columns generation failed:', error.response?.data)
-      throw error
-    }
+    return this.v1SaveDatasetSchema(appStore.activeWorkspaceId, tableName, {
+      context: context || '',
+      columns: (columns || []).map((col) => ({
+        name: col.name,
+        dtype: col.dtype || col.type || 'VARCHAR',
+        description: col.description || '',
+        samples: appStore.allowSchemaSampleValues && Array.isArray(col.samples) ? col.samples : []
+      }))
+    })
   },
 
   // Load existing schema
   async loadSchema(filepath) {
-    console.debug('📂 Loading schema for:', filepath)
-
-    // Verify authentication before loading schema
-    try {
-      await this.verifyAuth()
-    } catch (authError) {
-      console.error('❌ Authentication failed for schema loading')
-      throw new Error('Authentication required for schema loading')
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    const workspaceId = appStore.activeWorkspaceId
+    const tableName = (appStore.ingestedTableName || inferTableNameFromDataPath(filepath || appStore.dataFilePath || '')).trim()
+    if (!workspaceId || !tableName) {
+      throw new Error('Select a workspace dataset before loading schema.')
     }
-
-    try {
-      // NOTE: generated function takes filepath as an argument, separate from options
-      const response = await client.loadSchemaEndpointSchemasLoadFilepathGet(filepath)
-      console.debug('✅ Schema loading successful')
-      return response
-    } catch (error) {
-      console.error('❌ Schema loading failed:', error.response?.data)
-      throw error
-    }
+    return this.v1GetDatasetSchema(workspaceId, tableName)
   },
 
   // Save schema
   async saveSchema(filepath, context, columns) {
-    console.debug('💾 Saving schema for:', filepath)
-
-    // Verify authentication before saving schema
-    try {
-      await this.verifyAuth()
-    } catch (authError) {
-      console.error('❌ Authentication failed for schema saving')
-      throw new Error('Authentication required for schema saving')
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    const workspaceId = appStore.activeWorkspaceId
+    const tableName = (appStore.ingestedTableName || inferTableNameFromDataPath(filepath || appStore.dataFilePath || '')).trim()
+    if (!workspaceId || !tableName) {
+      throw new Error('Select a workspace dataset before saving schema.')
     }
-
-    try {
-      const response = await client.saveSchemaEndpointSchemasSavePost({
-        filepath: filepath,
-        context: context,
-        columns: columns
-      })
-      console.debug('✅ Schema saving successful')
-      return response
-    } catch (error) {
-      console.error('❌ Schema saving failed:', error.response?.data)
-      throw error
-    }
+    return this.v1SaveDatasetSchema(workspaceId, tableName, { context, columns })
   },
 
   // List schemas
   async listSchemas() {
-    console.debug('📋 Listing schemas')
-
-    // Verify authentication before listing schemas
-    try {
-      await this.verifyAuth()
-    } catch (authError) {
-      console.error('❌ Authentication failed for schema listing')
-      throw new Error('Authentication required for schema listing')
-    }
-
-    try {
-      const response = await client.listSchemasEndpointSchemasListGet()
-      console.debug('✅ Schema listing successful')
-      return response
-    } catch (error) {
-      console.error('❌ Schema listing failed:', error.response?.data)
-      throw error
-    }
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    if (!appStore.activeWorkspaceId) return { schemas: [] }
+    return this.v1ListSchemas(appStore.activeWorkspaceId)
   },
 
   // Get database and schema paths
   async getDatabasePaths() {
-    console.debug('📂 Getting database paths')
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    if (!appStore.activeWorkspaceId) {
+      return { database_path: null, schema_path: null, base_directory: null }
+    }
+    const paths = await this.v1GetWorkspacePaths(appStore.activeWorkspaceId)
+    return {
+      database_path: paths?.duckdb_path || null,
+      schema_path: paths?.workspace_dir || null,
+      base_directory: paths?.workspace_dir || null
+    }
+  },
 
-    // Verify authentication before getting paths
-    try {
-      await this.verifyAuth()
-    } catch (authError) {
-      console.error('❌ Authentication failed for getting database paths')
-      throw new Error('Authentication required for getting database paths')
+  // Code execution (server-side)
+  async executeCode(code, timeout = 60, workspaceId = null) {
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    const activeWorkspaceId = workspaceId || appStore.activeWorkspaceId
+    if (!activeWorkspaceId) {
+      throw new Error('Create/select a workspace before running code.')
+    }
+    console.debug('🚀 [API] Executing code...', { timeout })
+    const response = await fetch(
+      `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${activeWorkspaceId}/execute`,
+      {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ code, timeout })
+      }
+    )
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}))
+      throw new Error(detail.detail || `Execution request failed (${response.status})`)
+    }
+    return response.json()
+  },
+
+  // File data loading — inspect file for columns, then trigger background DuckDB conversion
+  async uploadDataPath(filePath) {
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    if (!appStore.activeWorkspaceId) {
+      throw new Error('Create/select a workspace before loading a dataset.')
     }
 
+    const ds = await this.v1AddDataset(appStore.activeWorkspaceId, filePath)
+    let columns = []
     try {
-      const response = await client.getStoragePathsSettingsPathsGet()
-      console.debug('✅ Database paths retrieved successfully')
-      return response
-    } catch (error) {
-      console.error('❌ Failed to get database paths:', error.response?.data)
-      throw error
+      const schema = await this.v1GetDatasetSchema(appStore.activeWorkspaceId, ds.table_name)
+      columns = (schema?.columns || []).map((col) => ({
+        name: col.name,
+        type: col.dtype || col.type || 'VARCHAR',
+        dtype: col.dtype || col.type || 'VARCHAR',
+        description: col.description || '',
+        samples: Array.isArray(col.samples) ? col.samples : []
+      }))
+    } catch (_error) {
+      // Keep ingestion successful even if schema metadata is unavailable.
     }
+
+    return {
+      table_name: ds.table_name,
+      row_count: ds.row_count ?? null,
+      file_path: ds.source_path || filePath,
+      columns
+    }
+  },
+
+  // Browser fallback — same endpoint, uses file name as path
+  async uploadFile(file) {
+    throw new Error('Browser file uploads are not supported in v1 desktop mode. Use the native file picker.')
   },
 
   // Chat and analysis
   async analyzeData(data, signal = null) {
-    // data is typically { question, context, model, current_code }
-    return client.chatEndpointChatPost(data, { signal })
+    throw new Error('Legacy /chat endpoint removed. Use v1Analyze with workspace scope.')
   },
 
   async analyzeDataStream(data, { signal = null, onEvent = null } = {}) {
-    if (!isStreamingEnabled()) {
-      return this.analyzeData(data, signal)
-    }
-
-    const url = `${apiBaseUrl.replace(/\/+$/, '')}/chat/stream`
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include',
-      body: JSON.stringify(data),
-      signal
-    })
-
-    if (!response.ok) {
-      let detail = `Request failed with status ${response.status}`
-      try {
-        const text = await response.text()
-        if (text) detail = text
-      } catch (_) {
-        // keep default detail
-      }
-      const err = new Error(detail)
-      err.status = response.status
-      disableStreamingForUnsupportedStatus(response.status)
-      throw err
-    }
-
-    if (!response.body) {
-      throw new Error('Streaming not supported by browser/runtime.')
-    }
-
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    let finalPayload = null
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const { events, remainder } = parseSseBuffer(buffer)
-      buffer = remainder
-
-      for (const evt of events) {
-        if (onEvent) onEvent(evt)
-        if (evt.event === 'final') {
-          finalPayload = evt.data
-        } else if (evt.event === 'error') {
-          const detail = evt.data?.detail || 'Streaming analysis failed.'
-          const err = new Error(detail)
-          err.status = evt.data?.status_code || 500
-          throw err
-        }
-      }
-    }
-
-    if (!finalPayload) {
-      throw new Error('Stream ended without final analysis payload.')
-    }
-    return finalPayload
+    throw new Error('Legacy /chat/stream endpoint removed. Use v1AnalyzeStream with workspace scope.')
   },
 
   async getHistory() {
@@ -416,20 +369,27 @@ export const apiService = {
 
   // Health check
   async healthCheck() {
-    console.debug('🏥 [API] Checking backend health...')
-    try {
-      const response = await client.rootGet()
-      console.debug('✅ [API] Backend is healthy:', response)
-      return response
-    } catch (error) {
-      console.error('❌ [API] Backend health check failed:', error.response?.status)
-      throw error
-    }
+    return { status: 'ok' }
   },
 
   // test gemini api
   async testGeminiApi(apiKey) {
-    return client.testGeminiApiKeyApiTestGeminiPost({ api_key: apiKey })
+    try {
+      // Prefer generated endpoint names from both old and current OpenAPI specs.
+      const generatedCall =
+        client.testGeminiApiKeyApiV1AdminTestGeminiPost || client.testGeminiApiKeyApiTestGeminiPost
+      if (typeof generatedCall === 'function') {
+        return generatedCall({ api_key: apiKey })
+      }
+
+      return axios.post('/api/v1/admin/test-gemini', { api_key: apiKey })
+    } catch (error) {
+      // Fallback to v1 admin route when backend omits legacy route.
+      if (error?.response?.status === 404) {
+        return axios.post('/api/v1/admin/test-gemini', { api_key: apiKey })
+      }
+      throw error
+    }
   },
 
   // System utilities
@@ -456,14 +416,10 @@ export const apiService = {
   },
 
   async setDataPathSimple(dataPath) {
-    // Set data path without triggering reprocessing
-    try {
-      const response = await client.setDataPathSimpleSettingsSetDataPathSimplePut({ data_path: dataPath })
-      return response
-    } catch (error) {
-      console.error('Failed to set data path (simple):', error)
-      throw error
-    }
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    appStore.setDataFilePath(dataPath || '')
+    return { detail: 'Data path saved locally.' }
   },
 
   async checkDatasetHealth(tableName) {
@@ -511,6 +467,199 @@ export const apiService = {
       console.error('Failed to download dataset blob:', error)
       throw error
     }
+  },
+
+  // V1 Workspace APIs
+  async v1ListWorkspaces() {
+    return v1Api.workspaces.list()
+  },
+
+  async v1CreateWorkspace(name) {
+    return v1Api.workspaces.create(name)
+  },
+
+  async v1ActivateWorkspace(workspaceId) {
+    return v1Api.workspaces.activate(workspaceId)
+  },
+
+  async v1DeleteWorkspace(workspaceId) {
+    return v1Api.workspaces.remove(workspaceId)
+  },
+
+  async v1ListWorkspaceDeletionJobs() {
+    return v1Api.workspaces.deletions()
+  },
+
+  async v1GetWorkspaceDeletionJob(jobId) {
+    return v1Api.workspaces.deletionById(jobId)
+  },
+
+  async v1ListDatasets(workspaceId) {
+    return v1Api.datasets.list(workspaceId)
+  },
+
+  async v1GetPreferences() {
+    return v1Api.preferences.get()
+  },
+
+  async v1UpdatePreferences(payload) {
+    return v1Api.preferences.update(payload)
+  },
+
+  async v1SetApiKey(apiKey) {
+    return v1Api.preferences.setApiKey(apiKey)
+  },
+
+  async v1DeleteApiKey() {
+    return v1Api.preferences.deleteApiKey()
+  },
+
+  async v1GetWorkspacePaths(workspaceId) {
+    return axios.get(`/api/v1/workspaces/${workspaceId}/paths`)
+  },
+
+  async v1AddDataset(workspaceId, sourcePath) {
+    return v1Api.datasets.add(workspaceId, sourcePath)
+  },
+
+  async v1GetDatasetSchema(workspaceId, tableName) {
+    return axios.get(`/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema`)
+  },
+
+  async v1SaveDatasetSchema(workspaceId, tableName, payload) {
+    return axios.post(`/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema`, payload)
+  },
+
+  async v1RegenerateDatasetSchema(workspaceId, tableName, payload = {}) {
+    return axios.post(
+      `/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema/regenerate`,
+      payload
+    )
+  },
+
+  async v1ListSchemas(workspaceId) {
+    return axios.get(`/api/v1/workspaces/${workspaceId}/schemas`)
+  },
+
+  async v1GetDatasetPreview(workspaceId, tableName, sampleType = 'random', limit = 100) {
+    return axios.get(`/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/preview`, {
+      params: { sample_type: sampleType, limit }
+    })
+  },
+
+  async v1SyncBrowserDataset(workspaceId, payload) {
+    return v1Api.datasets.syncBrowser(workspaceId, payload)
+  },
+
+  async v1ListConversations(workspaceId, limit = 50) {
+    return v1Api.conversations.list(workspaceId, limit)
+  },
+
+  async v1CreateConversation(workspaceId, title = null) {
+    return v1Api.conversations.create(workspaceId, title)
+  },
+
+  async v1ClearConversation(conversationId) {
+    return v1Api.conversations.clear(conversationId)
+  },
+
+  async v1DeleteConversation(conversationId) {
+    return v1Api.conversations.remove(conversationId)
+  },
+
+  async v1UpdateConversation(conversationId, title) {
+    return v1Api.conversations.update(conversationId, { title })
+  },
+
+  async v1ListTurns(conversationId, limit = 5, before = null) {
+    const params = { limit }
+    if (before) params.before = before
+    return v1Api.conversations.turns(conversationId, params)
+  },
+
+  async v1Analyze(payload) {
+    return v1Api.chat.analyze(payload)
+  },
+
+  async v1AnalyzeStream(payload, { signal = null, onEvent = null } = {}) {
+    if (!isStreamingEnabled()) {
+      return this.v1Analyze(payload)
+    }
+
+    const url = `${apiBaseUrl.replace(/\/+$/, '')}${v1Api.chat.stream}`
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+      signal
+    })
+
+    if (!response.ok) {
+      let detail = `Request failed with status ${response.status}`
+      try {
+        const text = await response.text()
+        if (text) detail = text
+      } catch (_) {
+        // keep default
+      }
+      const err = new Error(detail)
+      err.status = response.status
+      disableStreamingForUnsupportedStatus(response.status)
+      throw err
+    }
+
+    if (!response.body) {
+      throw new Error('Streaming not supported by browser/runtime.')
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let finalPayload = null
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const { events, remainder } = parseSseBuffer(buffer)
+      buffer = remainder
+
+      for (const evt of events) {
+        if (onEvent) onEvent(evt)
+        if (evt.event === 'final') {
+          finalPayload = evt.data
+        } else if (evt.event === 'error') {
+          const detail = evt.data?.detail || 'Streaming analysis failed.'
+          const err = new Error(detail)
+          err.status = evt.data?.status_code || 500
+          throw err
+        }
+      }
+    }
+
+    if (!finalPayload) {
+      throw new Error('Stream ended without final analysis payload.')
+    }
+    return finalPayload
+  },
+
+  async v1GetCurrentUser() {
+    return v1Api.auth.me()
+  },
+
+  async v1Register(username, password) {
+    return v1Api.auth.register(username, password)
+  },
+
+  async v1Login(username, password) {
+    return v1Api.auth.login(username, password)
+  },
+
+  async v1Logout() {
+    return v1Api.auth.logout()
   }
 }
 

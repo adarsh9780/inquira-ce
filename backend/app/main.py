@@ -21,20 +21,16 @@ if not hasattr(aiosqlite.Connection, "is_alive"):
     aiosqlite.Connection.is_alive = is_alive
 
 
-from .api.api_test import router as api_test_router
-from .api.auth import router as auth_router
-from .api.chat import router as chat_router
-from .api.data_preview import router as data_preview_router
-from .api.datasets import router as datasets_router
-from .api.schemas import router as schema_router
-from .api.legal import router as legal_router
-from .api.settings import router as settings_router
-from .api.system import router as system_router
+from .v1.api.router import router as v1_router
+from .v1.db.init import init_v1_database
+from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
+from .v1.services.workspace_deletion_service import WorkspaceDeletionService
 from .core.config_models import AppConfig
 from .database.database_manager import DatabaseManager
 from .core.logger import logprint, patch_print
 from .services.session_variable_store import session_variable_store
 from .services.websocket_manager import websocket_manager
+from .services.tracing import init_phoenix_tracing
 
 APP_VERSION = "0.4.6a0"
 
@@ -43,6 +39,7 @@ APP_VERSION = "0.4.6a0"
 async def lifespan(app: FastAPI):
     """Manage the lifecycle of the application"""
     logprint("API server started. Authentication system initialized.")
+    init_phoenix_tracing()
 
     # Initialize app state with None values
     app.state.api_key = None
@@ -51,6 +48,8 @@ async def lifespan(app: FastAPI):
     app.state.context = None
     app.state.llm_service = None
     app.state.llm_initialized = False
+    app.state.workspace_langgraph_manager = WorkspaceLangGraphManager()
+    app.state.workspace_deletion_service = WorkspaceDeletionService()
 
     # Initialize LangGraph Agent with Persistence
     try:
@@ -96,6 +95,14 @@ async def lifespan(app: FastAPI):
     app.state.db_manager = DatabaseManager(app.state.config)
     logprint("Database manager initialized")
 
+    # Initialize v1 ORM database schema
+    try:
+        await init_v1_database()
+        logprint("API v1 ORM schema initialized")
+    except Exception as e:
+        logprint(f"Failed to initialize API v1 ORM schema: {e}", level="error")
+        raise
+
     # Start session cleanup task
     cleanup_task = asyncio.create_task(session_cleanup_worker())
     logprint("Session cleanup worker started")
@@ -112,6 +119,18 @@ async def lifespan(app: FastAPI):
 
     if hasattr(app.state, "db_manager"):
         app.state.db_manager.shutdown()
+
+    if hasattr(app.state, "workspace_langgraph_manager") and app.state.workspace_langgraph_manager:
+        try:
+            await app.state.workspace_langgraph_manager.shutdown()
+        except Exception as e:
+            logprint(f"Error closing workspace LangGraph manager: {e}", level="error")
+
+    if hasattr(app.state, "workspace_deletion_service") and app.state.workspace_deletion_service:
+        try:
+            await app.state.workspace_deletion_service.shutdown()
+        except Exception as e:
+            logprint(f"Error closing workspace deletion service: {e}", level="error")
 
     if hasattr(app.state, "checkpointer_cm") and app.state.checkpointer_cm:
         logprint("Closing LangGraph checkpointer connection...")
@@ -147,6 +166,8 @@ app.add_middleware(
         "http://127.0.0.1:3000",  # Alternative dev port
         "http://127.0.0.1:8000",
         "http://localhost:8000",
+        "https://tauri.localhost",  # Tauri webview
+        "tauri://localhost",  # Tauri webview (custom protocol)
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -154,17 +175,8 @@ app.add_middleware(
     expose_headers=["set-cookie"],
 )
 
-# Include all routers
-app.include_router(auth_router)
-
-app.include_router(chat_router)
-app.include_router(settings_router)
-app.include_router(data_preview_router)
-app.include_router(schema_router)
-app.include_router(api_test_router)
-app.include_router(datasets_router)
-app.include_router(system_router)
-app.include_router(legal_router)
+# Include v1 router only
+app.include_router(v1_router)
 
 
 # WebSocket endpoint for real-time processing updates

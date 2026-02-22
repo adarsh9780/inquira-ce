@@ -74,20 +74,20 @@
       
       <!-- Schema Content -->
       <div v-else-if="hasActiveDataset">
-        <!-- Schema Generating Banner -->
-        <div v-if="isSchemaBeingGenerated" class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+        <!-- Schema Hint Banner -->
+        <div v-if="schemaNeedsDescriptions && !isRegenerating" class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
           <div class="flex items-center gap-3">
             <div class="flex-shrink-0">
-              <svg class="w-5 h-5 text-amber-600 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              <svg class="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"></circle>
+                <path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 8v5"></path>
+                <circle cx="12" cy="16.5" r="1" fill="currentColor"></circle>
               </svg>
             </div>
             <div class="flex-1">
-              <h4 class="text-sm font-medium text-amber-800">Schema Generation in Progress</h4>
+              <h4 class="text-sm font-medium text-amber-800">Schema Descriptions Not Generated Yet</h4>
               <p class="text-xs text-amber-600 mt-0.5">
-                AI is analyzing your data to generate meaningful column descriptions. This usually takes 10-30 seconds. 
-                The page will automatically refresh when ready.
+                These column descriptions are still blank. Click <strong>Regenerate</strong> to generate AI descriptions.
               </p>
             </div>
           </div>
@@ -149,17 +149,13 @@ const hasActiveDataset = computed(() => {
   return appStore.dataFilePath && appStore.dataFilePath.trim() !== ''
 })
 
-// Computed to check if schema has empty descriptions (being generated in background)
-const isSchemaBeingGenerated = computed(() => {
+// Computed to detect placeholder schema rows with blank descriptions.
+const schemaNeedsDescriptions = computed(() => {
   if (!schema.value || schema.value.length === 0) return false
-  // Check if all descriptions are empty and context is empty
   const allEmpty = schema.value.every(col => !col.description || col.description.trim() === '')
   const emptyContext = !schemaContext.value || schemaContext.value.trim() === ''
   return allEmpty && emptyContext
 })
-
-// Auto-poll interval for schema refresh when being generated
-let schemaPollingInterval = null
 
 // Progress tracking for modal
 const regenerationStatus = ref('Initializing...')
@@ -193,69 +189,7 @@ function formatElapsedTime(ms) {
 
 onUnmounted(() => {
   stopTimer()
-  stopSchemaPolling()
 })
-
-// Auto-poll for schema updates when initially empty
-let pollingAttempts = 0
-const MAX_POLLING_ATTEMPTS = 20 // Stop after ~60 seconds (20 * 3s)
-
-function startSchemaPolling() {
-  if (schemaPollingInterval) return
-  pollingAttempts = 0
-  console.debug('🔄 [Schema] Starting auto-poll for schema updates (max 60s)')
-  schemaPollingInterval = setInterval(async () => {
-    pollingAttempts++
-    
-    // Stop if schema generation is complete
-    if (!isSchemaBeingGenerated.value) {
-      console.debug('✅ [Schema] Schema generation complete, stopping poll')
-      stopSchemaPolling()
-      return
-    }
-    
-    // Stop after max attempts
-    if (pollingAttempts >= MAX_POLLING_ATTEMPTS) {
-      console.debug('⚠️ [Schema] Max polling attempts reached, stopping poll. Click Regenerate to try again.')
-      stopSchemaPolling()
-      return
-    }
-    
-    console.debug(`🔄 [Schema] Polling for updated schema... (attempt ${pollingAttempts}/${MAX_POLLING_ATTEMPTS})`)
-    await silentFetchSchema() // Silent refresh without loading state
-  }, 3000) // Poll every 3 seconds
-}
-
-function stopSchemaPolling() {
-  if (schemaPollingInterval) {
-    clearInterval(schemaPollingInterval)
-    schemaPollingInterval = null
-    pollingAttempts = 0
-  }
-}
-
-// Silent fetch for background polling - doesn't show loading state or clear existing data
-async function silentFetchSchema() {
-  try {
-    const settings = await previewService.getSettings(true)
-    if (!settings.data_path) return
-    
-    const existingSchema = await previewService.loadSchema(settings.data_path, true)
-    if (existingSchema && existingSchema.columns) {
-      // Check if descriptions are now filled (generation complete)
-      const hasDescriptions = existingSchema.columns.some(col => col.description && col.description.trim() !== '')
-      if (hasDescriptions || (existingSchema.context && existingSchema.context.trim() !== '')) {
-        console.debug('✅ [Schema] Poll found completed schema with descriptions!')
-        schema.value = existingSchema.columns
-        schemaContext.value = existingSchema.context || ''
-        stopSchemaPolling()
-      }
-    }
-  } catch (e) {
-    console.warn('🔄 [Schema] Silent poll failed:', e)
-    // Don't show error - just continue polling
-  }
-}
 
 async function fetchSchemaData(forceRefresh = false) {
   if (schemaLoading.value) return
@@ -271,17 +205,16 @@ async function fetchSchemaData(forceRefresh = false) {
     }
     try {
       console.debug('📋 [Schema] Loading schema for:', settings.data_path, 'forceRefresh:', forceRefresh)
-      const existingSchema = await previewService.loadSchema(settings.data_path, forceRefresh)
+      const existingSchema = await previewService.loadSchema(
+        settings.data_path,
+        forceRefresh,
+        appStore.ingestedTableName || null
+      )
       console.debug('📋 [Schema] Response:', existingSchema)
       if (existingSchema && existingSchema.columns) {
         console.debug('📋 [Schema] Loaded', existingSchema.columns.length, 'columns')
         schema.value = existingSchema.columns
         schemaContext.value = existingSchema.context || ''
-        
-        // Start polling if schema is still being generated
-        if (isSchemaBeingGenerated.value) {
-          startSchemaPolling()
-        }
       } else {
         console.warn('📋 [Schema] No columns in response:', existingSchema)
         schemaError.value = 'Schema has no columns. Try clicking Refresh.'
@@ -307,18 +240,34 @@ async function fetchSchemaDataForPath(dataPath) {
   try {
     console.debug('📋 [Schema] Loading schema for path (direct):', dataPath)
     // Force refresh to bypass cache
-    const existingSchema = await previewService.loadSchema(dataPath, true)
+    const existingSchema = await previewService.loadSchema(
+      dataPath,
+      true,
+      appStore.ingestedTableName || null
+    )
     console.debug('📋 [Schema] Response:', existingSchema)
     if (existingSchema && existingSchema.columns) {
       console.debug('📋 [Schema] Loaded', existingSchema.columns.length, 'columns')
       schema.value = existingSchema.columns
       schemaContext.value = existingSchema.context || ''
+      // Auto-trigger generation when schema is placeholder-only for a newly selected dataset.
+      if (schemaNeedsDescriptions.value && appStore.apiKeyConfigured) {
+        await regenerateSchemaForPath(dataPath, appStore.ingestedTableName || null)
+      }
     } else {
       console.warn('📋 [Schema] No columns in response:', existingSchema)
-      schemaError.value = 'Schema has no columns. Try clicking Refresh or Regenerate.'
+      if (appStore.apiKeyConfigured) {
+        await regenerateSchemaForPath(dataPath, appStore.ingestedTableName || null)
+      } else {
+        schemaError.value = 'Schema has no columns. Set API key and click Regenerate.'
+      }
     }
   } catch (loadError) {
     console.error('📋 [Schema] Failed to load schema:', loadError)
+    if ((loadError?.status === 422 || loadError?.response?.status === 422) && appStore.apiKeyConfigured) {
+      await regenerateSchemaForPath(dataPath, appStore.ingestedTableName || null)
+      return
+    }
     schemaError.value = `Failed to load schema: ${loadError.message || 'Unknown error'}`
   } finally {
     schemaLoading.value = false
@@ -353,6 +302,13 @@ function refreshSchema() {
 }
 
 async function regenerateSchema() {
+  const settings = await previewService.getSettings()
+  const dataPath = settings?.data_path || appStore.dataFilePath || ''
+  const tableName = appStore.ingestedTableName || null
+  await regenerateSchemaForPath(dataPath, tableName)
+}
+
+async function regenerateSchemaForPath(dataPath, tableName = null) {
   if (schemaLoading.value) return
   schemaLoading.value = true
   schemaError.value = ''
@@ -362,28 +318,39 @@ async function regenerateSchema() {
   startTimer()
 
   try {
-    regenerationStatus.value = 'Loading settings...'
+    regenerationStatus.value = 'Loading dataset context...'
     regenerationProgress.value = 10
-    const settings = await previewService.getSettings()
-    if (!settings.data_path) {
+    const normalizedPath = (dataPath || '').trim()
+    if (!normalizedPath) {
       schemaError.value = 'Please configure your data file path in settings first.'
       return
     }
 
     regenerationStatus.value = 'Analyzing data columns with AI...'
     regenerationProgress.value = 30
-    console.debug('🔄 [Schema] Regenerating schema with LLM for:', settings.data_path)
+    console.debug('🔄 [Schema] Regenerating schema with LLM for:', normalizedPath)
 
-    // Call generateSchema which uses LLM to create proper descriptions (force=true to regenerate)
-    const generatedSchema = await apiService.generateSchema(settings.data_path, null, true)
+    // Use v1 backend regeneration endpoint when workspace/table context is available.
+    const saveTableName = (tableName || appStore.ingestedTableName || '').trim()
+    const generatedSchema = (saveTableName && appStore.activeWorkspaceId)
+      ? await apiService.v1RegenerateDatasetSchema(appStore.activeWorkspaceId, saveTableName, {
+          context: schemaContext.value || ''
+        })
+      : await apiService.generateSchema(normalizedPath, schemaContext.value || null, true)
     console.debug('🔄 [Schema] Generated:', generatedSchema)
 
     if (generatedSchema && generatedSchema.columns) {
       regenerationStatus.value = `Saving ${generatedSchema.columns.length} column descriptions...`
       regenerationProgress.value = 80
 
-      // Save the generated schema
-      await apiService.saveSchema(settings.data_path, generatedSchema.context || null, generatedSchema.columns)
+      // Legacy fallback path requires explicit save after generation.
+      if (!saveTableName || !appStore.activeWorkspaceId) {
+        await apiService.saveSchema(
+          normalizedPath,
+          generatedSchema.context || null,
+          generatedSchema.columns
+        )
+      }
       console.debug('✅ [Schema] Saved regenerated schema')
 
       regenerationStatus.value = 'Finalizing...'
@@ -405,7 +372,12 @@ async function regenerateSchema() {
     }
   } catch (error) {
     console.error('❌ [Schema] Regeneration failed:', error)
-    schemaError.value = `Failed to regenerate schema: ${error.message || 'Unknown error'}`
+    const status = error?.response?.status || error?.status
+    const detail = error?.response?.data?.detail || error?.data?.detail || error?.message || 'Unknown error'
+    schemaError.value = `Failed to regenerate schema: ${detail}`
+    if (status === 401) {
+      schemaError.value = 'Failed to regenerate schema: please log in again (session expired).'
+    }
   } finally {
     stopTimer()
     schemaLoading.value = false
@@ -417,6 +389,7 @@ async function regenerateSchema() {
 function handleDatasetSwitch(event) {
   // Get path from event detail, or fallback to appStore
   const newDataPath = event?.detail?.dataPath
+  const newTableName = event?.detail?.tableName
   console.debug('📢 Dataset switched event:', event)
   console.debug('📢 Event detail:', event?.detail)
   console.debug('📢 Data path from event:', newDataPath)
@@ -438,6 +411,9 @@ function handleDatasetSwitch(event) {
   // If we have the new path from the event, use it directly
   if (newDataPath) {
     console.debug('📢 Using path from event:', newDataPath)
+    if (newTableName) {
+      appStore.setIngestedTableName(newTableName)
+    }
     fetchSchemaDataForPath(newDataPath)
   } else {
     // Fallback: try to get from appStore (should be set before event is dispatched)

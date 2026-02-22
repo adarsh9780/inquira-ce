@@ -9,10 +9,25 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = ref(false)
   const isLoading = ref(false)
   const error = ref('')
+  const plan = ref('FREE')
 
   // Computed
   const username = computed(() => user.value?.username || '')
   const userId = computed(() => user.value?.user_id || '')
+  const planLabel = computed(() => String(plan.value || 'FREE').toUpperCase())
+
+  async function refreshPlan() {
+    try {
+      const profile = await apiService.v1GetCurrentUser()
+      if (profile?.plan) {
+        plan.value = profile.plan
+      }
+    } catch (_err) {
+      if (!plan.value) {
+        plan.value = 'FREE'
+      }
+    }
+  }
 
   // Actions
   async function checkAuth() {
@@ -22,17 +37,23 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = ''
 
     try {
-      const result = await apiService.verifyAuth()
-      if (result && result.user) {
-        user.value = result.user
+      const profile = await apiService.v1GetCurrentUser()
+      if (profile && profile.user_id) {
+        user.value = {
+          user_id: profile.user_id,
+          username: profile.username
+        }
         isAuthenticated.value = true
+        plan.value = profile.plan || 'FREE'
       } else {
         user.value = null
         isAuthenticated.value = false
+        plan.value = 'FREE'
       }
     } catch (err) {
       user.value = null
       isAuthenticated.value = false
+      plan.value = 'FREE'
       // Don't set error.value for auth check failures - this is expected for unauthenticated users
     } finally {
       isLoading.value = false
@@ -46,12 +67,13 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = ''
 
     try {
-      const result = await apiService.login(username, password)
+      const result = await apiService.v1Login(username, password)
       user.value = {
         user_id: result.user_id,
-        username: username
+        username: result.username || username
       }
       isAuthenticated.value = true
+      plan.value = result.plan || 'FREE'
       error.value = ''
       return true
     } catch (error) {
@@ -79,7 +101,14 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = ''
 
     try {
-      const result = await apiService.register(username, password)
+      const result = await apiService.v1Register(username, password)
+      user.value = {
+        user_id: result.user_id,
+        username: result.username || username
+      }
+      isAuthenticated.value = true
+      plan.value = result.plan || 'FREE'
+      error.value = ''
       return true
     } catch (error) {
       console.error('❌ Registration failed:', error)
@@ -105,7 +134,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading.value = true
 
     try {
-      await apiService.logout()
+      await apiService.v1Logout()
 
       if (settingsWebSocket.isPersistentMode) {
         settingsWebSocket.disconnectPersistent()
@@ -113,6 +142,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       user.value = null
       isAuthenticated.value = false
+      plan.value = 'FREE'
       error.value = ''
     } catch (error) {
       console.error('❌ Logout failed:', error)
@@ -124,6 +154,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       user.value = null
       isAuthenticated.value = false
+      plan.value = 'FREE'
     } finally {
       isLoading.value = false
     }
@@ -172,6 +203,7 @@ export const useAuthStore = defineStore('auth', () => {
       // Clear local state immediately
       user.value = null
       isAuthenticated.value = false
+      plan.value = 'FREE'
       error.value = ''
 
       return true
@@ -209,16 +241,19 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     isLoading,
     error,
+    plan,
 
     // Computed
     username,
     userId,
+    planLabel,
 
     // Actions
     checkAuth,
     login,
     register,
     logout,
+    refreshPlan,
     changePassword,
     deleteAccount,
     clearError

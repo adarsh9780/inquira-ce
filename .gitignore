@@ -26,7 +26,10 @@ notebooks/*
 .pytest_cache
 .venv
 .vscode
-commit_message.txt
+commit_message
+AGENTS.md
+GEMINI.md
 
 # Pyodide offline dependencies
 backend/app/static/pyodide/
+dummy.md

@@ -191,7 +191,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue'
+import { useAppStore } from '../../stores/appStore'
 import { XMarkIcon, CommandLineIcon, RectangleStackIcon, EyeIcon, LightBulbIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -202,22 +203,18 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close'])
+const appStore = useAppStore()
 
 const dontShowAgain = ref(false)
 
-// Load user preference from localStorage
-onMounted(() => {
-  const savedPreference = localStorage.getItem('shortcuts-modal-hide')
-  if (savedPreference === 'true') {
-    dontShowAgain.value = true
+watch(() => props.isOpen, (open) => {
+  if (open) {
+    dontShowAgain.value = !!appStore.hideShortcutsModal
   }
 })
 
-// Save user preference to localStorage
 function savePreference() {
-  if (dontShowAgain.value) {
-    localStorage.setItem('shortcuts-modal-hide', 'true')
-  }
+  appStore.setHideShortcutsModal(dontShowAgain.value)
 }
 
 function closeModal() {

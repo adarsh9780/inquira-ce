@@ -1,8 +1,8 @@
 import { apiService } from './apiService'
 import { cacheService } from './cacheService'
 import { useAppStore } from '../stores/appStore'
-import { duckdbService } from './duckdbService'
-import { buildPreviewSql, isBrowserDataPath } from '../utils/previewRouting'
+import { isBrowserDataPath } from '../utils/previewRouting'
+import { inferTableNameFromDataPath } from '../utils/chatBootstrap'
 
 class PreviewService {
   constructor() {
@@ -11,84 +11,101 @@ class PreviewService {
   }
 
   async getBrowserPreview(sampleType = 'random') {
+    return this.getDataPreview(sampleType)
+  }
+
+  // Get data preview with caching
+  async getDataPreview(sampleType = 'random', forceRefresh = false, tableNameOverride = null) {
     const appStore = useAppStore()
-    const tableName = appStore.ingestedTableName
+    if (!appStore.hasWorkspace) {
+      return {
+        success: true,
+        data: [],
+        row_count: 0,
+        sample_type: sampleType,
+        message: 'Create a workspace to start previewing data.'
+      }
+    }
+    const dataPath = appStore.schemaFileId || appStore.dataFilePath
+    const tableName = (
+      tableNameOverride ||
+      appStore.ingestedTableName ||
+      inferTableNameFromDataPath(dataPath || '')
+    ).trim()
     if (!tableName) {
       return {
         success: true,
         data: [],
         row_count: 0,
         sample_type: sampleType,
-        message: 'No browser table loaded yet.'
+        message: 'Select a dataset to preview.'
       }
     }
-
-    const sql = buildPreviewSql(tableName, sampleType, 100)
-    const rows = await duckdbService.query(sql)
-    const data = rows.map((row) => {
-      const out = {}
-      for (const [key, value] of Object.entries(row)) {
-        out[key] = typeof value === 'bigint' ? Number(value) : value
-      }
-      return out
-    })
-
-    return {
-      success: true,
-      data,
-      row_count: data.length,
-      file_path: `browser://${tableName}`,
-      sample_type: sampleType,
-      message: `Loaded ${data.length} ${sampleType} sample rows from browser DuckDB.`
-    }
-  }
-
-  // Get data preview with caching
-  async getDataPreview(sampleType = 'random', forceRefresh = false) {
-    const appStore = useAppStore()
-    const dataPath = appStore.schemaFileId || appStore.dataFilePath
 
     if (isBrowserDataPath(dataPath)) {
       const localKey = cacheService.generateKey('data/preview/local', {
         sampleType,
         table: appStore.ingestedTableName || ''
       })
+      const fetcher = () => apiService.v1GetDatasetPreview(
+        appStore.activeWorkspaceId,
+        tableName,
+        sampleType,
+        100
+      ).then((resp) => ({
+        success: true,
+        data: resp?.data || [],
+        row_count: resp?.row_count || 0,
+        sample_type: resp?.sample_type || sampleType,
+        message: `Loaded ${resp?.row_count || 0} rows`
+      }))
       if (forceRefresh) {
-        return cacheService.refresh(localKey, () => this.getBrowserPreview(sampleType), this.cacheExpiry)
+        return cacheService.refresh(localKey, fetcher, this.cacheExpiry)
       }
-      return cacheService.getOrSet(localKey, () => this.getBrowserPreview(sampleType), this.cacheExpiry)
+      return cacheService.getOrSet(localKey, fetcher, this.cacheExpiry)
     }
 
-    const cacheKey = cacheService.generateKey('data/preview', { sampleType })
+    const cacheKey = cacheService.generateKey('data/preview', { sampleType, tableName, workspace: appStore.activeWorkspaceId })
+    const fetcher = () => apiService.v1GetDatasetPreview(
+      appStore.activeWorkspaceId,
+      tableName,
+      sampleType,
+      100
+    ).then((resp) => ({
+      success: true,
+      data: resp?.data || [],
+      row_count: resp?.row_count || 0,
+      sample_type: resp?.sample_type || sampleType,
+      message: `Loaded ${resp?.row_count || 0} rows`
+    }))
 
     if (forceRefresh) {
-      return cacheService.refresh(cacheKey,
-        () => apiService.getDataPreview(sampleType),
-        this.cacheExpiry
-      )
+      return cacheService.refresh(cacheKey, fetcher, this.cacheExpiry)
     }
 
-    return cacheService.getOrSet(cacheKey,
-      () => apiService.getDataPreview(sampleType),
-      this.cacheExpiry
-    )
+    return cacheService.getOrSet(cacheKey, fetcher, this.cacheExpiry)
   }
 
   // Load schema with caching
-  async loadSchema(filepath, forceRefresh = false) {
-    const cacheKey = cacheService.generateKey('schema/load', { filepath })
+  async loadSchema(filepath, forceRefresh = false, tableNameOverride = null) {
+    const appStore = useAppStore()
+    const dataPath = filepath || appStore.schemaFileId || appStore.dataFilePath
+    const tableName = (
+      tableNameOverride ||
+      appStore.ingestedTableName ||
+      inferTableNameFromDataPath(dataPath || '')
+    ).trim()
+    if (!appStore.activeWorkspaceId || !tableName) {
+      return { table_name: '', columns: [] }
+    }
+    const cacheKey = cacheService.generateKey('schema/load', { workspace: appStore.activeWorkspaceId, tableName })
+    const fetcher = () => apiService.v1GetDatasetSchema(appStore.activeWorkspaceId, tableName)
 
     if (forceRefresh) {
-      return cacheService.refresh(cacheKey,
-        () => apiService.loadSchema(filepath),
-        this.schemaCacheExpiry
-      )
+      return cacheService.refresh(cacheKey, fetcher, this.schemaCacheExpiry)
     }
 
-    return cacheService.getOrSet(cacheKey,
-      () => apiService.loadSchema(filepath),
-      this.schemaCacheExpiry
-    )
+    return cacheService.getOrSet(cacheKey, fetcher, this.schemaCacheExpiry)
   }
 
   // Generate schema with caching (more careful with this one as it's expensive)

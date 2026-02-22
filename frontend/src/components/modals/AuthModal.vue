@@ -199,7 +199,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'authenticated'])
 
 const authStore = useAuthStore()
 const isLoginMode = ref(true)
@@ -320,15 +320,16 @@ async function handleSubmit() {
 
       if (success) {
         isShowingSuccessSpinner.value = true
-        showMessage('Sign in successful', 'success')
+        showMessage('Account created. You are now signed in.', 'success')
         authStore.clearError() // Clear any previous errors
 
-        // Switch to login mode after successful registration
+        emit('authenticated', authStore.user)
+
         setTimeout(() => {
           isShowingSuccessSpinner.value = false
-          isLoginMode.value = true
+          emit('close')
           resetForm()
-        }, 2000)
+        }, 1200)
       } else {
         // Registration failed - display error message on the card
         console.debug('Registration failed with error:', authStore.error)

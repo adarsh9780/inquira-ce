@@ -20,13 +20,14 @@
       <button
         @click="handleSubmit"
         :disabled="!canSend"
-        class="absolute top-1/2 -translate-y-1/2 right-4 sm:right-5 p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all duration-200 shadow-sm"
+        class="absolute bottom-3 right-3 p-2.5 rounded-xl transition-all duration-200 shadow-sm z-40 flex-shrink-0"
         :class="canSend
-          ? 'text-white bg-primary-600 hover:bg-primary-700'
-          : 'text-gray-400 bg-gray-100 cursor-not-allowed'
+          ? 'text-white bg-primary-600 hover:bg-primary-700 hover:scale-105 active:scale-95'
+          : 'text-gray-400 bg-gray-200 cursor-not-allowed'
         "
+        :title="canSend ? 'Send question' : 'Fill requirements to enable send'"
       >
-        <PaperAirplaneIcon class="h-4 w-4 sm:h-5 sm:w-5" />
+        <PaperAirplaneIcon class="h-5 w-5" />
       </button>
 
     </div>
@@ -39,16 +40,19 @@
           <ExclamationTriangleIcon class="h-5 w-5 text-error" />
         </div>
         <div>
-          <h4 class="text-sm font-semibold text-error mb-2">API Key Required</h4>
-          <p class="text-sm text-gray-700 mb-3">You need to provide your Gemini API key to start chatting:</p>
+          <h4 class="text-sm font-semibold text-error mb-2">Setup Required</h4>
+          <p class="text-sm text-gray-700 mb-3">Before chatting, complete this setup:</p>
           <ul class="space-y-2 text-sm text-gray-700">
+            <li class="flex items-center space-x-2">
+              <div class="w-1.5 h-1.5 rounded-full bg-error"></div>
+              <span>Create or select a workspace from the header dropdown</span>
+            </li>
             <li class="flex items-center space-x-2">
               <div class="w-1.5 h-1.5 rounded-full bg-error"></div>
               <span>Enter your Gemini API key in Settings</span>
             </li>
           </ul>
-          <p class="text-xs text-gray-600 mt-3">Data and schema files are optional - you can chat about general topics without them.</p>
-          <p class="text-xs text-gray-600">Click the Settings button in the top toolbar to add your API key.</p>
+          <p class="text-xs text-gray-600 mt-3">Click the Settings button in the top toolbar to add your API key.</p>
         </div>
       </div>
     </div>
@@ -59,12 +63,9 @@
 import { ref, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import apiService from '../../services/apiService'
-import pyodideService from '../../services/pyodideService'
-import { duckdbService } from '../../services/duckdbService'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { buildBrowserDataPath, hasUsableIngestedColumns, inferTableNameFromDataPath } from '../../utils/chatBootstrap'
-import { ensureBrowserTableReady } from '../../utils/browserTableRecovery'
+import { buildBrowserDataPath, inferTableNameFromDataPath } from '../../utils/chatBootstrap'
 import {
   PaperAirplaneIcon,
   ExclamationTriangleIcon
@@ -81,63 +82,80 @@ const canSend = computed(() => {
          !appStore.isLoading
 })
 
-async function buildColumnsWithSamples(tableName, columns) {
-  const result = []
-  for (const col of columns) {
-    const columnName = col?.name
-    const columnType = col?.type || col?.dtype || 'VARCHAR'
-    if (!columnName) continue
-
-    try {
-      const rows = await duckdbService.query(
-        `SELECT DISTINCT "${columnName}" AS sample FROM ${tableName} LIMIT 5`
-      )
-      const samples = rows.map((row) => {
-        const value = row.sample
-        return typeof value === 'bigint' ? Number(value) : value
-      })
-      result.push({ name: columnName, dtype: columnType, samples })
-    } catch (_err) {
-      result.push({ name: columnName, dtype: columnType, samples: [] })
-    }
-  }
-  return result
+function isBrowserVirtualPath(path) {
+  const normalized = String(path || '').toLowerCase()
+  return normalized.startsWith('browser://') || normalized.startsWith('browser:/') || normalized.startsWith('/browser:/')
 }
 
-async function ensureBackendSchemaReadyForChat() {
-  const tableName = appStore.ingestedTableName
-  const backendDataPath = buildBrowserDataPath(tableName)
-  if (!backendDataPath) return
+function isRecoverableBrowserTableError(error) {
+  const message = String(error?.message || '')
+  return (
+    message.includes('Dataset is not loaded in this browser session') ||
+    message.includes('No saved data file handle found') ||
+    message.includes('Saved file reference is stale') ||
+    message.includes('Data file permission was not granted') ||
+    message.includes('Dataset could not be loaded in this browser session')
+  )
+}
 
-  await apiService.setDataPathSimple(backendDataPath)
+async function ensureWorkspaceDatasetReady() {
+  if (!appStore.activeWorkspaceId || !appStore.dataFilePath) return
+  const tableName = (
+    appStore.ingestedTableName ||
+    inferTableNameFromDataPath(appStore.schemaFileId) ||
+    inferTableNameFromDataPath(appStore.dataFilePath)
+  ).trim()
+  if (!tableName) {
+    throw new Error('Dataset sync failed: missing selected table name.')
+  }
 
-  if (appStore.schemaContext.trim()) {
-    await apiService.setContext(appStore.schemaContext.trim())
+  if (isBrowserVirtualPath(appStore.dataFilePath) || isBrowserVirtualPath(appStore.schemaFileId)) {
+    const columns = (Array.isArray(appStore.ingestedColumns) ? appStore.ingestedColumns : []).map((col) => ({
+      ...col,
+      samples: appStore.allowSchemaSampleValues && Array.isArray(col?.samples) ? col.samples : []
+    }))
+    await apiService.v1SyncBrowserDataset(appStore.activeWorkspaceId, {
+      table_name: tableName,
+      columns,
+      row_count: null,
+      allow_sample_values: appStore.allowSchemaSampleValues
+    })
+    return
   }
 
   try {
-    await apiService.loadSchema(backendDataPath)
-    appStore.setIsSchemaFileUploaded(true)
-    appStore.setSchemaFileId(backendDataPath)
+    await apiService.v1AddDataset(appStore.activeWorkspaceId, appStore.dataFilePath)
     return
-  } catch (error) {
-    if (error.response?.status !== 404) {
-      throw error
+  } catch (_error) {
+    throw new Error('Dataset sync failed: selected file could not be attached to workspace.')
+  }
+}
+
+function buildActiveSchemaPayload() {
+  const tableName = (
+    appStore.ingestedTableName ||
+    inferTableNameFromDataPath(appStore.schemaFileId) ||
+    inferTableNameFromDataPath(appStore.dataFilePath)
+  ).trim()
+
+  if (!tableName) return { tableName: null, activeSchema: null }
+
+  const columns = (Array.isArray(appStore.ingestedColumns) ? appStore.ingestedColumns : [])
+    .filter((col) => col?.name)
+    .map((col) => ({
+      name: col.name,
+      dtype: col.type || col.dtype || 'VARCHAR',
+      description: col.description || '',
+      samples: appStore.allowSchemaSampleValues && Array.isArray(col.samples) ? col.samples : []
+    }))
+
+  return {
+    tableName,
+    activeSchema: {
+      table_name: tableName,
+      columns
     }
   }
-
-  if (!hasUsableIngestedColumns(appStore.ingestedColumns)) {
-    return
-  }
-
-  const columnsWithSamples = await buildColumnsWithSamples(tableName, appStore.ingestedColumns)
-  await apiService.generateSchemaFromColumns(
-    tableName,
-    columnsWithSamples,
-    appStore.schemaContext.trim() || null
-  )
-  appStore.setIsSchemaFileUploaded(true)
-  appStore.setSchemaFileId(backendDataPath)
 }
 
 async function handleSubmit() {
@@ -172,34 +190,12 @@ async function handleSubmit() {
       appStore.setSchemaFileId(buildBrowserDataPath(expectedTableName))
     }
 
-    const tableHealth = await ensureBrowserTableReady({
-      expectedTableName
-    })
-    if (tableHealth.recovered) {
-      appStore.setIngestedTableName(tableHealth.tableName)
-      if (Array.isArray(tableHealth.columns) && tableHealth.columns.length > 0) {
-        appStore.setIngestedColumns(tableHealth.columns)
-      }
-      appStore.setDataFilePath(buildBrowserDataPath(tableHealth.tableName))
-      appStore.setSchemaFileId(buildBrowserDataPath(tableHealth.tableName))
+    if (!appStore.activeWorkspaceId) {
+      throw new Error('Create/select a workspace before analysis.')
     }
 
-    // Get current Python file content if available
-    const userCode = appStore.pythonFileContent || null
-
-    // Prepare the request data
-    const requestData = {
-      current_code: appStore.pythonFileContent || '',
-      question: questionText,
-      model: appStore.selectedModel,
-      context: appStore.schemaContext.trim() || null
-    }
-
-    // Log the request for debugging
-    console.debug('📤 Sending request to /chat endpoint:', requestData)
-
-    // Keep backend session aligned with browser-native dataset and schema before chat
-    await ensureBackendSchemaReadyForChat()
+    // Hard invariant: selected dataset must be synced to the active workspace before analyze.
+    await ensureWorkspaceDatasetReady()
 
     // Set up timeout timers
     warningTimer = setTimeout(() => {
@@ -212,30 +208,60 @@ async function handleSubmit() {
     }, 300000) // 5 minutes
 
     let response
+    const schemaPayload = buildActiveSchemaPayload()
     try {
-      response = await apiService.analyzeDataStream(requestData, {
-        signal,
-        onEvent: (evt) => {
-          if (evt.event === 'status' && evt.data?.message) {
-            appStore.updateLastMessageExplanation(evt.data.message)
-            return
-          }
-          if (evt.event === 'node' && evt.data?.node) {
-            appStore.updateLastMessageExplanation(`Running: ${evt.data.node}...`)
+      response = await apiService.v1AnalyzeStream(
+        {
+          workspace_id: appStore.activeWorkspaceId,
+          conversation_id: appStore.activeConversationId || null,
+          question: questionText,
+          current_code: appStore.pythonFileContent || '',
+          model: appStore.selectedModel,
+          context: appStore.schemaContext.trim() || null,
+          table_name: schemaPayload.tableName,
+          active_schema: schemaPayload.activeSchema,
+          api_key: null
+        },
+        {
+          signal,
+          onEvent: (evt) => {
+            if (evt.event === 'status' && evt.data?.message) {
+              appStore.updateLastMessageExplanation(evt.data.message)
+              return
+            }
+            if (evt.event === 'node' && evt.data?.node) {
+              appStore.updateLastMessageExplanation(`Running: ${evt.data.node}...`)
+            }
           }
         }
-      })
+      )
     } catch (streamError) {
-      // Backward-compatible fallback if streaming endpoint is unavailable.
+      // Fallback if streaming fails or is unsupported
       if (streamError?.status === 404 || streamError?.status === 405) {
-        response = await apiService.analyzeData(requestData, signal)
+        response = await apiService.v1Analyze({
+          workspace_id: appStore.activeWorkspaceId,
+          conversation_id: appStore.activeConversationId || null,
+          question: questionText,
+          current_code: appStore.pythonFileContent || '',
+          model: appStore.selectedModel,
+          context: appStore.schemaContext.trim() || null,
+          table_name: schemaPayload.tableName,
+          active_schema: schemaPayload.activeSchema,
+          api_key: null
+        })
       } else {
         throw streamError
       }
     }
 
+    if (response?.conversation_id && response.conversation_id !== appStore.activeConversationId) {
+      appStore.setActiveConversationId(response.conversation_id)
+      await appStore.fetchConversations()
+    }
+
     // Parse the response with new format
-    const { is_safe, is_relevant, code, explanation } = response
+    const { is_safe, is_relevant, code, current_code, explanation } = response
+    const finalCode = (code ?? current_code ?? '').toString()
 
     // Check if the query is safe and relevant
     if (!is_safe) {
@@ -249,51 +275,26 @@ async function handleSubmit() {
 
     // Update the last message with the explanation
     appStore.updateLastMessageExplanation(explanation)
-    appStore.setGeneratedCode(code)
+    appStore.setGeneratedCode(finalCode)
+    // Write directly to editor state so UI updates even if generatedCode watcher misses this cycle.
+    if (finalCode.trim()) {
+      appStore.setPythonFileContent(finalCode)
+    }
 
-    // Execute the code locally if code was generated
-    if (code && code.trim()) {
-      try {
-        appStore.setTerminalOutput('Executing with Python WebAssembly...\n')
-        
-        // Execute the code in Pyodide
-        const result = await pyodideService.executePython(code)
-        
-        if (result.success) {
-           appStore.addHistoricalCodeBlock(code) // Save it so we can restore on reload
-           
-           if (result.stdout || result.stderr) {
-              appStore.setTerminalOutput(result.stdout + '\n' + result.stderr)
-           } else {
-              appStore.setTerminalOutput('Execution successful. No terminal output.')
-           }
-           
-           // Based on what type of result Wasm returns, populate the UI
-           if (result.resultType === 'dict' && result.result?.data && result.result?.layout) {
-              // Plotly figure
-              appStore.setPlotlyFigure(result.result)
-              appStore.setResultData(null)
-              appStore.setActiveTab('chart')
-           } else if (result.resultType === 'dict' && result.result?.columns && result.result?.data) {
-              // Pandas DataFrame format
-              appStore.setResultData(result.result)
-              appStore.setPlotlyFigure(null)
-              appStore.setActiveTab('table')
-           } else {
-              // Bare code logic
-              appStore.setActiveTab('code')
-           }
+    // Display the generated code and any execution results from the backend
+    if (finalCode && finalCode.trim()) {
+      appStore.setTerminalOutput(response.stdout || response.terminal_output || 'Code generated successfully.')
 
-        } else {
-           // Execution failed locally
-           appStore.setTerminalOutput('Error executing code:\n' + result.error)
-           appStore.setActiveTab('code')
-           toast.error('Execution Failed', 'The generated code failed to run locally.')
-        }
-        
-      } catch (err) {
-        console.error('Pyodide execution error:', err)
-        appStore.setTerminalOutput('Critical error running WebAssembly: ' + err.message)
+      // Check for result data from server-side execution
+      if (response.plotly_figure || (response.result?.data && response.result?.layout)) {
+        appStore.setPlotlyFigure(response.plotly_figure || response.result)
+        appStore.setResultData(null)
+        appStore.setActiveTab('chart')
+      } else if (response.result?.columns && response.result?.data) {
+        appStore.setResultData(response.result)
+        appStore.setPlotlyFigure(null)
+        appStore.setActiveTab('table')
+      } else {
         appStore.setActiveTab('code')
       }
     } else {

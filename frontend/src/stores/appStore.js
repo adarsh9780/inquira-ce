@@ -1,12 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { apiService } from '../services/apiService'
-
-// Local storage keys
-const STORAGE_KEYS = {
-  CONFIG: 'llm-analysis-config',
-  SESSION: 'llm-analysis-session-id'
-}
+import { localStateService } from '../services/localStateService'
 
 export const useAppStore = defineStore('app', () => {
 
@@ -22,9 +17,11 @@ export const useAppStore = defineStore('app', () => {
   // LLM Configuration
   const selectedModel = ref('gemini-2.5-flash')
   const apiKey = ref('')
+  const apiKeyConfigured = ref(false)
 
   // Schema Context
   const schemaContext = ref('')
+  const allowSchemaSampleValues = ref(false)
 
 
   // Single Python File per Session (simplified)
@@ -34,6 +31,12 @@ export const useAppStore = defineStore('app', () => {
   const chatHistory = ref([])
   const currentQuestion = ref('')
   const currentExplanation = ref('')
+  const workspaces = ref([])
+  const workspaceDeletionJobs = ref([])
+  const activeWorkspaceId = ref('')
+  const conversations = ref([])
+  const activeConversationId = ref('')
+  const turnsNextCursor = ref(null)
 
   // Wasm Execution State
   const historicalCodeBlocks = ref([]) // Tracks successfully executed code snippets
@@ -50,6 +53,7 @@ export const useAppStore = defineStore('app', () => {
   const isChatOverlayOpen = ref(true)
   const chatOverlayWidth = ref(0.25) // 25% of area
   const isSidebarCollapsed = ref(true)
+  const hideShortcutsModal = ref(false)
 
   // UI State
   const isLoading = ref(false)
@@ -64,108 +68,141 @@ export const useAppStore = defineStore('app', () => {
   // Computed
   const hasDataFile = computed(() => dataFilePath.value.trim() !== '')
   const hasSchemaFile = computed(() => schemaFilePath.value.trim() !== '' || isSchemaFileUploaded.value)
-  const canAnalyze = computed(() => apiKey.value.trim() !== '' && dataFilePath.value.trim() !== '')
+  const hasWorkspace = computed(() => {
+    const activeId = activeWorkspaceId.value.trim()
+    if (!activeId) return false
+    return workspaces.value.some((ws) => ws.id === activeId)
+  })
+  const canAnalyze = computed(() => {
+    if (!apiKeyConfigured.value) return false
+    return hasWorkspace.value
+  })
 
-  // Local Configuration Management
-  function saveLocalConfig() {
-    const config = {
-      apiKey: apiKey.value,
-      selectedModel: selectedModel.value,
-      dataFilePath: dataFilePath.value,
-      schemaFilePath: schemaFilePath.value,
-      dataFileId: dataFileId.value,
-      schemaFileId: schemaFileId.value,
-      isSchemaFileUploaded: isSchemaFileUploaded.value,
-      ingestedTableName: ingestedTableName.value,
-      ingestedColumns: ingestedColumns.value,
-      schemaContext: schemaContext.value,
-      chatOverlayWidth: chatOverlayWidth.value,
-      historicalCodeBlocks: historicalCodeBlocks.value,
-      timestamp: new Date().toISOString()
-    }
+  let preferenceSyncTimer = null
+  let localStateSyncTimer = null
+  let suppressPreferenceSync = false
+  const LOCAL_SNAPSHOT_VERSION = 1
 
-    try {
-      localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config))
-    } catch (error) {
-      console.error('❌ Failed to save configuration:', error)
+  function buildLocalStateSnapshot() {
+    return {
+      version: LOCAL_SNAPSHOT_VERSION,
+      updated_at: new Date().toISOString(),
+      ui: {
+        active_tab: activeTab.value || 'code',
+        chat_overlay_open: !!isChatOverlayOpen.value,
+        chat_overlay_width: Number(chatOverlayWidth.value || 0.25),
+        is_sidebar_collapsed: !!isSidebarCollapsed.value,
+        hide_shortcuts_modal: !!hideShortcutsModal.value
+      },
+      session: {
+        active_workspace_id: activeWorkspaceId.value || '',
+        active_dataset_path: dataFilePath.value || '',
+        active_table_name: ingestedTableName.value || '',
+        active_conversation_id: activeConversationId.value || ''
+      },
+      editor: {
+        generated_code: generatedCode.value || '',
+        python_file_content: pythonFileContent.value || ''
+      }
     }
   }
 
-  function loadLocalConfig() {
-    try {
-      const configStr = localStorage.getItem(STORAGE_KEYS.CONFIG)
-      if (!configStr) {
-        return false
-      }
+  function applyLocalStateSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') return false
+    const ui = snapshot.ui || {}
+    const sessionState = snapshot.session || {}
+    const editor = snapshot.editor || {}
 
-      const config = JSON.parse(configStr)
-
-      // Restore API key and model
-      if (config.apiKey) {
-        apiKey.value = config.apiKey
-      }
-      if (config.selectedModel) {
-        selectedModel.value = config.selectedModel
-      }
-
-      // Restore data file path
-      if (config.dataFilePath) {
-        dataFilePath.value = config.dataFilePath
-      }
-
-      // Restore schema file path
-      if (config.schemaFilePath) {
-        schemaFilePath.value = config.schemaFilePath
-      }
-
-      // Restore file IDs
-      if (config.dataFileId) {
-        dataFileId.value = config.dataFileId
-      }
-      if (config.schemaFileId) {
-        schemaFileId.value = config.schemaFileId
-      }
-
-      // Restore schema upload status
-      if (config.isSchemaFileUploaded !== undefined) {
-        isSchemaFileUploaded.value = config.isSchemaFileUploaded
-      }
-      if (config.ingestedTableName) {
-        ingestedTableName.value = config.ingestedTableName
-      }
-      if (Array.isArray(config.ingestedColumns)) {
-        ingestedColumns.value = config.ingestedColumns
-      }
-
-      // Restore schema context
-      if (config.schemaContext) {
-        schemaContext.value = config.schemaContext
-      }
-
-      // Restore chat overlay width
-      if (config.chatOverlayWidth && config.chatOverlayWidth > 0.1 && config.chatOverlayWidth < 0.9) {
-        chatOverlayWidth.value = config.chatOverlayWidth
-      }
-
-      // Restore historical code blocks for Pyodide
-      if (config.historicalCodeBlocks) {
-        historicalCodeBlocks.value = config.historicalCodeBlocks
-      }
-      return true
-    } catch (error) {
-      console.error('Failed to load local configuration:', error)
-      // Clear corrupted config
-      localStorage.removeItem(STORAGE_KEYS.CONFIG)
-      return false
+    if (typeof ui.active_tab === 'string' && ui.active_tab.trim()) {
+      activeTab.value = ui.active_tab
     }
+    if (typeof ui.chat_overlay_open === 'boolean') {
+      isChatOverlayOpen.value = ui.chat_overlay_open
+    }
+    if (typeof ui.chat_overlay_width === 'number' && ui.chat_overlay_width > 0.1 && ui.chat_overlay_width < 0.9) {
+      chatOverlayWidth.value = ui.chat_overlay_width
+    }
+    if (typeof ui.is_sidebar_collapsed === 'boolean') {
+      isSidebarCollapsed.value = ui.is_sidebar_collapsed
+    }
+    if (typeof ui.hide_shortcuts_modal === 'boolean') {
+      hideShortcutsModal.value = ui.hide_shortcuts_modal
+    }
+
+    if (typeof sessionState.active_workspace_id === 'string') {
+      activeWorkspaceId.value = sessionState.active_workspace_id
+    }
+    if (typeof sessionState.active_dataset_path === 'string') {
+      dataFilePath.value = sessionState.active_dataset_path
+    }
+    if (typeof sessionState.active_table_name === 'string') {
+      ingestedTableName.value = sessionState.active_table_name
+    }
+    if (typeof sessionState.active_conversation_id === 'string') {
+      activeConversationId.value = sessionState.active_conversation_id
+    }
+
+    if (typeof editor.generated_code === 'string') {
+      generatedCode.value = editor.generated_code
+    }
+    if (typeof editor.python_file_content === 'string') {
+      pythonFileContent.value = editor.python_file_content
+    } else if (typeof editor.generated_code === 'string') {
+      pythonFileContent.value = editor.generated_code
+    }
+
+    return true
+  }
+
+  function schedulePreferenceSync() {
+    if (suppressPreferenceSync) return
+    if (preferenceSyncTimer) clearTimeout(preferenceSyncTimer)
+    preferenceSyncTimer = setTimeout(async () => {
+      try {
+        await apiService.v1UpdatePreferences({
+          selected_model: selectedModel.value,
+          schema_context: schemaContext.value,
+          allow_schema_sample_values: allowSchemaSampleValues.value,
+          chat_overlay_width: chatOverlayWidth.value,
+          is_sidebar_collapsed: isSidebarCollapsed.value,
+          hide_shortcuts_modal: hideShortcutsModal.value,
+          active_workspace_id: activeWorkspaceId.value || '',
+          active_dataset_path: dataFilePath.value || '',
+          active_table_name: ingestedTableName.value || ''
+        })
+      } catch (_error) {
+        // Best-effort sync. Keep UI responsive even if backend is unavailable.
+      }
+    }, 150)
+  }
+
+  function saveLocalConfig() {
+    schedulePreferenceSync()
+    if (localStateSyncTimer) clearTimeout(localStateSyncTimer)
+    localStateSyncTimer = setTimeout(() => {
+      void localStateService.saveSnapshot(buildLocalStateSnapshot())
+    }, 250)
+  }
+
+  async function flushLocalConfig() {
+    if (localStateSyncTimer) {
+      clearTimeout(localStateSyncTimer)
+      localStateSyncTimer = null
+    }
+    await localStateService.saveSnapshot(buildLocalStateSnapshot())
+  }
+
+  async function loadLocalConfig() {
+    const snapshot = await localStateService.loadSnapshot()
+    if (!snapshot) return false
+    return applyLocalStateSnapshot(snapshot)
   }
 
   function clearLocalConfig() {
     try {
-      localStorage.removeItem(STORAGE_KEYS.CONFIG)
-
       // Reset all configuration values
       apiKey.value = ''
+      apiKeyConfigured.value = false
       selectedModel.value = 'gemini-2.5-flash'
       dataFilePath.value = ''
       schemaFilePath.value = ''
@@ -175,7 +212,12 @@ export const useAppStore = defineStore('app', () => {
       ingestedTableName.value = ''
       ingestedColumns.value = []
       schemaContext.value = ''
+      allowSchemaSampleValues.value = false
+      activeWorkspaceId.value = ''
+      activeConversationId.value = ''
       historicalCodeBlocks.value = []
+      hideShortcutsModal.value = false
+      schedulePreferenceSync()
 
       return true
     } catch (error) {
@@ -188,9 +230,7 @@ export const useAppStore = defineStore('app', () => {
   function setDataFilePath(path) {
     dataFilePath.value = path
     saveLocalConfig()
-    if (path) {
-      fetchChatHistory()
-    } else {
+    if (!path) {
       // Clear chat history when no dataset is selected
       chatHistory.value = []
       generatedCode.value = ''
@@ -232,7 +272,10 @@ export const useAppStore = defineStore('app', () => {
 
   function setApiKey(key) {
     apiKey.value = key
-    saveLocalConfig()
+  }
+
+  function setApiKeyConfigured(configured) {
+    apiKeyConfigured.value = !!configured
   }
 
   function setSelectedModel(model) {
@@ -245,11 +288,17 @@ export const useAppStore = defineStore('app', () => {
     saveLocalConfig()
   }
 
+  function setAllowSchemaSampleValues(enabled) {
+    allowSchemaSampleValues.value = !!enabled
+    saveLocalConfig()
+  }
+
 
 
   // Python File Management (simplified to single file)
   function setPythonFileContent(content) {
     pythonFileContent.value = content
+    saveLocalConfig()
   }
 
   function addChatMessage(question, explanation) {
@@ -323,8 +372,226 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  function setWorkspaces(items) {
+    workspaces.value = Array.isArray(items) ? items : []
+  }
+
+  function setWorkspaceDeletionJobs(items) {
+    workspaceDeletionJobs.value = Array.isArray(items) ? items : []
+  }
+
+  function setActiveWorkspaceId(workspaceId) {
+    activeWorkspaceId.value = workspaceId || ''
+    saveLocalConfig()
+  }
+
+  function setConversations(items) {
+    conversations.value = Array.isArray(items) ? items : []
+  }
+
+  function setActiveConversationId(conversationId) {
+    activeConversationId.value = conversationId || ''
+    turnsNextCursor.value = null
+    saveLocalConfig()
+  }
+
+  function prependChatHistoryFromTurns(turns) {
+    if (!Array.isArray(turns) || turns.length === 0) return
+    const mapped = turns.map((turn) => ({
+      id: turn.id,
+      question: turn.user_text,
+      explanation: turn.assistant_text,
+      toolEvents: turn.tool_events || null,
+      timestamp: turn.created_at || new Date().toISOString()
+    }))
+    chatHistory.value = [...mapped.reverse(), ...chatHistory.value]
+  }
+
+  async function fetchWorkspaces() {
+    const response = await apiService.v1ListWorkspaces()
+    const items = response?.workspaces || []
+    workspaces.value = items
+    await fetchWorkspaceDeletionJobs()
+    if (!activeWorkspaceId.value && items.length > 0) {
+      const active = items.find((w) => w.is_active) || items[0]
+      activeWorkspaceId.value = active.id
+      saveLocalConfig()
+    }
+    if (activeWorkspaceId.value && !items.some((ws) => ws.id === activeWorkspaceId.value)) {
+      activeWorkspaceId.value = items[0]?.id || ''
+      activeConversationId.value = ''
+      chatHistory.value = []
+      turnsNextCursor.value = null
+      saveLocalConfig()
+    }
+
+    // Workspace-first guard: when user has no workspace, dataset selection must be cleared.
+    if (items.length === 0 && (dataFilePath.value || ingestedTableName.value || schemaFileId.value)) {
+      dataFilePath.value = ''
+      ingestedTableName.value = ''
+      ingestedColumns.value = []
+      schemaFileId.value = ''
+      isSchemaFileUploaded.value = false
+      saveLocalConfig()
+    }
+  }
+
+  async function createWorkspace(name) {
+    const ws = await apiService.v1CreateWorkspace(name)
+    await fetchWorkspaces()
+    return ws
+  }
+
+  async function activateWorkspace(workspaceId) {
+    if (workspaceDeletionJobs.value.some((job) => job.workspace_id === workspaceId)) return
+    await apiService.v1ActivateWorkspace(workspaceId)
+    activeWorkspaceId.value = workspaceId
+    conversations.value = []
+    activeConversationId.value = ''
+    chatHistory.value = []
+    turnsNextCursor.value = null
+    saveLocalConfig()
+  }
+
+  async function fetchConversations() {
+    if (!activeWorkspaceId.value) return
+    const response = await apiService.v1ListConversations(activeWorkspaceId.value, 50)
+    conversations.value = response?.conversations || []
+    if (!activeConversationId.value && conversations.value.length > 0) {
+      activeConversationId.value = conversations.value[0].id
+    }
+  }
+
+  async function createConversation(title = null) {
+    if (!activeWorkspaceId.value) return null
+    const conv = await apiService.v1CreateConversation(activeWorkspaceId.value, title)
+    await fetchConversations()
+    activeConversationId.value = conv.id
+    chatHistory.value = []
+    turnsNextCursor.value = null
+    saveLocalConfig()
+    return conv
+  }
+
+  async function fetchConversationTurns({ reset = true } = {}) {
+    if (!activeConversationId.value) return
+    const response = await apiService.v1ListTurns(
+      activeConversationId.value,
+      5,
+      reset ? null : turnsNextCursor.value
+    )
+    const turns = response?.turns || []
+    if (reset) {
+      chatHistory.value = []
+    }
+    prependChatHistoryFromTurns(turns)
+    turnsNextCursor.value = response?.next_cursor || null
+  }
+
+  async function clearActiveConversation() {
+    if (!activeConversationId.value) return
+    await apiService.v1ClearConversation(activeConversationId.value)
+    chatHistory.value = []
+    turnsNextCursor.value = null
+  }
+
+  async function deleteActiveConversation() {
+    if (!activeConversationId.value) return
+    await apiService.v1DeleteConversation(activeConversationId.value)
+    const deletedId = activeConversationId.value
+    conversations.value = conversations.value.filter((c) => c.id !== deletedId)
+    activeConversationId.value = conversations.value[0]?.id || ''
+    chatHistory.value = []
+    turnsNextCursor.value = null
+  }
+
+  async function updateConversationTitle(title) {
+    if (!activeConversationId.value) return
+    const updated = await apiService.v1UpdateConversation(activeConversationId.value, title)
+    // Update local list
+    const idx = conversations.value.findIndex(c => c.id === activeConversationId.value)
+    if (idx !== -1) {
+      conversations.value[idx] = { ...conversations.value[idx], title: updated.title }
+    }
+    return updated
+  }
+
+  async function fetchWorkspaceDeletionJobs() {
+    const response = await apiService.v1ListWorkspaceDeletionJobs()
+    workspaceDeletionJobs.value = response?.jobs || []
+    workspaceDeletionJobs.value.forEach((job) => {
+      if (job?.job_id) {
+        pollWorkspaceDeletionJob(job.job_id)
+      }
+    })
+  }
+
+  function upsertWorkspaceDeletionJob(job) {
+    const idx = workspaceDeletionJobs.value.findIndex((item) => item.job_id === job.job_id)
+    if (idx >= 0) {
+      workspaceDeletionJobs.value[idx] = job
+    } else {
+      workspaceDeletionJobs.value.push(job)
+    }
+  }
+
+  function removeWorkspaceDeletionJob(jobId) {
+    workspaceDeletionJobs.value = workspaceDeletionJobs.value.filter((job) => job.job_id !== jobId)
+  }
+
+  async function deleteWorkspaceAsync(workspaceId) {
+    const job = await apiService.v1DeleteWorkspace(workspaceId)
+    upsertWorkspaceDeletionJob(job)
+    if (activeWorkspaceId.value === workspaceId) {
+      activeWorkspaceId.value = ''
+      activeConversationId.value = ''
+      chatHistory.value = []
+      turnsNextCursor.value = null
+      saveLocalConfig()
+    }
+    pollWorkspaceDeletionJob(job.job_id)
+    return job
+  }
+
+  const deletionPollers = new Map()
+
+  function pollWorkspaceDeletionJob(jobId, timeoutMs = 300000) {
+    if (!jobId || deletionPollers.has(jobId)) return
+    const startedAt = Date.now()
+
+    const poll = async () => {
+      try {
+        const job = await apiService.v1GetWorkspaceDeletionJob(jobId)
+        upsertWorkspaceDeletionJob(job)
+        if (job.status === 'completed' || job.status === 'failed') {
+          deletionPollers.delete(jobId)
+          removeWorkspaceDeletionJob(jobId)
+          await fetchWorkspaces()
+          return
+        }
+
+        if (Date.now() - startedAt > timeoutMs) {
+          deletionPollers.delete(jobId)
+          return
+        }
+
+        const timer = setTimeout(poll, 2000)
+        deletionPollers.set(jobId, timer)
+      } catch (_error) {
+        deletionPollers.delete(jobId)
+      }
+    }
+
+    poll()
+  }
+
+  function trackWorkspaceDeletionJob(jobId) {
+    pollWorkspaceDeletionJob(jobId)
+  }
+
   function setGeneratedCode(code) {
     generatedCode.value = code
+    saveLocalConfig()
   }
 
   function setResultData(data) {
@@ -353,12 +620,15 @@ export const useAppStore = defineStore('app', () => {
 
   function setActiveTab(tab) {
     activeTab.value = tab
+    saveLocalConfig()
   }
   function toggleChatOverlay() {
     isChatOverlayOpen.value = !isChatOverlayOpen.value
+    saveLocalConfig()
   }
   function setChatOverlayOpen(open) {
     isChatOverlayOpen.value = !!open
+    saveLocalConfig()
   }
   function setChatOverlayWidth(widthFraction) {
     if (widthFraction > 0.1 && widthFraction < 0.9) {
@@ -368,6 +638,12 @@ export const useAppStore = defineStore('app', () => {
   }
   function setSidebarCollapsed(collapsed) {
     isSidebarCollapsed.value = collapsed
+    saveLocalConfig()
+  }
+
+  function setHideShortcutsModal(hidden) {
+    hideShortcutsModal.value = !!hidden
+    saveLocalConfig()
   }
 
   function setLoading(loading) {
@@ -466,6 +742,47 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  async function loadUserPreferences() {
+    try {
+      suppressPreferenceSync = true
+      const prefs = await apiService.v1GetPreferences()
+      if (prefs?.selected_model) selectedModel.value = prefs.selected_model
+      if (typeof prefs?.schema_context === 'string') schemaContext.value = prefs.schema_context
+      if (typeof prefs?.allow_schema_sample_values === 'boolean') {
+        allowSchemaSampleValues.value = prefs.allow_schema_sample_values
+      }
+      if (
+        typeof prefs?.chat_overlay_width === 'number' &&
+        prefs.chat_overlay_width > 0.1 &&
+        prefs.chat_overlay_width < 0.9
+      ) {
+        chatOverlayWidth.value = prefs.chat_overlay_width
+      }
+      if (typeof prefs?.is_sidebar_collapsed === 'boolean') {
+        isSidebarCollapsed.value = prefs.is_sidebar_collapsed
+      }
+      if (typeof prefs?.hide_shortcuts_modal === 'boolean') {
+        hideShortcutsModal.value = prefs.hide_shortcuts_modal
+      }
+      if (typeof prefs?.api_key_present === 'boolean') {
+        apiKeyConfigured.value = prefs.api_key_present
+      }
+      if (prefs?.active_workspace_id) {
+        activeWorkspaceId.value = prefs.active_workspace_id
+      }
+      if (prefs?.active_dataset_path) {
+        dataFilePath.value = prefs.active_dataset_path
+      }
+      if (prefs?.active_table_name) {
+        ingestedTableName.value = prefs.active_table_name
+      }
+    } catch (_error) {
+      // Continue with defaults if preference fetch fails.
+    } finally {
+      suppressPreferenceSync = false
+    }
+  }
+
 
   return {
     // State
@@ -478,11 +795,19 @@ export const useAppStore = defineStore('app', () => {
     ingestedColumns,
     selectedModel,
     apiKey,
+    apiKeyConfigured,
     schemaContext,
+    allowSchemaSampleValues,
     pythonFileContent,
     chatHistory,
     currentQuestion,
     currentExplanation,
+    workspaces,
+    workspaceDeletionJobs,
+    activeWorkspaceId,
+    conversations,
+    activeConversationId,
+    turnsNextCursor,
     generatedCode,
     resultData,
     plotlyFigure,
@@ -494,6 +819,7 @@ export const useAppStore = defineStore('app', () => {
     isChatOverlayOpen,
     chatOverlayWidth,
     isSidebarCollapsed,
+    hideShortcutsModal,
     isLoading,
     isCodeRunning,
     isNotebookMode,
@@ -506,10 +832,12 @@ export const useAppStore = defineStore('app', () => {
     hasDataFile,
     hasSchemaFile,
     canAnalyze,
+    hasWorkspace,
 
     // Actions
     saveLocalConfig,
     loadLocalConfig,
+    flushLocalConfig,
     clearLocalConfig,
     setDataFilePath,
     setSchemaFilePath,
@@ -519,11 +847,30 @@ export const useAppStore = defineStore('app', () => {
     setIngestedTableName,
     setIngestedColumns,
     setApiKey,
+    setApiKeyConfigured,
     setSelectedModel,
     setSchemaContext,
+    setAllowSchemaSampleValues,
     setPythonFileContent,
     addChatMessage,
     updateLastMessageExplanation,
+    setWorkspaces,
+    setWorkspaceDeletionJobs,
+    setActiveWorkspaceId,
+    setConversations,
+    setActiveConversationId,
+    fetchWorkspaces,
+    fetchWorkspaceDeletionJobs,
+    trackWorkspaceDeletionJob,
+    createWorkspace,
+    deleteWorkspaceAsync,
+    activateWorkspace,
+    fetchConversations,
+    createConversation,
+    fetchConversationTurns,
+    clearActiveConversation,
+    deleteActiveConversation,
+    updateConversationTitle,
     setGeneratedCode,
     setResultData,
     setPlotlyFigure,
@@ -536,6 +883,8 @@ export const useAppStore = defineStore('app', () => {
     setChatOverlayOpen,
     setChatOverlayWidth,
     setSidebarCollapsed,
+    setHideShortcutsModal,
+    loadUserPreferences,
     setLoading,
     setCodeRunning,
     setNotebookMode,

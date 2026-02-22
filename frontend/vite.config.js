@@ -2,11 +2,6 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 
-const crossOriginIsolationHeaders = {
-  'Cross-Origin-Opener-Policy': 'same-origin',
-  'Cross-Origin-Embedder-Policy': 'require-corp',
-  'Cross-Origin-Resource-Policy': 'cross-origin'
-}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -20,9 +15,6 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis',
-    'process.env': {
-      VUE_APP_WS_URL: process.env.VUE_APP_WS_URL || 'ws://localhost:8000'
-    }
   },
   optimizeDeps: {
     include: [
@@ -41,11 +33,14 @@ export default defineConfig({
       'markdown-it',
       'dompurify',
       'plotly.js-dist-min'
-    ],
-    exclude: ['pyodide']
+    ]
   },
   server: {
-    headers: crossOriginIsolationHeaders,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Resource-Policy': 'cross-origin'
+    },
     proxy: {
       '/upload': 'http://localhost:8000',
       '/analyze': 'http://localhost:8000',
@@ -56,7 +51,11 @@ export default defineConfig({
     }
   },
   preview: {
-    headers: crossOriginIsolationHeaders
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Resource-Policy': 'cross-origin'
+    }
   },
   build: {
     outDir: '../src/inquira/frontend/dist',

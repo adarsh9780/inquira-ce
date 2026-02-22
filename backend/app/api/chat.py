@@ -105,10 +105,17 @@ def _build_data_analysis_response(result: dict[str, Any]) -> DataAnalysisRespons
     )
 
     code = result.get("current_code", "") or result.get("code", "")
+    code_guard_feedback = result.get("code_guard_feedback", "") or ""
     if code:
         explanation = result.get("plan", "") or "Code generated based on request."
     else:
-        explanation = last_message or "No explanation provided."
+        if code_guard_feedback:
+            explanation = (
+                "I could not generate executable code that passed validation.\n"
+                f"Reason: {code_guard_feedback}"
+            )
+        else:
+            explanation = last_message or "No explanation provided."
 
     if not code and "```python" in explanation:
         import re
@@ -288,6 +295,15 @@ async def chat_stream_endpoint(
                     for node_name, payload in step.items():
                         if isinstance(payload, dict):
                             aggregated.update(payload)
+                        if node_name == "code_guard":
+                            logprint(
+                                "[Agent][Stream] code_guard node",
+                                level="INFO",
+                                request_id=thread_id,
+                                guard_status=aggregated.get("guard_status"),
+                                retry_count=aggregated.get("code_guard_retries", 0),
+                                feedback=aggregated.get("code_guard_feedback", ""),
+                            )
                         yield _to_sse(
                             "node",
                             {"node": node_name, "message": f"{node_name} completed"},
@@ -302,6 +318,16 @@ async def chat_stream_endpoint(
                     pass
 
                 final_response = _build_data_analysis_response(aggregated)
+                logprint(
+                    "[Agent][Stream] final response summary",
+                    level="INFO",
+                    request_id=thread_id,
+                    has_code=bool((final_response.code or "").strip()),
+                    code_len=len(final_response.code or ""),
+                    has_await_query=("await query(" in (final_response.code or "")),
+                    guard_status=aggregated.get("guard_status", ""),
+                    guard_feedback=aggregated.get("code_guard_feedback", ""),
+                )
                 yield _to_sse("final", final_response.model_dump())
                 return
 
