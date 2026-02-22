@@ -470,35 +470,32 @@ const defaultCodeTemplate = computed(() => {
   const backendTable = settingsInfo?.value?.table_name || settingsInfo?.value?.data_table_name || settingsInfo?.value?.table || null
   const tableName = backendTable || getTableName(originalFilepath)
 
-  // Default template (DuckDB .sql API) — assumes a table exists named table_name
-  return `# cell 1: Load and explore data
-import pandas as pd
-import duckdb as db
+  // Default template (DuckDB to Narwhals API)
+  return \`# cell 1: Load and explore data
+import duckdb
+import narwhals as nw
+import plotly.express as px
 
-# Load data into a table with the filename as table name
-table_name = "${tableName}"
-
-# If a connection object named 'conn' exists, use it as 'db' for .sql calls
+# Establish connection and set table name
+table_name = "\${tableName}"
 try:
     conn  # type: ignore  # noqa
-    db = conn
-except Exception:
-    pass
+except NameError:
+    conn = duckdb.connect()
 
 # cell 2: Quick sample
-result_df = db.sql(f"SELECT * FROM {table_name} LIMIT 100").fetchdf()
-result_df
+# Use DuckDB for lazy evaluation, then convert to a Narwhals-compatible DataFrame
+lazy_query = conn.sql(f"SELECT * FROM {table_name} LIMIT 10")
+df = nw.from_native(lazy_query.pl(), eager=True)
+df
 
-# cell 3: Schema + summary (DuckDB + pandas.describe)
-schema_df = db.sql(f"DESCRIBE SELECT * FROM {table_name}").fetchdf()
-row_count_df = db.sql(f"SELECT COUNT(*) AS rows FROM {table_name}").fetchdf()
-# Use a capped sample size for describe to avoid huge scans
-summary_sample = db.sql(f"SELECT * FROM {table_name} LIMIT 5000").fetchdf()
-summary_df = summary_sample.describe(include='all').transpose()
+# cell 3: Schema + summary
+# Use DuckDB for efficient aggregations and metadata extraction
+schema_df = nw.from_native(conn.sql(f"DESCRIBE SELECT * FROM {table_name}").pl(), eager=True)
+row_count_df = nw.from_native(conn.sql(f"SELECT COUNT(*) AS rows FROM {table_name}").pl(), eager=True)
 
-# Display schema and summary
-schema_df, row_count_df, summary_df
-`
+schema_df, row_count_df
+\`
 })
 
 // Replace table_name assignment in given Python source

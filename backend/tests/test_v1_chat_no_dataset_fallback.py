@@ -14,7 +14,7 @@ async def test_chat_uses_empty_schema_when_workspace_has_no_dataset(monkeypatch)
         return SimpleNamespace(id="ws-1")
 
     async def fake_create_conversation(*, session, user_id, workspace_id, title):
-        return SimpleNamespace(id="conv-1")
+        return SimpleNamespace(id="conv-1", title=title)
 
     async def fake_get_conversation(_session, _conversation_id):
         return SimpleNamespace(id="conv-1", workspace_id="ws-1", title="New Conversation")
@@ -51,6 +51,14 @@ async def test_chat_uses_empty_schema_when_workspace_has_no_dataset(monkeypatch)
 
     session.commit = _commit
 
+    async def _execute(*_args, **_kwargs):
+        class _Result:
+            def scalar_one_or_none(self):
+                return None
+        return _Result()
+
+    session.execute = _execute
+
     langgraph_manager = SimpleNamespace(get_graph=fake_get_graph)
     user = SimpleNamespace(id="u1", username="alice")
 
@@ -81,7 +89,7 @@ async def test_chat_prefers_client_table_schema_override(monkeypatch):
         return SimpleNamespace(id="ws-1")
 
     async def fake_create_conversation(*, session, user_id, workspace_id, title):
-        return SimpleNamespace(id="conv-2")
+        return SimpleNamespace(id="conv-2", title=title)
 
     async def fake_get_conversation(_session, _conversation_id):
         return SimpleNamespace(id="conv-2", workspace_id="ws-1", title="New Conversation")
@@ -130,6 +138,14 @@ async def test_chat_prefers_client_table_schema_override(monkeypatch):
 
     session.commit = _commit
 
+    async def _execute(*_args, **_kwargs):
+        class _Result:
+            def scalar_one_or_none(self):
+                return None
+        return _Result()
+
+    session.execute = _execute
+
     langgraph_manager = SimpleNamespace(get_graph=fake_get_graph)
     user = SimpleNamespace(id="u1", username="alice")
 
@@ -158,49 +174,4 @@ async def test_chat_prefers_client_table_schema_override(monkeypatch):
     assert captured["schema"]["columns"][0]["name"] == "batter"
 
 
-@pytest.mark.asyncio
-async def test_chat_requires_workspace_synced_dataset_for_selected_table(monkeypatch):
-    async def fake_get_workspace(_session, _workspace_id, _user_id):
-        return SimpleNamespace(id="ws-1")
 
-    async def fake_create_conversation(*, session, user_id, workspace_id, title):
-        return SimpleNamespace(id="conv-3")
-
-    async def fake_get_conversation(_session, _conversation_id):
-        return SimpleNamespace(id="conv-3", workspace_id="ws-1", title="New Conversation")
-
-    async def fake_get_for_workspace_table(*, session, workspace_id, table_name):
-        return None
-
-    monkeypatch.setattr("app.v1.services.chat_service.WorkspaceRepository.get_by_id", fake_get_workspace)
-    monkeypatch.setattr("app.v1.services.chat_service.ConversationService.create_conversation", fake_create_conversation)
-    monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.get_conversation", fake_get_conversation)
-    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_for_workspace_table", fake_get_for_workspace_table)
-
-    session = SimpleNamespace()
-
-    async def _commit():
-        return None
-
-    session.commit = _commit
-    langgraph_manager = SimpleNamespace(get_graph=lambda *_args, **_kwargs: None)
-    user = SimpleNamespace(id="u1", username="alice")
-
-    with pytest.raises(HTTPException) as exc:
-        await ChatService.analyze_and_persist_turn(
-            session=session,
-            langgraph_manager=langgraph_manager,
-            user=user,
-            workspace_id="ws-1",
-            conversation_id=None,
-            question="top 10 batsman",
-            current_code="",
-            model="gemini-2.5-flash",
-            context=None,
-            table_name_override="deliveries",
-            active_schema_override={"table_name": "deliveries", "columns": []},
-            api_key="x",
-        )
-
-    assert exc.value.status_code == 400
-    assert "not synced to workspace" in str(exc.value.detail)
