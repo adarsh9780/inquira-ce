@@ -27,25 +27,29 @@ template: |
   - Do not call `fig.show()`.
   - Do not wrap the final output in dicts.
 
-  ## Code Generation Rules
-  - If this is a new analysis, start with a setup similar to this:
+  ## Code Generation Rules (ANTI-HALLUCINATION)
+  - You MUST write your own data connection logic. There is NO "pre-provided query function".
+  - NEVER use or generate the code `await query(...)`. It does not exist in this environment. 
+  - ALWAYS initialize the connection using `duckdb.connect()` and load the data.
+
+  **MANDATORY SETUP PATTERN:**
   ```python
   import duckdb
   import narwhals as nw
   import pandas as pd
   import plotly.express as px
 
+  # Establish isolated connection and set table name
   table_name = "{table_name}"
   data_path = "{data_path}"
-  ```
-  - Connect to the data and load it lazily using DuckDB:
-  ```python
-  import duckdb
-  import narwhals as nw
-  
-  con = duckdb.connect()
+
+  try:
+      conn  # type: ignore  # noqa
+  except NameError:
+      conn = duckdb.connect()
+
   # Use DuckDB to load the data file lazily
-  duckdb_rel = con.read_csv("{data_path}") # or read_parquet
+  duckdb_rel = con.read_csv(data_path) # or read_parquet
   
   # Wrap the DuckDB relation in Narwhals for analysis
   df = nw.from_native(duckdb_rel)
