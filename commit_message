@@ -1,1 +1,9 @@
 Fix execution-provider test isolation by clearing cached runtime config between tests to prevent cross-test provider leakage
+Add VERSION single source-of-truth file and new maintenance script to bump backend, tauri, frontend, and installer wheel URLs in one command
+Add per-target override options (backend/tauri/frontend) while preserving one overall version workflow by default
+Add regression tests for PEP440-to-SemVer conversion and per-target version resolution in bump_versions script
+Add VERSION single source-of-truth file and new maintenance script to bump backend, tauri, frontend, and installer wheel URLs in one command
+Add per-target override options (--backend-version, --tauri-version, --frontend-version) while keeping one overall version workflow by default
+Map Python prerelease versions (e.g. 0.5.0a1) to SemVer prerelease for Tauri/frontend by default (0.5.0-alpha.1)
+Add regression tests for PEP440-to-SemVer conversion and per-target version resolution in bump_versions script
+Add usage examples to bump_versions.py --help output, including one-command dry-run and per-target override flows
