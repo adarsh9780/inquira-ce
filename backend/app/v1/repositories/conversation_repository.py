@@ -52,6 +52,12 @@ class ConversationRepository:
         await session.delete(conversation)
 
     @staticmethod
+    async def update_conversation(session: AsyncSession, conversation: Conversation, title: str) -> None:
+        """Update conversation title."""
+        conversation.title = title
+        await session.flush()
+
+    @staticmethod
     async def clear_conversation(session: AsyncSession, conversation_id: str) -> None:
         """Delete all turns for a conversation."""
         await session.execute(delete(Turn).where(Turn.conversation_id == conversation_id))

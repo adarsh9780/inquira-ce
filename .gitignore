@@ -27,6 +27,8 @@ notebooks/*
 .venv
 .vscode
 commit_message.txt
+AGENTS.md
+GEMINI.md
 
 # Pyodide offline dependencies
 backend/app/static/pyodide/

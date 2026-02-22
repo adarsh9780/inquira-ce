@@ -88,6 +88,27 @@ class ConversationService:
         await session.commit()
 
     @staticmethod
+    async def update_conversation(
+        session: AsyncSession,
+        user_id: str,
+        conversation_id: str,
+        title: str | None,
+    ) -> Conversation:
+        """Update conversation title."""
+        conversation = await ConversationRepository.get_conversation(session, conversation_id)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        await ConversationService.ensure_workspace_access(session, user_id, conversation.workspace_id)
+
+        if title is not None:
+            new_title = title.strip() or "Untitled Conversation"
+            await ConversationRepository.update_conversation(session, conversation, new_title)
+            await session.commit()
+            await session.refresh(conversation)
+
+        return conversation
+
+    @staticmethod
     async def list_turns(
         session: AsyncSession,
         user_id: str,

@@ -11,6 +11,7 @@ from ..schemas.conversation import (
     ConversationCreateRequest,
     ConversationListResponse,
     ConversationResponse,
+    ConversationUpdateRequest,
     TurnPageResponse,
     TurnResponse,
 )
@@ -93,6 +94,30 @@ async def delete_conversation(
     """Delete conversation and all turns."""
     await ConversationService.delete_conversation(session, current_user.id, conversation_id)
     return MessageResponse(message="Conversation deleted")
+
+
+@router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
+async def patch_conversation(
+    conversation_id: str,
+    payload: ConversationUpdateRequest,
+    session: AsyncSession = Depends(get_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Update conversation title."""
+    conv = await ConversationService.update_conversation(
+        session=session,
+        user_id=current_user.id,
+        conversation_id=conversation_id,
+        title=payload.title,
+    )
+    return ConversationResponse(
+        id=conv.id,
+        workspace_id=conv.workspace_id,
+        title=conv.title,
+        last_turn_at=conv.last_turn_at,
+        created_at=conv.created_at,
+        updated_at=conv.updated_at,
+    )
 
 
 @router.get("/conversations/{conversation_id}/turns", response_model=TurnPageResponse)

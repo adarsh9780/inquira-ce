@@ -251,6 +251,10 @@ async function loadDatasets() {
       catalogDatasets,
       runtimeTables: [],
       currentDataPath: currentDataPath.value
+    }).filter(ds => {
+      const path = String(ds.file_path || '').toLowerCase()
+      // Hide datasets living entirely in the browser storage
+      return !path.startsWith('browser://') && !path.startsWith('browser:/') && !path.startsWith('/browser:/')
     })
   } catch (error) {
     console.error('Failed to load datasets:', error)

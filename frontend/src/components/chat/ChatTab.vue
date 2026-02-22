@@ -1,47 +1,74 @@
 <template>
   <div class="flex h-full bg-white rounded-xl overflow-hidden">
     <div class="flex-1 flex flex-col">
-      <div class="border-b border-gray-100 bg-white px-3 py-2 sm:px-4">
-        <div class="flex items-center justify-between gap-2">
-          <div class="min-w-0">
-            <p class="text-[11px] uppercase tracking-wide text-gray-500">Conversation</p>
-            <h3 class="truncate text-sm font-semibold text-gray-800">{{ activeConversationTitle }}</h3>
+      <div class="border-b border-gray-100 bg-white px-3 py-2 sm:px-4 flex items-center justify-between gap-4">
+        <div class="flex-1 min-w-0 flex items-center gap-2 group">
+          <div v-if="!isEditingTitle" class="flex items-center gap-2 overflow-hidden">
+            <h3 
+              class="truncate text-sm font-bold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
+              @click="startEditingTitle"
+              title="Click to rename"
+            >
+              {{ activeConversationTitle }}
+            </h3>
+            <button 
+              @click="startEditingTitle" 
+              class="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-100 rounded-md transition-all flex-shrink-0"
+              title="Rename conversation"
+            >
+              <PencilIcon class="h-3 w-3 text-gray-400" />
+            </button>
           </div>
-          <div class="flex items-center gap-2">
+          <div v-else class="flex-1 max-w-sm flex items-center gap-2">
+            <input
+              ref="titleInputRef"
+              v-model="editingTitleValue"
+              class="w-full px-2 py-1 text-sm font-bold text-gray-900 border border-blue-500 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-100 bg-blue-50/30"
+              @keydown.enter="saveTitle"
+              @keydown.esc="cancelEditingTitle"
+              @blur="saveTitle"
+            />
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+          <div class="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100">
             <button
               type="button"
-              class="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+              class="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-white hover:text-blue-600 transition-all hover:shadow-sm"
               @click="createConversation"
               :disabled="!appStore.hasWorkspace"
+              title="New Conversation"
             >
-              New
+              <PlusIcon class="h-4 w-4" />
             </button>
+            <div class="w-px h-4 bg-gray-200 mx-0.5"></div>
             <button
               type="button"
-              class="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+              class="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-white hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-40 transition-all hover:shadow-sm"
               :disabled="!appStore.activeConversationId"
               @click="clearConversation"
+              title="Clear Conversation"
             >
-              Clear
+              <ArrowPathIcon class="h-4 w-4" />
             </button>
             <button
               type="button"
-              class="rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+              class="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-white hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 transition-all hover:shadow-sm"
               :disabled="!appStore.activeConversationId"
               @click="deleteConversation"
+              title="Delete Conversation"
             >
-              Delete
+              <TrashIcon class="h-4 w-4" />
             </button>
+            <div class="w-px h-4 bg-gray-200 mx-0.5"></div>
             <button
               type="button"
-              class="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
-              title="Conversation history"
+              class="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-white hover:text-blue-600 transition-all hover:shadow-sm"
               @click="openConversationHistory"
+              title="Conversation history"
             >
-              <span class="relative inline-block h-4 w-4 align-middle">
-                <ArrowPathIcon class="h-4 w-4 text-gray-500" />
-                <ClockIcon class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-white text-gray-500" />
-              </span>
+              <ClockIcon class="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -93,22 +120,66 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch, nextTick } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import ChatHistory from './ChatHistory.vue'
 import ChatInput from './ChatInput.vue'
 import ConversationHistoryModal from './ConversationHistoryModal.vue'
-import { ChatBubbleLeftRightIcon, ArrowPathIcon, ClockIcon } from '@heroicons/vue/24/outline'
+import { 
+  ChatBubbleLeftRightIcon, 
+  ArrowPathIcon, 
+  ClockIcon, 
+  PlusIcon, 
+  TrashIcon,
+  PencilIcon
+} from '@heroicons/vue/24/outline'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 
 const appStore = useAppStore()
 const isConversationHistoryOpen = ref(false)
 
+// Title Editing
+const isEditingTitle = ref(false)
+const editingTitleValue = ref('')
+const titleInputRef = ref(null)
+
 const activeConversationTitle = computed(() => {
   const active = appStore.conversations.find((conv) => conv.id === appStore.activeConversationId)
   return active?.title || 'New Conversation'
 })
+
+function startEditingTitle() {
+  if (!appStore.activeConversationId) return
+  editingTitleValue.value = activeConversationTitle.value
+  isEditingTitle.value = true
+  nextTick(() => {
+    titleInputRef.value?.focus()
+    titleInputRef.value?.select()
+  })
+}
+
+function cancelEditingTitle() {
+  isEditingTitle.value = false
+}
+
+async function saveTitle() {
+  if (!isEditingTitle.value) return
+  const newTitle = editingTitleValue.value.trim()
+  
+  if (!newTitle || newTitle === activeConversationTitle.value) {
+    isEditingTitle.value = false
+    return
+  }
+
+  try {
+    await appStore.updateConversationTitle(newTitle)
+    isEditingTitle.value = false
+    toast.success('Renamed', 'Conversation title updated')
+  } catch (error) {
+    toast.error('Rename Failed', extractApiErrorMessage(error, 'Failed to update title'))
+  }
+}
 
 async function createConversation() {
   try {

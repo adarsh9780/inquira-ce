@@ -20,13 +20,14 @@
       <button
         @click="handleSubmit"
         :disabled="!canSend"
-        class="absolute top-1/2 -translate-y-1/2 right-4 sm:right-5 p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all duration-200 shadow-sm"
+        class="absolute bottom-3 right-3 p-2.5 rounded-xl transition-all duration-200 shadow-sm z-40 flex-shrink-0"
         :class="canSend
-          ? 'text-white bg-primary-600 hover:bg-primary-700'
-          : 'text-gray-400 bg-gray-100 cursor-not-allowed'
+          ? 'text-white bg-primary-600 hover:bg-primary-700 hover:scale-105 active:scale-95'
+          : 'text-gray-400 bg-gray-200 cursor-not-allowed'
         "
+        :title="canSend ? 'Send question' : 'Fill requirements to enable send'"
       >
-        <PaperAirplaneIcon class="h-4 w-4 sm:h-5 sm:w-5" />
+        <PaperAirplaneIcon class="h-5 w-5" />
       </button>
 
     </div>
@@ -215,17 +216,51 @@ async function handleSubmit() {
     let response
     if (appStore.activeWorkspaceId) {
       const schemaPayload = buildActiveSchemaPayload()
-      response = await apiService.v1Analyze({
-        workspace_id: appStore.activeWorkspaceId,
-        conversation_id: appStore.activeConversationId || null,
-        question: questionText,
-        current_code: appStore.pythonFileContent || '',
-        model: appStore.selectedModel,
-        context: appStore.schemaContext.trim() || null,
-        table_name: schemaPayload.tableName,
-        active_schema: schemaPayload.activeSchema,
-        api_key: appStore.apiKey || null
-      })
+      try {
+        response = await apiService.v1AnalyzeStream(
+          {
+            workspace_id: appStore.activeWorkspaceId,
+            conversation_id: appStore.activeConversationId || null,
+            question: questionText,
+            current_code: appStore.pythonFileContent || '',
+            model: appStore.selectedModel,
+            context: appStore.schemaContext.trim() || null,
+            table_name: schemaPayload.tableName,
+            active_schema: schemaPayload.activeSchema,
+            api_key: appStore.apiKey || null
+          },
+          {
+            signal,
+            onEvent: (evt) => {
+              if (evt.event === 'status' && evt.data?.message) {
+                appStore.updateLastMessageExplanation(evt.data.message)
+                return
+              }
+              if (evt.event === 'node' && evt.data?.node) {
+                appStore.updateLastMessageExplanation(`Running: ${evt.data.node}...`)
+              }
+            }
+          }
+        )
+      } catch (streamError) {
+        // Fallback if streaming fails or is unsupported
+        if (streamError?.status === 404 || streamError?.status === 405) {
+          response = await apiService.v1Analyze({
+            workspace_id: appStore.activeWorkspaceId,
+            conversation_id: appStore.activeConversationId || null,
+            question: questionText,
+            current_code: appStore.pythonFileContent || '',
+            model: appStore.selectedModel,
+            context: appStore.schemaContext.trim() || null,
+            table_name: schemaPayload.tableName,
+            active_schema: schemaPayload.activeSchema,
+            api_key: appStore.apiKey || null
+          })
+        } else {
+          throw streamError
+        }
+      }
+
       if (response?.conversation_id && response.conversation_id !== appStore.activeConversationId) {
         appStore.setActiveConversationId(response.conversation_id)
         await appStore.fetchConversations()

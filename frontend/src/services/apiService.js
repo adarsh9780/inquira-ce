@@ -600,6 +600,10 @@ export const apiService = {
     return v1Api.conversations.remove(conversationId)
   },
 
+  async v1UpdateConversation(conversationId, title) {
+    return v1Api.conversations.update(conversationId, { title })
+  },
+
   async v1ListTurns(conversationId, limit = 5, before = null) {
     const params = { limit }
     if (before) params.before = before
@@ -607,7 +611,72 @@ export const apiService = {
   },
 
   async v1Analyze(payload) {
-    return v1Api.chat.analyze(payload)
+    return v1Api.chat.analyze(payload).then((res) => res.data)
+  },
+
+  async v1AnalyzeStream(payload, { signal = null, onEvent = null } = {}) {
+    if (!isStreamingEnabled()) {
+      return this.v1Analyze(payload)
+    }
+
+    const url = `${apiBaseUrl.replace(/\/+$/, '')}${v1Api.chat.stream}`
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+      signal
+    })
+
+    if (!response.ok) {
+      let detail = `Request failed with status ${response.status}`
+      try {
+        const text = await response.text()
+        if (text) detail = text
+      } catch (_) {
+        // keep default
+      }
+      const err = new Error(detail)
+      err.status = response.status
+      disableStreamingForUnsupportedStatus(response.status)
+      throw err
+    }
+
+    if (!response.body) {
+      throw new Error('Streaming not supported by browser/runtime.')
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let finalPayload = null
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const { events, remainder } = parseSseBuffer(buffer)
+      buffer = remainder
+
+      for (const evt of events) {
+        if (onEvent) onEvent(evt)
+        if (evt.event === 'final') {
+          finalPayload = evt.data
+        } else if (evt.event === 'error') {
+          const detail = evt.data?.detail || 'Streaming analysis failed.'
+          const err = new Error(detail)
+          err.status = evt.data?.status_code || 500
+          throw err
+        }
+      }
+    }
+
+    if (!finalPayload) {
+      throw new Error('Stream ended without final analysis payload.')
+    }
+    return finalPayload
   },
 
   async v1GetCurrentUser() {

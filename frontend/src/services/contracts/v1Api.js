@@ -33,10 +33,12 @@ export const v1Api = {
       axios.post(`/api/v1/workspaces/${workspaceId}/conversations`, { title }),
     clear: (conversationId) => axios.post(`/api/v1/conversations/${conversationId}/clear`),
     remove: (conversationId) => axios.delete(`/api/v1/conversations/${conversationId}`),
+    update: (conversationId, payload) => axios.patch(`/api/v1/conversations/${conversationId}`, payload),
     turns: (conversationId, params) => axios.get(`/api/v1/conversations/${conversationId}/turns`, { params })
   },
   chat: {
-    analyze: (payload) => axios.post('/api/v1/chat/analyze', payload)
+    analyze: (payload) => axios.post('/api/v1/chat/analyze', payload),
+    stream: '/api/v1/chat/stream'
   }
 }
 

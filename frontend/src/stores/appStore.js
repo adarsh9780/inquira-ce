@@ -478,6 +478,17 @@ export const useAppStore = defineStore('app', () => {
     turnsNextCursor.value = null
   }
 
+  async function updateConversationTitle(title) {
+    if (!activeConversationId.value) return
+    const updated = await apiService.v1UpdateConversation(activeConversationId.value, title)
+    // Update local list
+    const idx = conversations.value.findIndex(c => c.id === activeConversationId.value)
+    if (idx !== -1) {
+      conversations.value[idx] = { ...conversations.value[idx], title: updated.title }
+    }
+    return updated
+  }
+
   async function fetchWorkspaceDeletionJobs() {
     const response = await apiService.v1ListWorkspaceDeletionJobs()
     workspaceDeletionJobs.value = response?.jobs || []
@@ -775,6 +786,7 @@ export const useAppStore = defineStore('app', () => {
     fetchConversationTurns,
     clearActiveConversation,
     deleteActiveConversation,
+    updateConversationTitle,
     setGeneratedCode,
     setResultData,
     setPlotlyFigure,
