@@ -1,106 +1,13 @@
-feat(agent): refactor code guard and prompts to use duckdb with narwhals
+test(cleanup): remove pyodide-era regression tests from backend and frontend
 
-- Remove pyodide `await query` bridge fallbacks and constraints from `code_guard.py`.
-- Update `codegen_prompt.yaml` and `create_plan_prompt.yaml` to enforce Narwhals (Polars API) data manipulation with DuckDB lazy evaluation and Ibis fallback.
-- Refactor graph step `retry_code_generator` to remove browser connection avoidance warnings.
-- Update relevant backend unit tests in `test_code_guard.py` and `test_codegen_prompt_contract.py` to assert the new prompt behaviors.
-- Fix broken test mocks in `test_v1_chat_no_dataset_fallback.py`.
-
-- Update frontend CodeTab.vue default python template string to remove `pandas` and `db.sql().fetchdf()` boilerplate, effectively closing the pyodide logic migration.
-
-fix(agent): remove legacy await-query bridge usage for desktop backend execution
-
-- Rewrite legacy `await query(...)` code in `backend/app/agent/code_guard.py` to deterministic `conn.sql(...).fetchdf()` code and auto-bootstrap `duckdb.connect()` when needed.
-- Block and retry generation if any `await query(...)` call survives guard processing.
-- Update `backend/app/core/prompts/yaml/codegen_prompt.yaml` to explicitly migrate legacy current-code context away from `await query(...)` and use table-based DuckDB access.
-- Update `backend/app/agent/graph.py` to pass real backend `data_path` instead of DuckDB-WASM download URL hints.
-- Add regression test `test_code_guard_rewrites_legacy_await_query_bridge` and refresh prompt contract assertions.
-
-refactor(agent): switch query-bridge guard to detect-and-block without code rewriting
-
-- Remove automatic rewrite of `await query(...)` in `backend/app/agent/code_guard.py`.
-- Keep explicit guard failure + retry signal so incorrect LLM output is visible for quality tracking.
-- Update regression test to assert block-only behavior and no silent mutation.
-
-fix(agent): prevent blank final code when retry output is empty
-
-- Update `backend/app/agent/graph.py` code_guard node to validate the latest non-empty candidate from `state.code` or `state.current_code`.
-- Preserve generated code visibility in final payload even when retry generation returns empty code.
-- Add regression test `test_code_guard_node_uses_current_code_when_code_is_empty` to prevent blank editor output regressions.
-
-fix(frontend): hydrate code editor immediately from stream response payload
-
-- Update `frontend/src/components/chat/ChatInput.vue` to derive `finalCode` from `code` or `current_code` and write it directly to `pythonFileContent` (not only `generatedCode`).
-- Ensure code-tab UI updates deterministically at response time, even if watcher timing misses the generatedCode change.
-- Fix `frontend/src/services/apiService.js` `v1Analyze` to return the payload directly (remove incorrect `.then(res => res.data)` double-unwrapping).
-- Add regression test `frontend/test/chatCodeHydration.test.mjs` for direct editor hydration and v1 analyze payload handling.
-
-fix(agent): make code validation fail-closed and add runtime trace logs
-
-- Change `backend/app/agent/graph.py` code guard flow to fail closed after bounded retries (`MAX_CODE_GUARD_RETRIES=2`) instead of returning invalid code.
-- Add structured logs for code generation, retry generation, code guard decisions, and final stream payload summaries.
-- Route `guard_status=failed` to terminate graph without emitting invalid code.
-- Update response builders in `backend/app/api/chat.py` and `backend/app/v1/services/chat_service.py` to surface clear guard-failure explanations when code is blocked.
-- Add/refresh regression tests covering retry semantics, fail-closed behavior, and payload explanation behavior.
-
-chore(dev): add Arize Phoenix for local agent trace debugging
-
-- Add `arize-phoenix` to backend dev dependencies via `uv`.
-- Update `backend/uv.lock` for reproducible local debugging environment.
-- Enables local tracing to distinguish LLM-generation defects from backend/frontend transformation issues.
-
-feat(observability): add minimal Phoenix LangGraph tracing bootstrap
-
-- Add `backend/app/services/tracing.py` with doc-aligned `phoenix.otel.register(..., auto_instrument=True)` setup.
-- Wire tracing initialization in backend lifespan startup (`backend/app/main.py`).
-- Gate tracing with env vars (`INQUIRA_PHOENIX_ENABLED`, optional project and endpoint settings).
-- Add regression tests in `backend/tests/test_phoenix_tracing.py` for disabled and enabled initialization paths.
-
-feat(config): support Phoenix tracing settings from inquira.toml for Tauri runs
-
-- Extend `backend/app/services/tracing.py` to load Phoenix settings from `inquira.toml` (`[backend.phoenix]` or `[phoenix]`) when env vars are not set.
-- Keep env vars as higher-priority overrides for CI/local ad-hoc runs.
-- Add default Phoenix config block to `inquira.toml` with `enabled`, `project`, and `endpoint` keys.
-- Add tests for TOML-backed config and env-overrides in `backend/tests/test_phoenix_tracing.py`.
-
-fix(ui): keep chat header action buttons visible in narrow panel layouts
-
-- Update `frontend/src/components/chat/ChatTab.vue` header layout to use wrapping flex behavior so long titles cannot push controls off-screen.
-- Add `min-w-0` truncation guards on conversation title container/text.
-- Add horizontal overflow handling on the control group container to preserve access to new/clear/delete/history actions.
-- Add regression assertions in `frontend/test/chatHeaderHistoryUx.test.mjs` for responsive header classes.
-
-refactor(v1): remove legacy runtime route usage and implement missing v1 runtime endpoints
-
-Backend:
-- Stop mounting legacy API routers in `backend/app/main.py`; mount only `/api/v1/*` routes.
-- Add new v1 runtime router `backend/app/v1/api/runtime.py` with workspace-scoped endpoints:
-  - `GET /api/v1/workspaces/{workspace_id}/paths`
-  - `POST /api/v1/workspaces/{workspace_id}/execute`
-  - `GET /api/v1/workspaces/{workspace_id}/datasets/{table_name}/preview`
-  - `GET /api/v1/workspaces/{workspace_id}/datasets/{table_name}/schema`
-  - `POST /api/v1/workspaces/{workspace_id}/datasets/{table_name}/schema`
-  - `GET /api/v1/workspaces/{workspace_id}/schemas`
-- Wire runtime router into v1 API (`backend/app/v1/api/router.py`).
-- Extend `DatasetRepository` with `list_for_workspace` for schema listing.
-- Add v1 Gemini API key test endpoint at `POST /api/v1/admin/test-gemini`.
-
-Frontend:
-- Rewire execution to v1 workspace runtime endpoint instead of legacy `/execute`.
-- Rewire dataset ingest (`uploadDataPath`) to v1 dataset attach + schema fetch flow.
-- Rewire preview and schema fetch/save/list helpers to v1 workspace endpoints.
-- Implement real `getDatabasePaths()` via v1 workspace paths endpoint.
-- Update Code tab default template to prefer connecting DuckDB with workspace db path when available.
-- Guard browser-upload fallback with explicit unsupported message in v1 desktop mode.
-
-Tests:
-- Add backend contract test: `backend/tests/test_v1_runtime_api_contract.py`.
-- Add backend behavior test: `backend/tests/test_v1_runtime_execute_scope.py`.
-- Add frontend regression test: `frontend/test/v1RuntimeExecutionRoute.test.mjs`.
-
-followup(v1): remove legacy chat fallback paths from frontend submit flow
-
-- Update `frontend/src/components/chat/ChatInput.vue` to require workspace scope and use only `v1Analyze`/`v1AnalyzeStream`.
-- Convert legacy `apiService.analyzeData*` methods into explicit deprecation errors to prevent accidental non-v1 calls.
-- Redirect `generateSchemaFromColumns` helper to v1 schema save endpoint.
-- Add assertions in `frontend/test/v1FlowNoLegacyBridge.test.mjs` that legacy analyze APIs are not used.
+- Delete frontend pyodide/duckdb-browser recovery tests:
+  - `frontend/test/pyodideExecutionGuard.test.mjs`
+  - `frontend/test/pyodideQueryErrorHint.test.mjs`
+  - `frontend/test/duckdbInitResilience.test.mjs`
+  - `frontend/test/browserTableRecovery.test.mjs`
+  - `frontend/test/previewChatWorkspaceResilience.test.mjs`
+  - `frontend/test_duckdb.js`
+- Remove backend test cases tied to legacy `await query(...)` pyodide bridge assertions.
+- Delete backend payload-builder test file dedicated to legacy bridge feedback assertions:
+  - `backend/tests/test_v1_chat_payload_builder.py`
+- Keep non-pyodide backend coverage intact (`test_chat_streaming.py`, `test_code_guard.py`, `test_codegen_prompt_contract.py`).
