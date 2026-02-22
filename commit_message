@@ -7,3 +7,4 @@ Add per-target override options (--backend-version, --tauri-version, --frontend-
 Map Python prerelease versions (e.g. 0.5.0a1) to SemVer prerelease for Tauri/frontend by default (0.5.0-alpha.1)
 Add regression tests for PEP440-to-SemVer conversion and per-target version resolution in bump_versions script
 Add usage examples to bump_versions.py --help output, including one-command dry-run and per-target override flows
+Apply release version 0.5.0a1 across backend (PEP440), tauri/frontend (SemVer prerelease), and installer wheel URLs using bump_versions helper
