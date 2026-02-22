@@ -19,6 +19,8 @@ test('chat submit path enforces workspace dataset sync without legacy setDataPat
   assert.equal(source.includes('await ensureWorkspaceDatasetReady()'), true)
   assert.equal(source.includes('ensureBackendSchemaReadyForChat'), false)
   assert.equal(source.includes('apiService.setDataPathSimple('), false)
+  assert.equal(source.includes('apiService.analyzeDataStream('), false)
+  assert.equal(source.includes('apiService.analyzeData('), false)
 })
 
 test('v1 runtime avoids legacy settings check-update endpoint calls', () => {

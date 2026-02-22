@@ -2,6 +2,7 @@ import { apiService } from './apiService'
 import { cacheService } from './cacheService'
 import { useAppStore } from '../stores/appStore'
 import { isBrowserDataPath } from '../utils/previewRouting'
+import { inferTableNameFromDataPath } from '../utils/chatBootstrap'
 
 class PreviewService {
   constructor() {
@@ -10,19 +11,7 @@ class PreviewService {
   }
 
   async getBrowserPreview(sampleType = 'random') {
-    // In Tauri mode, all data lives on the backend — no browser DuckDB.
-    // Route through the standard API preview.
-    try {
-      return await apiService.getDataPreview(sampleType)
-    } catch (_error) {
-      return {
-        success: true,
-        data: [],
-        row_count: 0,
-        sample_type: sampleType,
-        message: 'Data preview is handled by the backend.'
-      }
-    }
+    return this.getDataPreview(sampleType)
   }
 
   // Get data preview with caching
@@ -38,48 +27,77 @@ class PreviewService {
       }
     }
     const dataPath = appStore.schemaFileId || appStore.dataFilePath
+    const tableName = (appStore.ingestedTableName || inferTableNameFromDataPath(dataPath || '')).trim()
+    if (!tableName) {
+      return {
+        success: true,
+        data: [],
+        row_count: 0,
+        sample_type: sampleType,
+        message: 'Select a dataset to preview.'
+      }
+    }
 
     if (isBrowserDataPath(dataPath)) {
       const localKey = cacheService.generateKey('data/preview/local', {
         sampleType,
         table: appStore.ingestedTableName || ''
       })
+      const fetcher = () => apiService.v1GetDatasetPreview(
+        appStore.activeWorkspaceId,
+        tableName,
+        sampleType,
+        100
+      ).then((resp) => ({
+        success: true,
+        data: resp?.data || [],
+        row_count: resp?.row_count || 0,
+        sample_type: resp?.sample_type || sampleType,
+        message: `Loaded ${resp?.row_count || 0} rows`
+      }))
       if (forceRefresh) {
-        return cacheService.refresh(localKey, () => this.getBrowserPreview(sampleType), this.cacheExpiry)
+        return cacheService.refresh(localKey, fetcher, this.cacheExpiry)
       }
-      return cacheService.getOrSet(localKey, () => this.getBrowserPreview(sampleType), this.cacheExpiry)
+      return cacheService.getOrSet(localKey, fetcher, this.cacheExpiry)
     }
 
-    const cacheKey = cacheService.generateKey('data/preview', { sampleType })
+    const cacheKey = cacheService.generateKey('data/preview', { sampleType, tableName, workspace: appStore.activeWorkspaceId })
+    const fetcher = () => apiService.v1GetDatasetPreview(
+      appStore.activeWorkspaceId,
+      tableName,
+      sampleType,
+      100
+    ).then((resp) => ({
+      success: true,
+      data: resp?.data || [],
+      row_count: resp?.row_count || 0,
+      sample_type: resp?.sample_type || sampleType,
+      message: `Loaded ${resp?.row_count || 0} rows`
+    }))
 
     if (forceRefresh) {
-      return cacheService.refresh(cacheKey,
-        () => apiService.getDataPreview(sampleType),
-        this.cacheExpiry
-      )
+      return cacheService.refresh(cacheKey, fetcher, this.cacheExpiry)
     }
 
-    return cacheService.getOrSet(cacheKey,
-      () => apiService.getDataPreview(sampleType),
-      this.cacheExpiry
-    )
+    return cacheService.getOrSet(cacheKey, fetcher, this.cacheExpiry)
   }
 
   // Load schema with caching
   async loadSchema(filepath, forceRefresh = false) {
-    const cacheKey = cacheService.generateKey('schema/load', { filepath })
+    const appStore = useAppStore()
+    const dataPath = filepath || appStore.schemaFileId || appStore.dataFilePath
+    const tableName = (appStore.ingestedTableName || inferTableNameFromDataPath(dataPath || '')).trim()
+    if (!appStore.activeWorkspaceId || !tableName) {
+      return { table_name: '', columns: [] }
+    }
+    const cacheKey = cacheService.generateKey('schema/load', { workspace: appStore.activeWorkspaceId, tableName })
+    const fetcher = () => apiService.v1GetDatasetSchema(appStore.activeWorkspaceId, tableName)
 
     if (forceRefresh) {
-      return cacheService.refresh(cacheKey,
-        () => apiService.loadSchema(filepath),
-        this.schemaCacheExpiry
-      )
+      return cacheService.refresh(cacheKey, fetcher, this.schemaCacheExpiry)
     }
 
-    return cacheService.getOrSet(cacheKey,
-      () => apiService.loadSchema(filepath),
-      this.schemaCacheExpiry
-    )
+    return cacheService.getOrSet(cacheKey, fetcher, this.schemaCacheExpiry)
   }
 
   // Generate schema with caching (more careful with this one as it's expensive)

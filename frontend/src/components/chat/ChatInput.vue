@@ -186,19 +186,9 @@ async function handleSubmit() {
       appStore.setSchemaFileId(buildBrowserDataPath(expectedTableName))
     }
 
-    // Get current Python file content if available
-    const userCode = appStore.pythonFileContent || null
-
-    // Prepare the request data
-    const requestData = {
-      current_code: appStore.pythonFileContent || '',
-      question: questionText,
-      model: appStore.selectedModel,
-      context: appStore.schemaContext.trim() || null
+    if (!appStore.activeWorkspaceId) {
+      throw new Error('Create/select a workspace before analysis.')
     }
-
-    // Log the request for debugging
-    console.debug('📤 Sending request to /chat endpoint:', requestData)
 
     // Hard invariant: selected dataset must be synced to the active workspace before analyze.
     await ensureWorkspaceDatasetReady()
@@ -214,60 +204,21 @@ async function handleSubmit() {
     }, 300000) // 5 minutes
 
     let response
-    if (appStore.activeWorkspaceId) {
-      const schemaPayload = buildActiveSchemaPayload()
-      try {
-        response = await apiService.v1AnalyzeStream(
-          {
-            workspace_id: appStore.activeWorkspaceId,
-            conversation_id: appStore.activeConversationId || null,
-            question: questionText,
-            current_code: appStore.pythonFileContent || '',
-            model: appStore.selectedModel,
-            context: appStore.schemaContext.trim() || null,
-            table_name: schemaPayload.tableName,
-            active_schema: schemaPayload.activeSchema,
-            api_key: appStore.apiKey || null
-          },
-          {
-            signal,
-            onEvent: (evt) => {
-              if (evt.event === 'status' && evt.data?.message) {
-                appStore.updateLastMessageExplanation(evt.data.message)
-                return
-              }
-              if (evt.event === 'node' && evt.data?.node) {
-                appStore.updateLastMessageExplanation(`Running: ${evt.data.node}...`)
-              }
-            }
-          }
-        )
-      } catch (streamError) {
-        // Fallback if streaming fails or is unsupported
-        if (streamError?.status === 404 || streamError?.status === 405) {
-          response = await apiService.v1Analyze({
-            workspace_id: appStore.activeWorkspaceId,
-            conversation_id: appStore.activeConversationId || null,
-            question: questionText,
-            current_code: appStore.pythonFileContent || '',
-            model: appStore.selectedModel,
-            context: appStore.schemaContext.trim() || null,
-            table_name: schemaPayload.tableName,
-            active_schema: schemaPayload.activeSchema,
-            api_key: appStore.apiKey || null
-          })
-        } else {
-          throw streamError
-        }
-      }
-
-      if (response?.conversation_id && response.conversation_id !== appStore.activeConversationId) {
-        appStore.setActiveConversationId(response.conversation_id)
-        await appStore.fetchConversations()
-      }
-    } else {
-      try {
-        response = await apiService.analyzeDataStream(requestData, {
+    const schemaPayload = buildActiveSchemaPayload()
+    try {
+      response = await apiService.v1AnalyzeStream(
+        {
+          workspace_id: appStore.activeWorkspaceId,
+          conversation_id: appStore.activeConversationId || null,
+          question: questionText,
+          current_code: appStore.pythonFileContent || '',
+          model: appStore.selectedModel,
+          context: appStore.schemaContext.trim() || null,
+          table_name: schemaPayload.tableName,
+          active_schema: schemaPayload.activeSchema,
+          api_key: appStore.apiKey || null
+        },
+        {
           signal,
           onEvent: (evt) => {
             if (evt.event === 'status' && evt.data?.message) {
@@ -278,15 +229,30 @@ async function handleSubmit() {
               appStore.updateLastMessageExplanation(`Running: ${evt.data.node}...`)
             }
           }
-        })
-      } catch (streamError) {
-        // Backward-compatible fallback if streaming endpoint is unavailable.
-        if (streamError?.status === 404 || streamError?.status === 405) {
-          response = await apiService.analyzeData(requestData, signal)
-        } else {
-          throw streamError
         }
+      )
+    } catch (streamError) {
+      // Fallback if streaming fails or is unsupported
+      if (streamError?.status === 404 || streamError?.status === 405) {
+        response = await apiService.v1Analyze({
+          workspace_id: appStore.activeWorkspaceId,
+          conversation_id: appStore.activeConversationId || null,
+          question: questionText,
+          current_code: appStore.pythonFileContent || '',
+          model: appStore.selectedModel,
+          context: appStore.schemaContext.trim() || null,
+          table_name: schemaPayload.tableName,
+          active_schema: schemaPayload.activeSchema,
+          api_key: appStore.apiKey || null
+        })
+      } else {
+        throw streamError
       }
+    }
+
+    if (response?.conversation_id && response.conversation_id !== appStore.activeConversationId) {
+      appStore.setActiveConversationId(response.conversation_id)
+      await appStore.fetchConversations()
     }
 
     // Parse the response with new format

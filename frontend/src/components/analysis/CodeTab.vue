@@ -481,7 +481,7 @@ table_name = "${tableName}"
 try:
     conn  # type: ignore  # noqa
 except NameError:
-    conn = duckdb.connect()
+    conn = duckdb.connect(r"${dbPath || ''}") if "${dbPath || ''}".strip() else duckdb.connect()
 
 # cell 2: Quick sample
 # Use DuckDB for lazy evaluation, then convert to a Narwhals-compatible DataFrame

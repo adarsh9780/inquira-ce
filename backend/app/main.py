@@ -21,17 +21,6 @@ if not hasattr(aiosqlite.Connection, "is_alive"):
     aiosqlite.Connection.is_alive = is_alive
 
 
-from .api.api_test import router as api_test_router
-from .api.auth import router as auth_router
-from .api.chat import router as chat_router
-from .api.data_preview import router as data_preview_router
-from .api.datasets import router as datasets_router
-from .api.schemas import router as schema_router
-from .api.legal import router as legal_router
-from .api.settings import router as settings_router
-from .api.system import router as system_router
-from .api.execute import router as execute_router
-from .api.data_inspect import router as data_inspect_router
 from .v1.api.router import router as v1_router
 from .v1.db.init import init_v1_database
 from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
@@ -186,19 +175,7 @@ app.add_middleware(
     expose_headers=["set-cookie"],
 )
 
-# Include all routers
-app.include_router(auth_router)
-
-app.include_router(chat_router)
-app.include_router(settings_router)
-app.include_router(data_preview_router)
-app.include_router(schema_router)
-app.include_router(api_test_router)
-app.include_router(datasets_router)
-app.include_router(system_router)
-app.include_router(legal_router)
-app.include_router(execute_router)
-app.include_router(data_inspect_router)
+# Include v1 router only
 app.include_router(v1_router)
 
 

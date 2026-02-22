@@ -69,3 +69,38 @@ fix(ui): keep chat header action buttons visible in narrow panel layouts
 - Add `min-w-0` truncation guards on conversation title container/text.
 - Add horizontal overflow handling on the control group container to preserve access to new/clear/delete/history actions.
 - Add regression assertions in `frontend/test/chatHeaderHistoryUx.test.mjs` for responsive header classes.
+
+refactor(v1): remove legacy runtime route usage and implement missing v1 runtime endpoints
+
+Backend:
+- Stop mounting legacy API routers in `backend/app/main.py`; mount only `/api/v1/*` routes.
+- Add new v1 runtime router `backend/app/v1/api/runtime.py` with workspace-scoped endpoints:
+  - `GET /api/v1/workspaces/{workspace_id}/paths`
+  - `POST /api/v1/workspaces/{workspace_id}/execute`
+  - `GET /api/v1/workspaces/{workspace_id}/datasets/{table_name}/preview`
+  - `GET /api/v1/workspaces/{workspace_id}/datasets/{table_name}/schema`
+  - `POST /api/v1/workspaces/{workspace_id}/datasets/{table_name}/schema`
+  - `GET /api/v1/workspaces/{workspace_id}/schemas`
+- Wire runtime router into v1 API (`backend/app/v1/api/router.py`).
+- Extend `DatasetRepository` with `list_for_workspace` for schema listing.
+- Add v1 Gemini API key test endpoint at `POST /api/v1/admin/test-gemini`.
+
+Frontend:
+- Rewire execution to v1 workspace runtime endpoint instead of legacy `/execute`.
+- Rewire dataset ingest (`uploadDataPath`) to v1 dataset attach + schema fetch flow.
+- Rewire preview and schema fetch/save/list helpers to v1 workspace endpoints.
+- Implement real `getDatabasePaths()` via v1 workspace paths endpoint.
+- Update Code tab default template to prefer connecting DuckDB with workspace db path when available.
+- Guard browser-upload fallback with explicit unsupported message in v1 desktop mode.
+
+Tests:
+- Add backend contract test: `backend/tests/test_v1_runtime_api_contract.py`.
+- Add backend behavior test: `backend/tests/test_v1_runtime_execute_scope.py`.
+- Add frontend regression test: `frontend/test/v1RuntimeExecutionRoute.test.mjs`.
+
+followup(v1): remove legacy chat fallback paths from frontend submit flow
+
+- Update `frontend/src/components/chat/ChatInput.vue` to require workspace scope and use only `v1Analyze`/`v1AnalyzeStream`.
+- Convert legacy `apiService.analyzeData*` methods into explicit deprecation errors to prevent accidental non-v1 calls.
+- Redirect `generateSchemaFromColumns` helper to v1 schema save endpoint.
+- Add assertions in `frontend/test/v1FlowNoLegacyBridge.test.mjs` that legacy analyze APIs are not used.

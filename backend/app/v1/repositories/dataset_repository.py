@@ -36,3 +36,13 @@ class DatasetRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    @staticmethod
+    async def list_for_workspace(session: AsyncSession, workspace_id: str) -> list[WorkspaceDataset]:
+        """List datasets for one workspace ordered by recency."""
+        result = await session.execute(
+            select(WorkspaceDataset)
+            .where(WorkspaceDataset.workspace_id == workspace_id)
+            .order_by(desc(WorkspaceDataset.updated_at))
+        )
+        return list(result.scalars().all())

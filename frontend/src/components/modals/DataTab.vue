@@ -517,7 +517,11 @@ async function saveDataSettings() {
     await apiService.setContext(appStore.schemaContext.trim())
     await generateAndSaveSchema()
 
-    if (appStore.activeWorkspaceId && ingestedTableName.value) {
+    if (
+      appStore.activeWorkspaceId &&
+      ingestedTableName.value &&
+      String(appStore.dataFilePath || '').toLowerCase().startsWith('browser://')
+    ) {
       const columnsPayload = ingestedColumns.value.map((col) => ({
         name: col.name,
         dtype: col.type || col.dtype || 'VARCHAR',

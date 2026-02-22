@@ -3,6 +3,7 @@ import { getInquira } from './generatedApi'
 import { v1Api } from './contracts/v1Api'
 import { parseSseBuffer } from '../utils/sseParser'
 import { disableStreamingForUnsupportedStatus, isStreamingEnabled } from '../utils/streamingCapability'
+import { inferTableNameFromDataPath } from '../utils/chatBootstrap'
 
 // ------------------------------------------------------------------
 // GLOBAL AXIOS CONFIGURATION
@@ -186,33 +187,40 @@ export const apiService = {
 
   // Data preview
   async getDataPreview(sampleType = 'random') {
-    return client.getDataPreviewDataPreviewGet({ sample_type: sampleType })
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    if (!appStore.activeWorkspaceId || !appStore.ingestedTableName) {
+      return {
+        success: true,
+        data: [],
+        row_count: 0,
+        sample_type: sampleType,
+        message: 'Select a workspace dataset to preview.'
+      }
+    }
+    return this.v1GetDatasetPreview(
+      appStore.activeWorkspaceId,
+      appStore.ingestedTableName,
+      sampleType,
+      100
+    )
   },
 
   // Generate schema with context
   async generateSchema(filepath, context = null, forceRegenerate = false) {
-    console.debug('🔄 Generating schema for:', filepath, 'force:', forceRegenerate)
-
-    // Verify authentication before schema generation
-    try {
-      await this.verifyAuth()
-    } catch (authError) {
-      console.error('❌ Authentication failed for schema generation')
-      throw new Error('Authentication required for schema generation')
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    const workspaceId = appStore.activeWorkspaceId
+    const tableName = (appStore.ingestedTableName || inferTableNameFromDataPath(filepath || appStore.dataFilePath || '')).trim()
+    if (!workspaceId || !tableName) {
+      throw new Error('Select a workspace dataset before generating schema.')
     }
-
-    try {
-      const response = await client.generateSchemaSchemasGeneratePost({
-        filepath: filepath,
-        context: context,
-        force_regenerate: forceRegenerate
-      })
-      console.debug('✅ Schema generation successful')
-      return response
-    } catch (error) {
-      console.error('❌ Schema generation failed:', error.response?.data)
-      throw error
-    }
+    const schema = await this.v1GetDatasetSchema(workspaceId, tableName)
+    if (!context) return schema
+    return this.v1SaveDatasetSchema(workspaceId, tableName, {
+      context,
+      columns: schema.columns || []
+    })
   },
 
   /**
@@ -220,121 +228,87 @@ export const apiService = {
    * The frontend sends columns from DuckDB-WASM directly — no file path needed.
    */
   async generateSchemaFromColumns(tableName, columns, context = null) {
-    console.debug('🔄 Generating schema from columns for table:', tableName)
-
-    try {
-      await this.verifyAuth()
-    } catch (authError) {
-      throw new Error('Authentication required for schema generation')
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    if (!appStore.activeWorkspaceId) {
+      throw new Error('Create/select a workspace before generating schema.')
     }
-
-    try {
-      const { default: axios } = await import('axios')
-      const baseUrl = client.defaults?.baseURL || (import.meta.env.VITE_API_BASE || '')
-      const response = await axios.post(`${baseUrl}/schemas/generate-from-columns`, {
-        table_name: tableName,
-        columns: columns,
-        context: context
-      }, {
-        withCredentials: true
-      })
-      console.debug('✅ Schema from columns generation successful')
-      return response.data
-    } catch (error) {
-      console.error('❌ Schema from columns generation failed:', error.response?.data)
-      throw error
-    }
+    return this.v1SaveDatasetSchema(appStore.activeWorkspaceId, tableName, {
+      context: context || '',
+      columns: (columns || []).map((col) => ({
+        name: col.name,
+        dtype: col.dtype || col.type || 'VARCHAR',
+        description: col.description || '',
+        samples: Array.isArray(col.samples) ? col.samples : []
+      }))
+    })
   },
 
   // Load existing schema
   async loadSchema(filepath) {
-    console.debug('📂 Loading schema for:', filepath)
-
-    // Verify authentication before loading schema
-    try {
-      await this.verifyAuth()
-    } catch (authError) {
-      console.error('❌ Authentication failed for schema loading')
-      throw new Error('Authentication required for schema loading')
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    const workspaceId = appStore.activeWorkspaceId
+    const tableName = (appStore.ingestedTableName || inferTableNameFromDataPath(filepath || appStore.dataFilePath || '')).trim()
+    if (!workspaceId || !tableName) {
+      throw new Error('Select a workspace dataset before loading schema.')
     }
-
-    try {
-      // NOTE: generated function takes filepath as an argument, separate from options
-      const response = await client.loadSchemaEndpointSchemasLoadFilepathGet(filepath)
-      console.debug('✅ Schema loading successful')
-      return response
-    } catch (error) {
-      console.error('❌ Schema loading failed:', error.response?.data)
-      throw error
-    }
+    return this.v1GetDatasetSchema(workspaceId, tableName)
   },
 
   // Save schema
   async saveSchema(filepath, context, columns) {
-    console.debug('💾 Saving schema for:', filepath)
-
-    // Verify authentication before saving schema
-    try {
-      await this.verifyAuth()
-    } catch (authError) {
-      console.error('❌ Authentication failed for schema saving')
-      throw new Error('Authentication required for schema saving')
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    const workspaceId = appStore.activeWorkspaceId
+    const tableName = (appStore.ingestedTableName || inferTableNameFromDataPath(filepath || appStore.dataFilePath || '')).trim()
+    if (!workspaceId || !tableName) {
+      throw new Error('Select a workspace dataset before saving schema.')
     }
-
-    try {
-      const response = await client.saveSchemaEndpointSchemasSavePost({
-        filepath: filepath,
-        context: context,
-        columns: columns
-      })
-      console.debug('✅ Schema saving successful')
-      return response
-    } catch (error) {
-      console.error('❌ Schema saving failed:', error.response?.data)
-      throw error
-    }
+    return this.v1SaveDatasetSchema(workspaceId, tableName, { context, columns })
   },
 
   // List schemas
   async listSchemas() {
-    console.debug('📋 Listing schemas')
-
-    // Verify authentication before listing schemas
-    try {
-      await this.verifyAuth()
-    } catch (authError) {
-      console.error('❌ Authentication failed for schema listing')
-      throw new Error('Authentication required for schema listing')
-    }
-
-    try {
-      const response = await client.listSchemasEndpointSchemasListGet()
-      console.debug('✅ Schema listing successful')
-      return response
-    } catch (error) {
-      console.error('❌ Schema listing failed:', error.response?.data)
-      throw error
-    }
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    if (!appStore.activeWorkspaceId) return { schemas: [] }
+    return this.v1ListSchemas(appStore.activeWorkspaceId)
   },
 
   // Get database and schema paths
   async getDatabasePaths() {
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    if (!appStore.activeWorkspaceId) {
+      return { database_path: null, schema_path: null, base_directory: null }
+    }
+    const paths = await this.v1GetWorkspacePaths(appStore.activeWorkspaceId)
     return {
-      database_path: null,
-      schema_path: null,
-      base_directory: null
+      database_path: paths?.duckdb_path || null,
+      schema_path: paths?.workspace_dir || null,
+      base_directory: paths?.workspace_dir || null
     }
   },
 
   // Code execution (server-side)
-  async executeCode(code, timeout = 60) {
+  async executeCode(code, timeout = 60, workspaceId = null) {
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    const activeWorkspaceId = workspaceId || appStore.activeWorkspaceId
+    if (!activeWorkspaceId) {
+      throw new Error('Create/select a workspace before running code.')
+    }
     console.debug('🚀 [API] Executing code...', { timeout })
-    const response = await fetch(`${apiBaseUrl.replace(/\/+$/, '')}/execute`, {
+    const response = await fetch(
+      `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${activeWorkspaceId}/execute`,
+      {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ code, timeout })
-    })
+      }
+    )
     if (!response.ok) {
       const detail = await response.json().catch(() => ({}))
       throw new Error(detail.detail || `Execution request failed (${response.status})`)
@@ -344,108 +318,47 @@ export const apiService = {
 
   // File data loading — inspect file for columns, then trigger background DuckDB conversion
   async uploadDataPath(filePath) {
-    console.debug('📂 [API] Inspecting file path:', filePath)
-    // Step 1: Inspect file header (fast, synchronous)
-    const inspectRes = await fetch(`${apiBaseUrl.replace(/\/+$/, '')}/data/inspect`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ file_path: filePath })
-    })
-    if (!inspectRes.ok) {
-      const detail = await inspectRes.json().catch(() => ({}))
-      console.error('❌ [API] Inspection failed:', detail)
-      throw new Error(detail.detail || `Failed to inspect file (${inspectRes.status})`)
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    if (!appStore.activeWorkspaceId) {
+      throw new Error('Create/select a workspace before loading a dataset.')
     }
-    const result = await inspectRes.json()
-    console.debug('✅ [API] Inspection result:', result)
 
-    // Step 2: Trigger background DuckDB conversion (fire-and-forget)
-    console.debug('⚙️ [API] Triggering background conversion...')
-    fetch(`${apiBaseUrl.replace(/\/+$/, '')}/settings/set/data_path`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ data_path: filePath })
-    }).catch(err => console.warn('⚠️ [API] Background conversion trigger warning:', err))
+    const ds = await this.v1AddDataset(appStore.activeWorkspaceId, filePath)
+    let columns = []
+    try {
+      const schema = await this.v1GetDatasetSchema(appStore.activeWorkspaceId, ds.table_name)
+      columns = (schema?.columns || []).map((col) => ({
+        name: col.name,
+        type: col.dtype || col.type || 'VARCHAR',
+        dtype: col.dtype || col.type || 'VARCHAR',
+        description: col.description || '',
+        samples: Array.isArray(col.samples) ? col.samples : []
+      }))
+    } catch (_error) {
+      // Keep ingestion successful even if schema metadata is unavailable.
+    }
 
-    return result
+    return {
+      table_name: ds.table_name,
+      row_count: ds.row_count ?? null,
+      file_path: ds.source_path || filePath,
+      columns
+    }
   },
 
   // Browser fallback — same endpoint, uses file name as path
   async uploadFile(file) {
-    return this.uploadDataPath(file.name)
+    throw new Error('Browser file uploads are not supported in v1 desktop mode. Use the native file picker.')
   },
 
   // Chat and analysis
   async analyzeData(data, signal = null) {
-    // data is typically { question, context, model, current_code }
-    return client.chatEndpointChatPost(data, { signal })
+    throw new Error('Legacy /chat endpoint removed. Use v1Analyze with workspace scope.')
   },
 
   async analyzeDataStream(data, { signal = null, onEvent = null } = {}) {
-    if (!isStreamingEnabled()) {
-      return this.analyzeData(data, signal)
-    }
-
-    const url = `${apiBaseUrl.replace(/\/+$/, '')}/chat/stream`
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include',
-      body: JSON.stringify(data),
-      signal
-    })
-
-    if (!response.ok) {
-      let detail = `Request failed with status ${response.status}`
-      try {
-        const text = await response.text()
-        if (text) detail = text
-      } catch (_) {
-        // keep default detail
-      }
-      const err = new Error(detail)
-      err.status = response.status
-      disableStreamingForUnsupportedStatus(response.status)
-      throw err
-    }
-
-    if (!response.body) {
-      throw new Error('Streaming not supported by browser/runtime.')
-    }
-
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    let finalPayload = null
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const { events, remainder } = parseSseBuffer(buffer)
-      buffer = remainder
-
-      for (const evt of events) {
-        if (onEvent) onEvent(evt)
-        if (evt.event === 'final') {
-          finalPayload = evt.data
-        } else if (evt.event === 'error') {
-          const detail = evt.data?.detail || 'Streaming analysis failed.'
-          const err = new Error(detail)
-          err.status = evt.data?.status_code || 500
-          throw err
-        }
-      }
-    }
-
-    if (!finalPayload) {
-      throw new Error('Stream ended without final analysis payload.')
-    }
-    return finalPayload
+    throw new Error('Legacy /chat/stream endpoint removed. Use v1AnalyzeStream with workspace scope.')
   },
 
   async getHistory() {
@@ -454,20 +367,12 @@ export const apiService = {
 
   // Health check
   async healthCheck() {
-    console.debug('🏥 [API] Checking backend health...')
-    try {
-      const response = await client.rootGet()
-      console.debug('✅ [API] Backend is healthy:', response)
-      return response
-    } catch (error) {
-      console.error('❌ [API] Backend health check failed:', error.response?.status)
-      throw error
-    }
+    return { status: 'ok' }
   },
 
   // test gemini api
   async testGeminiApi(apiKey) {
-    return client.testGeminiApiKeyApiTestGeminiPost({ api_key: apiKey })
+    return axios.post('/api/v1/admin/test-gemini', { api_key: apiKey })
   },
 
   // System utilities
@@ -576,8 +481,30 @@ export const apiService = {
     return v1Api.datasets.list(workspaceId)
   },
 
+  async v1GetWorkspacePaths(workspaceId) {
+    return axios.get(`/api/v1/workspaces/${workspaceId}/paths`)
+  },
+
   async v1AddDataset(workspaceId, sourcePath) {
     return v1Api.datasets.add(workspaceId, sourcePath)
+  },
+
+  async v1GetDatasetSchema(workspaceId, tableName) {
+    return axios.get(`/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema`)
+  },
+
+  async v1SaveDatasetSchema(workspaceId, tableName, payload) {
+    return axios.post(`/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema`, payload)
+  },
+
+  async v1ListSchemas(workspaceId) {
+    return axios.get(`/api/v1/workspaces/${workspaceId}/schemas`)
+  },
+
+  async v1GetDatasetPreview(workspaceId, tableName, sampleType = 'random', limit = 100) {
+    return axios.get(`/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/preview`, {
+      params: { sample_type: sampleType, limit }
+    })
   },
 
   async v1SyncBrowserDataset(workspaceId, payload) {

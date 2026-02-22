@@ -10,6 +10,7 @@
  */
 
 import apiService from './apiService'
+import { useAppStore } from '../stores/appStore'
 
 class ExecutionService {
     /**
@@ -21,7 +22,8 @@ class ExecutionService {
      */
     async executePython(code) {
         try {
-            const response = await apiService.executeCode(code)
+            const appStore = useAppStore()
+            const response = await apiService.executeCode(code, 60, appStore.activeWorkspaceId || null)
             return {
                 success: response.success !== false,
                 stdout: response.stdout || '',
