@@ -1,6 +1,7 @@
 import os
 from google import genai
 from pathlib import Path
+from typing import Any
 from dotenv import load_dotenv
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
@@ -33,6 +34,8 @@ class LLMService:
             self.api_key = os.getenv("GOOGLE_API_KEY", "")
 
         self.model = model
+        self.client: Any | None
+        self.chat_client: Any | None
 
         # Only initialize client if API key is available
         if self.api_key:
@@ -48,13 +51,10 @@ class LLMService:
                 status_code=503, detail="LLM service not available. API key not set."
             )
 
-        if model:
-            model = model
-        else:
-            model = self.model
+        selected_model = model or self.model
 
         self.chat_client = self.client.chats.create(
-            model=model,
+            model=selected_model,
             config=genai.types.GenerateContentConfig(
                 temperature=0,
                 system_instruction=system_instruction,

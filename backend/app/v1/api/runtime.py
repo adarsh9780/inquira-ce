@@ -85,6 +85,16 @@ def _normalize_table_name(raw: str) -> str:
     return "".join(c if c.isalnum() or c == "_" else "_" for c in raw.strip()).lower()
 
 
+def _normalize_schema_columns(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    normalized: list[dict[str, Any]] = []
+    for item in raw:
+        if isinstance(item, dict):
+            normalized.append(dict(item))
+    return normalized
+
+
 def _table_exists_in_workspace_db(duckdb_path: str, table_name: str) -> bool:
     con = duckdb.connect(duckdb_path)
     try:
@@ -212,7 +222,7 @@ async def get_workspace_dataset_schema(
             return DatasetSchemaResponse(
                 table_name=normalized,
                 context=str(data.get("context", "")),
-                columns=data.get("columns", []),
+                columns=_normalize_schema_columns(data.get("columns", [])),
             )
 
     con = duckdb.connect(workspace.duckdb_path)
@@ -262,10 +272,11 @@ async def save_workspace_dataset_schema(
         if dataset is not None and dataset.schema_path
         else meta_dir / f"{normalized}_schema.json"
     )
+    schema_columns: list[dict[str, Any]] = _normalize_schema_columns(payload.columns)
     schema_doc = {
         "table_name": normalized,
         "context": payload.context or "",
-        "columns": payload.columns or [],
+        "columns": schema_columns,
     }
     with schema_path.open("w", encoding="utf-8") as f:
         json.dump(schema_doc, f, indent=2)
@@ -277,7 +288,7 @@ async def save_workspace_dataset_schema(
     return DatasetSchemaResponse(
         table_name=normalized,
         context=str(schema_doc.get("context", "")),
-        columns=schema_doc["columns"],
+        columns=schema_columns,
     )
 
 

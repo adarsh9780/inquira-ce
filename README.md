@@ -1,125 +1,101 @@
-# 🚀 Inquira - AI-Powered Data Analysis Tool
+# Inquira CE
 
-<p align="center">
-  <img src="./src/inquira/logo/inquira_logo.svg" alt="Inquira Logo" width="100" height="100">
-</p>
+Local-first desktop data analysis with AI-assisted Python generation and execution.
 
-<p align="center">
-  <strong>Transform natural language into powerful data insights with AI-generated Python code</strong>
-</p>
+Current release line: `0.5.0a1` (alpha).
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Status-Active-success?style=for-the-badge" alt="Status">
-  <img src="https://img.shields.io/badge/Version-0.4.6a0-blue?style=for-the-badge" alt="Version">
-  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
-</p>
+## What This Repo Contains
 
----
+- `src-tauri/`: Desktop shell (Tauri/Rust) and app packaging.
+- `backend/`: FastAPI backend, agent/runtime services, and tests.
+- `frontend/`: Vue frontend used by the desktop app.
+- `scripts/`: install and maintenance scripts.
 
-**Inquira** is a local-first desktop application that functions as an autonomous data analyst. It allows you to load datasets (CSV, Excel, Parquet, DuckDB) and ask natural language questions. The AI plans the analysis, writes and executes Python/DuckDB code locally, and renders interactive results.
+## Install (End Users)
 
-## ⚡ Quick Start
+### Option A: Install CLI shim (recommended)
 
-### Option 1: Zero-Install (Run instantly)
-Requires **curl** (macOS/Linux) or **PowerShell** (Windows). No pre-installed Python required.
-
-**macOS/Linux**:
-```bash
-curl -fsSL https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/run-inquira.sh | bash
-```
-
-**Windows**:
-```powershell
-irm https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/run-inquira.ps1 | iex
-```
-
-### Option 2: Install Locally
-Adds `inquira` to your PATH.
-
-**macOS/Linux**:
+macOS/Linux:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/install-inquira.sh | bash
-# Then run:
 inquira
 ```
 
----
+Windows (PowerShell):
+```powershell
+irm https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/install-inquira.ps1 | iex
+inquira
+```
 
-## 🛠️ Development Setup
+The installer uses release wheel URLs published under GitHub Releases.
 
-If you want to contribute or build from source:
+## Build/Run From Source (Contributors)
 
-### Prerequisites
-*   **Python 3.12+**
-*   **UV** (Python package manager)
-*   **Node.js 18+** (Only if modifying the frontend)
+Prerequisites:
 
-### 1. Backend Setup
+- `uv`
+- Node.js 20+
+- Rust stable toolchain
+
+Run desktop app in development:
+
 ```bash
 git clone https://github.com/adarsh9780/inquira-ce.git
-cd inquira-ce/backend
-uv sync
-uv run python main.py
+cd inquira-ce
+cargo tauri dev --manifest-path src-tauri/Cargo.toml
 ```
-The app will start at `http://localhost:8000/ui`.
 
-### 2. Frontend Setup (Optional)
-The backend includes pre-built frontend assets in `backend/app/frontend/dist`. To modify the UI:
+## Local CI Commands (Same Intent As GitHub CI)
 
-1.  Navigate to `frontend/`.
-2.  Install & Run:
-    ```bash
-    cd frontend
-    npm install
-    npm run dev
-    ```
-3.  Link to backend:
-    ```bash
-    # In backend terminal
-    export INQUIRA_DEV_UI_DIR=$(pwd)/../frontend/dist
-    uv run python main.py
-    ```
+Backend:
+```bash
+cd backend
+uv sync --group dev
+uv run --group dev ruff check app/v1 tests
+uv run --group dev mypy --config-file mypy.ini app/v1
+uv run alembic upgrade head
+uv run pytest tests -q
+```
 
----
+Frontend:
+```bash
+cd frontend
+npm ci
+npm test -- --run
+npm run build
+```
 
-## ⚙️ Configuration
+## Versioning
 
-Configure via UI (**Settings**) or environment variables (`.env`).
+Versioning is centralized:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `GOOGLE_API_KEY` | Your Gemini API Key | None |
-| `INQUIRA_ALLOW_FILE_DIALOG` | Enable native file picker | `1` |
-| `LOG_LEVEL` | Logging verbosity | `INFO` |
+- `VERSION` is the source of truth (PEP 440 style, e.g. `0.5.0a1`).
+- Use:
+```bash
+uv run python scripts/maintenance/bump_versions.py --help
+```
 
----
+This updates backend, tauri, frontend, and installer wheel URLs consistently.
 
-## ✨ Features
+## CI and Release Automation
 
-*   **Local Execution**: Code runs on your machine, not the cloud.
-*   **Multi-Format**: Support for CSV, Excel, Parquet, and DuckDB.
-*   **AI-Powered**: Uses Google Gemini for code generation.
-*   **Visualizations**: Auto-generates interactive Plotly charts.
-*   **Project Aware**: Persistent sessions and file-based schemas.
+- CI workflow: `.github/workflows/ci.yml`
+  - Runs on push to `master`.
+- Release workflow: `.github/workflows/release.yml`
+  - Runs on pushed tags matching `v*`.
+  - Guard step fails if the tag commit is not on `master`.
+  - Builds desktop artifacts (macOS/Windows) and backend wheel, then attaches to release.
 
----
+## Notes For Alpha Releases
 
-## 🎯 Roadmap & Enhancements
+- `0.5.x` is alpha track. Expect iterative changes.
+- Desktop artifacts from CI are unsigned by default.
+- For production-grade distribution, add signing/notarization secrets and steps.
 
-#### **Immediate Technical Debt**
-- [ ] **Testing**: Add a comprehensive test suite (pytest) for the agent logic and prompt rendering.
-- [ ] **Error Handling**: Implement strict timeouts for code execution and graceful degradation when the LLM fails to plan.
-- [ ] **CI/CD**: Set up GitHub Actions for automated testing and linting.
+## Contributing
 
-#### **Future Features**
-- [ ] **Mobile App** (React Native)
-- [ ] **Cloud Deployment** (AWS/GCP)
-- [ ] **Team Collaboration** features
-- [ ] **Advanced ML** integrations
-- [ ] **Plugin System** for custom analyses
+Please read `CONTRIBUTING.md` before opening a PR.
 
----
+## License
 
-## 📄 License
-
-MIT License. See [LICENSE](LICENSE) for details.
+MIT (see `LICENSE`).

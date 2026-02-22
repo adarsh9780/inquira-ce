@@ -148,6 +148,9 @@ class ChatService:
         if schema is None:
             schema = {"table_name": table_name or "", "columns": []}
 
+        if conversation_id is None:
+            raise HTTPException(status_code=500, detail="Conversation initialization failed")
+
         return conversation, conversation_id, schema, table_name or "", data_path or ""
 
     @staticmethod

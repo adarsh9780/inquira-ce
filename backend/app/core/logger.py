@@ -26,7 +26,7 @@ _LEVEL_VALUES = {
 }
 
 
-def _normalize_level(level: str, default: str) -> str:
+def _normalize_level(level: Any, default: str) -> str:
     candidate = str(level or "").upper()
     return candidate if candidate in _LEVEL_VALUES else default
 

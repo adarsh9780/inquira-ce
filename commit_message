@@ -8,3 +8,9 @@ Map Python prerelease versions (e.g. 0.5.0a1) to SemVer prerelease for Tauri/fro
 Add regression tests for PEP440-to-SemVer conversion and per-target version resolution in bump_versions script
 Add usage examples to bump_versions.py --help output, including one-command dry-run and per-target override flows
 Apply release version 0.5.0a1 across backend (PEP440), tauri/frontend (SemVer prerelease), and installer wheel URLs using bump_versions helper
+Fix CI lint failure by removing unused fastapi.HTTPException import in test_v1_chat_no_dataset_fallback
+Fix CI type-check blockers in logger, llm_service, chat_service, and runtime schema typing; ensure mypy + ruff pass in backend workflow
+Refresh README and contributor docs for current desktop architecture, local CI commands, centralized versioning workflow, and install paths
+Add CONTRIBUTING.md and docs/release_process.md to document contributor and release procedures end-to-end
+Harden release workflow with pre-build backend/frontend validation jobs, master-tag guard enforcement, OS-specific desktop artifact uploads, and optional signing secret hooks
+Update release docs to reflect validation gates, artifact flow, and signing configuration requirements

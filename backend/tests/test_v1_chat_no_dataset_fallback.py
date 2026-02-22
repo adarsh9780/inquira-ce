@@ -1,7 +1,6 @@
 from types import SimpleNamespace
 
 import pytest
-from fastapi import HTTPException
 
 from app.v1.services.chat_service import ChatService
 
@@ -241,5 +240,4 @@ async def test_chat_uses_keychain_api_key_when_payload_key_missing(monkeypatch):
     )
 
     assert captured["api_key"] == "key-from-keychain"
-
 
