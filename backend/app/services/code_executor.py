@@ -126,12 +126,14 @@ async def execute_code(
         script_path = f.name
 
     try:
+        import sys
         result = subprocess.run(
-            ["python", script_path],
+            [sys.executable, script_path],
             capture_output=True,
             text=True,
             timeout=timeout,
             cwd=working_dir,
+            stdin=subprocess.DEVNULL,
         )
 
         stdout_raw = result.stdout

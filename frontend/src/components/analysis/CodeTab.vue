@@ -471,13 +471,13 @@ const defaultCodeTemplate = computed(() => {
   const tableName = backendTable || getTableName(originalFilepath)
 
   // Default template (DuckDB to Narwhals API)
-  return \`# cell 1: Load and explore data
+  return `# cell 1: Load and explore data
 import duckdb
 import narwhals as nw
 import plotly.express as px
 
 # Establish connection and set table name
-table_name = "\${tableName}"
+table_name = "${tableName}"
 try:
     conn  # type: ignore  # noqa
 except NameError:
@@ -495,7 +495,7 @@ schema_df = nw.from_native(conn.sql(f"DESCRIBE SELECT * FROM {table_name}").pl()
 row_count_df = nw.from_native(conn.sql(f"SELECT COUNT(*) AS rows FROM {table_name}").pl(), eager=True)
 
 schema_df, row_count_df
-\`
+`
 })
 
 // Replace table_name assignment in given Python source
@@ -711,18 +711,6 @@ watch(() => appStore.dataFilePath, (newPath, oldPath) => {
     if (isDefaultEditorContent(currentContent)) {
       console.debug('Updating code template due to data file path change')
       appStore.setPythonFileContent(defaultCodeTemplate.value)
-    } else {
-      // Try to update just the table_name assignment in existing code
-      const backendTable = settingsInfo?.value?.table_name || settingsInfo?.value?.data_table_name || settingsInfo?.value?.table || null
-      const tableName = backendTable || getTableName(newPath)
-      const updated = replaceTableNameInCode(appStore.pythonFileContent, tableName)
-      if (updated !== appStore.pythonFileContent) {
-        appStore.setPythonFileContent(updated)
-        updateEditorContent()
-      } else {
-        // No direct match; call silent sync to handle edge cases (and future settings refresh)
-        syncTableNameInCode(true)
-      }
     }
   }
 })

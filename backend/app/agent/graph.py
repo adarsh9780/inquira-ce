@@ -333,12 +333,12 @@ class InquiraAgent:
         model = self._get_model(config, "gemini-2.5-flash")
         chain = prompt | model.with_structured_output(Code)
         retry_feedback = state.code_guard_feedback or (
-            "Use await query(...) and avoid python duckdb/ibis connections."
+            "Ensure code is valid."
         )
         retry_messages = list(state.messages) + [
             HumanMessage(
                 content=(
-                    "Code validation failed. Regenerate code using browser bridge rules only.\n"
+                    "Code validation failed. Regenerate code.\n"
                     f"Validator feedback: {retry_feedback}"
                 )
             )
@@ -383,38 +383,29 @@ class InquiraAgent:
         return {"messages": [AIMessage(content=response.content)]}
 
     def code_guard(self, state: State, config: RunnableConfig) -> dict[str, Any]:
-        # First pass: strict validation and deterministic rewrites without fallback.
-        strict_result = guard_code(
-            state.code or "", table_name=state.table_name, allow_fallback=False
-        )
-        if not strict_result.blocked:
+        result = guard_code(state.code or "", table_name=state.table_name)
+        if not result.blocked:
             return {
-                "code": strict_result.code,
-                "current_code": strict_result.code,
+                "code": result.code,
+                "current_code": result.code,
                 "guard_status": "ok",
                 "code_guard_feedback": "",
             }
 
-        # One retry with validator feedback to preserve user intent.
         retries = int(state.code_guard_retries or 0)
-        if retries < 1 and strict_result.should_retry:
+        if retries < 1 and result.should_retry:
             return {
                 "guard_status": "retry",
                 "code_guard_retries": retries + 1,
-                "code_guard_feedback": strict_result.reason or "",
+                "code_guard_feedback": result.reason or "",
             }
 
-        # Final pass: deterministic fallback guarantees executable bridge-safe code.
-        final_result = guard_code(
-            state.code or "", table_name=state.table_name, allow_fallback=True
-        )
-        updates: dict[str, Any] = {
-            "code": final_result.code,
-            "current_code": final_result.code,
+        return {
+            "code": result.code,
+            "current_code": result.code,
             "guard_status": "ok",
-            "code_guard_feedback": "",
+            "code_guard_feedback": result.reason or "",
         }
-        return updates
 
     def general_purpose(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         system_prompt_template = """You are the AI assistant for **Inquira**, a data analysis platform.

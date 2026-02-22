@@ -8,8 +8,8 @@ template: |
     Python code or by simply answering questions in regular format.
 
   # Assumptions
-    1. Data is already loaded in browser DuckDB-WASM. Python accesses it via async helper `await query(sql)`.
-    2. The active table name and schema are provided; use those to plan exact SQL operations.
+    1. Data is available at a specific path/URL. Python accesses it using `duckdb.read_csv()` or `duckdb.read_parquet()`.
+    2. The active table name, schema, and data path are provided; use those to plan operations.
     3. Optionally, current code is provided; build incrementally when possible.
 
   # Task
@@ -17,8 +17,9 @@ template: |
     - understanding of the objective
     - any assumptions taken to reduce the ambiguity
     - column names and corresponding operations on those columns which needs to be performed, in the same order of operation
-    - STRATEGY: Plan to use SQL through DuckDB-WASM (`await query("...")`) for heavy lifting (filtering, aggregation, joining) before loading larger results into memory.
-    - STRATEGY: Keep Pandas usage for lightweight post-processing only.
+    - STRATEGY: Plan to use DuckDB for lazy data loading/querying, wrapped with Narwhals (Polars API) for data manipulation (`df.filter()`, `df.group_by()`, etc.).
+    - STRATEGY: Fallback to Ibis or raw DuckDB SQL only if Narwhals cannot handle an extraordinarily complex operation.
+    - STRATEGY: Bring data into memory (e.g., as Pandas) only after heavy lifting/reduction is completely done.
     - do not treat missing values and data anomalies but consider the possibility in the plan
     - also include the best visualisation which can be used to absorb information better
     - the plan should be self-sufficient, meaning the LLM responsible for writing the code should not need
