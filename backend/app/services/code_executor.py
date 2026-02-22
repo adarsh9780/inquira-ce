@@ -127,13 +127,16 @@ async def execute_code(
 
     try:
         import sys
+        
+        # Use subprocess.PIPE for stdin to prevent Bad file descriptor errors
+        # during init_sys_streams on certain platforms/background workers.
         result = subprocess.run(
             [sys.executable, script_path],
             capture_output=True,
             text=True,
             timeout=timeout,
             cwd=working_dir,
-            stdin=subprocess.DEVNULL,
+            stdin=subprocess.PIPE,
         )
 
         stdout_raw = result.stdout
