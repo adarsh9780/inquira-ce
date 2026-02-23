@@ -4,11 +4,15 @@ VERSION ?=
 POS_VERSION := $(word 2,$(MAKECMDGOALS))
 EFFECTIVE_VERSION := $(if $(VERSION),$(VERSION),$(POS_VERSION))
 
-.PHONY: help help-release help-push help-tag check-version check-message check-input-version check-input-version-greater check-version-file check-no-version-arg check-tag-not-latest set-version metadata test git-add git-commit git-push git-tag push release
+.PHONY: help help-release help-push help-tag check-version check-message check-input-version check-input-version-greater check-version-file check-no-version-arg check-tag-not-latest set-version metadata test build-frontend sync-frontend-dist build-wheel build-desktop git-add git-commit git-push git-tag push release
 
 help:
 	@echo "Usage:"
 	@echo "  make test"
+	@echo "  make build-frontend"
+	@echo "  make sync-frontend-dist"
+	@echo "  make build-wheel"
+	@echo "  make build-desktop"
 	@echo "  make git-add"
 	@echo "  make git-commit"
 	@echo "  make git-push"
@@ -28,6 +32,10 @@ help:
 	@echo "  check-version Print current versions from all version-bearing files"
 	@echo "  metadata      Regenerate .github/release/metadata.json from release_metadata.md"
 	@echo "  test          Run pytest suite"
+	@echo "  build-frontend Build frontend assets into src/inquira/frontend/dist"
+	@echo "  sync-frontend-dist Copy frontend assets to backend/app/frontend/dist for wheel packaging"
+	@echo "  build-wheel   Build backend Python wheel with bundled frontend assets"
+	@echo "  build-desktop Build desktop app via Tauri (Tauri runs frontend build via beforeBuildCommand)"
 	@echo "  git-add       Stage all changes"
 	@echo "  git-commit    Commit using commit_message.txt with validations"
 	@echo "  git-push      Push current branch"
@@ -114,6 +122,22 @@ metadata: check-version-file
 
 test:
 	cd backend && uv run --group dev pytest
+
+build-frontend:
+	cd frontend && npm ci && npm run build
+
+sync-frontend-dist:
+	@test -f src/inquira/frontend/dist/index.html || (echo "Frontend build output missing at src/inquira/frontend/dist. Run 'make build-frontend' first."; exit 1)
+	rm -rf backend/app/frontend/dist
+	mkdir -p backend/app/frontend
+	cp -R src/inquira/frontend/dist backend/app/frontend/dist
+
+build-wheel: build-frontend sync-frontend-dist
+	cd backend && uv build --wheel
+
+build-desktop:
+	cd frontend && npm ci
+	cargo tauri build
 
 git-add:
 	git add .

@@ -69,13 +69,26 @@ jobs:
   build_wheel:
     needs: [validate_backend, validate_frontend]
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build frontend for wheel
+        run: |
+          npm ci
+          npm run build
+        working-directory: frontend
+      - name: Sync frontend dist into backend package data
+        run: |
+          rm -rf backend/app/frontend/dist
+          mkdir -p backend/app/frontend
+          cp -R src/inquira/frontend/dist backend/app/frontend/dist
       - name: Build wheel
+        working-directory: backend
         run: uv build --wheel
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
@@ -195,7 +208,7 @@ jobs:
             src-tauri/target/release/bundle/**/*.exe
 
   publish_wheel_to_release:
-    needs: [build_wheel, build_tauri]
+    needs: [build_wheel]
     runs-on: ubuntu-latest
     steps:
       - name: Download wheel artifact
@@ -208,3 +221,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "${GITHUB_REF_NAME}" dist/*.whl --clobber
+
+  publish_wheel_to_pypi:
+    needs: [build_wheel]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download wheel artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: python-wheel
+          path: dist
+
+      - name: Publish wheel to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist

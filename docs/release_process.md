@@ -53,9 +53,10 @@ What it does:
 1. Verifies tag commit is on `master`.
 2. Runs backend validation (ruff, mypy, migration check, pytest).
 3. Runs frontend validation (test + build).
-4. Builds backend wheel (`backend/dist/*.whl`).
-5. Builds desktop artifacts via Tauri action (macOS + Windows matrix; Windows uses NSIS bundle).
-6. Creates/updates a draft GitHub release using `.github/release/metadata.json`.
+4. Builds frontend assets for wheel packaging, syncs them into `backend/app/frontend/dist`, and builds backend wheel (`backend/dist/*.whl`).
+5. Uploads wheel to GitHub Release and publishes wheel to PyPI (environment: `pypi`).
+6. Builds desktop artifacts via Tauri action (macOS + Windows matrix; Windows uses NSIS bundle).
+7. Desktop and wheel publishing are independent: one can fail while the other still publishes.
 
 ## 7. Publish release
 

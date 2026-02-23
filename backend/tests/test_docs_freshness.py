@@ -17,8 +17,9 @@ def test_release_docs_use_makefile_workflow():
 
 
 def test_docs_do_not_contain_obvious_secret_placeholders():
-    misc_doc = (DOCS / "dummy.md").read_text(encoding="utf-8")
-    assert "AIza" not in misc_doc
+    for path in DOCS.glob("*.md"):
+        text = path.read_text(encoding="utf-8")
+        assert "AIza" not in text
 
 
 def test_readme_omits_internal_misc_links_from_primary_map():

@@ -48,3 +48,5 @@ release_metadata.md
 backend/app/static/pyodide/
 dummy.md
 frontend/dist/
+src/inquira/frontend/dist/
+backend/app/frontend/dist/

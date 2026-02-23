@@ -18,6 +18,8 @@ def test_gitignore_blocks_common_cache_and_os_junk():
         "**/.DS_Store",
         "backend/.venv/",
         "frontend/dist/",
+        "src/inquira/frontend/dist/",
+        "backend/app/frontend/dist/",
     ]
     for pattern in required_patterns:
         assert pattern in text

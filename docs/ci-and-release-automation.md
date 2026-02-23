@@ -5,7 +5,8 @@
 - Release workflow: `.github/workflows/release.yml`
   - Runs on pushed tags matching `v*`.
   - Guard step fails if the tag commit is not on `master`.
-  - Builds desktop artifacts (macOS/Windows) and backend wheel, then attaches to release.
+  - Builds/publishes backend wheel (GitHub Release + PyPI) and builds desktop artifacts (macOS/Windows).
+  - Wheel and desktop publishing are independent so one failing does not block the other.
 
 Detailed steps: [Release Process](./release_process.md)
 
