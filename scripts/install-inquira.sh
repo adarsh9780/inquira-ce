@@ -4,7 +4,7 @@ set -euo pipefail
 # Install-once script: creates an `inquira` shim on PATH that runs via uv.
 # No system Python required.
 
-WHEEL_URL_DEFAULT="https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a0/inquira_ce-0.5.7a0-py3-none-any.whl"
+WHEEL_URL_DEFAULT="https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a1/inquira_ce-0.5.7a1-py3-none-any.whl"
 WHEEL_URL="${INQUIRA_WHEEL_URL:-$WHEEL_URL_DEFAULT}"
 
 UPDATE=false
@@ -75,7 +75,7 @@ fi
 export PATH="$HOME/.cargo/bin:$PATH"
 
 # Allow override at runtime (no auto-latest)
-WHEEL_URL_DEFAULT="https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a0/inquira_ce-0.5.7a0-py3-none-any.whl"
+WHEEL_URL_DEFAULT="https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a1/inquira_ce-0.5.7a1-py3-none-any.whl"
 WHEEL_URL="${INQUIRA_WHEEL_URL:-$WHEEL_URL_DEFAULT}"
 
 # Show version being launched (best-effort from wheel filename)

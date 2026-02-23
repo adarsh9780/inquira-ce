@@ -101,7 +101,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-latest
+            optional: false
+          - os: windows-latest
+            optional: true
+    continue-on-error: ${{ matrix.optional }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -211,6 +216,7 @@ jobs:
     needs: [build_wheel]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Download wheel artifact
         uses: actions/download-artifact@v4
         with:

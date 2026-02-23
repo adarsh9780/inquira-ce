@@ -30,6 +30,15 @@ def test_release_workflow_syncs_frontend_assets_for_wheel_packaging():
     assert "cp -R src/inquira/frontend/dist backend/app/frontend/dist" in text
 
 
+def test_release_workflow_windows_tauri_build_is_optional():
+    text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "build_tauri:" in text
+    assert "continue-on-error: ${{ matrix.optional }}" in text
+    assert "- os: windows-latest" in text
+    assert "optional: true" in text
+
+
 def test_makefile_has_wheel_and_desktop_build_targets():
     text = MAKEFILE.read_text(encoding="utf-8")
 

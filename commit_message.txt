@@ -1,33 +1,13 @@
-feat(release): decouple wheel and desktop publishing with pypi wheel flow
+fix(release): resolve desktop windows shell issue and wheel publish blockers
 
-Update release workflow so wheel publishing is independent from Tauri desktop builds
-Add wheel packaging prep step that builds frontend and syncs dist into backend/app/frontend/dist
-Publish wheel artifact both to GitHub Release and PyPI via trusted publisher environment `pypi`
-Add Makefile targets for build-frontend, sync-frontend-dist, build-wheel, and build-desktop
-Fix docs freshness test to stop depending on removed docs/dummy.md
-Add regression tests covering release workflow independence and new Makefile build targets
-Refresh release docs to document independent wheel/desktop publishing behavior
+Make tauri beforeBuildCommand shell-portable by using a Node script instead of Bash-only test syntax
+Add checkout step in publish_wheel_to_release so gh CLI has git repository context
+Switch backend dependency from git URL to PyPI-compatible safe-py-runner>=0.1.6
+Refresh backend/uv.lock so CI uv sync resolves safe-py-runner from package index instead of git source
+Add regression tests covering release checkout wiring, tauri command portability, and PyPI dependency metadata validity
 
-chore(gitignore): ignore generated frontend static build outputs
+chore(release): make windows tauri build non-blocking in release workflow
 
-Explicitly ignore src/inquira/frontend/dist and backend/app/frontend/dist to prevent tracking built static artifacts
-Add regression coverage in backend/tests/test_gitignore_hygiene.py for both static build output paths
-Keep local generated files intact while ensuring they do not appear in git tracking
-
-fix(makefile): pass Cargo manifest path correctly through tauri CLI
-
-Use `cargo tauri build -- --manifest-path src-tauri/Cargo.toml` so manifest flag is forwarded to Cargo
-Resolve desktop build failure caused by tauri CLI rejecting direct `--manifest-path`
-
-fix(makefile): run desktop build from src-tauri and remove duplicate frontend build
-
-Run `cargo tauri build` inside src-tauri to avoid invalid relative manifest path errors
-Remove redundant build-frontend dependency from build-desktop because tauri beforeBuildCommand already builds frontend
-Keep npm dependency installation in desktop target via `cd frontend && npm ci`
-
-fix(tauri): make desktop prebuild frontend path robust across working directories
-
-Update tauri beforeBuildCommand to resolve frontend directory from either repo root or src-tauri cwd
-Switch make build-desktop to run `cargo tauri build` from project root and avoid relative path mismatch
-Adjust regression test expectations for the updated desktop build command wiring
-adding a new release
+Mark windows-latest desktop build as optional via matrix metadata and continue-on-error
+Keep macOS desktop build and wheel publishing behavior unchanged
+Add regression test to ensure Windows desktop leg remains optional

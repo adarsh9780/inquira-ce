@@ -1,11 +1,11 @@
 [project]
 name = "inquira-ce"
-version = "0.5.7a0"
+version = "0.5.7a1"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "safe-py-runner @ git+https://github.com/adarsh9780/safe-py-runner.git",
+    "safe-py-runner>=0.1.6",
     "aiofiles>=24.1.0",
     "aiosqlite>=0.21.0",
     "alembic>=1.16.5",
