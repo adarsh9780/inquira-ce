@@ -12,13 +12,19 @@ def test_publish_wheel_to_release_checks_out_repo_for_gh_cli_context():
 
     assert "publish_wheel_to_release:" in text
     assert "- uses: actions/checkout@v4" in text
+    assert "Ensure GitHub release exists" in text
+    assert 'gh release view "${GITHUB_REF_NAME}"' in text
+    assert 'gh release create "${GITHUB_REF_NAME}"' in text
     assert 'gh release upload "${GITHUB_REF_NAME}" dist/*.whl --clobber' in text
 
 
 def test_tauri_before_build_command_is_shell_portable():
     text = TAURI_CONF.read_text(encoding="utf-8")
 
-    assert '"beforeBuildCommand": "node -e ' in text
+    assert (
+        '"beforeBuildCommand": "npm --prefix frontend run build -- --outDir dist"'
+        in text
+    )
     assert "[ -d frontend ]" not in text
 
 

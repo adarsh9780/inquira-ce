@@ -4,7 +4,7 @@ VERSION ?=
 POS_VERSION := $(word 2,$(MAKECMDGOALS))
 EFFECTIVE_VERSION := $(if $(VERSION),$(VERSION),$(POS_VERSION))
 
-.PHONY: help help-release help-push help-tag check-version check-message check-input-version check-input-version-greater check-version-file check-no-version-arg check-tag-not-latest set-version metadata test build-frontend sync-frontend-dist build-wheel build-desktop git-add git-commit git-push git-tag push release
+.PHONY: help help-release help-push help-tag check-version check-message check-input-version check-input-version-greater check-version-file check-no-version-arg check-tag-not-latest set-version metadata test test-backend test-frontend build-frontend sync-frontend-dist build-wheel build-desktop git-add git-commit git-push git-tag push release
 
 help:
 	@echo "Usage:"
@@ -31,7 +31,9 @@ help:
 	@echo "  set-version   Update VERSION and apply across backend/frontend/tauri/installers"
 	@echo "  check-version Print current versions from all version-bearing files"
 	@echo "  metadata      Regenerate .github/release/metadata.json from release_metadata.md"
-	@echo "  test          Run pytest suite"
+	@echo "  test          Run backend and frontend test suites"
+	@echo "  test-backend  Run backend pytest suite"
+	@echo "  test-frontend Run frontend npm test suite"
 	@echo "  build-frontend Build frontend assets into src/inquira/frontend/dist"
 	@echo "  sync-frontend-dist Copy frontend assets to backend/app/frontend/dist for wheel packaging"
 	@echo "  build-wheel   Build backend Python wheel with bundled frontend assets"
@@ -120,8 +122,13 @@ metadata: check-version-file
 		echo "release_metadata.md not found; skipping metadata generation."; \
 	fi
 
-test:
+test: test-backend test-frontend
+
+test-backend:
 	cd backend && uv run --group dev pytest
+
+test-frontend:
+	cd frontend && npm ci && npm test
 
 build-frontend:
 	cd frontend && npm ci && npm run build

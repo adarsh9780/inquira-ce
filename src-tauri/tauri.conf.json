@@ -1,13 +1,13 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Inquira",
-  "version": "0.5.7-alpha.1",
+  "version": "0.5.7-alpha.2",
   "identifier": "com.inquira.app",
   "build": {
     "frontendDist": "../frontend/dist",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "",
-    "beforeBuildCommand": "node -e \"const fs=require('fs');const cp=require('child_process');const p=fs.existsSync('frontend')?'frontend':(fs.existsSync('../frontend')?'../frontend':null);if(!p){console.error('frontend directory not found');process.exit(1)};cp.execSync('npm run build -- --outDir dist',{cwd:p,stdio:'inherit'})\""
+    "beforeBuildCommand": "npm --prefix frontend run build -- --outDir dist"
   },
   "app": {
     "windows": [

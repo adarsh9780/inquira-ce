@@ -33,10 +33,12 @@ def test_makefile_check_version_target_prints_all_versions():
     assert "make check-version" in text
 
 
-def test_makefile_test_target_runs_backend_pytest():
+def test_makefile_test_target_runs_backend_and_frontend_tests():
     text = MAKEFILE.read_text(encoding="utf-8")
     assert "test:" in text
+    assert "test: test-backend test-frontend" in text
     assert "cd backend && uv run --group dev pytest" in text
+    assert "cd frontend && npm ci && npm test" in text
 
 
 def test_makefile_git_tag_reads_version_file():

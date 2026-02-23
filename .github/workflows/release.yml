@@ -217,6 +217,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Ensure GitHub release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release create "${GITHUB_REF_NAME}" --title "Inquira ${GITHUB_REF_NAME}" --notes "" --draft --prerelease
+          fi
       - name: Download wheel artifact
         uses: actions/download-artifact@v4
         with:

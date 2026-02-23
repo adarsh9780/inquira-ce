@@ -1,13 +1,11 @@
-fix(release): resolve desktop windows shell issue and wheel publish blockers
+feat(makefile): run frontend tests in aggregate test target
 
-Make tauri beforeBuildCommand shell-portable by using a Node script instead of Bash-only test syntax
-Add checkout step in publish_wheel_to_release so gh CLI has git repository context
-Switch backend dependency from git URL to PyPI-compatible safe-py-runner>=0.1.6
-Refresh backend/uv.lock so CI uv sync resolves safe-py-runner from package index instead of git source
-Add regression tests covering release checkout wiring, tauri command portability, and PyPI dependency metadata validity
+Add test-backend and test-frontend targets to make backend/frontend test execution explicit
+Update aggregate test target to run both suites so local/CI checks cover frontend regressions
+Add regression assertion in backend/tests/test_makefile_release_workflow.py for the new Makefile test wiring
 
-chore(release): make windows tauri build non-blocking in release workflow
+fix(release): ensure wheel upload can create release and simplify tauri prebuild command
 
-Mark windows-latest desktop build as optional via matrix metadata and continue-on-error
-Keep macOS desktop build and wheel publishing behavior unchanged
-Add regression test to ensure Windows desktop leg remains optional
+Create draft prerelease when missing before attaching wheel artifact in publish_wheel_to_release job
+Replace tauri beforeBuildCommand with npm --prefix frontend invocation to avoid windows command parsing issues
+Add regression assertions for release-create fallback and updated tauri prebuild command

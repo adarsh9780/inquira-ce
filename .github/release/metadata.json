@@ -1,6 +1,6 @@
 {
-  "version": "0.5.7a1",
-  "tag": "v0.5.7a1",
-  "release_name": "Inquira v0.5.0a6",
-  "release_body": "## Release Highlights\n- Fixed release workflow so unsigned macOS builds do not attempt certificate import/codesign.\n- Added explicit signed vs unsigned macOS build gating based on available Apple signing inputs.\n- Kept Windows release bundling on NSIS to avoid MSI prerelease version restrictions.\n\n## Release Tooling\n- `bump_versions.py` now accepts both `0.5.0a6` and `v0.5.0a6` style input.\n- Added `generate_release_metadata.py` to transform local `release_metadata.md` into tracked `.github/release/metadata.json`.\n- Updated release docs (`README.md`, `CONTRIBUTING.md`, `docs/release_process.md`) with the new two-script flow.\n\n## CI/Tests\n- Added regression tests for version normalization and release metadata generation logic."
+  "version": "0.5.7a2",
+  "tag": "v0.5.7a2",
+  "release_name": "Inquira v0.5.7a2",
+  "release_body": "## Release Highlights\n\n- Decoupled wheel publishing from desktop artifact builds so Python distribution can proceed even when desktop jobs fail.\n- Added wheel publishing to PyPI (trusted publisher flow via the `pypi` environment).\n- Ensured release workflow can create a draft prerelease if missing before attaching wheel artifacts.\n\n## Desktop & Packaging\n\n- Kept macOS desktop release path active while making Windows desktop build non-blocking in release workflow.\n- Updated Tauri `beforeBuildCommand` to a portable frontend build command that works in CI across runners.\n- Synced frontend build output into backend package data during wheel build so static assets are included in the wheel.\n\n## Dependency & Quality\n\n- Replaced Git URL dependency for `safe-py-runner` with a PyPI-compatible version constraint.\n- Added regression tests for release workflow publishing guards, optional Windows desktop behavior, and packaging constraints.\n- Updated Makefile test flow to include frontend tests alongside backend tests."
 }
