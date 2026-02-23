@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "export-openapi": "uv run --project ../backend python ../backend/scripts/export_openapi.py ./openapi.json",
     "generate-client": "npm run export-openapi && orval",
-    "test": "node --test test/**/*.test.mjs"
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",

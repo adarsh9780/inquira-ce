@@ -34,10 +34,10 @@ provider = "local_safe_runner"
 # Name of the dedicated code-runner virtual environment folder under app data (~/.inquira/*)
 venv-name = ".runner-venv"
 # Optional local checkout path for editable install of safe-py-runner.
-project-path = "/Users/adarshmaurya/Downloads/Projects/safe-py-runner"
+# project-path = "/path/to/safe-py-runner"
 # safe-py-runner install source: "auto", "pypi", "github", "local"
 # "auto" tries PyPI -> GitHub -> local path (final fallback).
-safe-py-runner-source = "auto"
+safe-py-runner-source = "github"
 # Package name (PyPI source)
 safe-py-runner-pypi = "safe-py-runner"
 # Git URL/ref (GitHub source)

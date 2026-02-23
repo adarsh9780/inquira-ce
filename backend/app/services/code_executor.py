@@ -246,18 +246,37 @@ def _run_in_safe_runner(script: str, timeout: int) -> dict[str, Any]:
     try:
         from safe_py_runner import RunnerPolicy, run_code
     except Exception as e:
-        msg = (
-            "Execution provider 'local_safe_runner' is enabled but safe_py_runner "
-            f"could not be imported: {e}"
-        )
-        return {
-            "success": False,
-            "stdout": "",
-            "stderr": msg,
-            "error": msg,
-            "result": None,
-            "result_type": None,
-        }
+        install_error = _install_safe_py_runner_from_config(config)
+        if install_error:
+            msg = (
+                "Execution provider 'local_safe_runner' is enabled but safe_py_runner "
+                f"could not be imported: {e}. Install attempt failed: {install_error}"
+            )
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": msg,
+                "error": msg,
+                "result": None,
+                "result_type": None,
+            }
+
+        try:
+            from safe_py_runner import RunnerPolicy, run_code
+        except Exception as import_after_install:
+            msg = (
+                "Execution provider 'local_safe_runner' is enabled but safe_py_runner "
+                "could not be imported after install attempt: "
+                f"{import_after_install}"
+            )
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": msg,
+                "error": msg,
+                "result": None,
+                "result_type": None,
+            }
 
     effective_timeout = max(1, min(timeout, policy_cfg.timeout_seconds))
     policy = RunnerPolicy(
@@ -291,3 +310,62 @@ def _run_in_safe_runner(script: str, timeout: int) -> dict[str, Any]:
         stderr_raw=runner_result.stderr,
         returncode=0,
     )
+
+
+def _build_safe_py_runner_install_targets(config) -> list[list[str]]:
+    source = (config.safe_py_runner_source or "auto").strip().lower()
+    local_path = config.safe_py_runner_local_path
+    pypi_spec = config.safe_py_runner_pypi or "safe-py-runner"
+    github_spec = (
+        config.safe_py_runner_github
+        or "git+https://github.com/adarsh9780/safe-py-runner.git"
+    )
+
+    if source == "pypi":
+        return [[pypi_spec]]
+    if source == "github":
+        return [[github_spec]]
+    if source == "local":
+        if local_path and Path(local_path).exists():
+            return [["-e", local_path]]
+        return []
+
+    targets: list[list[str]] = [[pypi_spec], [github_spec]]
+    if local_path and Path(local_path).exists():
+        targets.append(["-e", local_path])
+    return targets
+
+
+def _install_safe_py_runner_from_config(config) -> str | None:
+    targets = _build_safe_py_runner_install_targets(config)
+    if not targets:
+        return "no valid safe-py-runner install source was configured"
+
+    runner_python = config.runner_python_executable
+    python_bin = runner_python or sys.executable
+    errors: list[str] = []
+
+    for target_args in targets:
+        uv_cmd = ["uv", "pip", "install"]
+        if runner_python:
+            uv_cmd.extend(["--python", runner_python])
+        uv_cmd.extend(target_args)
+        try:
+            uv_proc = subprocess.run(uv_cmd, capture_output=True, text=True)
+            if uv_proc.returncode == 0:
+                return None
+            errors.append((uv_proc.stderr or uv_proc.stdout or "").strip())
+        except Exception as e:
+            errors.append(str(e))
+
+        pip_cmd = [python_bin, "-m", "pip", "install", *target_args]
+        try:
+            pip_proc = subprocess.run(pip_cmd, capture_output=True, text=True)
+            if pip_proc.returncode == 0:
+                return None
+            errors.append((pip_proc.stderr or pip_proc.stdout or "").strip())
+        except Exception as e:
+            errors.append(str(e))
+
+    compact = [e for e in errors if e]
+    return compact[-1] if compact else "unknown install failure"

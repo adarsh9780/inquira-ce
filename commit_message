@@ -14,3 +14,10 @@ Refresh README and contributor docs for current desktop architecture, local CI c
 Add CONTRIBUTING.md and docs/release_process.md to document contributor and release procedures end-to-end
 Harden release workflow with pre-build backend/frontend validation jobs, master-tag guard enforcement, OS-specific desktop artifact uploads, and optional signing secret hooks
 Update release docs to reflect validation gates, artifact flow, and signing configuration requirements
+Ensure backend local_safe_runner can bootstrap safe-py-runner from configured source when import is missing
+Add execution runtime config fields for safe-py-runner source selection (auto/pypi/github/local)
+Default inquira runner source to GitHub and remove machine-specific local project path from sample config
+Pin backend dependency to safe-py-runner GitHub repo so CI and inquira backend install from source consistently
+Add regression tests for safe-py-runner GitHub target selection and uv->pip install fallback path
+Fix frontend CI test glob to node-compatible pattern (test/*.test.mjs) so GitHub Actions resolves test files correctly
+Add local verification by running frontend node test suite after script update
