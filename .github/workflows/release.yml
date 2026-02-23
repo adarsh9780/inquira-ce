@@ -107,11 +107,11 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build and publish desktop artifacts
+      - name: Build and publish desktop artifacts (macOS signed)
+        if: matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' && secrets.APPLE_SIGNING_IDENTITY != ''
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Optional signing/notarization hooks. Keep unset for unsigned alpha builds.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -120,8 +120,6 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Inquira ${{ github.ref_name }}
@@ -129,6 +127,33 @@ jobs:
             Automated desktop build for ${{ github.ref_name }}.
           releaseDraft: true
           prerelease: true
+
+      - name: Build and publish desktop artifacts (macOS unsigned)
+        if: matrix.os == 'macos-latest' && !(secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' && secrets.APPLE_SIGNING_IDENTITY != '')
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Inquira ${{ github.ref_name }}
+          releaseBody: |
+            Automated desktop build for ${{ github.ref_name }}.
+          releaseDraft: true
+          prerelease: true
+
+      - name: Build and publish desktop artifacts (Windows NSIS)
+        if: matrix.os == 'windows-latest'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Inquira ${{ github.ref_name }}
+          releaseBody: |
+            Automated desktop build for ${{ github.ref_name }}.
+          releaseDraft: true
+          prerelease: true
+          args: --bundles nsis
       - name: Upload desktop bundle artifact
         uses: actions/upload-artifact@v4
         with:
