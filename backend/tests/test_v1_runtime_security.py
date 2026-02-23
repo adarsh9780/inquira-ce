@@ -5,7 +5,17 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.execution_config import load_execution_runtime_config
 from app.v1.api import runtime as runtime_api
+
+
+@pytest.fixture(autouse=True)
+def _force_local_subprocess_provider(monkeypatch):
+    # Runtime API tests assert DuckDB workspace behavior, not safe-runner internals.
+    load_execution_runtime_config.cache_clear()
+    monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "local_subprocess")
+    yield
+    load_execution_runtime_config.cache_clear()
 
 
 def test_execute_endpoint_requires_auth_cookie():

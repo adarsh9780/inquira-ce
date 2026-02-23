@@ -4,7 +4,16 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from app.services.execution_config import load_execution_runtime_config
 from app.v1.api import runtime as runtime_api
+
+
+@pytest.fixture(autouse=True)
+def _force_local_subprocess_provider(monkeypatch):
+    load_execution_runtime_config.cache_clear()
+    monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "local_subprocess")
+    yield
+    load_execution_runtime_config.cache_clear()
 
 
 @pytest.mark.asyncio

@@ -1,23 +1,3 @@
-Fix execution-provider test isolation by clearing cached runtime config between tests to prevent cross-test provider leakage
-Add VERSION single source-of-truth file and new maintenance script to bump backend, tauri, frontend, and installer wheel URLs in one command
-Add per-target override options (backend/tauri/frontend) while preserving one overall version workflow by default
-Add regression tests for PEP440-to-SemVer conversion and per-target version resolution in bump_versions script
-Add VERSION single source-of-truth file and new maintenance script to bump backend, tauri, frontend, and installer wheel URLs in one command
-Add per-target override options (--backend-version, --tauri-version, --frontend-version) while keeping one overall version workflow by default
-Map Python prerelease versions (e.g. 0.5.0a1) to SemVer prerelease for Tauri/frontend by default (0.5.0-alpha.1)
-Add regression tests for PEP440-to-SemVer conversion and per-target version resolution in bump_versions script
-Add usage examples to bump_versions.py --help output, including one-command dry-run and per-target override flows
-Apply release version 0.5.0a1 across backend (PEP440), tauri/frontend (SemVer prerelease), and installer wheel URLs using bump_versions helper
-Fix CI lint failure by removing unused fastapi.HTTPException import in test_v1_chat_no_dataset_fallback
-Fix CI type-check blockers in logger, llm_service, chat_service, and runtime schema typing; ensure mypy + ruff pass in backend workflow
-Refresh README and contributor docs for current desktop architecture, local CI commands, centralized versioning workflow, and install paths
-Add CONTRIBUTING.md and docs/release_process.md to document contributor and release procedures end-to-end
-Harden release workflow with pre-build backend/frontend validation jobs, master-tag guard enforcement, OS-specific desktop artifact uploads, and optional signing secret hooks
-Update release docs to reflect validation gates, artifact flow, and signing configuration requirements
-Ensure backend local_safe_runner can bootstrap safe-py-runner from configured source when import is missing
-Add execution runtime config fields for safe-py-runner source selection (auto/pypi/github/local)
-Default inquira runner source to GitHub and remove machine-specific local project path from sample config
-Pin backend dependency to safe-py-runner GitHub repo so CI and inquira backend install from source consistently
-Add regression tests for safe-py-runner GitHub target selection and uv->pip install fallback path
-Fix frontend CI test glob to node-compatible pattern (test/*.test.mjs) so GitHub Actions resolves test files correctly
-Add local verification by running frontend node test suite after script update
+Fix GitHub Actions frontend test step by removing stale forwarded --run arg from CI and release workflows
+Add frontend regression test to ensure npm test script does not embed a --run dependency that breaks CI invocation
+Stabilize runtime workspace security/scope tests by forcing local_subprocess provider and clearing cached execution config between tests
