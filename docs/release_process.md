@@ -1,5 +1,7 @@
 # Release Process
 
+Use this checklist when you are preparing a tag-based release.
+
 ## 1. Ensure master is green
 
 CI must pass on `master`.
@@ -12,7 +14,7 @@ Use the Makefile guard (recommended):
 make set-version 0.5.0a7
 ```
 
-This writes to `VERSION` and updates backend/frontend/tauri/installers.
+This writes to `VERSION` and updates backend/frontend/tauri packaging files.
 It also blocks same-or-lower version values.
 
 ## 3. Generate release metadata
@@ -51,12 +53,11 @@ Workflow file: `.github/workflows/release.yml`
 What it does:
 
 1. Verifies tag commit is on `master`.
-2. Runs backend validation (ruff, mypy, migration check, pytest).
-3. Runs frontend validation (test + build).
-4. Builds frontend assets for wheel packaging, syncs them into `backend/app/frontend/dist`, and builds backend wheel (`backend/dist/*.whl`).
-5. Uploads wheel to GitHub Release and publishes wheel to PyPI (environment: `pypi`).
-6. Builds desktop artifacts via Tauri action (macOS + Windows matrix; Windows uses NSIS bundle).
-7. Desktop and wheel publishing are independent: one can fail while the other still publishes.
+2. Verifies `ci.yml` already succeeded for the same commit SHA.
+3. Builds frontend assets for wheel packaging, syncs them into `backend/app/frontend/dist`, and builds backend wheel (`backend/dist/*.whl`).
+4. Uploads wheel to GitHub Release and publishes wheel to PyPI (environment: `pypi`).
+5. Builds desktop artifacts via Tauri action (macOS + Windows matrix; Windows uses NSIS bundle).
+6. Desktop and wheel publishing are independent: one can fail while the other still publishes.
 
 ## 7. Publish release
 

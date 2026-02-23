@@ -14,6 +14,11 @@ make git-commit
 make git-push
 ```
 
+Why this flow is recommended:
+- You can stop immediately when one step fails.
+- Failures are easier to diagnose than in one-shot automation.
+- It keeps commit/release hygiene predictable for the whole team.
+
 Notes:
 - `make git-commit` uses the root `commit_message.txt` file.
 - Prefer this atomic flow over `make push` unless you are absolutely sure you want one-shot automation.
@@ -26,7 +31,7 @@ Only run this when preparing a release/tag.
 ```bash
 make set-version 0.5.0a7
 ```
-This writes the version to `VERSION` and applies it across backend/frontend/tauri/installers.
+This writes the version to `VERSION` and applies it across backend/frontend/tauri packaging files.
 
 2. Update release metadata JSON from your local `release_metadata.md`:
 ```bash

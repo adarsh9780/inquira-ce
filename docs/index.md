@@ -19,4 +19,4 @@ Inquira CE is a local-first AI data analysis app with three distribution channel
 - Release and CI workflow documentation
 - Project roadmap and contribution guide
 
-Continue to [Downloads](./downloads.md).
+If this is your first time here, start with [Downloads](./downloads.md) and then move to [Install](./install.md).

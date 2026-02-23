@@ -12,15 +12,15 @@
 pip install inquira-ce
 ```
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/install-inquira.sh | bash
-```
+Launch after install:
 
-```powershell
-irm https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/install-inquira.ps1 | iex
+```bash
+inquira
 ```
 
 ## Latest release assets (auto-loaded)
+
+The table below is fetched from GitHub Releases API at page load and lists files from your latest release.
 
 <div id="release-assets">Loading latest assets...</div>
 

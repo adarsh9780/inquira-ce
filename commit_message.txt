@@ -1,5 +1,13 @@
-fix(site): correct mkdocs nav paths and relax pages build strictness
+docs(site): remove script installer docs, refresh changelog, and enable Mermaid on Pages
 
-Fix mkdocs nav entries to use docs-root relative file names instead of docs/ prefixed paths
-Remove strict mode from Pages build command to avoid failing deployment on non-critical warnings
-Update docs-site regression tests to match corrected nav mapping and build command
+Replace old curl/PowerShell install instructions in README/docs with pip install and GitHub Releases download guidance
+Refresh docs/changelog.md to reflect current release and site/deployment changes instead of stale entries
+Enable Mermaid rendering in MkDocs via superfences plus mermaid JS init script for GitHub Pages output
+Add regression checks to ensure script-install docs stay removed and Mermaid config remains present
+
+docs(ux): rewrite core documentation pages for clarity and first-time usability
+
+Expand overview/install/development docs with clearer audience framing, workflow context, and practical guidance
+Refine commit/release and CI/release pages to explain purpose, expected behavior, and operational tradeoffs in plain language
+Improve downloads/index pages with clearer user paths and explicit asset-discovery explanation
+Keep docs navigation chain and automation-tested markers intact while making content more descriptive and easier to follow

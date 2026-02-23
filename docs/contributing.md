@@ -69,6 +69,7 @@ This writes `.github/release/metadata.json`.
 - CI (`.github/workflows/ci.yml`) runs on pushes to `master`.
 - Release (`.github/workflows/release.yml`) runs on tag pushes `v*`.
 - Release workflow enforces that tag commit must be on `master`.
+- Release workflow also enforces successful CI for the same commit SHA.
 
 ## Commit Hygiene
 

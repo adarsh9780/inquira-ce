@@ -26,19 +26,16 @@ Hosted docs site (GitHub Pages): `https://adarsh9780.github.io/inquira-ce/`
 
 ## Quick Start
 
-### End Users (Installer)
+### End Users
 
-macOS/Linux:
+Install via pip:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/install-inquira.sh | bash
+pip install inquira-ce
 inquira
 ```
 
-Windows (PowerShell):
-```powershell
-irm https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/install-inquira.ps1 | iex
-inquira
-```
+Desktop binaries (`.dmg`, `.exe`) are available on:
+`https://github.com/adarsh9780/inquira-ce/releases/latest`
 
 ### Contributors (Run From Source)
 

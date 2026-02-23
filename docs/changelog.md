@@ -5,16 +5,21 @@ All notable changes should be documented in this file.
 ## Unreleased
 
 ### Added
-- Root Makefile release orchestration (`set-version`, `metadata`, `push`, `release`, `git-tag`) for a safer and repeatable release flow.
-- Strict version monotonic guard: `make set-version` now rejects same/lower versions.
-- Release metadata generation flow through `make metadata`.
-- Regression tests for Makefile wiring, release metadata generation, and README/docs expectations.
+- GitHub Pages docs site workflow (`.github/workflows/pages.yml`) with MkDocs build/deploy.
+- New docs landing page (`docs/index.md`) and downloads page (`docs/downloads.md`) with latest-release links.
+- Regression tests for docs-site workflow wiring and docs navigation.
 
 ### Changed
-- Root `README.md` is now a production-style landing page with quick start plus docs map.
-- Main documentation moved into topic-based files under `docs/`.
+- Release workflow now gates tag releases on an already-successful `ci.yml` run for the same commit SHA.
+- Wheel publishing flow now creates a draft release if missing before uploading wheel artifacts.
+- Backend package metadata improved for PyPI (real description + package README for long description).
+- Tauri desktop metadata and assets refreshed:
+  - Bundle identifier updated to `com.inquira.desktop`
+  - Platform icons regenerated from `backend/app/logo/inquira_logo.svg`
+  - Cross-runner frontend prebuild command hardened for desktop builds
+- Documentation install guidance now uses `pip install inquira-ce` and release download links (removed curl/PowerShell script-install instructions).
 
 ### Notes
-- Release execution remains optional and should be run only when preparing tags.
+- Release execution remains tag-driven (`v*`) and currently creates draft prereleases for manual publish.
 
 Next: [Back To Overview](./overview.md)

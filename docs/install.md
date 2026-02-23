@@ -1,21 +1,34 @@
 # Install
 
+This page focuses on the fastest supported install paths.
+
 ## End Users
 
-### Option A: CLI shim (recommended)
+### Option A: pip install (recommended)
 
-macOS/Linux:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/install-inquira.sh | bash
+pip install inquira-ce
 inquira
 ```
 
-Windows (PowerShell):
-```powershell
-irm https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/install-inquira.ps1 | iex
-inquira
-```
+Use this when you want a quick local setup and are comfortable with Python tooling.
 
-The installer uses release wheel URLs published under GitHub Releases.
+### Option B: Desktop binaries
+
+Download platform-specific desktop builds (`.dmg`, `.exe`) from:
+
+- [Latest release](https://github.com/adarsh9780/inquira-ce/releases/latest)
+
+Use this when you prefer a desktop-first install experience.
+
+## Verification
+
+After installation, launch the app and verify the backend process starts without errors.
+If something fails, check the latest release notes and known issues in the release page.
+
+## Upgrade path
+
+- pip users: `pip install --upgrade inquira-ce`
+- desktop users: install the latest binary from releases
 
 Next: [Development](./development.md)
