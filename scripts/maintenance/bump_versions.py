@@ -35,6 +35,14 @@ FRONTEND_PACKAGE = ROOT / "frontend" / "package.json"
 FRONTEND_LOCK = ROOT / "frontend" / "package-lock.json"
 
 
+def normalize_version_input(version: str) -> str:
+    """Accept optional leading tag marker and normalize to PEP 440 base input."""
+    v = version.strip()
+    if v.startswith("v"):
+        return v[1:]
+    return v
+
+
 def pep440_to_tauri_semver(version: str) -> str:
     """Convert common PEP 440 prereleases to SemVer prerelease style.
 
@@ -44,7 +52,7 @@ def pep440_to_tauri_semver(version: str) -> str:
     - 0.5.0rc3 -> 0.5.0-rc.3
     - 0.5.0 -> 0.5.0
     """
-    v = version.strip()
+    v = normalize_version_input(version)
     m = re.fullmatch(r"(\d+\.\d+\.\d+)(?:(a|b|rc)(\d+))?", v)
     if not m:
         raise ValueError(
@@ -59,7 +67,7 @@ def pep440_to_tauri_semver(version: str) -> str:
 
 def read_version(cli_version: str | None) -> str:
     if cli_version:
-        return cli_version.strip()
+        return normalize_version_input(cli_version)
     return VERSION_FILE.read_text(encoding="utf-8").strip()
 
 

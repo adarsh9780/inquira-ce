@@ -47,3 +47,9 @@ def test_run_updates_dry_run_reports_all_effective_versions():
     assert "backend_version=0.6.0a1" in joined
     assert "tauri_version=0.6.0-alpha.1" in joined
     assert "frontend_version=0.6.0-alpha.1" in joined
+
+
+def test_normalize_version_input_accepts_tag_style():
+    mod = _load_module()
+    assert mod.normalize_version_input("v0.5.0a6") == "0.5.0a6"
+    assert mod.normalize_version_input("0.5.0a6") == "0.5.0a6"

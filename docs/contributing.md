@@ -26,19 +26,43 @@ Frontend:
 ```bash
 cd frontend
 npm ci
-npm test -- --run
+npm test
 npm run build
 ```
 
-## Version Bumps
+## Updating Version
 
 Do not bump version for every commit.
 
 Bump only when preparing a release/tag:
 
 ```bash
-uv run python scripts/maintenance/bump_versions.py --version 0.5.0a2 --write-version-file
+make set-version 0.5.0a7
 ```
+
+This enforces that the new version is greater than current `VERSION`.
+Use PEP 440 input (`0.5.0a7`). Tag style (`v0.5.0a7`) is normalized automatically.
+
+## Updating Release Metadata
+
+1. Create or edit `release_metadata.md` in repo root (this file is intentionally untracked).
+2. Generate tracked metadata JSON used by the release workflow:
+
+```bash
+make metadata
+```
+
+This writes `.github/release/metadata.json`.
+
+## Release Steps
+
+1. `make set-version X.Y.Z[a|b|rc]N`
+2. `make metadata`
+3. `make test`
+4. `make git-add`
+5. `make git-commit`
+6. `make git-push`
+7. `make git-tag`
 
 ## CI/Release Behavior
 
@@ -49,4 +73,6 @@ uv run python scripts/maintenance/bump_versions.py --version 0.5.0a2 --write-ver
 ## Commit Hygiene
 
 - Keep commit messages clear and scoped.
-- Keep `commit_message` root file updated as required by repo conventions.
+- Keep root `commit_message.txt` updated (`make git-commit` reads this file).
+
+Next: [Changelog](./changelog.md)

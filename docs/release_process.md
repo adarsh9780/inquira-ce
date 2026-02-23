@@ -6,22 +6,45 @@ CI must pass on `master`.
 
 ## 2. Bump versions
 
-Use centralized helper:
+Use the Makefile guard (recommended):
 
 ```bash
-uv run python scripts/maintenance/bump_versions.py --version 0.5.0a1 --write-version-file
+make set-version 0.5.0a7
 ```
 
-Commit version updates.
+This writes to `VERSION` and updates backend/frontend/tauri/installers.
+It also blocks same-or-lower version values.
 
-## 3. Create and push tag
+## 3. Generate release metadata
+
+Create local `release_metadata.md` in repo root (untracked) with:
+- first non-empty line as title
+- remaining content as release body
+
+Then generate tracked metadata JSON:
 
 ```bash
-git tag -a v0.5.0a1 -m "Inquira v0.5.0a1"
-git push origin v0.5.0a1
+make metadata
 ```
 
-## 4. GitHub Actions release workflow
+This writes `.github/release/metadata.json`, which release workflow uses for title/body.
+
+## 4. Commit and push
+
+```bash
+make test
+make git-add
+make git-commit
+make git-push
+```
+
+## 5. Create and push tag
+
+```bash
+make git-tag
+```
+
+## 6. GitHub Actions release workflow
 
 Workflow file: `.github/workflows/release.yml`
 
@@ -31,10 +54,10 @@ What it does:
 2. Runs backend validation (ruff, mypy, migration check, pytest).
 3. Runs frontend validation (test + build).
 4. Builds backend wheel (`backend/dist/*.whl`).
-5. Builds desktop artifacts via Tauri action (macOS + Windows matrix).
-6. Creates/updates a draft GitHub release and uploads artifacts.
+5. Builds desktop artifacts via Tauri action (macOS + Windows matrix; Windows uses NSIS bundle).
+6. Creates/updates a draft GitHub release using `.github/release/metadata.json`.
 
-## 5. Publish release
+## 7. Publish release
 
 Open GitHub Releases, review draft notes/artifacts, then publish.
 

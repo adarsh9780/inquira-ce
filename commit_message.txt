@@ -1,0 +1,70 @@
+feat(release): enforce monotonic set-version in Makefile flow
+
+Add root Makefile release orchestration similar to safe-py-runner for set-version/metadata/push/release/tag targets
+Wire set-version to bump_versions.py with --write-version-file so VERSION is the single source of truth
+Add strict check-input-version-greater guard so make set-version fails when version is same as or lower than current VERSION
+Keep metadata generation wired to generate_release_metadata.py to refresh .github/release/metadata.json from release_metadata.md
+Add regression tests for Makefile wiring, VERSION read behavior, and the new monotonic version guard
+
+docs(release): document atomic commit flow and optional release steps
+
+Update README with a single commit and release section using Makefile targets
+Mark release flow as optional and emphasize atomic commands (make test/git-add/git-commit/git-push)
+Explicitly discourage make push for routine usage unless user is absolutely sure
+Document set-version and metadata steps in release path, including strict greater-than VERSION rule
+Add regression test that enforces README guidance for atomic commit preference and optional release flow
+
+docs(structure): split docs into topic files and make README a TOC
+
+Convert root README into a documentation index linking topic-based files under docs/
+Move root CONTRIBUTING.md, GEMINI.md, and dummy.md into docs/
+Add focused docs pages for overview, install, development, commit/release, CI automation, architecture, roadmap, and changelog
+Add next-link navigation between the main docs pages so readers can follow a linear path
+Update README/docs regression test to assert TOC links and next-link chain
+
+docs(readme): add production-style landing content with logo and badges
+
+Upgrade root README to include logo, badge strip, project tags, quick start, and common command flows
+Keep README useful for end users while preserving docs split via explicit documentation map links
+Retain links to all topic-based docs and deep-dive references under docs/
+Update README regression test to validate logo/badges and core sections
+
+docs(readme): add production-style landing page with logo, badges, and tags
+
+Restore root README as a user-facing project entrypoint with logo, badge strip, and quick-start commands
+Add visible project tags and a latest-release badge for production-grade discoverability
+Keep docs split model by linking to all topic pages under docs/
+Update README regression test to validate the new README structure
+
+docs(cleanup): remove obsolete pyodide documentation references
+
+Remove Pyodide architecture doc from docs/ because the project no longer uses Pyodide
+Drop README and architecture-page links that pointed to the removed Pyodide doc
+Keep remaining architecture and workflow documentation intact
+
+docs(audit): refresh docs for current make-based workflows and safety
+
+Update docs to match current release flow (set-version/metadata/test/git-add/git-commit/git-push/git-tag)
+Replace stale direct-script examples in contributing and release process docs with Makefile-first commands
+Remove stale fixed version mention from overview and align changelog wording with current README style
+Sanitize docs/dummy.md by removing token-like content and replacing with a safe placeholder note
+Add docs freshness regression tests to prevent stale flow references and accidental secret placeholders
+
+chore(hygiene): stop tracking cache junk and strengthen gitignore
+
+Expand .gitignore to cover common cache/build artifacts (.pytest_cache, .mypy_cache, .ruff_cache, coverage, .DS_Store, backend/.venv, frontend/dist)
+Untrack already-committed .DS_Store files from root, backend, and frontend paths
+Add regression test to enforce core .gitignore hygiene patterns
+
+feat(makefile): add check-version to print all effective project versions
+
+Add scripts/maintenance/show_versions.py to report versions across VERSION, backend, tauri, frontend, installer URLs, and release metadata
+Wire new make check-version target to that script and expose it in Makefile help
+Update README and commit/release docs to include make check-version in atomic workflow
+Add regression tests for Makefile target wiring, show_versions output keys, and README mention
+
+chore(makefile): use commit_message.txt for git-commit and validation
+
+Switch make check-message to read and validate commit_message.txt instead of commit_message
+Switch make git-commit to run git commit -F commit_message.txt
+Update docs and regression tests to enforce commit_message.txt as the single commit message source

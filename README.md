@@ -1,19 +1,30 @@
 # Inquira CE
 
+<p align="center">
+  <img src="./backend/app/logo/inquira_logo.svg" alt="Inquira CE Logo" width="180" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/adarsh9780/inquira-ce/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/adarsh9780/inquira-ce/ci.yml?branch=master&label=CI" alt="CI Status"></a>
+  <a href="https://github.com/adarsh9780/inquira-ce/releases"><img src="https://img.shields.io/github/v/release/adarsh9780/inquira-ce?display_name=tag" alt="Latest Release"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License MIT"></a>
+  <img src="https://img.shields.io/badge/python-3.12%2B-blue.svg" alt="Python 3.12+">
+  <img src="https://img.shields.io/badge/stage-alpha-orange.svg" alt="Alpha">
+</p>
+
 Local-first desktop data analysis with AI-assisted Python generation and execution.
 
-Current release line: `0.5.0a1` (alpha).
+Tags: `desktop`, `local-first`, `fastapi`, `vue`, `tauri`, `duckdb`, `langgraph`, `gemini`.
 
-## What This Repo Contains
+## Why Inquira
 
-- `src-tauri/`: Desktop shell (Tauri/Rust) and app packaging.
-- `backend/`: FastAPI backend, agent/runtime services, and tests.
-- `frontend/`: Vue frontend used by the desktop app.
-- `scripts/`: install and maintenance scripts.
+- Keep data local while using AI-assisted analysis workflows.
+- Turn natural language requests into reproducible Python/data operations.
+- Package the app as a desktop experience with backend + frontend + Tauri shell.
 
-## Install (End Users)
+## Quick Start
 
-### Option A: Install CLI shim (recommended)
+### End Users (Installer)
 
 macOS/Linux:
 ```bash
@@ -27,17 +38,7 @@ irm https://raw.githubusercontent.com/adarsh9780/inquira-ce/master/scripts/insta
 inquira
 ```
 
-The installer uses release wheel URLs published under GitHub Releases.
-
-## Build/Run From Source (Contributors)
-
-Prerequisites:
-
-- `uv`
-- Node.js 20+
-- Rust stable toolchain
-
-Run desktop app in development:
+### Contributors (Run From Source)
 
 ```bash
 git clone https://github.com/adarsh9780/inquira-ce.git
@@ -45,56 +46,48 @@ cd inquira-ce
 cargo tauri dev --manifest-path src-tauri/Cargo.toml
 ```
 
-## Local CI Commands (Same Intent As GitHub CI)
+## Common Commands
 
-Backend:
+Atomic commit flow:
 ```bash
-cd backend
-uv sync --group dev
-uv run --group dev ruff check app/v1 tests
-uv run --group dev mypy --config-file mypy.ini app/v1
-uv run alembic upgrade head
-uv run pytest tests -q
+make check-version
+make test
+make git-add
+make git-commit
+make git-push
 ```
 
-Frontend:
+Optional release flow:
 ```bash
-cd frontend
-npm ci
-npm test -- --run
-npm run build
+make set-version 0.5.0a7
+make metadata
+make test
+make git-add
+make git-commit
+make git-push
+make git-tag
 ```
 
-## Versioning
+## Documentation Map
 
-Versioning is centralized:
+Core docs:
 
-- `VERSION` is the source of truth (PEP 440 style, e.g. `0.5.0a1`).
-- Use:
-```bash
-uv run python scripts/maintenance/bump_versions.py --help
-```
+1. [Overview](./docs/overview.md)
+2. [Install](./docs/install.md)
+3. [Development](./docs/development.md)
+4. [Commit And Release Flow](./docs/commit-and-release.md)
+5. [CI And Release Automation](./docs/ci-and-release-automation.md)
+6. [Architecture](./docs/architecture.md)
+7. [Roadmap](./docs/roadmap.md)
+8. [Contributing](./docs/contributing.md)
+9. [Changelog](./docs/changelog.md)
 
-This updates backend, tauri, frontend, and installer wheel URLs consistently.
+Additional references:
 
-## CI and Release Automation
-
-- CI workflow: `.github/workflows/ci.yml`
-  - Runs on push to `master`.
-- Release workflow: `.github/workflows/release.yml`
-  - Runs on pushed tags matching `v*`.
-  - Guard step fails if the tag commit is not on `master`.
-  - Builds desktop artifacts (macOS/Windows) and backend wheel, then attaches to release.
-
-## Notes For Alpha Releases
-
-- `0.5.x` is alpha track. Expect iterative changes.
-- Desktop artifacts from CI are unsigned by default.
-- For production-grade distribution, add signing/notarization secrets and steps.
-
-## Contributing
-
-Please read `CONTRIBUTING.md` before opening a PR.
+- [Release Process (Detailed)](./docs/release_process.md)
+- [Workflow Diagram](./docs/workflow_diagram.md)
+- [Data Pipeline Diagram](./docs/data_pipeline_diagram.md)
+- [Future Plans (Raw)](./docs/plans_for_future.md)
 
 ## License
 

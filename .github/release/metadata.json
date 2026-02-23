@@ -1,0 +1,6 @@
+{
+  "version": "0.5.0a6",
+  "tag": "v0.5.0a6",
+  "release_name": "Inquira v0.5.0a6",
+  "release_body": "## Release Highlights\n- Fixed release workflow so unsigned macOS builds do not attempt certificate import/codesign.\n- Added explicit signed vs unsigned macOS build gating based on available Apple signing inputs.\n- Kept Windows release bundling on NSIS to avoid MSI prerelease version restrictions.\n\n## Release Tooling\n- `bump_versions.py` now accepts both `0.5.0a6` and `v0.5.0a6` style input.\n- Added `generate_release_metadata.py` to transform local `release_metadata.md` into tracked `.github/release/metadata.json`.\n- Updated release docs (`README.md`, `CONTRIBUTING.md`, `docs/release_process.md`) with the new two-script flow.\n\n## CI/Tests\n- Added regression tests for version normalization and release metadata generation logic."
+}

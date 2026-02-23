@@ -90,10 +90,6 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    env:
-      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -111,8 +107,41 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Load release metadata
+        id: release_meta
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          meta_path = Path(".github/release/metadata.json")
+          data = json.loads(meta_path.read_text(encoding="utf-8"))
+          ref_name = os.environ.get("GITHUB_REF_NAME", "").strip()
+          default_name = f"Inquira {ref_name}" if ref_name else "Inquira Release"
+          name = str(data.get("release_name", "")).strip() or default_name
+          body = str(data.get("release_body", "")).strip()
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as out:
+              out.write(f"release_name={name}\n")
+              out.write("release_body<<EOF\n")
+              out.write(body + "\n")
+              out.write("EOF\n")
+          PY
+
+      - name: Detect macOS signing configuration
+        if: matrix.os == 'macos-latest'
+        id: mac_signing
+        shell: bash
+        run: |
+          if [[ -n "${{ secrets.APPLE_CERTIFICATE }}" && -n "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}" && -n "${{ secrets.APPLE_SIGNING_IDENTITY }}" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and publish desktop artifacts (macOS signed)
-        if: matrix.os == 'macos-latest' && env.APPLE_CERTIFICATE != '' && env.APPLE_CERTIFICATE_PASSWORD != '' && env.APPLE_SIGNING_IDENTITY != ''
+        if: matrix.os == 'macos-latest' && steps.mac_signing.outputs.enabled == 'true'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -126,22 +155,20 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: Inquira ${{ github.ref_name }}
-          releaseBody: |
-            Automated desktop build for ${{ github.ref_name }}.
+          releaseName: ${{ steps.release_meta.outputs.release_name }}
+          releaseBody: ${{ steps.release_meta.outputs.release_body }}
           releaseDraft: true
           prerelease: true
 
       - name: Build and publish desktop artifacts (macOS unsigned)
-        if: matrix.os == 'macos-latest' && (env.APPLE_CERTIFICATE == '' || env.APPLE_CERTIFICATE_PASSWORD == '' || env.APPLE_SIGNING_IDENTITY == '')
+        if: matrix.os == 'macos-latest' && steps.mac_signing.outputs.enabled == 'false'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: Inquira ${{ github.ref_name }}
-          releaseBody: |
-            Automated desktop build for ${{ github.ref_name }}.
+          releaseName: ${{ steps.release_meta.outputs.release_name }}
+          releaseBody: ${{ steps.release_meta.outputs.release_body }}
           releaseDraft: true
           prerelease: true
 
@@ -152,9 +179,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: Inquira ${{ github.ref_name }}
-          releaseBody: |
-            Automated desktop build for ${{ github.ref_name }}.
+          releaseName: ${{ steps.release_meta.outputs.release_name }}
+          releaseBody: ${{ steps.release_meta.outputs.release_body }}
           releaseDraft: true
           prerelease: true
           args: --bundles nsis

@@ -1,6 +1,13 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage/
+.tox/
 build/
 dist/
 wheels/
@@ -23,13 +30,21 @@ project.md
 notebooks/*
 .env
 .langgraph_api
-.pytest_cache
 .venv
+backend/.venv/
 .vscode
+.idea/
+*.log
+*.tmp
+*.swp
+.DS_Store
+**/.DS_Store
 commit_message
 AGENTS.md
 GEMINI.md
+release_metadata.md
 
 # Pyodide offline dependencies
 backend/app/static/pyodide/
 dummy.md
+frontend/dist/
