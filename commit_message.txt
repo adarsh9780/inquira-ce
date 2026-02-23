@@ -1,28 +1,7 @@
-chore(release): gate tag release on existing successful CI run
+feat(site): add GitHub Pages docs and release-download website pipeline
 
-Replace duplicate backend/frontend validation jobs in release workflow with a CI-success prerequisite check
-Add guard_release_prereqs step that verifies tag commit is on master and has a successful ci.yml run for the same SHA
-Rewire build_wheel and build_tauri to depend on the shared prerequisite guard
-Add regression tests to enforce CI-gating behavior and prevent release workflow from rerunning duplicate validation jobs
-
-fix(packaging): publish real PyPI project metadata and long description
-
-Replace placeholder backend package description with a real project summary for PyPI
-Add backend/README.md and keep pyproject readme path pointing to an existing file for long description rendering
-Add regression test to enforce non-placeholder description and valid readme path in backend/pyproject.toml
-
-fix(tauri): make beforeBuildCommand resilient across runner working directories
-
-Use npm prefix fallbacks (`.`, `frontend`, `../frontend`) so Tauri prebuild can locate frontend package.json on both macOS and Windows CI runners
-Prevent frontend/frontend path resolution errors seen in release desktop jobs
-Regressions: update release publish test to assert fallback command shape and portability constraints
-
-feat(tauri): regenerate desktop app icons from Inquira SVG logo
-
-Generate platform icon assets in src-tauri/icons from backend/app/logo/inquira_logo.svg using cargo tauri icon
-Refresh PNG/ICO/ICNS and Windows logo variants to align desktop app identity with current Inquira branding
-
-chore(tauri): update bundle identifier to avoid .app suffix conflict
-
-Change Tauri bundle identifier from com.inquira.app to com.inquira.desktop
-Resolve Tauri warning about using .app suffix that conflicts with macOS bundle extension conventions
+Add mkdocs-based site config with a public home page and downloads page for release assets
+Add docs content that links users to latest GitHub release, PyPI package, and installer commands
+Add GitHub Actions pages workflow to build docs and deploy to GitHub Pages from master
+Add regression tests validating pages workflow wiring, mkdocs navigation, and download links
+Update README with hosted docs URL for discoverability
