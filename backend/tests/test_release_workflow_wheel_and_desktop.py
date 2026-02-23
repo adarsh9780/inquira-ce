@@ -30,6 +30,17 @@ def test_release_workflow_syncs_frontend_assets_for_wheel_packaging():
     assert "cp -R src/inquira/frontend/dist backend/app/frontend/dist" in text
 
 
+def test_release_workflow_reuses_ci_instead_of_rerunning_validation():
+    text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "guard_release_prereqs:" in text
+    assert "Ensure CI workflow succeeded for this tag commit" in text
+    assert 'workflow_id: "ci.yml"' in text
+    assert "validate_backend:" not in text
+    assert "validate_frontend:" not in text
+    assert "needs: [guard_release_prereqs]" in text
+
+
 def test_release_workflow_windows_tauri_build_is_optional():
     text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
 

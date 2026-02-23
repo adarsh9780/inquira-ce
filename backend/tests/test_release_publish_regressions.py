@@ -21,10 +21,10 @@ def test_publish_wheel_to_release_checks_out_repo_for_gh_cli_context():
 def test_tauri_before_build_command_is_shell_portable():
     text = TAURI_CONF.read_text(encoding="utf-8")
 
-    assert (
-        '"beforeBuildCommand": "npm --prefix frontend run build -- --outDir dist"'
-        in text
-    )
+    assert '"beforeBuildCommand": "npm --prefix . run build -- --outDir dist' in text
+    assert "npm --prefix frontend run build -- --outDir dist" in text
+    assert "npm --prefix ../frontend run build -- --outDir dist" in text
+    assert "||" in text
     assert "[ -d frontend ]" not in text
 
 
