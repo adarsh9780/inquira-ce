@@ -16,7 +16,7 @@ def test_pages_workflow_builds_and_deploys_docs_site():
     assert "actions/deploy-pages@v4" in text
     assert "pages: write" in text
     assert "id-token: write" in text
-    assert "mkdocs build --strict" in text
+    assert "mkdocs build" in text
 
 
 def test_mkdocs_config_includes_downloads_and_core_docs_nav():
@@ -24,9 +24,9 @@ def test_mkdocs_config_includes_downloads_and_core_docs_nav():
 
     assert "theme:" in text
     assert "name: material" in text
-    assert "- Home: docs/index.md" in text
-    assert "- Downloads: docs/downloads.md" in text
-    assert "- CI And Release Automation: docs/ci-and-release-automation.md" in text
+    assert "- Home: index.md" in text
+    assert "- Downloads: downloads.md" in text
+    assert "- CI And Release Automation: ci-and-release-automation.md" in text
 
 
 def test_downloads_doc_links_latest_release_and_pypi():

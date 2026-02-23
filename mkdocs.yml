@@ -18,15 +18,15 @@ markdown_extensions:
   - tables
 
 nav:
-  - Home: docs/index.md
-  - Downloads: docs/downloads.md
-  - Overview: docs/overview.md
-  - Install: docs/install.md
-  - Development: docs/development.md
-  - Commit And Release: docs/commit-and-release.md
-  - CI And Release Automation: docs/ci-and-release-automation.md
-  - Architecture: docs/architecture.md
-  - Roadmap: docs/roadmap.md
-  - Contributing: docs/contributing.md
-  - Changelog: docs/changelog.md
-  - Release Process: docs/release_process.md
+  - Home: index.md
+  - Downloads: downloads.md
+  - Overview: overview.md
+  - Install: install.md
+  - Development: development.md
+  - Commit And Release: commit-and-release.md
+  - CI And Release Automation: ci-and-release-automation.md
+  - Architecture: architecture.md
+  - Roadmap: roadmap.md
+  - Contributing: contributing.md
+  - Changelog: changelog.md
+  - Release Process: release_process.md

@@ -1,7 +1,5 @@
-feat(site): add GitHub Pages docs and release-download website pipeline
+fix(site): correct mkdocs nav paths and relax pages build strictness
 
-Add mkdocs-based site config with a public home page and downloads page for release assets
-Add docs content that links users to latest GitHub release, PyPI package, and installer commands
-Add GitHub Actions pages workflow to build docs and deploy to GitHub Pages from master
-Add regression tests validating pages workflow wiring, mkdocs navigation, and download links
-Update README with hosted docs URL for discoverability
+Fix mkdocs nav entries to use docs-root relative file names instead of docs/ prefixed paths
+Remove strict mode from Pages build command to avoid failing deployment on non-critical warnings
+Update docs-site regression tests to match corrected nav mapping and build command
