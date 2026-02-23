@@ -1,3 +1,1 @@
-Fix GitHub Actions frontend test step by removing stale forwarded --run arg from CI and release workflows
-Add frontend regression test to ensure npm test script does not embed a --run dependency that breaks CI invocation
-Stabilize runtime workspace security/scope tests by forcing local_subprocess provider and clearing cached execution config between tests
+Bump release version to 0.5.0a2 using scripts/maintenance/bump_versions.py and synchronize backend, tauri, frontend, and installer wheel URLs
