@@ -30,3 +30,4 @@ fix(tauri): make desktop prebuild frontend path robust across working directorie
 Update tauri beforeBuildCommand to resolve frontend directory from either repo root or src-tauri cwd
 Switch make build-desktop to run `cargo tauri build` from project root and avoid relative path mismatch
 Adjust regression test expectations for the updated desktop build command wiring
+adding a new release
