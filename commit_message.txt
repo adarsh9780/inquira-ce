@@ -5,3 +5,8 @@ Add [llm].models parsing/validation to llm_runtime_config with env override supp
 Expose available_models in v1 preferences response and load it into app store state
 Update ModelSelector to consume injected model options instead of hardcoded list, with fallback models for resilience
 Replace brittle model-selector source-string test with behavior-based checks and add backend contract/runtime tests for available_models
+
+docs(release): draft detailed v0.5.7a4 release metadata in release_metadata.md
+
+Replace previous v0.5.7a3 notes with a full v0.5.7a4 release summary covering workspace/runtime hardening, auth repository boundary, TOML-driven token limits, model catalog wiring, and desktop reliability fixes
+Align release notes with merged backend/frontend test-backed changes for the next prerelease publish
