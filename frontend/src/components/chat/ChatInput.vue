@@ -98,8 +98,8 @@ function isRecoverableBrowserTableError(error) {
   )
 }
 
-async function ensureWorkspaceDatasetReady() {
-  if (!appStore.activeWorkspaceId || !appStore.dataFilePath) return
+async function ensureWorkspaceDatasetReady(workspaceId) {
+  if (!workspaceId || !appStore.dataFilePath) return
   const tableName = (
     appStore.ingestedTableName ||
     inferTableNameFromDataPath(appStore.schemaFileId) ||
@@ -114,7 +114,7 @@ async function ensureWorkspaceDatasetReady() {
       ...col,
       samples: appStore.allowSchemaSampleValues && Array.isArray(col?.samples) ? col.samples : []
     }))
-    await apiService.v1SyncBrowserDataset(appStore.activeWorkspaceId, {
+    await apiService.v1SyncBrowserDataset(workspaceId, {
       table_name: tableName,
       columns,
       row_count: null,
@@ -124,7 +124,7 @@ async function ensureWorkspaceDatasetReady() {
   }
 
   try {
-    await apiService.v1AddDataset(appStore.activeWorkspaceId, appStore.dataFilePath)
+    await apiService.v1AddDataset(workspaceId, appStore.dataFilePath)
     return
   } catch (_error) {
     throw new Error('Dataset sync failed: selected file could not be attached to workspace.')
@@ -190,12 +190,13 @@ async function handleSubmit() {
       appStore.setSchemaFileId(buildBrowserDataPath(expectedTableName))
     }
 
-    if (!appStore.activeWorkspaceId) {
+    const workspaceId = appStore.activeWorkspaceId
+    if (!workspaceId) {
       throw new Error('Create/select a workspace before analysis.')
     }
 
-    // Hard invariant: selected dataset must be synced to the active workspace before analyze.
-    await ensureWorkspaceDatasetReady()
+    // Sync dataset metadata only when a dataset is selected.
+    await ensureWorkspaceDatasetReady(workspaceId)
 
     // Set up timeout timers
     warningTimer = setTimeout(() => {
@@ -212,7 +213,7 @@ async function handleSubmit() {
     try {
       response = await apiService.v1AnalyzeStream(
         {
-          workspace_id: appStore.activeWorkspaceId,
+          workspace_id: workspaceId,
           conversation_id: appStore.activeConversationId || null,
           question: questionText,
           current_code: appStore.pythonFileContent || '',
@@ -239,7 +240,7 @@ async function handleSubmit() {
       // Fallback if streaming fails or is unsupported
       if (streamError?.status === 404 || streamError?.status === 405) {
         response = await apiService.v1Analyze({
-          workspace_id: appStore.activeWorkspaceId,
+          workspace_id: workspaceId,
           conversation_id: appStore.activeConversationId || null,
           question: questionText,
           current_code: appStore.pythonFileContent || '',

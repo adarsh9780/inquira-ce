@@ -19,7 +19,9 @@ class UserPreferences(Base):
         ForeignKey("v1_users.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    selected_model: Mapped[str] = mapped_column(String(120), nullable=False, default="gemini-2.5-flash")
+    selected_model: Mapped[str] = mapped_column(
+        String(120), nullable=False, default="google/gemini-2.5-flash"
+    )
     schema_context: Mapped[str] = mapped_column(Text, nullable=False, default="")
     allow_schema_sample_values: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     chat_overlay_width: Mapped[float] = mapped_column(Float, nullable=False, default=0.25)

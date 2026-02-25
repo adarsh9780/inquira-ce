@@ -143,3 +143,33 @@ async def test_execute_code_rejects_unknown_provider(monkeypatch, tmp_path):
 
     assert result["success"] is False
     assert "Unsupported execution provider" in (result["error"] or "")
+
+
+@pytest.mark.asyncio
+async def test_execute_code_default_workdir_avoids_legacy_workspace_root(monkeypatch, tmp_path):
+    monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "local_subprocess")
+
+    expected_dir = tmp_path / "runtime" / "exec_tmp"
+
+    monkeypatch.setattr(
+        code_executor.os.path,
+        "expanduser",
+        lambda path: str(expected_dir) if path == "~/.inquira/runtime/exec_tmp" else path,
+    )
+
+    def fake_subprocess(script_path: str, timeout: int, working_dir: str):
+        assert working_dir == str(expected_dir)
+        assert "~/.inquira/workspaces" not in working_dir
+        return {
+            "success": True,
+            "stdout": "ok",
+            "stderr": "",
+            "error": None,
+            "result": None,
+            "result_type": None,
+        }
+
+    monkeypatch.setattr(code_executor, "_run_in_subprocess", fake_subprocess)
+
+    result = await code_executor.execute_code(code="x = 1", timeout=3)
+    assert result["success"] is True

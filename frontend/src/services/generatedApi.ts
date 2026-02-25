@@ -234,6 +234,7 @@ export type PreferencesResponseActiveTableName = string | null;
 
 export interface PreferencesResponse {
   selected_model?: string;
+  available_models?: string[];
   schema_context?: string;
   allow_schema_sample_values?: boolean;
   chat_overlay_width?: number;

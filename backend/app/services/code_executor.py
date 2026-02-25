@@ -118,7 +118,7 @@ async def execute_code(
 
     # Determine working directory
     if working_dir is None:
-        working_dir = os.path.expanduser("~/.inquira/workspaces")
+        working_dir = os.path.expanduser("~/.inquira/runtime/exec_tmp")
     Path(working_dir).mkdir(parents=True, exist_ok=True)
 
     with tempfile.NamedTemporaryFile(

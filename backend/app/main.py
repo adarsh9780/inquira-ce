@@ -2,7 +2,6 @@ import argparse
 import asyncio
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime
 from pathlib import Path
 
 import uvicorn
@@ -26,7 +25,6 @@ from .v1.db.init import init_v1_database
 from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
 from .v1.services.workspace_deletion_service import WorkspaceDeletionService
 from .core.config_models import AppConfig
-from .database.database_manager import DatabaseManager
 from .core.logger import logprint, patch_print
 from .services.session_variable_store import session_variable_store
 from .services.websocket_manager import websocket_manager
@@ -91,10 +89,6 @@ async def lifespan(app: FastAPI):
         # Create a default config if loading fails
         app.state.config = AppConfig()
 
-    # Initialize database manager
-    app.state.db_manager = DatabaseManager(app.state.config)
-    logprint("Database manager initialized")
-
     # Initialize v1 ORM database schema
     try:
         await init_v1_database()
@@ -116,9 +110,6 @@ async def lifespan(app: FastAPI):
         await cleanup_task
     except asyncio.CancelledError:
         pass
-
-    if hasattr(app.state, "db_manager"):
-        app.state.db_manager.shutdown()
 
     if hasattr(app.state, "workspace_langgraph_manager") and app.state.workspace_langgraph_manager:
         try:
@@ -207,103 +198,7 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
         f"🔍 [WebSocket] Active connections after connect: {list(websocket_manager.active_connections.keys())}"
     )
 
-    # Check for existing preview cache and create if missing
-    try:
-        from .api.data_preview import (
-            SampleType,
-            get_cached_preview,
-            read_file_with_duckdb_sample,
-            set_cached_preview,
-        )
-        from .database.database import get_user_settings
-
-        # Get user's data path
-        user_settings = get_user_settings(user_id) or {}
-        data_path = user_settings.get("data_path")
-
-        if data_path:
-            if isinstance(data_path, str) and data_path.startswith("browser://"):
-                # Browser-native datasets are previewed client-side.
-                await websocket_manager.send_to_user(
-                    user_id,
-                    {
-                        "type": "cache_status",
-                        "data_path": data_path,
-                        "cache_status": {
-                            SampleType.random.value: "skipped",
-                            SampleType.first.value: "skipped",
-                        },
-                        "message": "Preview cache skipped for browser-native dataset (handled in frontend runtime).",
-                        "timestamp": datetime.now().isoformat(),
-                    },
-                )
-                return
-
-            # Check cache status for all sample types and create cache if missing
-            cache_status = {}
-            for sample_type in [SampleType.random, SampleType.first]:
-                cached_data = get_cached_preview(
-                    app.state, user_id, sample_type.value, data_path
-                )
-
-                if cached_data:
-                    cache_status[sample_type.value] = "cached"
-                    logprint(
-                        f"✅ [WebSocket] Cache found for {user_id}:{sample_type.value}"
-                    )
-                else:
-                    # Cache doesn't exist, create it asynchronously
-                    logprint(
-                        f"🔄 [WebSocket] Creating cache for {user_id}:{sample_type.value}"
-                    )
-                    try:
-                        sample_data = read_file_with_duckdb_sample(
-                            data_path, sample_type.value, 100
-                        )
-                        response_data = {
-                            "success": True,
-                            "data": sample_data,
-                            "row_count": len(sample_data),
-                            "file_path": data_path,
-                            "sample_type": sample_type.value,
-                            "message": f"Successfully loaded {len(sample_data)} {sample_type.value} sample rows",
-                        }
-                        set_cached_preview(
-                            app.state,
-                            user_id,
-                            sample_type.value,
-                            data_path,
-                            response_data,
-                        )
-                        cache_status[sample_type.value] = "cached"
-                        logprint(
-                            f"✅ [WebSocket] Cache created for {user_id}:{sample_type.value} ({len(sample_data)} rows)"
-                        )
-                    except Exception as cache_error:
-                        logprint(
-                            f"❌ [WebSocket] Failed to create cache for {user_id}:{sample_type.value}: {str(cache_error)}",
-                            level="error",
-                        )
-                        cache_status[sample_type.value] = "error"
-
-            # Send cache status to client
-            await websocket_manager.send_to_user(
-                user_id,
-                {
-                    "type": "cache_status",
-                    "data_path": data_path,
-                    "cache_status": cache_status,
-                    "message": f"Cache status checked for {data_path}",
-                    "timestamp": datetime.now().isoformat(),
-                },
-            )
-
-            logprint(
-                f"📊 [WebSocket] Cache status sent to user {user_id}: {cache_status}"
-            )
-
-    except Exception as e:
-        logprint(f"⚠️ [WebSocket] Error checking cache status: {str(e)}", level="error")
+    # V1 runtime keeps workspace-scoped state; legacy cache bootstrap is disabled.
 
     try:
         while True:

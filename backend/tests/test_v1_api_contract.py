@@ -29,3 +29,11 @@ def test_v1_analyze_contract_includes_workspace_dataset_fields():
     assert "table_name" in properties
     assert "active_schema" in properties
     assert "api_key" in properties
+
+
+def test_v1_preferences_response_exposes_available_models():
+    schema = app.openapi()
+    components = schema.get("components", {}).get("schemas", {})
+    prefs = components.get("PreferencesResponse", {})
+    properties = prefs.get("properties", {})
+    assert "available_models" in properties

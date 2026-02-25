@@ -1,10 +1,13 @@
 import os
-from google import genai
 from pathlib import Path
 from typing import Any
 from dotenv import load_dotenv
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, SystemMessage
+
+from .llm_runtime_config import load_llm_runtime_config, normalize_model_id
 
 
 class CodeOutput(BaseModel):
@@ -21,27 +24,35 @@ class CodeOutput(BaseModel):
 
 
 class LLMService:
-    """Service for interacting with Google Gemini LLM"""
+    """Service for interacting with OpenAI-compatible LLM providers."""
 
-    def __init__(self, api_key: str = "", model: str = "gemini-2.5-flash"):
-        """Initialize the LLM service with API key"""
+    def __init__(self, api_key: str = "", model: str = "google/gemini-2.5-flash"):
+        """Initialize LLM service with API key and OpenAI-compatible base URL."""
+        runtime = load_llm_runtime_config()
         if api_key:
             self.api_key = api_key
-            os.environ["GOOGLE_API_KEY"] = api_key
         else:
-            env_fp = Path(__file__).resolve().parents[2] / ".env"
-            load_dotenv(env_fp)
-            self.api_key = os.getenv("GOOGLE_API_KEY", "")
+            backend_env = Path(__file__).resolve().parents[2] / ".env"
+            repo_root_env = Path(__file__).resolve().parents[3] / ".env"
+            # Load both so local dev can keep .env at repo root or backend root.
+            load_dotenv(backend_env)
+            load_dotenv(repo_root_env)
+            self.api_key = os.getenv("OPENROUTER_API_KEY", "")
 
-        self.model = model
+        self.model = normalize_model_id(model) or runtime.default_model
+        self.base_url = runtime.base_url
+        self.default_max_tokens = runtime.default_max_tokens
         self.client: Any | None
         self.chat_client: Any | None
 
-        # Only initialize client if API key is available
+        self.client = None
         if self.api_key:
-            self.client = genai.Client(api_key=self.api_key)
-        else:
-            self.client = None
+            self.client = ChatOpenAI(
+                model=self.model,
+                api_key=self.api_key,
+                base_url=self.base_url,
+                temperature=0,
+            )
 
         self.chat_client = None
 
@@ -51,39 +62,43 @@ class LLMService:
                 status_code=503, detail="LLM service not available. API key not set."
             )
 
-        selected_model = model or self.model
+        selected_model = normalize_model_id((model or self.model).strip() or self.model)
 
-        self.chat_client = self.client.chats.create(
+        model_client = ChatOpenAI(
             model=selected_model,
-            config=genai.types.GenerateContentConfig(
-                temperature=0,
-                system_instruction=system_instruction,
-                response_mime_type="application/json",
-                response_schema=CodeOutput,
-            ),
+            api_key=self.api_key,
+            base_url=self.base_url,
+            temperature=0,
         )
+        bounded_model_client = model_client.bind(max_tokens=self.default_max_tokens)
+        self.chat_client = bounded_model_client.with_structured_output(CodeOutput)
+        self.chat_system_instruction = system_instruction or ""
 
         return self.chat_client
 
-    def ask(self, user_query: str, structured_output_format):
+    def ask(self, user_query: str, structured_output_format, max_tokens: int | None = None):
         if not self.client:
             raise HTTPException(
                 status_code=503, detail="LLM service not available. API key not set."
             )
 
         try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=user_query,
-                config={
-                    "response_mime_type": "application/json",
-                    "response_schema": structured_output_format,
-                },
-            )
-            return response.parsed
-        except Exception:
+            effective_max_tokens = max_tokens or self.default_max_tokens
+            client = self.client.bind(max_tokens=effective_max_tokens)
+            if structured_output_format is str:
+                response = client.invoke(user_query)
+                return getattr(response, "content", str(response))
+
+            chain = client.with_structured_output(structured_output_format)
+            return chain.invoke(user_query)
+        except HTTPException:
+            raise
+        except Exception as e:
+            status_code = getattr(e, "status_code", None)
+            if isinstance(status_code, int) and 400 <= status_code <= 599:
+                raise HTTPException(status_code=status_code, detail=str(e))
             raise HTTPException(
-                status_code=500, detail="Error while asking question from LLM"
+                status_code=500, detail=f"Error while asking question from LLM: {str(e)}"
             )
 
     def chat(self, message: str):
@@ -94,8 +109,11 @@ class LLMService:
             )
 
         try:
-            response = self.chat_client.send_message(message)
-            return response.parsed
+            messages = []
+            if getattr(self, "chat_system_instruction", ""):
+                messages.append(SystemMessage(content=self.chat_system_instruction))
+            messages.append(HumanMessage(content=message))
+            return self.chat_client.invoke(messages)
         except Exception as e:
             raise HTTPException(
                 status_code=500, detail=f"Error in chat conversation: {str(e)}"

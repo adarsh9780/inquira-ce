@@ -9,6 +9,7 @@ test('apiService testGeminiApi uses generated client and 404 fallback to v1 admi
 
   assert.equal(source.includes('testGeminiApiKeyApiV1AdminTestGeminiPost'), true)
   assert.equal(source.includes('testGeminiApiKeyApiTestGeminiPost'), true)
+  assert.equal(source.includes('const payload = { api_key: apiKey, model: model || undefined }'), true)
   assert.equal(source.includes("error?.response?.status === 404"), true)
   assert.equal(source.includes("axios.post('/api/v1/admin/test-gemini'"), true)
 })

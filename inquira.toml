@@ -60,3 +60,25 @@ enabled = false
 project = "inquira-dev"
 # Local Phoenix collector endpoint (OTLP HTTP)
 endpoint = "http://127.0.0.1:6006/v1/traces"
+
+[llm]
+# OpenAI-compatible runtime provider settings.
+provider = "openrouter"
+base-url = "https://openrouter.ai/api/v1"
+default-model = "google/gemini-2.5-flash"
+lite-model = "google/gemini-2.5-flash-lite"
+# Frontend model dropdown and server-side allowlist; use full model IDs.
+models = [
+  "google/gemini-3-flash-preview",
+  "google/gemini-2.5-flash",
+  "google/gemini-2.5-flash-lite",
+  "openrouter/free",
+]
+
+[llm.limits]
+# Default output cap when no endpoint-specific override is used.
+default = 4096
+# Schema generation/regeneration cap.
+schema = 2048
+# Code-generation/chat execution cap.
+code_generation = 4096

@@ -16,7 +16,9 @@ test('chat submit path enforces workspace dataset sync without legacy setDataPat
   const chatPath = resolve(process.cwd(), 'src/components/chat/ChatInput.vue')
   const source = readFileSync(chatPath, 'utf-8')
 
-  assert.equal(source.includes('await ensureWorkspaceDatasetReady()'), true)
+  assert.equal(source.includes('async function ensureWorkspaceForChat()'), false)
+  assert.equal(source.includes('const workspaceId = appStore.activeWorkspaceId'), true)
+  assert.equal(source.includes('await ensureWorkspaceDatasetReady(workspaceId)'), true)
   assert.equal(source.includes('ensureBackendSchemaReadyForChat'), false)
   assert.equal(source.includes('apiService.setDataPathSimple('), false)
   assert.equal(source.includes('apiService.analyzeDataStream('), false)

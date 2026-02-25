@@ -4,6 +4,7 @@ import duckdb
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from ..services.llm_service import LLMService
+from ..services.llm_runtime_config import load_llm_runtime_config
 from ..core.config_models import AppConfig
 from ..database.database_manager import DatabaseManager
 
@@ -133,7 +134,7 @@ def _generate_schema_internal(
     context: str,
     api_key: str,
     app_state,
-    model: str = "gemini-2.5-flash",
+    model: str = "google/gemini-2.5-flash",
     force_regenerate: bool = False,
 ) -> SchemaResponse:
     # Resolve table name early
@@ -278,9 +279,11 @@ def _generate_schema_internal(
     prompt = get_prompt("schema_generation", context=context, columns_text=columns_text)
 
     # Use the LLM service to generate schema descriptions
+    runtime = load_llm_runtime_config()
     schema_response = llm_service.ask(
         user_query=prompt,
         structured_output_format=SchemaList,
+        max_tokens=runtime.schema_max_tokens,
     )
 
     # Convert to SchemaColumn objects and save
@@ -349,7 +352,7 @@ def generate_schema(
     current_user: dict = Depends(get_current_user),
     current_api_key: str = Depends(get_api_key),
     app_state=Depends(get_app_state),
-    model: str = "gemini-2.5-flash",
+    model: str = "google/gemini-2.5-flash",
 ):
     user_id = current_user["user_id"]
     logprint(
@@ -463,8 +466,11 @@ def generate_schema_from_columns(
     prompt = get_prompt("schema_generation", context=context, columns_text=columns_text)
 
     # LLM generates descriptions
+    runtime = load_llm_runtime_config()
     schema_response = llm_service.ask(
-        user_query=prompt, structured_output_format=SchemaList
+        user_query=prompt,
+        structured_output_format=SchemaList,
+        max_tokens=runtime.schema_max_tokens,
     )
 
     # Merge LLM descriptions with column metadata

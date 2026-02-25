@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class PreferencesResponse(BaseModel):
-    selected_model: str = "gemini-2.5-flash"
+    selected_model: str = "google/gemini-2.5-flash"
     schema_context: str = ""
     allow_schema_sample_values: bool = False
     chat_overlay_width: float = 0.25
@@ -16,6 +16,7 @@ class PreferencesResponse(BaseModel):
     active_dataset_path: str | None = None
     active_table_name: str | None = None
     api_key_present: bool = False
+    available_models: list[str] = Field(default_factory=list)
 
 
 class PreferencesUpdateRequest(BaseModel):

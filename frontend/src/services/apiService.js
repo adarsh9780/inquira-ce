@@ -54,9 +54,10 @@ axios.interceptors.response.use(
   (error) => {
     const status = error?.response?.status
     const url = String(error?.config?.url || '')
+    const isAuthProbe = url.includes('/api/v1/auth/me')
     const isExpectedAuthCheckFailure =
-      status === 401 &&
-      (url.includes('/api/v1/auth/me') || url.includes('/api/v1/auth/login') || url.includes('/api/v1/auth/logout'))
+      (status === 401 || !status) &&
+      (isAuthProbe || url.includes('/api/v1/auth/login') || url.includes('/api/v1/auth/logout'))
 
     if (!isExpectedAuthCheckFailure) {
       console.error('API Error:', error)
@@ -373,20 +374,21 @@ export const apiService = {
   },
 
   // test gemini api
-  async testGeminiApi(apiKey) {
+  async testGeminiApi(apiKey, model = '') {
+    const payload = { api_key: apiKey, model: model || undefined }
     try {
       // Prefer generated endpoint names from both old and current OpenAPI specs.
       const generatedCall =
         client.testGeminiApiKeyApiV1AdminTestGeminiPost || client.testGeminiApiKeyApiTestGeminiPost
       if (typeof generatedCall === 'function') {
-        return generatedCall({ api_key: apiKey })
+        return generatedCall(payload)
       }
 
-      return axios.post('/api/v1/admin/test-gemini', { api_key: apiKey })
+      return axios.post('/api/v1/admin/test-gemini', payload)
     } catch (error) {
       // Fallback to v1 admin route when backend omits legacy route.
       if (error?.response?.status === 404) {
-        return axios.post('/api/v1/admin/test-gemini', { api_key: apiKey })
+        return axios.post('/api/v1/admin/test-gemini', payload)
       }
       throw error
     }

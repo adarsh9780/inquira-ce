@@ -1,13 +1,7 @@
-docs(site): remove script installer docs, refresh changelog, and enable Mermaid on Pages
 
-Replace old curl/PowerShell install instructions in README/docs with pip install and GitHub Releases download guidance
-Refresh docs/changelog.md to reflect current release and site/deployment changes instead of stale entries
-Enable Mermaid rendering in MkDocs via superfences plus mermaid JS init script for GitHub Pages output
-Add regression checks to ensure script-install docs stay removed and Mermaid config remains present
+fix(model-catalog): make frontend model dropdown TOML-driven via backend runtime config
 
-docs(ux): rewrite core documentation pages for clarity and first-time usability
-
-Expand overview/install/development docs with clearer audience framing, workflow context, and practical guidance
-Refine commit/release and CI/release pages to explain purpose, expected behavior, and operational tradeoffs in plain language
-Improve downloads/index pages with clearer user paths and explicit asset-discovery explanation
-Keep docs navigation chain and automation-tested markers intact while making content more descriptive and easier to follow
+Add [llm].models parsing/validation to llm_runtime_config with env override support (INQUIRA_LLM_MODELS)
+Expose available_models in v1 preferences response and load it into app store state
+Update ModelSelector to consume injected model options instead of hardcoded list, with fallback models for resilience
+Replace brittle model-selector source-string test with behavior-based checks and add backend contract/runtime tests for available_models

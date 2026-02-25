@@ -10,7 +10,7 @@ class AnalyzeRequest(BaseModel):
     conversation_id: str | None = None
     question: str = Field(min_length=1)
     current_code: str = ""
-    model: str = "gemini-2.5-flash"
+    model: str = "google/gemini-2.5-flash"
     context: str | None = None
     table_name: str | None = None
     active_schema: dict | None = None

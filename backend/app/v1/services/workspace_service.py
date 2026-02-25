@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import User, Workspace
+from ..repositories.user_repository import UserRepository
 from ..repositories.workspace_deletion_repository import WorkspaceDeletionRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .workspace_storage_service import WorkspaceStorageService
@@ -39,7 +40,8 @@ class WorkspaceService:
             raise HTTPException(status_code=409, detail="Workspace name already exists")
 
         count = await WorkspaceRepository.count_for_user(session, user.id)
-        if user.plan.value == "FREE" and count >= 1:
+        user_plan = user.plan.value if hasattr(user.plan, "value") else str(user.plan)
+        if user_plan == "FREE" and count >= 1:
             raise HTTPException(
                 status_code=403,
                 detail="You are on the Free plan and can create only 1 workspace. Upgrade your plan to create more.",
@@ -62,6 +64,14 @@ class WorkspaceService:
         workspace.duckdb_path = str(WorkspaceStorageService.build_duckdb_path(user.username, workspace.id))
         await session.commit()
         await session.refresh(workspace)
+        await WorkspaceStorageService.write_workspace_manifest(
+            username=user.username,
+            workspace_id=workspace.id,
+            workspace_name=workspace.name,
+            normalized_name=workspace.name_normalized,
+            created_at=workspace.created_at,
+            updated_at=workspace.updated_at,
+        )
         return workspace
 
     @staticmethod
@@ -71,10 +81,22 @@ class WorkspaceService:
         if workspace is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
 
+        user = await UserRepository.get_by_id(session, user_id)
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
         await WorkspaceRepository.deactivate_all_for_user(session, user_id)
         workspace.is_active = 1
         await session.commit()
         await session.refresh(workspace)
+        await WorkspaceStorageService.write_workspace_manifest(
+            username=user.username,
+            workspace_id=workspace.id,
+            workspace_name=workspace.name,
+            normalized_name=workspace.name_normalized,
+            created_at=workspace.created_at,
+            updated_at=workspace.updated_at,
+        )
         return workspace
 
     @staticmethod

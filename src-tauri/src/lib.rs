@@ -1,4 +1,5 @@
 use std::fs;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::Mutex;
@@ -148,6 +149,35 @@ fn find_uv_binary(resource_dir: &PathBuf) -> PathBuf {
 
     // Fallback: assume it's on PATH
     PathBuf::from("uv")
+}
+
+fn backend_env_fingerprint(backend_dir: &PathBuf) -> String {
+    let pyproject_path = backend_dir.join("pyproject.toml");
+    let lock_path = backend_dir.join("uv.lock");
+
+    let pyproject_content = fs::read_to_string(pyproject_path).unwrap_or_default();
+    let lock_content = fs::read_to_string(lock_path).unwrap_or_default();
+
+    let mut hasher = DefaultHasher::new();
+    pyproject_content.hash(&mut hasher);
+    lock_content.hash(&mut hasher);
+    format!("{:x}", hasher.finish())
+}
+
+fn needs_python_bootstrap(
+    venv_path: &PathBuf,
+    marker_path: &PathBuf,
+    expected_fingerprint: &str,
+    always_sync: bool,
+) -> bool {
+    if always_sync || !venv_path.exists() {
+        return true;
+    }
+
+    match fs::read_to_string(marker_path) {
+        Ok(existing) => existing.trim() != expected_fingerprint,
+        Err(_) => true,
+    }
 }
 
 fn bootstrap_python(
@@ -605,6 +635,15 @@ pub fn run() {
                     .unwrap_or_else(|| "local_subprocess".to_string())
             );
             let venv_path = data_dir.join(".venv");
+            let backend_env_marker = data_dir.join(".backend-env-fingerprint");
+            let expected_backend_env_fingerprint = backend_env_fingerprint(&backend_dir);
+            let always_sync_backend_env = cfg!(debug_assertions);
+            let should_bootstrap_python = needs_python_bootstrap(
+                &venv_path,
+                &backend_env_marker,
+                &expected_backend_env_fingerprint,
+                always_sync_backend_env,
+            );
             let runner_venv_name = config
                 .execution
                 .as_ref()
@@ -614,8 +653,12 @@ pub fn run() {
             let runner_venv_path = data_dir.join(runner_venv_name);
 
             // Phase 1: Bootstrap Python + venv (one-time)
-            if !venv_path.exists() {
-                log::info!("First launch detected. Bootstrapping Python environment...");
+            if should_bootstrap_python {
+                if always_sync_backend_env {
+                    log::info!("Debug mode: syncing backend Python environment...");
+                } else {
+                    log::info!("Backend dependencies changed. Re-syncing Python environment...");
+                }
                 app.emit("backend-status", "Installing Python environment (one-time setup)...")
                     .ok();
 
@@ -625,6 +668,10 @@ pub fn run() {
                         .ok();
                     // Don't crash — let the user see the error in the UI
                     return Ok(());
+                }
+
+                if let Err(e) = fs::write(&backend_env_marker, &expected_backend_env_fingerprint) {
+                    log::warn!("Could not write backend env marker: {}", e);
                 }
             }
 
@@ -691,4 +738,42 @@ pub fn run() {
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::needs_python_bootstrap;
+    use std::fs;
+    use std::path::PathBuf;
+
+    #[test]
+    fn bootstrap_required_when_venv_missing() {
+        let venv = PathBuf::from("/tmp/inq-missing-venv");
+        let marker = PathBuf::from("/tmp/inq-missing-marker");
+        assert!(needs_python_bootstrap(&venv, &marker, "abc", false));
+    }
+
+    #[test]
+    fn bootstrap_required_when_fingerprint_mismatch() {
+        let base = std::env::temp_dir().join("inq_bootstrap_test_mismatch");
+        let _ = fs::create_dir_all(&base);
+        let venv = base.join(".venv");
+        let marker = base.join(".backend-env-fingerprint");
+        let _ = fs::create_dir_all(&venv);
+        fs::write(&marker, "old").expect("write marker");
+
+        assert!(needs_python_bootstrap(&venv, &marker, "new", false));
+    }
+
+    #[test]
+    fn bootstrap_not_required_when_fingerprint_matches() {
+        let base = std::env::temp_dir().join("inq_bootstrap_test_match");
+        let _ = fs::create_dir_all(&base);
+        let venv = base.join(".venv");
+        let marker = base.join(".backend-env-fingerprint");
+        let _ = fs::create_dir_all(&venv);
+        fs::write(&marker, "same").expect("write marker");
+
+        assert!(!needs_python_bootstrap(&venv, &marker, "same", false));
+    }
 }

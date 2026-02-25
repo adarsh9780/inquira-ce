@@ -14,12 +14,14 @@ from ..schemas.preferences import (
     PreferencesUpdateRequest,
 )
 from ..services.secret_storage_service import SecretStorageService
+from ...services.llm_runtime_config import load_llm_runtime_config
 from .deps import get_current_user
 
 router = APIRouter(prefix="/preferences", tags=["V1 Preferences"])
 
 
 def _to_response(prefs, api_key_present: bool) -> PreferencesResponse:
+    runtime = load_llm_runtime_config()
     return PreferencesResponse(
         selected_model=prefs.selected_model,
         schema_context=prefs.schema_context,
@@ -31,6 +33,7 @@ def _to_response(prefs, api_key_present: bool) -> PreferencesResponse:
         active_dataset_path=prefs.active_dataset_path,
         active_table_name=prefs.active_table_name,
         api_key_present=api_key_present,
+        available_models=list(runtime.supported_models),
     )
 
 

@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.agent.graph import InquiraAgent
+from app.services.llm_runtime_config import LlmRuntimeConfig
 from app.v1.services.chat_service import ChatService
 
 
@@ -70,16 +71,54 @@ async def test_chat_service_passes_model_and_context_to_graph(monkeypatch):
 def test_agent_model_selection_uses_configurable_model(monkeypatch):
     called = {}
 
-    def fake_init_chat_model(model_ref):
-        called["model_ref"] = model_ref
-        return object()
+    class FakeChatOpenAI:
+        def __init__(self, **kwargs):
+            called.update(kwargs)
 
-    monkeypatch.setattr("app.agent.graph.init_chat_model", fake_init_chat_model)
+    monkeypatch.setattr("app.agent.graph.ChatOpenAI", FakeChatOpenAI)
+    monkeypatch.setattr(
+        "app.agent.graph.load_llm_runtime_config",
+        lambda: LlmRuntimeConfig(
+            provider="openrouter",
+            base_url="http://localhost:4000/v1",
+            default_model="google/gemini-2.5-flash",
+            lite_model="google/gemini-2.5-flash-lite",
+        ),
+    )
 
     agent = InquiraAgent()
     agent._get_model(
-        {"configurable": {"model": "gemini-2.5-pro", "api_key": "key"}},
+        {"configurable": {"model": "openai/gpt-4o-mini", "api_key": "key"}},
         model_name="gemini-2.5-flash",
     )
 
-    assert called["model_ref"] == "google_genai:gemini-2.5-pro"
+    assert called["model"] == "openai/gpt-4o-mini"
+    assert called["base_url"] == "http://localhost:4000/v1"
+    assert called["api_key"] == "key"
+    assert called["temperature"] == 0
+    assert called["max_tokens"] == 4096
+
+
+def test_agent_model_selection_maps_legacy_lite_model_to_runtime_default(monkeypatch):
+    called = {}
+
+    class FakeChatOpenAI:
+        def __init__(self, **kwargs):
+            called.update(kwargs)
+
+    monkeypatch.setattr("app.agent.graph.ChatOpenAI", FakeChatOpenAI)
+    monkeypatch.setattr(
+        "app.agent.graph.load_llm_runtime_config",
+        lambda: LlmRuntimeConfig(
+            provider="openrouter",
+            base_url="http://localhost:4000/v1",
+            default_model="google/gemini-2.5-flash",
+            lite_model="google/gemini-2.5-flash-lite",
+        ),
+    )
+
+    agent = InquiraAgent()
+    agent._get_model({"configurable": {"api_key": "k"}}, model_name="gemini-2.5-flash-lite")
+
+    assert called["model"] == "google/gemini-2.5-flash-lite"
+    assert called["max_tokens"] == 4096

@@ -1,10 +1,7 @@
 import os
 
-# some mobile hotspot like adarsh's iphone 14 plus sends ipv6, we need to force to use ipv4
-os.environ["GRPC_DNS_RESOLVER"] = "native"
-
 from pydantic import BaseModel, Field
-from langchain.chat_models import init_chat_model
+from langchain_openai import ChatOpenAI
 from langchain_core.messages import AnyMessage, HumanMessage, AIMessage
 from langgraph.graph import add_messages, StateGraph, START, END
 from langchain_core.prompts import (
@@ -23,6 +20,7 @@ import json
 from pathlib import Path
 from .code_guard import guard_code
 from ..core.logger import logprint
+from ..services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
 
 
 MAX_CODE_GUARD_RETRIES = 2
@@ -135,25 +133,54 @@ class InquiraAgent:
     def __init__(self) -> None:
         self.counter = 0
 
+    @staticmethod
+    def _resolve_runtime_model(
+        requested_model: str,
+        selected_model: str,
+        default_model: str,
+        lite_model: str,
+    ) -> str:
+        legacy_default_models = {"gemini-2.5-flash", "gemini-2.5-pro"}
+        legacy_lite_models = {"gemini-2.5-flash-lite", "gemini-2.0-flash-lite"}
+
+        requested_model = (requested_model or "").strip()
+        selected_model = normalize_model_id((selected_model or "").strip())
+        default_model = normalize_model_id((default_model or "").strip())
+        lite_model = normalize_model_id((lite_model or "").strip())
+
+        if selected_model and requested_model in legacy_default_models:
+            return selected_model
+        if requested_model in legacy_default_models:
+            return default_model
+        if requested_model in legacy_lite_models:
+            return lite_model
+        return normalize_model_id(requested_model)
+
     def _get_model(self, config: RunnableConfig, model_name: str = "gemini-2.5-flash"):
         """Get model instance with API key from config"""
         configurable = config.get("configurable", {})
-        api_key = configurable.get("api_key")
+        api_key = str(configurable.get("api_key") or "").strip()
         selected_model = str(configurable.get("model") or "").strip()
+        runtime = load_llm_runtime_config()
 
-        # If API key is provided, set it in env for Google GenAI to pick up
-        # or pass it if the specific init_chat_model supports it.
-        # google-genai usually looks at GOOGLE_API_KEY env var.
-        if api_key:
-            import os
+        effective_model = self._resolve_runtime_model(
+            requested_model=model_name,
+            selected_model=selected_model,
+            default_model=runtime.default_model,
+            lite_model=runtime.lite_model,
+        )
 
-            os.environ["GOOGLE_API_KEY"] = api_key
+        resolved_api_key = api_key or os.getenv("OPENROUTER_API_KEY", "").strip()
+        if not resolved_api_key:
+            raise ValueError("API key not configured for LLM runtime")
 
-        effective_model = model_name
-        if selected_model and model_name == "gemini-2.5-flash":
-            effective_model = selected_model
-
-        return init_chat_model(f"google_genai:{effective_model}")
+        return ChatOpenAI(
+            model=effective_model,
+            api_key=resolved_api_key,
+            base_url=runtime.base_url,
+            temperature=0,
+            max_tokens=runtime.code_generation_max_tokens,
+        )
 
     def check_relevancy(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         class IsRelevant(BaseModel):

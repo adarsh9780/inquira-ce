@@ -21,6 +21,7 @@
         <div class="max-w-xs">
           <ModelSelector
             :selected-model="appStore.selectedModel"
+            :model-options="appStore.availableModels"
             @model-changed="handleModelChange"
           />
         </div>
@@ -32,7 +33,7 @@
       <!-- API Key Input -->
       <div>
         <label for="api-key-input" class="block text-sm font-medium text-gray-700 mb-2">
-          Gemini API Key
+          OpenRouter API Key
         </label>
         <div class="relative max-w-md">
           <input
@@ -40,7 +41,7 @@
             :type="showApiKey ? 'text' : 'password'"
             :value="appStore.apiKey"
             @input="handleApiKeyChange"
-            placeholder="Enter your Gemini API key"
+            placeholder="Enter your OpenRouter API key"
             class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
           <button
@@ -56,19 +57,19 @@
           <p class="text-xs text-gray-500">
             Your API key is stored in your OS keychain.
             <a
-              href="https://aistudio.google.com/app/apikey"
+              href="https://openrouter.ai/keys"
               target="_blank"
               rel="noopener"
               class="text-blue-600 hover:underline ml-1"
             >
-              Get a Gemini API key
+              Get an OpenRouter API key
             </a>
           </p>
           <button
             @click="testApiKey"
             :disabled="isTestingApiKey || !appStore.apiKey.trim()"
             class="ml-4 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Test your API key with Gemini"
+            title="Test your API key with the configured provider"
             type="button"
           >
             <span v-if="!isTestingApiKey">Test</span>
@@ -170,7 +171,7 @@ function clearMessage() {
 async function testApiKey() {
   const key = appStore.apiKey.trim()
   if (!key) {
-    message.value = 'Please enter your Gemini API key first.'
+    message.value = 'Please enter your API key first.'
     messageType.value = 'error'
     return
   }
@@ -179,11 +180,11 @@ async function testApiKey() {
   clearMessage()
 
   try {
-    const res = await apiService.testGeminiApi(key)
-    message.value = res?.detail || 'Successfully connected to Gemini API.'
+    const res = await apiService.testGeminiApi(key, appStore.selectedModel)
+    message.value = res?.detail || 'Successfully connected to model provider.'
     messageType.value = 'success'
   } catch (error) {
-    console.error('❌ Gemini API test failed:', error)
+    console.error('❌ Provider API test failed:', error)
     const errorMessage = error.response?.data?.detail || error.data?.detail || error.message || 'Failed to validate API key.'
     message.value = errorMessage
     messageType.value = 'error'

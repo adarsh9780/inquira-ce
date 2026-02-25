@@ -25,7 +25,7 @@ class ChatRequest(BaseModel):
         None, description="Optional system instruction to set the behavior of the LLM"
     )
     model: str = Field(
-        default="gemini-2.5-flash",
+        default="google/gemini-2.5-flash",
         description="The LLM model to use for the conversation",
     )
 
@@ -43,7 +43,7 @@ class DataAnalysisRequest(BaseModel):
         description="current python code which will be used to guide LLM to generate new code",
     )
     question: str = Field(description="The question to ask about the data")
-    model: str = Field(default="gemini-2.5-flash", description="The LLM model to use")
+    model: str = Field(default="google/gemini-2.5-flash", description="The LLM model to use")
     context: Optional[str] = Field(
         None, description="Additional context about the data"
     )

@@ -15,7 +15,13 @@ export const useAppStore = defineStore('app', () => {
   const ingestedColumns = ref([])
 
   // LLM Configuration
-  const selectedModel = ref('gemini-2.5-flash')
+  const selectedModel = ref('google/gemini-2.5-flash')
+  const availableModels = ref([
+    'google/gemini-3-flash-preview',
+    'google/gemini-2.5-flash',
+    'google/gemini-2.5-flash-lite',
+    'openrouter/free'
+  ])
   const apiKey = ref('')
   const apiKeyConfigured = ref(false)
 
@@ -203,7 +209,13 @@ export const useAppStore = defineStore('app', () => {
       // Reset all configuration values
       apiKey.value = ''
       apiKeyConfigured.value = false
-      selectedModel.value = 'gemini-2.5-flash'
+      selectedModel.value = 'google/gemini-2.5-flash'
+      availableModels.value = [
+        'google/gemini-3-flash-preview',
+        'google/gemini-2.5-flash',
+        'google/gemini-2.5-flash-lite',
+        'openrouter/free'
+      ]
       dataFilePath.value = ''
       schemaFilePath.value = ''
       dataFileId.value = ''
@@ -746,7 +758,13 @@ export const useAppStore = defineStore('app', () => {
     try {
       suppressPreferenceSync = true
       const prefs = await apiService.v1GetPreferences()
+      if (Array.isArray(prefs?.available_models) && prefs.available_models.length) {
+        availableModels.value = prefs.available_models
+      }
       if (prefs?.selected_model) selectedModel.value = prefs.selected_model
+      if (!availableModels.value.includes(selectedModel.value)) {
+        selectedModel.value = availableModels.value[0] || 'google/gemini-2.5-flash'
+      }
       if (typeof prefs?.schema_context === 'string') schemaContext.value = prefs.schema_context
       if (typeof prefs?.allow_schema_sample_values === 'boolean') {
         allowSchemaSampleValues.value = prefs.allow_schema_sample_values
@@ -776,6 +794,12 @@ export const useAppStore = defineStore('app', () => {
       if (prefs?.active_table_name) {
         ingestedTableName.value = prefs.active_table_name
       }
+
+      // Preferences may point to deleted/stale workspace IDs.
+      if (activeWorkspaceId.value && !workspaces.value.some((ws) => ws.id === activeWorkspaceId.value)) {
+        const active = workspaces.value.find((ws) => ws.is_active) || workspaces.value[0]
+        activeWorkspaceId.value = active?.id || ''
+      }
     } catch (_error) {
       // Continue with defaults if preference fetch fails.
     } finally {
@@ -794,6 +818,7 @@ export const useAppStore = defineStore('app', () => {
     ingestedTableName,
     ingestedColumns,
     selectedModel,
+    availableModels,
     apiKey,
     apiKeyConfigured,
     schemaContext,

@@ -39,7 +39,7 @@ backend/.venv/
 *.swp
 .DS_Store
 **/.DS_Store
-commit_message
+commit_message.txt
 AGENTS.md
 GEMINI.md
 release_metadata.md

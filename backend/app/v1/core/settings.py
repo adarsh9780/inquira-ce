@@ -19,6 +19,7 @@ class V1Settings:
     reset_enabled: bool
     reset_token: str
     allow_schema_bootstrap: bool
+    auth_provider: str
 
     @staticmethod
     def load() -> "V1Settings":
@@ -37,6 +38,7 @@ class V1Settings:
             reset_enabled=os.getenv("INQUIRA_ENABLE_RESET", "0") == "1",
             reset_token=os.getenv("INQUIRA_RESET_TOKEN", ""),
             allow_schema_bootstrap=os.getenv("INQUIRA_ALLOW_SCHEMA_BOOTSTRAP", "0") == "1",
+            auth_provider=os.getenv("INQUIRA_AUTH_PROVIDER", "sqlite").strip().lower(),
         )
 
 

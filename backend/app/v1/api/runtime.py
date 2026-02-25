@@ -21,6 +21,7 @@ from ..services.secret_storage_service import SecretStorageService
 from .deps import get_current_user
 from ...core.prompt_library import get_prompt
 from ...services.llm_service import LLMService
+from ...services.llm_runtime_config import load_llm_runtime_config
 
 router = APIRouter(tags=["V1 Runtime"])
 
@@ -318,7 +319,7 @@ async def regenerate_workspace_dataset_schema(
 
     prefs = await PreferencesRepository.get_or_create(session, current_user.id)
     context = (payload.context if payload.context is not None else prefs.schema_context) or "General data analysis"
-    model = (payload.model or prefs.selected_model or "gemini-2.5-flash").strip()
+    model = (payload.model or prefs.selected_model or "google/gemini-2.5-flash").strip()
     allow_sample_values = bool(prefs.allow_schema_sample_values)
 
     try:
@@ -347,10 +348,12 @@ async def regenerate_workspace_dataset_schema(
     prompt = get_prompt("schema_generation", context=context, columns_text=columns_text)
 
     llm_service = LLMService(api_key=api_key, model=model)
+    runtime = load_llm_runtime_config()
     schema_response = await asyncio.to_thread(
         llm_service.ask,
         prompt,
         SchemaDescriptionList,
+        runtime.schema_max_tokens,
     )
     generated_items = (
         schema_response.schemas

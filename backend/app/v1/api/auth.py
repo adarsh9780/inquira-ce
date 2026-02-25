@@ -65,10 +65,12 @@ async def login_user(
 @router.get("/me", response_model=AuthUserResponse)
 async def get_current_user_profile(current_user=Depends(get_current_user)):
     """Return authenticated user profile and plan for UI rendering."""
+    plan = getattr(current_user, "plan", "FREE")
+    plan_value = plan.value if hasattr(plan, "value") else str(plan)
     return AuthUserResponse(
         user_id=current_user.id,
         username=current_user.username,
-        plan=current_user.plan.value,
+        plan=plan_value,
     )
 
 

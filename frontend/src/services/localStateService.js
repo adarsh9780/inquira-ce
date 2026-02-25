@@ -23,7 +23,10 @@ async function atomicWriteJson(path, payload) {
   const file = await create(path, { baseDir: BaseDirectory.AppData })
   try {
     await file.write(new TextEncoder().encode(serialized))
-    await file.sync()
+    // Older @tauri-apps/plugin-fs builds may not expose sync().
+    if (typeof file.sync === 'function') {
+      await file.sync()
+    }
   } finally {
     await file.close()
   }

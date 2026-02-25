@@ -18,7 +18,10 @@ router = APIRouter(prefix="/admin", tags=["V1 Admin"])
 
 
 class GeminiTestRequest(BaseModel):
-    api_key: str = Field(description="Google Gemini API key to test")
+    api_key: str = Field(description="OpenRouter API key to test")
+    model: str | None = Field(
+        default=None, description="Optional model identifier to validate against."
+    )
 
 
 @router.post("/reset", response_model=MessageResponse)
@@ -49,34 +52,49 @@ async def reset_everything(token: str):
 
 @router.post("/test-gemini")
 async def test_gemini_api_key(payload: GeminiTestRequest):
-    """Validate a Gemini key by issuing a lightweight test request."""
+    """Validate an OpenRouter-compatible key by issuing a lightweight test request."""
     api_key = (payload.api_key or "").strip()
+    model = (payload.model or "").strip()
     if not api_key:
-        raise HTTPException(status_code=400, detail="Please provide a valid Google Gemini API key to test.")
+        raise HTTPException(status_code=400, detail="Please provide a valid API key to test.")
 
     try:
-        llm_service = LLMService(api_key=api_key)
+        llm_service = LLMService(api_key=api_key, model=model or "google/gemini-2.5-flash")
         llm_service.ask(
             "Hello, please respond with just the word 'OK' to confirm this API key is working.",
             str,
+            max_tokens=8,
         )
         return {"detail": "API key is valid and working correctly"}
-    except Exception as exc:  # noqa: BLE001
-        error_msg = str(exc)
-        lowered = error_msg.lower()
-        if "api_key_invalid" in lowered or "invalid" in lowered:
+    except HTTPException as exc:
+        status_code = int(exc.status_code)
+        error_msg = str(exc.detail)
+        if status_code == 401:
             raise HTTPException(
                 status_code=401,
-                detail="The provided API key appears to be invalid. Please check your Google Gemini API key.",
+                detail="The provided API key appears to be invalid. Please check your API key.",
             ) from exc
-        if "quota" in lowered or "limit" in lowered:
+        if status_code == 429:
             raise HTTPException(
                 status_code=429,
-                detail="Your API key has exceeded its usage quota. Please check your Google Cloud billing and limits.",
+                detail="Your API key has exceeded its usage quota. Please check your provider billing and limits.",
             ) from exc
-        if "permission" in lowered or "unauthorized" in lowered:
+        if status_code == 403:
             raise HTTPException(
                 status_code=403,
-                detail="The API key doesn't have the required permissions to access Google Gemini.",
+                detail="The API key doesn't have the required permissions to access this model/provider.",
             ) from exc
-        raise HTTPException(status_code=500, detail=f"Error testing API key: {error_msg}") from exc
+        if status_code in {400, 404}:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Provider rejected model '{model or 'google/gemini-2.5-flash'}'. Pick another model or verify provider access.",
+            ) from exc
+        raise HTTPException(
+            status_code=status_code,
+            detail=f"Error testing API key: {error_msg}",
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error testing API key: {str(exc)}",
+        ) from exc

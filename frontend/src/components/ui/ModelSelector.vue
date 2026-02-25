@@ -64,7 +64,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
   Listbox,
   ListboxButton,
@@ -77,6 +77,10 @@ const props = defineProps({
   selectedModel: {
     type: String,
     required: true
+  },
+  modelOptions: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -84,10 +88,29 @@ const emit = defineEmits(['model-changed'])
 
 const selectedModel = ref(props.selectedModel)
 
-const availableModels = [
-  { value: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-  { value: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite' }
+const fallbackModels = [
+  'google/gemini-3-flash-preview',
+  'google/gemini-2.5-flash',
+  'google/gemini-2.5-flash-lite',
+  'openrouter/free'
 ]
+
+const availableModels = computed(() => {
+  const source = Array.isArray(props.modelOptions) && props.modelOptions.length
+    ? props.modelOptions
+    : fallbackModels
+  return source.map((value) => ({
+    value,
+    name: prettifyModelName(value)
+  }))
+})
+
+watch(
+  () => props.selectedModel,
+  (next) => {
+    selectedModel.value = next
+  }
+)
 
 function handleModelChange(value) {
   selectedModel.value = value
@@ -95,7 +118,19 @@ function handleModelChange(value) {
 }
 
 function getModelDisplayName(modelValue) {
-  const model = availableModels.find(m => m.value === modelValue)
-  return model ? model.name : modelValue
+  const model = availableModels.value.find(m => m.value === modelValue)
+  return model ? model.name : prettifyModelName(modelValue)
+}
+
+function prettifyModelName(modelId) {
+  const raw = String(modelId || '').trim()
+  if (!raw) return ''
+  if (raw === 'openrouter/free') return 'OpenRouter Free'
+  const withoutVendor = raw.includes('/') ? raw.split('/').slice(1).join('/') : raw
+  return withoutVendor
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.toUpperCase() === 'GPT' ? 'GPT' : `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ')
 }
 </script>
