@@ -3,6 +3,10 @@ function getDefaultWsBase() {
     return 'ws://localhost:8000'
   }
 
+  if (window.__TAURI_INTERNALS__) {
+    return 'ws://localhost:8000'
+  }
+
   const isSecure = window.location.protocol === 'https:'
   const scheme = isSecure ? 'wss:' : 'ws:'
 

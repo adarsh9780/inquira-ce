@@ -1,11 +1,11 @@
 /**
  * executionService.js — Server-Side Code Execution
- * 
- * Drop-in replacement for pyodideService.js.
- * Instead of running Python via Pyodide/WebAssembly in the browser,
+ *
+ * Drop-in replacement for the legacy in-browser Python execution service.
+ * Instead of running Python in the browser,
  * this service sends code to the backend for execution and returns results.
- * 
- * The API contract is intentionally identical to pyodideService so that
+ *
+ * The API contract is intentionally kept stable so that
  * components (CodeTab, ChatInput, NotebookCell) require minimal changes.
  */
 
@@ -15,7 +15,7 @@ import { useAppStore } from '../stores/appStore'
 class ExecutionService {
     /**
      * Execute Python code on the backend.
-     * Returns the same shape as the old pyodideService.executePython().
+     * Returns the same shape as the legacy executePython() contract.
      *
      * @param {string} code - Python code to execute
      * @returns {Promise<{success: boolean, stdout: string, stderr: string, error: string|null, result: any, resultType: string|null}>}
@@ -45,7 +45,7 @@ class ExecutionService {
     }
 
     /**
-     * No-op: Pyodide initialization is no longer needed.
+     * No-op: initialization is no longer needed.
      * Kept for API compatibility if any component calls it.
      */
     async initialize(_opts) {

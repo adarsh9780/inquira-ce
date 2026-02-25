@@ -16,6 +16,11 @@ function getDefaultApiBase() {
     return 'http://localhost:8000'
   }
 
+  if (window.__TAURI_INTERNALS__) {
+    // In packaged Tauri apps, window origin is tauri://localhost and is not the Python backend.
+    return 'http://localhost:8000'
+  }
+
   if (import.meta.env.DEV) {
     const { hostname } = window.location
     const port = '8000'
@@ -23,7 +28,7 @@ function getDefaultApiBase() {
     return `http://${hostname || 'localhost'}:${port}`
   }
 
-  return window.location.origin
+  return 'http://localhost:8000'
 }
 
 const resolvedEnvBase = (import.meta.env.VITE_API_BASE || '').trim()

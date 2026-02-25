@@ -192,7 +192,7 @@ onUnmounted(() => {
   background: #6160a9;
 }
 
-/* Pyodide loading overlay transitions */
+/* Backend startup overlay transitions */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease;

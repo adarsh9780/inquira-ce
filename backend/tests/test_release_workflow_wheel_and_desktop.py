@@ -50,6 +50,18 @@ def test_release_workflow_windows_tauri_build_is_optional():
     assert "optional: true" in text
 
 
+def test_release_workflow_stages_bundled_uv_for_desktop_builds():
+    text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "build_tauri:" in text
+    assert "- name: Setup UV" in text
+    assert "uses: astral-sh/setup-uv@v4" in text
+    assert "- name: Stage bundled uv (macOS)" in text
+    assert 'cp "$(command -v uv)" src-tauri/bundled-tools/uv' in text
+    assert "- name: Stage bundled uv (Windows)" in text
+    assert "Copy-Item (Get-Command uv).Source src-tauri/bundled-tools/uv.exe -Force" in text
+
+
 def test_makefile_has_wheel_and_desktop_build_targets():
     text = MAKEFILE.read_text(encoding="utf-8")
 

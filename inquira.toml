@@ -9,6 +9,7 @@ version = "3.12"
 
 # Set this if you're behind a corporate proxy or using JFrog/Nexus/Artifactory
 # index-url = "https://your-company.jfrog.io/artifactory/api/pypi/pypi-remote/simple"
+# Environment override (higher priority than this file): INQUIRA_UV_INDEX_URL
 
 # Set this to use a pre-installed Python instead of UV-managed one
 # python-path = "/usr/local/bin/python3.12"

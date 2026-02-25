@@ -28,7 +28,27 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "resources": [],
+    "resources": [
+      "../backend/app/__init__.py",
+      "../backend/app/main.py",
+      "../backend/app/app_config.json",
+      "../backend/app/agent",
+      "../backend/app/api",
+      "../backend/app/core",
+      "../backend/app/database",
+      "../backend/app/legal",
+      "../backend/app/logo",
+      "../backend/app/services",
+      "../backend/app/tools",
+      "../backend/app/v1",
+      "../backend/alembic",
+      "../backend/alembic.ini",
+      "../backend/main.py",
+      "../backend/pyproject.toml",
+      "../backend/uv.lock",
+      "../src-tauri/bundled-tools",
+      "../inquira.toml"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

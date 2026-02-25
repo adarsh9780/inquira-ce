@@ -106,6 +106,24 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v4
+
+      - name: Stage bundled uv (macOS)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          mkdir -p src-tauri/bundled-tools
+          cp "$(command -v uv)" src-tauri/bundled-tools/uv
+          chmod +x src-tauri/bundled-tools/uv
+
+      - name: Stage bundled uv (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path src-tauri/bundled-tools -Force | Out-Null
+          Copy-Item (Get-Command uv).Source src-tauri/bundled-tools/uv.exe -Force
+
       - name: Load release metadata
         id: release_meta
         shell: bash

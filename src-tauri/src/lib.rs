@@ -95,6 +95,14 @@ fn load_config(config_path: &PathBuf) -> InquiraConfig {
     }
 }
 
+fn resolve_resource_path(resource_dir: &PathBuf, relative: &str) -> PathBuf {
+    let direct = resource_dir.join(relative);
+    if direct.exists() {
+        return direct;
+    }
+    resource_dir.join("_up_").join(relative)
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Backend Process Manager
 // ─────────────────────────────────────────────────────────────────────
@@ -111,7 +119,7 @@ fn get_backend_url(app: tauri::AppHandle) -> String {
         .path()
         .resource_dir()
         .unwrap_or_else(|_| PathBuf::from("."));
-    let config_path = resource_dir.join("inquira.toml");
+    let config_path = resolve_resource_path(&resource_dir, "inquira.toml");
     let config = load_config(&config_path);
     let port = config
         .backend
@@ -132,9 +140,13 @@ fn get_backend_url(app: tauri::AppHandle) -> String {
 
 fn find_uv_binary(resource_dir: &PathBuf) -> PathBuf {
     // In production, UV is bundled in resources/
-    let bundled = resource_dir.join("uv");
-    if bundled.exists() {
-        return bundled;
+    let bundled_unix = resolve_resource_path(resource_dir, "bundled-tools/uv");
+    if bundled_unix.exists() {
+        return bundled_unix;
+    }
+    let bundled_windows = resolve_resource_path(resource_dir, "bundled-tools/uv.exe");
+    if bundled_windows.exists() {
+        return bundled_windows;
     }
 
     // In development, try to find uv on PATH
@@ -210,13 +222,7 @@ fn bootstrap_python(
     let mut cmd = Command::new(uv_bin);
     cmd.args(["sync", "--project", backend_dir.to_str().unwrap()])
         .env("UV_PROJECT_ENVIRONMENT", venv_path.to_str().unwrap());
-
-    // Apply custom index URL if configured
-    if let Some(ref index_url) = config.python.as_ref().and_then(|p| p.index_url.clone()) {
-        cmd.env("UV_INDEX_URL", index_url);
-    }
-
-    apply_proxy_env(&mut cmd, config);
+    apply_uv_package_env(&mut cmd, config);
     let status = cmd.status().map_err(|e| format!("uv sync failed: {}", e))?;
     if !status.success() {
         return Err("uv sync returned non-zero exit code".to_string());
@@ -301,7 +307,7 @@ fn bootstrap_runner_env(
         cmd.arg(pkg);
     }
 
-    apply_proxy_env(&mut cmd, config);
+    apply_uv_package_env(&mut cmd, config);
     let status = cmd
         .status()
         .map_err(|e| format!("runner package install failed: {}", e))?;
@@ -440,7 +446,7 @@ fn install_safe_py_runner(
         for arg in args {
             cmd.arg(arg);
         }
-        apply_proxy_env(&mut cmd, config);
+        apply_uv_package_env(&mut cmd, config);
         let status = cmd
             .status()
             .map_err(|e| format!("safe-py-runner install command failed: {}", e))?;
@@ -464,6 +470,29 @@ fn apply_proxy_env(cmd: &mut Command, config: &InquiraConfig) {
             cmd.env("HTTPS_PROXY", https);
         }
     }
+}
+
+fn resolve_uv_index_url(config: &InquiraConfig) -> String {
+    if let Ok(url) = std::env::var("INQUIRA_UV_INDEX_URL") {
+        let trimmed = url.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    if let Some(url) = config.python.as_ref().and_then(|p| p.index_url.clone()) {
+        let trimmed = url.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    "https://pypi.org/simple".to_string()
+}
+
+fn apply_uv_package_env(cmd: &mut Command, config: &InquiraConfig) {
+    apply_proxy_env(cmd, config);
+    cmd.env("UV_INDEX_URL", resolve_uv_index_url(config));
 }
 
 fn python_bin_from_venv(venv_path: &PathBuf) -> PathBuf {
@@ -610,9 +639,9 @@ pub fn run() {
             let backend_dir = if cfg!(debug_assertions) {
                 PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../backend")
             } else {
-                resource_dir.join("backend")
+                resolve_resource_path(&resource_dir, "backend")
             };
-            let config_path = resource_dir.join("inquira.toml");
+            let config_path = resolve_resource_path(&resource_dir, "inquira.toml");
             let runtime_config_path = if config_path.exists() {
                 config_path.clone()
             } else {
@@ -742,7 +771,10 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::needs_python_bootstrap;
+    use super::{
+        needs_python_bootstrap, resolve_resource_path, resolve_uv_index_url, InquiraConfig,
+        PythonConfig,
+    };
     use std::fs;
     use std::path::PathBuf;
 
@@ -775,5 +807,71 @@ mod tests {
         fs::write(&marker, "same").expect("write marker");
 
         assert!(!needs_python_bootstrap(&venv, &marker, "same", false));
+    }
+
+    fn base_config_with_index(index_url: Option<&str>) -> InquiraConfig {
+        InquiraConfig {
+            python: Some(PythonConfig {
+                version: None,
+                index_url: index_url.map(|s| s.to_string()),
+                python_path: None,
+            }),
+            proxy: None,
+            backend: None,
+            execution: None,
+        }
+    }
+
+    #[test]
+    fn uv_index_url_defaults_to_pypi_when_not_configured() {
+        std::env::remove_var("INQUIRA_UV_INDEX_URL");
+        let config = InquiraConfig {
+            python: None,
+            proxy: None,
+            backend: None,
+            execution: None,
+        };
+        assert_eq!(resolve_uv_index_url(&config), "https://pypi.org/simple");
+    }
+
+    #[test]
+    fn uv_index_url_uses_toml_when_env_missing() {
+        std::env::remove_var("INQUIRA_UV_INDEX_URL");
+        let config = base_config_with_index(Some("https://company.example/simple"));
+        assert_eq!(
+            resolve_uv_index_url(&config),
+            "https://company.example/simple"
+        );
+    }
+
+    #[test]
+    fn uv_index_url_env_overrides_toml() {
+        let config = base_config_with_index(Some("https://company.example/simple"));
+        std::env::set_var("INQUIRA_UV_INDEX_URL", "https://override.example/simple");
+        assert_eq!(
+            resolve_uv_index_url(&config),
+            "https://override.example/simple"
+        );
+        std::env::remove_var("INQUIRA_UV_INDEX_URL");
+    }
+
+    #[test]
+    fn resolve_resource_path_prefers_direct_resource() {
+        let base = std::env::temp_dir().join("inq_resource_path_direct");
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(base.join("backend")).expect("create backend dir");
+
+        let resolved = resolve_resource_path(&base, "backend");
+        assert_eq!(resolved, base.join("backend"));
+    }
+
+    #[test]
+    fn resolve_resource_path_falls_back_to_up_directory() {
+        let base = std::env::temp_dir().join("inq_resource_path_up");
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(base.join("_up_").join("backend")).expect("create _up_/backend dir");
+
+        let resolved = resolve_resource_path(&base, "backend");
+        assert_eq!(resolved, base.join("_up_").join("backend"));
     }
 }

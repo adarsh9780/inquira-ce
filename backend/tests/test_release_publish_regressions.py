@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,3 +34,31 @@ def test_backend_pyproject_avoids_vcs_direct_dependency_for_pypi():
 
     assert "safe-py-runner>=0.1.6" in text
     assert "safe-py-runner @ git+https://" not in text
+
+
+def test_tauri_bundle_resources_include_backend_project_files():
+    data = json.loads(TAURI_CONF.read_text(encoding="utf-8"))
+    resources = data.get("bundle", {}).get("resources", [])
+
+    assert "../backend" not in resources
+    assert "../backend/app" not in resources
+    assert "../backend/app/__init__.py" in resources
+    assert "../backend/app/main.py" in resources
+    assert "../backend/app/app_config.json" in resources
+    assert "../backend/app/agent" in resources
+    assert "../backend/app/api" in resources
+    assert "../backend/app/core" in resources
+    assert "../backend/app/database" in resources
+    assert "../backend/app/legal" in resources
+    assert "../backend/app/logo" in resources
+    assert "../backend/app/services" in resources
+    assert "../backend/app/tools" in resources
+    assert "../backend/app/v1" in resources
+    assert "../backend/alembic" in resources
+    assert "../backend/alembic.ini" in resources
+    assert "../backend/main.py" in resources
+    assert "../backend/pyproject.toml" in resources
+    assert "../backend/uv.lock" in resources
+    assert "../src-tauri/bundled-tools" in resources
+    assert "../inquira.toml" in resources
+    assert "../backend/app/static" not in resources

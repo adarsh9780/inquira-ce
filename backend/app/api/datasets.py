@@ -456,7 +456,7 @@ def refresh_dataset_endpoint(
 def download_database(current_user: dict = Depends(get_current_user)):
     """
     Download the user's main DuckDB database file.
-    Crucial for Pyodide frontend to fetch the entire database connection remotely via HTTP Range Requests.
+    Used by clients that need direct local database access for export/diagnostics.
     """
     user_id = current_user["user_id"]
     db_path = get_database_path(user_id)
@@ -474,7 +474,7 @@ def download_database(current_user: dict = Depends(get_current_user)):
 def download_dataset(table_name: str, current_user: dict = Depends(get_current_user)):
     """
     Download the raw dataset file.
-    Crucial for Pyodide frontend to fetch the data locally into DuckDB-Wasm.
+    Used by clients that need the original source file.
     """
     user_id = current_user["user_id"]
     ds = get_dataset_by_table_name(user_id, table_name)

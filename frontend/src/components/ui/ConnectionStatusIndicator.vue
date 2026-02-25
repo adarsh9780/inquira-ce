@@ -100,6 +100,16 @@ const formattedTimeSinceDisconnect = computed(() => {
 function setupWebSocketMonitoring() {
   // Monitor connection status
   const unsubscribe = settingsWebSocket.onConnection((connected) => {
+    const status = settingsWebSocket.getConnectionStatus()
+    const shouldMonitor = Boolean(status.isPersistentMode || status.lastConnectionAttempt)
+    if (!shouldMonitor) {
+      isConnected.value = true
+      showIndicator.value = false
+      disconnectTime.value = null
+      stopRetryTimer()
+      return
+    }
+
     isConnected.value = connected
 
     if (connected) {
@@ -121,11 +131,15 @@ function setupWebSocketMonitoring() {
   })
 
   // Start monitoring with current status
-  isConnected.value = settingsWebSocket.isConnected
-  if (!isConnected.value) {
+  const current = settingsWebSocket.getConnectionStatus()
+  const shouldMonitor = Boolean(current.isPersistentMode || current.lastConnectionAttempt)
+  isConnected.value = shouldMonitor ? settingsWebSocket.isConnected : true
+  if (shouldMonitor && !isConnected.value) {
     disconnectTime.value = Date.now()
     showIndicator.value = true
     startRetryTimer()
+  } else {
+    showIndicator.value = false
   }
 }
 
