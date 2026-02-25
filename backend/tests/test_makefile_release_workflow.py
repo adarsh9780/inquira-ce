@@ -36,7 +36,11 @@ def test_makefile_check_version_target_prints_all_versions():
 def test_makefile_test_target_runs_backend_and_frontend_tests():
     text = MAKEFILE.read_text(encoding="utf-8")
     assert "test:" in text
-    assert "test: test-backend test-frontend" in text
+    assert "test: ruff-test mypy-test test-backend test-frontend" in text
+    assert "ruff-test:" in text
+    assert "cd backend && uv run --group dev ruff check app/v1 tests" in text
+    assert "mypy-test:" in text
+    assert "cd backend && uv run --group dev mypy --config-file mypy.ini app/v1" in text
     assert "cd backend && uv run --group dev pytest" in text
     assert "cd frontend && npm ci && npm test" in text
 

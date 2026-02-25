@@ -1,11 +1,11 @@
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from dotenv import load_dotenv
 from fastapi import HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from .llm_runtime_config import load_llm_runtime_config, normalize_model_id
 
@@ -49,7 +49,7 @@ class LLMService:
         if self.api_key:
             self.client = ChatOpenAI(
                 model=self.model,
-                api_key=self.api_key,
+                api_key=SecretStr(self.api_key),
                 base_url=self.base_url,
                 temperature=0,
             )
@@ -66,11 +66,11 @@ class LLMService:
 
         model_client = ChatOpenAI(
             model=selected_model,
-            api_key=self.api_key,
+            api_key=SecretStr(self.api_key),
             base_url=self.base_url,
             temperature=0,
         )
-        bounded_model_client = model_client.bind(max_tokens=self.default_max_tokens)
+        bounded_model_client = cast(Any, model_client.bind(max_tokens=self.default_max_tokens))
         self.chat_client = bounded_model_client.with_structured_output(CodeOutput)
         self.chat_system_instruction = system_instruction or ""
 
@@ -109,7 +109,7 @@ class LLMService:
             )
 
         try:
-            messages = []
+            messages: list[BaseMessage] = []
             if getattr(self, "chat_system_instruction", ""):
                 messages.append(SystemMessage(content=self.chat_system_instruction))
             messages.append(HumanMessage(content=message))

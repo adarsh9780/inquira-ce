@@ -147,19 +147,19 @@ def load_llm_runtime_config() -> LlmRuntimeConfig:
     if not supported_models:
         supported_models = list(LlmRuntimeConfig.supported_models)
 
-    default_max_tokens_raw = os.getenv("INQUIRA_LLM_DEFAULT_MAX_TOKENS")
+    default_max_tokens_raw: Any = os.getenv("INQUIRA_LLM_DEFAULT_MAX_TOKENS")
     if default_max_tokens_raw is None:
         default_max_tokens_raw = llm_limits.get("default")
     if default_max_tokens_raw is None:
         default_max_tokens_raw = llm.get("default-max-tokens")
     if default_max_tokens_raw is None:
         default_max_tokens_raw = 4096
-    schema_max_tokens_raw = os.getenv("INQUIRA_LLM_SCHEMA_MAX_TOKENS")
+    schema_max_tokens_raw: Any = os.getenv("INQUIRA_LLM_SCHEMA_MAX_TOKENS")
     if schema_max_tokens_raw is None:
         schema_max_tokens_raw = llm_limits.get("schema")
     if schema_max_tokens_raw is None:
         schema_max_tokens_raw = 2048
-    code_generation_max_tokens_raw = os.getenv("INQUIRA_LLM_CODE_MAX_TOKENS")
+    code_generation_max_tokens_raw: Any = os.getenv("INQUIRA_LLM_CODE_MAX_TOKENS")
     if code_generation_max_tokens_raw is None:
         code_generation_max_tokens_raw = llm_limits.get("code_generation")
     if code_generation_max_tokens_raw is None:

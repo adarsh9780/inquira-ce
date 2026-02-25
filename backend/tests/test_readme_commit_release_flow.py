@@ -13,6 +13,8 @@ def test_readme_is_docs_table_of_contents():
     assert "## Quick Start" in text
     assert "## Documentation Map" in text
     assert "make check-version" in text
+    assert "make ruff-test" in text
+    assert "make mypy-test" in text
     assert "./docs/overview.md" in text
     assert "./docs/commit-and-release.md" in text
     assert "./docs/changelog.md" in text

@@ -10,3 +10,11 @@ docs(release): draft detailed v0.5.7a4 release metadata in release_metadata.md
 
 Replace previous v0.5.7a3 notes with a full v0.5.7a4 release summary covering workspace/runtime hardening, auth repository boundary, TOML-driven token limits, model catalog wiring, and desktop reliability fixes
 Align release notes with merged backend/frontend test-backed changes for the next prerelease publish
+
+chore(ci-parity): add local ruff/mypy make gates and document them in contributor flow
+
+Add make ruff-test and make mypy-test targets aligned with backend CI lint/type-check scope
+Wire make test to run ruff/mypy before backend/frontend tests for earlier local failure detection
+Update README and docs/commit-and-release.md atomic command flow to include ruff/mypy steps
+Add regression assertions for Makefile/README command expectations and fix backend lint blocker in test_llm_service imports
+Fix mypy type issues in llm runtime/service modules so new local type-check gate passes

@@ -8,6 +8,8 @@ Prefer atomic commands so you can verify each step before the next one:
 
 ```bash
 make check-version
+make ruff-test
+make mypy-test
 make test
 make git-add
 make git-commit
@@ -41,6 +43,8 @@ This generates `.github/release/metadata.json` used by the release workflow.
 
 3. Commit and push (prefer atomic commands):
 ```bash
+make ruff-test
+make mypy-test
 make test
 make git-add
 make git-commit

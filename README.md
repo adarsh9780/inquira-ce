@@ -50,6 +50,8 @@ cargo tauri dev --manifest-path src-tauri/Cargo.toml
 Atomic commit flow:
 ```bash
 make check-version
+make ruff-test
+make mypy-test
 make test
 make git-add
 make git-commit
@@ -60,6 +62,8 @@ Optional release flow:
 ```bash
 make set-version 0.5.0a7
 make metadata
+make ruff-test
+make mypy-test
 make test
 make git-add
 make git-commit
