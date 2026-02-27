@@ -58,6 +58,14 @@ make git-commit
 make git-push
 ```
 
+Developer-friendly rich output (wrapped + spaced) for local runs:
+```bash
+make check-version-pretty
+make ruff-test-pretty
+make mypy-test-pretty
+make test-pretty
+```
+
 Optional release flow:
 ```bash
 make set-version 0.5.0a7

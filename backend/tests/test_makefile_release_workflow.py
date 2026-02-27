@@ -57,3 +57,4 @@ def test_makefile_git_commit_uses_commit_message_txt():
     assert "commit_message.txt is missing or empty" in text
     assert 'current_msg="$$(cat commit_message.txt)"' in text
     assert "git commit -F commit_message.txt" in text
+    assert ": > commit_message.txt" in text

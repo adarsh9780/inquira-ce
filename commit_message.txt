@@ -1,8 +1,14 @@
-fix(safe-runner): migrate execution adapter to engine-based safe-py-runner API with compatibility fallback
+feat(dx): add rich-formatted make targets with wrapped output and step-level summaries
 
-Update backend safe runner integration to support the latest safe-py-runner contract where run_code requires an explicit engine object
-Switch import flow to module-level API resolution and detect run_code signature at runtime to choose the correct invocation path
-Use LocalEngine(venv_dir=...) for new API executions and derive venv directory from INQUIRA_RUNNER_PYTHON with strict pyvenv.cfg validation
-Return a clear actionable error when INQUIRA_RUNNER_PYTHON is not a venv python path, instead of running against a system interpreter path
-Preserve backward compatibility by falling back to legacy run_code(..., python_executable=...) when older safe-py-runner builds are still installed
-Add regression tests for new engine path, legacy fallback path, and invalid runner python path guardrail to prevent future API-drift breakages
+Add a dedicated pretty execution runner at scripts/maintenance/pretty_make.py to improve local developer UX with rich text panels, clear spacing, soft-wrapped output, explicit cwd/cmd context, and per-step timing
+Introduce make targets check-version-pretty, ruff-test-pretty, mypy-test-pretty, test-backend-pretty, test-frontend-pretty, and test-pretty while keeping existing plain targets unchanged for CI/log-parsing compatibility
+Configure pretty targets to run via uv with an explicit rich dependency (`uv run --with rich ...`) so onboarding remains frictionless without forcing a global install
+Implement output safety rails in the pretty runner: long command output is wrapped for readability and truncated to the last N lines with a visible truncation marker to keep failures actionable without log flooding
+Add regression coverage for this feature via tests/test_makefile_pretty_targets.py (Makefile wiring/commands) and tests/test_pretty_make_output.py (text wrapping + output truncation behavior)
+Document the improved DX path in README.md and docs/commit-and-release.md so contributors can use rich-formatted local validation flows immediately
+
+feat(makefile): clear commit_message.txt after successful git-commit target execution
+
+Update the git-commit target to truncate commit_message.txt after `git commit -F commit_message.txt` succeeds so stale commit text is not accidentally reused on the next commit
+Keep the existing check-message guard unchanged so the target still rejects empty files and duplicate latest-commit messages before attempting commit
+Add regression coverage in backend/tests/test_makefile_release_workflow.py to assert the clear-after-commit command remains present in the Makefile

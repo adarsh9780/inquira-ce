@@ -1,4 +1,5 @@
 import importlib.util
+import sys
 from pathlib import Path
 
 
@@ -10,6 +11,7 @@ def _load_pretty_make_module():
     spec = importlib.util.spec_from_file_location("pretty_make", SCRIPT)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -22,7 +24,10 @@ def test_wrap_block_applies_clean_text_wrapping():
     )
 
     assert "\n" in wrapped
-    assert "wrapping quality checks" in wrapped
+    assert "wrapping" in wrapped
+    assert "quality checks" in wrapped
+    for line in wrapped.splitlines():
+        assert len(line) <= 40
 
 
 def test_format_output_block_truncates_and_marks_large_output():

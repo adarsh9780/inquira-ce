@@ -191,6 +191,7 @@ git-add:
 
 git-commit: check-message
 	git commit -F commit_message.txt
+	: > commit_message.txt
 
 git-push:
 	@branch="$$(git rev-parse --abbrev-ref HEAD)"; \

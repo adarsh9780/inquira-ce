@@ -6,17 +6,11 @@ from __future__ import annotations
 import argparse
 import os
 import subprocess
-import sys
 import textwrap
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
-
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
+from typing import Any, Sequence
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -144,10 +138,10 @@ def _format_output_block(raw: str, width: int, max_lines: int = 80) -> str:
     return "\n".join(wrapped_lines)
 
 
-def _run_step(step: Step, console: Console, verbose: bool) -> StepResult:
+def _run_step(step: Step, console: Any, text_cls: Any, panel_cls: Any, verbose: bool) -> StepResult:
     command_display = " ".join(step.command)
     console.print()
-    console.rule(Text(step.name, style="bold cyan"))
+    console.rule(text_cls(step.name, style="bold cyan"))
     console.print(
         _wrap_block(step.description, width=console.width - 6),
         style="dim",
@@ -183,7 +177,7 @@ def _run_step(step: Step, console: Console, verbose: bool) -> StepResult:
     if should_print_output:
         console.print()
         console.print(
-            Panel(
+            panel_cls(
                 _format_output_block(result.stdout, width=console.width),
                 title="stdout",
                 border_style="blue",
@@ -191,7 +185,7 @@ def _run_step(step: Step, console: Console, verbose: bool) -> StepResult:
             )
         )
         console.print(
-            Panel(
+            panel_cls(
                 _format_output_block(result.stderr, width=console.width),
                 title="stderr",
                 border_style="magenta",
@@ -202,15 +196,17 @@ def _run_step(step: Step, console: Console, verbose: bool) -> StepResult:
     return result
 
 
-def _print_summary(console: Console, target: str, results: Sequence[StepResult]) -> None:
+def _print_summary(console: Any, panel_cls: Any, table_cls: Any, target: str, results: Sequence[StepResult]) -> None:
     total = sum(r.duration_s for r in results)
     failures = [r for r in results if not r.ok]
     title_style = "green" if not failures else "red"
     title = f"{target} complete" if not failures else f"{target} failed"
     console.print()
-    console.print(Panel(_wrap_block(title, width=console.width - 8), style=title_style, padding=(1, 2)))
+    console.print(
+        panel_cls(_wrap_block(title, width=console.width - 8), style=title_style, padding=(1, 2))
+    )
 
-    table = Table(show_header=True, header_style="bold", expand=True, padding=(0, 1))
+    table = table_cls(show_header=True, header_style="bold", expand=True, padding=(0, 1))
     table.add_column("Step", ratio=3)
     table.add_column("Status", ratio=1)
     table.add_column("Time (s)", ratio=1, justify="right")
@@ -222,6 +218,20 @@ def _print_summary(console: Console, target: str, results: Sequence[StepResult])
         )
     table.add_row("Total", "-" if failures else "[green]PASS[/green]", f"{total:.2f}")
     console.print(table)
+
+
+def _resolve_rich_types() -> dict[str, Any]:
+    try:
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.table import Table
+        from rich.text import Text
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "Rich is required for pretty output. Run via "
+            "`uv run --with rich python scripts/maintenance/pretty_make.py ...`."
+        ) from exc
+    return {"Console": Console, "Panel": Panel, "Table": Table, "Text": Text}
 
 
 def main() -> int:
@@ -240,7 +250,11 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    console = Console(soft_wrap=True)
+    rich_types = _resolve_rich_types()
+    console = rich_types["Console"](soft_wrap=True)
+    panel_cls = rich_types["Panel"]
+    table_cls = rich_types["Table"]
+    text_cls = rich_types["Text"]
     target = args.target
     steps = TARGET_STEPS[target]
 
@@ -249,7 +263,7 @@ def main() -> int:
         "Use standard make targets in CI where raw logs are preferred."
     )
     console.print(
-        Panel(
+        panel_cls(
             _wrap_block(intro, width=console.width - 10),
             title=f"Inquira {target}",
             border_style="cyan",
@@ -259,13 +273,31 @@ def main() -> int:
 
     results: list[StepResult] = []
     for step in steps:
-        result = _run_step(step, console=console, verbose=args.verbose)
+        result = _run_step(
+            step,
+            console=console,
+            text_cls=text_cls,
+            panel_cls=panel_cls,
+            verbose=args.verbose,
+        )
         results.append(result)
         if not result.ok:
-            _print_summary(console, target=target, results=results)
+            _print_summary(
+                console,
+                panel_cls=panel_cls,
+                table_cls=table_cls,
+                target=target,
+                results=results,
+            )
             return result.returncode
 
-    _print_summary(console, target=target, results=results)
+    _print_summary(
+        console,
+        panel_cls=panel_cls,
+        table_cls=table_cls,
+        target=target,
+        results=results,
+    )
     return 0
 
 

@@ -21,6 +21,18 @@ Why this flow is recommended:
 - Failures are easier to diagnose than in one-shot automation.
 - It keeps commit/release hygiene predictable for the whole team.
 
+Optional local DX mode (same checks, better readability):
+
+```bash
+make check-version-pretty
+make ruff-test-pretty
+make mypy-test-pretty
+make test-pretty
+```
+
+The `*-pretty` targets are for local development and use rich text formatting with wrapped output and spaced summaries.
+Use the plain targets in CI to keep raw logs machine-friendly.
+
 Notes:
 - `make git-commit` uses the root `commit_message.txt` file.
 - Prefer this atomic flow over `make push` unless you are absolutely sure you want one-shot automation.
