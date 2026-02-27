@@ -4,6 +4,7 @@ import { v1Api } from './contracts/v1Api'
 import { parseSseBuffer } from '../utils/sseParser'
 import { disableStreamingForUnsupportedStatus, isStreamingEnabled } from '../utils/streamingCapability'
 import { inferTableNameFromDataPath } from '../utils/chatBootstrap'
+import { normalizeExecutionResponse } from '../utils/runtimeExecution'
 
 // ------------------------------------------------------------------
 // GLOBAL AXIOS CONFIGURATION
@@ -321,7 +322,8 @@ export const apiService = {
       const detail = await response.json().catch(() => ({}))
       throw new Error(detail.detail || `Execution request failed (${response.status})`)
     }
-    return response.json()
+    const payload = await response.json()
+    return normalizeExecutionResponse(payload)
   },
 
   // File data loading — inspect file for columns, then trigger background DuckDB conversion
