@@ -1,4 +1,5 @@
 import os
+import warnings
 from pathlib import Path
 from typing import Any, cast
 from dotenv import load_dotenv
@@ -89,8 +90,17 @@ class LLMService:
                 response = client.invoke(user_query)
                 return getattr(response, "content", str(response))
 
-            chain = client.with_structured_output(structured_output_format)
-            return chain.invoke(user_query)
+            # LangChain/OpenAI structured-output currently triggers a noisy
+            # pydantic serializer warning for schema model classes in some versions.
+            # Suppress only that known warning path so schema regeneration logs stay clean.
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message=r"^Pydantic serializer warnings:",
+                    category=UserWarning,
+                )
+                chain = client.with_structured_output(structured_output_format)
+                return chain.invoke(user_query)
         except HTTPException:
             raise
         except Exception as e:

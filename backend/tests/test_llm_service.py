@@ -1,5 +1,7 @@
 import pytest
+import warnings
 from fastapi import HTTPException
+from pydantic import BaseModel
 
 from app.services.llm_service import LLMService
 
@@ -89,3 +91,41 @@ def test_llm_service_ask_uses_runtime_default_max_tokens(monkeypatch):
     result = svc.ask("ping", str)
     assert result == "OK"
     assert captured["max_tokens"] == 4096
+
+
+def test_llm_service_ask_suppresses_known_pydantic_serializer_warning(monkeypatch):
+    class SchemaOutput(BaseModel):
+        value: str
+
+    class FakeStructuredChain:
+        def invoke(self, _query):
+            import warnings
+
+            warnings.warn(
+                "Pydantic serializer warnings:\n"
+                "  PydanticSerializationUnexpectedValue(...)",
+                UserWarning,
+            )
+            return SchemaOutput(value="ok")
+
+    class FakeBoundClient:
+        def with_structured_output(self, _fmt):
+            return FakeStructuredChain()
+
+    class FakeChatOpenAI:
+        def __init__(self, **_kwargs):
+            pass
+
+        def bind(self, **_kwargs):
+            return FakeBoundClient()
+
+    monkeypatch.setattr("app.services.llm_service.ChatOpenAI", FakeChatOpenAI)
+    svc = LLMService(api_key="k")
+
+    with warnings.catch_warnings(record=True) as captured_warnings:
+        warnings.simplefilter("always")
+        result = svc.ask("ping", SchemaOutput)
+
+    assert isinstance(result, SchemaOutput)
+    assert result.value == "ok"
+    assert len(captured_warnings) == 0

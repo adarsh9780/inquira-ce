@@ -1,4 +1,5 @@
 import os
+import warnings
 
 from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
@@ -182,6 +183,18 @@ class InquiraAgent:
             max_tokens=runtime.code_generation_max_tokens,
         )
 
+    @staticmethod
+    def _invoke_structured_chain(chain: Any, payload: dict[str, Any]) -> Any:
+        # Some provider/langchain versions emit noisy pydantic serializer warnings
+        # for structured-output model serialization even when the call succeeds.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=r"^Pydantic serializer warnings:",
+                category=UserWarning,
+            )
+            return chain.invoke(payload)
+
     def check_relevancy(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         class IsRelevant(BaseModel):
             is_relevant: bool | None = Field(
@@ -200,8 +213,9 @@ class InquiraAgent:
         model = self._get_model(config, "gemini-2.5-flash-lite")
         chain = prompt | model.with_structured_output(IsRelevant)
 
-        response = chain.invoke(
-            {"messages": state.messages, "schema": state.active_schema}
+        response = self._invoke_structured_chain(
+            chain,
+            {"messages": state.messages, "schema": state.active_schema},
         )
         response = cast(IsRelevant, response)
 
@@ -230,7 +244,7 @@ class InquiraAgent:
         model = self._get_model(config, "gemini-2.5-flash-lite")
         chain = prompt | model.with_structured_output(IsSafe)
 
-        response = chain.invoke({"messages": state.messages})
+        response = self._invoke_structured_chain(chain, {"messages": state.messages})
         response = cast(IsSafe, response)
 
         return {
@@ -254,8 +268,9 @@ class InquiraAgent:
         model = self._get_model(config, "gemini-2.5-flash-lite")
         chain = prompt | model.with_structured_output(RequireCode)
 
-        response = chain.invoke(
-            {"messages": state.messages, "schema": state.active_schema}
+        response = self._invoke_structured_chain(
+            chain,
+            {"messages": state.messages, "schema": state.active_schema},
         )
         response = cast(RequireCode, response)
 
@@ -280,13 +295,14 @@ class InquiraAgent:
         model = self._get_model(config, "gemini-2.5-flash-lite")
         chain = prompt | model.with_structured_output(Plan)
 
-        response = chain.invoke(
+        response = self._invoke_structured_chain(
+            chain,
             {
                 "messages": state.messages,
                 "schema": state.active_schema,
                 "current_code": state.previous_code,
                 "context": state.context or "",
-            }
+            },
         )
         response = cast(Plan, response)
 
@@ -323,7 +339,8 @@ class InquiraAgent:
         model = self._get_model(config, "gemini-2.5-flash")
         chain = prompt | model.with_structured_output(Code)
 
-        response = chain.invoke(
+        response = self._invoke_structured_chain(
+            chain,
             {
                 "messages": state.messages,
                 "plan": state.plan,
@@ -332,7 +349,7 @@ class InquiraAgent:
                 "schema": schema_str,
                 "data_path": data_path,
                 "context": state.context or "",
-            }
+            },
         )
         response = cast(Code, response)
 
@@ -389,7 +406,8 @@ class InquiraAgent:
                 )
             )
         ]
-        response = chain.invoke(
+        response = self._invoke_structured_chain(
+            chain,
             {
                 "messages": retry_messages,
                 "plan": state.plan,
@@ -398,7 +416,7 @@ class InquiraAgent:
                 "schema": schema_str,
                 "data_path": data_path,
                 "context": state.context or "",
-            }
+            },
         )
         response = cast(Code, response)
 

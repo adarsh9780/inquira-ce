@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import pytest
+import warnings
 
 from app.agent.graph import InquiraAgent
 from app.services.llm_runtime_config import LlmRuntimeConfig
@@ -122,3 +123,21 @@ def test_agent_model_selection_maps_legacy_lite_model_to_runtime_default(monkeyp
 
     assert called["model"] == "google/gemini-2.5-flash-lite"
     assert called["max_tokens"] == 4096
+
+
+def test_agent_structured_invoke_suppresses_known_pydantic_serializer_warning():
+    class FakeChain:
+        def invoke(self, payload):
+            warnings.warn(
+                "Pydantic serializer warnings:\n"
+                "  PydanticSerializationUnexpectedValue(...)",
+                UserWarning,
+            )
+            return payload
+
+    with warnings.catch_warnings(record=True) as captured_warnings:
+        warnings.simplefilter("always")
+        result = InquiraAgent._invoke_structured_chain(FakeChain(), {"ok": True})
+
+    assert result == {"ok": True}
+    assert len(captured_warnings) == 0
