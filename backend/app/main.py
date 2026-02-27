@@ -5,7 +5,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import aiosqlite
@@ -179,6 +180,20 @@ app = FastAPI(title="Inquira", version="1.0.0", lifespan=lifespan)
 
 # Route legacy print() to structured logger
 patch_print()
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    
+    # Log the full traceback using logprint so we can see it in terminal
+    logprint(f"Unhandled server error at {request.url}: {exc}", level="error")
+    for line in traceback.format_exc().splitlines():
+        logprint(line, level="error")
+        
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error", "error": str(exc)},
+    )
 
 # Configure CORS
 app.add_middleware(

@@ -414,12 +414,19 @@ async def regenerate_workspace_dataset_schema(
 
     llm_service = LLMService(api_key=api_key, model=model)
     runtime = load_llm_runtime_config()
-    schema_response = await asyncio.to_thread(
-        llm_service.ask,
-        prompt,
-        SchemaDescriptionList,
-        runtime.schema_max_tokens,
-    )
+    try:
+        schema_response = await asyncio.to_thread(
+            llm_service.ask,
+            prompt,
+            SchemaDescriptionList,
+            runtime.schema_max_tokens,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate schema via LLM: {str(exc)}"
+        ) from exc
+
     generated_items = (
         schema_response.schemas
         if hasattr(schema_response, "schemas")
