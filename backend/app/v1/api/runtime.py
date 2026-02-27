@@ -456,8 +456,16 @@ async def regenerate_workspace_dataset_schema(
         "context": context,
         "columns": merged_columns,
     }
+    from datetime import date, datetime
+    
+    class DateTimeEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            return super().default(obj)
+
     with schema_path.open("w", encoding="utf-8") as f:
-        json.dump(schema_doc, f, indent=2)
+        json.dump(schema_doc, f, indent=2, cls=DateTimeEncoder)
 
     if dataset is not None:
         dataset.schema_path = str(schema_path)

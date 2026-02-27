@@ -53,6 +53,8 @@ class LLMService:
                 api_key=SecretStr(self.api_key),
                 base_url=self.base_url,
                 temperature=0,
+                max_retries=0,  # Fail fast instead of hanging the UI with automatic retries
+                timeout=60.0,
             )
 
         self.chat_client = None
@@ -70,6 +72,8 @@ class LLMService:
             api_key=SecretStr(self.api_key),
             base_url=self.base_url,
             temperature=0,
+            max_retries=0,  # Fail fast
+            timeout=60.0,
         )
         bounded_model_client = cast(Any, model_client.bind(max_tokens=self.default_max_tokens))
         self.chat_client = bounded_model_client.with_structured_output(CodeOutput)
