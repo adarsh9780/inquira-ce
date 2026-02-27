@@ -13,6 +13,7 @@ import os
 import subprocess
 import tempfile
 import sys
+import inspect
 import asyncio
 from pathlib import Path
 from typing import Any, Optional
@@ -244,7 +245,7 @@ def _run_in_safe_runner(script: str, timeout: int) -> dict[str, Any]:
                 sys.path.insert(0, src_path)
 
     try:
-        from safe_py_runner import RunnerPolicy, run_code
+        import safe_py_runner as spr
     except Exception as e:
         install_error = _install_safe_py_runner_from_config(config)
         if install_error:
@@ -262,7 +263,7 @@ def _run_in_safe_runner(script: str, timeout: int) -> dict[str, Any]:
             }
 
         try:
-            from safe_py_runner import RunnerPolicy, run_code
+            import safe_py_runner as spr
         except Exception as import_after_install:
             msg = (
                 "Execution provider 'local_safe_runner' is enabled but safe_py_runner "
@@ -278,6 +279,10 @@ def _run_in_safe_runner(script: str, timeout: int) -> dict[str, Any]:
                 "result_type": None,
             }
 
+    RunnerPolicy = spr.RunnerPolicy
+    run_code = spr.run_code
+    LocalEngine = getattr(spr, "LocalEngine", None)
+
     effective_timeout = max(1, min(timeout, policy_cfg.timeout_seconds))
     policy = RunnerPolicy(
         timeout_seconds=effective_timeout,
@@ -287,12 +292,38 @@ def _run_in_safe_runner(script: str, timeout: int) -> dict[str, Any]:
         blocked_builtins=policy_cfg.blocked_builtins,
     )
 
-    runner_result = run_code(
-        code=script,
-        input_data={},
-        policy=policy,
-        python_executable=config.runner_python_executable,
-    )
+    run_code_params = set(inspect.signature(run_code).parameters)
+
+    if LocalEngine is not None and "engine" in run_code_params:
+        runner_venv_dir = _resolve_runner_venv_dir(config.runner_python_executable)
+        if runner_venv_dir is None:
+            msg = (
+                "Execution provider 'local_safe_runner' requires INQUIRA_RUNNER_PYTHON "
+                "to point to a venv Python path like '<venv>/bin/python'."
+            )
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": msg,
+                "error": msg,
+                "result": None,
+                "result_type": None,
+            }
+
+        engine = LocalEngine(venv_dir=runner_venv_dir, venv_manager="python")
+        runner_result = run_code(
+            code=script,
+            input_data={},
+            policy=policy,
+            engine=engine,
+        )
+    else:
+        runner_result = run_code(
+            code=script,
+            input_data={},
+            policy=policy,
+            python_executable=config.runner_python_executable,
+        )
 
     if not runner_result.ok:
         msg = runner_result.error or runner_result.stderr or "Execution failed"
@@ -310,6 +341,27 @@ def _run_in_safe_runner(script: str, timeout: int) -> dict[str, Any]:
         stderr_raw=runner_result.stderr,
         returncode=0,
     )
+
+
+def _resolve_runner_venv_dir(runner_python_executable: str | None) -> str | None:
+    if not runner_python_executable:
+        return None
+
+    py_path = Path(runner_python_executable).expanduser()
+    parent_name = py_path.parent.name.lower()
+    exe_name = py_path.name.lower()
+
+    if parent_name == "bin" and exe_name.startswith("python"):
+        venv_dir = py_path.parent.parent
+    elif parent_name == "scripts" and exe_name.startswith("python"):
+        venv_dir = py_path.parent.parent
+    else:
+        return None
+
+    if not (venv_dir / "pyvenv.cfg").exists():
+        return None
+
+    return str(venv_dir)
 
 
 def _build_safe_py_runner_install_targets(config) -> list[list[str]]:

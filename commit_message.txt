@@ -1,66 +1,8 @@
+fix(safe-runner): migrate execution adapter to engine-based safe-py-runner API with compatibility fallback
 
-fix(model-catalog): make frontend model dropdown TOML-driven via backend runtime config
-
-Add [llm].models parsing/validation to llm_runtime_config with env override support (INQUIRA_LLM_MODELS)
-Expose available_models in v1 preferences response and load it into app store state
-Update ModelSelector to consume injected model options instead of hardcoded list, with fallback models for resilience
-Replace brittle model-selector source-string test with behavior-based checks and add backend contract/runtime tests for available_models
-
-docs(release): draft detailed v0.5.7a4 release metadata in release_metadata.md
-
-Replace previous v0.5.7a3 notes with a full v0.5.7a4 release summary covering workspace/runtime hardening, auth repository boundary, TOML-driven token limits, model catalog wiring, and desktop reliability fixes
-Align release notes with merged backend/frontend test-backed changes for the next prerelease publish
-
-chore(ci-parity): add local ruff/mypy make gates and document them in contributor flow
-
-Add make ruff-test and make mypy-test targets aligned with backend CI lint/type-check scope
-Wire make test to run ruff/mypy before backend/frontend tests for earlier local failure detection
-Update README and docs/commit-and-release.md atomic command flow to include ruff/mypy steps
-Add regression assertions for Makefile/README command expectations and fix backend lint blocker in test_llm_service imports
-Fix mypy type issues in llm runtime/service modules so new local type-check gate passes
-
-fix(desktop-dmg): bundle backend project files in Tauri resources to unblock auth startup
-
-Add backend and inquira.toml to src-tauri bundle resources so packaged macOS/Windows apps can bootstrap Python from Resources/backend
-Add regression test asserting tauri.conf.json bundle resources include backend project paths to prevent future login/register failures from missing pyproject.toml
-
-fix(tauri-bundle): avoid bundling backend virtualenv/cache directories in desktop resources
-
-Replace broad ../backend resource bundle with minimal runtime backend files/directories (app, alembic, main.py, pyproject.toml, uv.lock, alembic.ini) plus inquira.toml
-Add regression assertion that forbids bundling whole ../backend directory to prevent macOS permission failures during .app packaging
-
-refactor(desktop-packaging): remove stale Pyodide assets/mentions and prevent accidental rebundling
-
-Narrow Tauri resources from broad backend/app directory to required backend source/runtime folders only, explicitly excluding backend/app/static payloads
-Remove obsolete backend/scripts/download_offline_assets.py and clean stale Pyodide wording in frontend execution service, App.vue transition comment, and dataset download endpoint docstrings
-Delete local backend/app/static/pyodide assets and verify app bundle size drops from ~475MB to ~14MB while preserving backend resource bootstrap paths
-
-feat(tauri-bootstrap): support env override for UV package index with PyPI default
-
-Add UV index resolution precedence in desktop bootstrap: INQUIRA_UV_INDEX_URL (env) > [python].index-url (inquira.toml) > https://pypi.org/simple
-Apply resolved UV_INDEX_URL consistently to uv sync and uv pip install commands used during backend and runner environment setup
-Add Rust unit tests covering env override, TOML fallback, and default PyPI behavior; document env override in inquira.toml comments
-
-fix(tauri-runtime): resolve bundled resources from both Resources/ and Resources/_up_ layouts
-
-Add shared resource-path resolver used by backend/config/uv discovery so packaged app startup works when Tauri places resources under _up_
-Fix packaged backend bootstrap path lookup that caused uv sync to fail with "No pyproject.toml found" despite resources being bundled
-Add Rust unit tests for direct resource and _up_ fallback resolution to prevent regression
-
-fix(tauri-auth-routing): force packaged desktop frontend API base to backend HTTP endpoint
-
-Update frontend apiService default base URL logic so Tauri packaged mode does not use tauri:// origin for REST calls, preventing silent auth/register request misrouting
-Keep backend API base on http://localhost:8000 for desktop startup parity with local backend process and dev behavior
-Add regression test asserting apiService uses HTTP backend base in packaged Tauri mode and never falls back to window.location.origin
-
-fix(tauri-ws-ux): correct packaged WebSocket backend URL and suppress premature disconnect toast
-
-Route packaged desktop WebSocket traffic to ws://localhost:8000 instead of window host origin so backend reconnect loop targets the actual local API service
-Update connection status indicator gating to show reconnect toast only after persistent connection mode/attempt is active, avoiding false "Backend Connection Lost" warnings on initial mount
-Add regression test asserting Tauri-mode WebSocket base resolves to ws://localhost:8000
-
-feat(release-packaging): bundle uv binary into desktop artifacts from Astral during build
-
-Add release workflow setup/staging steps to download uv via astral-sh/setup-uv and copy platform binary into src-tauri/bundled-tools before Tauri packaging
-Update desktop runtime uv discovery to prefer bundled-tools/uv (mac/linux) and bundled-tools/uv.exe (windows), then fallback to PATH
-Add regression coverage for release workflow uv staging and Tauri resource declarations to prevent shipping desktop builds without bundled uv
+Update backend safe runner integration to support the latest safe-py-runner contract where run_code requires an explicit engine object
+Switch import flow to module-level API resolution and detect run_code signature at runtime to choose the correct invocation path
+Use LocalEngine(venv_dir=...) for new API executions and derive venv directory from INQUIRA_RUNNER_PYTHON with strict pyvenv.cfg validation
+Return a clear actionable error when INQUIRA_RUNNER_PYTHON is not a venv python path, instead of running against a system interpreter path
+Preserve backward compatibility by falling back to legacy run_code(..., python_executable=...) when older safe-py-runner builds are still installed
+Add regression tests for new engine path, legacy fallback path, and invalid runner python path guardrail to prevent future API-drift breakages

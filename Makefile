@@ -4,13 +4,19 @@ VERSION ?=
 POS_VERSION := $(word 2,$(MAKECMDGOALS))
 EFFECTIVE_VERSION := $(if $(VERSION),$(VERSION),$(POS_VERSION))
 
-.PHONY: help help-release help-push help-tag check-version check-message check-input-version check-input-version-greater check-version-file check-no-version-arg check-tag-not-latest set-version metadata test ruff-test mypy-test test-backend test-frontend build-frontend sync-frontend-dist build-wheel build-desktop git-add git-commit git-push git-tag push release
+.PHONY: help help-release help-push help-tag check-version check-version-pretty check-message check-input-version check-input-version-greater check-version-file check-no-version-arg check-tag-not-latest set-version metadata test test-pretty ruff-test ruff-test-pretty mypy-test mypy-test-pretty test-backend test-backend-pretty test-frontend test-frontend-pretty build-frontend sync-frontend-dist build-wheel build-desktop git-add git-commit git-push git-tag push release
 
 help:
 	@echo "Usage:"
 	@echo "  make test"
+	@echo "  make test-pretty"
 	@echo "  make ruff-test"
+	@echo "  make ruff-test-pretty"
 	@echo "  make mypy-test"
+	@echo "  make mypy-test-pretty"
+	@echo "  make test-backend-pretty"
+	@echo "  make test-frontend-pretty"
+	@echo "  make check-version-pretty"
 	@echo "  make build-frontend"
 	@echo "  make sync-frontend-dist"
 	@echo "  make build-wheel"
@@ -32,12 +38,18 @@ help:
 	@echo "  help-tag      Show details for tag workflow"
 	@echo "  set-version   Update VERSION and apply across backend/frontend/tauri/installers"
 	@echo "  check-version Print current versions from all version-bearing files"
+	@echo "  check-version-pretty Pretty formatted version check output (rich text + wrapping)"
 	@echo "  metadata      Regenerate .github/release/metadata.json from release_metadata.md"
 	@echo "  test          Run backend and frontend test suites"
+	@echo "  test-pretty   Run full validation suite with rich formatting, spacing, and wrapped output"
 	@echo "  ruff-test     Run backend Ruff checks (CI-aligned scope)"
+	@echo "  ruff-test-pretty Rich-formatted Ruff checks"
 	@echo "  mypy-test     Run backend mypy checks (CI-aligned scope)"
+	@echo "  mypy-test-pretty Rich-formatted mypy checks"
 	@echo "  test-backend  Run backend pytest suite"
+	@echo "  test-backend-pretty Rich-formatted backend pytest run"
 	@echo "  test-frontend Run frontend npm test suite"
+	@echo "  test-frontend-pretty Rich-formatted frontend test run"
 	@echo "  build-frontend Build frontend assets into src/inquira/frontend/dist"
 	@echo "  sync-frontend-dist Copy frontend assets to backend/app/frontend/dist for wheel packaging"
 	@echo "  build-wheel   Build backend Python wheel with bundled frontend assets"
@@ -107,6 +119,9 @@ check-no-version-arg:
 check-version:
 	uv run python scripts/maintenance/show_versions.py
 
+check-version-pretty:
+	uv run --with rich python scripts/maintenance/pretty_make.py check-version-pretty
+
 check-tag-not-latest: check-no-version-arg check-version-file
 	@file_version="$$(tr -d '[:space:]' < VERSION)"; \
 	tag="v$$file_version"; \
@@ -128,17 +143,32 @@ metadata: check-version-file
 
 test: ruff-test mypy-test test-backend test-frontend
 
+test-pretty:
+	uv run --with rich python scripts/maintenance/pretty_make.py test-pretty
+
 ruff-test:
 	cd backend && uv run --group dev ruff check app/v1 tests
+
+ruff-test-pretty:
+	uv run --with rich python scripts/maintenance/pretty_make.py ruff-test-pretty
 
 mypy-test:
 	cd backend && uv run --group dev mypy --config-file mypy.ini app/v1
 
+mypy-test-pretty:
+	uv run --with rich python scripts/maintenance/pretty_make.py mypy-test-pretty
+
 test-backend:
 	cd backend && uv run --group dev pytest
 
+test-backend-pretty:
+	uv run --with rich python scripts/maintenance/pretty_make.py test-backend-pretty
+
 test-frontend:
 	cd frontend && npm ci && npm test
+
+test-frontend-pretty:
+	uv run --with rich python scripts/maintenance/pretty_make.py test-frontend-pretty
 
 build-frontend:
 	cd frontend && npm ci && npm run build
