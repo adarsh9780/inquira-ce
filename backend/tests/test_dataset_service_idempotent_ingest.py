@@ -144,3 +144,76 @@ async def test_add_dataset_reingests_when_source_changed(monkeypatch, tmp_path):
     assert result is existing
     assert calls["create"] == 1
     assert session.committed is True
+
+
+@pytest.mark.asyncio
+async def test_add_dataset_ingests_excel_via_pandas_openpyxl(monkeypatch, tmp_path):
+    source = tmp_path / "demo.xlsx"
+    source.write_bytes(b"placeholder")
+    workspace_db = tmp_path / "workspace.duckdb"
+    workspace_db.touch()
+    workspace = SimpleNamespace(duckdb_path=str(workspace_db))
+    user = SimpleNamespace(id="u1")
+
+    async def fake_workspace(_session, _workspace_id, _user_id):
+        return workspace
+
+    session = _Session(existing=None)
+    monkeypatch.setattr(
+        dataset_service_module.WorkspaceRepository,
+        "get_by_id",
+        fake_workspace,
+    )
+
+    calls = {"read_excel": 0, "register": 0, "create": 0, "unregister": 0}
+
+    class FakeConn:
+        def __init__(self):
+            self._last_sql = ""
+
+        def register(self, name, dataframe):
+            _ = dataframe
+            if name == "_inquira_excel_df":
+                calls["register"] += 1
+
+        def unregister(self, name):
+            if name == "_inquira_excel_df":
+                calls["unregister"] += 1
+
+        def execute(self, sql, _params=None):
+            self._last_sql = str(sql)
+            if "CREATE OR REPLACE TABLE" in self._last_sql and "_inquira_excel_df" in self._last_sql:
+                calls["create"] += 1
+            return self
+
+        def fetchone(self):
+            return (2,)
+
+        def fetchall(self):
+            return [("a", "INTEGER"), ("b", "VARCHAR")]
+
+        def close(self):
+            return None
+
+    def fake_read_excel(path, engine=None):
+        assert path == str(source)
+        assert engine == "openpyxl"
+        calls["read_excel"] += 1
+        return [{"a": 1, "b": "x"}, {"a": 2, "b": "y"}]
+
+    monkeypatch.setattr(dataset_service_module.pd, "read_excel", fake_read_excel)
+    monkeypatch.setattr(dataset_service_module.duckdb, "connect", lambda _path: FakeConn())
+
+    result = await DatasetService.add_dataset(
+        session=session,
+        user=user,
+        workspace_id="ws-1",
+        source_path=str(source),
+    )
+
+    assert result.file_type == "xlsx"
+    assert calls["read_excel"] == 1
+    assert calls["register"] == 1
+    assert calls["create"] == 1
+    assert calls["unregister"] == 1
+    assert session.committed is True

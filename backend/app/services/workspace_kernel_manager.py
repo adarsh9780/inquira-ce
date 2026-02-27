@@ -17,6 +17,46 @@ from app.services.jupyter_message_parser import (
 )
 from app.services.runner_env import ensure_runner_kernel_dependencies, resolve_runner_python
 
+_FALLBACK_RESULT_PROBE_CODE = """
+import json as _json
+
+try:
+    import pandas as _pd
+except Exception:
+    _pd = None
+
+try:
+    import plotly.graph_objects as _go
+except Exception:
+    _go = None
+
+_inquira_target = None
+for _name in ("result", "final_df", "df", "fig", "figure"):
+    if _name in globals():
+        _inquira_target = globals().get(_name)
+        break
+
+if _inquira_target is None:
+    _inquira_target = globals().get("_")
+
+if _inquira_target is None:
+    _inquira_payload = None
+elif _pd is not None and isinstance(_inquira_target, _pd.DataFrame):
+    _preview = _inquira_target.head(1000)
+    # Ensure the payload remains JSON-safe so Jupyter can emit application/json
+    # and frontend can classify it as a dataframe instead of scalar text.
+    _inquira_payload = {
+        "columns": [str(c) for c in list(_preview.columns)],
+        "data": _json.loads(_preview.to_json(orient="records", date_format="iso")),
+    }
+elif _go is not None and isinstance(_inquira_target, _go.Figure):
+    _inquira_payload = _inquira_target.to_plotly_json()
+else:
+    _inquira_payload = _inquira_target
+
+_inquira_payload
+"""
+
 
 @dataclass
 class WorkspaceKernelSession:
@@ -215,6 +255,25 @@ class WorkspaceKernelManager:
         session: WorkspaceKernelSession,
         code: str,
     ) -> dict[str, Any]:
+        parsed = await self._execute_request(session, code)
+
+        if (
+            parsed.result is None
+            and parsed.error is None
+            and not parsed.stderr_parts
+        ):
+            probe = await self._execute_request(session, _FALLBACK_RESULT_PROBE_CODE)
+            if probe.result is not None and probe.result_type is not None:
+                parsed.result = probe.result
+                parsed.result_type = probe.result_type
+
+        return parsed.as_response()
+
+    async def _execute_request(
+        self,
+        session: WorkspaceKernelSession,
+        code: str,
+    ) -> ParsedExecutionOutput:
         msg_id = session.client.execute(code, store_history=True, stop_on_error=True)
         parsed = ParsedExecutionOutput()
 
@@ -234,7 +293,7 @@ class WorkspaceKernelManager:
             if isinstance(content, dict):
                 update_from_iopub_message(parsed, msg_type, content)
 
-        return parsed.as_response()
+        return parsed
 
     async def _interrupt_or_restart(self, session: WorkspaceKernelSession, config: Any) -> None:
         await self._await_maybe(session.manager.interrupt_kernel())

@@ -7,6 +7,7 @@ from app.services.workspace_kernel_manager import (
     WorkspaceKernelManager,
     WorkspaceKernelSession,
 )
+from app.services.jupyter_message_parser import ParsedExecutionOutput
 
 
 def _session(workspace_id: str, workspace_duckdb_path: str) -> WorkspaceKernelSession:
@@ -113,3 +114,53 @@ async def test_execute_serializes_requests_per_workspace():
         ["start-a", "end-a", "start-b", "end-b"],
         ["start-b", "end-b", "start-a", "end-a"],
     )
+
+
+@pytest.mark.asyncio
+async def test_execute_on_session_uses_fallback_probe_when_primary_has_no_result():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-1", "/tmp/a.duckdb")
+    calls = {"count": 0}
+
+    async def fake_execute_request(current_session, code):
+        _ = (current_session, code)
+        calls["count"] += 1
+        parsed = ParsedExecutionOutput()
+        if calls["count"] == 1:
+            parsed.stdout_parts.append("ok")
+            return parsed
+        parsed.result = {"columns": ["x"], "data": [{"x": 1}]}
+        parsed.result_type = "DataFrame"
+        return parsed
+
+    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
+
+    payload = await manager._execute_on_session(session, "df = ...")
+
+    assert calls["count"] == 2
+    assert payload["success"] is True
+    assert payload["result_type"] == "DataFrame"
+    assert payload["result"] == {"columns": ["x"], "data": [{"x": 1}]}
+
+
+@pytest.mark.asyncio
+async def test_execute_on_session_skips_fallback_probe_when_primary_has_result():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-1", "/tmp/a.duckdb")
+    calls = {"count": 0}
+
+    async def fake_execute_request(current_session, code):
+        _ = (current_session, code)
+        calls["count"] += 1
+        parsed = ParsedExecutionOutput()
+        parsed.result = {"value": 1}
+        parsed.result_type = "scalar"
+        return parsed
+
+    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
+
+    payload = await manager._execute_on_session(session, "1")
+
+    assert calls["count"] == 1
+    assert payload["result_type"] == "scalar"
+    assert payload["result"] == {"value": 1}

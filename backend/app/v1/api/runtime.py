@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +25,8 @@ from .deps import get_current_user
 from ...core.prompt_library import get_prompt
 from ...services.llm_service import LLMService
 from ...services.llm_runtime_config import load_llm_runtime_config
+from ...services.execution_config import load_execution_runtime_config
+from ...services.runner_env import install_runner_package
 
 router = APIRouter(tags=["V1 Runtime"])
 
@@ -39,6 +43,28 @@ class ExecuteResponse(BaseModel):
     error: str | None = None
     result: object | None = None
     result_type: str | None = None
+
+
+class RunnerPackageInstallRequest(BaseModel):
+    workspace_id: str
+    package: str = Field(..., min_length=1, description="Package name without version specifier")
+    version: str = Field(..., min_length=1, description="Exact package version")
+    index_url: str | None = Field(default=None, description="Optional package index URL")
+    save_as_default: bool = Field(
+        default=False,
+        description="Persist package/index settings to inquira.toml runner defaults",
+    )
+
+
+class RunnerPackageInstallResponse(BaseModel):
+    installed: bool
+    package_spec: str
+    installer: str
+    command: list[str]
+    stdout: str = ""
+    stderr: str = ""
+    workspace_kernel_reset: bool
+    saved_as_default: bool
 
 
 class KernelStatusResponse(BaseModel):
@@ -93,8 +119,127 @@ class SchemaListResponse(BaseModel):
     schemas: list[dict[str, Any]]
 
 
+_PACKAGE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_PACKAGE_VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+\-]*$")
+_INSTALL_BLOCK_RE = re.compile(
+    r"(?im)(?:^\s*!?\s*%?\s*pip\s+install\b|uv\s+pip\s+install\b|python\s+-m\s+pip\s+install\b)"
+)
+
+
 def _normalize_table_name(raw: str) -> str:
     return "".join(c if c.isalnum() or c == "_" else "_" for c in raw.strip()).lower()
+
+
+def _validate_runner_install_request(
+    payload: RunnerPackageInstallRequest,
+    config: Any,
+) -> tuple[str, str | None]:
+    package_name = payload.package.strip()
+    version = payload.version.strip()
+    index_url = (payload.index_url or "").strip() or None
+
+    if not _PACKAGE_NAME_RE.fullmatch(package_name):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid package name. Use letters, numbers, dot, underscore, or hyphen only.",
+        )
+    if not _PACKAGE_VERSION_RE.fullmatch(version):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid package version. Exact pinned versions only (e.g., 2.2.3).",
+        )
+    if any(token in package_name for token in ["<", ">", "=", "!", "~", " "]):
+        raise HTTPException(status_code=400, detail="Package name must not include a version specifier.")
+    if any(token in version for token in ["<", ">", "=", "!", "~", " "]):
+        raise HTTPException(status_code=400, detail="Version must be exact and must not include comparison operators.")
+
+    if index_url and not (index_url.startswith("http://") or index_url.startswith("https://")):
+        raise HTTPException(status_code=400, detail="index_url must start with http:// or https://")
+
+    allowlist = [p.strip().lower() for p in (config.runner_package_allowlist or []) if p.strip()]
+    denylist = [p.strip().lower() for p in (config.runner_package_denylist or []) if p.strip()]
+    package_lower = package_name.lower()
+
+    if allowlist and package_lower not in allowlist:
+        raise HTTPException(status_code=403, detail="Package is not allowed by runner package policy.")
+    if package_lower in denylist:
+        raise HTTPException(status_code=403, detail="Package is blocked by runner package policy.")
+
+    max_packages = max(1, int(config.runner_install_max_packages_per_request or 1))
+    if max_packages < 1:
+        raise HTTPException(status_code=400, detail="Runner install policy is misconfigured.")
+
+    package_spec = f"{package_name}=={version}"
+    return package_spec, index_url
+
+
+def _runner_toml_path() -> Path:
+    cfg_path = os.getenv("INQUIRA_TOML_PATH")
+    if cfg_path:
+        return Path(cfg_path)
+    return Path(__file__).resolve().parents[4] / "inquira.toml"
+
+
+def _persist_runner_defaults(package_spec: str, index_url: str | None) -> None:
+    path = _runner_toml_path()
+    if not path.exists():
+        raise RuntimeError(f"Cannot persist runner defaults; config file not found: {path}")
+
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+
+    section_start = None
+    section_end = len(lines)
+    for idx, line in enumerate(lines):
+        if line.strip() == "[execution.runner]":
+            section_start = idx
+            break
+
+    if section_start is None:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines.append("[execution.runner]")
+        lines.append('packages = []')
+        section_start = len(lines) - 2
+        section_end = len(lines)
+    else:
+        for idx in range(section_start + 1, len(lines)):
+            if lines[idx].strip().startswith("["):
+                section_end = idx
+                break
+
+    section_lines = lines[section_start + 1 : section_end]
+    packages_idx = None
+    index_url_idx = None
+    for idx, line in enumerate(section_lines):
+        stripped = line.strip()
+        if stripped.startswith("packages"):
+            packages_idx = idx
+        if stripped.startswith("index-url"):
+            index_url_idx = idx
+
+    runtime = load_execution_runtime_config()
+    merged_packages = list(runtime.runner_packages or [])
+    if package_spec not in merged_packages:
+        merged_packages.append(package_spec)
+    packages_value = "[" + ", ".join(f'"{pkg}"' for pkg in merged_packages) + "]"
+    packages_line = f"packages = {packages_value}"
+
+    if packages_idx is None:
+        section_lines.append(packages_line)
+    else:
+        section_lines[packages_idx] = packages_line
+
+    if index_url:
+        index_line = f'index-url = "{index_url}"'
+        if index_url_idx is None:
+            section_lines.append(index_line)
+        else:
+            section_lines[index_url_idx] = index_line
+
+    lines[section_start + 1 : section_end] = section_lines
+    updated = "\n".join(lines).rstrip() + "\n"
+    path.write_text(updated, encoding="utf-8")
 
 
 def _normalize_schema_columns(raw: Any) -> list[dict[str, Any]]:
@@ -226,6 +371,14 @@ async def execute_workspace_code(
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    if _INSTALL_BLOCK_RE.search(payload.code or ""):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Package installation commands are blocked in analysis execution. "
+                "Use Settings > Runner Packages to install pinned dependencies."
+            ),
+        )
     result = await execute_code(
         code=payload.code,
         timeout=payload.timeout,
@@ -234,6 +387,52 @@ async def execute_workspace_code(
         workspace_duckdb_path=str(workspace.duckdb_path),
     )
     return ExecuteResponse(**result)
+
+
+@router.post("/runtime/runner/packages/install", response_model=RunnerPackageInstallResponse)
+async def install_runner_runtime_package(
+    payload: RunnerPackageInstallRequest,
+    session: AsyncSession = Depends(get_db_session),
+    current_user=Depends(get_current_user),
+):
+    await _require_workspace_access(session, current_user.id, payload.workspace_id)
+    runtime = load_execution_runtime_config()
+    package_spec, index_url = _validate_runner_install_request(payload, runtime)
+
+    try:
+        install_result = await asyncio.to_thread(
+            install_runner_package,
+            runtime,
+            package_spec,
+            index_url,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    reset = await reset_workspace_kernel(payload.workspace_id)
+
+    saved_default = False
+    if payload.save_as_default:
+        try:
+            await asyncio.to_thread(_persist_runner_defaults, package_spec, index_url)
+            load_execution_runtime_config.cache_clear()
+            saved_default = True
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Package installed but failed to persist runner defaults: {str(exc)}",
+            ) from exc
+
+    return RunnerPackageInstallResponse(
+        installed=True,
+        package_spec=package_spec,
+        installer=install_result.installer,
+        command=install_result.command,
+        stdout=install_result.stdout,
+        stderr=install_result.stderr,
+        workspace_kernel_reset=reset,
+        saved_as_default=saved_default,
+    )
 
 
 @router.get(

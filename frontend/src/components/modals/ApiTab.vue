@@ -102,6 +102,57 @@
           Off by default. When disabled, sample cell values are stripped before schema metadata is saved.
         </p>
       </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Runner Packages
+        </label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+          <input
+            v-model="runnerPackageName"
+            type="text"
+            placeholder="Package name (e.g. scikit-learn)"
+            class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <input
+            v-model="runnerPackageVersion"
+            type="text"
+            placeholder="Exact version (e.g. 1.5.2)"
+            class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <input
+            v-model="runnerIndexUrl"
+            type="text"
+            placeholder="Index URL (optional)"
+            class="sm:col-span-2 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+          <input
+            v-model="saveRunnerDefaults"
+            type="checkbox"
+            class="mt-0.5"
+          />
+          <span>Save as default in <code>inquira.toml</code></span>
+        </label>
+        <div class="mt-3 max-w-2xl">
+          <button
+            @click="installRunnerPackage"
+            :disabled="isInstallingRunnerPackage || !runnerPackageName.trim() || !runnerPackageVersion.trim() || !appStore.activeWorkspaceId"
+            type="button"
+            class="px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-100 hover:bg-indigo-200 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span v-if="!isInstallingRunnerPackage">Install Runner Package</span>
+            <span v-else class="inline-flex items-center">
+              <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-700 mr-2"></div>
+              Installing...
+            </span>
+          </button>
+        </div>
+        <p class="mt-1 text-xs text-gray-500">
+          Installs are restricted to pinned versions (<code>name==version</code>) and run outside notebook/code execution.
+        </p>
+      </div>
     </div>
 
     <!-- Save Button -->
@@ -139,8 +190,13 @@ const appStore = useAppStore()
 const showApiKey = ref(false)
 const isTestingApiKey = ref(false)
 const isSaving = ref(false)
+const isInstallingRunnerPackage = ref(false)
 const message = ref('')
 const messageType = ref('') // 'success' | 'error'
+const runnerPackageName = ref('')
+const runnerPackageVersion = ref('')
+const runnerIndexUrl = ref('')
+const saveRunnerDefaults = ref(false)
 
 const messageTypeClass = computed(() => {
   return messageType.value === 'success'
@@ -223,6 +279,46 @@ async function saveApiSettings() {
     messageType.value = 'error'
   } finally {
     isSaving.value = false
+  }
+}
+
+async function installRunnerPackage() {
+  const packageName = runnerPackageName.value.trim()
+  const version = runnerPackageVersion.value.trim()
+  const indexUrl = runnerIndexUrl.value.trim()
+
+  if (!appStore.activeWorkspaceId) {
+    message.value = 'Create/select a workspace before installing runner packages.'
+    messageType.value = 'error'
+    return
+  }
+  if (!packageName || !version) {
+    message.value = 'Package name and exact version are required.'
+    messageType.value = 'error'
+    return
+  }
+
+  isInstallingRunnerPackage.value = true
+  clearMessage()
+  try {
+    const response = await apiService.v1InstallRunnerPackage({
+      workspace_id: appStore.activeWorkspaceId,
+      package: packageName,
+      version,
+      index_url: indexUrl || null,
+      save_as_default: saveRunnerDefaults.value
+    })
+    const installText = response?.package_spec || `${packageName}==${version}`
+    message.value = `Installed ${installText} using ${response?.installer || 'uv'}. Workspace kernel reset: ${response?.workspace_kernel_reset ? 'yes' : 'no'}.`
+    messageType.value = 'success'
+    toast.success('Runner Package Installed', message.value)
+  } catch (error) {
+    const errorMessage = error.response?.data?.detail || error.message || 'Failed to install runner package.'
+    message.value = errorMessage
+    messageType.value = 'error'
+    toast.error('Install Failed', errorMessage)
+  } finally {
+    isInstallingRunnerPackage.value = false
   }
 }
 </script>

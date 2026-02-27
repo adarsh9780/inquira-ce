@@ -2,13 +2,12 @@ from app.agent.code_guard import guard_code
 from app.agent.graph import InquiraAgent, State
 
 
-def test_code_guard_allows_duckdb_and_narwhals_execution():
+def test_code_guard_allows_conn_backed_duckdb_execution():
     code = """
 import duckdb
 import narwhals as nw
-conn = duckdb.connect()
-df = conn.read_csv("data.csv")
-res = nw.from_native(df)
+duckdb_rel = conn.sql('SELECT * FROM "sales" LIMIT 100')
+res = nw.from_native(duckdb_rel)
 res
 """
     result = guard_code(code, table_name="sales")
@@ -47,3 +46,15 @@ fig
     assert result.blocked is True
     assert result.should_retry is True
     assert "Plotly requires a native/pandas dataframe" in (result.reason or "")
+
+
+def test_code_guard_blocks_file_loader_patterns():
+    code = """
+import pandas as pd
+df = pd.read_excel("source.xlsx")
+df
+"""
+    result = guard_code(code, table_name="events")
+    assert result.blocked is True
+    assert result.should_retry is True
+    assert "Source-file loaders are not allowed" in (result.reason or "")

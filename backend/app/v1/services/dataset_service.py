@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 
 import duckdb
+import pandas as pd
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -114,6 +115,33 @@ class DatasetService:
                         f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM read_json_auto(?)",
                         [str(source)],
                     )
+                elif file_type in {"xlsx", "xls"}:
+                    try:
+                        excel_df = pd.read_excel(str(source), engine="openpyxl")
+                    except ImportError as exc:
+                        raise HTTPException(
+                            status_code=500,
+                            detail=(
+                                "Excel ingestion requires the 'openpyxl' dependency. "
+                                "Install it in the backend environment and retry."
+                            ),
+                        ) from exc
+                    except Exception as exc:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Failed to read Excel file: {str(exc)}",
+                        ) from exc
+
+                    con.register("_inquira_excel_df", excel_df)
+                    try:
+                        con.execute(
+                            f'CREATE OR REPLACE TABLE "{table_name}" AS SELECT * FROM _inquira_excel_df'
+                        )
+                    finally:
+                        try:
+                            con.unregister("_inquira_excel_df")
+                        except Exception:
+                            pass
                 else:
                     raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_type}")
 

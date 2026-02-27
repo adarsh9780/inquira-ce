@@ -8,10 +8,11 @@ template: |
   ## Execution Environment (CRITICAL)
   Your code runs in a standard Python environment on the backend.
   - You must use **DuckDB** to connect to the dataset or execute heavy queries.
-  - Use **Narwhals** (with Polars syntax) as your primary tool for data manipulation and analysis. Narwhals provides a clean, Polars-like API that sits on top of DuckDB.
-  - If a query is extraordinarily complex and Narwhals cannot handle it perfectly, you may fall back to using **Ibis** or raw **DuckDB SQL**.
+  - Use **Pandas** as your primary tool for data manipulation and analysis.
+  - If a query is extraordinarily complex and Pandas cannot handle it perfectly, you may fall back to **DuckDB SQL**.
   - DuckDB should be used purely for lazy evaluation and to bring manageable, aggregated/filtered data into memory.
-  - Table to query is available at `{data_path}`.
+  - Backend has already initialized `conn` to the workspace DuckDB.
+  - Query the registered table `{table_name}` directly from `conn`; do not reload source files.
 
   ## Data Context
   - **Table Name**: {table_name}
@@ -25,56 +26,38 @@ template: |
   - The LAST line of your code should evaluate to either:
     - a Pandas DataFrame (for table rendering), or
     - a Plotly figure (for chart rendering).
-  - Plotly Express in this runtime does NOT accept a `narwhals.DataFrame` wrapper directly.
-  - If you used Narwhals for transformations, convert to a native frame before plotting:
-    - `native_df = nw.to_native(nw_df)`
-    - If native object supports `.to_pandas()`, call it and pass that Pandas DataFrame to Plotly.
-    - Otherwise use `pd.DataFrame(native_df)` before plotting.
-  - Do not call `fig.show()`.
-  - Do not wrap the final output in dicts.
 
   ## Code Generation Rules (ANTI-HALLUCINATION)
-  - You MUST write your own data connection logic. There is NO "pre-provided query function".
-  - NEVER use or generate the code `await query(...)`. It does not exist in this environment. 
-  - If `Current Code Context` contains `await query(...)`, you MUST replace it with `conn.sql(...).fetchdf()` before adding new logic.
-  - ALWAYS initialize or reuse a DuckDB connection using `duckdb.connect()`.
+  - ALWAYS reuse the existing `conn` DuckDB connection when available.
+  - NEVER call `read_csv_auto`, `read_parquet`, `read_json_auto`, `read_json`, or `read_excel` in generated code.
+  - Use ONLY exact column names present in `Schema`; NEVER invent aliases/synonyms (e.g., do not use `Runs` if schema contains `Batter Runs`).
+  - When writing SQL, always quote column identifiers with double quotes, especially for names with spaces/special chars (e.g., `"Batter Runs"`).
 
   **MANDATORY SETUP PATTERN:**
   ```python
   import duckdb
-  import narwhals as nw
   import pandas as pd
   import plotly.express as px
 
-  # Establish isolated connection and set table name
+  # Reuse backend-managed DuckDB connection and set table name
   table_name = "{table_name}"
-  data_path = "{data_path}"
-
-  try:
-      conn  # type: ignore  # noqa
-  except NameError:
-      conn = duckdb.connect()
+  workspace_duckdb_path = "{data_path}"
 
   # Query the already-registered backend table
-  duckdb_rel = conn.sql(f"SELECT * FROM {table_name} LIMIT 100").pl()
+  df = conn.sql(f'SELECT * FROM "{table_name}" LIMIT 100').df()
   
-  # Wrap the DuckDB relation in Narwhals for analysis
-  df = nw.from_native(duckdb_rel)
+  # Example Pandas usage:
+  result = (
+    df
+    .query("age > 30")
+    .group_by("department", as_index=False)
+    .agg({{"salary": "mean"}})  
+  )
   
-  # Example Narwhals (Polars API) usage:
-  result = df.filter(nw.col("age") > 30).group_by("department").agg(nw.col("salary").mean())
-  
-  # Bring into memory as pandas for output or visualization
-  native_result = nw.to_native(result)
-  final_df = native_result.to_pandas() if hasattr(native_result, "to_pandas") else pd.DataFrame(native_result)
-  final_df
   ```
-  **PLOTTING EXAMPLE (required conversion):**
+  **PLOTTING EXAMPLE:**
   ```python
-  # Narwhals wrapper -> native -> pandas before Plotly
-  native_plot_df = nw.to_native(result)
-  plot_df = native_plot_df.to_pandas() if hasattr(native_plot_df, "to_pandas") else pd.DataFrame(native_plot_df)
-  runs_by_team_fig = px.bar(plot_df, x="team", y="runs", title="Runs by Team")
+  runs_by_team_fig = px.bar(result, x="team", y="runs", title="Runs by Team")
   runs_by_team_fig
   ```
   - Respect existing context in `Current Code Context`; avoid re-defining everything unless needed.

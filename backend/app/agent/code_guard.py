@@ -36,6 +36,30 @@ def guard_code(
             ),
         )
 
+    forbidden_loader_patterns = [
+        r"\bread_csv_auto\s*\(",
+        r"\bread_parquet\s*\(",
+        r"\bread_json_auto\s*\(",
+        r"\bread_json\s*\(",
+        r"\bread_excel\s*\(",
+        r"\bread_csv\s*\(",
+        r"\bpd\.read_csv\s*\(",
+        r"\bpd\.read_parquet\s*\(",
+        r"\bpd\.read_json\s*\(",
+        r"\bpd\.read_excel\s*\(",
+    ]
+    if any(re.search(pattern, raw) for pattern in forbidden_loader_patterns):
+        return CodeGuardResult(
+            code=raw,
+            changed=False,
+            blocked=True,
+            should_retry=True,
+            reason=(
+                "Source-file loaders are not allowed in generated analysis code. "
+                "Reuse the backend workspace DuckDB connection (`conn`) and query the registered table directly."
+            ),
+        )
+
     # Plotly Express does not accept Narwhals wrapper DataFrames directly.
     # Catch the common failure pattern and request regeneration.
     narwhals_vars = set(

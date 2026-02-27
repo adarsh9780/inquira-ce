@@ -595,6 +595,10 @@ export const apiService = {
     return v1Api.chat.analyze(payload)
   },
 
+  async v1InstallRunnerPackage(payload) {
+    return v1Api.runtime.installRunnerPackage(payload)
+  },
+
   async v1AnalyzeStream(payload, { signal = null, onEvent = null } = {}) {
     if (!isStreamingEnabled()) {
       return this.v1Analyze(payload)

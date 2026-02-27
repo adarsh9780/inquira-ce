@@ -2,7 +2,7 @@
 
 ## Commit & Testing Procedures
 
-1. Always update the `commit_message.txt` file in the root directory whenever a change is made.
+1. Always update the `commit_message.txt` file in the root directory whenever a change is made. Make sure we industry practice to write commit message.
 3. For every bug and feature we add or report, create a dedicated test case to prevent regressions.
 
 ## Environment & Communication

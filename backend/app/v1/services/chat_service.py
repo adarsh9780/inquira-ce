@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 from typing import cast
 
+import duckdb
 from fastapi import HTTPException
 from langchain_core.messages import HumanMessage
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,6 +53,117 @@ class ChatService:
         return await asyncio.to_thread(_read)
 
     @staticmethod
+    async def _read_live_table_columns(duckdb_path: str, table_name: str) -> list[dict[str, Any]]:
+        """Read authoritative column names/types from workspace DuckDB."""
+
+        def _read() -> list[dict[str, Any]]:
+            con = duckdb.connect(duckdb_path, read_only=True)
+            try:
+                rows = con.execute(f'DESCRIBE "{table_name}"').fetchall()
+                return [
+                    {
+                        "name": str(row[0]),
+                        "dtype": str(row[1]),
+                        "description": "",
+                        "samples": [],
+                    }
+                    for row in rows
+                ]
+            finally:
+                con.close()
+
+        try:
+            return await asyncio.to_thread(_read)
+        except Exception:
+            return []
+
+    @staticmethod
+    def _merge_schema_with_live_columns(
+        schema: dict[str, Any] | None,
+        table_name: str,
+        live_columns: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Prefer live DuckDB columns while preserving optional schema descriptions."""
+        base = dict(schema or {})
+        raw_columns = base.get("columns", [])
+        existing_columns = raw_columns if isinstance(raw_columns, list) else []
+        by_name = {
+            str(col.get("name", "")).strip().lower(): col
+            for col in existing_columns
+            if isinstance(col, dict) and str(col.get("name", "")).strip()
+        }
+
+        merged_columns: list[dict[str, Any]] = []
+        for live in live_columns:
+            name = str(live.get("name", "")).strip()
+            if not name:
+                continue
+            old = by_name.get(name.lower(), {})
+            merged_columns.append(
+                {
+                    "name": name,
+                    "dtype": str(live.get("dtype") or old.get("dtype") or old.get("type") or "VARCHAR"),
+                    "description": str(old.get("description", "")),
+                    "samples": old.get("samples", []) if isinstance(old.get("samples", []), list) else [],
+                }
+            )
+
+        return {
+            "table_name": table_name,
+            "context": str(base.get("context", "")),
+            "columns": merged_columns,
+        }
+
+    @staticmethod
+    def _merge_override_metadata(
+        schema: dict[str, Any] | None,
+        active_schema_override: dict[str, Any] | None,
+        table_name: str,
+    ) -> dict[str, Any] | None:
+        """Merge optional frontend context/description hints without replacing backend columns."""
+        if not schema or not isinstance(schema, dict):
+            return schema
+        if not active_schema_override or not isinstance(active_schema_override, dict):
+            return schema
+
+        override_table = str(active_schema_override.get("table_name", "")).strip().lower()
+        if override_table and override_table != table_name:
+            return schema
+
+        merged = dict(schema)
+        override_context = active_schema_override.get("context")
+        if isinstance(override_context, str):
+            merged["context"] = override_context
+
+        raw_columns = merged.get("columns", [])
+        schema_columns = raw_columns if isinstance(raw_columns, list) else []
+        override_raw_columns = active_schema_override.get("columns", [])
+        override_columns = override_raw_columns if isinstance(override_raw_columns, list) else []
+        override_by_name = {
+            str(col.get("name", "")).strip().lower(): col
+            for col in override_columns
+            if isinstance(col, dict) and str(col.get("name", "")).strip()
+        }
+
+        enriched_columns: list[dict[str, Any]] = []
+        for col in schema_columns:
+            if not isinstance(col, dict):
+                continue
+            name = str(col.get("name", "")).strip()
+            if not name:
+                continue
+            candidate = dict(col)
+            override = override_by_name.get(name.lower())
+            if isinstance(override, dict):
+                if isinstance(override.get("description"), str):
+                    candidate["description"] = override["description"]
+                if isinstance(override.get("samples"), list):
+                    candidate["samples"] = override["samples"]
+            enriched_columns.append(candidate)
+        merged["columns"] = enriched_columns
+        return merged
+
+    @staticmethod
     async def _preflight_check(
         session: AsyncSession,
         user,
@@ -86,7 +198,7 @@ class ChatService:
 
         schema: dict[str, Any] | None = None
         table_name: str | None = None
-        data_path: str | None = None
+        workspace_duckdb_path = str(workspace.duckdb_path)
 
         def _normalize_table_name(raw: str) -> str:
             return "".join(c if c.isalnum() or c == "_" else "_" for c in raw.strip()).lower()
@@ -106,44 +218,49 @@ class ChatService:
             )
             if selected_dataset is not None:
                 table_name = selected_dataset.table_name
-                data_path = selected_dataset.source_path
-                if not selected_dataset.schema_path:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=(
-                            "Dataset preflight failed: schema metadata is missing for selected table. "
-                            "Please reselect your dataset in the Data tab."
-                        ),
-                    )
-                try:
-                    schema = await ChatService._load_schema(selected_dataset.schema_path)
-                except HTTPException as exc:
-                    if exc.status_code == 404:
-                        raise HTTPException(
-                            status_code=400,
-                            detail=(
-                                "Dataset preflight failed: schema file is unavailable for selected table. "
-                                "Please reselect your dataset in the Data tab."
-                            ),
-                        ) from exc
-                    raise
-
-                if active_schema_override and isinstance(active_schema_override, dict):
-                    override_table = str(active_schema_override.get("table_name", "")).strip().lower()
-                    if not override_table or override_table == table_name:
-                        schema = active_schema_override
-                        if not schema.get("table_name"):
-                            schema["table_name"] = table_name
+                if selected_dataset.schema_path:
+                    try:
+                        schema = await ChatService._load_schema(selected_dataset.schema_path)
+                    except HTTPException as exc:
+                        if exc.status_code != 404:
+                            raise
             else:
-                logprint(f"⚠️ Requested table '{requested_table}' not found in workspace {workspace_id}. Falling back.")
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "Dataset preflight failed: selected table was not found in this workspace. "
+                        "Re-select your dataset and try again."
+                    ),
+                )
 
         if schema is None:
             latest_dataset = await DatasetRepository.get_latest_for_workspace(session, workspace_id)
             if latest_dataset is not None:
                 table_name = latest_dataset.table_name
-                data_path = latest_dataset.source_path
                 if latest_dataset.schema_path:
-                    schema = await ChatService._load_schema(latest_dataset.schema_path)
+                    try:
+                        schema = await ChatService._load_schema(latest_dataset.schema_path)
+                    except HTTPException as exc:
+                        if exc.status_code != 404:
+                            raise
+
+        schema = ChatService._merge_override_metadata(
+            schema,
+            active_schema_override,
+            table_name or "",
+        )
+
+        if table_name:
+            live_columns = await ChatService._read_live_table_columns(
+                workspace.duckdb_path,
+                table_name,
+            )
+            if live_columns:
+                schema = ChatService._merge_schema_with_live_columns(
+                    schema,
+                    table_name,
+                    live_columns,
+                )
 
         if schema is None:
             schema = {"table_name": table_name or "", "columns": []}
@@ -151,7 +268,7 @@ class ChatService:
         if conversation_id is None:
             raise HTTPException(status_code=500, detail="Conversation initialization failed")
 
-        return conversation, conversation_id, schema, table_name or "", data_path or ""
+        return conversation, conversation_id, schema, table_name or "", workspace_duckdb_path
 
     @staticmethod
     async def analyze_and_persist_turn(

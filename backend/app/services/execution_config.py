@@ -29,6 +29,10 @@ class ExecutionRuntimeConfig:
     runner_python_executable: str | None = None
     runner_venv_name: str = ".runner-venv"
     runner_packages: list[str] = field(default_factory=list)
+    runner_index_url: str | None = None
+    runner_package_allowlist: list[str] = field(default_factory=list)
+    runner_package_denylist: list[str] = field(default_factory=list)
+    runner_install_max_packages_per_request: int = 1
     kernel_idle_minutes: int = 30
     runner_policy: RunnerPolicyConfig = field(default_factory=RunnerPolicyConfig)
 
@@ -100,6 +104,13 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
         or ".runner-venv"
     ).strip() or ".runner-venv"
     runner_packages = _as_str_list(runner.get("packages"))
+    runner_index_url = str(runner.get("index-url") or "").strip() or None
+    runner_package_allowlist = _as_str_list(runner.get("package-allowlist"))
+    runner_package_denylist = _as_str_list(runner.get("package-denylist"))
+    runner_install_max_packages_per_request = _as_int(
+        runner.get("install-max-packages-per-request", 1),
+        1,
+    )
     kernel_idle_minutes = _as_int(runner.get("kernel-idle-minutes", 30), 30)
 
     policy = RunnerPolicyConfig(
@@ -114,6 +125,10 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
         runner_python_executable=str(runner_python) if runner_python else None,
         runner_venv_name=runner_venv_name,
         runner_packages=runner_packages,
+        runner_index_url=runner_index_url,
+        runner_package_allowlist=runner_package_allowlist,
+        runner_package_denylist=runner_package_denylist,
+        runner_install_max_packages_per_request=max(1, runner_install_max_packages_per_request),
         kernel_idle_minutes=max(1, kernel_idle_minutes),
         runner_policy=policy,
     )
