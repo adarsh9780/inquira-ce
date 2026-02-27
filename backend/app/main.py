@@ -160,6 +160,8 @@ app.add_middleware(
         "https://tauri.localhost",  # Tauri webview
         "tauri://localhost",  # Tauri webview (custom protocol)
     ],
+    # Keep local-dev origins resilient across Vite/Tauri port changes.
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$|^https://tauri\.localhost$|^tauri://localhost$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],

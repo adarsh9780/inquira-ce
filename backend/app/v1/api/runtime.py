@@ -144,6 +144,43 @@ def _read_table_columns_for_prompt(
         con.close()
 
 
+def _read_columns_from_schema_file(
+    schema_path: str,
+    allow_sample_values: bool,
+) -> list[dict[str, Any]]:
+    path = Path(schema_path)
+    if not path.exists():
+        return []
+
+    with path.open("r", encoding="utf-8") as f:
+        payload = json.load(f)
+
+    raw_columns = payload.get("columns", [])
+    if not isinstance(raw_columns, list):
+        return []
+
+    columns: list[dict[str, Any]] = []
+    for col in raw_columns:
+        if not isinstance(col, dict):
+            continue
+        name = str(col.get("name", "")).strip()
+        if not name:
+            continue
+        columns.append(
+            {
+                "name": name,
+                "dtype": str(col.get("dtype") or col.get("type") or "VARCHAR"),
+                "samples": (
+                    col.get("samples", [])
+                    if allow_sample_values and isinstance(col.get("samples", []), list)
+                    else []
+                ),
+                "description": str(col.get("description", "")),
+            }
+        )
+    return columns
+
+
 async def _require_workspace_access(
     session: AsyncSession,
     user_id: str,
@@ -218,17 +255,29 @@ async def get_workspace_dataset_schema(
     if dataset is not None and dataset.schema_path:
         schema_path = Path(dataset.schema_path)
         if schema_path.exists():
-            with schema_path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-            return DatasetSchemaResponse(
-                table_name=normalized,
-                context=str(data.get("context", "")),
-                columns=_normalize_schema_columns(data.get("columns", [])),
-            )
+            try:
+                with schema_path.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return DatasetSchemaResponse(
+                    table_name=normalized,
+                    context=str(data.get("context", "")),
+                    columns=_normalize_schema_columns(data.get("columns", [])),
+                )
+            except (OSError, json.JSONDecodeError, TypeError, ValueError):
+                # Fall back to DuckDB introspection when saved schema metadata is unreadable.
+                pass
 
     con = duckdb.connect(workspace.duckdb_path)
     try:
         rows = con.execute(f'DESCRIBE "{normalized}"').fetchall()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Dataset schema unavailable. The saved schema metadata is invalid "
+                "and table introspection failed."
+            ),
+        ) from exc
     finally:
         con.close()
 
@@ -333,12 +382,28 @@ async def regenerate_workspace_dataset_schema(
             detail="API key not set. Please configure your API key in Settings.",
         )
 
-    columns = await asyncio.to_thread(
-        _read_table_columns_for_prompt,
-        workspace.duckdb_path,
-        normalized,
-        allow_sample_values,
-    )
+    columns: list[dict[str, Any]] = []
+    try:
+        columns = await asyncio.to_thread(
+            _read_table_columns_for_prompt,
+            workspace.duckdb_path,
+            normalized,
+            allow_sample_values,
+        )
+    except Exception:
+        columns = []
+
+    if (
+        not columns
+        and dataset is not None
+        and dataset.schema_path
+    ):
+        columns = await asyncio.to_thread(
+            _read_columns_from_schema_file,
+            dataset.schema_path,
+            allow_sample_values,
+        )
+
     if not columns:
         raise HTTPException(status_code=400, detail="No columns found for this dataset table")
 
