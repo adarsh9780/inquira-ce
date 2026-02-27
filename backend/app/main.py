@@ -33,6 +33,39 @@ from .services.tracing import init_phoenix_tracing
 APP_VERSION = "0.5.7a5"
 
 
+def _default_cors_origins() -> list[str]:
+    return [
+        "http://localhost:5173",  # Vue dev server
+        "http://127.0.0.1:5173",  # Alternative localhost
+        "http://localhost:3000",  # Alternative dev port
+        "http://127.0.0.1:3000",  # Alternative dev port
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+        "https://tauri.localhost",  # Tauri webview
+        "tauri://localhost",  # Tauri webview (custom protocol)
+    ]
+
+
+def _load_cors_origins() -> list[str]:
+    configured = os.getenv("CORS_ORIGINS", "").strip()
+    if not configured:
+        return _default_cors_origins()
+
+    # Accept either comma-separated values or a JSON array.
+    if configured.startswith("["):
+        try:
+            import json
+
+            values = json.loads(configured)
+        except Exception:
+            values = []
+    else:
+        values = configured.split(",")
+
+    parsed = [str(origin).strip() for origin in values if str(origin).strip()]
+    return parsed or _default_cors_origins()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage the lifecycle of the application"""
@@ -150,16 +183,7 @@ patch_print()
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",  # Vue dev server
-        "http://127.0.0.1:5173",  # Alternative localhost
-        "http://localhost:3000",  # Alternative dev port
-        "http://127.0.0.1:3000",  # Alternative dev port
-        "http://127.0.0.1:8000",
-        "http://localhost:8000",
-        "https://tauri.localhost",  # Tauri webview
-        "tauri://localhost",  # Tauri webview (custom protocol)
-    ],
+    allow_origins=_load_cors_origins(),
     # Keep local-dev origins resilient across Vite/Tauri port changes.
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$|^https://tauri\.localhost$|^tauri://localhost$",
     allow_credentials=True,
