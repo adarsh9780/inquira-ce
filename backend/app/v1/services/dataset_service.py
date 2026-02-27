@@ -51,7 +51,12 @@ class DatasetService:
 
     @staticmethod
     async def add_dataset(session: AsyncSession, user, workspace_id: str, source_path: str) -> WorkspaceDataset:
-        """Ingest dataset into workspace DuckDB and persist metadata."""
+        """Ingest dataset into workspace DuckDB and persist metadata.
+
+        The ingestion is idempotent for unchanged files: if the source path
+        maps to an existing dataset row with matching file size and mtime,
+        the current dataset metadata is returned without replacing the table.
+        """
         workspace = await WorkspaceRepository.get_by_id(session, workspace_id, user.id)
         if workspace is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
@@ -63,9 +68,36 @@ class DatasetService:
         table_name = DatasetService._normalize_table_name(str(source))
         fingerprint = DatasetService._source_fingerprint(str(source))
         file_type = source.suffix.lower().lstrip(".")
+        source_size = source.stat().st_size
+        source_mtime = os.path.getmtime(source)
+
+        existing_result = await session.execute(
+            select(WorkspaceDataset).where(
+                WorkspaceDataset.workspace_id == workspace_id,
+                WorkspaceDataset.source_fingerprint == fingerprint,
+            )
+        )
+        existing = existing_result.scalar_one_or_none()
+        if (
+            existing is not None
+            and existing.file_size is not None
+            and existing.source_mtime is not None
+            and int(existing.file_size) == int(source_size)
+            and float(existing.source_mtime) == float(source_mtime)
+        ):
+            return existing
 
         def _ingest() -> tuple[int, str]:
-            con = duckdb.connect(workspace.duckdb_path)
+            try:
+                con = duckdb.connect(workspace.duckdb_path)
+            except duckdb.IOException as exc:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Workspace database is currently locked by another running execution. "
+                        "Please wait, stop running code, or reset the workspace kernel and try again."
+                    ),
+                ) from exc
             try:
                 if file_type in {"csv", "tsv"}:
                     con.execute(
@@ -102,6 +134,14 @@ class DatasetService:
                         for r in schema_rows
                     ],
                 }
+            except duckdb.IOException as exc:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Workspace database is currently locked by another running execution. "
+                        "Please wait, stop running code, or reset the workspace kernel and try again."
+                    ),
+                ) from exc
             finally:
                 con.close()
 
@@ -114,20 +154,11 @@ class DatasetService:
 
         row_count, schema_path = await asyncio.to_thread(_ingest)
 
-        existing_result = await session.execute(
-            select(WorkspaceDataset).where(
-                WorkspaceDataset.workspace_id == workspace_id,
-                WorkspaceDataset.source_fingerprint == fingerprint,
-            )
-        )
-        existing = existing_result.scalar_one_or_none()
-
-        source_mtime = os.path.getmtime(source)
         if existing:
             existing.source_path = str(source)
             existing.table_name = table_name
             existing.schema_path = schema_path
-            existing.file_size = source.stat().st_size
+            existing.file_size = source_size
             existing.source_mtime = source_mtime
             existing.row_count = row_count
             existing.file_type = file_type
@@ -139,7 +170,7 @@ class DatasetService:
                 source_fingerprint=fingerprint,
                 table_name=table_name,
                 schema_path=schema_path,
-                file_size=source.stat().st_size,
+                file_size=source_size,
                 source_mtime=source_mtime,
                 row_count=row_count,
                 file_type=file_type,

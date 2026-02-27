@@ -473,7 +473,7 @@ const defaultCodeTemplate = computed(() => {
   const tableName = backendTable || getTableName(originalFilepath)
 
   // Default template (DuckDB to Narwhals API)
-  return `# cell 1: Load and explore data
+  return `# cell: Load and explore data
 import duckdb
 import narwhals as nw
 import plotly.express as px
@@ -485,13 +485,13 @@ try:
 except NameError:
     conn = duckdb.connect(r"${dbPath || ''}") if "${dbPath || ''}".strip() else duckdb.connect()
 
-# cell 2: Quick sample
+# cell: Quick sample
 # Use DuckDB for lazy evaluation, then convert to a Narwhals-compatible DataFrame
 lazy_query = conn.sql(f"SELECT * FROM {table_name} LIMIT 10")
 df = nw.from_native(lazy_query.pl(), eager=True)
 df
 
-# cell 3: Schema + summary
+# cell: Schema + summary
 # Use DuckDB for efficient aggregations and metadata extraction
 schema_df = nw.from_native(conn.sql(f"DESCRIBE SELECT * FROM {table_name}").pl(), eager=True)
 row_count_df = nw.from_native(conn.sql(f"SELECT COUNT(*) AS rows FROM {table_name}").pl(), eager=True)
@@ -1070,7 +1070,7 @@ function toggleNotebookMode(eventOrValue) {
 
         // Check if the cell already has a properly formatted title comment
         const firstLine = content.split('\n')[0].trim()
-        const cellCommentMatch = firstLine.match(/^#\s*cell\s+(\d+):\s*(.+)$/i)
+        const cellCommentMatch = firstLine.match(/^#\s*cell(?:\s+\d+)?\s*:\s*(.+)$/i)
 
         if (cellCommentMatch) {
           // Cell already has a properly formatted title comment, use content as is
@@ -1079,14 +1079,14 @@ function toggleNotebookMode(eventOrValue) {
           return separator + content
         } else {
           // Cell doesn't have a title comment, add a default one
-          const cellMarker = index === 0 ? '' : `\n# cell ${index + 1}: Write your Python code here\n`
+          const cellMarker = index === 0 ? '' : `\n# cell: Write your Python code here\n`
           return cellMarker + content
         }
       })
       .filter(content => content) // Remove empty entries
       .join('\n\n')
 
-    appStore.setPythonFileContent(combinedContent || '# Python code for data analysis\n# cell 1: Write your Python code here')
+    appStore.setPythonFileContent(combinedContent || '# Python code for data analysis\n# cell: Write your Python code here')
   }
 }
 
@@ -1097,14 +1097,13 @@ function parseCellsFromScript() {
     // Create default cell
     appStore.clearNotebookCells()
     appStore.addNotebookCell({
-      content: '# cell 1: Write your Python code here'
+      content: '# cell: Write your Python code here'
     })
     return
   }
 
-  // Split content by "# cell <number>" comments (case insensitive)
-  // This regex matches "# cell" followed by optional number and optional whitespace
-  const cellPattern = /(?=# cell(?:\s+\d+)?)/gi
+  // Split content by "# cell: <title>" comments with backward compatibility.
+  const cellPattern = /(?=^\s*#\s*cell(?:\s+\d+)?\s*:)/gim
   const parts = scriptContent.split(cellPattern)
 
   appStore.clearNotebookCells()
@@ -1121,22 +1120,12 @@ function parseCellsFromScript() {
     const firstLine = lines[0].trim()
 
     // If the first line is a cell comment with title, keep it as is
-    const cellCommentMatch = firstLine.match(/^#\s*cell\s+(\d+):\s*(.+)$/i)
+    const cellCommentMatch = firstLine.match(/^#\s*cell(?:\s+\d+)?\s*:\s*(.+)$/i)
     if (cellCommentMatch) {
-      // This is already in the correct format, use as is
-      appStore.addNotebookCell({ content: cellContent })
-    } else if (firstLine.match(/^#\s*cell\s+\d+$/i)) {
-      // This is a cell comment without title, add a default title
-      const cellNumberMatch = firstLine.match(/^#\s*cell\s+(\d+)$/i)
-      if (cellNumberMatch) {
-        const cellNumber = cellNumberMatch[1]
-        const restOfContent = lines.slice(1).join('\n').trim()
-        const newContent = `# cell ${cellNumber}: Write your Python code here${restOfContent ? '\n' + restOfContent : ''}`
-        appStore.addNotebookCell({ content: newContent })
-      } else {
-        // Fallback - just use the content as is
-        appStore.addNotebookCell({ content: cellContent })
-      }
+      const title = cellCommentMatch[1]?.trim() || 'Write your Python code here'
+      const rest = lines.slice(1).join('\n').trim()
+      const normalized = `# cell: ${title}${rest ? `\n${rest}` : ''}`
+      appStore.addNotebookCell({ content: normalized })
     } else {
       // This doesn't start with a cell comment, treat as regular content
       appStore.addNotebookCell({ content: cellContent })
@@ -1153,13 +1142,13 @@ function parseCellsFromScript() {
 
 function addCellAbove(index) {
   appStore.addNotebookCell({
-    content: '# cell ' + (index + 1) + ': Write your Python code here'
+    content: '# cell: Write your Python code here'
   }, index)
 }
 
 function addCellBelow(index) {
   appStore.addNotebookCell({
-    content: '# cell ' + (index + 2) + ': Write your Python code here'
+    content: '# cell: Write your Python code here'
   }, index + 1)
 }
 

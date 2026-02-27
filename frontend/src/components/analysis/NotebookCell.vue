@@ -402,10 +402,10 @@ const cellTitle = computed(() => {
 
   const firstLine = content.split('\n')[0].trim()
 
-  // Check if first line matches "# cell <number>: <title>" pattern
-  const cellCommentMatch = firstLine.match(/^#\s*cell\s+(\d+):\s*(.+)$/i)
+  // Check if first line matches "# cell: <title>" (legacy numbered markers supported).
+  const cellCommentMatch = firstLine.match(/^#\s*cell(?:\s+\d+)?\s*:\s*(.+)$/i)
   if (cellCommentMatch) {
-    const title = cellCommentMatch[2].trim()
+    const title = cellCommentMatch[1].trim()
     return title || `Cell ${props.index + 1}`
   }
 
@@ -427,14 +427,14 @@ function updateCellTitle(newTitle) {
   const firstLineRaw = lines[0] ?? ''
   const firstLineTrimmed = firstLineRaw.trim()
 
-  const match = firstLineTrimmed.match(/^#\s*cell\s+(\d+):\s*(.+)$/i)
+  const match = firstLineTrimmed.match(/^#\s*cell(?:\s+\d+)?\s*:\s*(.+)$/i)
   if (match) {
     // Replace existing title line, preserve original spacing before '#'
     const leading = firstLineRaw.match(/^\s*/)?.[0] ?? ''
-    lines[0] = `${leading}# cell ${props.index + 1}: ${safeTitle}`
+    lines[0] = `${leading}# cell: ${safeTitle}`
   } else {
     // Prepend a title line
-    lines.unshift(`# cell ${props.index + 1}: ${safeTitle}`)
+    lines.unshift(`# cell: ${safeTitle}`)
   }
 
   const updated = lines.join('\n')
@@ -451,7 +451,7 @@ const cleanCellContent = computed(() => {
   const firstLine = firstLineRaw.trim()
 
   // Check if first line is a title comment that should be hidden
-  const cellCommentMatch = firstLine.match(/^#\s*cell\s+(\d+):\s*(.+)$/i)
+  const cellCommentMatch = firstLine.match(/^#\s*cell(?:\s+\d+)?\s*:\s*(.+)$/i)
   if (cellCommentMatch) {
     // Remove the first line (title comment) and return the rest (preserve trailing newlines)
     const remainingLines = lines.slice(1)
@@ -670,7 +670,7 @@ function splitCell() {
     // Get the title comment from the original cell content
     const fullContent = props.cell.content.trim()
     const firstLine = fullContent.split('\n')[0].trim()
-    const cellCommentMatch = firstLine.match(/^#\s*cell\s+(\d+):\s*(.+)$/i)
+    const cellCommentMatch = firstLine.match(/^#\s*cell(?:\s+\d+)?\s*:\s*(.+)$/i)
 
     let titleComment = ''
     if (cellCommentMatch) {
@@ -685,14 +685,14 @@ function splitCell() {
 
       emit('split-cell', {
         cellId: props.cell.id,
-        beforeContent: titleComment ? titleComment + '\n' + beforeContent : beforeContent || '# cell ' + (props.index + 1) + ': Write your Python code here',
-        afterContent: afterContent || '# cell ' + (props.index + 2) + ': Write your Python code here'
+        beforeContent: titleComment ? titleComment + '\n' + beforeContent : beforeContent || '# cell: Write your Python code here',
+        afterContent: afterContent || '# cell: Write your Python code here'
       })
     } else {
       emit('split-cell', {
         cellId: props.cell.id,
-        beforeContent: titleComment ? titleComment + '\n' + beforeCursor : beforeCursor || '# cell ' + (props.index + 1) + ': Write your Python code here',
-        afterContent: afterCursor || '# cell ' + (props.index + 2) + ': Write your Python code here'
+        beforeContent: titleComment ? titleComment + '\n' + beforeCursor : beforeCursor || '# cell: Write your Python code here',
+        afterContent: afterCursor || '# cell: Write your Python code here'
       })
     }
   }

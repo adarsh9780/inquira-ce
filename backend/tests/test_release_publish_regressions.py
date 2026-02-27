@@ -32,8 +32,9 @@ def test_tauri_before_build_command_is_shell_portable():
 def test_backend_pyproject_avoids_vcs_direct_dependency_for_pypi():
     text = BACKEND_PYPROJECT.read_text(encoding="utf-8")
 
-    assert "safe-py-runner>=0.1.6" in text
-    assert "safe-py-runner @ git+https://" not in text
+    assert "jupyter-client>=" in text
+    assert "ipykernel>=" in text
+    assert "safe-py-runner" not in text
 
 
 def test_tauri_bundle_resources_include_backend_project_files():

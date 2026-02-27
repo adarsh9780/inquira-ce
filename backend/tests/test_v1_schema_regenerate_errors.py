@@ -1,7 +1,6 @@
 import pytest
 from types import SimpleNamespace
 from fastapi import HTTPException
-from pathlib import Path
 
 from app.v1.api import runtime as runtime_api
 

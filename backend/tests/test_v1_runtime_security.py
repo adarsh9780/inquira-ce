@@ -1,6 +1,5 @@
 from types import SimpleNamespace
 
-import duckdb
 import pytest
 from fastapi.testclient import TestClient
 
@@ -10,10 +9,10 @@ from app.v1.api import runtime as runtime_api
 
 
 @pytest.fixture(autouse=True)
-def _force_local_subprocess_provider(monkeypatch):
-    # Runtime API tests assert DuckDB workspace behavior, not safe-runner internals.
+def _force_local_jupyter_provider(monkeypatch):
+    # Runtime API tests assert workspace-scoped execution wiring.
     load_execution_runtime_config.cache_clear()
-    monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "local_subprocess")
+    monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "local_jupyter")
     yield
     load_execution_runtime_config.cache_clear()
 
@@ -30,24 +29,43 @@ def test_execute_endpoint_requires_auth_cookie():
 @pytest.mark.asyncio
 async def test_execute_workspace_cannot_query_table_from_other_workspace(monkeypatch, tmp_path):
     ws_a_dir = tmp_path / "workspace_a"
-    ws_b_dir = tmp_path / "workspace_b"
     ws_a_dir.mkdir(parents=True, exist_ok=True)
-    ws_b_dir.mkdir(parents=True, exist_ok=True)
     db_a = ws_a_dir / "workspace.duckdb"
-    db_b = ws_b_dir / "workspace.duckdb"
-
-    con_a = duckdb.connect(str(db_a))
-    con_a.execute("CREATE TABLE table_a AS SELECT 1 AS id")
-    con_a.close()
-
-    con_b = duckdb.connect(str(db_b))
-    con_b.execute("CREATE TABLE table_b AS SELECT 2 AS id")
-    con_b.close()
+    db_a.touch()
 
     async def fake_require_workspace_access(session, user_id, workspace_id):
         return SimpleNamespace(duckdb_path=str(db_a))
 
+    async def fake_execute_code(
+        code,
+        timeout,
+        working_dir=None,
+        workspace_id=None,
+        workspace_duckdb_path=None,
+    ):
+        _ = (timeout, working_dir)
+        assert workspace_id == "workspace-a"
+        assert workspace_duckdb_path == str(db_a)
+        if "table_b" in code:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "Catalog Error: Table with name table_b does not exist",
+                "error": "Catalog Error: Table with name table_b does not exist",
+                "result": None,
+                "result_type": None,
+            }
+        return {
+            "success": True,
+            "stdout": "",
+            "stderr": "",
+            "error": None,
+            "result": None,
+            "result_type": None,
+        }
+
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "execute_code", fake_execute_code)
 
     response = await runtime_api.execute_workspace_code(
         workspace_id="workspace-a",

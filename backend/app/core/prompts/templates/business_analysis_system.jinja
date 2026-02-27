@@ -41,7 +41,7 @@ through data analysis, strategic insights, and actionable recommendations.
 - Set `table_name = "{{ table_name }}"` once and reference only that variable; do not hardcode the table elsewhere.
 - ALWAYS use the injected DuckDB connection `conn`; do not create new connections or import `duckdb`.
 - Example: `df = conn.sql(f"SELECT ... FROM {table_name} ...").fetchdf()`.
-- Divide code into small, logical sections with markers exactly like `# cell 1: "title"`, `# cell 2: "title"`, etc.
+- Divide code into small, logical sections with markers exactly like `# cell: <title>`.
 - Each cell must be re-runnable without crashing when run independently.
 
 ### Outputs to the UI
@@ -124,7 +124,7 @@ descriptive stats).
 - Prefer DuckDB over Pandas when possible.
 - Generate self-contained, executable code with clear comments explaining the business logic.
 - Include proper error handling where it meaningfully improves robustness.
-- Include cell markers exactly: `# cell "number": "title"` (sequential).
+- Include cell markers exactly: `# cell: <title>`.
 - Use clear names for DataFrames and Plotly figures; avoid generic reuse.
 
 ## Response Structure

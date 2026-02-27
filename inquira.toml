@@ -28,31 +28,20 @@ host = "localhost"
 
 [execution]
 # Switch execution backend without code changes.
-# Supported values: "local_subprocess", "local_safe_runner", "e2b", "piston"
-provider = "local_safe_runner"
+# Supported values: "local_jupyter", "local_subprocess"
+provider = "local_jupyter"
 
 [execution.runner]
 # Name of the dedicated code-runner virtual environment folder under app data (~/.inquira/*)
 venv-name = ".runner-venv"
-# Optional local checkout path for editable install of safe-py-runner.
-# project-path = "/path/to/safe-py-runner"
-# safe-py-runner install source: "auto", "pypi", "github", "local"
-# "auto" tries PyPI -> GitHub -> local path (final fallback).
-safe-py-runner-source = "github"
-# Package name (PyPI source)
-safe-py-runner-pypi = "safe-py-runner"
-# Git URL/ref (GitHub source)
-safe-py-runner-github = "git+https://github.com/adarsh9780/safe-py-runner.git"
-# Local path override (local source/fallback). If omitted, project-path is used.
-# safe-py-runner-local-path = "/Users/adarshmaurya/Downloads/Projects/safe-py-runner"
-# Optional package list installed into the runner venv (excluding safe-py-runner).
+# Optional package list installed into the runner venv alongside ipykernel and defaults.
 packages = ["narwhals", "duckdb", "pandas", "plotly", "pyarrow", "polars"]
-# Optional runtime guardrails for safe-py-runner.
+# Idle kernel eviction threshold in minutes.
+kernel-idle-minutes = 30
+# Runtime timeout guardrails.
 timeout-seconds = 60
 memory-limit-mb = 512
 max-output-kb = 512
-# blocked-imports = ["socket", "subprocess"]
-# blocked-builtins = ["open", "exec", "eval"]
 
 [backend.phoenix]
 # Enable Phoenix tracing for LangGraph/LangChain (used by backend startup)

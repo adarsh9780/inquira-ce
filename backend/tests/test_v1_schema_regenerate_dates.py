@@ -70,7 +70,7 @@ async def test_regenerate_schema_handles_date_types(monkeypatch, tmp_path):
     session = SimpleNamespace(commit=fake_commit)
 
     # This should not raise a TypeError (Object of type date is not JSON serializable)
-    result = await runtime_api.regenerate_workspace_dataset_schema(
+    await runtime_api.regenerate_workspace_dataset_schema(
         workspace_id="ws-1",
         table_name="dates",
         payload=runtime_api.RegenerateSchemaRequest(

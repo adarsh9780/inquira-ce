@@ -1,4 +1,4 @@
-"""Execution runtime configuration loaded from env and inquira.toml."""
+"""Execution runtime configuration loaded from env and ``inquira.toml``."""
 
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ from typing import Any
 
 @dataclass(frozen=True)
 class RunnerPolicyConfig:
+    """Execution policy values shared by runtime providers."""
+
     timeout_seconds: int = 60
     memory_limit_mb: int = 512
     max_output_kb: int = 512
@@ -21,17 +23,19 @@ class RunnerPolicyConfig:
 
 @dataclass(frozen=True)
 class ExecutionRuntimeConfig:
-    provider: str = "local_subprocess"
+    """Runtime execution provider and runner environment settings."""
+
+    provider: str = "local_jupyter"
     runner_python_executable: str | None = None
-    runner_project_path: str | None = None
-    safe_py_runner_source: str = "auto"
-    safe_py_runner_pypi: str = "safe-py-runner"
-    safe_py_runner_github: str = "git+https://github.com/adarsh9780/safe-py-runner.git"
-    safe_py_runner_local_path: str | None = None
+    runner_venv_name: str = ".runner-venv"
+    runner_packages: list[str] = field(default_factory=list)
+    kernel_idle_minutes: int = 30
     runner_policy: RunnerPolicyConfig = field(default_factory=RunnerPolicyConfig)
 
 
 def _as_int(value: Any, default: int) -> int:
+    """Return ``value`` coerced to ``int`` or ``default`` when invalid."""
+
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -39,12 +43,16 @@ def _as_int(value: Any, default: int) -> int:
 
 
 def _as_str_list(value: Any) -> list[str]:
+    """Return a list of non-empty strings from a TOML array value."""
+
     if not isinstance(value, list):
         return []
     return [str(item) for item in value if str(item).strip()]
 
 
 def _load_toml_data() -> dict[str, Any]:
+    """Load ``inquira.toml`` and return a mapping object."""
+
     cfg_path = os.getenv("INQUIRA_TOML_PATH")
     if cfg_path:
         path = Path(cfg_path)
@@ -65,6 +73,8 @@ def _load_toml_data() -> dict[str, Any]:
 
 @lru_cache(maxsize=1)
 def load_execution_runtime_config() -> ExecutionRuntimeConfig:
+    """Build cached runtime config from environment and TOML settings."""
+
     data = _load_toml_data()
     execution = data.get("execution", {})
     if not isinstance(execution, dict):
@@ -77,7 +87,7 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
     provider = str(
         os.getenv("INQUIRA_EXECUTION_PROVIDER")
         or execution.get("provider")
-        or "local_subprocess"
+        or "local_jupyter"
     ).strip()
 
     runner_python = (
@@ -85,32 +95,12 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
         or runner.get("python-executable")
         or None
     )
-    runner_project_path = (
-        os.getenv("INQUIRA_SAFE_PY_RUNNER_PROJECT_PATH")
-        or runner.get("project-path")
-        or None
-    )
-    safe_py_runner_source = str(
-        os.getenv("INQUIRA_SAFE_PY_RUNNER_SOURCE")
-        or runner.get("safe-py-runner-source")
-        or "auto"
-    ).strip()
-    safe_py_runner_pypi = str(
-        os.getenv("INQUIRA_SAFE_PY_RUNNER_PYPI")
-        or runner.get("safe-py-runner-pypi")
-        or "safe-py-runner"
-    ).strip()
-    safe_py_runner_github = str(
-        os.getenv("INQUIRA_SAFE_PY_RUNNER_GITHUB")
-        or runner.get("safe-py-runner-github")
-        or "git+https://github.com/adarsh9780/safe-py-runner.git"
-    ).strip()
-    safe_py_runner_local_path = (
-        os.getenv("INQUIRA_SAFE_PY_RUNNER_LOCAL_PATH")
-        or runner.get("safe-py-runner-local-path")
-        or runner_project_path
-        or None
-    )
+    runner_venv_name = str(
+        runner.get("venv-name")
+        or ".runner-venv"
+    ).strip() or ".runner-venv"
+    runner_packages = _as_str_list(runner.get("packages"))
+    kernel_idle_minutes = _as_int(runner.get("kernel-idle-minutes", 30), 30)
 
     policy = RunnerPolicyConfig(
         timeout_seconds=_as_int(runner.get("timeout-seconds", 60), 60),
@@ -122,12 +112,8 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
     return ExecutionRuntimeConfig(
         provider=provider,
         runner_python_executable=str(runner_python) if runner_python else None,
-        runner_project_path=str(runner_project_path) if runner_project_path else None,
-        safe_py_runner_source=safe_py_runner_source.lower(),
-        safe_py_runner_pypi=safe_py_runner_pypi,
-        safe_py_runner_github=safe_py_runner_github,
-        safe_py_runner_local_path=(
-            str(safe_py_runner_local_path) if safe_py_runner_local_path else None
-        ),
+        runner_venv_name=runner_venv_name,
+        runner_packages=runner_packages,
+        kernel_idle_minutes=max(1, kernel_idle_minutes),
         runner_policy=policy,
     )

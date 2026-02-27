@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -33,11 +34,7 @@ async def test_execute_code_uses_local_subprocess_provider(monkeypatch, tmp_path
             "result_type": "scalar",
         }
 
-    def fail_safe_runner(script: str, timeout: int):
-        raise AssertionError("safe runner should not be called")
-
     monkeypatch.setattr(code_executor, "_run_in_subprocess", fake_subprocess)
-    monkeypatch.setattr(code_executor, "_run_in_safe_runner", fail_safe_runner)
 
     result = await code_executor.execute_code(
         code="result = 1",
@@ -51,37 +48,44 @@ async def test_execute_code_uses_local_subprocess_provider(monkeypatch, tmp_path
 
 
 @pytest.mark.asyncio
-async def test_execute_code_uses_safe_runner_provider(monkeypatch, tmp_path):
-    monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "local_safe_runner")
+async def test_execute_code_uses_jupyter_provider(monkeypatch):
+    monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "local_jupyter")
 
-    captured = {"called": False}
+    class FakeManager:
+        async def execute(
+            self,
+            *,
+            workspace_id: str,
+            workspace_duckdb_path: str,
+            code: str,
+            timeout: int,
+            config,
+        ):
+            assert workspace_id == "ws-1"
+            assert workspace_duckdb_path == "/tmp/ws/workspace.duckdb"
+            assert "result = 2" in code
+            assert timeout == 11
+            return {
+                "success": True,
+                "stdout": "",
+                "stderr": "",
+                "error": None,
+                "result": 2,
+                "result_type": "scalar",
+            }
 
-    def fake_safe_runner(script: str, timeout: int):
-        captured["called"] = True
-        assert "result = 2" in script
-        assert timeout == 11
-        return {
-            "success": True,
-            "stdout": "",
-            "stderr": "",
-            "error": None,
-            "result": 2,
-            "result_type": "scalar",
-        }
+    async def fake_get_manager():
+        return FakeManager()
 
-    def fail_subprocess(script_path: str, timeout: int, working_dir: str):
-        raise AssertionError("subprocess runner should not be called")
-
-    monkeypatch.setattr(code_executor, "_run_in_safe_runner", fake_safe_runner)
-    monkeypatch.setattr(code_executor, "_run_in_subprocess", fail_subprocess)
+    monkeypatch.setattr(code_executor, "get_workspace_kernel_manager", fake_get_manager)
 
     result = await code_executor.execute_code(
         code="result = 2",
         timeout=11,
-        working_dir=str(tmp_path),
+        workspace_id="ws-1",
+        workspace_duckdb_path="/tmp/ws/workspace.duckdb",
     )
 
-    assert captured["called"] is True
     assert result["success"] is True
     assert result["result"] == 2
 
@@ -93,7 +97,8 @@ async def test_execute_code_reads_provider_from_toml(monkeypatch, tmp_path):
         """
 [execution]
 provider = "local_subprocess"
-""".strip()
+""".strip(),
+        encoding="utf-8",
     )
     monkeypatch.delenv("INQUIRA_EXECUTION_PROVIDER", raising=False)
     monkeypatch.setenv("INQUIRA_TOML_PATH", str(cfg))
@@ -109,17 +114,6 @@ provider = "local_subprocess"
         }
 
     monkeypatch.setattr(code_executor, "_run_in_subprocess", fake_subprocess)
-    def unexpected_safe_runner(script: str, timeout: int):
-        return {
-            "success": False,
-            "stdout": "",
-            "stderr": "",
-            "error": "unexpected",
-            "result": None,
-            "result_type": None,
-        }
-
-    monkeypatch.setattr(code_executor, "_run_in_safe_runner", unexpected_safe_runner)
 
     result = await code_executor.execute_code(
         code="print('x')",
@@ -148,7 +142,6 @@ async def test_execute_code_rejects_unknown_provider(monkeypatch, tmp_path):
 @pytest.mark.asyncio
 async def test_execute_code_default_workdir_avoids_legacy_workspace_root(monkeypatch, tmp_path):
     monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "local_subprocess")
-
     expected_dir = tmp_path / "runtime" / "exec_tmp"
 
     monkeypatch.setattr(
@@ -173,3 +166,22 @@ async def test_execute_code_default_workdir_avoids_legacy_workspace_root(monkeyp
 
     result = await code_executor.execute_code(code="x = 1", timeout=3)
     assert result["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_execute_code_requires_workspace_metadata_for_jupyter(monkeypatch):
+    monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "local_jupyter")
+
+    result = await code_executor.execute_code(code="x = 1", timeout=3)
+    assert result["success"] is False
+    assert "workspace_id" in (result["error"] or "")
+
+
+@pytest.mark.asyncio
+async def test_get_workspace_kernel_manager_uses_config_idle_minutes(monkeypatch):
+    fake_config = SimpleNamespace(kernel_idle_minutes=99)
+    monkeypatch.setattr(code_executor, "load_execution_runtime_config", lambda: fake_config)
+
+    await code_executor.shutdown_workspace_kernel_manager()
+    manager = await code_executor.get_workspace_kernel_manager()
+    assert manager is not None

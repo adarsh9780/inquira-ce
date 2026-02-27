@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...services.code_executor import execute_code
+from ...services.code_executor import get_workspace_kernel_status, reset_workspace_kernel
 from ..db.session import get_db_session
 from ..repositories.preferences_repository import PreferencesRepository
 from ..repositories.dataset_repository import DatasetRepository
@@ -38,6 +39,16 @@ class ExecuteResponse(BaseModel):
     error: str | None = None
     result: object | None = None
     result_type: str | None = None
+
+
+class KernelStatusResponse(BaseModel):
+    workspace_id: str
+    status: str
+
+
+class KernelResetResponse(BaseModel):
+    workspace_id: str
+    reset: bool
 
 
 class WorkspacePathsResponse(BaseModel):
@@ -215,18 +226,44 @@ async def execute_workspace_code(
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
-    working_dir = str(Path(workspace.duckdb_path).parent)
-
-    bootstrap = (
-        "import duckdb\n"
-        f"conn = duckdb.connect(r'''{workspace.duckdb_path}''')\n"
-    )
     result = await execute_code(
-        code=f"{bootstrap}\n{payload.code}",
+        code=payload.code,
         timeout=payload.timeout,
-        working_dir=working_dir,
+        working_dir=str(Path(workspace.duckdb_path).parent),
+        workspace_id=workspace_id,
+        workspace_duckdb_path=str(workspace.duckdb_path),
     )
     return ExecuteResponse(**result)
+
+
+@router.get(
+    "/workspaces/{workspace_id}/kernel/status",
+    response_model=KernelStatusResponse,
+)
+async def get_workspace_kernel_runtime_status(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Return current workspace kernel status."""
+    await _require_workspace_access(session, current_user.id, workspace_id)
+    status = await get_workspace_kernel_status(workspace_id)
+    return KernelStatusResponse(workspace_id=workspace_id, status=status)
+
+
+@router.post(
+    "/workspaces/{workspace_id}/kernel/reset",
+    response_model=KernelResetResponse,
+)
+async def reset_workspace_kernel_runtime(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Reset workspace kernel and clear in-memory execution context."""
+    await _require_workspace_access(session, current_user.id, workspace_id)
+    reset = await reset_workspace_kernel(workspace_id)
+    return KernelResetResponse(workspace_id=workspace_id, reset=reset)
 
 
 @router.get(

@@ -27,6 +27,10 @@ from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
 from .v1.services.workspace_deletion_service import WorkspaceDeletionService
 from .core.config_models import AppConfig
 from .core.logger import logprint, patch_print
+from .services.code_executor import (
+    prune_idle_workspace_kernels,
+    shutdown_workspace_kernel_manager,
+)
 from .services.session_variable_store import session_variable_store
 from .services.websocket_manager import websocket_manager
 from .services.tracing import init_phoenix_tracing
@@ -164,12 +168,18 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logprint(f"Error closing checkpointer: {e}", level="error")
 
+    try:
+        await shutdown_workspace_kernel_manager()
+    except Exception as e:
+        logprint(f"Error shutting down workspace kernels: {e}", level="error")
+
 
 async def session_cleanup_worker():
     """Background task to clean up expired sessions"""
     while True:
         try:
             session_variable_store.cleanup_expired_sessions()
+            await prune_idle_workspace_kernels()
             await asyncio.sleep(300)  # Clean up every 5 minutes
         except Exception as e:
             logprint(f"Error in session cleanup: {e}", level="error")

@@ -53,16 +53,6 @@ struct ExecutionConfig {
 struct RunnerConfig {
     #[serde(rename = "venv-name")]
     venv_name: Option<String>,
-    #[serde(rename = "project-path")]
-    project_path: Option<String>,
-    #[serde(rename = "safe-py-runner-source")]
-    safe_py_runner_source: Option<String>,
-    #[serde(rename = "safe-py-runner-pypi")]
-    safe_py_runner_pypi: Option<String>,
-    #[serde(rename = "safe-py-runner-github")]
-    safe_py_runner_github: Option<String>,
-    #[serde(rename = "safe-py-runner-local-path")]
-    safe_py_runner_local_path: Option<String>,
     packages: Option<Vec<String>>,
 }
 
@@ -280,6 +270,7 @@ fn bootstrap_runner_env(
     }
 
     let mut packages = vec![
+        "ipykernel".to_string(),
         "narwhals".to_string(),
         "duckdb".to_string(),
         "pandas".to_string(),
@@ -290,11 +281,10 @@ fn bootstrap_runner_env(
         if let Some(runner) = &exec.runner {
             if let Some(custom) = &runner.packages {
                 if !custom.is_empty() {
-                    packages = custom
-                        .iter()
-                        .filter(|pkg| pkg.as_str() != "safe-py-runner")
-                        .cloned()
-                        .collect();
+                    packages = custom.to_vec();
+                    if !packages.iter().any(|pkg| pkg == "ipykernel") {
+                        packages.push("ipykernel".to_string());
+                    }
                 }
             }
         }
@@ -315,19 +305,14 @@ fn bootstrap_runner_env(
         return Err("runner package install returned non-zero exit code".to_string());
     }
 
-    install_safe_py_runner(uv_bin, &runner_python, config)?;
-
     let _ = fs::write(&marker_file, desired_runner_state);
 
     Ok(())
 }
 
 fn build_runner_state_marker(config: &InquiraConfig) -> String {
-    let mut source = "auto".to_string();
-    let mut pypi_pkg = "safe-py-runner".to_string();
-    let mut github_ref = "git+https://github.com/adarsh9780/safe-py-runner.git".to_string();
-    let mut local_path = String::new();
     let mut packages = vec![
+        "ipykernel".to_string(),
         "narwhals".to_string(),
         "duckdb".to_string(),
         "pandas".to_string(),
@@ -336,129 +321,19 @@ fn build_runner_state_marker(config: &InquiraConfig) -> String {
 
     if let Some(exec) = &config.execution {
         if let Some(runner) = &exec.runner {
-            if let Some(val) = &runner.safe_py_runner_source {
-                source = val.to_lowercase();
-            }
-            if let Some(val) = &runner.safe_py_runner_pypi {
-                pypi_pkg = val.to_string();
-            }
-            if let Some(val) = &runner.safe_py_runner_github {
-                github_ref = val.to_string();
-            }
-            if let Some(val) = &runner.safe_py_runner_local_path {
-                local_path = val.to_string();
-            } else if let Some(val) = &runner.project_path {
-                local_path = val.to_string();
-            }
             if let Some(custom) = &runner.packages {
                 if !custom.is_empty() {
-                    packages = custom
-                        .iter()
-                        .filter(|pkg| pkg.as_str() != "safe-py-runner")
-                        .cloned()
-                        .collect();
+                    packages = custom.to_vec();
+                    if !packages.iter().any(|pkg| pkg == "ipykernel") {
+                        packages.push("ipykernel".to_string());
+                    }
                 }
             }
         }
     }
 
     packages.sort();
-    format!(
-        "source={source}\npypi={pypi_pkg}\ngithub={github_ref}\nlocal={local_path}\npackages={}",
-        packages.join(",")
-    )
-}
-
-fn install_safe_py_runner(
-    uv_bin: &PathBuf,
-    runner_python: &PathBuf,
-    config: &InquiraConfig,
-) -> Result<(), String> {
-    let mut source = "auto".to_string();
-    let mut pypi_pkg = "safe-py-runner".to_string();
-    let mut github_ref = "git+https://github.com/adarsh9780/safe-py-runner.git".to_string();
-    let mut local_path = None::<String>;
-
-    if let Some(exec) = &config.execution {
-        if let Some(runner) = &exec.runner {
-            if let Some(val) = &runner.safe_py_runner_source {
-                source = val.to_lowercase();
-            }
-            if let Some(val) = &runner.safe_py_runner_pypi {
-                pypi_pkg = val.to_string();
-            }
-            if let Some(val) = &runner.safe_py_runner_github {
-                github_ref = val.to_string();
-            }
-            if let Some(val) = &runner.safe_py_runner_local_path {
-                local_path = Some(val.to_string());
-            } else if let Some(val) = &runner.project_path {
-                // Backward compatibility with existing config
-                local_path = Some(val.to_string());
-            }
-        }
-    }
-
-    let mut attempts: Vec<(String, Vec<String>)> = Vec::new();
-    match source.as_str() {
-        "pypi" => {
-            attempts.push(("PyPI".to_string(), vec![pypi_pkg]));
-        }
-        "github" => {
-            attempts.push(("GitHub".to_string(), vec![github_ref]));
-        }
-        "local" => {
-            if let Some(path) = local_path.clone() {
-                attempts.push(("local".to_string(), vec!["-e".to_string(), path]));
-            }
-        }
-        _ => {
-            // auto: PyPI -> GitHub -> local (final fallback)
-            attempts.push(("PyPI".to_string(), vec![pypi_pkg]));
-            attempts.push(("GitHub".to_string(), vec![github_ref]));
-            if let Some(path) = local_path.clone() {
-                attempts.push(("local".to_string(), vec!["-e".to_string(), path]));
-            }
-        }
-    }
-
-    if attempts.is_empty() {
-        return Err(
-            "No valid safe-py-runner source configured. Provide local path or select pypi/github."
-                .to_string(),
-        );
-    }
-
-    for (label, args) in attempts {
-        if label == "local" && args.len() == 2 {
-            let local = PathBuf::from(&args[1]);
-            if !local.exists() {
-                log::warn!(
-                    "safe-py-runner local path does not exist, skipping: {}",
-                    local.display()
-                );
-                continue;
-            }
-        }
-
-        let mut cmd = Command::new(uv_bin);
-        cmd.args(["pip", "install", "--python", runner_python.to_str().unwrap()]);
-        for arg in args {
-            cmd.arg(arg);
-        }
-        apply_uv_package_env(&mut cmd, config);
-        let status = cmd
-            .status()
-            .map_err(|e| format!("safe-py-runner install command failed: {}", e))?;
-
-        if status.success() {
-            log::info!("Installed safe-py-runner from {}", label);
-            return Ok(());
-        }
-        log::warn!("safe-py-runner install from {} failed, trying next source", label);
-    }
-
-    Err("Failed to install safe-py-runner from all configured sources".to_string())
+    format!("packages={}", packages.join(","))
 }
 
 fn apply_proxy_env(cmd: &mut Command, config: &InquiraConfig) {
@@ -596,7 +471,7 @@ fn start_backend(
         .execution
         .as_ref()
         .and_then(|e| e.provider.clone())
-        .unwrap_or_else(|| "local_subprocess".to_string());
+        .unwrap_or_else(|| "local_jupyter".to_string());
 
     cmd.args(["-m", "app.main"])
         .current_dir(backend_dir)
@@ -606,13 +481,6 @@ fn start_backend(
         .env("INQUIRA_TOML_PATH", inquira_toml_path.to_string_lossy().to_string())
         .env("INQUIRA_EXECUTION_PROVIDER", execution_provider);
 
-    if let Some(exec) = &config.execution {
-        if let Some(runner) = &exec.runner {
-            if let Some(path) = &runner.project_path {
-                cmd.env("INQUIRA_SAFE_PY_RUNNER_PROJECT_PATH", path);
-            }
-        }
-    }
     if let Some(py) = runner_python {
         cmd.env("INQUIRA_RUNNER_PYTHON", py.to_string_lossy().to_string());
     }
@@ -685,7 +553,7 @@ pub fn run() {
                     .execution
                     .as_ref()
                     .and_then(|e| e.provider.clone())
-                    .unwrap_or_else(|| "local_subprocess".to_string())
+                    .unwrap_or_else(|| "local_jupyter".to_string())
             );
             let venv_path = data_dir.join(".venv");
             let backend_env_marker = data_dir.join(".backend-env-fingerprint");
@@ -732,9 +600,9 @@ pub fn run() {
                 .execution
                 .as_ref()
                 .and_then(|e| e.provider.clone())
-                .unwrap_or_else(|| "local_subprocess".to_string())
+                .unwrap_or_else(|| "local_jupyter".to_string())
                 .to_lowercase();
-            if execution_provider == "local_safe_runner" {
+            if execution_provider == "local_jupyter" {
                 app.emit("backend-status", "Preparing isolated code runner...").ok();
                 if let Err(e) = bootstrap_runner_env(&uv_bin, &runner_venv_path, &config) {
                     log::error!("Runner bootstrap failed: {}", e);
@@ -746,7 +614,7 @@ pub fn run() {
 
             // Phase 2: Start the backend
             app.emit("backend-status", "Starting backend...").ok();
-            let runner_python = if execution_provider == "local_safe_runner" {
+            let runner_python = if execution_provider == "local_jupyter" {
                 Some(python_bin_from_venv(&runner_venv_path))
             } else {
                 None
