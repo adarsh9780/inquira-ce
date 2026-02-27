@@ -60,6 +60,7 @@ When given a question, follow this structured approach:
 - Ensure charts tell a clear business story
 - Use descriptive, unique variable names for figures (do not always use a generic name like `fig`). Example:
 `monthly_sales_fig`, `revenue_by_region_chart`.
+- If Narwhals is used, convert wrappers to native/pandas before Plotly (`nw.to_native(...)` then `.to_pandas()` when available). Do not pass `narwhals.DataFrame` directly to Plotly.
 
 ## Code Generation Rules:
 - ALWAYS use the 'conn' variable for DuckDB operations

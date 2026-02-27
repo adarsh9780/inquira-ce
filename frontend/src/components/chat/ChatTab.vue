@@ -1,7 +1,7 @@
 <template>
-  <div class="flex h-full bg-white rounded-xl overflow-hidden">
-    <div class="flex-1 flex flex-col">
-      <div class="border-b border-gray-100 bg-white px-3 py-2 sm:px-4 flex flex-wrap items-center gap-2">
+  <div class="flex h-full min-w-0 bg-white rounded-xl overflow-hidden">
+    <div class="flex-1 min-w-0 flex flex-col">
+      <div class="border-b border-gray-100 bg-white px-3 py-2 sm:px-4 flex items-center gap-2">
         <div class="flex-1 min-w-0 flex items-center gap-2 group">
           <div v-if="!isEditingTitle" class="min-w-0 flex items-center gap-2 overflow-hidden">
             <h3 
@@ -31,8 +31,8 @@
           </div>
         </div>
 
-        <div class="ml-auto flex items-center gap-1 sm:gap-1.5 flex-shrink-0 max-w-full">
-          <div class="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100 overflow-x-auto">
+        <div class="ml-auto flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+          <div class="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100">
             <button
               type="button"
               class="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-white hover:text-blue-600 transition-all hover:shadow-sm"
@@ -74,7 +74,7 @@
         </div>
       </div>
 
-      <div class="flex-1 overflow-y-auto bg-gray-50/30" data-chat-scroll-container>
+      <div class="flex-1 min-h-0 overflow-y-auto bg-gray-50/30" data-chat-scroll-container>
         <div v-if="!appStore.hasWorkspace" class="flex items-center justify-center h-full px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-2 sm:pb-3 lg:pb-4">
           <div class="text-center max-w-md">
             <div class="mx-auto flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 mb-4 sm:mb-6 shadow-lg">

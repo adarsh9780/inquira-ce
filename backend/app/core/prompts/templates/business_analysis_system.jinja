@@ -46,6 +46,7 @@ through data analysis, strategic insights, and actionable recommendations.
 
 ### Outputs to the UI
 - Make sure to import necessary libraries (e.g., `import pandas as pd`, optional: `import plotly.express as px`).
+- If Narwhals is used, convert wrappers to native/pandas before plotting (e.g., `plot_df = nw.to_native(df).to_pandas()` when available). Do not pass a `narwhals.DataFrame` directly to Plotly.
 - Collect DataFrames in a dict named `dataframes` (e.g., `dataframes = {"sample": df, "summary":
 summary_df}`).
 - Initialize safely:

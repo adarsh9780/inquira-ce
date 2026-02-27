@@ -472,12 +472,93 @@ function handleProgressUpdate(data) {
 }
 
 // Schema generation
+function schemaNeedsDescriptionRegeneration(columns) {
+  if (!Array.isArray(columns) || columns.length === 0) {
+    return true
+  }
+  return columns.some((col) => !String(col?.description || '').trim())
+}
+
+function buildSchemaColumnsFromIngestedColumns() {
+  return (ingestedColumns.value || [])
+    .filter((col) => String(col?.name || '').trim())
+    .map((col) => ({
+      name: String(col.name).trim(),
+      dtype: col.type || col.dtype || 'VARCHAR',
+      description: String(col.description || ''),
+      samples: Array.isArray(col.samples) ? col.samples : []
+    }))
+}
+
 async function generateAndSaveSchema() {
+  const workspaceId = appStore.activeWorkspaceId
+  const tableName = (ingestedTableName.value || appStore.ingestedTableName || '').trim()
+  const schemaContext = appStore.schemaContext.trim() || ''
+  const isBrowserDataset = String(appStore.dataFilePath || '').toLowerCase().startsWith('browser://')
+
+  if (!workspaceId || !tableName) {
+    throw new Error('Dataset table context is missing. Please re-select your file and try again.')
+  }
+
+  let schemaColumns = []
+  let generatedDescriptions = false
+
   try {
     updateProgress('Preparing schema metadata...', 60)
+
+    // Ensure browser-native datasets have a schema file on disk before checks.
+    if (isBrowserDataset) {
+      await apiService.v1SyncBrowserDataset(workspaceId, {
+        table_name: tableName,
+        columns: buildSchemaColumnsFromIngestedColumns(),
+        row_count: null,
+        allow_sample_values: appStore.allowSchemaSampleValues
+      })
+    }
+
+    let existingSchema = null
+    try {
+      existingSchema = await apiService.v1GetDatasetSchema(workspaceId, tableName)
+      schemaColumns = Array.isArray(existingSchema?.columns) ? existingSchema.columns : []
+    } catch (schemaLoadError) {
+      // If schema is missing or invalid, create one from ingested metadata first.
+      schemaColumns = buildSchemaColumnsFromIngestedColumns()
+      if (schemaColumns.length === 0) {
+        throw new Error('No columns available to build schema. Please re-select the data file.')
+      }
+      await apiService.v1SaveDatasetSchema(workspaceId, tableName, {
+        context: schemaContext,
+        columns: schemaColumns
+      })
+    }
+
+    if (schemaNeedsDescriptionRegeneration(schemaColumns)) {
+      if (isBrowserDataset) {
+        // Browser datasets do not reliably support backend SQL-based LLM regeneration.
+        // Keep schema file created and let users regenerate from Schema tab if runtime supports it.
+        await apiService.v1SaveDatasetSchema(workspaceId, tableName, {
+          context: schemaContext,
+          columns: schemaColumns.length > 0 ? schemaColumns : buildSchemaColumnsFromIngestedColumns()
+        })
+      } else {
+        updateProgress('Generating schema descriptions with AI...', 80)
+        await apiService.v1RegenerateDatasetSchema(workspaceId, tableName, { context: schemaContext })
+        generatedDescriptions = true
+      }
+    } else if (schemaContext !== String(existingSchema?.context || '')) {
+      // Keep context in sync even when descriptions are already complete.
+      await apiService.v1SaveDatasetSchema(workspaceId, tableName, {
+        context: schemaContext,
+        columns: schemaColumns
+      })
+    }
+
     appStore.setIsSchemaFileUploaded(true)
-    appStore.setSchemaFileId(ingestedTableName.value || '')
-    updateProgress('Schema metadata ready', 100)
+    appStore.setSchemaFileId(tableName)
+    updateProgress(
+      generatedDescriptions ? 'Schema descriptions generated' : 'Schema metadata ready',
+      100
+    )
   } catch (error) {
     console.error('❌ Schema generation failed:', error)
     throw error
@@ -516,25 +597,6 @@ async function saveDataSettings() {
 
     await apiService.setContext(appStore.schemaContext.trim())
     await generateAndSaveSchema()
-
-    if (
-      appStore.activeWorkspaceId &&
-      ingestedTableName.value &&
-      String(appStore.dataFilePath || '').toLowerCase().startsWith('browser://')
-    ) {
-      const columnsPayload = ingestedColumns.value.map((col) => ({
-        name: col.name,
-        dtype: col.type || col.dtype || 'VARCHAR',
-        description: col.description || '',
-        samples: Array.isArray(col.samples) ? col.samples : []
-      }))
-      await apiService.v1SyncBrowserDataset(appStore.activeWorkspaceId, {
-        table_name: ingestedTableName.value,
-        columns: columnsPayload,
-        row_count: null,
-        allow_sample_values: appStore.allowSchemaSampleValues
-      })
-    }
 
     updateProgress('Data settings saved!', 100)
     showMessage('Data settings saved! Your data is ready for analysis.', 'success')

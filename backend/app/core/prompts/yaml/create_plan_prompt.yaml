@@ -21,6 +21,7 @@ template: |
     - STRATEGY: There is NO pre-provided `query` function. You must construct the connection yourself. Do not use `await query`.
     - STRATEGY: Fallback to Ibis or raw DuckDB SQL only if Narwhals cannot handle an extraordinarily complex operation.
     - STRATEGY: Bring data into memory (e.g., as Pandas) only after heavy lifting/reduction is completely done.
+    - STRATEGY: If visualization is needed, plan an explicit conversion from Narwhals wrapper to a native frame before Plotly (`nw.to_native(...)` then `.to_pandas()` when available).
     - do not treat missing values and data anomalies but consider the possibility in the plan
     - also include the best visualisation which can be used to absorb information better
     - the plan should be self-sufficient, meaning the LLM responsible for writing the code should not need

@@ -25,6 +25,11 @@ template: |
   - The LAST line of your code should evaluate to either:
     - a Pandas DataFrame (for table rendering), or
     - a Plotly figure (for chart rendering).
+  - Plotly Express in this runtime does NOT accept a `narwhals.DataFrame` wrapper directly.
+  - If you used Narwhals for transformations, convert to a native frame before plotting:
+    - `native_df = nw.to_native(nw_df)`
+    - If native object supports `.to_pandas()`, call it and pass that Pandas DataFrame to Plotly.
+    - Otherwise use `pd.DataFrame(native_df)` before plotting.
   - Do not call `fig.show()`.
   - Do not wrap the final output in dicts.
 
@@ -60,8 +65,17 @@ template: |
   result = df.filter(nw.col("age") > 30).group_by("department").agg(nw.col("salary").mean())
   
   # Bring into memory as pandas for output or visualization
-  final_df = nw.to_native(result).df()
+  native_result = nw.to_native(result)
+  final_df = native_result.to_pandas() if hasattr(native_result, "to_pandas") else pd.DataFrame(native_result)
   final_df
+  ```
+  **PLOTTING EXAMPLE (required conversion):**
+  ```python
+  # Narwhals wrapper -> native -> pandas before Plotly
+  native_plot_df = nw.to_native(result)
+  plot_df = native_plot_df.to_pandas() if hasattr(native_plot_df, "to_pandas") else pd.DataFrame(native_plot_df)
+  runs_by_team_fig = px.bar(plot_df, x="team", y="runs", title="Runs by Team")
+  runs_by_team_fig
   ```
   - Respect existing context in `Current Code Context`; avoid re-defining everything unless needed.
   - Generate self-contained, valid Python code.

@@ -224,6 +224,11 @@ export const apiService = {
     if (!workspaceId || !tableName) {
       throw new Error('Select a workspace dataset before generating schema.')
     }
+    if (forceRegenerate) {
+      return this.v1RegenerateDatasetSchema(workspaceId, tableName, {
+        context: context || ''
+      })
+    }
     const schema = await this.v1GetDatasetSchema(workspaceId, tableName)
     if (!context) return schema
     return this.v1SaveDatasetSchema(workspaceId, tableName, {

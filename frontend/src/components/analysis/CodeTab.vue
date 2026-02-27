@@ -268,6 +268,8 @@ import { useAuthStore } from '../../stores/authStore'
 import apiService from '../../services/apiService'
 import executionService from '../../services/executionService'
 import { toast } from '../../composables/useToast'
+import { normalizeExecutionResponse } from '../../utils/runtimeExecution'
+import { buildExecutionViewModel } from '../../utils/executionViewModel'
 import NotebookCell from './NotebookCell.vue'
 
 // CodeMirror 6 imports
@@ -833,6 +835,41 @@ function updateEditorContent() {
   }
 }
 
+function applyExecutionArtifactsToStore(viewModel, { switchTabs = false } = {}) {
+  appStore.setDataframes(viewModel.dataframes)
+  if (viewModel.dataframes.length > 0) {
+    appStore.setResultData(viewModel.dataframes[0].data)
+    if (switchTabs) appStore.setActiveTab('table')
+  }
+
+  appStore.setFigures(viewModel.figures)
+  if (viewModel.figures.length > 0) {
+    appStore.setPlotlyFigure(viewModel.figures[0].data)
+    if (switchTabs) appStore.setActiveTab('figure')
+  }
+
+  appStore.setScalars(viewModel.scalars)
+  if (viewModel.scalars.length > 0 && switchTabs) {
+    appStore.setActiveTab('terminal')
+  }
+}
+
+function buildCellExecutionViewModel(response, executionTime, mode = 'available') {
+  const locationWord = mode === 'displayed' ? 'Displayed' : 'Available'
+  return buildExecutionViewModel(
+    {
+      ...response,
+      execution_time: executionTime,
+    },
+    {
+      dataframeLine: (count) => `✅ ${count} dataframe(s) found. ${locationWord} in Table tab.`,
+      figureLine: (count) => `✅ ${count} figure(s) found. ${locationWord} in Chart tab.`,
+      scalarLine: (count) => `✅ ${count} scalar(s) found. ${locationWord} in Terminal tab.`,
+      successLine: '✅ Cell executed successfully!',
+    },
+  )
+}
+
 async function runCode() {
   if (!canRunCode.value) return
 
@@ -855,105 +892,17 @@ async function runCode() {
           const start = performance.now()
           const pyResponse = await executionService.executePython(cell.content)
           const execTime = (performance.now() - start) / 1000
-
-          const response = {
-            execution_time: execTime,
-            output: pyResponse.stdout + (pyResponse.stderr ? '\n' + pyResponse.stderr : ''),
-            error: pyResponse.success ? null : (pyResponse.error || 'Execution failed'),
-            variables: { dataframes: {}, figures: {}, scalars: {} }
-          }
-
-          if (pyResponse.success && pyResponse.result !== undefined && pyResponse.result !== null) {
-            if (pyResponse.resultType === 'DataFrame' || (typeof pyResponse.result === 'object' && pyResponse.result.columns && pyResponse.result.data)) {
-              response.variables.dataframes['result'] = pyResponse.result
-            } else if (pyResponse.resultType === 'Figure' || (typeof pyResponse.result === 'object' && pyResponse.result.data && pyResponse.result.layout)) {
-              response.variables.figures['result'] = pyResponse.result
-            } else {
-              response.variables.scalars['result'] = pyResponse.result
-            }
-          }
-
-          let output = ''
-
-          // Show execution time if available
-          if (response.execution_time) {
-            output += `Execution time: ${response.execution_time.toFixed(3)}s\n\n`
-          }
-
-          // Show raw output from the API
-          if (response.output) {
-            output += `Output:\n${response.output}\n\n`
-          }
-
-          // Show error if present
-          if (response.error) {
-            output += `Error: ${response.error}\n\n`
-          }
-
-          // Handle dataframes for table display
-          if (response.variables && response.variables.dataframes) {
-            try {
-              const dfEntries = Object.entries(response.variables.dataframes)
-              const dfs = dfEntries.map(([name, data]) => {
-                const parsedData = typeof data === 'string' ? JSON.parse(data) : data
-                return { name, data: parsedData }
-              }).filter(df => df !== null)
-
-              if (dfs.length > 0) {
-                appStore.setDataframes(dfs)
-                appStore.setResultData(dfs[0].data)
-                output += `✅ ${dfs.length} dataframe(s) found. Displayed in Table tab.\n`
-                appStore.setActiveTab('table')
-              }
-            } catch (error) {
-              console.error('Failed to parse dataframes:', error)
-              output += '⚠️ Failed to parse dataframe data.\n'
-            }
-          }
-
-          // Handle figures for chart display
-          if (response.variables && response.variables.figures) {
-            try {
-              const figEntries = Object.entries(response.variables.figures)
-              const figs = figEntries.map(([name, data]) => {
-                const parsedData = typeof data === 'string' ? JSON.parse(data) : data
-                return { name, data: parsedData }
-              }).filter(fig => fig !== null)
-
-              if (figs.length > 0) {
-                appStore.setFigures(figs)
-                appStore.setPlotlyFigure(figs[0].data)
-                output += `✅ ${figs.length} figure(s) found. Displayed in Chart tab.\n`
-                appStore.setActiveTab('figure')
-              }
-            } catch (error) {
-              console.error('Failed to parse figures:', error)
-              output += '⚠️ Failed to parse figure data.\n'
-            }
-          }
-
-          // Handle scalars
-          if (response.variables && response.variables.scalars) {
-            try {
-              const scalarEntries = Object.entries(response.variables.scalars)
-              const scs = scalarEntries.map(([name, value]) => ({ name, value }))
-              if (scs.length > 0) {
-                appStore.setScalars(scs)
-                output += `✅ ${scs.length} scalar(s) found. Displayed in Terminal tab.\n`
-                appStore.setActiveTab('terminal')
-              }
-            } catch (error) {
-              console.error('Failed to parse scalars:', error)
-              output += '⚠️ Failed to parse scalar data.\n'
-            }
-          }
-
-          // Success message if no errors
-          if (!response.error) {
-            output += '\n✅ Cell executed successfully!'
-          }
-
-          appStore.updateNotebookCell(cell.id, { output, isRunning: false })
+          const normalized = normalizeExecutionResponse({
+            success: pyResponse.success,
+            stdout: pyResponse.stdout,
+            stderr: pyResponse.stderr,
+            error: pyResponse.error,
+            result: pyResponse.result,
+            result_type: pyResponse.resultType,
+          })
+          const viewModel = buildCellExecutionViewModel(normalized, execTime, 'displayed')
+          applyExecutionArtifactsToStore(viewModel, { switchTabs: true })
+          appStore.updateNotebookCell(cell.id, { output: viewModel.output, isRunning: false })
 
         } catch (cellError) {
           console.error(`Cell ${i + 1} execution failed:`, cellError)
@@ -995,122 +944,26 @@ async function runCode() {
       const start = performance.now()
       const pyResponse = await executionService.executePython(code)
       const execTime = (performance.now() - start) / 1000
-
-      const response = {
-        execution_time: execTime,
-        output: pyResponse.stdout + (pyResponse.stderr ? '\n' + pyResponse.stderr : ''),
-        error: pyResponse.success ? null : (pyResponse.error || 'Execution failed'),
-        variables: { dataframes: {}, figures: {}, scalars: {} }
-      }
-
-      if (pyResponse.success && pyResponse.result !== undefined && pyResponse.result !== null) {
-        if (pyResponse.resultType === 'DataFrame' || (typeof pyResponse.result === 'object' && pyResponse.result.columns && pyResponse.result.data)) {
-          response.variables.dataframes['result'] = pyResponse.result
-        } else if (pyResponse.resultType === 'Figure' || (typeof pyResponse.result === 'object' && pyResponse.result.data && pyResponse.result.layout)) {
-          response.variables.figures['result'] = pyResponse.result
-        } else {
-          response.variables.scalars['result'] = pyResponse.result
-        }
-      }
-
-      // Handle the response - always show raw output in terminal
-      let terminalMessage = ''
-
-      // Show execution time if available
-      if (response.execution_time) {
-        terminalMessage += `Execution time: ${response.execution_time.toFixed(3)}s\n\n`
-      }
-
-      // Show raw output from the API
-      if (response.output) {
-        terminalMessage += `Output:\n${response.output}\n\n`
-      }
-
-      // Show error if present
-      if (response.error) {
-        terminalMessage += `Error: ${response.error}\n\n`
-      }
-
-      // Track what content was generated
-      let hasTableData = false
-      let hasFigureData = false
-      let hasScalars = false
-
-      // Handle dataframes for table display
-      if (response.variables && response.variables.dataframes && typeof response.variables.dataframes === 'object') {
-        try {
-          const dfEntries = Object.entries(response.variables.dataframes)
-          const dfs = dfEntries.map(([name, data]) => {
-            const parsedData = typeof data === 'string' ? JSON.parse(data) : data
-            return { name, data: parsedData }
-          }).filter(df => df !== null)
-
-          appStore.setDataframes(dfs)
-          if (dfs.length > 0) {
-            // Set the first dataframe as the current resultData for backward compatibility
-            appStore.setResultData(dfs[0].data)
-            hasTableData = true
-            terminalMessage += `✅ ${dfs.length} dataframe(s) found. Available in Table tab.\n`
-          }
-        } catch (error) {
-          console.error('Failed to parse dataframes:', error)
-          terminalMessage += '⚠️ Failed to parse dataframe data.\n'
-        }
-      }
-
-      // Handle figures for chart display
-      if (response.variables && response.variables.figures && typeof response.variables.figures === 'object') {
-        try {
-          const figEntries = Object.entries(response.variables.figures)
-          const figs = figEntries.map(([name, data]) => {
-            const parsedData = typeof data === 'string' ? JSON.parse(data) : data
-            return { name, data: parsedData }
-          }).filter(fig => fig !== null)
-
-          appStore.setFigures(figs)
-          if (figs.length > 0) {
-            // Set the first figure as the current plotlyFigure for backward compatibility
-            appStore.setPlotlyFigure(figs[0].data)
-            hasFigureData = true
-            terminalMessage += `✅ ${figs.length} figure(s) found. Available in Chart tab.\n`
-          }
-        } catch (error) {
-          console.error('Failed to parse figures:', error)
-          terminalMessage += '⚠️ Failed to parse figure data.\n'
-        }
-      }
-
-      // Handle scalars for terminal display
-      if (response.variables && response.variables.scalars && typeof response.variables.scalars === 'object') {
-        try {
-          const scalarEntries = Object.entries(response.variables.scalars)
-          const scs = scalarEntries.map(([name, value]) => ({ name, value }))
-          appStore.setScalars(scs)
-          if (scs.length > 0) {
-            hasScalars = true
-            terminalMessage += `✅ ${scs.length} scalar(s) found. Available in Terminal tab.\n`
-          }
-        } catch (error) {
-          console.error('Failed to parse scalars:', error)
-          terminalMessage += '⚠️ Failed to parse scalar data.\n'
-        }
-      }
-
-      // Show summary of variables
-      if (response.variables) {
-        const dfCount = (response.variables.dataframes && typeof response.variables.dataframes === 'object') ? Object.keys(response.variables.dataframes).length : 0
-        const figCount = (response.variables.figures && typeof response.variables.figures === 'object') ? Object.keys(response.variables.figures).length : 0
-        const scalarCount = (response.variables.scalars && typeof response.variables.scalars === 'object') ? Object.keys(response.variables.scalars).length : 0
-        terminalMessage += `Variables created: ${dfCount} dataframe(s), ${figCount} figure(s), ${scalarCount} scalar(s)\n`
-      }
-
-      // Success message if no errors
-      if (!response.error) {
-        terminalMessage += '\nCode executed successfully!'
-      }
-
-      // Set the terminal output
-      appStore.setTerminalOutput(terminalMessage)
+      const normalized = normalizeExecutionResponse({
+        success: pyResponse.success,
+        stdout: pyResponse.stdout,
+        stderr: pyResponse.stderr,
+        error: pyResponse.error,
+        result: pyResponse.result,
+        result_type: pyResponse.resultType,
+      })
+      const viewModel = buildExecutionViewModel(
+        {
+          ...normalized,
+          execution_time: execTime,
+        },
+        {
+          successLine: 'Code executed successfully!',
+          includeVariableSummary: true,
+        },
+      )
+      applyExecutionArtifactsToStore(viewModel)
+      appStore.setTerminalOutput(viewModel.output)
 
       // Results are available in respective tabs but don't auto-switch
       // Users can manually navigate to view results
@@ -1521,87 +1374,9 @@ async function runActiveCell() {
 
   try {
     const response = await apiService.executeCode(activeCell.content)
-    let output = ''
-
-    // Show execution time if available
-    if (response.execution_time) {
-      output += `Execution time: ${response.execution_time.toFixed(3)}s\n\n`
-    }
-
-    // Show raw output from the API
-    if (response.output) {
-      output += `Output:\n${response.output}\n\n`
-    }
-
-    // Show error if present
-    if (response.error) {
-      output += `Error: ${response.error}\n\n`
-    }
-
-    // Handle dataframes for table display
-    if (response.variables && response.variables.dataframes) {
-      try {
-        const dfEntries = Object.entries(response.variables.dataframes)
-        const dfs = dfEntries.map(([name, data]) => {
-          const parsedData = typeof data === 'string' ? JSON.parse(data) : data
-          return { name, data: parsedData }
-        }).filter(df => df !== null)
-
-        if (dfs.length > 0) {
-          appStore.setDataframes(dfs)
-          appStore.setResultData(dfs[0].data)
-          output += `✅ ${dfs.length} dataframe(s) found. Displayed in Table tab.\n`
-          appStore.setActiveTab('table')
-        }
-      } catch (error) {
-        console.error('Failed to parse dataframes:', error)
-        output += '⚠️ Failed to parse dataframe data.\n'
-      }
-    }
-
-    // Handle figures for chart display
-    if (response.variables && response.variables.figures) {
-      try {
-        const figEntries = Object.entries(response.variables.figures)
-        const figs = figEntries.map(([name, data]) => {
-          const parsedData = typeof data === 'string' ? JSON.parse(data) : data
-          return { name, data: parsedData }
-        }).filter(fig => fig !== null)
-
-        if (figs.length > 0) {
-          appStore.setFigures(figs)
-          appStore.setPlotlyFigure(figs[0].data)
-          output += `✅ ${figs.length} figure(s) found. Displayed in Chart tab.\n`
-          appStore.setActiveTab('figure')
-        }
-      } catch (error) {
-        console.error('Failed to parse figures:', error)
-        output += '⚠️ Failed to parse figure data.\n'
-      }
-    }
-
-    // Handle scalars
-    if (response.variables && response.variables.scalars) {
-      try {
-        const scalarEntries = Object.entries(response.variables.scalars)
-        const scs = scalarEntries.map(([name, value]) => ({ name, value }))
-        if (scs.length > 0) {
-          appStore.setScalars(scs)
-          output += `✅ ${scs.length} scalar(s) found. Displayed in Terminal tab.\n`
-          appStore.setActiveTab('terminal')
-        }
-      } catch (error) {
-        console.error('Failed to parse scalars:', error)
-        output += '⚠️ Failed to parse scalar data.\n'
-      }
-    }
-
-    // Success message if no errors
-    if (!response.error) {
-      output += '\n✅ Cell executed successfully!'
-    }
-
-    appStore.updateNotebookCell(activeCell.id, { output, isRunning: false })
+    const viewModel = buildCellExecutionViewModel(response, response.execution_time, 'displayed')
+    applyExecutionArtifactsToStore(viewModel, { switchTabs: true })
+    appStore.updateNotebookCell(activeCell.id, { output: viewModel.output, isRunning: false })
 
   } catch (error) {
     console.error('Active cell execution failed:', error)

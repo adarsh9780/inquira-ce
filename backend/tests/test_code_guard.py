@@ -33,3 +33,17 @@ def test_code_guard_node_preserves_valid_code():
     result = agent.code_guard(state, {})
     assert result["guard_status"] == "ok"
     assert result["code"] == code
+
+
+def test_code_guard_blocks_plotly_with_narwhals_wrapper():
+    code = """
+import narwhals as nw
+import plotly.express as px
+df = nw.from_native(conn.sql("SELECT 1 AS value").pl())
+fig = px.bar(df, x="value", y="value")
+fig
+"""
+    result = guard_code(code, table_name="events")
+    assert result.blocked is True
+    assert result.should_retry is True
+    assert "Plotly requires a native/pandas dataframe" in (result.reason or "")

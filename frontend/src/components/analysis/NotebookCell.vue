@@ -183,6 +183,7 @@ import { EditorSelection } from '@codemirror/state'
 import { toggleComment } from '@codemirror/commands'
 import apiService from '../../services/apiService'
 import { toast } from '../../composables/useToast'
+import { buildExecutionViewModel } from '../../utils/executionViewModel'
 
 import {
   PlayIcon,
@@ -733,85 +734,17 @@ async function runCell() {
   try {
     const code = cleanCellContent.value
     const response = await apiService.executeCode(code)
-
-    let output = ''
-
-    // Show execution time if available
-    if (response.execution_time) {
-      output += `Execution time: ${response.execution_time.toFixed(3)}s\n\n`
+    const viewModel = buildExecutionViewModel(response)
+    appStore.setDataframes(viewModel.dataframes)
+    if (viewModel.dataframes.length > 0) {
+      appStore.setResultData(viewModel.dataframes[0].data)
     }
-
-    // Show raw output from the API
-    if (response.output) {
-      output += `Output:\n${response.output}\n\n`
+    appStore.setFigures(viewModel.figures)
+    if (viewModel.figures.length > 0) {
+      appStore.setPlotlyFigure(viewModel.figures[0].data)
     }
-
-    // Show error if present
-    if (response.error) {
-      output += `Error: ${response.error}\n\n`
-    }
-
-    // Handle dataframes for table display
-    if (response.variables && response.variables.dataframes) {
-      try {
-        const dfEntries = Object.entries(response.variables.dataframes)
-        const dfs = dfEntries.map(([name, data]) => {
-          const parsedData = typeof data === 'string' ? JSON.parse(data) : data
-          return { name, data: parsedData }
-        }).filter(df => df !== null)
-
-        if (dfs.length > 0) {
-          appStore.setDataframes(dfs)
-          appStore.setResultData(dfs[0].data)
-          output += `✅ ${dfs.length} dataframe(s) found. Available in Table tab.\n`
-        }
-      } catch (error) {
-        console.error('Failed to parse dataframes:', error)
-        output += '⚠️ Failed to parse dataframe data.\n'
-      }
-    }
-
-    // Handle figures for chart display
-    if (response.variables && response.variables.figures) {
-      try {
-        const figEntries = Object.entries(response.variables.figures)
-        const figs = figEntries.map(([name, data]) => {
-          const parsedData = typeof data === 'string' ? JSON.parse(data) : data
-          return { name, data: parsedData }
-        }).filter(fig => fig !== null)
-
-        if (figs.length > 0) {
-          appStore.setFigures(figs)
-          appStore.setPlotlyFigure(figs[0].data)
-          output += `✅ ${figs.length} figure(s) found. Available in Chart tab.\n`
-        }
-      } catch (error) {
-        console.error('Failed to parse figures:', error)
-        output += '⚠️ Failed to parse figure data.\n'
-      }
-    }
-
-    // Handle scalars
-    if (response.variables && response.variables.scalars) {
-      try {
-        const scalarEntries = Object.entries(response.variables.scalars)
-        const scs = scalarEntries.map(([name, value]) => ({ name, value }))
-        if (scs.length > 0) {
-          appStore.setScalars(scs)
-          output += `✅ ${scs.length} scalar(s) found. Available in Terminal tab.\n`
-        }
-      } catch (error) {
-        console.error('Failed to parse scalars:', error)
-        output += '⚠️ Failed to parse scalar data.\n'
-      }
-    }
-
-    // Success message if no errors
-    if (!response.error) {
-      output += '\n✅ Cell executed successfully!'
-    }
-
-    appStore.updateNotebookCell(props.cell.id, { output, isRunning: false })
+    appStore.setScalars(viewModel.scalars)
+    appStore.updateNotebookCell(props.cell.id, { output: viewModel.output, isRunning: false })
 
   } catch (error) {
     console.error('Cell execution failed:', error)
