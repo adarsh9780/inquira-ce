@@ -503,9 +503,9 @@ fn python_bin_from_venv(venv_path: &PathBuf) -> PathBuf {
     }
 }
 
-fn kill_stale_backend_on_port(port: u16) {
+fn kill_stale_backend_on_port(port: u16, backend_dir: &PathBuf) {
     // Best-effort cleanup for orphan listeners from previous dev runs.
-    // We only kill processes whose command includes "app.main".
+    // We only kill processes that look like Inquira backend listeners.
     let output = Command::new("lsof")
         .args(["-t", "-nP", "-iTCP"])
         .arg(format!("{port}"))
@@ -520,6 +520,7 @@ fn kill_stale_backend_on_port(port: u16) {
     }
 
     let pids = String::from_utf8_lossy(&output.stdout);
+    let backend_dir_hint = backend_dir.to_string_lossy().to_string();
     for pid in pids.lines().map(str::trim).filter(|s| !s.is_empty()) {
         let ps_output = Command::new("ps")
             .args(["-o", "command=", "-p", pid])
@@ -533,7 +534,30 @@ fn kill_stale_backend_on_port(port: u16) {
         }
 
         let cmdline = String::from_utf8_lossy(&ps_output.stdout).to_string();
-        if cmdline.contains("app.main") {
+        let lsof_cwd_output = Command::new("lsof")
+            .args(["-a", "-p", pid, "-d", "cwd", "-Fn"])
+            .output();
+        let cwd = if let Ok(cwd_output) = lsof_cwd_output {
+            if cwd_output.status.success() {
+                String::from_utf8_lossy(&cwd_output.stdout)
+                    .lines()
+                    .find_map(|line| line.strip_prefix('n'))
+                    .unwrap_or("")
+                    .to_string()
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
+
+        let is_inquira_backend = cmdline.contains("app.main")
+            || cmdline.contains("backend/main.py")
+            || cmdline.contains("inquira")
+            || (!backend_dir_hint.is_empty() && cmdline.contains(&backend_dir_hint))
+            || (!backend_dir_hint.is_empty() && cwd.starts_with(&backend_dir_hint));
+
+        if is_inquira_backend {
             log::warn!("Killing stale backend process on port {} (pid {})", port, pid);
             let _ = Command::new("kill").args(["-9", pid]).status();
         }
@@ -555,7 +579,7 @@ fn start_backend(
         .and_then(|b| b.port)
         .unwrap_or(8000);
 
-    kill_stale_backend_on_port(port);
+    kill_stale_backend_on_port(port, backend_dir);
 
     log::info!("Starting Inquira backend on port {}...", port);
 
