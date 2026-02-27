@@ -74,6 +74,7 @@ This writes `.github/release/metadata.json`.
 ## Commit Hygiene
 
 - Keep commit messages clear and scoped.
-- Keep root `commit_message.txt` updated (`make git-commit` reads this file).
+- Create a local root `commit_message.txt` before running `make git-commit`, and keep it updated for each commit.
+- `commit_message.txt` is intentionally untracked; contributors should maintain their own local file content.
 
 Next: [Changelog](./changelog.md)

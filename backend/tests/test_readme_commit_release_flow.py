@@ -15,6 +15,7 @@ def test_readme_is_docs_table_of_contents():
     assert "make check-version" in text
     assert "make ruff-test" in text
     assert "make mypy-test" in text
+    assert "create a local root `commit_message.txt` file" in text
     assert "./docs/overview.md" in text
     assert "./docs/commit-and-release.md" in text
     assert "./docs/changelog.md" in text

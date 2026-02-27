@@ -45,10 +45,14 @@ cd inquira-ce
 cargo tauri dev --manifest-path src-tauri/Cargo.toml
 ```
 
+Before running `make git-commit`, create a local root `commit_message.txt` file and write your commit message in it.
+This file is intentionally untracked so each contributor manages their own local commit text.
+
 ## Common Commands
 
 Atomic commit flow:
 ```bash
+printf "feat(scope): your message\n\nDetails..." > commit_message.txt
 make check-version
 make ruff-test
 make mypy-test
