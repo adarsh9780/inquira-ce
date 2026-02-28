@@ -87,6 +87,8 @@ export const useAppStore = defineStore('app', () => {
   let preferenceSyncTimer = null
   let localStateSyncTimer = null
   let suppressPreferenceSync = false
+  let kernelEnsureWorkspaceId = ''
+  let kernelEnsurePromise = null
   const LOCAL_SNAPSHOT_VERSION = 1
 
   function buildLocalStateSnapshot() {
@@ -397,6 +399,34 @@ export const useAppStore = defineStore('app', () => {
     saveLocalConfig()
   }
 
+  async function ensureWorkspaceKernelConnected(workspaceId = activeWorkspaceId.value) {
+    const targetWorkspaceId = (workspaceId || '').trim()
+    if (!targetWorkspaceId) return false
+
+    if (kernelEnsurePromise && kernelEnsureWorkspaceId === targetWorkspaceId) {
+      return kernelEnsurePromise
+    }
+
+    kernelEnsureWorkspaceId = targetWorkspaceId
+    kernelEnsurePromise = (async () => {
+      try {
+        const status = await apiService.v1GetWorkspaceKernelStatus(targetWorkspaceId)
+        const normalized = String(status?.status || '').toLowerCase()
+        if (normalized === 'ready' || normalized === 'busy' || normalized === 'starting') {
+          return true
+        }
+        const restarted = await apiService.v1RestartWorkspaceKernel(targetWorkspaceId)
+        return restarted?.reset === true
+      } catch (_error) {
+        return false
+      } finally {
+        kernelEnsurePromise = null
+      }
+    })()
+
+    return kernelEnsurePromise
+  }
+
   function setConversations(items) {
     conversations.value = Array.isArray(items) ? items : []
   }
@@ -446,11 +476,18 @@ export const useAppStore = defineStore('app', () => {
       isSchemaFileUploaded.value = false
       saveLocalConfig()
     }
+
+    if (activeWorkspaceId.value) {
+      await ensureWorkspaceKernelConnected(activeWorkspaceId.value)
+    }
   }
 
   async function createWorkspace(name) {
     const ws = await apiService.v1CreateWorkspace(name)
     await fetchWorkspaces()
+    if (activeWorkspaceId.value) {
+      await ensureWorkspaceKernelConnected(activeWorkspaceId.value)
+    }
     return ws
   }
 
@@ -463,6 +500,7 @@ export const useAppStore = defineStore('app', () => {
     chatHistory.value = []
     turnsNextCursor.value = null
     saveLocalConfig()
+    await ensureWorkspaceKernelConnected(workspaceId)
   }
 
   async function fetchConversations() {
@@ -807,6 +845,11 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  watch(activeWorkspaceId, (workspaceId) => {
+    if (!workspaceId) return
+    void ensureWorkspaceKernelConnected(workspaceId)
+  })
+
 
   return {
     // State
@@ -882,6 +925,7 @@ export const useAppStore = defineStore('app', () => {
     setWorkspaces,
     setWorkspaceDeletionJobs,
     setActiveWorkspaceId,
+    ensureWorkspaceKernelConnected,
     setConversations,
     setActiveConversationId,
     fetchWorkspaces,

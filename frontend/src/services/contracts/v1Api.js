@@ -54,7 +54,9 @@ export const v1Api = {
     kernelInterrupt: (workspaceId) =>
       axios.post(`/api/v1/workspaces/${workspaceId}/kernel/interrupt`),
     kernelReset: (workspaceId) =>
-      axios.post(`/api/v1/workspaces/${workspaceId}/kernel/reset`)
+      axios.post(`/api/v1/workspaces/${workspaceId}/kernel/reset`),
+    kernelRestart: (workspaceId) =>
+      axios.post(`/api/v1/workspaces/${workspaceId}/kernel/restart`)
   }
 }
 

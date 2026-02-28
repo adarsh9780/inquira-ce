@@ -31,12 +31,12 @@
             Interrupt
           </button>
           <button
-            @click="resetKernel"
+            @click="restartKernel"
             :disabled="!appStore.activeWorkspaceId || isKernelActionRunning"
             class="px-2 py-1 text-xs font-medium rounded border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Reset workspace kernel and clear runtime state"
+            title="Restart workspace kernel and clear runtime state"
           >
-            Reset
+            Restart
           </button>
         </div>
 
@@ -379,21 +379,21 @@ async function interruptKernel() {
   }
 }
 
-async function resetKernel() {
+async function restartKernel() {
   if (!appStore.activeWorkspaceId || isKernelActionRunning.value) return
   isKernelActionRunning.value = true
   try {
-    const response = await apiService.v1ResetWorkspaceKernel(appStore.activeWorkspaceId)
+    const response = await apiService.v1RestartWorkspaceKernel(appStore.activeWorkspaceId)
     if (response?.reset) {
       appStore.setCodeRunning(false)
-      toast.success('Kernel Reset', 'Workspace kernel has been reset.')
+      toast.success('Kernel Restarted', 'Workspace kernel has been restarted.')
     } else {
-      toast.error('Reset Failed', 'No kernel session existed for this workspace.')
+      toast.error('Restart Failed', 'No kernel session existed for this workspace.')
     }
     await refreshKernelStatus()
   } catch (error) {
-    const message = error?.response?.data?.detail || error.message || 'Failed to reset kernel.'
-    toast.error('Reset Failed', message)
+    const message = error?.response?.data?.detail || error.message || 'Failed to restart kernel.'
+    toast.error('Restart Failed', message)
   } finally {
     isKernelActionRunning.value = false
   }

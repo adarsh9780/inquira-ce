@@ -10,6 +10,7 @@ def test_openapi_contains_v1_runtime_routes():
     assert "/api/v1/workspaces/{workspace_id}/kernel/status" in paths
     assert "/api/v1/workspaces/{workspace_id}/kernel/interrupt" in paths
     assert "/api/v1/workspaces/{workspace_id}/kernel/reset" in paths
+    assert "/api/v1/workspaces/{workspace_id}/kernel/restart" in paths
     assert "/api/v1/workspaces/{workspace_id}/paths" in paths
     assert "/api/v1/workspaces/{workspace_id}/artifacts/dataframes/{artifact_id}/rows" in paths
     assert "/api/v1/workspaces/{workspace_id}/datasets/{table_name}/preview" in paths

@@ -35,7 +35,7 @@ provider = "local_jupyter"
 # Name of the dedicated code-runner virtual environment folder under app data (~/.inquira/*)
 venv-name = ".runner-venv"
 # Optional package list installed into the runner venv alongside ipykernel and defaults.
-packages = ["narwhals", "duckdb", "pandas", "plotly", "pyarrow", "polars", "nbformat>=4.2.0"]
+packages = ["narwhals", "duckdb", "pandas", "plotly", "pyarrow", "polars", "nbformat>=5.10.4"]
 # Idle kernel eviction threshold in minutes.
 kernel-idle-minutes = 30
 # Runtime timeout guardrails.

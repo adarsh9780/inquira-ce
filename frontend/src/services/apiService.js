@@ -626,6 +626,10 @@ export const apiService = {
     return v1Api.runtime.kernelReset(workspaceId)
   },
 
+  async v1RestartWorkspaceKernel(workspaceId) {
+    return v1Api.runtime.kernelRestart(workspaceId)
+  },
+
   async v1AnalyzeStream(payload, { signal = null, onEvent = null } = {}) {
     if (!isStreamingEnabled()) {
       return this.v1Analyze(payload)

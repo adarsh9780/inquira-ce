@@ -517,9 +517,38 @@ async def reset_workspace_kernel_runtime(
     current_user=Depends(get_current_user),
 ):
     """Reset workspace kernel and clear in-memory execution context."""
-    await _require_workspace_access(session, current_user.id, workspace_id)
-    reset = await reset_workspace_kernel(workspace_id)
-    return KernelResetResponse(workspace_id=workspace_id, reset=reset)
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    return await _restart_workspace_kernel(workspace_id, workspace)
+
+
+@router.post(
+    "/workspaces/{workspace_id}/kernel/restart",
+    response_model=KernelResetResponse,
+)
+async def restart_workspace_kernel_runtime(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Restart workspace kernel and warm it immediately."""
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    return await _restart_workspace_kernel(workspace_id, workspace)
+
+
+async def _restart_workspace_kernel(workspace_id: str, workspace: Any) -> KernelResetResponse:
+    """Shared reset/restart flow: reset session then warm-start kernel."""
+    await reset_workspace_kernel(workspace_id)
+    warm_result = await execute_code(
+        code="None",
+        timeout=15,
+        working_dir=str(Path(workspace.duckdb_path).parent),
+        workspace_id=workspace_id,
+        workspace_duckdb_path=str(workspace.duckdb_path),
+    )
+    if warm_result.get("success") is not True:
+        detail = warm_result.get("error") or warm_result.get("stderr") or "Failed to warm workspace kernel."
+        raise HTTPException(status_code=500, detail=str(detail))
+    return KernelResetResponse(workspace_id=workspace_id, reset=True)
 
 
 @router.get(

@@ -20,7 +20,7 @@ def test_build_required_packages_includes_defaults_and_dedupes():
     )
     assert "duckdb" in packages
     assert "ipykernel" in packages
-    assert "nbformat>=4.2.0" in packages
+    assert "nbformat>=5.10.4" in packages
     assert "pandas" in packages
     assert "plotly" in packages
     assert "PyArrow" in packages
