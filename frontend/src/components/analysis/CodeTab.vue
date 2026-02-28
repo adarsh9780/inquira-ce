@@ -227,10 +227,16 @@ const canRedo = computed(() => editor && editor.state && editor.state.redoDepth 
 
 function getSelectedSnippet() {
   if (!editor || !editor.state) return ''
-  const selected = editor.state.selection.ranges
-    .map((range) => editor.state.doc.sliceString(range.from, range.to))
+  const snippets = editor.state.selection.ranges
+    .map((range) => {
+      if (!range.empty) {
+        return editor.state.doc.sliceString(range.from, range.to)
+      }
+      const line = editor.state.doc.lineAt(range.head)
+      return line?.text || ''
+    })
     .filter((text) => text && text.trim())
-  return selected.join('\n\n')
+  return snippets.join('\n\n')
 }
 
 async function executeSnippet(code, successLine) {
@@ -312,7 +318,7 @@ async function runSelectedCode() {
   if (isRunning.value) return
   const selectedCode = getSelectedSnippet()
   if (!selectedCode) {
-    await runCode()
+    toast.info('No selected code or non-empty current line to run.')
     return
   }
 

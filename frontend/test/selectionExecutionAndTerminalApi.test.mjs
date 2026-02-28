@@ -10,6 +10,8 @@ test('code tab binds Shift+Enter to selected code execution', () => {
   assert.equal(source.includes("key: 'Shift-Enter'"), true)
   assert.equal(source.includes('runSelectedCode()'), true)
   assert.equal(source.includes('getSelectedSnippet()'), true)
+  assert.equal(source.includes('if (!range.empty)'), true)
+  assert.equal(source.includes('editor.state.doc.lineAt(range.head)'), true)
 })
 
 test('api service exposes workspace terminal execute endpoint', () => {
