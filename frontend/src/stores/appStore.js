@@ -55,6 +55,7 @@ export const useAppStore = defineStore('app', () => {
   const figures = ref([])
   const scalars = ref([])
   const terminalOutput = ref('')
+  const terminalEntries = ref([])
   const activeTab = ref('workspace')
   const workspacePane = ref('code') // 'code' | 'chat'
   const terminalConsentGranted = ref(false)
@@ -680,6 +681,25 @@ export const useAppStore = defineStore('app', () => {
     terminalOutput.value = output
   }
 
+  function appendTerminalEntry(entry) {
+    if (!entry || typeof entry !== 'object') return
+    const kind = entry.kind === 'output' ? 'output' : 'command'
+    terminalEntries.value.push({
+      kind,
+      source: String(entry.source || (kind === 'output' ? 'analysis' : 'terminal')),
+      label: String(entry.label || (kind === 'output' ? 'Python output' : '')),
+      command: String(entry.command || ''),
+      stdout: String(entry.stdout || ''),
+      stderr: String(entry.stderr || ''),
+      exitCode: Number.isInteger(entry.exitCode) ? entry.exitCode : 0,
+      createdAt: entry.createdAt || new Date().toISOString(),
+    })
+  }
+
+  function clearTerminalEntries() {
+    terminalEntries.value = []
+  }
+
   function setActiveTab(tab) {
     const normalized = String(tab || '').trim().toLowerCase()
     if (normalized === 'code') {
@@ -744,6 +764,7 @@ export const useAppStore = defineStore('app', () => {
     resultData.value = null
     plotlyFigure.value = null
     terminalOutput.value = ''
+    terminalEntries.value = []
     activeTab.value = 'workspace'
     workspacePane.value = 'code'
     terminalConsentGranted.value = false
@@ -851,6 +872,7 @@ export const useAppStore = defineStore('app', () => {
     figures,
     scalars,
     terminalOutput,
+    terminalEntries,
     activeTab,
     workspacePane,
     terminalConsentGranted,
@@ -914,6 +936,8 @@ export const useAppStore = defineStore('app', () => {
     setFigures,
     setScalars,
     setTerminalOutput,
+    appendTerminalEntry,
+    clearTerminalEntries,
     setActiveTab,
     setWorkspacePane,
     setTerminalConsentGranted,

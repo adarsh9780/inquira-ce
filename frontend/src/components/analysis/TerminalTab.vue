@@ -30,10 +30,15 @@
           Terminal ready. Run commands with <code class="rounded bg-slate-800 px-1 py-0.5">Enter</code>.
         </div>
         <div v-for="(entry, idx) in entries" :key="idx" class="mb-3">
-          <div class="text-sky-300">$ {{ entry.command }}</div>
+          <div v-if="entry.kind !== 'output'" class="text-sky-300">$ {{ entry.command }}</div>
+          <div v-else class="text-xs uppercase tracking-wide text-slate-400">{{ entry.label || 'Output' }}</div>
           <pre v-if="entry.stdout" class="whitespace-pre-wrap break-words text-slate-100">{{ entry.stdout }}</pre>
           <pre v-if="entry.stderr" class="whitespace-pre-wrap break-words text-rose-300">{{ entry.stderr }}</pre>
-          <div class="text-xs" :class="entry.exitCode === 0 ? 'text-emerald-400' : 'text-amber-400'">
+          <div
+            v-if="entry.kind !== 'output'"
+            class="text-xs"
+            :class="entry.exitCode === 0 ? 'text-emerald-400' : 'text-amber-400'"
+          >
             exit {{ entry.exitCode }}
           </div>
         </div>
@@ -88,7 +93,7 @@ import { toast } from '../../composables/useToast'
 const appStore = useAppStore()
 
 const command = ref('')
-const entries = ref([])
+const entries = computed(() => appStore.terminalEntries || [])
 const isRunning = ref(false)
 const scrollRef = ref(null)
 const shell = ref('')
@@ -130,7 +135,7 @@ function grantConsent() {
 }
 
 function clearTerminal() {
-  entries.value = []
+  appStore.clearTerminalEntries()
   appStore.setTerminalOutput('')
 }
 
@@ -148,7 +153,9 @@ async function runCommand() {
     shell.value = payload?.shell || shell.value
     if (payload?.cwd) appStore.setTerminalCwd(payload.cwd)
 
-    entries.value.push({
+    appStore.appendTerminalEntry({
+      kind: 'command',
+      source: 'terminal',
       command: raw,
       stdout: payload?.stdout || '',
       stderr: payload?.stderr || '',
@@ -164,7 +171,14 @@ async function runCommand() {
     }
   } catch (error) {
     const message = error?.message || 'Terminal execution failed.'
-    entries.value.push({ command: raw, stdout: '', stderr: message, exitCode: 1 })
+    appStore.appendTerminalEntry({
+      kind: 'command',
+      source: 'terminal',
+      command: raw,
+      stdout: '',
+      stderr: message,
+      exitCode: 1,
+    })
     appStore.setTerminalOutput(message)
     toast.error('Terminal command failed', message)
   } finally {
@@ -176,7 +190,7 @@ async function resetSession() {
   if (!appStore.activeWorkspaceId) return
   try {
     await apiService.resetTerminalSession(appStore.activeWorkspaceId)
-    entries.value = []
+    appStore.clearTerminalEntries()
     shell.value = ''
     await ensureWorkspaceCwd()
     toast.success('Terminal session reset', 'Started a fresh shell for this workspace.')

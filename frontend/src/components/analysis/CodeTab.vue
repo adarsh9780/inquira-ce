@@ -268,6 +268,19 @@ async function executeSnippet(code, successLine) {
     },
   )
 
+  const outputStdout = String(normalized?.stdout || '')
+  const outputStderr = String(normalized?.stderr || normalized?.error || '')
+  if (outputStdout || outputStderr) {
+    appStore.appendTerminalEntry({
+      kind: 'output',
+      source: 'analysis',
+      label: 'Python output',
+      stdout: outputStdout,
+      stderr: outputStderr,
+      exitCode: normalized?.error ? 1 : 0,
+    })
+  }
+
   if (normalized?.error) {
     appStore.setTerminalOutput(viewModel.output)
     appStore.setActiveTab('terminal')
