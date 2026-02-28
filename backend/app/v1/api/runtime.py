@@ -14,8 +14,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...services.code_executor import execute_code
-from ...services.code_executor import get_workspace_kernel_status, reset_workspace_kernel
+from ...services.code_executor import (
+    execute_code,
+    get_workspace_dataframe_rows,
+    get_workspace_kernel_status,
+    reset_workspace_kernel,
+)
 from ..db.session import get_db_session
 from ..repositories.preferences_repository import PreferencesRepository
 from ..repositories.dataset_repository import DatasetRepository
@@ -43,6 +47,19 @@ class ExecuteResponse(BaseModel):
     error: str | None = None
     result: object | None = None
     result_type: str | None = None
+    variables: dict[str, dict[str, Any]] = Field(
+        default_factory=lambda: {"dataframes": {}, "figures": {}, "scalars": {}}
+    )
+
+
+class DataframeArtifactRowsResponse(BaseModel):
+    artifact_id: str
+    name: str
+    row_count: int
+    columns: list[str]
+    rows: list[dict[str, Any]]
+    offset: int
+    limit: int
 
 
 class RunnerPackageInstallRequest(BaseModel):
@@ -387,6 +404,30 @@ async def execute_workspace_code(
         workspace_duckdb_path=str(workspace.duckdb_path),
     )
     return ExecuteResponse(**result)
+
+
+@router.get(
+    "/workspaces/{workspace_id}/artifacts/dataframes/{artifact_id}/rows",
+    response_model=DataframeArtifactRowsResponse,
+)
+async def get_workspace_dataframe_artifact_rows(
+    workspace_id: str,
+    artifact_id: str,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=1000, ge=1, le=1000),
+    session: AsyncSession = Depends(get_db_session),
+    current_user=Depends(get_current_user),
+):
+    await _require_workspace_access(session, current_user.id, workspace_id)
+    rows = await get_workspace_dataframe_rows(
+        workspace_id=workspace_id,
+        artifact_id=artifact_id,
+        offset=offset,
+        limit=limit,
+    )
+    if rows is None:
+        raise HTTPException(status_code=404, detail="Dataframe artifact not found")
+    return DataframeArtifactRowsResponse(**rows)
 
 
 @router.post("/runtime/runner/packages/install", response_model=RunnerPackageInstallResponse)

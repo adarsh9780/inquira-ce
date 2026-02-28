@@ -48,6 +48,7 @@ async def test_execute_workspace_code_passes_workspace_context(monkeypatch, tmp_
             "error": None,
             "result": None,
             "result_type": None,
+            "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
         }
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
@@ -98,6 +99,7 @@ async def test_execute_workspace_code_returns_upstream_result(monkeypatch, tmp_p
             "error": "boom",
             "result": None,
             "result_type": None,
+            "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
         }
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
@@ -113,6 +115,50 @@ async def test_execute_workspace_code_returns_upstream_result(monkeypatch, tmp_p
 
     assert response.success is False
     assert response.error == "boom"
+
+
+@pytest.mark.asyncio
+async def test_workspace_dataframe_artifact_rows_endpoint(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws5"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    async def fake_get_rows(workspace_id: str, artifact_id: str, offset: int, limit: int):
+        assert workspace_id == "ws-5"
+        assert artifact_id == "art-1"
+        assert offset == 0
+        assert limit == 1000
+        return {
+            "artifact_id": "art-1",
+            "name": "summary",
+            "row_count": 2000,
+            "columns": ["a"],
+            "rows": [{"a": 1}],
+            "offset": 0,
+            "limit": 1000,
+        }
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "get_workspace_dataframe_rows", fake_get_rows)
+
+    response = await runtime_api.get_workspace_dataframe_artifact_rows(
+        workspace_id="ws-5",
+        artifact_id="art-1",
+        offset=0,
+        limit=1000,
+        session=object(),
+        current_user=SimpleNamespace(id="user-1"),
+    )
+
+    assert response.artifact_id == "art-1"
+    assert response.row_count == 2000
+    assert response.rows == [{"a": 1}]
 
 
 @pytest.mark.asyncio

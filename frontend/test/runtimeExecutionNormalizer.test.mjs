@@ -62,6 +62,28 @@ test('preserves explicit variable buckets from payload', () => {
   assert.equal(normalized.variables.scalars.answer, 42)
 })
 
+test('preserves dataframe artifact metadata while normalizing rows', () => {
+  const normalized = normalizeExecutionResponse({
+    success: true,
+    stdout: '',
+    stderr: '',
+    variables: {
+      dataframes: {
+        summary: {
+          artifact_id: 'a1',
+          row_count: 2000,
+          columns: ['a'],
+          data: [[1]],
+        },
+      },
+    },
+  })
+
+  assert.equal(normalized.variables.dataframes.summary.artifact_id, 'a1')
+  assert.equal(normalized.variables.dataframes.summary.row_count, 2000)
+  assert.deepEqual(normalized.variables.dataframes.summary.data, [{ a: 1 }])
+})
+
 test('unpacks variable bundle when returned inside result', () => {
   const normalized = normalizeExecutionResponse({
     success: true,

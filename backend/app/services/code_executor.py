@@ -116,6 +116,22 @@ async def get_workspace_kernel_status(workspace_id: str) -> str:
     return await manager.get_status(workspace_id)
 
 
+async def get_workspace_dataframe_rows(
+    workspace_id: str,
+    artifact_id: str,
+    offset: int = 0,
+    limit: int = 1000,
+) -> dict[str, Any] | None:
+    """Fetch a paginated slice of a stored dataframe artifact."""
+    manager = await get_workspace_kernel_manager()
+    return await manager.get_dataframe_rows(
+        workspace_id=workspace_id,
+        artifact_id=artifact_id,
+        offset=offset,
+        limit=limit,
+    )
+
+
 async def execute_code(
     code: str,
     timeout: int = 60,
@@ -170,6 +186,7 @@ def _error_payload(message: str) -> dict[str, Any]:
         "error": message,
         "result": None,
         "result_type": None,
+        "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
     }
 
 

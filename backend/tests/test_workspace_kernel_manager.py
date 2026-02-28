@@ -1,6 +1,8 @@
 import asyncio
+from pathlib import Path
 from types import SimpleNamespace
 
+import duckdb
 import pytest
 
 from app.services.workspace_kernel_manager import (
@@ -11,11 +13,13 @@ from app.services.jupyter_message_parser import ParsedExecutionOutput
 
 
 def _session(workspace_id: str, workspace_duckdb_path: str) -> WorkspaceKernelSession:
+    artifact_db_path = str(Path(workspace_duckdb_path).with_name("workspace_runtime_artifacts.duckdb"))
     return WorkspaceKernelSession(
         workspace_id=workspace_id,
         workspace_duckdb_path=workspace_duckdb_path,
         manager=SimpleNamespace(),
         client=SimpleNamespace(),
+        artifact_db_path=artifact_db_path,
     )
 
 
@@ -164,3 +168,38 @@ async def test_execute_on_session_skips_fallback_probe_when_primary_has_result()
     assert calls["count"] == 1
     assert payload["result_type"] == "scalar"
     assert payload["result"] == {"value": 1}
+
+
+@pytest.mark.asyncio
+async def test_get_dataframe_rows_reads_paginated_chunk(tmp_path):
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    workspace_db = tmp_path / "workspace.duckdb"
+    workspace_db.touch()
+    session = _session("ws-2", str(workspace_db))
+    artifact_db = Path(session.artifact_db_path)
+    artifact_db.parent.mkdir(parents=True, exist_ok=True)
+    conn = duckdb.connect(str(artifact_db))
+    conn.execute("CREATE TABLE df_summary AS SELECT * FROM (VALUES (1), (2), (3)) AS t(a)")
+    conn.close()
+    session.artifact_registry = {
+        "artifact-1": {
+            "kind": "dataframe",
+            "name": "summary",
+            "table_name": "df_summary",
+            "row_count": 3,
+        }
+    }
+    manager._sessions["ws-2"] = session
+
+    rows = await manager.get_dataframe_rows(
+        workspace_id="ws-2",
+        artifact_id="artifact-1",
+        offset=1,
+        limit=2,
+    )
+
+    assert rows is not None
+    assert rows["artifact_id"] == "artifact-1"
+    assert rows["name"] == "summary"
+    assert rows["row_count"] == 3
+    assert rows["rows"] == [{"a": 2}, {"a": 3}]

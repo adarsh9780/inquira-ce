@@ -27,7 +27,7 @@ function normalizeDataFrameValue(value) {
   if (!Array.isArray(value.columns) || !Array.isArray(value.data)) return value
 
   // Convert pandas "split" JSON (columns + row arrays) into row objects.
-  return value.data.map((row) => {
+  const mappedRows = value.data.map((row) => {
     if (!Array.isArray(row)) return row
     const result = {}
     value.columns.forEach((col, idx) => {
@@ -35,6 +35,13 @@ function normalizeDataFrameValue(value) {
     })
     return result
   })
+
+  // Preserve backend artifact metadata for paginated fetches.
+  if (Object.prototype.hasOwnProperty.call(value, 'artifact_id') || Object.prototype.hasOwnProperty.call(value, 'row_count')) {
+    return { ...value, data: mappedRows }
+  }
+
+  return mappedRows
 }
 
 function normalizeDataFrameBucket(bucket) {

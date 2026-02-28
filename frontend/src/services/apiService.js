@@ -331,6 +331,21 @@ export const apiService = {
     return normalizeExecutionResponse(payload)
   },
 
+  async getDataframeArtifactRows(workspaceId, artifactId, offset = 0, limit = 1000) {
+    const response = await fetch(
+      `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/dataframes/${artifactId}/rows?offset=${offset}&limit=${limit}`,
+      {
+        method: 'GET',
+        credentials: 'include',
+      }
+    )
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}))
+      throw new Error(detail.detail || `Artifact row fetch failed (${response.status})`)
+    }
+    return response.json()
+  },
+
   // File data loading — inspect file for columns, then trigger background DuckDB conversion
   async uploadDataPath(filePath) {
     const { useAppStore } = await import('../stores/appStore')
