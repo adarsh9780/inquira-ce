@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import re
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +33,11 @@ from ...services.llm_service import LLMService
 from ...services.llm_runtime_config import load_llm_runtime_config
 from ...services.execution_config import load_execution_runtime_config
 from ...services.runner_env import install_runner_package
-from ...services.terminal_executor import run_workspace_terminal_command
+from ...services.terminal_executor import (
+    run_workspace_terminal_command,
+    stop_workspace_terminal_session,
+)
+from ...core.logger import logprint
 
 router = APIRouter(tags=["V1 Runtime"])
 
@@ -78,6 +83,12 @@ class TerminalExecuteResponse(BaseModel):
     shell: str
     platform: str
     timed_out: bool = False
+    persistent: bool = True
+
+
+class TerminalSessionResetResponse(BaseModel):
+    workspace_id: str
+    reset: bool
 
 
 class RunnerPackageInstallRequest(BaseModel):
@@ -159,6 +170,10 @@ _PACKAGE_VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+\-]*$")
 _INSTALL_BLOCK_RE = re.compile(
     r"(?im)(?:^\s*!?\s*%?\s*pip\s+install\b|uv\s+pip\s+install\b|python\s+-m\s+pip\s+install\b)"
 )
+_DEFAULT_TERMINAL_DENYLIST = [
+    r"(^|\\s)rm\\s+-rf\\s+/",
+    r":\\(\\)\\s*\\{\\s*:\\|:\\s*&\\s*\\};:",
+]
 
 
 def _normalize_table_name(raw: str) -> str:
@@ -505,14 +520,43 @@ async def execute_workspace_terminal_command(
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    runtime = load_execution_runtime_config()
+    _enforce_terminal_command_policy(payload.command, runtime)
     workspace_dir = str(Path(workspace.duckdb_path).parent)
     result = await run_workspace_terminal_command(
+        user_id=current_user.id,
+        workspace_id=workspace_id,
         command=payload.command,
         workspace_dir=workspace_dir,
         cwd=payload.cwd,
         timeout=payload.timeout,
     )
+    logprint(
+        "Terminal command completed",
+        level="INFO",
+        workspace_id=workspace_id,
+        user_id=current_user.id,
+        exit_code=result.get("exit_code"),
+        timed_out=result.get("timed_out"),
+    )
     return TerminalExecuteResponse(**result)
+
+
+@router.post(
+    "/workspaces/{workspace_id}/terminal/session/reset",
+    response_model=TerminalSessionResetResponse,
+)
+async def reset_workspace_terminal_session(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_db_session),
+    current_user=Depends(get_current_user),
+):
+    await _require_workspace_access(session, current_user.id, workspace_id)
+    reset = await stop_workspace_terminal_session(
+        user_id=current_user.id,
+        workspace_id=workspace_id,
+    )
+    return TerminalSessionResetResponse(workspace_id=workspace_id, reset=reset)
 
 
 @router.get(
@@ -901,3 +945,28 @@ async def list_workspace_schemas(
             }
         )
     return SchemaListResponse(schemas=schemas)
+def _enforce_terminal_command_policy(command: str, config: Any) -> None:
+    trimmed = (command or "").strip()
+    if not trimmed:
+        raise HTTPException(status_code=400, detail="Command must not be empty.")
+
+    denylist = list(_DEFAULT_TERMINAL_DENYLIST)
+    denylist.extend([p for p in (config.terminal_command_denylist or []) if str(p).strip()])
+    for pattern in denylist:
+        try:
+            if re.search(pattern, trimmed):
+                raise HTTPException(status_code=400, detail="Command blocked by terminal security policy.")
+        except re.error:
+            continue
+
+    allowlist = [a.strip().lower() for a in (config.terminal_command_allowlist or []) if a.strip()]
+    if allowlist:
+        try:
+            first_token = shlex.split(trimmed, posix=os.name != "nt")[0].lower()
+        except Exception:
+            first_token = trimmed.split()[0].lower()
+        if first_token not in allowlist:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Command '{first_token}' is not in terminal allowlist policy.",
+            )

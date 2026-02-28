@@ -150,7 +150,7 @@
           </button>
         </div>
         <p class="mt-1 text-xs text-gray-500">
-          Installs are restricted to pinned versions (<code>name==version</code>) and run outside notebook/code execution.
+          Installs are restricted to pinned versions (<code>name==version</code>) and run outside analysis execution.
         </p>
         <div v-if="runnerInstallDetails" class="mt-3 max-w-2xl p-3 rounded-md border border-gray-200 bg-gray-50">
           <p class="text-xs font-medium text-gray-700 mb-1">Last install details</p>

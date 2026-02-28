@@ -18,4 +18,6 @@ test('api service exposes workspace terminal execute endpoint', () => {
 
   assert.equal(source.includes('executeTerminalCommand(workspaceId, payload)'), true)
   assert.equal(source.includes('/api/v1/workspaces/${workspaceId}/terminal/execute'), true)
+  assert.equal(source.includes('resetTerminalSession(workspaceId)'), true)
+  assert.equal(source.includes('/api/v1/workspaces/${workspaceId}/terminal/session/reset'), true)
 })

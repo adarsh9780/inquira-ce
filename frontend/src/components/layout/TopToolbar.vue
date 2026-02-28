@@ -705,8 +705,13 @@ function handleKeydown(event) {
         event.preventDefault()
         appStore.setActiveTab('schema-editor')
         break
+      case 'x':
+        console.debug('x: Switching to variable explorer tab')
+        event.preventDefault()
+        appStore.setActiveTab('varex')
+        break
       case 'o':
-        console.debug('o: Switching to console tab')
+        console.debug('o: Switching to terminal tab')
         event.preventDefault()
         appStore.setActiveTab('terminal')
         break

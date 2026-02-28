@@ -67,10 +67,6 @@ export const useAppStore = defineStore('app', () => {
   // UI State
   const isLoading = ref(false)
   const isCodeRunning = ref(false)
-  const isNotebookMode = ref(false)
-  const notebookCells = ref([])
-  const activeCellIndex = ref(0)
-  const selectedCellIds = ref([])
 
   // Settings trigger - removed, no longer needed
 
@@ -740,69 +736,6 @@ export const useAppStore = defineStore('app', () => {
     isCodeRunning.value = running
   }
 
-  function setNotebookMode(mode) {
-    isNotebookMode.value = mode
-  }
-
-  function setNotebookCells(cells) {
-    notebookCells.value = Array.isArray(cells) ? cells : []
-  }
-
-  function addNotebookCell(cell, index = null) {
-    const newCell = {
-      id: Date.now() + Math.random(), // Use timestamp + random for unique ID
-      content: cell.content || '',
-      output: cell.output || '',
-      isRunning: false,
-      ...cell
-    }
-
-    if (index === null || index >= notebookCells.value.length) {
-      notebookCells.value.push(newCell)
-    } else {
-      notebookCells.value.splice(index, 0, newCell)
-    }
-  }
-
-  function updateNotebookCell(id, updates) {
-    const cellIndex = notebookCells.value.findIndex(cell => cell.id === id)
-    if (cellIndex !== -1) {
-      notebookCells.value[cellIndex] = { ...notebookCells.value[cellIndex], ...updates }
-    }
-  }
-
-  function deleteNotebookCell(id) {
-    const cellIndex = notebookCells.value.findIndex(cell => cell.id === id)
-    if (cellIndex !== -1) {
-      notebookCells.value.splice(cellIndex, 1)
-    }
-  }
-
-  function clearNotebookCells() {
-    notebookCells.value = []
-  }
-
-  function setActiveCellIndex(index) {
-    activeCellIndex.value = index
-  }
-
-  function setSelectedCellIds(ids) {
-    selectedCellIds.value = Array.isArray(ids) ? ids : []
-  }
-
-  function toggleCellSelection(cellId) {
-    const index = selectedCellIds.value.indexOf(cellId)
-    if (index > -1) {
-      selectedCellIds.value.splice(index, 1)
-    } else {
-      selectedCellIds.value.push(cellId)
-    }
-  }
-
-  function clearCellSelection() {
-    selectedCellIds.value = []
-  }
-
   function resetSession() {
     chatHistory.value = []
     currentQuestion.value = ''
@@ -816,10 +749,6 @@ export const useAppStore = defineStore('app', () => {
     terminalConsentGranted.value = false
     terminalCwd.value = ''
     isCodeRunning.value = false
-    isNotebookMode.value = false
-    notebookCells.value = []
-    activeCellIndex.value = 0
-    selectedCellIds.value = []
     historicalCodeBlocks.value = []
     saveLocalConfig()
   }
@@ -932,10 +861,6 @@ export const useAppStore = defineStore('app', () => {
     hideShortcutsModal,
     isLoading,
     isCodeRunning,
-    isNotebookMode,
-    notebookCells,
-    activeCellIndex,
-    selectedCellIds,
     historicalCodeBlocks,
 
     // Computed
@@ -1001,16 +926,6 @@ export const useAppStore = defineStore('app', () => {
     loadUserPreferences,
     setLoading,
     setCodeRunning,
-    setNotebookMode,
-    setNotebookCells,
-    addNotebookCell,
-    updateNotebookCell,
-    deleteNotebookCell,
-    clearNotebookCells,
-    setActiveCellIndex,
-    setSelectedCellIds,
-    toggleCellSelection,
-    clearCellSelection,
     resetSession,
     fetchChatHistory,
     addHistoricalCodeBlock

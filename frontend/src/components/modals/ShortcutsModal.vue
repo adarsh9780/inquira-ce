@@ -64,7 +64,7 @@
                 <h5 class="text-sm font-medium text-gray-900 mb-3">Panel Navigation</h5>
                 <div class="grid grid-cols-2 gap-3">
                   <div class="flex items-center justify-between py-2">
-                    <span class="text-sm text-gray-700">Code Tab</span>
+                    <span class="text-sm text-gray-700">Workspace (Code)</span>
                     <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">c</kbd>
                   </div>
                   <div class="flex items-center justify-between py-2">
@@ -76,7 +76,11 @@
                     <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">f</kbd>
                   </div>
                   <div class="flex items-center justify-between py-2">
-                    <span class="text-sm text-gray-700">Console Tab</span>
+                    <span class="text-sm text-gray-700">VarEx Tab</span>
+                    <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">x</kbd>
+                  </div>
+                  <div class="flex items-center justify-between py-2">
+                    <span class="text-sm text-gray-700">Terminal Tab</span>
                     <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">o</kbd>
                   </div>
                 </div>
@@ -103,10 +107,6 @@
                     <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">g</kbd>
                   </div>
                   <div class="flex items-center justify-between py-2">
-                    <span class="text-sm text-gray-700">Open Preview</span>
-                    <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">p</kbd>
-                  </div>
-                  <div class="flex items-center justify-between py-2">
                     <span class="text-sm text-gray-700">Open Settings</span>
                     <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">,</kbd>
                   </div>
@@ -115,8 +115,8 @@
                     <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">k</kbd>
                   </div>
                   <div class="flex items-center justify-between py-2">
-                    <span class="text-sm text-gray-700">Preview Data Tab</span>
-                    <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">d</kbd>
+                    <span class="text-sm text-gray-700">Workspace (Chat)</span>
+                    <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">h</kbd>
                   </div>
                 </div>
               </div>
@@ -126,16 +126,12 @@
                 <h5 class="text-sm font-medium text-gray-900 mb-3">Preview Shortcuts</h5>
                 <div class="grid grid-cols-1 gap-3">
                   <div class="flex items-center justify-between py-2">
-                    <span class="text-sm text-gray-700">Open Preview (Schema)</span>
-                    <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">p</kbd>
-                  </div>
-                  <div class="flex items-center justify-between py-2">
-                    <span class="text-sm text-gray-700">Open Preview (Data)</span>
-                    <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">d</kbd>
+                    <span class="text-sm text-gray-700">Open Preview Tab</span>
+                    <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">v</kbd>
                   </div>
                   <div class="flex items-center justify-between py-2">
                     <span class="text-sm text-gray-700">Open Preview (Schema)</span>
-                    <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">s</kbd>
+                    <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">e</kbd>
                   </div>
                 </div>
               </div>
@@ -156,8 +152,11 @@
                     <li>• <strong>Escape to exit:</strong> Press Escape to leave input fields</li>
                     <li>• <strong>w</strong> focuses code editor at end of line</li>
                     <li>• <strong>r</strong> runs the Python code</li>
+                    <li>• <strong>Shift+Enter</strong> runs selected code in editor</li>
                     <li>• <strong>g</strong> downloads the Python code file</li>
-                    <li>• <strong>p/d/s</strong> open preview with different default tabs</li>
+                    <li>• <strong>x</strong> opens Variable Explorer tab</li>
+                    <li>• <strong>o</strong> opens Terminal tab</li>
+                    <li>• <strong>v/e</strong> open Preview/Schema tabs</li>
                   </ul>
                 </div>
               </div>

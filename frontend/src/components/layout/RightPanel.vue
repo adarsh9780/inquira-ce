@@ -2,7 +2,7 @@
   <div class="flex h-full bg-white overflow-hidden">
     <div
       class="border-r border-gray-100 bg-gradient-to-b from-gray-50 to-slate-50 p-2 sm:p-3 transition-all duration-200"
-      :class="appStore.isSidebarCollapsed ? 'w-16 sm:w-16 lg:w-16' : 'w-44 sm:w-52 lg:w-56'"
+      :class="appStore.isSidebarCollapsed ? 'w-14 sm:w-14 lg:w-14' : 'w-40 sm:w-44 lg:w-48'"
     >
       <div class="mb-2 flex items-center justify-between">
         <span v-if="!appStore.isSidebarCollapsed" class="ml-1 text-xs font-semibold text-gray-500">Views</span>
@@ -62,6 +62,9 @@
       <div v-show="appStore.activeTab === 'figure'" class="h-full p-3 sm:p-4">
         <FigureTab />
       </div>
+      <div v-show="appStore.activeTab === 'varex'" class="h-full p-3 sm:p-4">
+        <VariableExplorerTab />
+      </div>
       <div v-show="appStore.activeTab === 'terminal'" class="h-full p-3 sm:p-4">
         <TerminalTab />
       </div>
@@ -81,6 +84,7 @@ import { useAppStore } from '../../stores/appStore'
 import WorkspaceTab from './WorkspaceTab.vue'
 import TableTab from '../analysis/TableTab.vue'
 import FigureTab from '../analysis/FigureTab.vue'
+import VariableExplorerTab from '../analysis/VariableExplorerTab.vue'
 import TerminalTab from '../analysis/TerminalTab.vue'
 import PreviewTab from '../preview/PreviewTab.vue'
 import SchemaEditorTab from '../preview/SchemaEditorTab.vue'
@@ -89,6 +93,7 @@ import {
   TableCellsIcon,
   ChartBarIcon,
   CommandLineIcon,
+  CircleStackIcon,
   DocumentTextIcon,
   EyeIcon,
 } from '@heroicons/vue/24/outline'
@@ -121,6 +126,14 @@ const tabs = computed(() => [
     badgeColor: 'bg-fuchsia-600',
   },
   {
+    id: 'varex',
+    name: 'VarEx',
+    icon: CircleStackIcon,
+    count: appStore.scalars?.length ? String(appStore.scalars.length) : null,
+    badgeClass: appStore.scalars?.length ? 'bg-emerald-100 text-emerald-800' : '',
+    badgeColor: 'bg-emerald-600',
+  },
+  {
     id: 'terminal',
     name: 'Terminal',
     icon: CommandLineIcon,
@@ -151,6 +164,7 @@ const counts = computed(() => ({
   workspace: appStore.workspacePane === 'chat' ? appStore.chatHistory?.length || 0 : (!appStore.isCodeRunning && appStore.generatedCode ? 1 : 0),
   table: appStore.dataframes?.length || 0,
   figure: appStore.figures?.length || 0,
+  varex: appStore.scalars?.length || 0,
   terminal: appStore.terminalOutput && !appStore.isCodeRunning ? 1 : 0,
 }))
 

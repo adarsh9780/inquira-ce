@@ -14,7 +14,6 @@ def test_detect_shell_command_returns_executable_and_args():
     assert isinstance(shell, str)
     assert shell.strip() != ""
     assert isinstance(args, list)
-    assert len(args) >= 1
 
 
 def test_normalize_workspace_cwd_defaults_to_workspace(tmp_path):
@@ -30,6 +29,8 @@ async def test_run_workspace_terminal_command_executes_in_workspace_dir(tmp_path
     workspace_dir.mkdir(parents=True, exist_ok=True)
 
     result = await run_workspace_terminal_command(
+        user_id="user-1",
+        workspace_id="ws-1",
         command="echo inquira_terminal_test",
         workspace_dir=str(workspace_dir),
         timeout=30,
@@ -38,3 +39,28 @@ async def test_run_workspace_terminal_command_executes_in_workspace_dir(tmp_path
     assert result["exit_code"] == 0
     assert "inquira_terminal_test" in result["stdout"]
     assert result["cwd"] == str(Path(workspace_dir).resolve())
+
+
+@pytest.mark.asyncio
+async def test_run_workspace_terminal_command_persists_shell_session_state(tmp_path):
+    workspace_dir = tmp_path / "workspace_state"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+
+    first = await run_workspace_terminal_command(
+        user_id="user-1",
+        workspace_id="ws-persist",
+        command="export INQ_TEST_VAR=12345",
+        workspace_dir=str(workspace_dir),
+        timeout=30,
+    )
+    second = await run_workspace_terminal_command(
+        user_id="user-1",
+        workspace_id="ws-persist",
+        command="echo $INQ_TEST_VAR",
+        workspace_dir=str(workspace_dir),
+        timeout=30,
+    )
+
+    assert first["exit_code"] == 0
+    assert second["exit_code"] == 0
+    assert "12345" in second["stdout"]

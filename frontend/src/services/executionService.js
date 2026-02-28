@@ -6,7 +6,7 @@
  * this service sends code to the backend for execution and returns results.
  *
  * The API contract is intentionally kept stable so that
- * components (CodeTab, ChatInput, NotebookCell) require minimal changes.
+ * components (CodeTab, ChatInput) require minimal changes.
  */
 
 import apiService from './apiService'

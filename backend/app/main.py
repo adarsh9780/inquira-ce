@@ -31,6 +31,7 @@ from .services.code_executor import (
     prune_idle_workspace_kernels,
     shutdown_workspace_kernel_manager,
 )
+from .services.terminal_executor import shutdown_terminal_sessions
 from .services.session_variable_store import session_variable_store
 from .services.websocket_manager import websocket_manager
 from .services.tracing import init_phoenix_tracing
@@ -172,6 +173,10 @@ async def lifespan(app: FastAPI):
         await shutdown_workspace_kernel_manager()
     except Exception as e:
         logprint(f"Error shutting down workspace kernels: {e}", level="error")
+    try:
+        await shutdown_terminal_sessions()
+    except Exception as e:
+        logprint(f"Error shutting down terminal sessions: {e}", level="error")
 
 
 async def session_cleanup_worker():

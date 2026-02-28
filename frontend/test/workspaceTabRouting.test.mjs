@@ -20,6 +20,7 @@ test('right panel includes unified workspace tab component', () => {
 
   assert.equal(source.includes('WorkspaceTab'), true)
   assert.equal(source.includes("id: 'workspace'"), true)
+  assert.equal(source.includes("id: 'varex'"), true)
   assert.equal(source.includes("appStore.activeTab === 'workspace'"), true)
   assert.equal(source.includes('Chat Overlay'), false)
 })

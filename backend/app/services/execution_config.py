@@ -32,6 +32,8 @@ class ExecutionRuntimeConfig:
     runner_index_url: str | None = None
     runner_package_allowlist: list[str] = field(default_factory=list)
     runner_package_denylist: list[str] = field(default_factory=list)
+    terminal_command_allowlist: list[str] = field(default_factory=list)
+    terminal_command_denylist: list[str] = field(default_factory=list)
     runner_install_max_packages_per_request: int = 1
     kernel_idle_minutes: int = 30
     runner_policy: RunnerPolicyConfig = field(default_factory=RunnerPolicyConfig)
@@ -107,6 +109,8 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
     runner_index_url = str(runner.get("index-url") or "").strip() or None
     runner_package_allowlist = _as_str_list(runner.get("package-allowlist"))
     runner_package_denylist = _as_str_list(runner.get("package-denylist"))
+    terminal_command_allowlist = _as_str_list(runner.get("terminal-command-allowlist"))
+    terminal_command_denylist = _as_str_list(runner.get("terminal-command-denylist"))
     runner_install_max_packages_per_request = _as_int(
         runner.get("install-max-packages-per-request", 1),
         1,
@@ -128,6 +132,8 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
         runner_index_url=runner_index_url,
         runner_package_allowlist=runner_package_allowlist,
         runner_package_denylist=runner_package_denylist,
+        terminal_command_allowlist=terminal_command_allowlist,
+        terminal_command_denylist=terminal_command_denylist,
         runner_install_max_packages_per_request=max(1, runner_install_max_packages_per_request),
         kernel_idle_minutes=max(1, kernel_idle_minutes),
         runner_policy=policy,

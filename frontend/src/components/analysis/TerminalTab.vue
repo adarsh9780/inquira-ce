@@ -14,6 +14,7 @@
         <p class="font-semibold">Local terminal access</p>
         <p class="mt-2">Commands here run on your machine with your user permissions in the active workspace context.</p>
         <p class="mt-1">Consent is required once per app session.</p>
+        <p class="mt-1 text-xs">Some commands may be blocked by terminal security policy.</p>
         <button
           class="mt-4 rounded bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700"
           @click="grantConsent"
@@ -41,12 +42,20 @@
       <div class="border-t border-gray-200 bg-white p-3">
         <div class="mb-2 flex items-center justify-between text-xs text-gray-600">
           <span>Shell: {{ shellLabel }}</span>
-          <button
-            class="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50"
-            @click="clearTerminal"
-          >
-            Clear
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              class="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50"
+              @click="resetSession"
+            >
+              Reset Session
+            </button>
+            <button
+              class="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50"
+              @click="clearTerminal"
+            >
+              Clear
+            </button>
+          </div>
         </div>
         <form class="flex items-center gap-2" @submit.prevent="runCommand">
           <input
@@ -160,6 +169,20 @@ async function runCommand() {
     toast.error('Terminal command failed', message)
   } finally {
     isRunning.value = false
+  }
+}
+
+async function resetSession() {
+  if (!appStore.activeWorkspaceId) return
+  try {
+    await apiService.resetTerminalSession(appStore.activeWorkspaceId)
+    entries.value = []
+    shell.value = ''
+    await ensureWorkspaceCwd()
+    toast.success('Terminal session reset', 'Started a fresh shell for this workspace.')
+  } catch (error) {
+    const message = error?.message || 'Failed to reset terminal session.'
+    toast.error('Terminal reset failed', message)
   }
 }
 </script>

@@ -363,6 +363,21 @@ export const apiService = {
     return response.json()
   },
 
+  async resetTerminalSession(workspaceId) {
+    const response = await fetch(
+      `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/terminal/session/reset`,
+      {
+        method: 'POST',
+        credentials: 'include',
+      },
+    )
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}))
+      throw new Error(detail.detail || `Terminal reset failed (${response.status})`)
+    }
+    return response.json()
+  },
+
   // File data loading — inspect file for columns, then trigger background DuckDB conversion
   async uploadDataPath(filePath) {
     const { useAppStore } = await import('../stores/appStore')

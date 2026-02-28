@@ -215,7 +215,7 @@ sales_data,category,string,Product category,"Electronics,Clothing,Books"
 4. **Export Results**: Download data as CSV or charts as images
 
 ### ⌨️ Navigation & Shortcuts
-- `H`: Toggle Chat overlay (25% width) without leaving your current tab
+- `H`: Switch Workspace pane to Chat
 - `C / T / F / O / V / E`: Switch to Code / Table / Figure / Terminal / Preview / Schema tabs
 - `Tab` / `Shift+Tab`: Indent / outdent code in the editor (4 spaces)
 

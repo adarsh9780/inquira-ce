@@ -285,7 +285,9 @@ async def test_workspace_terminal_execute_endpoint(monkeypatch, tmp_path):
 
     captured = {}
 
-    async def fake_run_terminal_command(*, command, workspace_dir, cwd, timeout):
+    async def fake_run_terminal_command(*, user_id, workspace_id, command, workspace_dir, cwd, timeout):
+        captured["user_id"] = user_id
+        captured["workspace_id"] = workspace_id
         captured["command"] = command
         captured["workspace_dir"] = workspace_dir
         captured["cwd"] = cwd
@@ -298,6 +300,7 @@ async def test_workspace_terminal_execute_endpoint(monkeypatch, tmp_path):
             "shell": "/bin/bash",
             "platform": "Darwin",
             "timed_out": False,
+            "persistent": True,
         }
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
@@ -312,10 +315,74 @@ async def test_workspace_terminal_execute_endpoint(monkeypatch, tmp_path):
 
     assert response.exit_code == 0
     assert response.stdout == "ok\n"
+    assert captured["user_id"] == "user-1"
+    assert captured["workspace_id"] == "ws-7"
     assert captured["command"] == "pwd"
     assert captured["workspace_dir"] == str(workspace_dir)
     assert captured["cwd"] is None
     assert captured["timeout"] == 90
+
+
+@pytest.mark.asyncio
+async def test_workspace_terminal_session_reset_endpoint(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws9"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    async def fake_stop_terminal(*, user_id, workspace_id):
+        assert user_id == "user-1"
+        assert workspace_id == "ws-9"
+        return True
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "stop_workspace_terminal_session", fake_stop_terminal)
+
+    response = await runtime_api.reset_workspace_terminal_session(
+        workspace_id="ws-9",
+        session=object(),
+        current_user=SimpleNamespace(id="user-1"),
+    )
+
+    assert response.workspace_id == "ws-9"
+    assert response.reset is True
+
+
+@pytest.mark.asyncio
+async def test_workspace_terminal_execute_enforces_allowlist_policy(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws10"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    def fake_load_runtime_config():
+        return SimpleNamespace(
+            terminal_command_allowlist=["pwd"],
+            terminal_command_denylist=[],
+        )
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "load_execution_runtime_config", fake_load_runtime_config)
+
+    with pytest.raises(runtime_api.HTTPException) as exc:
+        await runtime_api.execute_workspace_terminal_command(
+            workspace_id="ws-10",
+            payload=runtime_api.TerminalExecuteRequest(command="ls -la", cwd=None, timeout=30),
+            session=object(),
+            current_user=SimpleNamespace(id="user-1"),
+        )
+
+    assert exc.value.status_code == 400
 
 
 @pytest.mark.asyncio
