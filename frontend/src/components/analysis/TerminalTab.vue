@@ -1,11 +1,11 @@
 <template>
   <div class="flex flex-col h-full">
-    <!-- Terminal Header -->
+    <!-- Console Header -->
     <div class="flex-shrink-0 bg-gray-900 text-white px-4 py-3">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-3">
           <CommandLineIcon class="h-5 w-5" />
-          <h3 class="text-sm font-medium">Terminal Output</h3>
+          <h3 class="text-sm font-medium">Output Console</h3>
           <span v-if="appStore.terminalOutput" class="text-xs bg-gray-700 px-2 py-1 rounded">
             {{ outputType }}
           </span>
@@ -23,7 +23,7 @@
             Copy
           </button>
           
-          <!-- Clear Terminal Button -->
+          <!-- Clear Console Button -->
           <button
             @click="clearTerminal"
             :disabled="!appStore.terminalOutput"
@@ -37,7 +37,7 @@
       </div>
     </div>
     
-    <!-- Terminal Content -->
+    <!-- Console Content -->
     <div class="flex-1 bg-gray-900 text-gray-100 overflow-hidden">
       <div v-if="formattedOutput" class="h-full overflow-y-auto">
         <pre class="p-4 text-sm font-mono leading-relaxed whitespace-pre-wrap">{{ formattedOutput }}</pre>
@@ -48,12 +48,12 @@
         <div class="text-center text-gray-500">
           <CommandLineIcon class="h-12 w-12 mx-auto mb-3 text-gray-600" />
           <p class="text-sm">No output to display</p>
-          <p class="text-xs text-gray-600 mt-1">Terminal output will appear here</p>
+          <p class="text-xs text-gray-600 mt-1">Execution output will appear here</p>
         </div>
       </div>
     </div>
     
-    <!-- Terminal Footer with Status -->
+    <!-- Console Footer with Status -->
     <div class="flex-shrink-0 bg-gray-800 text-gray-300 px-4 py-2 text-xs">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-4">

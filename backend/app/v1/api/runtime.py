@@ -18,6 +18,7 @@ from ...services.code_executor import (
     execute_code,
     get_workspace_dataframe_rows,
     get_workspace_kernel_status,
+    interrupt_workspace_kernel,
     reset_workspace_kernel,
 )
 from ..db.session import get_db_session
@@ -489,6 +490,21 @@ async def get_workspace_kernel_runtime_status(
     await _require_workspace_access(session, current_user.id, workspace_id)
     status = await get_workspace_kernel_status(workspace_id)
     return KernelStatusResponse(workspace_id=workspace_id, status=status)
+
+
+@router.post(
+    "/workspaces/{workspace_id}/kernel/interrupt",
+    response_model=KernelResetResponse,
+)
+async def interrupt_workspace_kernel_runtime(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Interrupt currently running code in workspace kernel."""
+    await _require_workspace_access(session, current_user.id, workspace_id)
+    interrupted = await interrupt_workspace_kernel(workspace_id)
+    return KernelResetResponse(workspace_id=workspace_id, reset=interrupted)
 
 
 @router.post(

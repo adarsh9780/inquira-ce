@@ -18,6 +18,28 @@
 
       <!-- Right Section: User Controls Group -->
       <div class="flex items-center space-x-3 flex-shrink-0">
+        <div class="hidden lg:flex items-center space-x-2 px-2 py-1 rounded-md border border-gray-200 bg-white">
+          <span class="text-xs font-medium" :class="kernelStatusMeta.textClass">
+            Kernel: {{ kernelStatusMeta.label }}
+          </span>
+          <button
+            @click="interruptKernel"
+            :disabled="!appStore.activeWorkspaceId || isKernelActionRunning || kernelStatus === 'missing'"
+            class="px-2 py-1 text-xs font-medium rounded border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Interrupt current workspace kernel execution"
+          >
+            Interrupt
+          </button>
+          <button
+            @click="resetKernel"
+            :disabled="!appStore.activeWorkspaceId || isKernelActionRunning"
+            class="px-2 py-1 text-xs font-medium rounded border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Reset workspace kernel and clear runtime state"
+          >
+            Reset
+          </button>
+        </div>
+
         <!-- Configuration Status Dot -->
         <div class="relative group">
           <div
@@ -195,6 +217,8 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { useAuthStore } from '../../stores/authStore'
 import { settingsWebSocket } from '../../services/websocketService'
+import { apiService } from '../../services/apiService'
+import { toast } from '../../composables/useToast'
 import SettingsModal from '../modals/SettingsModal.vue'
 // PreviewModal removed; use in-panel tabs instead
 import ShortcutsModal from '../modals/ShortcutsModal.vue'
@@ -213,6 +237,10 @@ const isUserMenuOpen = ref(false)
 const isShortcutsOpen = ref(false)
 const isLogoutConfirmOpen = ref(false)
 const isWebSocketConnected = ref(false)
+const kernelStatus = ref('missing')
+const isKernelActionRunning = ref(false)
+const isKernelStatusRequestInFlight = ref(false)
+let kernelStatusPoller = null
 
 // Computed property to check if configuration is complete
 const isConfigurationComplete = computed(() => {
@@ -230,6 +258,21 @@ const getStatusDotClasses = computed(() => {
     } else {
       return 'bg-gray-400 shadow-gray-200 shadow-sm'
     }
+  }
+})
+
+const kernelStatusMeta = computed(() => {
+  switch (String(kernelStatus.value || '').toLowerCase()) {
+    case 'ready':
+      return { label: 'Ready', textClass: 'text-green-700' }
+    case 'busy':
+      return { label: 'Busy', textClass: 'text-amber-700' }
+    case 'starting':
+      return { label: 'Starting', textClass: 'text-blue-700' }
+    case 'error':
+      return { label: 'Error', textClass: 'text-red-700' }
+    default:
+      return { label: appStore.activeWorkspaceId ? 'Missing' : 'No Workspace', textClass: 'text-gray-600' }
   }
 })
 
@@ -267,7 +310,94 @@ function setupWebSocketMonitoring() {
 onMounted(() => {
   autoShowShortcutsModal()
   setupWebSocketMonitoring()
+  startKernelStatusPolling()
 })
+
+onUnmounted(() => {
+  stopKernelStatusPolling()
+})
+
+watch(
+  () => appStore.activeWorkspaceId,
+  async () => {
+    await refreshKernelStatus()
+  },
+)
+
+async function refreshKernelStatus() {
+  if (!appStore.activeWorkspaceId) {
+    kernelStatus.value = 'missing'
+    return
+  }
+  if (isKernelStatusRequestInFlight.value) {
+    return
+  }
+  isKernelStatusRequestInFlight.value = true
+  try {
+    const status = await apiService.v1GetWorkspaceKernelStatus(appStore.activeWorkspaceId)
+    kernelStatus.value = String(status?.status || 'missing').toLowerCase()
+  } catch (error) {
+    console.error('Failed to fetch kernel status:', error)
+    kernelStatus.value = 'error'
+  } finally {
+    isKernelStatusRequestInFlight.value = false
+  }
+}
+
+function startKernelStatusPolling() {
+  stopKernelStatusPolling()
+  refreshKernelStatus()
+  kernelStatusPoller = setInterval(() => {
+    if (document.hidden) return
+    refreshKernelStatus()
+  }, 5000)
+}
+
+function stopKernelStatusPolling() {
+  if (kernelStatusPoller) {
+    clearInterval(kernelStatusPoller)
+    kernelStatusPoller = null
+  }
+}
+
+async function interruptKernel() {
+  if (!appStore.activeWorkspaceId || isKernelActionRunning.value) return
+  isKernelActionRunning.value = true
+  try {
+    const response = await apiService.v1InterruptWorkspaceKernel(appStore.activeWorkspaceId)
+    if (response?.reset) {
+      toast.success('Kernel Interrupted', 'Execution interrupt signal sent.')
+    } else {
+      toast.error('Interrupt Failed', 'No running kernel found for this workspace.')
+    }
+    await refreshKernelStatus()
+  } catch (error) {
+    const message = error?.response?.data?.detail || error.message || 'Failed to interrupt kernel.'
+    toast.error('Interrupt Failed', message)
+  } finally {
+    isKernelActionRunning.value = false
+  }
+}
+
+async function resetKernel() {
+  if (!appStore.activeWorkspaceId || isKernelActionRunning.value) return
+  isKernelActionRunning.value = true
+  try {
+    const response = await apiService.v1ResetWorkspaceKernel(appStore.activeWorkspaceId)
+    if (response?.reset) {
+      appStore.setCodeRunning(false)
+      toast.success('Kernel Reset', 'Workspace kernel has been reset.')
+    } else {
+      toast.error('Reset Failed', 'No kernel session existed for this workspace.')
+    }
+    await refreshKernelStatus()
+  } catch (error) {
+    const message = error?.response?.data?.detail || error.message || 'Failed to reset kernel.'
+    toast.error('Reset Failed', message)
+  } finally {
+    isKernelActionRunning.value = false
+  }
+}
 
 function openSettings(tab = 'api') {
   const normalizedTab = typeof tab === 'string' ? tab.toLowerCase() : 'api'
@@ -573,7 +703,7 @@ function handleKeydown(event) {
         appStore.setActiveTab('schema-editor')
         break
       case 'o':
-        console.debug('o: Switching to terminal tab')
+        console.debug('o: Switching to console tab')
         event.preventDefault()
         appStore.setActiveTab('terminal')
         break

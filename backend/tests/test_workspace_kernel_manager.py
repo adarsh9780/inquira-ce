@@ -68,6 +68,24 @@ async def test_reset_workspace_removes_cached_session():
 
 
 @pytest.mark.asyncio
+async def test_interrupt_workspace_updates_status():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-1", "/tmp/a.duckdb")
+    session.status = "busy"
+    called = {"interrupt": 0}
+
+    async def fake_interrupt():
+        called["interrupt"] += 1
+
+    session.manager = SimpleNamespace(interrupt_kernel=fake_interrupt)
+    manager._sessions["ws-1"] = session
+
+    assert await manager.interrupt_workspace("ws-1") is True
+    assert called["interrupt"] == 1
+    assert session.status == "ready"
+
+
+@pytest.mark.asyncio
 async def test_execute_serializes_requests_per_workspace():
     manager = WorkspaceKernelManager(idle_minutes=30)
     session = _session("ws-1", "/tmp/a.duckdb")

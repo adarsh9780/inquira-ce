@@ -191,7 +191,7 @@ const tabs = computed(() => [
   },
   {
     id: 'terminal',
-    name: 'Terminal',
+    name: 'Console',
     icon: CommandLineIcon,
     count: (appStore.terminalOutput && !appStore.isCodeRunning) ? '1' : null,
     badgeClass: (appStore.terminalOutput && !appStore.isCodeRunning) ? 'bg-gray-100 text-gray-800' : '',

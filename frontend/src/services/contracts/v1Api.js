@@ -48,7 +48,13 @@ export const v1Api = {
   },
   runtime: {
     installRunnerPackage: (payload) =>
-      axios.post('/api/v1/runtime/runner/packages/install', payload)
+      axios.post('/api/v1/runtime/runner/packages/install', payload),
+    kernelStatus: (workspaceId) =>
+      axios.get(`/api/v1/workspaces/${workspaceId}/kernel/status`),
+    kernelInterrupt: (workspaceId) =>
+      axios.post(`/api/v1/workspaces/${workspaceId}/kernel/interrupt`),
+    kernelReset: (workspaceId) =>
+      axios.post(`/api/v1/workspaces/${workspaceId}/kernel/reset`)
   }
 }
 

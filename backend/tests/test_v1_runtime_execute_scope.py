@@ -217,3 +217,32 @@ async def test_workspace_kernel_reset_endpoint(monkeypatch, tmp_path):
 
     assert response.workspace_id == "ws-4"
     assert response.reset is True
+
+
+@pytest.mark.asyncio
+async def test_workspace_kernel_interrupt_endpoint(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws6"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    async def fake_interrupt(workspace_id: str):
+        assert workspace_id == "ws-6"
+        return True
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "interrupt_workspace_kernel", fake_interrupt)
+
+    response = await runtime_api.interrupt_workspace_kernel_runtime(
+        workspace_id="ws-6",
+        session=object(),
+        current_user=SimpleNamespace(id="user-1"),
+    )
+
+    assert response.workspace_id == "ws-6"
+    assert response.reset is True

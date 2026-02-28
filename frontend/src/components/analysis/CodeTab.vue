@@ -864,7 +864,7 @@ function buildCellExecutionViewModel(response, executionTime, mode = 'available'
     {
       dataframeLine: (count) => `✅ ${count} dataframe(s) found. ${locationWord} in Table tab.`,
       figureLine: (count) => `✅ ${count} figure(s) found. ${locationWord} in Chart tab.`,
-      scalarLine: (count) => `✅ ${count} scalar(s) found. ${locationWord} in Terminal tab.`,
+      scalarLine: (count) => `✅ ${count} scalar(s) found. ${locationWord} in Console tab.`,
       successLine: '✅ Cell executed successfully!',
     },
   )

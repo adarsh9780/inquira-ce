@@ -614,6 +614,18 @@ export const apiService = {
     return v1Api.runtime.installRunnerPackage(payload)
   },
 
+  async v1GetWorkspaceKernelStatus(workspaceId) {
+    return v1Api.runtime.kernelStatus(workspaceId)
+  },
+
+  async v1InterruptWorkspaceKernel(workspaceId) {
+    return v1Api.runtime.kernelInterrupt(workspaceId)
+  },
+
+  async v1ResetWorkspaceKernel(workspaceId) {
+    return v1Api.runtime.kernelReset(workspaceId)
+  },
+
   async v1AnalyzeStream(payload, { signal = null, onEvent = null } = {}) {
     if (!isStreamingEnabled()) {
       return this.v1Analyze(payload)

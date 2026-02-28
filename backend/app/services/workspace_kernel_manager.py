@@ -284,6 +284,21 @@ class WorkspaceKernelManager:
             return "missing"
         return session.status
 
+    async def interrupt_workspace(self, workspace_id: str) -> bool:
+        """Interrupt a running workspace kernel if present."""
+        async with self._sessions_lock:
+            session = self._sessions.get(workspace_id)
+        if session is None:
+            return False
+        try:
+            await self._await_maybe(session.manager.interrupt_kernel())
+            session.status = "ready"
+            session.last_used = datetime.now(UTC)
+            return True
+        except Exception:
+            session.status = "error"
+            return False
+
     async def get_dataframe_rows(
         self,
         *,

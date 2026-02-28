@@ -76,7 +76,7 @@
                     <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">f</kbd>
                   </div>
                   <div class="flex items-center justify-between py-2">
-                    <span class="text-sm text-gray-700">Terminal Tab</span>
+                    <span class="text-sm text-gray-700">Console Tab</span>
                     <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-200 rounded">o</kbd>
                   </div>
                 </div>

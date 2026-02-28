@@ -22,7 +22,7 @@ export function buildExecutionViewModel(response, options = {}) {
   const opts = {
     dataframeLine: (count) => `✅ ${count} dataframe(s) found. Available in Table tab.`,
     figureLine: (count) => `✅ ${count} figure(s) found. Available in Chart tab.`,
-    scalarLine: (count) => `✅ ${count} scalar(s) found. Available in Terminal tab.`,
+    scalarLine: (count) => `✅ ${count} scalar(s) found. Available in Console tab.`,
     dataframeParseErrorLine: '⚠️ Failed to parse dataframe data.',
     figureParseErrorLine: '⚠️ Failed to parse figure data.',
     scalarParseErrorLine: '⚠️ Failed to parse scalar data.',
@@ -98,4 +98,3 @@ export function buildExecutionViewModel(response, options = {}) {
     },
   }
 }
-

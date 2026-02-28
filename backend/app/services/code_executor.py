@@ -116,6 +116,12 @@ async def get_workspace_kernel_status(workspace_id: str) -> str:
     return await manager.get_status(workspace_id)
 
 
+async def interrupt_workspace_kernel(workspace_id: str) -> bool:
+    """Interrupt a workspace kernel."""
+    manager = await get_workspace_kernel_manager()
+    return await manager.interrupt_workspace(workspace_id)
+
+
 async def get_workspace_dataframe_rows(
     workspace_id: str,
     artifact_id: str,
