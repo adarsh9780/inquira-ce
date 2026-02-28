@@ -42,6 +42,10 @@ from ...core.logger import logprint
 router = APIRouter(tags=["V1 Runtime"])
 
 
+def _default_variable_bundle() -> dict[str, dict[str, Any]]:
+    return {"dataframes": {}, "figures": {}, "scalars": {}}
+
+
 class ExecuteRequest(BaseModel):
     code: str = Field(..., description="Python code to execute")
     timeout: int = Field(60, ge=1, le=300, description="Max execution time in seconds")
@@ -51,11 +55,15 @@ class ExecuteResponse(BaseModel):
     success: bool
     stdout: str = ""
     stderr: str = ""
+    has_stdout: bool = False
+    has_stderr: bool = False
     error: str | None = None
     result: object | None = None
     result_type: str | None = None
+    result_kind: str = "none"
+    result_name: str | None = None
     variables: dict[str, dict[str, Any]] = Field(
-        default_factory=lambda: {"dataframes": {}, "figures": {}, "scalars": {}}
+        default_factory=_default_variable_bundle
     )
 
 

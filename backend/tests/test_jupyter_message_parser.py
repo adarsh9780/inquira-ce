@@ -19,6 +19,8 @@ def test_stream_messages_are_aggregated_to_stdout_and_stderr():
     payload = output.as_response()
     assert payload["stdout"] == "hello"
     assert payload["stderr"] == "warn"
+    assert payload["has_stdout"] is True
+    assert payload["has_stderr"] is True
     assert payload["success"] is False
 
 
@@ -32,6 +34,8 @@ def test_execute_result_prefers_plotly_payload_and_sets_figure_type():
     payload = output.as_response()
     assert payload["result_type"] == "Figure"
     assert payload["result"] == {"data": [], "layout": {}}
+    assert payload["has_stdout"] is False
+    assert payload["has_stderr"] is False
 
 
 def test_error_message_produces_failure_payload():
@@ -43,4 +47,5 @@ def test_error_message_produces_failure_payload():
     )
     payload = output.as_response()
     assert payload["success"] is False
+    assert payload["has_stderr"] is True
     assert "Traceback line 1" in (payload["error"] or "")

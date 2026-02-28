@@ -6,7 +6,17 @@ from app.services.terminal_executor import (
     detect_shell_command,
     normalize_workspace_cwd,
     run_workspace_terminal_command,
+    shutdown_terminal_sessions,
 )
+
+
+@pytest.fixture(autouse=True)
+async def _cleanup_terminal_sessions():
+    # Ensure subprocess-backed terminal sessions are closed on the same event loop
+    # used by async tests to avoid event-loop-closed transport warnings.
+    await shutdown_terminal_sessions()
+    yield
+    await shutdown_terminal_sessions()
 
 
 def test_detect_shell_command_returns_executable_and_args():

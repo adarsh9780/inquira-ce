@@ -24,11 +24,15 @@ class ParsedExecutionOutput:
         """Return the legacy execution payload consumed by the frontend."""
         stdout = "".join(self.stdout_parts).strip()
         stderr = "".join(self.stderr_parts).strip()
+        has_stdout = bool(stdout)
+        has_stderr = bool(stderr)
         success = self.error is None and not stderr
         return {
             "success": success,
             "stdout": stdout,
             "stderr": stderr,
+            "has_stdout": has_stdout,
+            "has_stderr": has_stderr,
             "error": self.error if not success else None,
             "result": self.result,
             "result_type": self.result_type,

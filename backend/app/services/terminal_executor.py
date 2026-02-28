@@ -176,6 +176,20 @@ class TerminalSessionManager:
         timed_out = False
 
         async with session.lock:
+            stdin = session.process.stdin
+            stdout_stream = session.process.stdout
+            if stdin is None or stdout_stream is None:
+                return {
+                    "stdout": "",
+                    "stderr": "Terminal session stream is unavailable.",
+                    "exit_code": 1,
+                    "cwd": session.cwd,
+                    "shell": session.shell,
+                    "platform": platform.system(),
+                    "timed_out": False,
+                    "persistent": True,
+                }
+
             # If caller requested cwd, cd first in current persistent shell.
             if cwd:
                 target_cwd = self.normalize_workspace_cwd(session.workspace_dir, cwd)
@@ -187,11 +201,11 @@ class TerminalSessionManager:
                         cd_payload = f"cd /d {target_cwd}\r\n"
                     else:
                         cd_payload = f"cd {shlex.quote(target_cwd)}\n"
-                    session.process.stdin.write(cd_payload.encode("utf-8", errors="replace"))
-                    await session.process.stdin.drain()
+                    stdin.write(cd_payload.encode("utf-8", errors="replace"))
+                    await stdin.drain()
 
-            session.process.stdin.write(payload.encode("utf-8", errors="replace"))
-            await session.process.stdin.drain()
+            stdin.write(payload.encode("utf-8", errors="replace"))
+            await stdin.drain()
 
             deadline = asyncio.get_running_loop().time() + max(1, int(timeout))
             done_seen = False
@@ -203,7 +217,7 @@ class TerminalSessionManager:
                     if remaining <= 0:
                         raise asyncio.TimeoutError
 
-                    line_bytes = await asyncio.wait_for(session.process.stdout.readline(), timeout=remaining)
+                    line_bytes = await asyncio.wait_for(stdout_stream.readline(), timeout=remaining)
                     if not line_bytes:
                         break
 

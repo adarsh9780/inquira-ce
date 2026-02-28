@@ -29,6 +29,8 @@ async def test_execute_code_uses_local_subprocess_provider(monkeypatch, tmp_path
             "success": True,
             "stdout": "ok",
             "stderr": "",
+            "has_stdout": True,
+            "has_stderr": False,
             "error": None,
             "result": 1,
             "result_type": "scalar",
@@ -45,6 +47,8 @@ async def test_execute_code_uses_local_subprocess_provider(monkeypatch, tmp_path
     assert captured["called"] is True
     assert result["success"] is True
     assert result["stdout"] == "ok"
+    assert result["has_stdout"] is True
+    assert result["has_stderr"] is False
 
 
 @pytest.mark.asyncio
@@ -137,6 +141,7 @@ async def test_execute_code_rejects_unknown_provider(monkeypatch, tmp_path):
 
     assert result["success"] is False
     assert "Unsupported execution provider" in (result["error"] or "")
+    assert result["has_stderr"] is True
 
 
 @pytest.mark.asyncio

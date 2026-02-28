@@ -11,9 +11,15 @@ test('normalizes stdout/stderr into legacy output field', () => {
     error: null,
     result: null,
     result_type: null,
+    result_kind: 'none',
+    result_name: null,
   })
 
   assert.equal(normalized.output, 'hello\nwarn')
+  assert.equal(normalized.result_kind, 'none')
+  assert.equal(normalized.result_name, null)
+  assert.equal(normalized.has_stdout, true)
+  assert.equal(normalized.has_stderr, true)
 })
 
 test('maps DataFrame result to variables.dataframes', () => {

@@ -61,17 +61,25 @@ function isVariableBundle(value) {
 export function normalizeExecutionResponse(raw) {
   const stdout = String(raw?.stdout || '')
   const stderr = String(raw?.stderr || '')
+  const hasStdout = Boolean(raw?.has_stdout ?? raw?.hasStdout ?? stdout)
+  const hasStderr = Boolean(raw?.has_stderr ?? raw?.hasStderr ?? stderr)
   const error = raw?.error || null
   const result = raw?.result ?? null
   const resultType = raw?.result_type ?? raw?.resultType ?? null
+  const resultKind = raw?.result_kind ?? raw?.resultKind ?? null
+  const resultName = raw?.result_name ?? raw?.resultName ?? null
 
   const response = {
     success: raw?.success !== false,
     stdout,
     stderr,
+    has_stdout: hasStdout,
+    has_stderr: hasStderr,
     error,
     result,
     result_type: resultType,
+    result_kind: resultKind,
+    result_name: resultName,
     output: [stdout, stderr].filter(Boolean).join('\n'),
     variables: {
       dataframes: normalizeDataFrameBucket(raw?.variables?.dataframes),

@@ -161,11 +161,12 @@ async def test_execute_on_session_uses_fallback_probe_when_primary_has_no_result
     assert calls["count"] == 2
     assert payload["success"] is True
     assert payload["result_type"] == "DataFrame"
+    assert payload["result_kind"] == "dataframe"
     assert payload["result"] == {"columns": ["x"], "data": [{"x": 1}]}
 
 
 @pytest.mark.asyncio
-async def test_execute_on_session_skips_fallback_probe_when_primary_has_result():
+async def test_execute_on_session_probes_scalar_result_without_overriding_scalar_payload():
     manager = WorkspaceKernelManager(idle_minutes=30)
     session = _session("ws-1", "/tmp/a.duckdb")
     calls = {"count": 0}
@@ -174,7 +175,11 @@ async def test_execute_on_session_skips_fallback_probe_when_primary_has_result()
         _ = (current_session, code)
         calls["count"] += 1
         parsed = ParsedExecutionOutput()
-        parsed.result = {"value": 1}
+        if calls["count"] == 1:
+            parsed.result = {"value": 1}
+            parsed.result_type = "scalar"
+            return parsed
+        parsed.result = {"from_probe": 2}
         parsed.result_type = "scalar"
         return parsed
 
@@ -182,9 +187,113 @@ async def test_execute_on_session_skips_fallback_probe_when_primary_has_result()
 
     payload = await manager._execute_on_session(session, "1")
 
-    assert calls["count"] == 1
+    assert calls["count"] == 2
     assert payload["result_type"] == "scalar"
+    assert payload["result_kind"] == "scalar"
     assert payload["result"] == {"value": 1}
+
+
+@pytest.mark.asyncio
+async def test_execute_on_session_promotes_scalar_primary_when_probe_finds_dataframe():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-1", "/tmp/a.duckdb")
+    calls = {"count": 0}
+
+    async def fake_execute_request(current_session, code):
+        _ = (current_session, code)
+        calls["count"] += 1
+        parsed = ParsedExecutionOutput()
+        if calls["count"] == 1:
+            parsed.result = "   a\n0  1"
+            parsed.result_type = "scalar"
+            return parsed
+        parsed.result = {"columns": ["a"], "data": [{"a": 1}]}
+        parsed.result_type = "DataFrame"
+        return parsed
+
+    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
+
+    payload = await manager._execute_on_session(session, "df.head()")
+
+    assert calls["count"] == 2
+    assert payload["result_type"] == "DataFrame"
+    assert payload["result_kind"] == "dataframe"
+    assert payload["result"] == {"columns": ["a"], "data": [{"a": 1}]}
+
+
+@pytest.mark.asyncio
+async def test_execute_on_session_fallback_still_runs_when_stderr_contains_warning():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-1", "/tmp/a.duckdb")
+    calls = {"count": 0}
+
+    async def fake_execute_request(current_session, code):
+        _ = (current_session, code)
+        calls["count"] += 1
+        parsed = ParsedExecutionOutput()
+        if calls["count"] == 1:
+            parsed.stderr_parts.append("FutureWarning: something changed")
+            parsed.result = "   a\n0  1"
+            parsed.result_type = "scalar"
+            return parsed
+        parsed.result = {"columns": ["a"], "data": [{"a": 1}]}
+        parsed.result_type = "DataFrame"
+        return parsed
+
+    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
+
+    payload = await manager._execute_on_session(session, "df.head()")
+
+    assert calls["count"] == 2
+    assert payload["result_type"] == "DataFrame"
+    assert payload["result_kind"] == "dataframe"
+    assert payload["result"] == {"columns": ["a"], "data": [{"a": 1}]}
+
+
+@pytest.mark.asyncio
+async def test_execute_on_session_sets_result_name_for_identifier_dataframe_selection():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-1", "/tmp/a.duckdb")
+    session.bootstrap_completed = True
+    calls = {"count": 0}
+
+    async def fake_execute_request(current_session, code):
+        _ = current_session
+        calls["count"] += 1
+        parsed = ParsedExecutionOutput()
+        if calls["count"] == 1:
+            assert code == "top_batsmen"
+            parsed.result = "text repr"
+            parsed.result_type = "scalar"
+            return parsed
+        if calls["count"] == 2:
+            # fallback probe runs before artifact sync for scalar primary results
+            assert "_inquira_payload" in code
+            parsed.result = None
+            parsed.result_type = None
+            return parsed
+        assert "_bundle" in code
+        parsed.result = {
+            "dataframes": {
+                "top_batsmen": {
+                    "artifact_id": "df-1",
+                    "row_count": 2,
+                    "columns": ["Batter", "Total Runs"],
+                    "data": [{"Batter": "A", "Total Runs": 1}],
+                }
+            },
+            "figures": {},
+            "scalars": {},
+        }
+        parsed.result_type = "scalar"
+        return parsed
+
+    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
+
+    payload = await manager._execute_on_session(session, "top_batsmen")
+
+    assert payload["result_kind"] == "dataframe"
+    assert payload["result_name"] == "top_batsmen"
 
 
 @pytest.mark.asyncio
@@ -252,6 +361,11 @@ async def test_execute_on_session_surfaces_artifact_sync_error():
         if calls["count"] == 1:
             parsed.result = {"ok": True}
             parsed.result_type = "scalar"
+            return parsed
+        if calls["count"] == 2:
+            # fallback probe for scalar primary
+            parsed.result = None
+            parsed.result_type = None
             return parsed
         raise RuntimeError("artifact sync failed")
 

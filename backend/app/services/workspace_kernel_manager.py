@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -235,9 +236,13 @@ class WorkspaceKernelManager:
                 "success": False,
                 "stdout": "",
                 "stderr": str(exc),
+                "has_stdout": False,
+                "has_stderr": True,
                 "error": str(exc),
                 "result": None,
                 "result_type": None,
+                "result_kind": "error",
+                "result_name": None,
             }
 
         async with session.lock:
@@ -256,9 +261,13 @@ class WorkspaceKernelManager:
                     "success": False,
                     "stdout": "",
                     "stderr": "",
+                    "has_stdout": False,
+                    "has_stderr": False,
                     "error": f"Execution timed out after {timeout} seconds.",
                     "result": None,
                     "result_type": None,
+                    "result_kind": "error",
+                    "result_name": None,
                 }
             except Exception as exc:
                 session.status = "error"
@@ -266,9 +275,13 @@ class WorkspaceKernelManager:
                     "success": False,
                     "stdout": "",
                     "stderr": str(exc),
+                    "has_stdout": False,
+                    "has_stderr": True,
                     "error": str(exc),
                     "result": None,
                     "result_type": None,
+                    "result_kind": "error",
+                    "result_name": None,
                 }
             finally:
                 session.last_used = datetime.now(UTC)
@@ -462,17 +475,31 @@ class WorkspaceKernelManager:
     ) -> dict[str, Any]:
         parsed = await self._execute_request(session, code)
 
-        if (
-            parsed.result is None
-            and parsed.error is None
-            and not parsed.stderr_parts
-        ):
+        should_probe_fallback = (
+            parsed.error is None
+            and (
+                parsed.result is None
+                or parsed.result_type in {None, "scalar"}
+            )
+        )
+
+        if should_probe_fallback:
             probe = await self._execute_request(session, _FALLBACK_RESULT_PROBE_CODE)
-            if probe.result is not None and probe.result_type is not None:
+            if (
+                probe.result is not None
+                and probe.result_type in {"DataFrame", "Figure"}
+            ):
+                parsed.result = probe.result
+                parsed.result_type = probe.result_type
+            elif (
+                parsed.result is None
+                and probe.result is not None
+                and probe.result_type is not None
+            ):
                 parsed.result = probe.result
                 parsed.result_type = probe.result_type
 
-        variables = {"dataframes": {}, "figures": {}, "scalars": {}}
+        variables: dict[str, dict[str, Any]] = {"dataframes": {}, "figures": {}, "scalars": {}}
         if session.bootstrap_completed and parsed.error is None:
             try:
                 artifact_probe = await self._execute_request(session, _ARTIFACT_SYNC_CODE)
@@ -488,6 +515,13 @@ class WorkspaceKernelManager:
 
         response = parsed.as_response()
         response["variables"] = variables
+        result_kind, result_name = self._resolve_canonical_result(
+            code=code,
+            parsed=parsed,
+            variables=variables,
+        )
+        response["result_kind"] = result_kind
+        response["result_name"] = result_name
         return response
 
     async def _execute_request(
@@ -545,7 +579,7 @@ class WorkspaceKernelManager:
 
     @staticmethod
     def _coerce_variable_bundle(result: Any) -> dict[str, dict[str, Any]]:
-        default_bundle = {"dataframes": {}, "figures": {}, "scalars": {}}
+        default_bundle: dict[str, dict[str, Any]] = {"dataframes": {}, "figures": {}, "scalars": {}}
         parsed_result: Any = result
 
         # Some kernels may emit artifact payloads as JSON-encoded strings.
@@ -615,3 +649,50 @@ class WorkspaceKernelManager:
         if not cleaned:
             return "value"
         return cleaned[:96]
+
+    @staticmethod
+    def _extract_identifier_reference(code: str) -> str | None:
+        trimmed = str(code or "").strip()
+        if not trimmed:
+            return None
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", trimmed):
+            return trimmed
+        return None
+
+    @staticmethod
+    def _normalize_result_kind(result_type: str | None) -> str:
+        normalized = str(result_type or "").strip().lower()
+        if normalized == "dataframe":
+            return "dataframe"
+        if normalized == "figure":
+            return "figure"
+        if normalized == "scalar":
+            return "scalar"
+        return "none"
+
+    @classmethod
+    def _resolve_canonical_result(
+        cls,
+        *,
+        code: str,
+        parsed: ParsedExecutionOutput,
+        variables: dict[str, dict[str, Any]],
+    ) -> tuple[str, str | None]:
+        if parsed.error:
+            return "error", None
+
+        identifier_ref = cls._extract_identifier_reference(code)
+        if identifier_ref:
+            if identifier_ref in variables.get("dataframes", {}):
+                return "dataframe", identifier_ref
+            if identifier_ref in variables.get("figures", {}):
+                return "figure", identifier_ref
+            if identifier_ref in variables.get("scalars", {}):
+                return "scalar", identifier_ref
+
+        kind = cls._normalize_result_kind(parsed.result_type)
+        if kind in {"dataframe", "figure", "scalar"}:
+            return kind, None
+        if parsed.result is not None:
+            return "scalar", None
+        return "none", None

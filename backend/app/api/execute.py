@@ -21,9 +21,13 @@ class ExecuteResponse(BaseModel):
     success: bool
     stdout: str = ""
     stderr: str = ""
+    has_stdout: bool = False
+    has_stderr: bool = False
     error: str | None = None
     result: object | None = None
     result_type: str | None = None
+    result_kind: str = "none"
+    result_name: str | None = None
 
 
 @router.post("/execute", response_model=ExecuteResponse)

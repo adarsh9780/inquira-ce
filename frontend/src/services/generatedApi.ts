@@ -189,9 +189,13 @@ export interface ExecuteResponse {
   success: boolean;
   stdout?: string;
   stderr?: string;
+  has_stdout?: boolean;
+  has_stderr?: boolean;
   error?: ExecuteResponseError;
   result?: ExecuteResponseResult;
   result_type?: ExecuteResponseResultType;
+  result_kind?: string;
+  result_name?: string | null;
 }
 
 export interface GeminiTestRequest {

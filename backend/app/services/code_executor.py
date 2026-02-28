@@ -189,9 +189,13 @@ def _error_payload(message: str) -> dict[str, Any]:
         "success": False,
         "stdout": "",
         "stderr": message,
+        "has_stdout": False,
+        "has_stderr": True,
         "error": message,
         "result": None,
         "result_type": None,
+        "result_kind": "error",
+        "result_name": None,
         "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
     }
 
@@ -280,12 +284,27 @@ def _parse_subprocess_output(
             pass
 
     stderr = stderr_raw.strip()
+    stdout = clean_stdout.strip()
     success = returncode == 0 and not stderr
+    if not success:
+        result_kind = "error"
+    elif result_type == "DataFrame":
+        result_kind = "dataframe"
+    elif result_type == "Figure":
+        result_kind = "figure"
+    elif parsed_result is not None:
+        result_kind = "scalar"
+    else:
+        result_kind = "none"
     return {
         "success": success,
-        "stdout": clean_stdout.strip(),
+        "stdout": stdout,
         "stderr": stderr,
+        "has_stdout": bool(stdout),
+        "has_stderr": bool(stderr),
         "error": stderr if not success else None,
         "result": parsed_result,
         "result_type": result_type,
+        "result_kind": result_kind,
+        "result_name": None,
     }

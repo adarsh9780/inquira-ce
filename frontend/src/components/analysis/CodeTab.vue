@@ -98,6 +98,11 @@ import executionService from '../../services/executionService'
 import { toast } from '../../composables/useToast'
 import { buildExecutionViewModel } from '../../utils/executionViewModel'
 import { normalizeExecutionResponse } from '../../utils/runtimeExecution'
+import {
+  decideExecutionTabWithSelection,
+  prioritizeByName,
+  resolvePreferredArtifactNames,
+} from '../../utils/executionRouting'
 
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState, Prec } from '@codemirror/state'
@@ -129,18 +134,7 @@ const settingsInfo = ref(null)
 let editor = null
 let isUpdatingFromStore = false
 
-function choosePreferredTab(viewModel, preferredType = null) {
-  const normalized = String(preferredType || '').toLowerCase()
-  if (normalized === 'dataframe' && viewModel.dataframes.length > 0) return 'table'
-  if (normalized === 'figure' && viewModel.figures.length > 0) return 'figure'
-  if (normalized === 'scalar' && viewModel.scalars.length > 0) return 'varex'
-  if (viewModel.figures.length > 0) return 'figure'
-  if (viewModel.dataframes.length > 0) return 'table'
-  if (viewModel.scalars.length > 0) return 'varex'
-  return null
-}
-
-function applyExecutionArtifactsToStore(viewModel, { switchTabs = false, preferredType = null } = {}) {
+function applyExecutionArtifactsToStore(viewModel) {
   appStore.setDataframes(viewModel.dataframes)
   if (viewModel.dataframes.length > 0) {
     appStore.setResultData(viewModel.dataframes[0].data)
@@ -152,10 +146,6 @@ function applyExecutionArtifactsToStore(viewModel, { switchTabs = false, preferr
   }
 
   appStore.setScalars(viewModel.scalars)
-  if (switchTabs) {
-    const targetTab = choosePreferredTab(viewModel, preferredType)
-    if (targetTab) appStore.setActiveTab(targetTab)
-  }
 }
 
 async function fetchDatabasePaths() {
@@ -251,9 +241,13 @@ async function executeSnippet(code, successLine) {
     success: pyResponse.success,
     stdout: pyResponse.stdout,
     stderr: pyResponse.stderr,
+    has_stdout: pyResponse.hasStdout,
+    has_stderr: pyResponse.hasStderr,
     error: pyResponse.error,
     result: pyResponse.result,
     result_type: pyResponse.resultType,
+    result_kind: pyResponse.resultKind,
+    result_name: pyResponse.resultName,
     variables: pyResponse.variables,
   })
 
@@ -268,7 +262,32 @@ async function executeSnippet(code, successLine) {
     },
   )
 
-  applyExecutionArtifactsToStore(viewModel, { switchTabs: true, preferredType: normalized?.result_type })
+  if (normalized?.error) {
+    appStore.setTerminalOutput(viewModel.output)
+    appStore.setActiveTab('terminal')
+    return
+  }
+
+  const preferred = resolvePreferredArtifactNames(viewModel, normalized)
+  const orderedViewModel = {
+    ...viewModel,
+    dataframes: prioritizeByName(viewModel.dataframes, preferred.dataframeName),
+    figures: prioritizeByName(viewModel.figures, preferred.figureName),
+  }
+
+  applyExecutionArtifactsToStore(orderedViewModel)
+  const targetTab = decideExecutionTabWithSelection({
+    resultType: normalized?.result_type,
+    resultKind: normalized?.result_kind,
+    resultName: normalized?.result_name,
+    hasError: false,
+    hasDataframes: orderedViewModel.dataframes.length > 0,
+    hasFigures: orderedViewModel.figures.length > 0,
+    selectedCode: code,
+    dataframeNames: orderedViewModel.dataframes.map((df) => String(df?.name || '')),
+    figureNames: orderedViewModel.figures.map((fig) => String(fig?.name || '')),
+  })
+  if (targetTab) appStore.setActiveTab(targetTab)
   appStore.setTerminalOutput(viewModel.output)
 }
 
