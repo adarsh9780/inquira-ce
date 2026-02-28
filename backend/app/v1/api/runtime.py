@@ -32,6 +32,7 @@ from ...services.llm_service import LLMService
 from ...services.llm_runtime_config import load_llm_runtime_config
 from ...services.execution_config import load_execution_runtime_config
 from ...services.runner_env import install_runner_package
+from ...services.terminal_executor import run_workspace_terminal_command
 
 router = APIRouter(tags=["V1 Runtime"])
 
@@ -61,6 +62,22 @@ class DataframeArtifactRowsResponse(BaseModel):
     rows: list[dict[str, Any]]
     offset: int
     limit: int
+
+
+class TerminalExecuteRequest(BaseModel):
+    command: str = Field(..., min_length=1, description="Shell command to run")
+    cwd: str | None = Field(default=None, description="Optional working directory override")
+    timeout: int = Field(120, ge=1, le=600, description="Max command execution time in seconds")
+
+
+class TerminalExecuteResponse(BaseModel):
+    stdout: str = ""
+    stderr: str = ""
+    exit_code: int
+    cwd: str
+    shell: str
+    platform: str
+    timed_out: bool = False
 
 
 class RunnerPackageInstallRequest(BaseModel):
@@ -475,6 +492,27 @@ async def install_runner_runtime_package(
         workspace_kernel_reset=reset,
         saved_as_default=saved_default,
     )
+
+
+@router.post(
+    "/workspaces/{workspace_id}/terminal/execute",
+    response_model=TerminalExecuteResponse,
+)
+async def execute_workspace_terminal_command(
+    workspace_id: str,
+    payload: TerminalExecuteRequest,
+    session: AsyncSession = Depends(get_db_session),
+    current_user=Depends(get_current_user),
+):
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    workspace_dir = str(Path(workspace.duckdb_path).parent)
+    result = await run_workspace_terminal_command(
+        command=payload.command,
+        workspace_dir=workspace_dir,
+        cwd=payload.cwd,
+        timeout=payload.timeout,
+    )
+    return TerminalExecuteResponse(**result)
 
 
 @router.get(

@@ -460,6 +460,8 @@ function cancelLogout() {
 
 // Global shortcut helper functions
 function focusChatInput() {
+  appStore.setWorkspacePane('chat')
+  appStore.setActiveTab('workspace')
   // Find and focus the chat input textarea
   const chatInput = document.querySelector('textarea[placeholder*="Ask a question"]')
   if (chatInput) {
@@ -470,6 +472,8 @@ function focusChatInput() {
 }
 
 function focusCodeEditor() {
+  appStore.setWorkspacePane('code')
+  appStore.setActiveTab('workspace')
   // Find and focus the code editor
   const codeEditor = document.querySelector('.cm-editor')
   if (codeEditor) {
@@ -480,6 +484,8 @@ function focusCodeEditor() {
 }
 
 function focusCodeEditorAtEnd() {
+  appStore.setWorkspacePane('code')
+  appStore.setActiveTab('workspace')
   // Find and focus the code editor at the end of the current line
   const codeEditor = document.querySelector('.cm-editor')
   if (codeEditor) {
@@ -649,9 +655,9 @@ function handleKeydown(event) {
 
     switch (key) {
       case 'c':
-        console.debug('c: Switching to code tab')
+        console.debug('c: Switching to workspace code pane')
         event.preventDefault()
-        appStore.setActiveTab('code')
+        appStore.setWorkspacePane('code')
         break
       case 't':
         console.debug('t: Switching to table tab')
@@ -679,13 +685,10 @@ function handleKeydown(event) {
         downloadCode()
         break
       case 'h':
-        // 'h' toggles Chat overlay
-        console.debug('h: Toggle chat overlay')
+        console.debug('h: Switching to workspace chat pane')
         event.preventDefault()
-        appStore.toggleChatOverlay()
-        if (appStore.isChatOverlayOpen) {
-          focusChatInput()
-        }
+        appStore.setWorkspacePane('chat')
+        focusChatInput()
         break
       case 'f':
         console.debug('f: Switching to figure tab')
@@ -718,16 +721,6 @@ function handleKeydown(event) {
         openShortcuts()
         break
       // Modal shortcuts removed; use v/e for tabs
-      case 'n':
-        console.debug('n: Toggle notebook mode')
-        event.preventDefault()
-        // This will be handled by the code tab component
-        // We need to emit an event or use a global method
-        const notebookToggle = document.querySelector('button[title*="Notebook Mode"]')
-        if (notebookToggle) {
-          notebookToggle.click()
-        }
-        break
       default:
         // Not a shortcut key, allow normal typing (don't prevent default)
         console.debug('Not a shortcut key, allowing normal typing')

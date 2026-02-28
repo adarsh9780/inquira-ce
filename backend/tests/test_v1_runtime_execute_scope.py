@@ -272,6 +272,53 @@ async def test_workspace_kernel_interrupt_endpoint(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_workspace_terminal_execute_endpoint(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws7"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    captured = {}
+
+    async def fake_run_terminal_command(*, command, workspace_dir, cwd, timeout):
+        captured["command"] = command
+        captured["workspace_dir"] = workspace_dir
+        captured["cwd"] = cwd
+        captured["timeout"] = timeout
+        return {
+            "stdout": "ok\n",
+            "stderr": "",
+            "exit_code": 0,
+            "cwd": workspace_dir,
+            "shell": "/bin/bash",
+            "platform": "Darwin",
+            "timed_out": False,
+        }
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "run_workspace_terminal_command", fake_run_terminal_command)
+
+    response = await runtime_api.execute_workspace_terminal_command(
+        workspace_id="ws-7",
+        payload=runtime_api.TerminalExecuteRequest(command="pwd", cwd=None, timeout=90),
+        session=object(),
+        current_user=SimpleNamespace(id="user-1"),
+    )
+
+    assert response.exit_code == 0
+    assert response.stdout == "ok\n"
+    assert captured["command"] == "pwd"
+    assert captured["workspace_dir"] == str(workspace_dir)
+    assert captured["cwd"] is None
+    assert captured["timeout"] == 90
+
+
+@pytest.mark.asyncio
 async def test_workspace_kernel_restart_endpoint(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws7"
     workspace_dir.mkdir(parents=True, exist_ok=True)

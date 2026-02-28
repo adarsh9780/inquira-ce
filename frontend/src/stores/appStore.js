@@ -55,7 +55,10 @@ export const useAppStore = defineStore('app', () => {
   const figures = ref([])
   const scalars = ref([])
   const terminalOutput = ref('')
-  const activeTab = ref('code')
+  const activeTab = ref('workspace')
+  const workspacePane = ref('code') // 'code' | 'chat'
+  const terminalConsentGranted = ref(false)
+  const terminalCwd = ref('')
   const isChatOverlayOpen = ref(true)
   const chatOverlayWidth = ref(0.25) // 25% of area
   const isSidebarCollapsed = ref(true)
@@ -96,7 +99,8 @@ export const useAppStore = defineStore('app', () => {
       version: LOCAL_SNAPSHOT_VERSION,
       updated_at: new Date().toISOString(),
       ui: {
-        active_tab: activeTab.value || 'code',
+        active_tab: activeTab.value || 'workspace',
+        workspace_pane: workspacePane.value || 'code',
         chat_overlay_open: !!isChatOverlayOpen.value,
         chat_overlay_width: Number(chatOverlayWidth.value || 0.25),
         is_sidebar_collapsed: !!isSidebarCollapsed.value,
@@ -122,7 +126,19 @@ export const useAppStore = defineStore('app', () => {
     const editor = snapshot.editor || {}
 
     if (typeof ui.active_tab === 'string' && ui.active_tab.trim()) {
-      activeTab.value = ui.active_tab
+      const restoredTab = ui.active_tab.trim().toLowerCase()
+      if (restoredTab === 'code') {
+        activeTab.value = 'workspace'
+        workspacePane.value = 'code'
+      } else if (restoredTab === 'chat') {
+        activeTab.value = 'workspace'
+        workspacePane.value = 'chat'
+      } else {
+        activeTab.value = restoredTab
+      }
+    }
+    if (typeof ui.workspace_pane === 'string' && ui.workspace_pane.trim()) {
+      workspacePane.value = ui.workspace_pane === 'chat' ? 'chat' : 'code'
     }
     if (typeof ui.chat_overlay_open === 'boolean') {
       isChatOverlayOpen.value = ui.chat_overlay_open
@@ -669,8 +685,28 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setActiveTab(tab) {
-    activeTab.value = tab
+    const normalized = String(tab || '').trim().toLowerCase()
+    if (normalized === 'code') {
+      activeTab.value = 'workspace'
+      workspacePane.value = 'code'
+    } else if (normalized === 'chat') {
+      activeTab.value = 'workspace'
+      workspacePane.value = 'chat'
+    } else {
+      activeTab.value = normalized || 'workspace'
+    }
     saveLocalConfig()
+  }
+  function setWorkspacePane(pane) {
+    workspacePane.value = pane === 'chat' ? 'chat' : 'code'
+    activeTab.value = 'workspace'
+    saveLocalConfig()
+  }
+  function setTerminalConsentGranted(granted) {
+    terminalConsentGranted.value = !!granted
+  }
+  function setTerminalCwd(cwd) {
+    terminalCwd.value = String(cwd || '')
   }
   function toggleChatOverlay() {
     isChatOverlayOpen.value = !isChatOverlayOpen.value
@@ -775,7 +811,10 @@ export const useAppStore = defineStore('app', () => {
     resultData.value = null
     plotlyFigure.value = null
     terminalOutput.value = ''
-    activeTab.value = 'code'
+    activeTab.value = 'workspace'
+    workspacePane.value = 'code'
+    terminalConsentGranted.value = false
+    terminalCwd.value = ''
     isCodeRunning.value = false
     isNotebookMode.value = false
     notebookCells.value = []
@@ -884,6 +923,9 @@ export const useAppStore = defineStore('app', () => {
     scalars,
     terminalOutput,
     activeTab,
+    workspacePane,
+    terminalConsentGranted,
+    terminalCwd,
     isChatOverlayOpen,
     chatOverlayWidth,
     isSidebarCollapsed,
@@ -948,6 +990,9 @@ export const useAppStore = defineStore('app', () => {
     setScalars,
     setTerminalOutput,
     setActiveTab,
+    setWorkspacePane,
+    setTerminalConsentGranted,
+    setTerminalCwd,
     toggleChatOverlay,
     setChatOverlayOpen,
     setChatOverlayWidth,

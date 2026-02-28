@@ -225,3 +225,41 @@ async def test_get_dataframe_rows_reads_paginated_chunk(tmp_path):
     assert rows["name"] == "summary"
     assert rows["row_count"] == 3
     assert rows["rows"] == [{"a": 2}, {"a": 3}]
+
+
+def test_coerce_variable_bundle_accepts_json_string_payload():
+    bundle_json = (
+        '{"dataframes":{"df":{"artifact_id":"a1","row_count":1,"data":[{"x":1}]}},"figures":{"fig":{"data":[],"layout":{}}},"scalars":{"n":1}}'
+    )
+    bundle = WorkspaceKernelManager._coerce_variable_bundle(bundle_json)
+
+    assert bundle["dataframes"]["df"]["artifact_id"] == "a1"
+    assert bundle["figures"]["fig"]["layout"] == {}
+    assert bundle["scalars"]["n"] == 1
+
+
+@pytest.mark.asyncio
+async def test_execute_on_session_surfaces_artifact_sync_error():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-3", "/tmp/a.duckdb")
+    session.bootstrap_completed = True
+    calls = {"count": 0}
+
+    async def fake_execute_request(current_session, code):
+        _ = (current_session, code)
+        calls["count"] += 1
+        parsed = ParsedExecutionOutput()
+        if calls["count"] == 1:
+            parsed.result = {"ok": True}
+            parsed.result_type = "scalar"
+            return parsed
+        raise RuntimeError("artifact sync failed")
+
+    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
+
+    payload = await manager._execute_on_session(session, "x = 1")
+
+    assert payload["result"] == {"ok": True}
+    assert payload["variables"]["dataframes"] == {}
+    assert payload["variables"]["figures"] == {}
+    assert payload["variables"]["scalars"]["_artifact_sync_error"] == "artifact sync failed"

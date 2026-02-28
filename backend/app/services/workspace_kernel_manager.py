@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -158,10 +159,15 @@ for _name, _value in list(globals().items()):
         _seen_fig_names.add(_name)
         _artifact = _inquira_fig_artifacts.get(_name, {})
         _artifact_id = _artifact.get("artifact_id") or str(_uuid.uuid4())
-        if _go is not None and isinstance(_value, _go.Figure):
-            _fig_payload = _value.to_plotly_json()
-        else:
-            _fig_payload = _value
+        try:
+            if _go is not None and isinstance(_value, _go.Figure):
+                # Plotly's JSON encoder handles ndarray/typed values better than
+                # plain python repr and keeps payload frontend-compatible.
+                _fig_payload = _json.loads(_value.to_json())
+            else:
+                _fig_payload = _json.loads(_json.dumps(_value))
+        except Exception:
+            _fig_payload = _json.loads(_json.dumps(_value, default=str))
         _inquira_fig_artifacts[_name] = {"artifact_id": _artifact_id}
         _bundle["figures"][_name] = _fig_payload
 
@@ -473,8 +479,12 @@ class WorkspaceKernelManager:
                 bundle = self._coerce_variable_bundle(artifact_probe.result)
                 variables = bundle
                 self._update_artifact_registry(session, bundle)
-            except Exception:
-                variables = {"dataframes": {}, "figures": {}, "scalars": {}}
+            except Exception as exc:
+                variables = {
+                    "dataframes": {},
+                    "figures": {},
+                    "scalars": {"_artifact_sync_error": str(exc)},
+                }
 
         response = parsed.as_response()
         response["variables"] = variables
@@ -536,11 +546,23 @@ class WorkspaceKernelManager:
     @staticmethod
     def _coerce_variable_bundle(result: Any) -> dict[str, dict[str, Any]]:
         default_bundle = {"dataframes": {}, "figures": {}, "scalars": {}}
-        if not isinstance(result, dict):
+        parsed_result: Any = result
+
+        # Some kernels may emit artifact payloads as JSON-encoded strings.
+        if isinstance(parsed_result, str):
+            stripped = parsed_result.strip()
+            if not stripped:
+                return default_bundle
+            try:
+                parsed_result = json.loads(stripped)
+            except json.JSONDecodeError:
+                return default_bundle
+
+        if not isinstance(parsed_result, dict):
             return default_bundle
-        dataframes = result.get("dataframes")
-        figures = result.get("figures")
-        scalars = result.get("scalars")
+        dataframes = parsed_result.get("dataframes")
+        figures = parsed_result.get("figures")
+        scalars = parsed_result.get("scalars")
         if not isinstance(dataframes, dict):
             dataframes = {}
         if not isinstance(figures, dict):

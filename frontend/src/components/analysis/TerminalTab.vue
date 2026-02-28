@@ -1,229 +1,165 @@
 <template>
-  <div class="flex flex-col h-full">
-    <!-- Console Header -->
-    <div class="flex-shrink-0 bg-gray-900 text-white px-4 py-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center space-x-3">
-          <CommandLineIcon class="h-5 w-5" />
-          <h3 class="text-sm font-medium">Output Console</h3>
-          <span v-if="appStore.terminalOutput" class="text-xs bg-gray-700 px-2 py-1 rounded">
-            {{ outputType }}
-          </span>
+  <div class="flex h-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
+    <div class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3">
+      <div class="flex items-center space-x-2">
+        <CommandLineIcon class="h-5 w-5 text-gray-700" />
+        <h3 class="text-sm font-semibold text-gray-900">Terminal</h3>
+        <span class="rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-700">{{ shellLabel }}</span>
+      </div>
+      <div class="text-xs text-gray-600">cwd: {{ displayCwd }}</div>
+    </div>
+
+    <div v-if="!appStore.terminalConsentGranted" class="flex-1 p-5">
+      <div class="mx-auto max-w-xl rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <p class="font-semibold">Local terminal access</p>
+        <p class="mt-2">Commands here run on your machine with your user permissions in the active workspace context.</p>
+        <p class="mt-1">Consent is required once per app session.</p>
+        <button
+          class="mt-4 rounded bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700"
+          @click="grantConsent"
+        >
+          Enable terminal for this session
+        </button>
+      </div>
+    </div>
+
+    <template v-else>
+      <div ref="scrollRef" class="min-h-0 flex-1 overflow-y-auto bg-[#0f172a] p-4 font-mono text-sm text-slate-100">
+        <div v-if="entries.length === 0" class="text-slate-400">
+          Terminal ready. Run commands with <code class="rounded bg-slate-800 px-1 py-0.5">Enter</code>.
         </div>
-        
-        <div class="flex items-center space-x-2">
-          <!-- Copy Output Button -->
+        <div v-for="(entry, idx) in entries" :key="idx" class="mb-3">
+          <div class="text-sky-300">$ {{ entry.command }}</div>
+          <pre v-if="entry.stdout" class="whitespace-pre-wrap break-words text-slate-100">{{ entry.stdout }}</pre>
+          <pre v-if="entry.stderr" class="whitespace-pre-wrap break-words text-rose-300">{{ entry.stderr }}</pre>
+          <div class="text-xs" :class="entry.exitCode === 0 ? 'text-emerald-400' : 'text-amber-400'">
+            exit {{ entry.exitCode }}
+          </div>
+        </div>
+      </div>
+
+      <div class="border-t border-gray-200 bg-white p-3">
+        <div class="mb-2 flex items-center justify-between text-xs text-gray-600">
+          <span>Shell: {{ shellLabel }}</span>
           <button
-            @click="copyOutput"
-            :disabled="!appStore.terminalOutput"
-            class="inline-flex items-center px-2 py-1 text-xs font-medium rounded text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
-            :class="!appStore.terminalOutput ? 'opacity-50 cursor-not-allowed' : ''"
-          >
-            <DocumentDuplicateIcon class="h-3 w-3 mr-1" />
-            Copy
-          </button>
-          
-          <!-- Clear Console Button -->
-          <button
+            class="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50"
             @click="clearTerminal"
-            :disabled="!appStore.terminalOutput"
-            class="inline-flex items-center px-2 py-1 text-xs font-medium rounded text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
-            :class="!appStore.terminalOutput ? 'opacity-50 cursor-not-allowed' : ''"
           >
-            <TrashIcon class="h-3 w-3 mr-1" />
             Clear
           </button>
         </div>
+        <form class="flex items-center gap-2" @submit.prevent="runCommand">
+          <input
+            v-model="command"
+            type="text"
+            class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            placeholder="Enter command (e.g., pwd, ls, pip install pandas==2.2.3)"
+            :disabled="isRunning || !appStore.activeWorkspaceId"
+          />
+          <button
+            type="submit"
+            class="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+            :disabled="isRunning || !command.trim() || !appStore.activeWorkspaceId"
+          >
+            {{ isRunning ? 'Running...' : 'Run' }}
+          </button>
+        </form>
       </div>
-    </div>
-    
-    <!-- Console Content -->
-    <div class="flex-1 bg-gray-900 text-gray-100 overflow-hidden">
-      <div v-if="formattedOutput" class="h-full overflow-y-auto">
-        <pre class="p-4 text-sm font-mono leading-relaxed whitespace-pre-wrap">{{ formattedOutput }}</pre>
-      </div>
-      
-      <!-- Empty State -->
-      <div v-else class="h-full flex items-center justify-center">
-        <div class="text-center text-gray-500">
-          <CommandLineIcon class="h-12 w-12 mx-auto mb-3 text-gray-600" />
-          <p class="text-sm">No output to display</p>
-          <p class="text-xs text-gray-600 mt-1">Execution output will appear here</p>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Console Footer with Status -->
-    <div class="flex-shrink-0 bg-gray-800 text-gray-300 px-4 py-2 text-xs">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center space-x-4">
-          <span class="flex items-center space-x-1">
-            <div 
-              class="w-2 h-2 rounded-full"
-              :class="statusIndicatorClass"
-            />
-            <span>{{ statusText }}</span>
-          </span>
-          <span v-if="formattedOutput">
-            {{ lineCount }} lines
-          </span>
-        </div>
-        
-        <div class="flex items-center space-x-2">
-          <span>{{ currentTime }}</span>
-        </div>
-      </div>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { CommandLineIcon } from '@heroicons/vue/24/outline'
 import { useAppStore } from '../../stores/appStore'
-import { 
-  CommandLineIcon, 
-  DocumentDuplicateIcon, 
-  TrashIcon 
-} from '@heroicons/vue/24/outline'
+import apiService from '../../services/apiService'
+import { toast } from '../../composables/useToast'
 
 const appStore = useAppStore()
 
-const currentTime = ref('')
-let timeInterval = null
+const command = ref('')
+const entries = ref([])
+const isRunning = ref(false)
+const scrollRef = ref(null)
+const shell = ref('')
 
-const formattedOutput = computed(() => {
-  let output = appStore.terminalOutput || ''
+const displayCwd = computed(() => appStore.terminalCwd || 'n/a')
+const shellLabel = computed(() => {
+  if (shell.value) return shell.value
+  const p = navigator.platform.toLowerCase()
+  if (p.includes('win')) return 'PowerShell/cmd'
+  return 'bash/sh'
+})
 
-  // Add scalars if available
-  if (appStore.scalars && appStore.scalars.length > 0) {
-    const scalarsDict = {}
-    appStore.scalars.forEach((scalar) => {
-      if (scalar && scalar.name) {
-        scalarsDict[scalar.name] = scalar.value
-      }
-    })
+onMounted(async () => {
+  await ensureWorkspaceCwd()
+})
 
-    const scalarsText = `\n\nScalars:\n${JSON.stringify(scalarsDict, null, 2)}`
-    output += scalarsText
+watch(() => appStore.activeWorkspaceId, async () => {
+  await ensureWorkspaceCwd()
+  clearTerminal()
+})
+
+async function ensureWorkspaceCwd() {
+  if (!appStore.activeWorkspaceId) {
+    appStore.setTerminalCwd('')
+    return
   }
-
-  if (!output) return ''
-
-  // Add timestamp prefix to each line
-  const timestamp = new Date().toLocaleTimeString()
-  const lines = output.split('\n')
-
-  return lines.map((line, index) => {
-    if (index === 0) {
-      return `[${timestamp}] ${line}`
+  try {
+    const paths = await apiService.getDatabasePaths()
+    if (paths?.base_directory) {
+      appStore.setTerminalCwd(paths.base_directory)
     }
-    return line
-  }).join('\n')
-})
-
-const lineCount = computed(() => {
-  const output = formattedOutput.value
-  if (!output) return 0
-  return output.split('\n').length
-})
-
-const outputType = computed(() => {
-  const output = formattedOutput.value
-  if (!output) return ''
-
-  const lowerOutput = output.toLowerCase()
-  if (lowerOutput.includes('error') || lowerOutput.includes('exception') || lowerOutput.includes('traceback')) {
-    return 'Error'
-  } else if (lowerOutput.includes('warning')) {
-    return 'Warning'
-  } else if (lowerOutput.includes('success') || lowerOutput.includes('completed')) {
-    return 'Success'
+  } catch (_error) {
+    // Keep terminal usable even if path lookup fails.
   }
-  return 'Output'
-})
-
-const statusIndicatorClass = computed(() => {
-  if (appStore.isCodeRunning) {
-    return 'bg-orange-500'
-  }
-  switch (outputType.value) {
-    case 'Error':
-      return 'bg-red-500'
-    case 'Warning':
-      return 'bg-yellow-500'
-    case 'Success':
-      return 'bg-green-500'
-    default:
-      return 'bg-blue-500'
-  }
-})
-
-const statusText = computed(() => {
-  if (appStore.isCodeRunning) {
-    return 'Processing'
-  }
-  if (!formattedOutput.value) {
-    return 'Ready'
-  }
-  return `${outputType.value} - Last updated ${new Date().toLocaleTimeString()}`
-})
-
-onMounted(() => {
-  updateTime()
-  timeInterval = setInterval(updateTime, 1000)
-})
-
-onUnmounted(() => {
-  if (timeInterval) {
-    clearInterval(timeInterval)
-  }
-})
-
-function updateTime() {
-  currentTime.value = new Date().toLocaleTimeString()
 }
 
-async function copyOutput() {
-  if (!formattedOutput.value) return
-
-  try {
-    await navigator.clipboard.writeText(formattedOutput.value)
-    console.debug('Terminal output copied to clipboard')
-    // You could add a toast notification here
-  } catch (error) {
-    console.error('Failed to copy terminal output:', error)
-  }
+function grantConsent() {
+  appStore.setTerminalConsentGranted(true)
 }
 
 function clearTerminal() {
-  if (confirm('Are you sure you want to clear the terminal output?')) {
-    appStore.setTerminalOutput('')
-    appStore.setScalars([])
+  entries.value = []
+  appStore.setTerminalOutput('')
+}
+
+async function runCommand() {
+  const raw = command.value.trim()
+  if (!raw || !appStore.activeWorkspaceId || isRunning.value) return
+
+  isRunning.value = true
+  try {
+    const payload = await apiService.executeTerminalCommand(appStore.activeWorkspaceId, {
+      command: raw,
+      cwd: appStore.terminalCwd || null,
+      timeout: 180,
+    })
+    shell.value = payload?.shell || shell.value
+    if (payload?.cwd) appStore.setTerminalCwd(payload.cwd)
+
+    entries.value.push({
+      command: raw,
+      stdout: payload?.stdout || '',
+      stderr: payload?.stderr || '',
+      exitCode: Number.isInteger(payload?.exit_code) ? payload.exit_code : 1,
+    })
+
+    appStore.setTerminalOutput([payload?.stdout || '', payload?.stderr || ''].filter(Boolean).join('\n'))
+    command.value = ''
+
+    await nextTick()
+    if (scrollRef.value) {
+      scrollRef.value.scrollTop = scrollRef.value.scrollHeight
+    }
+  } catch (error) {
+    const message = error?.message || 'Terminal execution failed.'
+    entries.value.push({ command: raw, stdout: '', stderr: message, exitCode: 1 })
+    appStore.setTerminalOutput(message)
+    toast.error('Terminal command failed', message)
+  } finally {
+    isRunning.value = false
   }
 }
 </script>
-
-<style scoped>
-/* Terminal-specific styling */
-pre {
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-}
-
-/* Custom scrollbar for terminal */
-.overflow-y-auto::-webkit-scrollbar {
-  width: 8px;
-}
-
-.overflow-y-auto::-webkit-scrollbar-track {
-  background: #374151;
-}
-
-.overflow-y-auto::-webkit-scrollbar-thumb {
-  background: #6b7280;
-  border-radius: 4px;
-}
-
-.overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
-}
-</style>

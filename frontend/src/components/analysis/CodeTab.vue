@@ -8,7 +8,7 @@
         <button
           @click="runCode"
           :disabled="!canRunCode || isRunning"
-            :title="appStore.isNotebookMode ? 'Run All Cells (R)' : 'Run Code (R)'"
+            :title="'Run Code (R)'"
             class="inline-flex items-center px-2 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white transition-colors"
             :class="canRunCode && !isRunning
               ? 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
@@ -30,10 +30,10 @@
           <!-- Undo Button -->
           <button
             @click="undo"
-            :disabled="!canUndo || appStore.isNotebookMode"
+            :disabled="!canUndo"
             class="inline-flex items-center px-2 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-            :class="(!canUndo || appStore.isNotebookMode) ? 'opacity-50 cursor-not-allowed' : ''"
-            :title="appStore.isNotebookMode ? 'Undo not available in Cell mode' : 'Undo (Ctrl+Z)'"
+            :class="!canUndo ? 'opacity-50 cursor-not-allowed' : ''"
+            :title="'Undo (Ctrl+Z)'"
           >
             <ArrowUturnLeftIcon class="h-4 w-4" />
           </button>
@@ -41,10 +41,10 @@
           <!-- Redo Button -->
           <button
             @click="redo"
-            :disabled="!canRedo || appStore.isNotebookMode"
+            :disabled="!canRedo"
             class="inline-flex items-center px-2 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-            :class="(!canRedo || appStore.isNotebookMode) ? 'opacity-50 cursor-not-allowed' : ''"
-            :title="appStore.isNotebookMode ? 'Redo not available in Cell mode' : 'Redo (Ctrl+Y)'"
+            :class="!canRedo ? 'opacity-50 cursor-not-allowed' : ''"
+            :title="'Redo (Ctrl+Y)'"
           >
             <ArrowUturnRightIcon class="h-4 w-4" />
           </button>
@@ -52,15 +52,15 @@
           <!-- Download Button (available in both modes) -->
           <button
             @click="downloadCode"
-            :disabled="!appStore.pythonFileContent && !appStore.isNotebookMode"
+            :disabled="!appStore.pythonFileContent"
             class="inline-flex items-center px-2 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-            :class="(!appStore.pythonFileContent && !appStore.isNotebookMode) ? 'opacity-50 cursor-not-allowed' : ''"
+            :class="!appStore.pythonFileContent ? 'opacity-50 cursor-not-allowed' : ''"
           >
             <ArrowDownTrayIcon class="h-4 w-4" />
           </button>
 
-          <!-- Notebook Mode Toggle -->
-          <div class="flex items-center space-x-2">
+          <!-- Notebook Mode Toggle (removed) -->
+          <div v-if="false" class="flex items-center space-x-2">
             <span class="text-sm font-medium text-gray-700">Script</span>
             <input
               type="checkbox"
@@ -73,7 +73,7 @@
           </div>
 
           <!-- Cell Action Icons (only active in notebook mode) -->
-          <div v-if="appStore.isNotebookMode" class="flex items-center space-x-1 ml-4 pl-4 border-l border-gray-300">
+          <div v-if="false" class="flex items-center space-x-1 ml-4 pl-4 border-l border-gray-300">
             <!-- Run Active Cell -->
             <button
               @click="runActiveCell"
@@ -132,7 +132,7 @@
           </div>
 
           <!-- Cell Action Icons (disabled in script mode) -->
-          <div v-else class="flex items-center space-x-1 ml-4 pl-4 border-l border-gray-300">
+          <div v-if="false" class="flex items-center space-x-1 ml-4 pl-4 border-l border-gray-300">
             <!-- Run Active Cell (disabled) -->
             <button
               disabled
@@ -192,7 +192,7 @@
     </div>
 
     <!-- Conditional Rendering: Notebook Mode or Single Editor -->
-    <div v-if="appStore.isNotebookMode" class="flex-1 overflow-y-auto bg-gray-50 p-4">
+    <div v-if="false" class="flex-1 overflow-y-auto bg-gray-50 p-4">
       <!-- Notebook Cells -->
       <div v-if="appStore.notebookCells.length > 0" class="space-y-4">
         <NotebookCell
@@ -274,7 +274,7 @@ import NotebookCell from './NotebookCell.vue'
 
 // CodeMirror 6 imports
 import { EditorView, basicSetup } from 'codemirror'
-import { EditorState } from '@codemirror/state'
+import { EditorState, Prec } from '@codemirror/state'
 import { python } from '@codemirror/lang-python'
 import { autocompletion } from '@codemirror/autocomplete'
 import { keymap } from '@codemirror/view'
@@ -358,13 +358,7 @@ async function fetchSettings() {
 }
 
 const canRunCode = computed(() => {
-  if (appStore.isNotebookMode) {
-    // In notebook mode, can run if there are cells with content
-    return appStore.notebookCells.some(cell => cell.content.trim()) && !isRunning.value
-  } else {
-    // In script mode, can run if there's content
-    return appStore.pythonFileContent.trim() && !isRunning.value
-  }
+  return appStore.pythonFileContent.trim() && !isRunning.value
 })
 
 const canUndo = computed(() => {
@@ -376,11 +370,7 @@ const canRedo = computed(() => {
 })
 
 const canRunActiveCell = computed(() => {
-  if (!appStore.isNotebookMode) return false
-  const activeCellIndex = appStore.activeCellIndex
-  if (activeCellIndex < 0 || activeCellIndex >= appStore.notebookCells.length) return false
-  const activeCell = appStore.notebookCells[activeCellIndex]
-  return activeCell && activeCell.content.trim() && !activeCell.isRunning
+  return false
 })
 
 // Define keymap with access to component functions
@@ -402,15 +392,18 @@ const customKeymap = [
   {
     key: 'Mod-Enter',
     run: () => {
-      if (appStore.isNotebookMode) {
-        // In notebook mode, Shift+Enter runs current cell
-        // This will be handled by individual cells
-        return false
-      } else if (canRunCode.value) {
+      if (canRunCode.value) {
         runCode()
         return true
       }
       return false
+    }
+  },
+  {
+    key: 'Shift-Enter',
+    run: () => {
+      runSelectedCode()
+      return true
     }
   },
   {
@@ -423,46 +416,6 @@ const customKeymap = [
       return false
     }
   },
-  // Notebook mode shortcuts
-  {
-    key: 'Mod-n',
-    run: () => {
-      if (appStore.isNotebookMode) {
-        toggleNotebookMode()
-        return true
-      }
-      return false
-    }
-  },
-  // Cell split shortcut (Ctrl+Shift+-)
-  {
-    key: 'Mod-Shift--',
-    run: () => {
-      if (appStore.isNotebookMode) {
-        // Split the active cell - this will be handled by the cell component
-        // The actual splitting logic is in the NotebookCell component
-        return false // Let the cell component handle this
-      }
-      return false
-    }
-  },
-  // Cell join shortcut (Ctrl+Shift++)
-  {
-    key: 'Mod-Shift-=',
-    run: () => {
-      if (appStore.isNotebookMode) {
-        if (appStore.selectedCellIds.length > 1) {
-          // Join selected cells
-          joinCells(null)
-        } else {
-          // Join active cell with previous - this will be handled by the cell component
-          return false // Let the cell component handle this
-        }
-        return true
-      }
-      return false
-    }
-  }
 ]
 
 // Computed property for default code template
@@ -556,6 +509,9 @@ async function syncTableNameInCode(silent = false) {
 
 onMounted(async () => {
   await nextTick()
+  if (appStore.isNotebookMode) {
+    appStore.setNotebookMode(false)
+  }
 
   // Fetch database paths from API
   await fetchSettings()
@@ -751,7 +707,7 @@ async function initializeEditor() {
       indentUnit.of('    '),
       python(),
       autocompletion(),
-      keymap.of(customKeymap),
+      Prec.highest(keymap.of(customKeymap)),
       EditorView.theme({
         '&': {
           fontSize: '14px',
@@ -835,22 +791,32 @@ function updateEditorContent() {
   }
 }
 
-function applyExecutionArtifactsToStore(viewModel, { switchTabs = false } = {}) {
+function choosePreferredTab(viewModel, preferredType = null) {
+  const normalized = String(preferredType || '').toLowerCase()
+  if (normalized === 'dataframe' && viewModel.dataframes.length > 0) return 'table'
+  if (normalized === 'figure' && viewModel.figures.length > 0) return 'figure'
+  if (normalized === 'scalar' && viewModel.scalars.length > 0) return 'terminal'
+  if (viewModel.figures.length > 0) return 'figure'
+  if (viewModel.dataframes.length > 0) return 'table'
+  if (viewModel.scalars.length > 0) return 'terminal'
+  return null
+}
+
+function applyExecutionArtifactsToStore(viewModel, { switchTabs = false, preferredType = null } = {}) {
   appStore.setDataframes(viewModel.dataframes)
   if (viewModel.dataframes.length > 0) {
     appStore.setResultData(viewModel.dataframes[0].data)
-    if (switchTabs) appStore.setActiveTab('table')
   }
 
   appStore.setFigures(viewModel.figures)
   if (viewModel.figures.length > 0) {
     appStore.setPlotlyFigure(viewModel.figures[0].data)
-    if (switchTabs) appStore.setActiveTab('figure')
   }
 
   appStore.setScalars(viewModel.scalars)
-  if (viewModel.scalars.length > 0 && switchTabs) {
-    appStore.setActiveTab('terminal')
+  if (switchTabs) {
+    const targetTab = choosePreferredTab(viewModel, preferredType)
+    if (targetTab) appStore.setActiveTab(targetTab)
   }
 }
 
@@ -902,7 +868,7 @@ async function runCode() {
             variables: pyResponse.variables,
           })
           const viewModel = buildCellExecutionViewModel(normalized, execTime, 'displayed')
-          applyExecutionArtifactsToStore(viewModel, { switchTabs: true })
+          applyExecutionArtifactsToStore(viewModel, { switchTabs: true, preferredType: normalized?.result_type })
           appStore.updateNotebookCell(cell.id, { output: viewModel.output, isRunning: false })
 
         } catch (cellError) {
@@ -964,7 +930,7 @@ async function runCode() {
           includeVariableSummary: true,
         },
       )
-      applyExecutionArtifactsToStore(viewModel)
+      applyExecutionArtifactsToStore(viewModel, { switchTabs: true, preferredType: normalized?.result_type })
       appStore.setTerminalOutput(viewModel.output)
 
       // Results are available in respective tabs but don't auto-switch
@@ -994,6 +960,61 @@ async function runCode() {
       isRunning.value = false
       appStore.setCodeRunning(false)
     }
+  }
+}
+
+function getSelectedSnippet() {
+  if (!editor || !editor.state) return ''
+  const selected = editor.state.selection.ranges
+    .map((range) => editor.state.doc.sliceString(range.from, range.to))
+    .filter((text) => text && text.trim())
+  return selected.join('\n\n')
+}
+
+async function runSelectedCode() {
+  if (isRunning.value) return
+  const selectedCode = getSelectedSnippet()
+  if (!selectedCode) {
+    await runCode()
+    return
+  }
+
+  isRunning.value = true
+  appStore.setCodeRunning(true)
+  appStore.setTerminalOutput('Running selected code...')
+
+  try {
+    const start = performance.now()
+    const pyResponse = await executionService.executePython(selectedCode)
+    const execTime = (performance.now() - start) / 1000
+    const normalized = normalizeExecutionResponse({
+      success: pyResponse.success,
+      stdout: pyResponse.stdout,
+      stderr: pyResponse.stderr,
+      error: pyResponse.error,
+      result: pyResponse.result,
+      result_type: pyResponse.resultType,
+      variables: pyResponse.variables,
+    })
+    const viewModel = buildExecutionViewModel(
+      {
+        ...normalized,
+        execution_time: execTime,
+      },
+      {
+        successLine: 'Selected code executed successfully!',
+        includeVariableSummary: true,
+      },
+    )
+    applyExecutionArtifactsToStore(viewModel, { switchTabs: true, preferredType: normalized?.result_type })
+    appStore.setTerminalOutput(viewModel.output)
+  } catch (error) {
+    const errorMessage = error.response?.data?.detail || error.message || 'Code execution failed'
+    appStore.setTerminalOutput(`Error: ${errorMessage}`)
+    toast.error('Execution Failed', errorMessage)
+  } finally {
+    isRunning.value = false
+    appStore.setCodeRunning(false)
   }
 }
 
