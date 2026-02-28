@@ -43,7 +43,8 @@ def ensure_runner_kernel_dependencies(config: ExecutionRuntimeConfig) -> None:
 
 
 def _build_required_packages(config: ExecutionRuntimeConfig) -> list[str]:
-    defaults = ["ipykernel", "narwhals", "duckdb", "pandas", "plotly"]
+    # nbformat is required by plotly's mime renderer in notebook-like environments.
+    defaults = ["ipykernel", "nbformat>=4.2.0", "narwhals", "duckdb", "pandas", "plotly"]
     merged: list[str] = []
     seen: set[str] = set()
 

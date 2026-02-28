@@ -899,6 +899,7 @@ async function runCode() {
             error: pyResponse.error,
             result: pyResponse.result,
             result_type: pyResponse.resultType,
+            variables: pyResponse.variables,
           })
           const viewModel = buildCellExecutionViewModel(normalized, execTime, 'displayed')
           applyExecutionArtifactsToStore(viewModel, { switchTabs: true })
@@ -951,6 +952,7 @@ async function runCode() {
         error: pyResponse.error,
         result: pyResponse.result,
         result_type: pyResponse.resultType,
+        variables: pyResponse.variables,
       })
       const viewModel = buildExecutionViewModel(
         {

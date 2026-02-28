@@ -152,6 +152,10 @@
         <p class="mt-1 text-xs text-gray-500">
           Installs are restricted to pinned versions (<code>name==version</code>) and run outside notebook/code execution.
         </p>
+        <div v-if="runnerInstallDetails" class="mt-3 max-w-2xl p-3 rounded-md border border-gray-200 bg-gray-50">
+          <p class="text-xs font-medium text-gray-700 mb-1">Last install details</p>
+          <pre class="text-xs text-gray-700 whitespace-pre-wrap break-words">{{ runnerInstallDetails }}</pre>
+        </div>
       </div>
     </div>
 
@@ -197,6 +201,7 @@ const runnerPackageName = ref('')
 const runnerPackageVersion = ref('')
 const runnerIndexUrl = ref('')
 const saveRunnerDefaults = ref(false)
+const runnerInstallDetails = ref('')
 
 const messageTypeClass = computed(() => {
   return messageType.value === 'success'
@@ -300,6 +305,7 @@ async function installRunnerPackage() {
 
   isInstallingRunnerPackage.value = true
   clearMessage()
+  runnerInstallDetails.value = ''
   try {
     const response = await apiService.v1InstallRunnerPackage({
       workspace_id: appStore.activeWorkspaceId,
@@ -309,11 +315,28 @@ async function installRunnerPackage() {
       save_as_default: saveRunnerDefaults.value
     })
     const installText = response?.package_spec || `${packageName}==${version}`
+    const commandText = Array.isArray(response?.command) ? response.command.join(' ') : ''
+    const stdoutText = String(response?.stdout || '').trim()
+    const stderrText = String(response?.stderr || '').trim()
+    runnerInstallDetails.value = [
+      commandText ? `Command: ${commandText}` : '',
+      stdoutText ? `stdout:\n${stdoutText}` : '',
+      stderrText ? `stderr:\n${stderrText}` : '',
+    ].filter(Boolean).join('\n\n')
     message.value = `Installed ${installText} using ${response?.installer || 'uv'}. Workspace kernel reset: ${response?.workspace_kernel_reset ? 'yes' : 'no'}.`
     messageType.value = 'success'
     toast.success('Runner Package Installed', message.value)
   } catch (error) {
     const errorMessage = error.response?.data?.detail || error.message || 'Failed to install runner package.'
+    const data = error.response?.data || {}
+    const command = Array.isArray(data?.command) ? data.command.join(' ') : ''
+    const stdoutText = String(data?.stdout || '').trim()
+    const stderrText = String(data?.stderr || '').trim()
+    runnerInstallDetails.value = [
+      command ? `Command: ${command}` : '',
+      stdoutText ? `stdout:\n${stdoutText}` : '',
+      stderrText ? `stderr:\n${stderrText}` : '',
+    ].filter(Boolean).join('\n\n')
     message.value = errorMessage
     messageType.value = 'error'
     toast.error('Install Failed', errorMessage)

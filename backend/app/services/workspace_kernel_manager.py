@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-import duckdb
 from jupyter_client import AsyncKernelManager
 
 from app.services.jupyter_message_parser import (
@@ -310,23 +308,33 @@ class WorkspaceKernelManager:
         safe_limit = max(1, min(1000, int(limit)))
         safe_offset = max(0, int(offset))
         escaped = table_name.replace('"', '""')
-        quoted = f'"{escaped}"'
-        query = f"SELECT * FROM {quoted} LIMIT ? OFFSET ?"
-
-        rows_df = await asyncio.to_thread(
-            self._read_dataframe_page,
-            session.artifact_db_path,
-            query,
-            safe_limit,
-            safe_offset,
+        page_code = (
+            "import json as _json\n"
+            f"_page_df = artifact_conn.execute('SELECT * FROM \"{escaped}\" LIMIT {safe_limit} OFFSET {safe_offset}').fetchdf()\n"
+            "{\n"
+            "    'columns': [str(c) for c in list(_page_df.columns)],\n"
+            "    'rows': _json.loads(_page_df.to_json(orient='records', date_format='iso')),\n"
+            "}\n"
         )
-        data = json.loads(rows_df.to_json(orient="records", date_format="iso"))
+
+        async with session.lock:
+            session.last_used = datetime.now(UTC)
+            parsed = await self._execute_request(session, page_code)
+
+        if parsed.error is not None or not isinstance(parsed.result, dict):
+            return None
+
+        columns = parsed.result.get("columns")
+        rows = parsed.result.get("rows")
+        if not isinstance(columns, list) or not isinstance(rows, list):
+            return None
+
         return {
             "artifact_id": artifact_id,
             "name": artifact.get("name"),
             "row_count": int(artifact.get("row_count") or 0),
-            "columns": [str(c) for c in list(rows_df.columns)],
-            "rows": data,
+            "columns": [str(c) for c in columns],
+            "rows": rows,
             "offset": safe_offset,
             "limit": safe_limit,
         }
@@ -570,16 +578,3 @@ class WorkspaceKernelManager:
         if not cleaned:
             return "value"
         return cleaned[:96]
-
-    @staticmethod
-    def _read_dataframe_page(
-        db_path: str,
-        query: str,
-        limit: int,
-        offset: int,
-    ) -> Any:
-        conn = duckdb.connect(db_path, read_only=True)
-        try:
-            return conn.execute(query, [limit, offset]).fetchdf()
-        finally:
-            conn.close()

@@ -2,7 +2,6 @@ import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 
-import duckdb
 import pytest
 
 from app.services.workspace_kernel_manager import (
@@ -176,11 +175,6 @@ async def test_get_dataframe_rows_reads_paginated_chunk(tmp_path):
     workspace_db = tmp_path / "workspace.duckdb"
     workspace_db.touch()
     session = _session("ws-2", str(workspace_db))
-    artifact_db = Path(session.artifact_db_path)
-    artifact_db.parent.mkdir(parents=True, exist_ok=True)
-    conn = duckdb.connect(str(artifact_db))
-    conn.execute("CREATE TABLE df_summary AS SELECT * FROM (VALUES (1), (2), (3)) AS t(a)")
-    conn.close()
     session.artifact_registry = {
         "artifact-1": {
             "kind": "dataframe",
@@ -190,6 +184,16 @@ async def test_get_dataframe_rows_reads_paginated_chunk(tmp_path):
         }
     }
     manager._sessions["ws-2"] = session
+
+    async def fake_execute_request(current_session, code):
+        _ = current_session
+        assert "SELECT * FROM \"df_summary\" LIMIT 2 OFFSET 1" in code
+        parsed = ParsedExecutionOutput()
+        parsed.result = {"columns": ["a"], "rows": [{"a": 2}, {"a": 3}]}
+        parsed.result_type = "scalar"
+        return parsed
+
+    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
 
     rows = await manager.get_dataframe_rows(
         workspace_id="ws-2",

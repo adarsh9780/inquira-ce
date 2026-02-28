@@ -11,6 +11,7 @@
 
 import apiService from './apiService'
 import { useAppStore } from '../stores/appStore'
+import { mapExecutionServiceResponse } from '../utils/executionServiceMapper'
 
 class ExecutionService {
     /**
@@ -24,14 +25,7 @@ class ExecutionService {
         try {
             const appStore = useAppStore()
             const response = await apiService.executeCode(code, 60, appStore.activeWorkspaceId || null)
-            return {
-                success: response.success !== false,
-                stdout: response.stdout || '',
-                stderr: response.stderr || '',
-                error: response.error || null,
-                result: response.result || null,
-                resultType: response.result_type || null,
-            }
+            return mapExecutionServiceResponse(response)
         } catch (err) {
             return {
                 success: false,
@@ -40,6 +34,7 @@ class ExecutionService {
                 error: err?.response?.data?.detail || err.message || 'Execution failed',
                 result: null,
                 resultType: null,
+                variables: { dataframes: {}, figures: {}, scalars: {} },
             }
         }
     }
