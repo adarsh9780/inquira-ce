@@ -1,20 +1,28 @@
 <template>
   <div class="flex h-full min-h-0 flex-col overflow-hidden bg-white">
-    <div class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3">
-      <div class="flex items-center gap-2">
-        <span class="text-sm font-semibold text-gray-900">Terminal</span>
-        <span class="rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-700">{{ shellLabel }}</span>
+    <!-- Terminal Header (Teleported to RightPanel) -->
+    <Teleport to="#terminal-toolbar" v-if="isMounted">
+      <div class="flex items-center gap-3 text-[10px] sm:text-xs text-gray-600">
+        <span class="rounded bg-gray-200 px-1.5 py-0.5 font-medium text-gray-700">{{ shellLabel }}</span>
+        <span class="hidden md:inline font-mono truncate max-w-[150px]" :title="displayCwd">cwd: {{ displayCwd }}</span>
+        <div class="flex items-center gap-1">
+          <button 
+            class="rounded border border-gray-300 px-2 py-0.5 bg-white hover:bg-gray-100 transition-colors" 
+            @click="resetSession"
+            title="Reset Session"
+          >
+            Reset
+          </button>
+          <button 
+            class="rounded border border-gray-300 px-2 py-0.5 bg-white hover:bg-gray-100 transition-colors" 
+            @click="clearScreen"
+            title="Clear Screen"
+          >
+            Clear
+          </button>
+        </div>
       </div>
-      <div class="flex items-center gap-2 text-xs text-gray-600">
-        <span>cwd: {{ displayCwd }}</span>
-        <button class="rounded border border-gray-300 px-2 py-1 hover:bg-gray-100" @click="resetSession">
-          Reset Session
-        </button>
-        <button class="rounded border border-gray-300 px-2 py-1 hover:bg-gray-100" @click="clearScreen">
-          Clear
-        </button>
-      </div>
-    </div>
+    </Teleport>
 
     <div class="flex-1 min-h-0 bg-[#0b1228] p-2">
       <div ref="terminalHostRef" class="h-full w-full"></div>
@@ -36,6 +44,7 @@ const terminalHostRef = ref(null)
 const sessionId = ref('')
 const sessionCwd = ref('')
 const shellLabel = ref('shell')
+const isMounted = ref(false)
 
 let terminal = null
 let fitAddon = null
@@ -131,6 +140,7 @@ function clearScreen() {
 }
 
 onMounted(async () => {
+  isMounted.value = true
   if (!tauriTerminalService.isTauriRuntime()) return
   if (!terminalHostRef.value) return
 

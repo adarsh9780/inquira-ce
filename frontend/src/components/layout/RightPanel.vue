@@ -1,3 +1,4 @@
+<template>
   <div class="flex flex-col h-full bg-white overflow-hidden relative">
     
     <!-- Top Workspace Area (Chat/Code & Data Panes) -->
@@ -47,6 +48,10 @@
           <CommandLineIcon class="w-3.5 h-3.5" />
           Terminal
         </div>
+        
+        <!-- Teleport Target for Terminal Toolbar -->
+        <div id="terminal-toolbar" class="flex-1 min-w-0 flex items-center justify-end ml-4 mr-2"></div>
+
         <button 
           @click="appStore.toggleTerminal()" 
           class="text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-200 transition-colors"

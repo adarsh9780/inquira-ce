@@ -1,16 +1,12 @@
 <template>
   <div class="flex h-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
-    <div
-      v-if="!(useTauriPty && appStore.terminalConsentGranted)"
-      class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3"
-    >
-      <div class="flex items-center space-x-2">
-        <CommandLineIcon class="h-5 w-5 text-gray-700" />
-        <h3 class="text-sm font-semibold text-gray-900">Terminal</h3>
-        <span class="rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-700">{{ shellLabel }}</span>
+    <!-- Terminal Header (Teleported to RightPanel) -->
+    <Teleport to="#terminal-toolbar" v-if="isMounted && !(useTauriPty && appStore.terminalConsentGranted)">
+      <div class="flex items-center gap-2 text-[10px] sm:text-xs text-gray-600">
+        <span class="rounded bg-gray-200 px-1.5 py-0.5 font-medium text-gray-700">{{ shellLabel }}</span>
+        <span class="hidden md:inline font-mono truncate max-w-[150px]" :title="displayCwd">cwd: {{ displayCwd }}</span>
       </div>
-      <div class="text-xs text-gray-600">cwd: {{ displayCwd }}</div>
-    </div>
+    </Teleport>
 
     <div v-if="!appStore.terminalConsentGranted" class="flex-1 p-5">
       <div class="mx-auto max-w-xl rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -122,6 +118,7 @@ import { toast } from '../../composables/useToast'
 import TauriTerminalPane from './TauriTerminalPane.vue'
 
 const appStore = useAppStore()
+const isMounted = ref(false)
 
 const command = ref('')
 const entries = computed(() => appStore.terminalEntries || [])
@@ -146,8 +143,11 @@ const shellLabel = computed(() => {
 })
 
 onMounted(async () => {
+  isMounted.value = true
   await ensureWorkspaceCwd()
-  focusCommandInput()
+  if (!useTauriPty) {
+    focusCommandInput()
+  }
 })
 
 watch(() => appStore.activeWorkspaceId, async () => {
