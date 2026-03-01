@@ -1,10 +1,13 @@
+use std::collections::HashMap;
 use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::process::{Child, Command};
+use std::process::{Child as StdChild, Command};
 use std::sync::Mutex;
 
-use serde::Deserialize;
+use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+use serde::{Deserialize, Serialize};
 use tauri::Emitter;
 use tauri::Manager;
 
@@ -89,7 +92,38 @@ fn resolve_resource_path(resource_dir: &PathBuf, relative: &str) -> PathBuf {
 // Backend Process Manager
 // ─────────────────────────────────────────────────────────────────────
 
-struct BackendProcess(Mutex<Option<Child>>);
+struct BackendProcess(Mutex<Option<StdChild>>);
+
+struct PtySession {
+    writer: Box<dyn Write + Send>,
+    child: Box<dyn portable_pty::Child + Send>,
+    master: Box<dyn portable_pty::MasterPty + Send>,
+}
+
+struct PtySessions(Mutex<HashMap<String, PtySession>>);
+
+#[derive(Serialize)]
+struct PtyStartResponse {
+    session_id: String,
+    cwd: String,
+    shell: String,
+}
+
+#[derive(Serialize, Clone)]
+struct PtyDataEvent {
+    session_id: String,
+    data: String,
+}
+
+#[derive(Serialize, Clone)]
+struct PtyExitEvent {
+    session_id: String,
+}
+
+#[derive(Serialize)]
+struct PtyStopResponse {
+    stopped: bool,
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // Tauri Commands (callable from frontend via invoke())
@@ -103,17 +137,227 @@ fn get_backend_url(app: tauri::AppHandle) -> String {
         .unwrap_or_else(|_| PathBuf::from("."));
     let config_path = resolve_resource_path(&resource_dir, "inquira.toml");
     let config = load_config(&config_path);
-    let port = config
-        .backend
-        .as_ref()
-        .and_then(|b| b.port)
-        .unwrap_or(8000);
+    let port = config.backend.as_ref().and_then(|b| b.port).unwrap_or(8000);
     let host = config
         .backend
         .as_ref()
         .and_then(|b| b.host.clone())
         .unwrap_or_else(|| "localhost".to_string());
     format!("http://{}:{}", host, port)
+}
+
+fn detect_default_shell() -> (String, Vec<String>) {
+    if cfg!(target_os = "windows") {
+        let shell = std::env::var("COMSPEC")
+            .ok()
+            .filter(|v| !v.trim().is_empty())
+            .unwrap_or_else(|| "powershell.exe".to_string());
+        return (shell, Vec::new());
+    }
+
+    let shell = std::env::var("SHELL")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .unwrap_or_else(|| "/bin/bash".to_string());
+    (shell, Vec::new())
+}
+
+fn resolve_pty_cwd(requested_cwd: Option<String>) -> String {
+    let fallback = std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .to_string_lossy()
+        .to_string();
+    let Some(raw) = requested_cwd else {
+        return fallback;
+    };
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return fallback;
+    }
+    let candidate = PathBuf::from(trimmed);
+    if candidate.exists() && candidate.is_dir() {
+        return candidate.to_string_lossy().to_string();
+    }
+    fallback
+}
+
+fn emit_terminal_exit_event(app: &tauri::AppHandle, session_id: &str) {
+    let _ = app.emit(
+        "terminal:pty-exit",
+        PtyExitEvent {
+            session_id: session_id.to_string(),
+        },
+    );
+}
+
+#[tauri::command]
+fn tauri_terminal_start(
+    app: tauri::AppHandle,
+    sessions: tauri::State<PtySessions>,
+    session_id: String,
+    cwd: Option<String>,
+    cols: u16,
+    rows: u16,
+) -> Result<PtyStartResponse, String> {
+    let normalized_session_id = session_id.trim().to_string();
+    if normalized_session_id.is_empty() {
+        return Err("session_id is required".to_string());
+    }
+
+    {
+        let mut guard = sessions
+            .0
+            .lock()
+            .map_err(|_| "Failed to lock PTY session store.".to_string())?;
+        if let Some(mut existing) = guard.remove(&normalized_session_id) {
+            let _ = existing.child.kill();
+            emit_terminal_exit_event(&app, &normalized_session_id);
+        }
+    }
+
+    let shell_cwd = resolve_pty_cwd(cwd);
+    let pty_rows = rows.max(1);
+    let pty_cols = cols.max(1);
+    let pty_system = native_pty_system();
+    let pair = pty_system
+        .openpty(PtySize {
+            rows: pty_rows,
+            cols: pty_cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|err| format!("Unable to allocate PTY: {err}"))?;
+
+    let (shell, args) = detect_default_shell();
+    let mut cmd = CommandBuilder::new(&shell);
+    for arg in &args {
+        cmd.arg(arg);
+    }
+    cmd.cwd(&shell_cwd);
+
+    let child = pair
+        .slave
+        .spawn_command(cmd)
+        .map_err(|err| format!("Unable to start shell: {err}"))?;
+    let mut reader = pair
+        .master
+        .try_clone_reader()
+        .map_err(|err| format!("Unable to clone PTY reader: {err}"))?;
+    let writer = pair
+        .master
+        .take_writer()
+        .map_err(|err| format!("Unable to open PTY writer: {err}"))?;
+
+    let app_handle = app.clone();
+    let session_for_thread = normalized_session_id.clone();
+    std::thread::spawn(move || {
+        let mut buf = [0_u8; 4096];
+        loop {
+            match reader.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    let chunk = String::from_utf8_lossy(&buf[..n]).to_string();
+                    let _ = app_handle.emit(
+                        "terminal:pty-data",
+                        PtyDataEvent {
+                            session_id: session_for_thread.clone(),
+                            data: chunk,
+                        },
+                    );
+                }
+                Err(_) => break,
+            }
+        }
+        emit_terminal_exit_event(&app_handle, &session_for_thread);
+    });
+
+    let session = PtySession {
+        writer,
+        child,
+        master: pair.master,
+    };
+
+    let mut guard = sessions
+        .0
+        .lock()
+        .map_err(|_| "Failed to lock PTY session store.".to_string())?;
+    guard.insert(normalized_session_id.clone(), session);
+
+    Ok(PtyStartResponse {
+        session_id: normalized_session_id,
+        cwd: shell_cwd,
+        shell,
+    })
+}
+
+#[tauri::command]
+fn tauri_terminal_write(
+    sessions: tauri::State<PtySessions>,
+    session_id: String,
+    data: String,
+) -> Result<(), String> {
+    let mut guard = sessions
+        .0
+        .lock()
+        .map_err(|_| "Failed to lock PTY session store.".to_string())?;
+    let session = guard
+        .get_mut(&session_id)
+        .ok_or_else(|| "PTY session not found.".to_string())?;
+    session
+        .writer
+        .write_all(data.as_bytes())
+        .map_err(|err| format!("Failed to write PTY input: {err}"))?;
+    session
+        .writer
+        .flush()
+        .map_err(|err| format!("Failed to flush PTY input: {err}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+fn tauri_terminal_resize(
+    sessions: tauri::State<PtySessions>,
+    session_id: String,
+    cols: u16,
+    rows: u16,
+) -> Result<(), String> {
+    let mut guard = sessions
+        .0
+        .lock()
+        .map_err(|_| "Failed to lock PTY session store.".to_string())?;
+    let session = guard
+        .get_mut(&session_id)
+        .ok_or_else(|| "PTY session not found.".to_string())?;
+    let pty_rows = rows.max(1);
+    let pty_cols = cols.max(1);
+    session
+        .master
+        .resize(PtySize {
+            rows: pty_rows,
+            cols: pty_cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|err| format!("Failed to resize PTY: {err}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+fn tauri_terminal_stop(
+    app: tauri::AppHandle,
+    sessions: tauri::State<PtySessions>,
+    session_id: String,
+) -> Result<PtyStopResponse, String> {
+    let mut guard = sessions
+        .0
+        .lock()
+        .map_err(|_| "Failed to lock PTY session store.".to_string())?;
+    if let Some(mut session) = guard.remove(&session_id) {
+        let _ = session.child.kill();
+        emit_terminal_exit_event(&app, &session_id);
+        return Ok(PtyStopResponse { stopped: true });
+    }
+    Ok(PtyStopResponse { stopped: false })
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -194,7 +438,9 @@ fn bootstrap_python(
         let mut cmd = Command::new(uv_bin);
         cmd.args(["python", "install", &python_version]);
         apply_proxy_env(&mut cmd, config);
-        let status = cmd.status().map_err(|e| format!("uv python install failed: {}", e))?;
+        let status = cmd
+            .status()
+            .map_err(|e| format!("uv python install failed: {}", e))?;
         if !status.success() {
             return Err("uv python install returned non-zero exit code".to_string());
         }
@@ -310,7 +556,11 @@ fn kill_stale_backend_on_port(port: u16, backend_dir: &PathBuf) {
             || (!backend_dir_hint.is_empty() && cwd.starts_with(&backend_dir_hint));
 
         if is_inquira_backend {
-            log::warn!("Killing stale backend process on port {} (pid {})", port, pid);
+            log::warn!(
+                "Killing stale backend process on port {} (pid {})",
+                port,
+                pid
+            );
             let _ = Command::new("kill").args(["-9", pid]).status();
         }
     }
@@ -322,13 +572,9 @@ fn start_backend(
     venv_path: &PathBuf,
     config: &InquiraConfig,
     inquira_toml_path: &PathBuf,
-) -> Result<Child, String> {
+) -> Result<StdChild, String> {
     let _ = uv_bin; // kept for signature compatibility with existing call sites
-    let port = config
-        .backend
-        .as_ref()
-        .and_then(|b| b.port)
-        .unwrap_or(8000);
+    let port = config.backend.as_ref().and_then(|b| b.port).unwrap_or(8000);
 
     kill_stale_backend_on_port(port, backend_dir);
 
@@ -354,7 +600,10 @@ fn start_backend(
         .env("VIRTUAL_ENV", venv_path.to_str().unwrap())
         .env("INQUIRA_PORT", port.to_string())
         .env("INQUIRA_DESKTOP", "1")
-        .env("INQUIRA_TOML_PATH", inquira_toml_path.to_string_lossy().to_string())
+        .env(
+            "INQUIRA_TOML_PATH",
+            inquira_toml_path.to_string_lossy().to_string(),
+        )
         .env("INQUIRA_EXECUTION_PROVIDER", execution_provider);
 
     apply_proxy_env(&mut cmd, config);
@@ -376,6 +625,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(BackendProcess(Mutex::new(None)))
+        .manage(PtySessions(Mutex::new(HashMap::new())))
         .setup(|app| {
             // Set up logging in debug mode
             if cfg!(debug_assertions) {
@@ -444,8 +694,11 @@ pub fn run() {
                 } else {
                     log::info!("Backend dependencies changed. Re-syncing Python environment...");
                 }
-                app.emit("backend-status", "Installing Python environment (one-time setup)...")
-                    .ok();
+                app.emit(
+                    "backend-status",
+                    "Installing Python environment (one-time setup)...",
+                )
+                .ok();
 
                 if let Err(e) = bootstrap_python(&uv_bin, &backend_dir, &venv_path, &config) {
                     log::error!("Python bootstrap failed: {}", e);
@@ -484,7 +737,13 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_backend_url])
+        .invoke_handler(tauri::generate_handler![
+            get_backend_url,
+            tauri_terminal_start,
+            tauri_terminal_write,
+            tauri_terminal_resize,
+            tauri_terminal_stop
+        ])
         .build(tauri::generate_context!())
         .expect("error while building Inquira")
         .run(|app, event| {
@@ -498,6 +757,15 @@ pub fn run() {
                         }
                     }
                 }
+
+                if let Some(sessions) = app.try_state::<PtySessions>() {
+                    if let Ok(mut guard) = sessions.0.lock() {
+                        for (session_id, mut session) in guard.drain() {
+                            let _ = session.child.kill();
+                            let _ = app.emit("terminal:pty-exit", PtyExitEvent { session_id });
+                        }
+                    }
+                }
             }
         });
 }
@@ -505,8 +773,8 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        needs_python_bootstrap, resolve_resource_path, resolve_uv_index_url, InquiraConfig,
-        PythonConfig,
+        detect_default_shell, needs_python_bootstrap, resolve_pty_cwd, resolve_resource_path,
+        resolve_uv_index_url, InquiraConfig, PythonConfig,
     };
     use std::fs;
     use std::path::PathBuf;
@@ -606,5 +874,18 @@ mod tests {
 
         let resolved = resolve_resource_path(&base, "backend");
         assert_eq!(resolved, base.join("_up_").join("backend"));
+    }
+
+    #[test]
+    fn detect_default_shell_is_non_empty_across_platforms() {
+        let (shell, _args) = detect_default_shell();
+        assert!(!shell.trim().is_empty());
+    }
+
+    #[test]
+    fn resolve_pty_cwd_uses_existing_directory() {
+        let dir = std::env::temp_dir();
+        let resolved = resolve_pty_cwd(Some(dir.to_string_lossy().to_string()));
+        assert_eq!(resolved, dir.to_string_lossy().to_string());
     }
 }

@@ -35,7 +35,9 @@
     "pinia": "^3.0.3",
     "plotly.js-dist-min": "^3.0.3",
     "tailwindcss": "^4.1.11",
-    "vue": "^3.5.17"
+    "vue": "^3.5.17",
+    "@xterm/xterm": "^5.5.0",
+    "@xterm/addon-fit": "^0.10.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.0",

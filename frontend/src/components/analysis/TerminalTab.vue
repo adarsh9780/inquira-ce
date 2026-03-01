@@ -1,6 +1,9 @@
 <template>
   <div class="flex h-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
-    <div class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3">
+    <div
+      v-if="!(useTauriPty && appStore.terminalConsentGranted)"
+      class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3"
+    >
       <div class="flex items-center space-x-2">
         <CommandLineIcon class="h-5 w-5 text-gray-700" />
         <h3 class="text-sm font-semibold text-gray-900">Terminal</h3>
@@ -23,6 +26,10 @@
         </button>
       </div>
     </div>
+
+    <template v-else-if="useTauriPty">
+      <TauriTerminalPane />
+    </template>
 
     <template v-else>
       <div
@@ -112,6 +119,7 @@ import { CommandLineIcon } from '@heroicons/vue/24/outline'
 import { useAppStore } from '../../stores/appStore'
 import apiService from '../../services/apiService'
 import { toast } from '../../composables/useToast'
+import TauriTerminalPane from './TauriTerminalPane.vue'
 
 const appStore = useAppStore()
 
@@ -126,6 +134,7 @@ const liveStderr = ref('')
 const commandInputRef = ref(null)
 const commandHistory = ref([])
 const commandHistoryIndex = ref(-1)
+const useTauriPty = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
 
 const displayCwd = computed(() => appStore.terminalCwd || 'n/a')
 const promptPrefix = computed(() => `${(displayCwd.value || '~').split('/').pop() || '~'} $`)
