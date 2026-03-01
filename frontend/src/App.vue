@@ -15,11 +15,11 @@
 
     <!-- Main App (only shown when authenticated) -->
     <div v-if="authStore.isAuthenticated" class="flex flex-col h-screen">
-      <!-- Top Toolbar -->
-      <TopToolbar />
-
-      <!-- Main Content Area -->
+      <!-- Main Content Area with Sidebar -->
       <div class="flex-1 flex overflow-hidden bg-white">
+        <!-- New Unified Left Sidebar -->
+        <UnifiedSidebar />
+
         <!-- Single Panel - Tabs include Chat -->
         <div class="flex-1 bg-white flex flex-col overflow-hidden">
           <RightPanel />
@@ -68,7 +68,7 @@ import { useAppStore } from './stores/appStore'
 import { useAuthStore } from './stores/authStore'
 import { settingsWebSocket } from './services/websocketService'
 import AuthModal from './components/modals/AuthModal.vue'
-import TopToolbar from './components/layout/TopToolbar.vue'
+import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
 import ToastContainer from './components/ui/ToastContainer.vue'
 import ConnectionStatusIndicator from './components/ui/ConnectionStatusIndicator.vue'
