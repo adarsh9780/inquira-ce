@@ -431,6 +431,7 @@ async function initializeEditor() {
         }, 10)
       }
     }),
+    EditorView.lineWrapping,
   ]
 
   const state = EditorState.create({
@@ -547,4 +548,10 @@ watch(() => authStore.userId, async (newUserId, oldUserId) => {
 
 <style scoped>
 /* CodeMirror styling is handled by editor theme extension */
+:deep(.cm-content) {
+  min-width: 40ch;
+}
+:deep(.cm-scroller) {
+  overflow-x: auto !important;
+}
 </style>

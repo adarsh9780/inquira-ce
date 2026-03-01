@@ -14,7 +14,7 @@
 
       <!-- Resizer Handle -->
       <div 
-        class="w-1.5 bg-gray-100 hover:bg-blue-400 cursor-col-resize z-10 hover:shadow-[0_0_8px_rgba(59,130,246,0.5)] transition-colors"
+        class="w-[3px] hover:w-1 bg-transparent hover:bg-blue-400 cursor-col-resize z-10 transition-all duration-150 relative -mx-[1px] hover:shadow-[0_0_8px_rgba(59,130,246,0.5)]"
         @mousedown="startResize"
       ></div>
 
