@@ -615,6 +615,9 @@ function isInInputField() {
   return false
 }
 
+// Temporary kill-switch while UI navigation is being redesigned.
+const shortcutsEnabled = false
+
 // Keyboard shortcuts - Caps Lock + key combinations for cross-platform compatibility
 function handleKeydown(event) {
 
@@ -669,6 +672,10 @@ function handleKeydown(event) {
       event.preventDefault()
       return
     }
+  }
+
+  if (!shortcutsEnabled) {
+    return
   }
 
   // Only handle shortcuts when not in input fields
