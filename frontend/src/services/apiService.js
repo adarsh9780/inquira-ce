@@ -153,7 +153,7 @@ export const apiService = {
     return {
       api_key: null,
       api_key_present: !!appStore.apiKeyConfigured,
-      data_path: appStore.schemaFileId || appStore.dataFilePath || null,
+      data_path: appStore.dataFilePath || null,
       context: appStore.schemaContext || '',
       table_name: appStore.ingestedTableName || null
     }
@@ -318,10 +318,10 @@ export const apiService = {
     const response = await fetch(
       `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${activeWorkspaceId}/execute`,
       {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ code, timeout })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ code, timeout })
       }
     )
     if (!response.ok) {

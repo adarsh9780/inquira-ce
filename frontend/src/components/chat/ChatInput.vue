@@ -102,14 +102,13 @@ async function ensureWorkspaceDatasetReady(workspaceId) {
   if (!workspaceId || !appStore.dataFilePath) return
   const tableName = (
     appStore.ingestedTableName ||
-    inferTableNameFromDataPath(appStore.schemaFileId) ||
     inferTableNameFromDataPath(appStore.dataFilePath)
   ).trim()
   if (!tableName) {
     throw new Error('Dataset sync failed: missing selected table name.')
   }
 
-  if (isBrowserVirtualPath(appStore.dataFilePath) || isBrowserVirtualPath(appStore.schemaFileId)) {
+  if (isBrowserVirtualPath(appStore.dataFilePath)) {
     const columns = (Array.isArray(appStore.ingestedColumns) ? appStore.ingestedColumns : []).map((col) => ({
       ...col,
       samples: appStore.allowSchemaSampleValues && Array.isArray(col?.samples) ? col.samples : []
@@ -134,7 +133,6 @@ async function ensureWorkspaceDatasetReady(workspaceId) {
 function buildActiveSchemaPayload() {
   const tableName = (
     appStore.ingestedTableName ||
-    inferTableNameFromDataPath(appStore.schemaFileId) ||
     inferTableNameFromDataPath(appStore.dataFilePath)
   ).trim()
 
@@ -187,7 +185,6 @@ async function handleSubmit() {
     ).trim()
     if (expectedTableName && expectedTableName !== appStore.ingestedTableName) {
       appStore.setIngestedTableName(expectedTableName)
-      appStore.setSchemaFileId(buildBrowserDataPath(expectedTableName))
     }
 
     const workspaceId = appStore.activeWorkspaceId

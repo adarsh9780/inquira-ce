@@ -374,7 +374,6 @@ async function processSelectedPath(filePath) {
     ingestedColumns.value = result.columns || []
     appStore.setIngestedColumns(ingestedColumns.value)
     appStore.setIngestedTableName(ingestedTableName.value)
-    appStore.setSchemaFileId(filePath)
     showMessage(`Loaded "${filePath.split('/').pop()}" → table "${ingestedTableName.value}" (${result.row_count || '?'} rows, ${ingestedColumns.value.length} columns)`, 'success')
   } catch (error) {
     console.error('File path loading failed:', error)
@@ -395,7 +394,6 @@ async function processSelectedFileUpload(file) {
     ingestedColumns.value = result.columns || []
     appStore.setIngestedColumns(ingestedColumns.value)
     appStore.setIngestedTableName(ingestedTableName.value)
-    appStore.setSchemaFileId(result.file_path || file.name)
     showMessage(`Loaded "${file.name}" → table "${ingestedTableName.value}" (${result.row_count || '?'} rows, ${ingestedColumns.value.length} columns)`, 'success')
   } catch (error) {
     console.error('File upload failed:', error)
@@ -554,7 +552,6 @@ async function generateAndSaveSchema() {
     }
 
     appStore.setIsSchemaFileUploaded(true)
-    appStore.setSchemaFileId(tableName)
     updateProgress(
       generatedDescriptions ? 'Schema descriptions generated' : 'Schema metadata ready',
       100
@@ -591,10 +588,6 @@ async function saveDataSettings() {
   showProgress('Saving context...', 20)
 
   try {
-    if (ingestedTableName.value) {
-      appStore.setSchemaFileId(appStore.dataFilePath)
-    }
-
     await apiService.setContext(appStore.schemaContext.trim())
     await generateAndSaveSchema()
 

@@ -26,7 +26,7 @@ class PreviewService {
         message: 'Create a workspace to start previewing data.'
       }
     }
-    const dataPath = appStore.schemaFileId || appStore.dataFilePath
+    const dataPath = appStore.dataFilePath
     const tableName = (
       tableNameOverride ||
       appStore.ingestedTableName ||
@@ -89,7 +89,7 @@ class PreviewService {
   // Load schema with caching
   async loadSchema(filepath, forceRefresh = false, tableNameOverride = null) {
     const appStore = useAppStore()
-    const dataPath = filepath || appStore.schemaFileId || appStore.dataFilePath
+    const dataPath = filepath || appStore.dataFilePath
     const tableName = (
       tableNameOverride ||
       appStore.ingestedTableName ||

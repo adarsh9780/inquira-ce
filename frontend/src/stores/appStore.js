@@ -8,9 +8,6 @@ export const useAppStore = defineStore('app', () => {
   // Files
   const dataFilePath = ref('')
   const schemaFilePath = ref('')
-  const dataFileId = ref('')
-  const schemaFileId = ref('')
-  const isSchemaFileUploaded = ref(false)
   const ingestedTableName = ref('')
   const ingestedColumns = ref([])
 
@@ -245,9 +242,6 @@ export const useAppStore = defineStore('app', () => {
       ]
       dataFilePath.value = ''
       schemaFilePath.value = ''
-      dataFileId.value = ''
-      schemaFileId.value = ''
-      isSchemaFileUploaded.value = false
       ingestedTableName.value = ''
       ingestedColumns.value = []
       schemaContext.value = ''
@@ -281,21 +275,6 @@ export const useAppStore = defineStore('app', () => {
 
   function setSchemaFilePath(path) {
     schemaFilePath.value = path
-    saveLocalConfig()
-  }
-
-  function setDataFileId(id) {
-    dataFileId.value = id
-    saveLocalConfig()
-  }
-
-  function setSchemaFileId(id) {
-    schemaFileId.value = id
-    saveLocalConfig()
-  }
-
-  function setIsSchemaFileUploaded(uploaded) {
-    isSchemaFileUploaded.value = uploaded
     saveLocalConfig()
   }
 
@@ -893,9 +872,6 @@ export const useAppStore = defineStore('app', () => {
     // State
     dataFilePath,
     schemaFilePath,
-    dataFileId,
-    schemaFileId,
-    isSchemaFileUploaded,
     ingestedTableName,
     ingestedColumns,
     selectedModel,
@@ -951,9 +927,6 @@ export const useAppStore = defineStore('app', () => {
     clearLocalConfig,
     setDataFilePath,
     setSchemaFilePath,
-    setDataFileId,
-    setSchemaFileId,
-    setIsSchemaFileUploaded,
     setIngestedTableName,
     setIngestedColumns,
     setApiKey,
