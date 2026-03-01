@@ -147,7 +147,6 @@
           class="input-base w-full resize-none disabled:opacity-50 disabled:cursor-not-allowed"
           rows="4"
         ></textarea>
-        <p class="mt-1 text-xs text-gray-500">
         <p class="mt-1 text-xs" style="color: var(--color-text-muted);">
           This context will be used to generate more accurate schema descriptions for your data columns.
         </p>
