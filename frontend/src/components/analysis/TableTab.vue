@@ -89,12 +89,13 @@
       <!-- Empty State -->
       <div
         v-else
-        class="absolute inset-0 flex items-center justify-center bg-gray-50"
+        class="absolute inset-0 flex items-center justify-center"
+        style="background-color: var(--color-base);"
       >
         <div class="text-center">
-          <TableCellsIcon class="h-12 w-12 text-gray-300 mx-auto mb-3" />
-          <p class="text-sm text-gray-500">No data to display</p>
-          <p class="text-xs text-gray-400 mt-1">Run code to generate table data</p>
+          <TableCellsIcon class="h-12 w-12 mx-auto mb-3" style="color: var(--color-border);" />
+          <p class="text-sm" style="color: var(--color-text-muted);">No data to display</p>
+          <p class="text-xs mt-1" style="color: var(--color-text-muted);">Run code to generate table data</p>
         </div>
       </div>
     </div>
@@ -343,21 +344,20 @@ function convertToCSV(data) {
 </script>
 
 <style>
-/* AG Grid theme customizations */
-.ag-theme-alpine {
-  --ag-border-color: #e5e7eb;
-  --ag-header-background-color: #f9fafb;
-  --ag-odd-row-background-color: #ffffff;
-  --ag-even-row-background-color: #f9fafb;
-  --ag-row-hover-color: #f3f4f6;
-  --ag-selected-row-background-color: #dbeafe;
-}
-
-.ag-theme-alpine .ag-header-cell-label {
-  font-weight: 600;
-}
-
-.ag-theme-alpine .ag-cell {
-  border-right: 1px solid var(--ag-border-color);
+/* AG Grid warm tint overrides — applies on top of ag-theme-quartz */
+.ag-theme-quartz {
+  --ag-background-color: #FDFCF8;
+  --ag-header-background-color: #F5F3ED;
+  --ag-odd-row-background-color: #FDFCF8;
+  --ag-even-row-background-color: #FAF8F3;
+  --ag-row-hover-color: #F0EDE5;
+  --ag-selected-row-background-color: #EDE9DE;
+  --ag-border-color: #E8E4DC;
+  --ag-header-foreground-color: #3d3830;
+  --ag-foreground-color: #1a1612;
+  --ag-secondary-foreground-color: #6b6358;
+  --ag-input-focus-border-color: #d4b896;
+  --ag-range-selection-border-color: #c8a87c;
+  --ag-cell-horizontal-border: solid #E8E4DC;
 }
 </style>

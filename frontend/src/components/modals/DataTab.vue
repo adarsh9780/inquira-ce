@@ -88,7 +88,7 @@
     <div class="space-y-6">
       <!-- Data File Path Input -->
       <div>
-        <label for="data-file-input" class="block text-sm font-medium text-gray-700 mb-2">
+        <label for="data-file-input" class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
           Data File
         </label>
         <div class="max-w-md">
@@ -96,15 +96,15 @@
             <button
               type="button"
               @click="openFilePicker"
-              class="flex-1 flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm cursor-pointer hover:bg-gray-50 transition-colors text-left"
+              class="flex-1 flex items-center px-3 py-2 border rounded-md text-sm cursor-pointer transition-colors text-left input-base"
               :class="{ 'opacity-50 cursor-not-allowed': isProcessing || isPickingFile || isRestoringFile }"
               :disabled="isProcessing || isPickingFile || isRestoringFile"
             >
               <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
-              <span v-if="!appStore.dataFilePath" class="text-gray-500">Choose a file...</span>
-              <span v-else class="text-gray-900 truncate">{{ appStore.dataFilePath }}</span>
+              <span v-if="!appStore.dataFilePath" style="color: var(--color-text-muted);">Choose a file...</span>
+              <span v-else class="truncate" style="color: var(--color-text-main);">{{ appStore.dataFilePath }}</span>
             </button>
             <input
               id="data-file-input"
@@ -135,7 +135,7 @@
 
       <!-- Schema Context Input -->
       <div>
-        <label for="schema-context" class="block text-sm font-medium text-gray-700 mb-2">
+        <label for="schema-context" class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
           Data Domain Context
         </label>
         <textarea
@@ -144,21 +144,22 @@
           @input="handleSchemaContextChange"
           :disabled="isProcessing"
           placeholder="Describe your data domain to help generate better schema descriptions (e.g., 'This dataset contains customer information for an e-commerce platform including purchase history, demographics, and behavioral data')"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+          class="input-base w-full resize-none disabled:opacity-50 disabled:cursor-not-allowed"
           rows="4"
         ></textarea>
         <p class="mt-1 text-xs text-gray-500">
+        <p class="mt-1 text-xs" style="color: var(--color-text-muted);">
           This context will be used to generate more accurate schema descriptions for your data columns.
         </p>
       </div>
     </div>
 
     <!-- Save Button -->
-    <div class="mt-8 pt-4 border-t border-gray-200 space-y-3">
+    <div class="mt-8 pt-4 border-t space-y-3" style="border-color: var(--color-border);">
       <button
         @click="saveDataSettings"
         :disabled="!hasApiKey || isProcessing || !appStore.dataFilePath.trim()"
-        class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        class="w-full px-4 py-2 btn-primary"
       >
         <span v-if="isProcessing" class="inline-flex items-center">
           <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -172,7 +173,7 @@
         v-if="appStore.dataFilePath.trim() && !isProcessing"
         @click="refreshCurrentDataset"
         :disabled="isRefreshing"
-        class="w-full px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+        class="w-full px-4 py-2 btn-secondary border rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
       >
         <svg class="w-4 h-4 mr-2" :class="{ 'animate-spin': isRefreshing }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

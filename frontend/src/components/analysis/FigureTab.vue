@@ -80,12 +80,13 @@
       <!-- Empty State -->
       <div
         v-else
-        class="absolute inset-0 flex items-center justify-center bg-gray-50"
+        class="absolute inset-0 flex items-center justify-center"
+        style="background-color: var(--color-base);"
       >
         <div class="text-center">
-          <ChartBarIcon class="h-12 w-12 text-gray-300 mx-auto mb-3" />
-          <p class="text-sm text-gray-500">No chart to display</p>
-          <p class="text-xs text-gray-400 mt-1">Run code that generates a Plotly figure</p>
+          <ChartBarIcon class="h-12 w-12 mx-auto mb-3" style="color: var(--color-border);" />
+          <p class="text-sm" style="color: var(--color-text-muted);">No chart to display</p>
+          <p class="text-xs mt-1" style="color: var(--color-text-muted);">Run code that generates a Plotly figure</p>
         </div>
       </div>
     </div>
@@ -234,6 +235,8 @@ async function renderPlot() {
       ...figureData.layout,
       autosize: true,
       responsive: true,
+      paper_bgcolor: '#FDFCF8',
+      plot_bgcolor: '#FAF8F3',
       margin: { l: 50, r: 50, t: 50, b: 50 }
     }
 
@@ -268,6 +271,8 @@ async function renderFullscreenPlot() {
       ...figureData.layout,
       autosize: true,
       responsive: true,
+      paper_bgcolor: '#FDFCF8',
+      plot_bgcolor: '#FAF8F3',
       margin: { l: 60, r: 60, t: 60, b: 60 }
     }
     

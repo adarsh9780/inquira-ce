@@ -16,7 +16,8 @@
     <!-- Modal container -->
     <div class="flex min-h-full items-center justify-center p-4">
       <div
-        class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all mx-auto w-full max-w-4xl max-h-[90vh] flex flex-col"
+        class="relative transform overflow-hidden rounded-lg text-left shadow-xl transition-all mx-auto w-full max-w-4xl max-h-[90vh] flex flex-col"
+        style="background-color: var(--color-base);"
         @click.stop
       >
         <!-- Modal Header -->
@@ -36,7 +37,7 @@
         </div>
 
         <!-- Modal Body -->
-        <div class="flex flex-1 overflow-hidden" style="background-color: var(--color-surface);">
+        <div class="flex flex-1 overflow-hidden" style="background-color: var(--color-base);">
           <!-- Sidebar Tabs -->
           <div class="w-56 shrink-0 border-r flex flex-col" style="background-color: var(--color-base); border-color: var(--color-border);">
             <!-- Tab Navigation -->

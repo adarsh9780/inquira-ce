@@ -62,7 +62,7 @@
     </Teleport>
 
     <div class="relative flex-1" style="min-height: 400px;">
-      <div ref="editorContainer" class="h-full w-full" style="min-height: 400px; position: relative; z-index: 1; background-color: white;"></div>
+      <div ref="editorContainer" class="h-full w-full" style="min-height: 400px; position: relative; z-index: 1;"></div>
 
       <div
         v-if="isGeneratingCode"
@@ -458,8 +458,10 @@ async function initializeEditor() {
     autocompletion(),
     Prec.highest(keymap.of(customKeymap)),
     EditorView.theme({
-      '&': { fontSize: '14px', height: '100%' },
-      '.cm-scroller': { fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace' },
+      '&': { fontSize: '14px', height: '100%', backgroundColor: '#FDFCF8' },
+      '.cm-editor': { backgroundColor: '#FDFCF8' },
+      '.cm-scroller': { fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace', backgroundColor: '#FDFCF8' },
+      '.cm-gutters': { backgroundColor: '#F5F3ED', borderRight: '1px solid #E8E4DC', color: '#8a8070' },
       '.cm-content': { padding: '16px' },
       '.cm-focused': { outline: 'none' },
     }),
