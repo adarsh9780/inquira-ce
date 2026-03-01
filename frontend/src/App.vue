@@ -202,35 +202,8 @@ onUnmounted(() => {
 </script>
 
 <style>
-/* Global styles for the application */
 .monaco-editor {
   border-radius: 0.375rem;
-}
-
-.ag-theme-alpine {
-  --ag-border-color: #a3a2cd;
-  --ag-header-background-color: #d1d1e6;
-  --ag-odd-row-background-color: #ffffff;
-  --ag-even-row-background-color: #e8e8f3;
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: #d1d1e6;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #8a89c0;
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #6160a9;
 }
 
 /* Backend startup overlay transitions */

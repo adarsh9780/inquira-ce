@@ -7,15 +7,24 @@
     ]"
   >
     <!-- Top Section: Brand & Header -->
-    <div class="h-16 flex items-center px-4 border-b border-gray-200 shrink-0">
-      <div class="flex items-center">
-        <!-- Logo always visible -->
-        <img :src="logo" alt="Inquira Logo" class="w-8 h-8 rounded shrink-0 shadow-sm cursor-pointer hover:opacity-80 transition-opacity" @click="appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)" title="Toggle Sidebar" />
-        <!-- Brand Name (Hidden when collapsed) -->
-        <div v-show="!appStore.isSidebarCollapsed" class="ml-3 truncate">
-          <h1 class="text-sm font-bold text-gray-800 tracking-tight leading-none">Inquira</h1>
-          <p class="text-[10px] text-gray-500 font-medium mt-0.5">LLM-Powered Analysis</p>
+    <div class="h-16 flex items-center px-3 border-b border-gray-200 shrink-0">
+      <div class="flex items-center justify-between w-full">
+        <div class="flex items-center min-w-0">
+          <img :src="logo" alt="Inquira Logo" class="w-8 h-8 rounded shrink-0 shadow-sm" />
+          <div v-show="!appStore.isSidebarCollapsed" class="ml-3 truncate">
+            <h1 class="text-sm font-bold text-gray-800 tracking-tight leading-none">Inquira</h1>
+            <p class="text-[10px] text-gray-500 font-medium mt-0.5">LLM-Powered Analysis</p>
+          </div>
         </div>
+        <button
+          @click="toggleSidebar"
+          class="inline-flex items-center justify-center rounded-md p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors"
+          :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+          :aria-label="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        >
+          <ChevronRightIcon v-if="appStore.isSidebarCollapsed" class="w-4 h-4" />
+          <ChevronLeftIcon v-else class="w-4 h-4" />
+        </button>
       </div>
     </div>
 
@@ -77,10 +86,64 @@
         </nav>
       </div>
 
+      <!-- Collapsed quick summary -->
+      <div v-if="appStore.isSidebarCollapsed" class="mt-4 px-2 space-y-2">
+        <div
+          class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[10px] text-gray-600 truncate"
+          :title="activeWorkspaceName ? `Workspace: ${activeWorkspaceName}` : 'No active workspace'"
+        >
+          <div class="flex items-center justify-center gap-1.5">
+            <RectangleGroupIcon class="h-3.5 w-3.5" />
+            <span class="truncate">{{ activeWorkspaceName ? 'WS' : '--' }}</span>
+          </div>
+        </div>
+        <div
+          class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[10px] text-gray-600 truncate"
+          :title="activeDatasetName ? `Dataset: ${activeDatasetName}` : 'No active dataset'"
+        >
+          <div class="flex items-center justify-center gap-1.5">
+            <CircleStackIcon class="h-3.5 w-3.5" />
+            <span class="truncate">{{ activeDatasetName ? 'DS' : '--' }}</span>
+          </div>
+        </div>
+        <div
+          class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[10px] text-gray-600 truncate"
+          :title="`Kernel: ${kernelStatusMeta.label}`"
+        >
+          <div class="flex items-center justify-center gap-1.5">
+            <span class="w-2 h-2 rounded-full shrink-0" :class="kernelStatusMeta.dotClass"></span>
+            <span class="truncate">{{ kernelStatusMeta.shortLabel }}</span>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- Bottom Section: User & Status -->
     <div class="border-t border-gray-200 bg-gray-100/50 p-3 shrink-0">
+      <div v-show="!appStore.isSidebarCollapsed" class="mb-3 space-y-2">
+        <div class="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[11px] text-gray-700">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-gray-500">Workspace</span>
+            <span class="truncate font-medium">{{ activeWorkspaceName || 'None' }}</span>
+          </div>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[11px] text-gray-700">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-gray-500">Dataset</span>
+            <span class="truncate font-medium">{{ activeDatasetName || 'None' }}</span>
+          </div>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[11px] text-gray-700">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-gray-500">Kernel</span>
+            <span class="inline-flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full" :class="kernelStatusMeta.dotClass"></span>
+              <span class="font-medium">{{ kernelStatusMeta.label }}</span>
+            </span>
+          </div>
+        </div>
+      </div>
       
       <!-- User Menu Toggle -->
       <div class="relative w-full" v-if="authStore.isAuthenticated">
@@ -193,10 +256,13 @@ import logo from '../../assets/favicon.svg'
 
 import {
   RectangleGroupIcon,
+  CircleStackIcon,
   DocumentTextIcon,
   CogIcon,
   ArrowRightOnRectangleIcon,
-  ChevronUpIcon
+  ChevronUpIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
@@ -245,6 +311,15 @@ const settingsInitialTab = ref('api')
 const isUserMenuOpen = ref(false)
 const isLogoutConfirmOpen = ref(false)
 const isWebSocketConnected = ref(false)
+const kernelStatus = ref('missing')
+const isKernelStatusRequestInFlight = ref(false)
+let kernelStatusPoller = null
+
+const activeWorkspaceName = computed(() => {
+  const workspace = appStore.workspaces.find((ws) => ws.id === appStore.activeWorkspaceId)
+  return workspace?.name || ''
+})
+const activeDatasetName = computed(() => appStore.ingestedTableName || '')
 
 const isConfigurationComplete = computed(() => {
   return appStore.apiKeyConfigured && appStore.hasDataFile && isWebSocketConnected.value
@@ -252,6 +327,10 @@ const isConfigurationComplete = computed(() => {
 
 function handleTabClick(tabId) {
   appStore.setActiveTab(tabId)
+}
+
+function toggleSidebar() {
+  appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
 }
 
 const getStatusDotClasses = computed(() => {
@@ -266,6 +345,25 @@ const getStatusDotClasses = computed(() => {
   }
 })
 
+const kernelStatusMeta = computed(() => {
+  if (appStore.runtimeError && appStore.activeWorkspaceId) {
+    return { label: 'Error', shortLabel: 'ERR', dotClass: 'bg-red-500' }
+  }
+  switch (String(kernelStatus.value || '').toLowerCase()) {
+    case 'ready':
+      return { label: 'Ready', shortLabel: 'OK', dotClass: 'bg-green-500' }
+    case 'busy':
+      return { label: 'Busy', shortLabel: 'BUSY', dotClass: 'bg-amber-500' }
+    case 'starting':
+    case 'connecting':
+      return { label: 'Connecting', shortLabel: 'CON', dotClass: 'bg-blue-500' }
+    case 'error':
+      return { label: 'Error', shortLabel: 'ERR', dotClass: 'bg-red-500' }
+    default:
+      return { label: appStore.activeWorkspaceId ? 'Connecting' : 'No Workspace', shortLabel: appStore.activeWorkspaceId ? 'CON' : 'N/A', dotClass: appStore.activeWorkspaceId ? 'bg-blue-500' : 'bg-gray-300' }
+  }
+})
+
 // Lifecycle and Event Handling
 function setupWebSocketMonitoring() {
   const unsubscribe = settingsWebSocket.onConnection((connected) => {
@@ -277,15 +375,52 @@ function setupWebSocketMonitoring() {
   })
 }
 
+async function refreshKernelStatus() {
+  if (!appStore.activeWorkspaceId) {
+    kernelStatus.value = 'missing'
+    return
+  }
+  if (isKernelStatusRequestInFlight.value) return
+  isKernelStatusRequestInFlight.value = true
+  try {
+    const status = await apiService.v1GetWorkspaceKernelStatus(appStore.activeWorkspaceId)
+    kernelStatus.value = String(status?.status || 'missing').toLowerCase()
+  } catch (_error) {
+    kernelStatus.value = 'error'
+  } finally {
+    isKernelStatusRequestInFlight.value = false
+  }
+}
+
+function startKernelStatusPolling() {
+  stopKernelStatusPolling()
+  refreshKernelStatus()
+  kernelStatusPoller = setInterval(() => {
+    if (!document.hidden) refreshKernelStatus()
+  }, 5000)
+}
+
+function stopKernelStatusPolling() {
+  if (kernelStatusPoller) {
+    clearInterval(kernelStatusPoller)
+    kernelStatusPoller = null
+  }
+}
+
 onMounted(() => {
   setupWebSocketMonitoring()
+  startKernelStatusPolling()
   document.addEventListener('keydown', handleKeydown)
   document.addEventListener('click', handleClickOutside)
 })
 
 onUnmounted(() => {
+  stopKernelStatusPolling()
   document.removeEventListener('keydown', handleKeydown)
   document.removeEventListener('click', handleClickOutside)
+})
+watch(() => appStore.activeWorkspaceId, async () => {
+  await refreshKernelStatus()
 })
 function openSettings(tab = 'api') {
   settingsInitialTab.value = tab

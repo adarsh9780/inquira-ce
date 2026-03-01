@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col h-full bg-white overflow-hidden relative">
+  <div ref="panelRef" class="flex flex-col h-full bg-white overflow-hidden relative">
     
     <!-- Top Workspace Area (Chat/Code & Data Panes) -->
     <div 
@@ -97,6 +97,7 @@ import { CommandLineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 const appStore = useAppStore()
 
 // Resizing Logic
+const panelRef = ref(null)
 const isResizingX = ref(false)
 const isResizingY = ref(false)
 
@@ -111,9 +112,11 @@ function startResizeY(e) {
 }
 
 function onResize(e) {
+  const panelRect = panelRef.value?.getBoundingClientRect?.()
+  if (!panelRect || panelRect.width <= 0 || panelRect.height <= 0) return
+
   if (isResizingX.value) {
-    const containerWidth = document.body.clientWidth - (appStore.isSidebarCollapsed ? 64 : 256)
-    let newWidthPct = ((e.clientX - (appStore.isSidebarCollapsed ? 64 : 256)) / containerWidth) * 100
+    let newWidthPct = ((e.clientX - panelRect.left) / panelRect.width) * 100
     
     if (newWidthPct < 20) newWidthPct = 20
     if (newWidthPct > 80) newWidthPct = 80
@@ -122,11 +125,8 @@ function onResize(e) {
   }
   
   if (isResizingY.value) {
-    // Determine height based on mouse Y relative to window height.
-    // The top UI header is roughly 64px, container height can be assumed full window height.
-    let rootHeight = document.body.clientHeight
-    let mouseFromBottom = rootHeight - e.clientY
-    let newHeightPct = (mouseFromBottom / rootHeight) * 100
+    const mouseFromBottom = panelRect.bottom - e.clientY
+    let newHeightPct = (mouseFromBottom / panelRect.height) * 100
 
     if (newHeightPct < 10) newHeightPct = 10
     if (newHeightPct > 80) newHeightPct = 80

@@ -11,6 +11,8 @@ test('app store persists local session snapshot via Tauri app data file service'
   assert.equal(source.includes('buildLocalStateSnapshot()'), true)
   assert.equal(source.includes('await localStateService.saveSnapshot(buildLocalStateSnapshot())'), true)
   assert.equal(source.includes('await localStateService.loadSnapshot()'), true)
+  assert.equal(source.includes('terminal_open: !!isTerminalOpen.value'), true)
+  assert.equal(source.includes('if (typeof ui.terminal_open === \'boolean\')'), true)
 })
 
 test('local snapshot writer is compatible when Tauri file handle has no sync method', () => {
@@ -26,6 +28,15 @@ test('app boot and unload flows load and flush local snapshot state', () => {
 
   assert.equal(source.includes('await appStore.loadLocalConfig()'), true)
   assert.equal(source.includes('void appStore.flushLocalConfig?.()'), true)
+})
+
+test('terminal pane visibility changes are persisted to local snapshot', () => {
+  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const source = readFileSync(storePath, 'utf-8')
+
+  assert.equal(source.includes('function toggleTerminal() {'), true)
+  assert.equal(source.includes('isTerminalOpen.value = !isTerminalOpen.value'), true)
+  assert.equal(source.includes('saveLocalConfig()'), true)
 })
 
 test('tauri fs capability allows writing local snapshot into app data scope', () => {

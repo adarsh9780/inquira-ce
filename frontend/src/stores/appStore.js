@@ -110,6 +110,7 @@ export const useAppStore = defineStore('app', () => {
         left_pane_width: Number(leftPaneWidth.value || 50),
         chat_overlay_open: !!isChatOverlayOpen.value,
         chat_overlay_width: Number(chatOverlayWidth.value || 0.25),
+        terminal_open: !!isTerminalOpen.value,
         terminal_height: Number(terminalHeight.value || 30),
         is_sidebar_collapsed: !!isSidebarCollapsed.value,
         hide_shortcuts_modal: !!hideShortcutsModal.value
@@ -161,6 +162,9 @@ export const useAppStore = defineStore('app', () => {
     }
     if (typeof ui.chat_overlay_width === 'number' && ui.chat_overlay_width > 0.1 && ui.chat_overlay_width < 0.9) {
       chatOverlayWidth.value = ui.chat_overlay_width
+    }
+    if (typeof ui.terminal_open === 'boolean') {
+      isTerminalOpen.value = ui.terminal_open
     }
     if (typeof ui.terminal_height === 'number' && ui.terminal_height >= 10 && ui.terminal_height <= 90) {
       terminalHeight.value = ui.terminal_height
@@ -779,6 +783,7 @@ export const useAppStore = defineStore('app', () => {
     if (isTerminalOpen.value && activeTab.value === 'schema-editor') {
       activeTab.value = 'workspace'
     }
+    saveLocalConfig()
   }
 
   function setTerminalConsentGranted(granted) {
@@ -842,6 +847,7 @@ export const useAppStore = defineStore('app', () => {
     workspacePane.value = 'code'
     dataPane.value = 'table'
     leftPaneWidth.value = 50
+    isTerminalOpen.value = false
     terminalConsentGranted.value = false
     terminalCwd.value = ''
     isCodeRunning.value = false
