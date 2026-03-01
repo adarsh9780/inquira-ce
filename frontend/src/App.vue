@@ -7,6 +7,7 @@
     <ConnectionStatusIndicator />
 
     <!-- Authentication Modal -->
+    <!-- Auth Modal -->
     <AuthModal
       :is-open="!authStore.isAuthenticated && !authStore.isLoading"
       @close="handleAuthClose"
@@ -15,16 +16,19 @@
 
     <!-- Main App (only shown when authenticated) -->
     <div v-if="authStore.isAuthenticated" class="flex flex-col h-screen">
-      <!-- Top Toolbar -->
-      <TopToolbar />
-
-      <!-- Main Content Area -->
+      <!-- Main Content Area with Sidebar -->
       <div class="flex-1 flex overflow-hidden bg-white">
+        <!-- New Unified Left Sidebar -->
+        <UnifiedSidebar />
+
         <!-- Single Panel - Tabs include Chat -->
         <div class="flex-1 bg-white flex flex-col overflow-hidden">
           <RightPanel />
         </div>
       </div>
+      
+      <!-- Footer Status Bar -->
+      <StatusBar />
     </div>
 
     <!-- Loading Screen -->
@@ -36,7 +40,7 @@
       </div>
     </div>
 
-    <!-- Backend Status Overlay (shown during first-time setup) -->
+    <!-- Backend Status Overlay ... -->
     <Teleport to="body">
       <Transition name="fade">
         <div
@@ -68,8 +72,9 @@ import { useAppStore } from './stores/appStore'
 import { useAuthStore } from './stores/authStore'
 import { settingsWebSocket } from './services/websocketService'
 import AuthModal from './components/modals/AuthModal.vue'
-import TopToolbar from './components/layout/TopToolbar.vue'
+import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
+import StatusBar from './components/layout/StatusBar.vue'
 import ToastContainer from './components/ui/ToastContainer.vue'
 import ConnectionStatusIndicator from './components/ui/ConnectionStatusIndicator.vue'
 
@@ -197,35 +202,8 @@ onUnmounted(() => {
 </script>
 
 <style>
-/* Global styles for the application */
 .monaco-editor {
   border-radius: 0.375rem;
-}
-
-.ag-theme-alpine {
-  --ag-border-color: #a3a2cd;
-  --ag-header-background-color: #d1d1e6;
-  --ag-odd-row-background-color: #ffffff;
-  --ag-even-row-background-color: #e8e8f3;
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: #d1d1e6;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #8a89c0;
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #6160a9;
 }
 
 /* Backend startup overlay transitions */

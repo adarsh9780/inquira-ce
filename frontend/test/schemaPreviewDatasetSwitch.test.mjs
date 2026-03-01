@@ -3,13 +3,13 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('preview service accepts table override for schema and preview fetches', () => {
+test('preview service accepts table override for schema loads', () => {
   const servicePath = resolve(process.cwd(), 'src/services/previewService.js')
   const source = readFileSync(servicePath, 'utf-8')
 
-  assert.equal(source.includes('getDataPreview(sampleType = \'random\', forceRefresh = false, tableNameOverride = null)'), true)
   assert.equal(source.includes('loadSchema(filepath, forceRefresh = false, tableNameOverride = null)'), true)
   assert.equal(source.includes('tableNameOverride ||'), true)
+  assert.equal(source.includes('clearSchemaCache()'), true)
 })
 
 test('api service exposes v1 regenerate schema endpoint for workspace datasets', () => {
@@ -39,11 +39,14 @@ test('schema editor does not label blank descriptions as active generation', () 
   assert.equal(source.includes('const schemaNeedsDescriptions = computed(() => {'), true)
 })
 
-test('preview tab forwards selected table name on dataset switch refresh', () => {
-  const previewTabPath = resolve(process.cwd(), 'src/components/preview/PreviewTab.vue')
-  const source = readFileSync(previewTabPath, 'utf-8')
+test('code tab default template includes deterministic duckdb samples', () => {
+  const codeTabPath = resolve(process.cwd(), 'src/components/analysis/CodeTab.vue')
+  const source = readFileSync(codeTabPath, 'utf-8')
 
-  assert.equal(source.includes('const tableNameOverride = event?.detail?.tableName || appStore.ingestedTableName || null'), true)
-  assert.equal(source.includes('fetchDataPreview(true, tableNameOverride)'), true)
-  assert.equal(source.includes('fetchSchemaData(true, tableNameOverride)'), true)
+  assert.equal(source.includes('head_100 = conn.sql('), true)
+  assert.equal(source.includes('tail_100 = conn.sql('), true)
+  assert.equal(source.includes('sample_100 = conn.sql('), true)
+  assert.equal(source.includes("SELECT 'head' AS sample_bucket"), true)
+  assert.equal(source.includes("SELECT 'tail' AS sample_bucket"), true)
+  assert.equal(source.includes("SELECT 'sample' AS sample_bucket"), true)
 })

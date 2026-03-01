@@ -1,95 +1,17 @@
 import { apiService } from './apiService'
 import { cacheService } from './cacheService'
 import { useAppStore } from '../stores/appStore'
-import { isBrowserDataPath } from '../utils/previewRouting'
 import { inferTableNameFromDataPath } from '../utils/chatBootstrap'
 
 class PreviewService {
   constructor() {
-    this.cacheExpiry = 10 * 60 * 1000 // 10 minutes for preview data
     this.schemaCacheExpiry = 15 * 60 * 1000 // 15 minutes for schema data
-  }
-
-  async getBrowserPreview(sampleType = 'random') {
-    return this.getDataPreview(sampleType)
-  }
-
-  // Get data preview with caching
-  async getDataPreview(sampleType = 'random', forceRefresh = false, tableNameOverride = null) {
-    const appStore = useAppStore()
-    if (!appStore.hasWorkspace) {
-      return {
-        success: true,
-        data: [],
-        row_count: 0,
-        sample_type: sampleType,
-        message: 'Create a workspace to start previewing data.'
-      }
-    }
-    const dataPath = appStore.schemaFileId || appStore.dataFilePath
-    const tableName = (
-      tableNameOverride ||
-      appStore.ingestedTableName ||
-      inferTableNameFromDataPath(dataPath || '')
-    ).trim()
-    if (!tableName) {
-      return {
-        success: true,
-        data: [],
-        row_count: 0,
-        sample_type: sampleType,
-        message: 'Select a dataset to preview.'
-      }
-    }
-
-    if (isBrowserDataPath(dataPath)) {
-      const localKey = cacheService.generateKey('data/preview/local', {
-        sampleType,
-        table: appStore.ingestedTableName || ''
-      })
-      const fetcher = () => apiService.v1GetDatasetPreview(
-        appStore.activeWorkspaceId,
-        tableName,
-        sampleType,
-        100
-      ).then((resp) => ({
-        success: true,
-        data: resp?.data || [],
-        row_count: resp?.row_count || 0,
-        sample_type: resp?.sample_type || sampleType,
-        message: `Loaded ${resp?.row_count || 0} rows`
-      }))
-      if (forceRefresh) {
-        return cacheService.refresh(localKey, fetcher, this.cacheExpiry)
-      }
-      return cacheService.getOrSet(localKey, fetcher, this.cacheExpiry)
-    }
-
-    const cacheKey = cacheService.generateKey('data/preview', { sampleType, tableName, workspace: appStore.activeWorkspaceId })
-    const fetcher = () => apiService.v1GetDatasetPreview(
-      appStore.activeWorkspaceId,
-      tableName,
-      sampleType,
-      100
-    ).then((resp) => ({
-      success: true,
-      data: resp?.data || [],
-      row_count: resp?.row_count || 0,
-      sample_type: resp?.sample_type || sampleType,
-      message: `Loaded ${resp?.row_count || 0} rows`
-    }))
-
-    if (forceRefresh) {
-      return cacheService.refresh(cacheKey, fetcher, this.cacheExpiry)
-    }
-
-    return cacheService.getOrSet(cacheKey, fetcher, this.cacheExpiry)
   }
 
   // Load schema with caching
   async loadSchema(filepath, forceRefresh = false, tableNameOverride = null) {
     const appStore = useAppStore()
-    const dataPath = filepath || appStore.schemaFileId || appStore.dataFilePath
+    const dataPath = filepath || appStore.dataFilePath
     const tableName = (
       tableNameOverride ||
       appStore.ingestedTableName ||
@@ -145,15 +67,8 @@ class PreviewService {
     )
   }
 
-  // Clear all preview-related cache
-  clearPreviewCache() {
-    // Clear data preview cache
-    const dataPreviewKeys = Array.from(cacheService.cache.keys())
-      .filter(key => key.startsWith('data/preview:'))
-
-    dataPreviewKeys.forEach(key => cacheService.delete(key))
-
-    // Clear schema cache
+  // Clear schema/settings cache so dataset schema state is reloaded from backend.
+  clearSchemaCache() {
     const schemaKeys = Array.from(cacheService.cache.keys())
       .filter(key => key.startsWith('schema/'))
 
@@ -165,7 +80,12 @@ class PreviewService {
 
     settingsKeys.forEach(key => cacheService.delete(key))
 
-    console.debug(`🗑️ Cleared ${dataPreviewKeys.length} data preview, ${schemaKeys.length} schema, and ${settingsKeys.length} settings cache entries`)
+    console.debug(`🗑️ Cleared ${schemaKeys.length} schema and ${settingsKeys.length} settings cache entries`)
+  }
+
+  // Backward-compat alias while call sites migrate.
+  clearPreviewCache() {
+    this.clearSchemaCache()
   }
 
   // Clear cache for specific filepath

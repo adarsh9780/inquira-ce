@@ -357,7 +357,7 @@ async function regenerateSchemaForPath(dataPath, tableName = null) {
       regenerationProgress.value = 95
 
       // Clear cache and reload
-      previewService.clearPreviewCache()
+      previewService.clearSchemaCache()
       schema.value = generatedSchema.columns
       schemaContext.value = generatedSchema.context || ''
       
@@ -400,7 +400,7 @@ function handleDatasetSwitch(event) {
   schemaError.value = ''
   
   // Clear cache to force fresh load from backend
-  previewService.clearPreviewCache()
+  previewService.clearSchemaCache()
   
   // If event.detail is null, the last dataset was deleted - show empty state
   if (event?.detail === null) {
@@ -439,8 +439,8 @@ onUnmounted(() => {
 
 function clearCache() {
   try {
-    previewService.clearPreviewCache()
-    console.debug('Preview cache cleared')
+    previewService.clearSchemaCache()
+    console.debug('Schema cache cleared')
   } catch (e) {
     console.warn('Failed to clear cache')
   }

@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, Request
+from fastapi import FastAPI, WebSocket, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -22,6 +22,8 @@ if not hasattr(aiosqlite.Connection, "is_alive"):
 
 
 from .v1.api.router import router as v1_router
+from .v1.services.auth_service import AuthService
+from .v1.db.session import SessionLocal
 from .v1.db.init import init_v1_database
 from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
 from .v1.services.workspace_deletion_service import WorkspaceDeletionService
@@ -226,30 +228,44 @@ app.add_middleware(
 app.include_router(v1_router)
 
 
+async def _resolve_websocket_user(websocket: WebSocket):
+    """Resolve authenticated websocket user from HTTP-only session cookie."""
+    session_token = websocket.cookies.get("session_token")
+    if not session_token:
+        return None
+
+    async with SessionLocal() as session:
+        try:
+            return await AuthService.resolve_user_from_session(session, session_token)
+        except Exception:
+            return None
+
+
 # WebSocket endpoint for real-time processing updates
 @app.websocket("/ws/settings/{user_id}")
 async def settings_websocket(websocket: WebSocket, user_id: str):
     """WebSocket endpoint for real-time settings processing updates"""
-    logprint(f"🔌 [WebSocket] New WebSocket connection request for user: {user_id}")
-    logprint(f"🔍 [WebSocket] User ID type: {type(user_id)}, value: '{user_id}'")
+    logprint(f"🔌 [WebSocket] New WebSocket connection request for path user: {user_id}")
+    auth_user = await _resolve_websocket_user(websocket)
+    if auth_user is None:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Not authenticated")
+        return
 
-    # Check for common issues
-    if user_id == "current_user":
-        logprint(
-            "⚠️ [WebSocket] WARNING: Frontend is using 'current_user' instead of actual user ID!"
-        )
-        logprint(
-            f"💡 [WebSocket] Frontend should connect to: ws://localhost:8000/ws/settings/{user_id}"
-        )
-        logprint(
-            "💡 [WebSocket] But it's connecting to: ws://localhost:8000/ws/settings/current_user"
-        )
-        logprint(
-            "✅ [WebSocket] Accepting connection with 'current_user' for compatibility"
-        )
+    auth_user_id = str(getattr(auth_user, "id", "")).strip()
+    if not auth_user_id:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid user")
+        return
 
-    await websocket_manager.connect(user_id, websocket)
-    logprint(f"✅ [WebSocket] Connection established for user: {user_id}")
+    if user_id != auth_user_id:
+        logprint(
+            f"⚠️ [WebSocket] Rejected user-id mismatch. path={user_id} session={auth_user_id}",
+            level="warning",
+        )
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="User mismatch")
+        return
+
+    await websocket_manager.connect(auth_user_id, websocket)
+    logprint(f"✅ [WebSocket] Connection established for user: {auth_user_id}")
     logprint(
         f"🔍 [WebSocket] Active connections after connect: {list(websocket_manager.active_connections.keys())}"
     )
@@ -259,16 +275,16 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
     try:
         while True:
             # Keep connection alive and handle any incoming messages
-            logprint(f"👂 [WebSocket] Waiting for messages from user {user_id}...")
+            logprint(f"👂 [WebSocket] Waiting for messages from user {auth_user_id}...")
             data = await websocket.receive_text()
-            logprint(f"📨 [WebSocket] Received message from user {user_id}: {data}")
+            logprint(f"📨 [WebSocket] Received message from user {auth_user_id}: {data}")
             # For now, we just keep the connection alive
             # In the future, this could handle cancellation requests, etc.
     except Exception as e:
-        logprint(f"❌ [WebSocket] Error for user {user_id}: {e}", level="error")
+        logprint(f"❌ [WebSocket] Error for user {auth_user_id}: {e}", level="error")
     finally:
-        logprint(f"🔌 [WebSocket] Cleaning up connection for user {user_id}")
-        await websocket_manager.disconnect(user_id)
+        logprint(f"🔌 [WebSocket] Cleaning up connection for user {auth_user_id}")
+        await websocket_manager.disconnect(auth_user_id)
 
 
 @app.get("/favicon.ico", include_in_schema=False)

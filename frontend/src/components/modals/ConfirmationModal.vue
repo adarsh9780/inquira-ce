@@ -9,7 +9,7 @@
   >
     <!-- Background overlay -->
     <div
-      class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+      class="modal-overlay"
       @click="closeModal"
     ></div>
 
@@ -20,46 +20,22 @@
         @click.stop
       >
         <!-- Modal Header -->
-        <div class="bg-white px-6 py-4 border-b border-gray-200">
-          <div class="flex items-center">
-            <div class="flex-shrink-0">
-              <ExclamationTriangleIcon class="h-6 w-6 text-yellow-500" />
-            </div>
-            <div class="ml-3">
-              <h3 class="text-lg font-semibold text-gray-900" id="modal-title">
-                {{ title }}
-              </h3>
-            </div>
+        <div class="modal-header">
+          <div class="flex items-center gap-3">
+            <ExclamationTriangleIcon class="h-5 w-5 shrink-0" style="color: var(--color-warning);" />
+            <h3 class="text-base font-semibold" id="modal-title" style="color: var(--color-text-main);">{{ title }}</h3>
           </div>
         </div>
 
         <!-- Modal Body -->
-        <div class="bg-white px-6 py-4">
-          <div class="sm:flex sm:items-start">
-            <div class="mt-3 text-center sm:mt-0 sm:text-left">
-              <div class="mt-2">
-                <p class="text-sm text-gray-500">
-                  {{ message }}
-                </p>
-              </div>
-            </div>
-          </div>
+        <div class="px-6 py-4">
+          <p class="text-sm" style="color: var(--color-text-muted);">{{ message }}</p>
         </div>
 
         <!-- Modal Footer -->
-        <div class="bg-gray-50 px-6 py-4 flex justify-end space-x-3">
-          <button
-            @click="closeModal"
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-          >
-            {{ cancelText }}
-          </button>
-          <button
-            @click="confirmAction"
-            class="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-          >
-            {{ confirmText }}
-          </button>
+        <div class="modal-footer">
+          <button @click="closeModal" class="btn-secondary text-sm px-4 py-2">{{ cancelText }}</button>
+          <button @click="confirmAction" class="btn-danger text-sm px-4 py-2">{{ confirmText }}</button>
         </div>
       </div>
     </div>

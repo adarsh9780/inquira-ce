@@ -8,9 +8,6 @@ export const useAppStore = defineStore('app', () => {
   // Files
   const dataFilePath = ref('')
   const schemaFilePath = ref('')
-  const dataFileId = ref('')
-  const schemaFileId = ref('')
-  const isSchemaFileUploaded = ref(false)
   const ingestedTableName = ref('')
   const ingestedColumns = ref([])
 
@@ -60,12 +57,21 @@ export const useAppStore = defineStore('app', () => {
   const runtimeError = ref('')
   const activeTab = ref('workspace')
   const workspacePane = ref('code') // 'code' | 'chat'
+  const dataPane = ref('table') // 'table' | 'figure' | 'varex'
+  const leftPaneWidth = ref(50) // percentage
   const terminalConsentGranted = ref(false)
+  const isTerminalOpen = ref(false)
+  const terminalHeight = ref(30) // percentage
   const terminalCwd = ref('')
   const isChatOverlayOpen = ref(true)
   const chatOverlayWidth = ref(0.25) // 25% of area
-  const isSidebarCollapsed = ref(true)
+  const isSidebarCollapsed = ref(false)
   const hideShortcutsModal = ref(false)
+
+  // Editor State
+  const editorLine = ref(1)
+  const editorCol = ref(1)
+  const isEditorFocused = ref(false)
 
   // UI State
   const isLoading = ref(false)
@@ -100,8 +106,12 @@ export const useAppStore = defineStore('app', () => {
       ui: {
         active_tab: activeTab.value || 'workspace',
         workspace_pane: workspacePane.value || 'code',
+        data_pane: dataPane.value || 'table',
+        left_pane_width: Number(leftPaneWidth.value || 50),
         chat_overlay_open: !!isChatOverlayOpen.value,
         chat_overlay_width: Number(chatOverlayWidth.value || 0.25),
+        terminal_open: !!isTerminalOpen.value,
+        terminal_height: Number(terminalHeight.value || 30),
         is_sidebar_collapsed: !!isSidebarCollapsed.value,
         hide_shortcuts_modal: !!hideShortcutsModal.value
       },
@@ -132,6 +142,8 @@ export const useAppStore = defineStore('app', () => {
       } else if (restoredTab === 'chat') {
         activeTab.value = 'workspace'
         workspacePane.value = 'chat'
+      } else if (restoredTab === 'preview') {
+        activeTab.value = 'workspace'
       } else {
         activeTab.value = restoredTab
       }
@@ -139,11 +151,23 @@ export const useAppStore = defineStore('app', () => {
     if (typeof ui.workspace_pane === 'string' && ui.workspace_pane.trim()) {
       workspacePane.value = ui.workspace_pane === 'chat' ? 'chat' : 'code'
     }
+    if (typeof ui.data_pane === 'string' && ui.data_pane.trim()) {
+      dataPane.value = ['table', 'figure', 'varex'].includes(ui.data_pane) ? ui.data_pane : 'table'
+    }
+    if (typeof ui.left_pane_width === 'number' && ui.left_pane_width > 10 && ui.left_pane_width < 90) {
+      leftPaneWidth.value = ui.left_pane_width
+    }
     if (typeof ui.chat_overlay_open === 'boolean') {
       isChatOverlayOpen.value = ui.chat_overlay_open
     }
     if (typeof ui.chat_overlay_width === 'number' && ui.chat_overlay_width > 0.1 && ui.chat_overlay_width < 0.9) {
       chatOverlayWidth.value = ui.chat_overlay_width
+    }
+    if (typeof ui.terminal_open === 'boolean') {
+      isTerminalOpen.value = ui.terminal_open
+    }
+    if (typeof ui.terminal_height === 'number' && ui.terminal_height >= 10 && ui.terminal_height <= 90) {
+      terminalHeight.value = ui.terminal_height
     }
     if (typeof ui.is_sidebar_collapsed === 'boolean') {
       isSidebarCollapsed.value = ui.is_sidebar_collapsed
@@ -235,9 +259,6 @@ export const useAppStore = defineStore('app', () => {
       ]
       dataFilePath.value = ''
       schemaFilePath.value = ''
-      dataFileId.value = ''
-      schemaFileId.value = ''
-      isSchemaFileUploaded.value = false
       ingestedTableName.value = ''
       ingestedColumns.value = []
       schemaContext.value = ''
@@ -271,21 +292,6 @@ export const useAppStore = defineStore('app', () => {
 
   function setSchemaFilePath(path) {
     schemaFilePath.value = path
-    saveLocalConfig()
-  }
-
-  function setDataFileId(id) {
-    dataFileId.value = id
-    saveLocalConfig()
-  }
-
-  function setSchemaFileId(id) {
-    schemaFileId.value = id
-    saveLocalConfig()
-  }
-
-  function setIsSchemaFileUploaded(uploaded) {
-    isSchemaFileUploaded.value = uploaded
     saveLocalConfig()
   }
 
@@ -732,6 +738,16 @@ export const useAppStore = defineStore('app', () => {
     } else if (normalized === 'chat') {
       activeTab.value = 'workspace'
       workspacePane.value = 'chat'
+    } else if (['table', 'figure', 'varex'].includes(normalized)) {
+      // Route data-related tabs to the right pane instead of a full-screen view
+      activeTab.value = 'workspace'
+      dataPane.value = normalized
+    } else if (normalized === 'terminal') {
+      // Open the bottom terminal pane instead of navigating away
+      activeTab.value = 'workspace'
+      isTerminalOpen.value = true
+    } else if (normalized === 'preview') {
+      activeTab.value = 'workspace'
     } else {
       activeTab.value = normalized || 'workspace'
     }
@@ -742,6 +758,34 @@ export const useAppStore = defineStore('app', () => {
     activeTab.value = 'workspace'
     saveLocalConfig()
   }
+  function setDataPane(pane) {
+    dataPane.value = ['table', 'figure', 'varex'].includes(pane) ? pane : 'table'
+    activeTab.value = 'workspace'
+    saveLocalConfig()
+  }
+  function setLeftPaneWidth(widthPct) {
+    if (widthPct >= 10 && widthPct <= 90) {
+      leftPaneWidth.value = widthPct
+      saveLocalConfig()
+    }
+  }
+
+  function setTerminalHeight(heightPct) {
+    if (heightPct >= 10 && heightPct <= 90) {
+      terminalHeight.value = heightPct
+      saveLocalConfig()
+    }
+  }
+
+  function toggleTerminal() {
+    isTerminalOpen.value = !isTerminalOpen.value
+    // If opening the terminal, ensure we are not hiding the workspace if we were previously in a full-screen view.
+    if (isTerminalOpen.value && activeTab.value === 'schema-editor') {
+      activeTab.value = 'workspace'
+    }
+    saveLocalConfig()
+  }
+
   function setTerminalConsentGranted(granted) {
     terminalConsentGranted.value = !!granted
   }
@@ -763,13 +807,21 @@ export const useAppStore = defineStore('app', () => {
     }
   }
   function setSidebarCollapsed(collapsed) {
-    isSidebarCollapsed.value = collapsed
+    isSidebarCollapsed.value = !!collapsed
+    saveLocalConfig()
+  }
+  function setHideShortcutsModal(hide) {
+    hideShortcutsModal.value = !!hide
     saveLocalConfig()
   }
 
-  function setHideShortcutsModal(hidden) {
-    hideShortcutsModal.value = !!hidden
-    saveLocalConfig()
+  // Editor tracking
+  function setEditorPosition(line, col) {
+    editorLine.value = line
+    editorCol.value = col
+  }
+  function setEditorFocused(focused) {
+    isEditorFocused.value = focused
   }
 
   function setLoading(loading) {
@@ -793,6 +845,9 @@ export const useAppStore = defineStore('app', () => {
     runtimeError.value = ''
     activeTab.value = 'workspace'
     workspacePane.value = 'code'
+    dataPane.value = 'table'
+    leftPaneWidth.value = 50
+    isTerminalOpen.value = false
     terminalConsentGranted.value = false
     terminalCwd.value = ''
     isCodeRunning.value = false
@@ -870,9 +925,6 @@ export const useAppStore = defineStore('app', () => {
     // State
     dataFilePath,
     schemaFilePath,
-    dataFileId,
-    schemaFileId,
-    isSchemaFileUploaded,
     ingestedTableName,
     ingestedColumns,
     selectedModel,
@@ -903,12 +955,19 @@ export const useAppStore = defineStore('app', () => {
     runtimeError,
     activeTab,
     workspacePane,
+    dataPane,
+    leftPaneWidth,
+    isTerminalOpen,
+    terminalHeight,
     terminalConsentGranted,
     terminalCwd,
     isChatOverlayOpen,
     chatOverlayWidth,
     isSidebarCollapsed,
     hideShortcutsModal,
+    editorLine,
+    editorCol,
+    isEditorFocused,
     isLoading,
     isCodeRunning,
     historicalCodeBlocks,
@@ -926,9 +985,6 @@ export const useAppStore = defineStore('app', () => {
     clearLocalConfig,
     setDataFilePath,
     setSchemaFilePath,
-    setDataFileId,
-    setSchemaFileId,
-    setIsSchemaFileUploaded,
     setIngestedTableName,
     setIngestedColumns,
     setApiKey,
@@ -970,6 +1026,10 @@ export const useAppStore = defineStore('app', () => {
     clearTerminalEntries,
     setActiveTab,
     setWorkspacePane,
+    setDataPane,
+    setLeftPaneWidth,
+    setTerminalHeight,
+    toggleTerminal,
     setTerminalConsentGranted,
     setTerminalCwd,
     toggleChatOverlay,
@@ -977,6 +1037,8 @@ export const useAppStore = defineStore('app', () => {
     setChatOverlayWidth,
     setSidebarCollapsed,
     setHideShortcutsModal,
+    setEditorPosition,
+    setEditorFocused,
     loadUserPreferences,
     setLoading,
     setCodeRunning,

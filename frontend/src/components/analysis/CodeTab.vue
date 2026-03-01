@@ -1,34 +1,36 @@
 <template>
   <div class="flex h-full flex-col">
-    <div class="flex-shrink-0 border-b border-gray-200 bg-gray-50 px-4 py-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center space-x-2">
+    <Teleport to="#workspace-left-pane-toolbar" v-if="isMounted && appStore.workspacePane === 'code'">
+      <div class="flex items-center w-full justify-end">
+        <div class="flex items-center gap-1 bg-zinc-50 p-1 rounded-xl border border-zinc-200">
           <button
             @click="runCode"
             :disabled="!canRunCode || isRunning"
             title="Run Code (R)"
-            class="inline-flex items-center rounded-md border border-transparent px-2 py-2 text-sm font-medium leading-4 text-white transition-colors"
+            class="btn-icon"
             :class="canRunCode && !isRunning
-              ? 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2'
-              : 'cursor-not-allowed bg-gray-400'"
+              ? 'hover:bg-white hover:text-green-600 hover:shadow-sm'
+              : ''"
           >
             <PlayIcon v-if="!isRunning" class="h-4 w-4" />
-            <div v-else class="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+            <div v-else class="h-4 w-4 animate-spin rounded-full border-b-2 border-gray-400"></div>
           </button>
 
           <button
             @click="syncTableNameInCode"
             title="Sync table name in code to current data file"
-            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            class="btn-icon hover:bg-white hover:text-blue-600 hover:shadow-sm"
           >
             <ArrowPathIcon class="h-4 w-4" />
           </button>
 
+          <div class="w-px h-4 bg-zinc-200 mx-0.5"></div>
+
           <button
             @click="undo"
             :disabled="!canUndo"
-            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            :class="!canUndo ? 'cursor-not-allowed opacity-50' : ''"
+            class="btn-icon"
+            :class="canUndo ? 'hover:bg-white hover:text-blue-600 hover:shadow-sm' : ''"
             title="Undo (Ctrl+Z)"
           >
             <ArrowUturnLeftIcon class="h-4 w-4" />
@@ -37,32 +39,30 @@
           <button
             @click="redo"
             :disabled="!canRedo"
-            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            :class="!canRedo ? 'cursor-not-allowed opacity-50' : ''"
+            class="btn-icon"
+            :class="canRedo ? 'hover:bg-white hover:text-blue-600 hover:shadow-sm' : ''"
             title="Redo (Ctrl+Y)"
           >
             <ArrowUturnRightIcon class="h-4 w-4" />
           </button>
+          
+          <div class="w-px h-4 bg-zinc-200 mx-0.5"></div>
 
           <button
             @click="downloadCode"
             :disabled="!appStore.pythonFileContent"
-            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            :class="!appStore.pythonFileContent ? 'cursor-not-allowed opacity-50' : ''"
+            class="btn-icon"
+            :class="appStore.pythonFileContent ? 'hover:bg-white hover:text-blue-600 hover:shadow-sm' : ''"
             title="Download code"
           >
             <ArrowDownTrayIcon class="h-4 w-4" />
           </button>
         </div>
-
-        <div class="text-xs text-gray-500">
-          <span class="font-medium">Tip:</span> Select code and press <kbd class="rounded border border-gray-300 bg-white px-1 py-0.5">Shift+Enter</kbd> to run selection
-        </div>
       </div>
-    </div>
+    </Teleport>
 
     <div class="relative flex-1" style="min-height: 400px;">
-      <div ref="editorContainer" class="h-full w-full" style="min-height: 400px; position: relative; z-index: 1; background-color: white;"></div>
+      <div ref="editorContainer" class="h-full w-full" style="min-height: 400px; position: relative; z-index: 1;"></div>
 
       <div
         v-if="isGeneratingCode"
@@ -130,6 +130,7 @@ const isRunning = ref(false)
 const isGeneratingCode = ref(false)
 const databasePaths = ref(null)
 const settingsInfo = ref(null)
+const isMounted = ref(false)
 
 let editor = null
 let isUpdatingFromStore = false
@@ -180,18 +181,59 @@ const defaultCodeTemplate = computed(() => {
   const tableName = backendTable || getTableName(originalFilepath)
 
   return `import duckdb
-import narwhals as nw
-import plotly.express as px
 
 table_name = "${tableName}"
+limit_rows = 100
+
+def quote_ident(name: str) -> str:
+    return '"' + str(name).replace('"', '""') + '"'
+
+quoted_table = quote_ident(table_name)
+
 try:
     conn  # type: ignore  # noqa
 except NameError:
     conn = duckdb.connect(r"${dbPath || ''}") if "${dbPath || ''}".strip() else duckdb.connect()
 
-lazy_query = conn.sql(f"SELECT * FROM {table_name} LIMIT 10")
-df = nw.from_native(lazy_query.pl(), eager=True)
-df
+head_100 = conn.sql(f"SELECT * FROM {quoted_table} LIMIT {limit_rows}").df()
+tail_100 = conn.sql(
+    f"""
+    WITH numbered AS (
+      SELECT *, row_number() OVER () AS __rownum
+      FROM {quoted_table}
+    )
+    SELECT * EXCLUDE (__rownum)
+    FROM numbered
+    ORDER BY __rownum DESC
+    LIMIT {limit_rows}
+    """
+).df()
+sample_100 = conn.sql(f"SELECT * FROM {quoted_table} USING SAMPLE {limit_rows} ROWS").df()
+
+combined_preview = conn.sql(
+    f"""
+    SELECT 'head' AS sample_bucket, * FROM (
+      SELECT * FROM {quoted_table} LIMIT {limit_rows}
+    )
+    UNION ALL
+    SELECT 'tail' AS sample_bucket, * FROM (
+      WITH numbered AS (
+        SELECT *, row_number() OVER () AS __rownum
+        FROM {quoted_table}
+      )
+      SELECT * EXCLUDE (__rownum)
+      FROM numbered
+      ORDER BY __rownum DESC
+      LIMIT {limit_rows}
+    )
+    UNION ALL
+    SELECT 'sample' AS sample_bucket, * FROM (
+      SELECT * FROM {quoted_table} USING SAMPLE {limit_rows} ROWS
+    )
+    """
+).df()
+
+combined_preview
 `
 })
 
@@ -416,12 +458,15 @@ async function initializeEditor() {
     autocompletion(),
     Prec.highest(keymap.of(customKeymap)),
     EditorView.theme({
-      '&': { fontSize: '14px', height: '100%' },
-      '.cm-scroller': { fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace' },
+      '&': { fontSize: '14px', height: '100%', backgroundColor: '#FDFCF8' },
+      '.cm-editor': { backgroundColor: '#FDFCF8' },
+      '.cm-scroller': { fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace', backgroundColor: '#FDFCF8' },
+      '.cm-gutters': { backgroundColor: '#F5F3ED', borderRight: '1px solid #E8E4DC', color: '#8a8070' },
       '.cm-content': { padding: '16px' },
       '.cm-focused': { outline: 'none' },
     }),
     EditorView.updateListener.of((update) => {
+      // Handle content changes
       if (update.docChanged && !isUpdatingFromStore) {
         const content = editor.state.doc.toString()
         isUpdatingFromStore = true
@@ -430,7 +475,29 @@ async function initializeEditor() {
           isUpdatingFromStore = false
         }, 10)
       }
+
+      // Handle cursor position updates
+      if (update.selectionSet || update.docChanged) {
+        const head = update.state.selection.main.head
+        const line = update.state.doc.lineAt(head)
+        appStore.setEditorPosition(line.number, head - line.from + 1)
+      }
     }),
+    EditorView.domEventHandlers({
+      focus: () => {
+        appStore.setEditorFocused(true)
+        // Ensure accurate position on initial focus
+        if (editor) {
+          const head = editor.state.selection.main.head
+          const line = editor.state.doc.lineAt(head)
+          appStore.setEditorPosition(line.number, head - line.from + 1)
+        }
+      },
+      blur: () => {
+        appStore.setEditorFocused(false)
+      }
+    }),
+    EditorView.lineWrapping,
   ]
 
   const state = EditorState.create({
@@ -476,6 +543,7 @@ function isDefaultEditorContent(content) {
 }
 
 onMounted(async () => {
+  isMounted.value = true
   await nextTick()
   await fetchSettings()
   await fetchDatabasePaths()
@@ -500,6 +568,13 @@ watch(() => appStore.generatedCode, (newCode) => {
     isGeneratingCode.value = false
     appStore.setLoading(false)
     appStore.setCodeRunning(false)
+
+    // Auto-run the newly generated code
+    nextTick(() => {
+      if (canRunCode.value) {
+        runCode()
+      }
+    })
   }
 })
 
@@ -547,4 +622,10 @@ watch(() => authStore.userId, async (newUserId, oldUserId) => {
 
 <style scoped>
 /* CodeMirror styling is handled by editor theme extension */
+:deep(.cm-content) {
+  min-width: 40ch;
+}
+:deep(.cm-scroller) {
+  overflow-x: auto !important;
+}
 </style>

@@ -1,10 +1,9 @@
 <template>
   <div class="flex flex-col h-full">
-    <!-- Figure Header -->
-    <div class="flex-shrink-0 bg-gray-50 border-b border-gray-200 px-4 py-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center space-x-3">
-          <h3 class="text-sm font-medium text-gray-900">Chart Visualization</h3>
+    <!-- Figure Header (Teleported) -->
+    <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'figure'">
+      <div class="flex items-center justify-end w-full gap-4">
+        <div class="flex items-center space-x-3 text-sm mr-auto">
           <span v-if="appStore.plotlyFigure || appStore.isCodeRunning" class="text-xs px-2 py-1 rounded"
                 :class="appStore.isCodeRunning
                   ? 'text-orange-600 bg-orange-100'
@@ -20,7 +19,7 @@
             <select
               id="figure-select"
               v-model="selectedFigureIndex"
-              class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option
                 v-for="(fig, index) in orderedFigures"
@@ -36,7 +35,7 @@
           <button
             @click="downloadPng"
             :disabled="!selectedFigure || isDownloading"
-            class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
             :class="!selectedFigure ? 'opacity-50 cursor-not-allowed' : ''"
           >
             <PhotoIcon v-if="!isDownloading" class="h-4 w-4 mr-1" />
@@ -48,7 +47,7 @@
           <button
             @click="downloadHtml"
             :disabled="!selectedFigure"
-            class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
             :class="!selectedFigure ? 'opacity-50 cursor-not-allowed' : ''"
           >
             <DocumentIcon class="h-4 w-4 mr-1" />
@@ -59,7 +58,7 @@
           <button
             @click="toggleFullscreen"
             :disabled="!selectedFigure"
-            class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
             :class="!selectedFigure ? 'opacity-50 cursor-not-allowed' : ''"
           >
             <ArrowsPointingOutIcon class="h-4 w-4 mr-1" />
@@ -67,10 +66,10 @@
           </button>
         </div>
       </div>
-    </div>
+    </Teleport>
     
     <!-- Plotly Chart Container -->
-    <div class="flex-1 relative">
+    <div class="flex-1 relative mt-1">
       <div
         v-if="selectedFigure"
         :key="selectedFigureIndex"
@@ -81,12 +80,13 @@
       <!-- Empty State -->
       <div
         v-else
-        class="absolute inset-0 flex items-center justify-center bg-gray-50"
+        class="absolute inset-0 flex items-center justify-center"
+        style="background-color: var(--color-base);"
       >
         <div class="text-center">
-          <ChartBarIcon class="h-12 w-12 text-gray-300 mx-auto mb-3" />
-          <p class="text-sm text-gray-500">No chart to display</p>
-          <p class="text-xs text-gray-400 mt-1">Run code that generates a Plotly figure</p>
+          <ChartBarIcon class="h-12 w-12 mx-auto mb-3" style="color: var(--color-border);" />
+          <p class="text-sm" style="color: var(--color-text-muted);">No chart to display</p>
+          <p class="text-xs mt-1" style="color: var(--color-text-muted);">Run code that generates a Plotly figure</p>
         </div>
       </div>
     </div>
@@ -137,6 +137,7 @@ const fullscreenPlotContainer = ref(null)
 const isDownloading = ref(false)
 const isFullscreen = ref(false)
 const selectedFigureIndex = ref(0)
+const isMounted = ref(false)
 
 const orderedFigures = computed(() => {
   if (!appStore.figures) return []
@@ -151,6 +152,7 @@ const selectedFigure = computed(() => {
 })
 
 onMounted(async () => {
+  isMounted.value = true
   // Observe container size changes to keep plot sized correctly
   if ('ResizeObserver' in window) {
     ro = new ResizeObserver(() => {
@@ -233,6 +235,8 @@ async function renderPlot() {
       ...figureData.layout,
       autosize: true,
       responsive: true,
+      paper_bgcolor: '#FDFCF8',
+      plot_bgcolor: '#FAF8F3',
       margin: { l: 50, r: 50, t: 50, b: 50 }
     }
 
@@ -267,6 +271,8 @@ async function renderFullscreenPlot() {
       ...figureData.layout,
       autosize: true,
       responsive: true,
+      paper_bgcolor: '#FDFCF8',
+      plot_bgcolor: '#FAF8F3',
       margin: { l: 60, r: 60, t: 60, b: 60 }
     }
     

@@ -7,5 +7,5 @@ test('terminal tab hides outer header when tauri PTY terminal is active and cons
   const terminalTabPath = resolve(process.cwd(), 'src/components/analysis/TerminalTab.vue')
   const source = readFileSync(terminalTabPath, 'utf-8')
 
-  assert.equal(source.includes('v-if="!(useTauriPty && appStore.terminalConsentGranted)"'), true)
+  assert.equal(source.includes('Teleport to="#terminal-toolbar" v-if="isMounted && !(useTauriPty && appStore.terminalConsentGranted)"'), true)
 })

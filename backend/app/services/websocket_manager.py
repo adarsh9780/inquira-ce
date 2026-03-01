@@ -118,8 +118,6 @@ class ProgressMessenger:
                 update_data["message"] = "🚀 Starting data processing pipeline..."
             elif stage == "completed":
                 update_data["message"] = "✅ Processing completed successfully!"
-            elif stage == "caching_preview":
-                update_data["message"] = "⚡ Optimizing data preview performance..."
             else:
                 update_data["message"] = f"Processing stage: {stage}..."
 

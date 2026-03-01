@@ -166,7 +166,7 @@ async function selectDataset(ds) {
     }
 
     // Clear caches first
-    previewService.clearPreviewCache()
+    previewService.clearSchemaCache()
 
     // Update local workspace-scoped dataset selection state.
     appStore.setDataFilePath(selectedPath)

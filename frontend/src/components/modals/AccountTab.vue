@@ -14,13 +14,13 @@
 
     <div class="space-y-6">
       <!-- Change Password Section -->
-      <div class="border border-gray-200 rounded-lg p-4">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Change Password</h3>
+      <div class="border rounded-lg p-4" style="border-color: var(--color-border);">
+        <h3 class="text-lg font-medium mb-4" style="color: var(--color-text-main);">Change Password</h3>
 
         <div class="space-y-4">
           <!-- Current Password -->
           <div>
-            <label for="current-password" class="block text-sm font-medium text-gray-700 mb-2">
+            <label for="current-password" class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
               Current Password
             </label>
             <input
@@ -29,13 +29,13 @@
               v-model="currentPassword"
               :disabled="isChangingPassword"
               placeholder="Enter your current password"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              class="input-base w-full disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
           <!-- New Password -->
           <div>
-            <label for="new-password" class="block text-sm font-medium text-gray-700 mb-2">
+            <label for="new-password" class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
               New Password
             </label>
             <input
@@ -44,16 +44,16 @@
               v-model="newPassword"
               :disabled="isChangingPassword"
               placeholder="Enter your new password"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              class="input-base w-full disabled:opacity-50 disabled:cursor-not-allowed"
             />
-            <p class="mt-1 text-xs text-gray-500">
+            <p class="mt-1 text-xs" style="color: var(--color-text-muted);">
               Password must be at least 8 characters long
             </p>
           </div>
 
           <!-- Confirm New Password -->
           <div>
-            <label for="confirm-password" class="block text-sm font-medium text-gray-700 mb-2">
+            <label for="confirm-password" class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
               Confirm New Password
             </label>
             <input
@@ -62,7 +62,7 @@
               v-model="confirmPassword"
               :disabled="isChangingPassword"
               placeholder="Confirm your new password"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              class="input-base w-full disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -70,7 +70,7 @@
           <button
             @click="changePassword"
             :disabled="!canChangePassword || isChangingPassword"
-            class="w-full px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            class="w-full px-4 py-2 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span v-if="isChangingPassword" class="inline-flex items-center">
               <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>

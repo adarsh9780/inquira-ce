@@ -1,10 +1,11 @@
 <template>
   <div class="flex flex-col h-full">
-    <!-- Table Header -->
-    <div class="flex-shrink-0 bg-gray-50 border-b border-gray-200 px-4 py-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center space-x-3">
-          <h3 class="text-sm font-medium text-gray-900">Data Table</h3>
+    <!-- Table Header (Teleported to WorkspaceRightPane) -->
+    <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'table'">
+      <div class="flex items-center justify-end w-full gap-4">
+        <!-- Optional status indicators on the left side of the teleported area
+             but it's flex-end, so they show before the buttons -->
+        <div class="flex items-center space-x-3 text-sm mr-auto">
           <span v-if="appStore.isCodeRunning" class="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">
             Processing
           </span>
@@ -37,11 +38,10 @@
 
           <!-- Dataframe Selector -->
           <div v-if="orderedDataframes && orderedDataframes.length > 1" class="flex items-center space-x-2">
-            <label for="dataframe-select" class="text-sm font-medium text-gray-700">Dataframe:</label>
             <select
               id="dataframe-select"
               v-model="selectedDataframeIndex"
-              class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option
                 v-for="(df, index) in orderedDataframes"
@@ -57,19 +57,19 @@
           <button
             @click="downloadCsv"
             :disabled="!rowData.length || isDownloading"
-            class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
             :class="!rowData.length ? 'opacity-50 cursor-not-allowed' : ''"
           >
             <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4 mr-1" />
             <div v-else class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-1"></div>
-            {{ isDownloading ? 'Downloading...' : 'Download CSV' }}
+            {{ isDownloading ? 'Downloading...' : 'CSV' }}
           </button>
         </div>
       </div>
-    </div>
+    </Teleport>
 
     <!-- AG Grid Container -->
-    <div class="flex-1 relative">
+    <div class="flex-1 relative mt-1">
       <ag-grid-vue
         v-if="rowData.length"
         :key="`${selectedDataframeIndex}-${chunkOffset}`"
@@ -89,12 +89,13 @@
       <!-- Empty State -->
       <div
         v-else
-        class="absolute inset-0 flex items-center justify-center bg-gray-50"
+        class="absolute inset-0 flex items-center justify-center"
+        style="background-color: var(--color-base);"
       >
         <div class="text-center">
-          <TableCellsIcon class="h-12 w-12 text-gray-300 mx-auto mb-3" />
-          <p class="text-sm text-gray-500">No data to display</p>
-          <p class="text-xs text-gray-400 mt-1">Run code to generate table data</p>
+          <TableCellsIcon class="h-12 w-12 mx-auto mb-3" style="color: var(--color-border);" />
+          <p class="text-sm" style="color: var(--color-text-muted);">No data to display</p>
+          <p class="text-xs mt-1" style="color: var(--color-text-muted);">Run code to generate table data</p>
         </div>
       </div>
     </div>
@@ -102,7 +103,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import apiService from '../../services/apiService'
 import { AgGridVue } from 'ag-grid-vue3'
@@ -124,7 +125,12 @@ const selectedDataframeIndex = ref(0)
 const chunkOffset = ref(0)
 const chunkLimit = 1000
 const chunkRows = ref([])
+const isMounted = ref(false)
 let gridApi = null
+
+onMounted(() => {
+  isMounted.value = true
+})
 
 const orderedDataframes = computed(() => {
   if (!appStore.dataframes) return []
@@ -338,21 +344,20 @@ function convertToCSV(data) {
 </script>
 
 <style>
-/* AG Grid theme customizations */
-.ag-theme-alpine {
-  --ag-border-color: #e5e7eb;
-  --ag-header-background-color: #f9fafb;
-  --ag-odd-row-background-color: #ffffff;
-  --ag-even-row-background-color: #f9fafb;
-  --ag-row-hover-color: #f3f4f6;
-  --ag-selected-row-background-color: #dbeafe;
-}
-
-.ag-theme-alpine .ag-header-cell-label {
-  font-weight: 600;
-}
-
-.ag-theme-alpine .ag-cell {
-  border-right: 1px solid var(--ag-border-color);
+/* AG Grid warm tint overrides — applies on top of ag-theme-quartz */
+.ag-theme-quartz {
+  --ag-background-color: #FDFCF8;
+  --ag-header-background-color: #F5F3ED;
+  --ag-odd-row-background-color: #FDFCF8;
+  --ag-even-row-background-color: #FAF8F3;
+  --ag-row-hover-color: #F0EDE5;
+  --ag-selected-row-background-color: #EDE9DE;
+  --ag-border-color: #E8E4DC;
+  --ag-header-foreground-color: #3d3830;
+  --ag-foreground-color: #1a1612;
+  --ag-secondary-foreground-color: #6b6358;
+  --ag-input-focus-border-color: #d4b896;
+  --ag-range-selection-border-color: #c8a87c;
+  --ag-cell-horizontal-border: solid #E8E4DC;
 }
 </style>

@@ -13,26 +13,11 @@
     </div>
 
     <div class="space-y-6">
-      <!-- Model Selector -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-          Language Model
-        </label>
-        <div class="max-w-xs">
-          <ModelSelector
-            :selected-model="appStore.selectedModel"
-            :model-options="appStore.availableModels"
-            @model-changed="handleModelChange"
-          />
-        </div>
-        <p class="mt-1 text-xs text-gray-500">
-          Choose the AI model for data analysis
-        </p>
-      </div>
+
 
       <!-- API Key Input -->
       <div>
-        <label for="api-key-input" class="block text-sm font-medium text-gray-700 mb-2">
+        <label for="api-key-input" class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
           API Key (OpenRouter)
         </label>
         <div class="relative max-w-md">
@@ -42,7 +27,7 @@
             :value="appStore.apiKey"
             @input="handleApiKeyChange"
             placeholder="Enter your OpenRouter API key"
-            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            class="input-base pr-10"
           />
           <button
             @click="showApiKey = !showApiKey"
@@ -54,13 +39,14 @@
           </button>
         </div>
         <div class="mt-2 flex items-center justify-between">
-          <p class="text-xs text-gray-500">
+          <p class="text-xs" style="color: var(--color-text-muted);">
             Your API key is stored in your OS keychain.
             <a
               href="https://openrouter.ai/keys"
               target="_blank"
               rel="noopener"
-              class="text-blue-600 hover:underline ml-1"
+              class="hover:underline ml-1"
+              style="color: var(--color-accent);"
             >
               Get an OpenRouter API key
             </a>
@@ -68,7 +54,7 @@
           <button
             @click="testApiKey"
             :disabled="isTestingApiKey || !appStore.apiKey.trim()"
-            class="ml-4 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="ml-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-secondary"
             title="Test your API key with the configured provider"
             type="button"
           >
@@ -86,7 +72,7 @@
       </p>
 
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
+        <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
           Schema Privacy
         </label>
         <label class="inline-flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
@@ -104,7 +90,7 @@
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
+        <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
           Runner Packages
         </label>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
@@ -112,19 +98,19 @@
             v-model="runnerPackageName"
             type="text"
             placeholder="Package name (e.g. scikit-learn)"
-            class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            class="input-base"
           />
           <input
             v-model="runnerPackageVersion"
             type="text"
             placeholder="Exact version (e.g. 1.5.2)"
-            class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            class="input-base"
           />
           <input
             v-model="runnerIndexUrl"
             type="text"
             placeholder="Index URL (optional)"
-            class="sm:col-span-2 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            class="sm:col-span-2 input-base"
           />
         </div>
         <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
@@ -140,7 +126,7 @@
             @click="installRunnerPackage"
             :disabled="isInstallingRunnerPackage || !runnerPackageName.trim() || !runnerPackageVersion.trim() || !appStore.activeWorkspaceId"
             type="button"
-            class="px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-100 hover:bg-indigo-200 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="px-3 py-2 text-sm font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-secondary"
           >
             <span v-if="!isInstallingRunnerPackage">Install Runner Package</span>
             <span v-else class="inline-flex items-center">
@@ -160,11 +146,11 @@
     </div>
 
     <!-- Save Button -->
-    <div class="mt-8 pt-4 border-t border-gray-200">
+    <div class="mt-8 pt-4 border-t" style="border-color: var(--color-border);">
       <button
         @click="saveApiSettings"
         :disabled="isSaving"
-        class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        class="w-full px-4 py-2 btn-primary"
       >
         <span v-if="isSaving" class="inline-flex items-center">
           <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -181,7 +167,6 @@ import { ref, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { apiService } from '../../services/apiService'
 import { toast } from '../../composables/useToast'
-import ModelSelector from '../ui/ModelSelector.vue'
 import {
   KeyIcon,
   EyeIcon,
@@ -208,11 +193,6 @@ const messageTypeClass = computed(() => {
     ? 'bg-green-50 border border-green-200 text-green-800'
     : 'bg-red-50 border border-red-200 text-red-800'
 })
-
-function handleModelChange(model) {
-  appStore.setSelectedModel(model)
-  clearMessage()
-}
 
 function handleApiKeyChange(event) {
   appStore.setApiKey(event.target.value)

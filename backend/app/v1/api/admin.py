@@ -5,13 +5,14 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..core.settings import settings
 from ..db.base import Base
 from ..db.session import engine
 from ..schemas.common import MessageResponse
+from .deps import get_current_user
 from ...services.llm_service import LLMService
 
 router = APIRouter(prefix="/admin", tags=["V1 Admin"])
@@ -51,8 +52,12 @@ async def reset_everything(token: str):
 
 
 @router.post("/test-gemini")
-async def test_gemini_api_key(payload: GeminiTestRequest):
+async def test_gemini_api_key(
+    payload: GeminiTestRequest,
+    current_user=Depends(get_current_user),
+):
     """Validate an OpenRouter-compatible key by issuing a lightweight test request."""
+    _ = current_user
     api_key = (payload.api_key or "").strip()
     model = (payload.model or "").strip()
     if not api_key:
