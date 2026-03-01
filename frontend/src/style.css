@@ -72,17 +72,37 @@ body {
 
   /* Secondary Button - Medium emphasis actions (e.g., Cancel, Refresh) */
   .btn-secondary {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none bg-white text-zinc-800 border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none border shadow-sm disabled:opacity-50 disabled:cursor-not-allowed;
+    background-color: var(--color-surface);
+    color: var(--color-text-main);
+    border-color: var(--color-border);
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--color-base);
+    border-color: var(--color-border-hover);
   }
 
   /* Ghost Button - Low emphasis actions (e.g., subtle navigation, links) */
   .btn-ghost {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none bg-transparent text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none bg-transparent disabled:opacity-50 disabled:cursor-not-allowed;
+    color: var(--color-text-muted);
+  }
+
+  .btn-ghost:hover {
+    background-color: color-mix(in srgb, var(--color-text-main) 6%, transparent);
+    color: var(--color-text-main);
   }
 
   /* Icon Button - For small controls in headers and sidebars */
   .btn-icon {
-    @apply inline-flex items-center justify-center rounded-md transition-all duration-150 p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center rounded-md transition-all duration-150 p-1.5 disabled:opacity-50 disabled:cursor-not-allowed;
+    color: var(--color-text-muted);
+  }
+
+  .btn-icon:hover {
+    background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent);
+    color: var(--color-text-main);
   }
 
   /* Danger Button - For destructive actions */
@@ -101,8 +121,8 @@ body {
 
   /* Modal card shell */
   .modal-card {
-    background-color: var(--color-surface);
     @apply relative rounded-xl shadow-2xl border overflow-hidden;
+    background-color: var(--color-surface);
     border-color: var(--color-border);
   }
 
@@ -193,35 +213,26 @@ body {
   }
 }
 
-/* Typography Overrides for maximum crispness */
+/* ============================================================
+   Typography — single source of truth via CSS vars
+   ============================================================ */
 h1,
 h2,
 h3,
 h4,
 h5,
 h6 {
-  @apply text-zinc-900 font-semibold tracking-tight;
+  @apply font-semibold tracking-tight;
+  color: var(--color-text-main);
 }
 
 p {
-  @apply text-zinc-700;
+  color: var(--color-text-muted);
 }
 
-/* AG Grid Theme Customization to match the minimal aesthetic */
-.ag-theme-alpine {
-  --ag-border-color: #E4E4E7;
-  /* Zinc 200 */
-  --ag-header-background-color: #FAFAFA;
-  /* Base background */
-  --ag-odd-row-background-color: #FFFFFF;
-  --ag-even-row-background-color: #FAFAFA;
-  --ag-header-foreground-color: #71717A;
-  /* Zinc 500 */
-  --ag-row-hover-color: #F4F4F5;
-  /* Zinc 100 */
-}
-
-/* Custom Scrollbar - Minimal and subtle */
+/* ============================================================
+   Custom Scrollbar — minimal and subtle
+   ============================================================ */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -232,10 +243,10 @@ p {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D4D4D8;
+  background: var(--color-border-hover);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #A1A1AA;
+  background: var(--color-text-muted);
 }

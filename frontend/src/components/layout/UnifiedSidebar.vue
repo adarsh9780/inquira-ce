@@ -162,7 +162,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { useAuthStore } from '../../stores/authStore'
 import { settingsWebSocket } from '../../services/websocketService'
@@ -174,8 +174,6 @@ import SidebarConversations from './sidebar/SidebarConversations.vue'
 import logo from '../../assets/favicon.svg'
 
 import {
-  RectangleGroupIcon,
-  CircleStackIcon,
   DocumentTextIcon,
   CogIcon,
   ArrowRightOnRectangleIcon,
@@ -185,23 +183,6 @@ import {
 const appStore = useAppStore()
 const authStore = useAuthStore()
 
-// State from RightPanel for notification counts
-const flash = ref({})
-const counts = computed(() => ({
-  workspace: appStore.chatHistory?.length || (!appStore.isCodeRunning && appStore.generatedCode ? 1 : 0),
-}))
-
-watch(counts, (n, o) => {
-  if (!o) return
-  for (const k of Object.keys(n)) {
-    if ((n[k] || 0) > (o[k] || 0)) {
-      flash.value = { ...flash.value, [k]: true }
-      setTimeout(() => {
-        flash.value = { ...flash.value, [k]: false }
-      }, 1000)
-    }
-  }
-}, { deep: true })
 
 // Toolbar & User State
 const isSettingsOpen = ref(false)

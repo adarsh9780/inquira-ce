@@ -176,16 +176,20 @@ async function restartKernel() {
   }
 }
 
+// Named handler so we can remove the exact same reference on unmount
+function handleVisibilityChange() {
+  if (!document.hidden && appStore.activeWorkspaceId) refreshKernelStatus()
+}
+
 // Lifecycle and Watchers
 onMounted(() => {
   if (appStore.activeWorkspaceId) startKernelStatusPolling()
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && appStore.activeWorkspaceId) refreshKernelStatus()
-  })
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
 onUnmounted(() => {
   stopKernelStatusPolling()
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
 watch(() => appStore.activeWorkspaceId, (newId) => {
