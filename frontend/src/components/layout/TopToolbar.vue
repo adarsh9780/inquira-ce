@@ -19,6 +19,11 @@
       <!-- Right Section: User Controls Group -->
       <div class="flex items-center space-x-3 flex-shrink-0">
         <div class="hidden lg:flex items-center space-x-2 px-2 py-1 rounded-md border border-gray-200 bg-white">
+          <span
+            v-if="kernelStatusMeta.showSpinner"
+            class="inline-block w-3 h-3 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin"
+            aria-hidden="true"
+          ></span>
           <span class="text-xs font-medium" :class="kernelStatusMeta.textClass">
             Kernel: {{ kernelStatusMeta.label }}
           </span>
@@ -237,7 +242,7 @@ const isUserMenuOpen = ref(false)
 const isShortcutsOpen = ref(false)
 const isLogoutConfirmOpen = ref(false)
 const isWebSocketConnected = ref(false)
-const kernelStatus = ref('missing')
+const kernelStatus = ref('connecting')
 const isKernelActionRunning = ref(false)
 const isKernelStatusRequestInFlight = ref(false)
 let kernelStatusPoller = null
@@ -264,15 +269,21 @@ const getStatusDotClasses = computed(() => {
 const kernelStatusMeta = computed(() => {
   switch (String(kernelStatus.value || '').toLowerCase()) {
     case 'ready':
-      return { label: 'Ready', textClass: 'text-green-700' }
+      return { label: 'Ready', textClass: 'text-green-700', showSpinner: false }
     case 'busy':
-      return { label: 'Busy', textClass: 'text-amber-700' }
+      return { label: 'Busy', textClass: 'text-amber-700', showSpinner: false }
     case 'starting':
-      return { label: 'Starting', textClass: 'text-blue-700' }
+    case 'connecting':
+      return { label: 'Connecting', textClass: 'text-blue-700', showSpinner: true }
     case 'error':
-      return { label: 'Error', textClass: 'text-red-700' }
+      return { label: 'Error', textClass: 'text-red-700', showSpinner: false }
+    case 'missing':
+      if (appStore.activeWorkspaceId) {
+        return { label: 'Connecting', textClass: 'text-blue-700', showSpinner: true }
+      }
+      return { label: 'No Workspace', textClass: 'text-gray-600', showSpinner: false }
     default:
-      return { label: appStore.activeWorkspaceId ? 'Missing' : 'No Workspace', textClass: 'text-gray-600' }
+      return { label: appStore.activeWorkspaceId ? 'Connecting' : 'No Workspace', textClass: appStore.activeWorkspaceId ? 'text-blue-700' : 'text-gray-600', showSpinner: Boolean(appStore.activeWorkspaceId) }
   }
 })
 
@@ -382,6 +393,7 @@ async function interruptKernel() {
 async function restartKernel() {
   if (!appStore.activeWorkspaceId || isKernelActionRunning.value) return
   isKernelActionRunning.value = true
+  kernelStatus.value = 'connecting'
   try {
     const response = await apiService.v1RestartWorkspaceKernel(appStore.activeWorkspaceId)
     if (response?.reset) {
@@ -394,6 +406,7 @@ async function restartKernel() {
   } catch (error) {
     const message = error?.response?.data?.detail || error.message || 'Failed to restart kernel.'
     toast.error('Restart Failed', message)
+    await refreshKernelStatus()
   } finally {
     isKernelActionRunning.value = false
   }
