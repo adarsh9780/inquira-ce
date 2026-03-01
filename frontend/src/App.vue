@@ -153,6 +153,7 @@ onMounted(async () => {
   )
   wsUnsubscribers.value.push(
     settingsWebSocket.subscribeError((message) => {
+      appStore.setRuntimeError(message || 'Workspace runtime bootstrap failed.')
       if (!workspaceRuntimeStatus.active) return
       workspaceRuntimeStatus.active = false
       workspaceRuntimeStatus.message = message || ''

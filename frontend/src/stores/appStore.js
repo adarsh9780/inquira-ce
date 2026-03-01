@@ -57,6 +57,7 @@ export const useAppStore = defineStore('app', () => {
   const terminalOutput = ref('')
   const terminalEntries = ref([])
   const terminalEnabled = ref(false)
+  const runtimeError = ref('')
   const activeTab = ref('workspace')
   const workspacePane = ref('code') // 'code' | 'chat'
   const terminalConsentGranted = ref(false)
@@ -427,8 +428,13 @@ export const useAppStore = defineStore('app', () => {
         const paths = await apiService.v1GetWorkspacePaths(targetWorkspaceId)
         setTerminalEnabled(Boolean(paths?.terminal_enabled))
         const bootstrapped = await apiService.v1BootstrapWorkspaceRuntime(targetWorkspaceId)
+        if (bootstrapped?.reset === true) {
+          setRuntimeError('')
+        }
         return bootstrapped?.reset === true
-      } catch (_error) {
+      } catch (error) {
+        const message = error?.response?.data?.detail || error?.message || 'Workspace runtime bootstrap failed.'
+        setRuntimeError(String(message))
         setTerminalEnabled(false)
         return false
       } finally {
@@ -695,6 +701,10 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  function setRuntimeError(message) {
+    runtimeError.value = String(message || '')
+  }
+
   function appendTerminalEntry(entry) {
     if (!entry || typeof entry !== 'object') return
     const kind = entry.kind === 'output' ? 'output' : 'command'
@@ -780,6 +790,7 @@ export const useAppStore = defineStore('app', () => {
     terminalOutput.value = ''
     terminalEntries.value = []
     terminalEnabled.value = false
+    runtimeError.value = ''
     activeTab.value = 'workspace'
     workspacePane.value = 'code'
     terminalConsentGranted.value = false
@@ -889,6 +900,7 @@ export const useAppStore = defineStore('app', () => {
     terminalOutput,
     terminalEntries,
     terminalEnabled,
+    runtimeError,
     activeTab,
     workspacePane,
     terminalConsentGranted,
@@ -953,6 +965,7 @@ export const useAppStore = defineStore('app', () => {
     setScalars,
     setTerminalOutput,
     setTerminalEnabled,
+    setRuntimeError,
     appendTerminalEntry,
     clearTerminalEntries,
     setActiveTab,

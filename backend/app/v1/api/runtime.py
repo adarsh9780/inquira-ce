@@ -709,12 +709,13 @@ async def bootstrap_workspace_runtime_endpoint(
                 },
             )
     except Exception as exc:
+        detail = _describe_exception(exc)
         if websocket_user_id:
             await websocket_manager.send_error(
                 websocket_user_id,
-                f"Workspace runtime bootstrap failed: {str(exc)}",
+                f"Workspace runtime bootstrap failed: {detail}",
             )
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail=detail) from exc
     return KernelResetResponse(workspace_id=workspace_id, reset=bool(ready))
 
 
@@ -1175,3 +1176,10 @@ def _resolve_websocket_user_id(user_id: str) -> str | None:
     if websocket_manager.is_connected("current_user"):
         return "current_user"
     return None
+
+
+def _describe_exception(exc: Exception) -> str:
+    text = str(exc).strip()
+    if text:
+        return text
+    return exc.__class__.__name__

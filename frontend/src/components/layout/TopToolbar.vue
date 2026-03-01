@@ -27,6 +27,13 @@
           <span class="text-xs font-medium" :class="kernelStatusMeta.textClass">
             Kernel: {{ kernelStatusMeta.label }}
           </span>
+          <span
+            v-if="appStore.runtimeError"
+            class="max-w-[320px] truncate text-xs text-red-700"
+            :title="appStore.runtimeError"
+          >
+            {{ appStore.runtimeError }}
+          </span>
           <button
             @click="interruptKernel"
             :disabled="!appStore.activeWorkspaceId || isKernelActionRunning || kernelStatus === 'missing'"
@@ -267,6 +274,9 @@ const getStatusDotClasses = computed(() => {
 })
 
 const kernelStatusMeta = computed(() => {
+  if (appStore.runtimeError && appStore.activeWorkspaceId) {
+    return { label: 'Error', textClass: 'text-red-700', showSpinner: false }
+  }
   switch (String(kernelStatus.value || '').toLowerCase()) {
     case 'ready':
       return { label: 'Ready', textClass: 'text-green-700', showSpinner: false }
@@ -279,7 +289,7 @@ const kernelStatusMeta = computed(() => {
       return { label: 'Error', textClass: 'text-red-700', showSpinner: false }
     case 'missing':
       if (appStore.activeWorkspaceId) {
-        return { label: 'Connecting', textClass: 'text-blue-700', showSpinner: true }
+        return { label: 'Missing', textClass: 'text-amber-700', showSpinner: false }
       }
       return { label: 'No Workspace', textClass: 'text-gray-600', showSpinner: false }
     default:
@@ -347,9 +357,14 @@ async function refreshKernelStatus() {
   try {
     const status = await apiService.v1GetWorkspaceKernelStatus(appStore.activeWorkspaceId)
     kernelStatus.value = String(status?.status || 'missing').toLowerCase()
+    if (kernelStatus.value === 'ready' || kernelStatus.value === 'busy' || kernelStatus.value === 'starting') {
+      appStore.setRuntimeError('')
+    }
   } catch (error) {
     console.error('Failed to fetch kernel status:', error)
     kernelStatus.value = 'error'
+    const message = error?.response?.data?.detail || error?.message || 'Failed to fetch kernel status.'
+    appStore.setRuntimeError(message)
   } finally {
     isKernelStatusRequestInFlight.value = false
   }

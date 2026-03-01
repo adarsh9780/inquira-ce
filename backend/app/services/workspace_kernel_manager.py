@@ -497,6 +497,8 @@ class WorkspaceKernelManager:
         if progress_callback is not None:
             await self._await_maybe(progress_callback("workspace_runtime_kernel", "Starting Python kernel..."))
         km = AsyncKernelManager(kernel_name="python3")
+        kc = None
+        ready_timeout = max(15, int(config.runner_policy.timeout_seconds) * 2)
         kernel_spec = km.kernel_spec
         if kernel_spec is None:
             raise RuntimeError("Failed to load Jupyter kernelspec for python3.")
@@ -507,22 +509,31 @@ class WorkspaceKernelManager:
             "-f",
             "{connection_file}",
         ]
-        await km.start_kernel()
-        kc = km.client()
-        kc.start_channels()
-        await kc.wait_for_ready(timeout=max(5, int(config.runner_policy.timeout_seconds)))
-        session = WorkspaceKernelSession(
-            workspace_id=workspace_id,
-            workspace_duckdb_path=workspace_duckdb_path,
-            manager=km,
-            client=kc,
-            artifact_db_path=str(Path(workspace_duckdb_path).with_name("workspace_runtime_artifacts.duckdb")),
-            status="ready",
-        )
-        if progress_callback is not None:
-            await self._await_maybe(progress_callback("workspace_runtime_bootstrap", "Warming workspace runtime..."))
-        await self._bootstrap_workspace(session)
-        return session
+        try:
+            await km.start_kernel()
+            kc = km.client()
+            kc.start_channels()
+            await kc.wait_for_ready(timeout=ready_timeout)
+            session = WorkspaceKernelSession(
+                workspace_id=workspace_id,
+                workspace_duckdb_path=workspace_duckdb_path,
+                manager=km,
+                client=kc,
+                artifact_db_path=str(Path(workspace_duckdb_path).with_name("workspace_runtime_artifacts.duckdb")),
+                status="ready",
+            )
+            if progress_callback is not None:
+                await self._await_maybe(progress_callback("workspace_runtime_bootstrap", "Warming workspace runtime..."))
+            await self._bootstrap_workspace(session)
+            return session
+        except asyncio.TimeoutError as exc:
+            await self._shutdown_partial_startup(km, kc)
+            raise RuntimeError(
+                f"Timed out waiting for workspace kernel to become ready after {ready_timeout} seconds."
+            ) from exc
+        except Exception as exc:
+            await self._shutdown_partial_startup(km, kc)
+            raise RuntimeError(f"Failed to start workspace kernel: {self._describe_exception(exc)}") from exc
 
     async def _bootstrap_workspace(self, session: WorkspaceKernelSession) -> None:
         duckdb_path = Path(session.workspace_duckdb_path).as_posix()
@@ -654,6 +665,25 @@ class WorkspaceKernelManager:
     async def _await_maybe(self, maybe_awaitable: Any) -> None:
         if inspect.isawaitable(maybe_awaitable):
             await maybe_awaitable
+
+    async def _shutdown_partial_startup(self, manager: Any, client: Any) -> None:
+        try:
+            if client is not None:
+                client.stop_channels()
+        except Exception:
+            pass
+        try:
+            if manager is not None:
+                await self._await_maybe(manager.shutdown_kernel(now=True))
+        except Exception:
+            pass
+
+    @staticmethod
+    def _describe_exception(exc: Exception) -> str:
+        text = str(exc).strip()
+        if text:
+            return text
+        return exc.__class__.__name__
 
     @staticmethod
     def _coerce_variable_bundle(result: Any) -> dict[str, dict[str, Any]]:
