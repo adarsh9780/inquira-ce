@@ -17,19 +17,6 @@
           <p class="text-[10px] text-gray-500 font-medium mt-0.5">LLM-Powered Analysis</p>
         </div>
       </div>
-      
-      <!-- Collapse Toggle Button -->
-      <!-- Positioned absolute on the right edge or cleanly in the header -->
-      <button
-        v-show="!appStore.isSidebarCollapsed"
-        class="ml-auto rounded-md p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition-colors"
-        title="Collapse sidebar"
-        @click="appStore.setSidebarCollapsed(true)"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
-          <path fill-rule="evenodd" d="M21 12a1 1 0 01-1 1H8.414l3.293 3.293a1 1 0 11-1.414 1.414l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L8.414 11H20a1 1 0 011 1z" clip-rule="evenodd" />
-        </svg>
-      </button>
     </div>
 
     <!-- Scrollable Middle Section -->
@@ -88,19 +75,6 @@
             </div>
           </button>
         </nav>
-      </div>
-      
-      <!-- Expand Sidebar Button (when collapsed) -->
-      <div v-show="appStore.isSidebarCollapsed" class="mt-4 flex justify-center w-full px-2 text-center">
-        <button
-          class="rounded-lg p-2 text-gray-400 hover:bg-gray-200 hover:text-gray-700 w-full flex justify-center transition-colors"
-          title="Expand sidebar"
-          @click="appStore.setSidebarCollapsed(false)"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4">
-            <path fill-rule="evenodd" d="M3 12a1 1 0 011-1h11.586l-3.293-3.293a1 1 0 111.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 11-1.414-1.414L15.586 13H4a1 1 0 01-1-1z" clip-rule="evenodd" />
-          </svg>
-        </button>
       </div>
 
     </div>
