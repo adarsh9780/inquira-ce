@@ -1,55 +1,81 @@
 <template>
-  <div class="space-y-2 sm:space-y-3">
-    <!-- Input Area -->
-    <div class="relative">
+  <div class="space-y-2">
+    <!-- Main Input Card (Cursor-style) -->
+    <div
+      class="relative flex flex-col rounded-2xl border transition-all duration-150"
+      style="
+        background-color: var(--color-base);
+        border-color: var(--color-border);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      "
+      :style="isFocused ? { borderColor: 'var(--color-border-hover)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-text-main) 5%, transparent)' } : {}"
+    >
+      <!-- Textarea -->
       <textarea
         v-model="question"
         @keydown.enter.prevent="handleSubmit"
         @keydown.shift.enter="handleNewLine"
-        placeholder="Ask a question about your data... (Enter to send, Shift+Enter for new line)"
-        rows="3"
-        class="w-full px-4 sm:px-5 py-2.5 sm:py-3.5 pr-14 sm:pr-18 border border-border rounded-2xl resize-none focus:outline-none focus:ring-0 focus:border-border-hover text-sm sm:text-base shadow-sm transition-all duration-150 leading-relaxed"
-        style="background-color: #ffffff; color: #27272A;"
-        :class="{
-          'opacity-70 cursor-not-allowed': !appStore.canAnalyze || appStore.isLoading,
-          'hover:shadow': appStore.canAnalyze && !appStore.isLoading
-        }"
+        @focus="isFocused = true"
+        @blur="isFocused = false"
+        placeholder="How can I help you today?"
+        class="w-full px-4 pt-4 pb-2 resize-none focus:outline-none text-sm leading-relaxed bg-transparent border-none"
+        style="color: var(--color-text-main); min-height: 72px;"
+        :class="{ 'opacity-60 cursor-not-allowed': !appStore.canAnalyze || appStore.isLoading }"
         :disabled="!appStore.canAnalyze || appStore.isLoading"
       />
 
-      <!-- Send Button -->
-      <button
-        @click="handleSubmit"
-        :disabled="!canSend"
-        class="absolute bottom-3 right-3 p-2.5 z-40 flex-shrink-0 btn-primary transition-transform hover:scale-105 active:scale-95 border-none"
-        :title="canSend ? 'Send question' : 'Fill requirements to enable send'"
-      >
-        <PaperAirplaneIcon class="h-5 w-5" />
-      </button>
+      <!-- Bottom Action Row -->
+      <div class="flex items-center justify-between px-3 pb-3 pt-1">
 
-    </div>
-    
-    
-    <!-- Requirements Notice -->
-    <div v-if="!appStore.canAnalyze" class="bg-error/5 border border-error/20 rounded-xl p-4">
-      <div class="flex items-start space-x-3">
-        <div class="flex-shrink-0">
-          <ExclamationTriangleIcon class="h-5 w-5 text-error" />
+        <!-- Left: Add button -->
+        <button
+          type="button"
+          class="btn-icon"
+          title="Attach file"
+        >
+          <PlusIcon class="w-5 h-5" />
+        </button>
+
+        <!-- Right: Model selector + action button -->
+        <div class="flex items-center gap-3">
+          <ModelSelector
+            :selected-model="appStore.selectedModel"
+            :model-options="appStore.availableModels"
+            @model-changed="handleModelChange"
+          />
+
+          <!-- Mic (empty) → ArrowUp (has text) -->
+          <button
+            @click="handleSubmit"
+            :disabled="appStore.isLoading || !appStore.canAnalyze"
+            class="transition-all duration-150 focus:outline-none"
+            :class="
+              question.trim().length > 0
+                ? 'text-zinc-900 hover:text-zinc-700'
+                : 'cursor-default opacity-50'
+            "
+            :title="question.trim().length > 0 ? 'Send (Enter)' : 'Start typing to send'"
+          >
+            <!-- Mic icon: empty state -->
+            <MicrophoneIcon v-if="question.trim().length === 0" class="w-5 h-5" />
+            <!-- Arrow Up icon: text entered -->
+            <ArrowUpCircleIcon v-else class="w-6 h-6" />
+          </button>
         </div>
+
+      </div>
+    </div>
+
+    <!-- Requirements Notice -->
+    <div v-if="!appStore.canAnalyze" class="rounded-xl p-4 border" style="background-color: color-mix(in srgb, var(--color-error) 5%, transparent); border-color: color-mix(in srgb, var(--color-error) 20%, transparent);">
+      <div class="flex items-start gap-3">
+        <ExclamationTriangleIcon class="h-5 w-5 shrink-0 mt-0.5" style="color: var(--color-error);" />
         <div>
-          <h4 class="text-sm font-semibold text-error mb-2">Setup Required</h4>
-          <p class="text-sm text-text-muted mb-3">Before chatting, complete this setup:</p>
-          <ul class="space-y-2 text-sm text-text-muted">
-            <li class="flex items-center space-x-2">
-              <div class="w-1.5 h-1.5 rounded-full bg-error"></div>
-              <span>Create or select a workspace from the header dropdown</span>
-            </li>
-            <li class="flex items-center space-x-2">
-              <div class="w-1.5 h-1.5 rounded-full bg-error"></div>
-              <span>Enter your OpenRouter API key in Settings</span>
-            </li>
+          <h4 class="text-sm font-semibold mb-1" style="color: var(--color-error);">Setup Required</h4>
+          <ul class="space-y-1 text-sm list-disc list-inside" style="color: var(--color-text-muted);">
+            <li>Create or select a workspace from the header dropdown</li>
+            <li>Enter your OpenRouter API key in Settings</li>
           </ul>
-          <p class="text-xs text-text-muted mt-3">Click the Settings button in the top toolbar to add your API key.</p>
         </div>
       </div>
     </div>
@@ -63,36 +89,33 @@ import apiService from '../../services/apiService'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { buildBrowserDataPath, inferTableNameFromDataPath } from '../../utils/chatBootstrap'
+import ModelSelector from '../ui/ModelSelector.vue'
 import {
-  PaperAirplaneIcon,
-  ExclamationTriangleIcon
+  PlusIcon,
+  MicrophoneIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
+import { ArrowUpCircleIcon } from '@heroicons/vue/24/solid'
 
 const appStore = useAppStore()
 
 const question = ref('')
+const isFocused = ref(false)
 
-const canSend = computed(() => {
-  return appStore.canAnalyze && 
-         question.value.trim().length > 0 && 
-         question.value.length <= 1000 &&
-         !appStore.isLoading
-})
+const canSend = computed(() =>
+  appStore.canAnalyze &&
+  question.value.trim().length > 0 &&
+  question.value.length <= 1000 &&
+  !appStore.isLoading
+)
+
+function handleModelChange(model) {
+  appStore.setSelectedModel(model)
+}
 
 function isBrowserVirtualPath(path) {
   const normalized = String(path || '').toLowerCase()
   return normalized.startsWith('browser://') || normalized.startsWith('browser:/') || normalized.startsWith('/browser:/')
-}
-
-function isRecoverableBrowserTableError(error) {
-  const message = String(error?.message || '')
-  return (
-    message.includes('Dataset is not loaded in this browser session') ||
-    message.includes('No saved data file handle found') ||
-    message.includes('Saved file reference is stale') ||
-    message.includes('Data file permission was not granted') ||
-    message.includes('Dataset could not be loaded in this browser session')
-  )
 }
 
 async function ensureWorkspaceDatasetReady(workspaceId) {
@@ -121,7 +144,6 @@ async function ensureWorkspaceDatasetReady(workspaceId) {
 
   try {
     await apiService.v1AddDataset(workspaceId, appStore.dataFilePath)
-    return
   } catch (_error) {
     throw new Error('Dataset sync failed: selected file could not be attached to workspace.')
   }
@@ -159,16 +181,12 @@ async function handleSubmit() {
   const questionText = question.value.trim()
   question.value = ''
 
-  // Add user message immediately to show in chat history
   appStore.addChatMessage(questionText, '')
-
   appStore.setLoading(true)
 
-  // Create AbortController for cancellation
   const abortController = new AbortController()
   const signal = abortController.signal
 
-  // Timers for timeout handling
   let warningTimer = null
   let cancelTimer = null
 
@@ -186,18 +204,16 @@ async function handleSubmit() {
       throw new Error('Create/select a workspace before analysis.')
     }
 
-    // Sync dataset metadata only when a dataset is selected.
     await ensureWorkspaceDatasetReady(workspaceId)
 
-    // Set up timeout timers
     warningTimer = setTimeout(() => {
-      toast.warning('Request Taking Longer', 'Your query is taking longer than expected. It will continue processing in the background.')
-    }, 30000) // 30 seconds
+      toast.warning('Request Taking Longer', 'Your query is taking longer than expected.')
+    }, 30000)
 
     cancelTimer = setTimeout(() => {
-      toast.error('Request Cancelled', 'Your query took too long and was cancelled. Please try again.')
+      toast.error('Request Cancelled', 'Your query took too long and was cancelled.')
       abortController.abort()
-    }, 300000) // 5 minutes
+    }, 300000)
 
     let response
     const schemaPayload = buildActiveSchemaPayload()
@@ -228,7 +244,6 @@ async function handleSubmit() {
         }
       )
     } catch (streamError) {
-      // Fallback if streaming fails or is unsupported
       if (streamError?.status === 404 || streamError?.status === 405) {
         response = await apiService.v1Analyze({
           workspace_id: workspaceId,
@@ -251,32 +266,23 @@ async function handleSubmit() {
       await appStore.fetchConversations()
     }
 
-    // Parse the response with new format
-    const { is_safe, is_relevant, code, current_code, explanation } = response
+    const { is_safe, code, current_code, explanation } = response
     const finalCode = (code ?? current_code ?? '').toString()
 
-    // Check if the query is safe and relevant
     if (!is_safe) {
-      // Show the rejection reason in the chat window so user understands why
       appStore.updateLastMessageExplanation(explanation || 'Your query was flagged as potentially unsafe.')
       return
     }
 
-
-
-    // Update the last message with the explanation
     appStore.updateLastMessageExplanation(explanation)
     appStore.setGeneratedCode(finalCode)
-    // Write directly to editor state so UI updates even if generatedCode watcher misses this cycle.
     if (finalCode.trim()) {
       appStore.setPythonFileContent(finalCode)
     }
 
-    // Display the generated code and any execution results from the backend
     if (finalCode && finalCode.trim()) {
       appStore.setTerminalOutput(response.stdout || response.terminal_output || 'Code generated successfully.')
 
-      // Check for result data from server-side execution
       if (response.plotly_figure || (response.result?.data && response.result?.layout)) {
         appStore.setPlotlyFigure(response.plotly_figure || response.result)
         appStore.setResultData(null)
@@ -288,30 +294,23 @@ async function handleSubmit() {
       }
     }
 
-    // Trigger scroll to bottom after message is added
     setTimeout(() => {
-      // Find the scrollable container directly
       const scrollableContainer = document.querySelector('[data-chat-scroll-container]')
       if (scrollableContainer) {
         scrollableContainer.scrollTop = scrollableContainer.scrollHeight
       }
     }, 200)
 
-
-
   } catch (error) {
     console.error('Analysis failed:', error)
 
-    // Clear timers
     if (warningTimer) clearTimeout(warningTimer)
     if (cancelTimer) clearTimeout(cancelTimer)
 
-    // Determine error type and show appropriate toast
     let errorTitle = 'Analysis Failed'
     let errorMessage = 'Failed to generate code. Please try again.'
 
     if (error.name === 'AbortError' || signal.aborted) {
-      // Request was cancelled
       errorTitle = 'Request Cancelled'
       errorMessage = 'Your query was cancelled due to timeout.'
     } else if (error.response?.status === 400) {
@@ -332,36 +331,27 @@ async function handleSubmit() {
     } else if (error.code === 'NETWORK_ERROR' || !navigator.onLine) {
       errorTitle = 'Network Error'
       errorMessage = 'Unable to connect to the server. Please check your internet connection.'
-    } else if (error.code === 'TIMEOUT' || error.code === 'ECONNABORTED') {
-      errorTitle = 'Request Timeout'
-      errorMessage = 'The request took too long. Please try again.'
     }
 
     toast.error(errorTitle, errorMessage)
     appStore.setTerminalOutput(`Error: ${errorMessage}`)
     appStore.updateLastMessageExplanation(errorMessage)
   } finally {
-    // Clear timers
     if (warningTimer) clearTimeout(warningTimer)
     if (cancelTimer) clearTimeout(cancelTimer)
-
     appStore.setLoading(false)
   }
 }
 
 function handleNewLine(event) {
-  // Allow Shift+Enter to create new lines
   const textarea = event.target
   const start = textarea.selectionStart
   const end = textarea.selectionEnd
-  
+
   question.value = question.value.substring(0, start) + '\n' + question.value.substring(end)
-  
-  // Move cursor to after the new line
+
   setTimeout(() => {
     textarea.selectionStart = textarea.selectionEnd = start + 1
   }, 0)
 }
-
-
 </script>

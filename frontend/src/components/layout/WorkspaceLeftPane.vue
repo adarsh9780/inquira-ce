@@ -1,18 +1,20 @@
 <template>
   <div class="flex h-full flex-col">
-    <div class="flex-shrink-0 border-b border-gray-200 bg-white px-4 py-2 flex items-center gap-4">
-      <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 flex-shrink-0">
+    <div class="flex-shrink-0 border-b px-4 py-2 flex items-center gap-4" style="background-color: var(--color-base); border-color: var(--color-border);">
+      <div class="inline-flex rounded-lg border p-1 flex-shrink-0" style="border-color: var(--color-border); background-color: var(--color-base);">
         <button
           @click="appStore.setWorkspacePane('code')"
           class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
-          :class="appStore.workspacePane === 'code' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+          :class="appStore.workspacePane === 'code' ? 'bg-white shadow-sm' : ''"
+          :style="appStore.workspacePane === 'code' ? 'color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
         >
           Code
         </button>
         <button
           @click="appStore.setWorkspacePane('chat')"
           class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
-          :class="appStore.workspacePane === 'chat' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+          :class="appStore.workspacePane === 'chat' ? 'bg-white shadow-sm' : ''"
+          :style="appStore.workspacePane === 'chat' ? 'color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
         >
           Chat
         </button>

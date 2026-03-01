@@ -9,7 +9,7 @@
   >
     <!-- Background overlay -->
     <div
-      class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+      class="modal-overlay"
       @click="closeModal"
     ></div>
 
@@ -20,99 +20,74 @@
         @click.stop
       >
         <!-- Modal Header -->
-        <div class="bg-white px-6 py-4 border-b border-gray-200">
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold text-gray-900" id="modal-title">
+        <div class="modal-header">
+          <div class="flex items-center justify-between w-full">
+            <h3 class="text-base font-semibold" id="modal-title" style="color: var(--color-text-main);">
               Application Settings
             </h3>
             <button
               @click="closeModal"
               :disabled="isSavingSettings || isProgressModalVisible"
-              class="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              class="btn-icon disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <XMarkIcon class="h-6 w-6" />
+              <XMarkIcon class="h-5 w-5" />
             </button>
           </div>
         </div>
 
         <!-- Modal Body -->
-        <div class="bg-white flex flex-1 overflow-hidden">
+        <div class="flex flex-1 overflow-hidden" style="background-color: var(--color-surface);">
           <!-- Sidebar Tabs -->
-          <div class="w-64 bg-gray-50 border-r border-gray-200 flex flex-col">
+          <div class="w-56 shrink-0 border-r flex flex-col" style="background-color: var(--color-base); border-color: var(--color-border);">
             <!-- Tab Navigation -->
-            <nav class="flex-1 px-4 py-6 space-y-2">
+            <nav class="flex-1 px-3 py-4 space-y-1">
               <button
                 @click="activeTab = 'api'"
-                :class="[
-                  'w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors',
-                  activeTab === 'api'
-                    ? 'bg-green-100 text-green-700 border border-green-200'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                ]"
+                :class="activeTab === 'api' ? 'nav-tab-active' : 'nav-tab'"
               >
-                <KeyIcon class="w-5 h-5 mr-3 flex-shrink-0" />
+                <KeyIcon class="w-4 h-4 shrink-0" />
                 <span class="flex-1 text-left">API</span>
-                <!-- Warning indicator for missing API key -->
                 <ExclamationTriangleIcon
                   v-if="!hasApiKey"
-                  class="w-4 h-4 text-yellow-500 flex-shrink-0 ml-2"
+                  class="w-3.5 h-3.5 shrink-0"
+                  style="color: var(--color-warning);"
                   title="API key is required"
                 />
               </button>
 
               <button
                 @click="activeTab = 'data'"
-                :class="[
-                  'w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors',
-                  activeTab === 'data'
-                    ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                ]"
+                :class="activeTab === 'data' ? 'nav-tab-active' : 'nav-tab'"
               >
-                <DocumentArrowUpIcon class="w-5 h-5 mr-3 flex-shrink-0" />
+                <DocumentArrowUpIcon class="w-4 h-4 shrink-0" />
                 <span class="flex-1 text-left">Data</span>
-                <!-- Warning indicator for missing API key -->
                 <ExclamationTriangleIcon
                   v-if="!hasApiKey"
-                  class="w-4 h-4 text-yellow-500 flex-shrink-0 ml-2"
+                  class="w-3.5 h-3.5 shrink-0"
+                  style="color: var(--color-warning);"
                   title="API key is required for data configuration"
                 />
               </button>
 
               <button
                 @click="activeTab = 'account'"
-                :class="[
-                  'w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors',
-                  activeTab === 'account'
-                    ? 'bg-purple-100 text-purple-700 border border-purple-200'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                ]"
+                :class="activeTab === 'account' ? 'nav-tab-active' : 'nav-tab'"
               >
-                <UserIcon class="w-5 h-5 mr-3 flex-shrink-0" />
+                <UserIcon class="w-4 h-4 shrink-0" />
                 <span class="flex-1 text-left">Account</span>
               </button>
             </nav>
 
             <!-- Sidebar Footer -->
-            <div class="px-4 py-4 border-t border-gray-200">
-              <div class="text-xs text-gray-500">
-                <div class="flex items-center mb-2">
-                  <div
-                    :class="[
-                      'w-2 h-2 rounded-full mr-2',
-                      hasApiKey ? 'bg-green-500' : 'bg-yellow-500'
-                    ]"
-                  ></div>
-                  <span>{{ hasApiKey ? 'API Key Set' : 'API Key Missing' }}</span>
+            <div class="px-4 py-4 border-t" style="border-color: var(--color-border);">
+              <div class="space-y-1.5">
+                <div class="flex items-center gap-2">
+                  <span :class="hasApiKey ? 'status-dot status-dot-green' : 'status-dot status-dot-yellow'"></span>
+                  <span class="text-xs" style="color: var(--color-text-muted);">{{ hasApiKey ? 'API Key Set' : 'API Key Missing' }}</span>
                 </div>
-                <div class="flex items-center">
-                  <div
-                    :class="[
-                      'w-2 h-2 rounded-full mr-2',
-                      appStore.canAnalyze ? 'bg-green-500' : 'bg-gray-400'
-                    ]"
-                  ></div>
-                  <span>{{ appStore.canAnalyze ? 'Ready to Analyze' : 'Setup Incomplete' }}</span>
+                <div class="flex items-center gap-2">
+                  <span :class="appStore.canAnalyze ? 'status-dot status-dot-green' : 'status-dot status-dot-muted'"></span>
+                  <span class="text-xs" style="color: var(--color-text-muted);">{{ appStore.canAnalyze ? 'Ready to Analyze' : 'Setup Incomplete' }}</span>
                 </div>
               </div>
             </div>
@@ -122,8 +97,8 @@
           <div class="flex-1 overflow-y-auto">
             <!-- Loading State -->
             <div v-if="isLoadingSettings" class="flex items-center justify-center py-12">
-              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span class="ml-3 text-gray-600">Loading settings...</span>
+              <div class="animate-spin rounded-full h-7 w-7 border-b-2" style="border-color: var(--color-text-main);"></div>
+              <span class="ml-3 text-sm" style="color: var(--color-text-muted);">Loading settings...</span>
             </div>
 
             <!-- Tab Content -->

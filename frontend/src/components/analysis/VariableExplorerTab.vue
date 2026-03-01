@@ -1,17 +1,17 @@
 <template>
-  <div class="flex h-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
+  <div class="flex h-full flex-col overflow-hidden rounded-lg border" style="background-color: var(--color-base); border-color: var(--color-border);">
     <!-- Teleported Header -->
     <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'varex'">
       <div class="flex items-center justify-end w-full">
-        <p class="text-xs text-gray-500 hidden sm:block">Inspect scalars and artifacts from the latest run</p>
+        <p class="text-xs hidden sm:block" style="color: var(--color-text-muted);">Inspect scalars and artifacts from the latest run</p>
       </div>
     </Teleport>
 
     <div class="min-h-0 flex-1 overflow-y-auto p-4">
-      <div v-if="!hasVariables" class="flex h-full items-center justify-center text-center text-gray-500">
+      <div v-if="!hasVariables" class="flex h-full items-center justify-center text-center" style="color: var(--color-text-muted);">
         <div>
           <p class="text-sm">No variables available</p>
-          <p class="mt-1 text-xs text-gray-400">Run code to populate variable explorer.</p>
+          <p class="mt-1 text-xs" style="color: var(--color-text-muted);">Run code to populate variable explorer.</p>
         </div>
       </div>
 
@@ -22,10 +22,10 @@
             <div
               v-for="(scalar, idx) in appStore.scalars"
               :key="`scalar-${idx}-${scalar.name}`"
-              class="rounded border border-gray-200 bg-white p-3"
+              class="rounded border p-3" style="border-color: var(--color-border); background-color: var(--color-surface);"
             >
-              <div class="text-xs font-semibold text-gray-700">{{ scalar.name }}</div>
-              <pre class="mt-1 whitespace-pre-wrap break-words text-xs text-gray-900">{{ formatScalar(scalar.value) }}</pre>
+              <div class="text-xs font-semibold" style="color: var(--color-text-main);">{{ scalar.name }}</div>
+              <pre class="mt-1 whitespace-pre-wrap break-words text-xs" style="color: var(--color-text-main);">{{ formatScalar(scalar.value) }}</pre>
             </div>
           </div>
         </section>
@@ -36,9 +36,9 @@
             <div
               v-for="(df, idx) in appStore.dataframes"
               :key="`df-${idx}-${df.name}`"
-              class="rounded border border-gray-200 bg-white p-3 text-xs text-gray-700"
+              class="rounded border p-3 text-xs" style="border-color: var(--color-border); background-color: var(--color-surface); color: var(--color-text-muted);"
             >
-              <div class="font-semibold text-gray-800">{{ df.name }}</div>
+              <div class="font-semibold" style="color: var(--color-text-main);">{{ df.name }}</div>
               <div class="mt-1 grid grid-cols-2 gap-2">
                 <div>rows: {{ getRowCount(df.data) }}</div>
                 <div>artifact: {{ df.data?.artifact_id || 'inline' }}</div>
@@ -53,9 +53,9 @@
             <div
               v-for="(fig, idx) in appStore.figures"
               :key="`fig-${idx}-${fig.name}`"
-              class="rounded border border-gray-200 bg-white p-3 text-xs text-gray-700"
+              class="rounded border p-3 text-xs" style="border-color: var(--color-border); background-color: var(--color-surface); color: var(--color-text-muted);"
             >
-              <div class="font-semibold text-gray-800">{{ fig.name }}</div>
+              <div class="font-semibold" style="color: var(--color-text-main);">{{ fig.name }}</div>
               <div class="mt-1">traces: {{ Array.isArray(fig.data?.data) ? fig.data.data.length : 0 }}</div>
             </div>
           </div>

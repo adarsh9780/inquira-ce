@@ -11,8 +11,8 @@
       title="Datasets"
     >
       <div class="flex items-center gap-2">
-        <CircleStackIcon class="w-4 h-4 text-gray-500 transition-transform" :class="!isCollapsed && 'scale-110 text-gray-700'" />
-        <span v-if="!isCollapsed" class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Datasets</span>
+        <CircleStackIcon class="w-4 h-4 transition-transform" :class="!isCollapsed && 'scale-110'" style="color: var(--color-text-muted);" />
+        <span v-if="!isCollapsed" class="section-label">Datasets</span>
       </div>
       <button 
         v-if="!isCollapsed && appStore.hasWorkspace"
@@ -27,12 +27,12 @@
 
     <!-- List -->
     <div v-show="!isCollapsed && appStore.hasWorkspace" class="flex flex-col mt-0.5 space-y-0.5 px-2 pb-2">
-      <div v-if="loading" class="px-2 py-2 text-[11px] text-center text-gray-400 flex items-center justify-center gap-2">
-        <div class="animate-spin w-3 h-3 border-2 border-gray-300 border-t-blue-500 rounded-full"></div>
+      <div v-if="loading" class="px-2 py-2 text-[11px] text-center flex items-center justify-center gap-2" style="color: var(--color-text-muted);">
+        <div class="animate-spin w-3 h-3 border-2 rounded-full" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);"></div>
         <span>Loading datasets...</span>
       </div>
 
-      <div v-else-if="datasets.length === 0" class="px-2 py-2 text-xs text-center text-gray-400">
+      <div v-else-if="datasets.length === 0" class="px-2 py-2 text-xs text-center" style="color: var(--color-text-muted);">
         No datasets yet. Add in Settings.
       </div>
       
@@ -46,14 +46,15 @@
         <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5">
           <CheckCircleIcon 
             v-if="ds.file_path === currentDataPath" 
-            class="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" 
+            class="w-3.5 h-3.5 shrink-0 mt-0.5" 
+            style="color: var(--color-success);"
           />
           <div v-else class="w-3.5 h-3.5 shrink-0 mt-0.5"></div>
           <div class="flex-1 min-w-0">
-             <p class="truncate text-xs" :class="ds.file_path === currentDataPath ? 'font-medium text-blue-800' : 'text-gray-700'">
+             <p class="truncate text-xs" :style="ds.file_path === currentDataPath ? 'font-weight:600;color:var(--color-text-main)' : 'color:var(--color-text-muted)'">
               {{ ds.table_name }}
             </p>
-            <p v-if="ds.file_path !== currentDataPath" class="text-[10px] text-gray-400 truncate">{{ formatPath(ds.file_path) }}</p>
+            <p v-if="ds.file_path !== currentDataPath" class="text-[10px] truncate" style="color: var(--color-text-muted);">{{ formatPath(ds.file_path) }}</p>
           </div>
         </div>
       </div>

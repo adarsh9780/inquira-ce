@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
+  <div class="flex h-full flex-col overflow-hidden rounded-lg border" style="background-color: var(--color-base); border-color: var(--color-border);">
     <!-- Terminal Header (Teleported to RightPanel) -->
     <Teleport to="#terminal-toolbar" v-if="isMounted && !(useTauriPty && appStore.terminalConsentGranted)">
       <div class="flex items-center gap-2 text-[10px] sm:text-xs text-gray-600">
@@ -86,8 +86,8 @@
         </form>
       </div>
 
-      <div class="border-t border-gray-200 bg-white px-3 py-2">
-        <div class="flex items-center justify-between text-xs text-gray-600">
+      <div class="border-t px-3 py-2" style="border-color: var(--color-border); background-color: var(--color-base);">
+        <div class="flex items-center justify-between text-xs" style="color: var(--color-text-muted);">
           <span>Shell: {{ shellLabel }}</span>
           <div class="flex items-center gap-2">
             <button

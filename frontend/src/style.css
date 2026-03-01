@@ -62,32 +62,134 @@ body {
 
   /* Base Button - The foundation for all interactive elements */
   .btn {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2;
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2;
   }
 
   /* Primary Button - High emphasis actions (e.g., Save, Submit, Create) */
   .btn-primary {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 bg-zinc-900 text-white shadow-sm hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-900;
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none bg-zinc-900 text-white shadow-sm hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-900;
   }
 
   /* Secondary Button - Medium emphasis actions (e.g., Cancel, Refresh) */
   .btn-secondary {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 bg-white text-zinc-800 border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none bg-white text-zinc-800 border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   /* Ghost Button - Low emphasis actions (e.g., subtle navigation, links) */
   .btn-ghost {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 bg-transparent text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none bg-transparent text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   /* Icon Button - For small controls in headers and sidebars */
   .btn-icon {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 p-1.5 text-zinc-500 hover:bg-zinc-200/50 hover:text-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center rounded-md transition-all duration-150 p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   /* Danger Button - For destructive actions */
   .btn-danger {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 bg-red-600 text-white shadow-sm border border-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none bg-red-600 text-white shadow-sm border border-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* ============================================================
+     Modal primitives — use in every dialog/sheet
+     ============================================================ */
+
+  /* Semi-transparent backdrop */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity;
+  }
+
+  /* Modal card shell */
+  .modal-card {
+    background-color: var(--color-surface);
+    @apply relative rounded-xl shadow-2xl border overflow-hidden;
+    border-color: var(--color-border);
+  }
+
+  /* Modal header row */
+  .modal-header {
+    @apply px-6 py-4 flex items-center justify-between border-b;
+    border-color: var(--color-border);
+  }
+
+  /* Modal footer row */
+  .modal-footer {
+    @apply px-6 py-4 flex items-center justify-end gap-3 border-t;
+    border-color: var(--color-border);
+    background-color: var(--color-base);
+  }
+
+  /* ============================================================
+     Settings sidebar nav tab
+     ============================================================ */
+
+  /* Default nav tab */
+  .nav-tab {
+    @apply w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors gap-3;
+    color: var(--color-text-muted);
+  }
+
+  .nav-tab:hover {
+    background-color: color-mix(in srgb, var(--color-text-main) 6%, transparent);
+    color: var(--color-text-main);
+  }
+
+  /* Active nav tab */
+  .nav-tab-active {
+    @apply w-full flex items-center px-3 py-2 text-sm font-semibold rounded-lg gap-3;
+    background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent);
+    color: var(--color-text-main);
+  }
+
+  /* ============================================================
+     Form inputs — all text inputs, textareas, selects
+     ============================================================ */
+
+  .input-base {
+    @apply w-full rounded-lg px-3 py-2 text-sm transition-all focus:outline-none;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-main);
+  }
+
+  .input-base::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  .input-base:focus {
+    border-color: var(--color-border-hover);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-text-main) 6%, transparent);
+  }
+
+  /* ============================================================
+     Section label — small uppercase section headings
+     ============================================================ */
+  .section-label {
+    @apply text-xs font-semibold uppercase tracking-wider;
+    color: var(--color-text-muted);
+  }
+
+  /* ============================================================
+     Status dots
+     ============================================================ */
+  .status-dot {
+    @apply w-2 h-2 rounded-full shrink-0;
+  }
+
+  .status-dot-green {
+    background-color: var(--color-success);
+  }
+
+  .status-dot-yellow {
+    background-color: var(--color-warning);
+  }
+
+  .status-dot-red {
+    background-color: var(--color-error);
+  }
+
+  .status-dot-muted {
+    background-color: var(--color-border-hover);
   }
 }
 

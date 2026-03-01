@@ -16,5 +16,5 @@ test('chat tab uses compact header controls without history modal', () => {
   assert.equal(source.includes('flex flex-wrap items-center'), false)
   assert.equal(source.includes('overflow-x-auto'), false)
   assert.equal(source.includes('class="min-w-0 truncate text-sm font-bold text-gray-900'), false)
-  assert.equal(source.includes('class="flex-1 min-h-0 overflow-y-auto bg-gray-50/30"'), true)
+  assert.equal(source.includes('data-chat-scroll-container'), true)
 })

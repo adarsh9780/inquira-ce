@@ -1,20 +1,22 @@
 <template>
   <div
-    class="flex flex-col border-r border-gray-200 bg-gray-50 transition-all duration-300 h-full shrink-0 z-40 shadow-sm relative overflow-visible"
+    class="flex flex-col border-r transition-all duration-300 h-full shrink-0 z-40 shadow-sm relative overflow-visible"
     :class="appStore.isSidebarCollapsed ? 'w-16' : 'w-64'"
+    style="background-color: var(--color-base); border-color: var(--color-border);"
   >
     <!-- Top Section: Brand & Header -->
     <div 
-      class="h-16 flex items-center px-3 border-b border-gray-200 shrink-0 cursor-pointer hover:bg-gray-100 transition-colors"
+      class="h-16 flex items-center px-3 border-b shrink-0 cursor-pointer hover:bg-zinc-100/70 transition-colors"
       @click="toggleSidebar"
-      title="Toggle Sidebar"
+      style="border-color: var(--color-border);"
+      title="Click to collapse/expand"
     >
       <div class="flex items-center justify-center w-full">
         <div class="flex items-center min-w-0" :class="appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start w-full'">
           <img :src="logo" alt="Inquira Logo" class="w-8 h-8 rounded shrink-0 shadow-sm" />
           <div v-show="!appStore.isSidebarCollapsed" class="ml-3 truncate">
-            <h1 class="text-sm font-bold text-gray-800 tracking-tight leading-none">Inquira</h1>
-            <p class="text-[10px] text-gray-500 font-medium mt-0.5">LLM-Powered Analysis</p>
+            <h1 class="text-sm font-bold tracking-tight leading-none" style="color: var(--color-text-main);">Inquira</h1>
+            <p class="text-[10px] font-medium mt-0.5" style="color: var(--color-text-muted);">LLM-Powered Analysis</p>
           </div>
         </div>
       </div>
@@ -47,12 +49,12 @@
     </div>
 
     <!-- Bottom Section: Schema Link & User Menu -->
-    <div class="border-t border-gray-200 bg-gray-100/50 p-2 shrink-0 flex flex-col gap-2">
+    <div class="border-t p-2 shrink-0 flex flex-col gap-2" style="border-color: var(--color-border); background-color: var(--color-base);">
       <!-- Schema Editor Link -->
       <button
         @click="handleTabClick('schema-editor')"
-        class="w-full flex items-center justify-between p-2 rounded-lg transition-colors border"
-        :class="appStore.activeTab === 'schema-editor' ? 'bg-white border-gray-200 shadow-sm text-blue-600' : 'border-transparent text-gray-600 hover:bg-gray-200/50'"
+        class="w-full flex items-center justify-between p-2 rounded-lg transition-colors"
+        :style="appStore.activeTab === 'schema-editor' ? 'background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent); color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
         title="Schema Editor"
       >
         <div class="flex items-center gap-2 min-w-0" :class="appStore.isSidebarCollapsed ? 'justify-center w-full' : ''">
@@ -75,23 +77,24 @@
             </div>
             
             <div v-show="!appStore.isSidebarCollapsed" class="flex-1 text-left truncate">
-              <p class="text-xs font-semibold text-gray-800 truncate">{{ authStore.username }}</p>
-              <p class="text-[10px] text-gray-500 truncate">{{ authStore.planLabel }}</p>
+          <p class="text-xs font-semibold truncate" style="color: var(--color-text-main);">{{ authStore.username }}</p>
+              <p class="text-[10px] truncate" style="color: var(--color-text-muted);">{{ authStore.planLabel }}</p>
             </div>
           </div>
-          <ChevronUpIcon v-show="!appStore.isSidebarCollapsed" class="h-3.5 w-3.5 text-gray-400 shrink-0" />
+          <ChevronUpIcon v-show="!appStore.isSidebarCollapsed" class="h-3.5 w-3.5 shrink-0" style="color: var(--color-text-muted);" />
         </button>
 
         <!-- Dropdown Menu (Renders above the button) -->
         <div
           v-if="isUserMenuOpen"
-          class="absolute bottom-full left-0 mb-2 w-56 bg-white rounded-lg shadow-xl ring-1 ring-black/5 z-50 border border-gray-100 overflow-hidden text-left"
+          class="absolute bottom-full left-0 mb-2 w-56 rounded-xl shadow-xl z-50 overflow-hidden text-left"
+          style="background-color: var(--color-surface); border: 1px solid var(--color-border);"
           @click.stop
         >
           <!-- User Info Header -->
-          <div class="px-3 py-2.5 border-b border-gray-100 bg-gray-50/50">
-            <p class="text-sm font-semibold text-gray-800">{{ authStore.username }}</p>
-            <p class="text-[10px] bg-blue-100 text-blue-700 font-medium px-1.5 py-0.5 rounded w-max mt-0.5">{{ authStore.planLabel }}</p>
+          <div class="px-3 py-2.5 border-b" style="border-color: var(--color-border); background-color: var(--color-base);">
+            <p class="text-sm font-semibold" style="color: var(--color-text-main);">{{ authStore.username }}</p>
+            <p class="text-[10px] font-medium px-1.5 py-0.5 rounded w-max mt-0.5" style="background-color: color-mix(in srgb, var(--color-accent) 12%, transparent); color: var(--color-accent);">{{ authStore.planLabel }}</p>
           </div>
 
           <!-- Configuration Status Overview -->
@@ -109,21 +112,23 @@
           <div class="py-1">
             <button
               @click="openSettings('api')"
-              class="flex items-center w-full px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              class="flex items-center w-full px-4 py-2 text-xs font-medium transition-colors hover:bg-zinc-50"
+              style="color: var(--color-text-main);"
             >
-              <CogIcon class="h-4 w-4 mr-2.5 text-gray-400" />
+              <CogIcon class="h-4 w-4 mr-2.5" style="color: var(--color-text-muted);" />
               Settings
             </button>
 
             <button
               @click="openTerms"
-              class="flex items-center w-full px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              class="flex items-center w-full px-4 py-2 text-xs font-medium transition-colors hover:bg-zinc-50"
+              style="color: var(--color-text-main);"
             >
-              <DocumentTextIcon class="h-4 w-4 mr-2.5 text-gray-400" />
+              <DocumentTextIcon class="h-4 w-4 mr-2.5" style="color: var(--color-text-muted);" />
               Terms &amp; Conditions
             </button>
 
-            <div class="border-t border-gray-100 my-1"></div>
+            <div class="border-t my-1" style="border-color: var(--color-border);"></div>
 
             <button
               @click="handleLogout"

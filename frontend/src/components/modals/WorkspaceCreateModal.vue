@@ -5,48 +5,36 @@
     role="dialog"
     aria-modal="true"
   >
-    <div class="fixed inset-0 bg-gray-500 bg-opacity-70" @click="closeModal"></div>
+    <div class="modal-overlay" @click="closeModal"></div>
 
     <div class="flex min-h-full items-center justify-center p-4">
-      <div class="relative w-full max-w-md rounded-xl bg-white shadow-xl" @click.stop>
-        <div class="border-b border-gray-200 px-5 py-4">
-          <h3 class="text-base font-semibold text-gray-900">Create Workspace</h3>
-          <p class="mt-1 text-sm text-gray-500">
+      <div class="relative w-full max-w-md modal-card" @click.stop>
+        <div class="modal-header flex-col items-start">
+          <h3 class="text-base font-semibold" style="color: var(--color-text-main);">Create Workspace</h3>
+          <p class="mt-1 text-sm" style="color: var(--color-text-muted);">
             Organize datasets and chats in a dedicated workspace.
           </p>
         </div>
 
         <div class="px-5 py-4 space-y-3">
-          <label for="workspace-name" class="text-sm font-medium text-gray-700">Workspace Name</label>
+          <label for="workspace-name" class="text-sm font-medium" style="color: var(--color-text-main);">Workspace Name</label>
           <input
             id="workspace-name"
             ref="nameInputRef"
             v-model="name"
             type="text"
             maxlength="120"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="input-base"
             placeholder="e.g. IPL Analytics"
             @keydown.enter.prevent="submit"
           />
-          <p class="text-xs text-gray-500">{{ planLabel }} plan</p>
+          <p class="text-xs" style="color: var(--color-text-muted);">{{ planLabel }} plan</p>
         </div>
 
-        <div class="flex justify-end gap-2 border-t border-gray-200 px-5 py-4">
-          <button
-            type="button"
-            class="btn-secondary"
-            :disabled="isSubmitting"
-            @click="closeModal"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            class="btn-primary"
-            :disabled="isSubmitting || !name.trim()"
-            @click="submit"
-          >
-            {{ isSubmitting ? 'Creating...' : 'Create Workspace' }}
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary text-sm px-4 py-2" :disabled="isSubmitting" @click="closeModal">Cancel</button>
+          <button type="button" class="btn-primary text-sm px-4 py-2" :disabled="isSubmitting || !name.trim()" @click="submit">
+            {{ isSubmitting ? 'Creating…' : 'Create Workspace' }}
           </button>
         </div>
       </div>

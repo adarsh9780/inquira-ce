@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-full min-w-0 bg-white rounded-xl overflow-hidden">
+  <div class="flex h-full min-w-0 rounded-xl overflow-hidden" style="background-color: var(--color-base);">
     <div class="flex-1 min-w-0 flex flex-col">
     <Teleport to="#workspace-left-pane-toolbar" v-if="isMounted && appStore.workspacePane === 'chat'">
       <div class="flex items-center w-full justify-end">
@@ -36,14 +36,14 @@
       </div>
     </Teleport>
 
-      <div class="flex-1 min-h-0 overflow-y-auto bg-gray-50/30" data-chat-scroll-container>
+      <div class="flex-1 min-h-0 overflow-y-auto" style="background-color: var(--color-base);" data-chat-scroll-container>
         <div v-if="!appStore.hasWorkspace" class="flex items-center justify-center h-full px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-2 sm:pb-3 lg:pb-4">
           <div class="text-center max-w-md">
             <div class="mx-auto flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 mb-4 sm:mb-6 shadow-lg">
               <ChatBubbleLeftRightIcon class="h-8 w-8 sm:h-10 sm:w-10 text-amber-700" />
             </div>
-            <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-2 sm:mb-3">Create a Workspace First</h3>
-            <p class="text-sm sm:text-base text-gray-600 leading-relaxed">
+            <h3 class="text-xl sm:text-2xl font-bold mb-2 sm:mb-3" style="color: var(--color-text-main);">Create a Workspace First</h3>
+            <p class="text-sm sm:text-base leading-relaxed" style="color: var(--color-text-muted);">
               Open the workspace dropdown in the header and create your first workspace before starting analysis.
             </p>
           </div>
@@ -54,8 +54,8 @@
             <div class="mx-auto flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 mb-4 sm:mb-6 shadow-lg">
               <ChatBubbleLeftRightIcon class="h-8 w-8 sm:h-10 sm:w-10 text-blue-600" />
             </div>
-            <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-2 sm:mb-3">Start Your Analysis</h3>
-            <p class="text-sm sm:text-base text-gray-600 leading-relaxed">
+            <h3 class="text-xl sm:text-2xl font-bold mb-2 sm:mb-3" style="color: var(--color-text-main);">Start Your Analysis</h3>
+            <p class="text-sm sm:text-base leading-relaxed" style="color: var(--color-text-muted);">
               Point Inquira at your local dataset path, add your OpenRouter API key in Settings, then ask a question to generate code and insights.
             </p>
           </div>
@@ -66,7 +66,7 @@
         </div>
       </div>
 
-      <div class="flex-shrink-0 border-t border-gray-100 bg-white pt-2 sm:pt-3">
+      <div class="flex-shrink-0 border-t pt-2 sm:pt-3" style="background-color: var(--color-base); border-color: var(--color-border);">
         <ChatInput />
       </div>
     </div>

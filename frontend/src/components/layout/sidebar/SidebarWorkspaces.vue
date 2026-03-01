@@ -8,8 +8,8 @@
       title="Workspaces"
     >
       <div class="flex items-center gap-2">
-        <RectangleGroupIcon class="w-4 h-4 text-gray-500 transition-transform" :class="!isCollapsed && 'scale-110 text-gray-700'" />
-        <span v-if="!isCollapsed" class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Workspaces</span>
+        <RectangleGroupIcon class="w-4 h-4 transition-transform" :class="!isCollapsed && 'scale-110'" style="color: var(--color-text-muted);"/>
+        <span v-if="!isCollapsed" class="section-label">Workspaces</span>
       </div>
       <button 
         v-if="!isCollapsed"
@@ -32,7 +32,7 @@
         <span class="truncate">Deleting workspace...</span>
       </div>
 
-      <div v-if="appStore.workspaces.length === 0" class="px-2 py-2 text-xs text-center text-gray-400">
+      <div v-if="appStore.workspaces.length === 0" class="px-2 py-2 text-xs text-center" style="color: var(--color-text-muted);">
         No workspaces yet
       </div>
       
@@ -49,10 +49,11 @@
         <div class="flex items-center gap-2 min-w-0 pr-2">
           <CheckCircleIcon 
             v-if="ws.id === appStore.activeWorkspaceId" 
-            class="w-3.5 h-3.5 text-green-500 shrink-0" 
+            class="w-3.5 h-3.5 shrink-0" 
+            style="color: var(--color-success);"
           />
           <div v-else class="w-3.5 h-3.5 shrink-0"></div>
-          <span class="truncate text-xs" :class="ws.id === appStore.activeWorkspaceId ? 'font-medium text-blue-800' : 'text-gray-700'">
+          <span class="truncate text-xs" :style="ws.id === appStore.activeWorkspaceId ? 'font-weight: 600; color: var(--color-text-main);' : 'color: var(--color-text-muted);'">
             {{ ws.name }}
           </span>
         </div>

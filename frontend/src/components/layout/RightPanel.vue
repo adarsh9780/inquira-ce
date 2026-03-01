@@ -1,5 +1,5 @@
 <template>
-  <div ref="panelRef" class="flex flex-col h-full bg-white overflow-hidden relative">
+  <div ref="panelRef" class="flex flex-col h-full overflow-hidden relative" style="background-color: var(--color-base);">
     
     <!-- Top Workspace Area (Chat/Code & Data Panes) -->
     <div 
@@ -9,15 +9,15 @@
     >
       <!-- Left Pane (Chat / Code) -->
       <div 
-        class="flex flex-col h-full border-r border-gray-200" 
-        :style="{ width: appStore.leftPaneWidth + '%' }"
+        class="flex flex-col h-full border-r" 
+        :style="{ width: appStore.leftPaneWidth + '%', borderColor: 'var(--color-border)' }"
       >
         <WorkspaceLeftPane />
       </div>
 
       <!-- Vertical Resizer Handle (Left/Right panes) -->
       <div 
-        class="w-[3px] h-full hover:w-1 bg-transparent hover:bg-blue-400 cursor-col-resize z-10 transition-all duration-150 relative -mx-[1px] hover:shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+        class="w-[3px] h-full hover:w-1 bg-transparent hover:bg-zinc-300 cursor-col-resize z-10 transition-all duration-150 relative -mx-[1px] hover:shadow-[0_0_6px_rgba(0,0,0,0.15)]"
         @mousedown="startResizeX"
       ></div>
 
@@ -33,18 +33,18 @@
     <!-- Horizontal Resizer Handle (Workspace/Terminal panes) -->
     <div
       v-show="appStore.activeTab === 'workspace' && appStore.isTerminalOpen"
-      class="h-[3px] w-full hover:h-1 bg-transparent hover:bg-blue-400 cursor-row-resize z-20 transition-all duration-150 relative -my-[1px] hover:shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+      class="h-[3px] w-full hover:h-1 bg-transparent hover:bg-zinc-300 cursor-row-resize z-20 transition-all duration-150 relative -my-[1px] hover:shadow-[0_0_6px_rgba(0,0,0,0.15)]"
       @mousedown="startResizeY"
     ></div>
 
     <!-- Bottom Pane (Terminal View) -->
     <div
       v-show="appStore.isTerminalOpen && appStore.activeTab === 'workspace'"
-      class="w-full flex flex-col bg-white border-t border-gray-200 z-10 overflow-hidden"
-      :style="{ height: appStore.terminalHeight + '%' }"
+      class="w-full flex flex-col border-t z-10 overflow-hidden"
+      :style="{ height: appStore.terminalHeight + '%', borderColor: 'var(--color-border)', backgroundColor: 'var(--color-base)' }"
     >
-      <div class="flex justify-between items-center px-4 py-1.5 bg-gray-50 border-b border-gray-200">
-        <div class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+      <div class="flex justify-between items-center px-4 py-1.5 border-b" style="background-color: var(--color-base); border-color: var(--color-border);">
+        <div class="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5" style="color: var(--color-text-muted);">
           <CommandLineIcon class="w-3.5 h-3.5" />
           Terminal
         </div>
@@ -54,7 +54,7 @@
 
         <button 
           @click="appStore.toggleTerminal()" 
-          class="text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-200 transition-colors"
+          class="btn-icon"
           title="Close Terminal"
         >
           <XMarkIcon class="w-4 h-4" />
@@ -66,7 +66,7 @@
     </div>
 
     <!-- Other Full-Screen Views (Schema) -->
-    <div v-show="appStore.activeTab !== 'workspace'" class="relative flex-1 overflow-hidden bg-gray-50/50">
+    <div v-show="appStore.activeTab !== 'workspace'" class="relative flex-1 overflow-hidden" style="background-color: var(--color-base);">
       <div v-show="appStore.activeTab === 'schema-editor'" class="h-full p-3 sm:p-4">
         <SchemaEditorTab />
       </div>

@@ -11,8 +11,8 @@
       title="Conversations"
     >
       <div class="flex items-center gap-2">
-        <ChatBubbleLeftRightIcon class="w-4 h-4 text-gray-500 transition-transform" :class="!isCollapsed && 'scale-110 text-gray-700'" />
-        <span v-if="!isCollapsed" class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Conversations</span>
+        <ChatBubbleLeftRightIcon class="w-4 h-4 transition-transform" :class="!isCollapsed && 'scale-110'" style="color: var(--color-text-muted);" />
+        <span v-if="!isCollapsed" class="section-label">Conversations</span>
       </div>
       <button 
         v-if="!isCollapsed && appStore.hasWorkspace"
@@ -27,7 +27,7 @@
 
     <!-- List -->
     <div v-show="!isCollapsed && appStore.hasWorkspace" class="flex flex-col mt-0.5 space-y-0.5 px-2 pb-2 overflow-y-auto flex-1">
-      <div v-if="appStore.conversations.length === 0" class="px-2 py-2 text-xs text-center text-gray-400">
+      <div v-if="appStore.conversations.length === 0" class="px-2 py-2 text-xs text-center" style="color: var(--color-text-muted);">
         No conversations yet.
       </div>
       
@@ -41,7 +41,8 @@
         <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5" @dblclick="startEditing(conv)">
           <CheckCircleIcon 
             v-if="conv.id === appStore.activeConversationId" 
-            class="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" 
+            class="w-3.5 h-3.5 shrink-0 mt-0.5" 
+            style="color: var(--color-success);"
           />
           <div v-else class="w-3.5 h-3.5 shrink-0 mt-0.5"></div>
           <div class="flex-1 min-w-0">
@@ -49,7 +50,7 @@
                <input
                  :ref="(el) => { if (el) editInputs[conv.id] = el }"
                  v-model="editingTitleValue"
-                 class="w-full bg-white px-1 py-0.5 text-xs font-semibold text-gray-900 border border-blue-400 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
+                 class="input-base py-0.5 px-1 text-xs font-semibold"
                  @keydown.enter.prevent="saveTitle(conv.id)"
                  @keydown.esc.prevent="cancelEditing"
                  @blur="saveTitle(conv.id)"
@@ -58,13 +59,13 @@
              </div>
              <template v-else>
                <p 
-                 class="truncate text-xs" 
-                 :class="conv.id === appStore.activeConversationId ? 'font-medium text-blue-800' : 'text-gray-700'"
-                 :title="conv.title || 'Conversation'"
-               >
-                 {{ conv.title || 'Conversation' }}
-               </p>
-               <p class="text-[9px] text-gray-400 truncate">{{ formatTimestamp(conv.updated_at || conv.created_at) }}</p>
+                  class="truncate text-xs" 
+                  :style="conv.id === appStore.activeConversationId ? 'font-weight: 600; color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
+                  :title="conv.title || 'Conversation'"
+                >
+                  {{ conv.title || 'Conversation' }}
+                </p>
+                <p class="text-[9px] truncate" style="color: var(--color-text-muted);">{{ formatTimestamp(conv.updated_at || conv.created_at) }}</p>
              </template>
           </div>
         </div>
