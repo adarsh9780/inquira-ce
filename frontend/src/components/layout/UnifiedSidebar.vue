@@ -130,9 +130,9 @@
           class="w-full flex items-center justify-between p-1.5 rounded-lg hover:bg-white border border-transparent hover:border-gray-200 transition-colors"
           title="Account & Settings"
         >
-          <div class="flex items-center gap-2 truncate">
-            <div class="relative">
-              <div class="w-7 h-7 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center shrink-0 shadow-sm text-white font-medium text-xs">
+          <div class="flex items-center gap-2 min-w-0">
+            <div class="relative shrink-0">
+              <div class="w-7 h-7 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center shadow-sm text-white font-medium text-xs">
                 {{ authStore.username ? authStore.username.charAt(0).toUpperCase() : 'U' }}
               </div>
               <!-- Status Dot Overlay on Avatar -->
