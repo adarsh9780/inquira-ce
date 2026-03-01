@@ -28,7 +28,7 @@ host = "localhost"
 
 [execution]
 # Switch execution backend without code changes.
-# Supported values: "local_jupyter", "local_subprocess"
+# Supported values: "local_jupyter"
 provider = "local_jupyter"
 
 [execution.runner]

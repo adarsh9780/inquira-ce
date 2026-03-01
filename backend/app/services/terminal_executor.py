@@ -11,7 +11,7 @@ import shutil
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncIterator, Awaitable, Callable
 
 from app.core.logger import logprint
 
@@ -66,8 +66,30 @@ class TerminalSessionManager:
         base = Path(workspace_dir).resolve()
         if not cwd:
             return str(base)
-        requested = Path(cwd).expanduser()
-        resolved = requested.resolve() if requested.is_absolute() else (base / requested).resolve()
+        return TerminalSessionManager.resolve_workspace_cwd(
+            workspace_dir=workspace_dir,
+            cwd=cwd,
+            current_cwd=str(base),
+        )
+
+    @staticmethod
+    def resolve_workspace_cwd(
+        *,
+        workspace_dir: str,
+        cwd: str | None,
+        current_cwd: str | None = None,
+    ) -> str:
+        base = Path(workspace_dir).resolve()
+        anchor = Path(current_cwd).resolve() if current_cwd else base
+        if not cwd:
+            resolved = anchor
+        else:
+            requested = Path(cwd).expanduser()
+            resolved = requested.resolve() if requested.is_absolute() else (anchor / requested).resolve()
+        try:
+            resolved.relative_to(base)
+        except ValueError as exc:
+            raise PermissionError("cwd must stay within the workspace directory.") from exc
         return str(resolved)
 
     async def _start_session(self, session_key: str, workspace_dir: str) -> TerminalSession:
@@ -142,6 +164,26 @@ class TerminalSessionManager:
             f"printf '__INQUIRA_CWD__{token}__%s\\n' \"$PWD\"\n"
         )
 
+    @staticmethod
+    def _parse_first_command_tokens(command: str) -> list[str]:
+        try:
+            return shlex.split(command, posix=os.name != "nt")
+        except Exception:
+            return command.split()
+
+    def _validate_inline_cd_command(self, *, session: TerminalSession, command: str) -> None:
+        tokens = self._parse_first_command_tokens(command)
+        if not tokens or tokens[0].lower() != "cd":
+            return
+        if len(tokens) > 2:
+            raise ValueError("cd command accepts at most one path argument.")
+        target = tokens[1] if len(tokens) == 2 else session.workspace_dir
+        self.resolve_workspace_cwd(
+            workspace_dir=session.workspace_dir,
+            cwd=target,
+            current_cwd=session.cwd,
+        )
+
     async def run_command(
         self,
         *,
@@ -150,6 +192,7 @@ class TerminalSessionManager:
         workspace_dir: str,
         cwd: str | None = None,
         timeout: int = 120,
+        on_output_line: Callable[[str], Awaitable[None]] | None = None,
     ) -> dict[str, Any]:
         trimmed = (command or "").strip()
         if not trimmed:
@@ -166,6 +209,7 @@ class TerminalSessionManager:
             }
 
         session = await self.get_or_start_session(session_key=session_key, workspace_dir=workspace_dir)
+        self._validate_inline_cd_command(session=session, command=trimmed)
         token = uuid.uuid4().hex[:12]
         payload = self._wrap_command(mode=session.mode, command=trimmed, token=token)
 
@@ -192,7 +236,11 @@ class TerminalSessionManager:
 
             # If caller requested cwd, cd first in current persistent shell.
             if cwd:
-                target_cwd = self.normalize_workspace_cwd(session.workspace_dir, cwd)
+                target_cwd = self.resolve_workspace_cwd(
+                    workspace_dir=session.workspace_dir,
+                    cwd=cwd,
+                    current_cwd=session.cwd,
+                )
                 if target_cwd != session.cwd:
                     if session.mode == "powershell":
                         escaped = target_cwd.replace("'", "''")
@@ -238,6 +286,8 @@ class TerminalSessionManager:
                         continue
 
                     stdout_lines.append(line)
+                    if on_output_line is not None:
+                        await on_output_line(line)
 
                     if done_seen and cwd_seen:
                         break
@@ -260,6 +310,44 @@ class TerminalSessionManager:
             "timed_out": timed_out,
             "persistent": True,
         }
+
+    async def run_command_stream(
+        self,
+        *,
+        session_key: str,
+        command: str,
+        workspace_dir: str,
+        cwd: str | None = None,
+        timeout: int = 120,
+    ) -> AsyncIterator[dict[str, Any]]:
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+        async def on_output_line(line: str) -> None:
+            await queue.put({"type": "output", "line": line})
+
+        async def worker() -> None:
+            try:
+                result = await self.run_command(
+                    session_key=session_key,
+                    command=command,
+                    workspace_dir=workspace_dir,
+                    cwd=cwd,
+                    timeout=timeout,
+                    on_output_line=on_output_line,
+                )
+                await queue.put({"type": "final", "result": result})
+            except Exception as exc:
+                await queue.put({"type": "error", "error": str(exc)})
+
+        worker_task = asyncio.create_task(worker())
+        try:
+            while True:
+                event = await queue.get()
+                yield event
+                if event.get("type") in {"final", "error"}:
+                    break
+        finally:
+            await worker_task
 
 
 _terminal_session_manager = TerminalSessionManager()
@@ -310,3 +398,30 @@ async def run_workspace_terminal_command(
         cwd=cwd,
         timeout=timeout,
     )
+
+
+async def stream_workspace_terminal_command(
+    *,
+    user_id: str,
+    workspace_id: str,
+    command: str,
+    workspace_dir: str,
+    cwd: str | None = None,
+    timeout: int = 120,
+) -> AsyncIterator[dict[str, Any]]:
+    session_key = make_terminal_session_key(user_id=user_id, workspace_id=workspace_id)
+    logprint(
+        "Terminal command streaming execution",
+        level="INFO",
+        workspace_id=workspace_id,
+        user_id=user_id,
+        command_preview=command[:200],
+    )
+    async for event in _terminal_session_manager.run_command_stream(
+        session_key=session_key,
+        command=command,
+        workspace_dir=workspace_dir,
+        cwd=cwd,
+        timeout=timeout,
+    ):
+        yield event

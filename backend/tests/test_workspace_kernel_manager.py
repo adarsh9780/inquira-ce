@@ -377,3 +377,34 @@ async def test_execute_on_session_surfaces_artifact_sync_error():
     assert payload["variables"]["dataframes"] == {}
     assert payload["variables"]["figures"] == {}
     assert payload["variables"]["scalars"]["_artifact_sync_error"] == "artifact sync failed"
+
+
+@pytest.mark.asyncio
+async def test_shutdown_session_attempts_kernel_resource_cleanup_before_shutdown():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-clean", "/tmp/a.duckdb")
+    events: list[str] = []
+
+    class FakeClient:
+        def stop_channels(self):
+            events.append("stop_channels")
+
+    class FakeKernelManager:
+        async def shutdown_kernel(self, now=True):
+            _ = now
+            events.append("shutdown_kernel")
+
+    session.client = FakeClient()
+    session.manager = FakeKernelManager()
+
+    async def fake_execute_request(current_session, code):
+        _ = current_session
+        if "artifact_conn.close()" in code and "conn.close()" in code:
+            events.append("cleanup_code")
+        return ParsedExecutionOutput()
+
+    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
+
+    await manager._shutdown_session(session)
+
+    assert events == ["cleanup_code", "stop_channels", "shutdown_kernel"]

@@ -189,6 +189,22 @@ for _stale_name in list(_inquira_fig_artifacts.keys()):
 _bundle
 """
 
+_KERNEL_RESOURCE_CLEANUP_CODE = """
+try:
+    if "artifact_conn" in globals() and artifact_conn is not None:
+        artifact_conn.close()
+except Exception:
+    pass
+
+try:
+    if "conn" in globals() and conn is not None:
+        conn.close()
+except Exception:
+    pass
+
+None
+"""
+
 
 @dataclass
 class WorkspaceKernelSession:
@@ -567,6 +583,15 @@ class WorkspaceKernelManager:
             session.status = "ready"
 
     async def _shutdown_session(self, session: WorkspaceKernelSession) -> None:
+        try:
+            async with session.lock:
+                await asyncio.wait_for(
+                    self._execute_request(session, _KERNEL_RESOURCE_CLEANUP_CODE),
+                    timeout=2,
+                )
+        except Exception:
+            # Best-effort cleanup: continue with forced kernel shutdown.
+            pass
         try:
             session.client.stop_channels()
         except Exception:

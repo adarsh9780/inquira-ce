@@ -12,6 +12,7 @@ from typing import Any
 
 import duckdb
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,6 +36,7 @@ from ...services.execution_config import load_execution_runtime_config
 from ...services.runner_env import install_runner_package
 from ...services.terminal_executor import (
     run_workspace_terminal_command,
+    stream_workspace_terminal_command,
     stop_workspace_terminal_session,
 )
 from ...core.logger import logprint
@@ -182,6 +184,19 @@ _DEFAULT_TERMINAL_DENYLIST = [
     r"(^|\\s)rm\\s+-rf\\s+/",
     r":\\(\\)\\s*\\{\\s*:\\|:\\s*&\\s*\\};:",
 ]
+_DEFAULT_TERMINAL_ALLOWLIST = {
+    "uv",
+    "python",
+    "python3",
+    "py",
+    "pip",
+    "pip3",
+    "ls",
+    "grep",
+    "cd",
+    "pwd",
+}
+_BLOCKED_TERMINAL_SYNTAX_RE = re.compile(r"(&&|\|\||;|>|<|`|\$\(|\r|\n)")
 
 
 def _normalize_table_name(raw: str) -> str:
@@ -531,14 +546,18 @@ async def execute_workspace_terminal_command(
     runtime = load_execution_runtime_config()
     _enforce_terminal_command_policy(payload.command, runtime)
     workspace_dir = str(Path(workspace.duckdb_path).parent)
-    result = await run_workspace_terminal_command(
-        user_id=current_user.id,
-        workspace_id=workspace_id,
-        command=payload.command,
-        workspace_dir=workspace_dir,
-        cwd=payload.cwd,
-        timeout=payload.timeout,
-    )
+    _validate_terminal_cwd(payload.cwd, workspace_dir)
+    try:
+        result = await run_workspace_terminal_command(
+            user_id=current_user.id,
+            workspace_id=workspace_id,
+            command=payload.command,
+            workspace_dir=workspace_dir,
+            cwd=payload.cwd,
+            timeout=payload.timeout,
+        )
+    except (ValueError, PermissionError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     logprint(
         "Terminal command completed",
         level="INFO",
@@ -548,6 +567,58 @@ async def execute_workspace_terminal_command(
         timed_out=result.get("timed_out"),
     )
     return TerminalExecuteResponse(**result)
+
+
+@router.post("/workspaces/{workspace_id}/terminal/stream")
+async def stream_workspace_terminal_command_sse(
+    workspace_id: str,
+    payload: TerminalExecuteRequest,
+    session: AsyncSession = Depends(get_db_session),
+    current_user=Depends(get_current_user),
+):
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    runtime = load_execution_runtime_config()
+    _enforce_terminal_command_policy(payload.command, runtime)
+    workspace_dir = str(Path(workspace.duckdb_path).parent)
+    _validate_terminal_cwd(payload.cwd, workspace_dir)
+
+    async def event_stream():
+        yield _format_sse_event("status", {"message": "Command started"})
+        try:
+            async for event in stream_workspace_terminal_command(
+                user_id=current_user.id,
+                workspace_id=workspace_id,
+                command=payload.command,
+                workspace_dir=workspace_dir,
+                cwd=payload.cwd,
+                timeout=payload.timeout,
+            ):
+                event_type = str(event.get("type") or "")
+                if event_type == "output":
+                    yield _format_sse_event("output", {"line": str(event.get("line") or "")})
+                elif event_type == "error":
+                    yield _format_sse_event("error", {"detail": str(event.get("error") or "Terminal execution failed.")})
+                    return
+                elif event_type == "final":
+                    result = event.get("result") or {}
+                    yield _format_sse_event("final", result)
+                    return
+        except (ValueError, PermissionError) as exc:
+            yield _format_sse_event("error", {"detail": str(exc)})
+            return
+        except Exception as exc:
+            yield _format_sse_event("error", {"detail": str(exc)})
+            return
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post(
@@ -953,10 +1024,45 @@ async def list_workspace_schemas(
             }
         )
     return SchemaListResponse(schemas=schemas)
+
+
+def _format_sse_event(event: str, payload: Any) -> str:
+    data = json.dumps(payload, default=str)
+    return f"event: {event}\ndata: {data}\n\n"
+
+
+def _parse_terminal_tokens(command: str) -> list[str]:
+    try:
+        return shlex.split(command, posix=os.name != "nt")
+    except Exception:
+        return command.split()
+
+
+def _validate_terminal_cwd(cwd: str | None, workspace_dir: str) -> None:
+    if not cwd:
+        return
+    base = Path(workspace_dir).resolve()
+    requested = Path(cwd).expanduser()
+    resolved = requested.resolve() if requested.is_absolute() else (base / requested).resolve()
+    try:
+        resolved.relative_to(base)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="cwd must stay within the workspace directory.",
+        ) from exc
+
+
 def _enforce_terminal_command_policy(command: str, config: Any) -> None:
     trimmed = (command or "").strip()
     if not trimmed:
         raise HTTPException(status_code=400, detail="Command must not be empty.")
+
+    if _BLOCKED_TERMINAL_SYNTAX_RE.search(trimmed):
+        raise HTTPException(
+            status_code=400,
+            detail="Command contains unsupported shell syntax. Use a single command without chaining/redirection.",
+        )
 
     denylist = list(_DEFAULT_TERMINAL_DENYLIST)
     denylist.extend([p for p in (config.terminal_command_denylist or []) if str(p).strip()])
@@ -967,14 +1073,26 @@ def _enforce_terminal_command_policy(command: str, config: Any) -> None:
         except re.error:
             continue
 
-    allowlist = [a.strip().lower() for a in (config.terminal_command_allowlist or []) if a.strip()]
-    if allowlist:
-        try:
-            first_token = shlex.split(trimmed, posix=os.name != "nt")[0].lower()
-        except Exception:
-            first_token = trimmed.split()[0].lower()
-        if first_token not in allowlist:
+    allowlist = {
+        a.strip().lower()
+        for a in (config.terminal_command_allowlist or [])
+        if str(a).strip()
+    }
+    effective_allowlist = allowlist or _DEFAULT_TERMINAL_ALLOWLIST
+
+    segments = [seg.strip() for seg in trimmed.split("|") if seg.strip()]
+    for segment in segments:
+        tokens = _parse_terminal_tokens(segment)
+        if not tokens:
+            continue
+        first_token = tokens[0].lower()
+        if first_token not in effective_allowlist:
             raise HTTPException(
                 status_code=400,
-                detail=f"Command '{first_token}' is not in terminal allowlist policy.",
+                detail=f"Command '{first_token}' is not allowed by terminal policy.",
+            )
+        if first_token == "cd" and len(tokens) > 2:
+            raise HTTPException(
+                status_code=400,
+                detail="cd accepts at most one path argument.",
             )

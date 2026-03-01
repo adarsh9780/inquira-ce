@@ -1,4 +1,3 @@
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -12,43 +11,6 @@ def _clear_execution_config_cache():
     load_execution_runtime_config.cache_clear()
     yield
     load_execution_runtime_config.cache_clear()
-
-
-@pytest.mark.asyncio
-async def test_execute_code_uses_local_subprocess_provider(monkeypatch, tmp_path):
-    monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "local_subprocess")
-
-    captured = {"called": False}
-
-    def fake_subprocess(script_path: str, timeout: int, working_dir: str):
-        captured["called"] = True
-        assert Path(script_path).exists()
-        assert timeout == 7
-        assert working_dir == str(tmp_path)
-        return {
-            "success": True,
-            "stdout": "ok",
-            "stderr": "",
-            "has_stdout": True,
-            "has_stderr": False,
-            "error": None,
-            "result": 1,
-            "result_type": "scalar",
-        }
-
-    monkeypatch.setattr(code_executor, "_run_in_subprocess", fake_subprocess)
-
-    result = await code_executor.execute_code(
-        code="result = 1",
-        timeout=7,
-        working_dir=str(tmp_path),
-    )
-
-    assert captured["called"] is True
-    assert result["success"] is True
-    assert result["stdout"] == "ok"
-    assert result["has_stdout"] is True
-    assert result["has_stderr"] is False
 
 
 @pytest.mark.asyncio
@@ -95,7 +57,74 @@ async def test_execute_code_uses_jupyter_provider(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_execute_code_reads_provider_from_toml(monkeypatch, tmp_path):
+async def test_execute_code_reads_jupyter_provider_from_toml(monkeypatch, tmp_path):
+    cfg = tmp_path / "inquira.toml"
+    cfg.write_text(
+        """
+[execution]
+provider = "local_jupyter"
+""".strip(),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("INQUIRA_EXECUTION_PROVIDER", raising=False)
+    monkeypatch.setenv("INQUIRA_TOML_PATH", str(cfg))
+
+    class FakeManager:
+        async def execute(
+            self,
+            *,
+            workspace_id: str,
+            workspace_duckdb_path: str,
+            code: str,
+            timeout: int,
+            config,
+        ):
+            assert workspace_id == "ws-toml"
+            assert workspace_duckdb_path == "/tmp/ws/workspace.duckdb"
+            assert "print('x')" in code
+            assert timeout == 5
+            return {
+                "success": True,
+                "stdout": "from_toml",
+                "stderr": "",
+                "error": None,
+                "result": None,
+                "result_type": None,
+            }
+
+    async def fake_get_manager():
+        return FakeManager()
+
+    monkeypatch.setattr(code_executor, "get_workspace_kernel_manager", fake_get_manager)
+
+    result = await code_executor.execute_code(
+        code="print('x')",
+        timeout=5,
+        workspace_id="ws-toml",
+        workspace_duckdb_path="/tmp/ws/workspace.duckdb",
+    )
+
+    assert result["success"] is True
+    assert result["stdout"] == "from_toml"
+
+
+@pytest.mark.asyncio
+async def test_execute_code_rejects_non_jupyter_provider_from_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "local_subprocess")
+
+    result = await code_executor.execute_code(
+        code="result = 3",
+        timeout=8,
+        working_dir=str(tmp_path),
+    )
+
+    assert result["success"] is False
+    assert "Only 'local_jupyter' is supported." in (result["error"] or "")
+    assert result["has_stderr"] is True
+
+
+@pytest.mark.asyncio
+async def test_execute_code_rejects_non_jupyter_provider_from_toml(monkeypatch, tmp_path):
     cfg = tmp_path / "inquira.toml"
     cfg.write_text(
         """
@@ -107,70 +136,9 @@ provider = "local_subprocess"
     monkeypatch.delenv("INQUIRA_EXECUTION_PROVIDER", raising=False)
     monkeypatch.setenv("INQUIRA_TOML_PATH", str(cfg))
 
-    def fake_subprocess(script_path: str, timeout: int, working_dir: str):
-        return {
-            "success": True,
-            "stdout": "from_toml",
-            "stderr": "",
-            "error": None,
-            "result": None,
-            "result_type": None,
-        }
-
-    monkeypatch.setattr(code_executor, "_run_in_subprocess", fake_subprocess)
-
-    result = await code_executor.execute_code(
-        code="print('x')",
-        timeout=5,
-        working_dir=str(tmp_path),
-    )
-
-    assert result["success"] is True
-    assert result["stdout"] == "from_toml"
-
-
-@pytest.mark.asyncio
-async def test_execute_code_rejects_unknown_provider(monkeypatch, tmp_path):
-    monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "piston")
-
-    result = await code_executor.execute_code(
-        code="result = 3",
-        timeout=8,
-        working_dir=str(tmp_path),
-    )
-
-    assert result["success"] is False
-    assert "Unsupported execution provider" in (result["error"] or "")
-    assert result["has_stderr"] is True
-
-
-@pytest.mark.asyncio
-async def test_execute_code_default_workdir_avoids_legacy_workspace_root(monkeypatch, tmp_path):
-    monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "local_subprocess")
-    expected_dir = tmp_path / "runtime" / "exec_tmp"
-
-    monkeypatch.setattr(
-        code_executor.os.path,
-        "expanduser",
-        lambda path: str(expected_dir) if path == "~/.inquira/runtime/exec_tmp" else path,
-    )
-
-    def fake_subprocess(script_path: str, timeout: int, working_dir: str):
-        assert working_dir == str(expected_dir)
-        assert "~/.inquira/workspaces" not in working_dir
-        return {
-            "success": True,
-            "stdout": "ok",
-            "stderr": "",
-            "error": None,
-            "result": None,
-            "result_type": None,
-        }
-
-    monkeypatch.setattr(code_executor, "_run_in_subprocess", fake_subprocess)
-
     result = await code_executor.execute_code(code="x = 1", timeout=3)
-    assert result["success"] is True
+    assert result["success"] is False
+    assert "Only 'local_jupyter' is supported." in (result["error"] or "")
 
 
 @pytest.mark.asyncio

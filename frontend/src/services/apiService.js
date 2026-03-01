@@ -363,6 +363,54 @@ export const apiService = {
     return response.json()
   },
 
+  async executeTerminalCommandStream(workspaceId, payload, { signal = null, onEvent = null } = {}) {
+    const response = await fetch(
+      `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/terminal/stream`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload || {}),
+        signal,
+      },
+    )
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}))
+      throw new Error(detail.detail || `Terminal stream failed (${response.status})`)
+    }
+    if (!response.body) {
+      return this.executeTerminalCommand(workspaceId, payload)
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let finalPayload = null
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const { events, remainder } = parseSseBuffer(buffer)
+      buffer = remainder
+
+      for (const evt of events) {
+        if (onEvent) onEvent(evt)
+        if (evt.event === 'final') {
+          finalPayload = evt.data
+        } else if (evt.event === 'error') {
+          const detail = evt.data?.detail || 'Terminal execution failed.'
+          throw new Error(detail)
+        }
+      }
+    }
+
+    if (!finalPayload) {
+      throw new Error('Terminal stream ended without a final payload.')
+    }
+    return finalPayload
+  },
+
   async resetTerminalSession(workspaceId) {
     const response = await fetch(
       `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/terminal/session/reset`,

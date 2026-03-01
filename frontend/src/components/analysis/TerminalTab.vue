@@ -42,6 +42,12 @@
             exit {{ entry.exitCode }}
           </div>
         </div>
+        <div v-if="isRunning && liveCommand" class="mb-3">
+          <div class="text-sky-300">$ {{ liveCommand }}</div>
+          <pre v-if="liveStdout" class="whitespace-pre-wrap break-words text-slate-100">{{ liveStdout }}</pre>
+          <pre v-if="liveStderr" class="whitespace-pre-wrap break-words text-rose-300">{{ liveStderr }}</pre>
+          <div class="text-xs text-amber-400">running...</div>
+        </div>
       </div>
 
       <div class="border-t border-gray-200 bg-white p-3">
@@ -97,6 +103,9 @@ const entries = computed(() => appStore.terminalEntries || [])
 const isRunning = ref(false)
 const scrollRef = ref(null)
 const shell = ref('')
+const liveCommand = ref('')
+const liveStdout = ref('')
+const liveStderr = ref('')
 
 const displayCwd = computed(() => appStore.terminalCwd || 'n/a')
 const shellLabel = computed(() => {
@@ -144,12 +153,37 @@ async function runCommand() {
   if (!raw || !appStore.activeWorkspaceId || isRunning.value) return
 
   isRunning.value = true
+  liveCommand.value = raw
+  liveStdout.value = ''
+  liveStderr.value = ''
   try {
-    const payload = await apiService.executeTerminalCommand(appStore.activeWorkspaceId, {
-      command: raw,
-      cwd: appStore.terminalCwd || null,
-      timeout: 180,
-    })
+    const payload = await apiService.executeTerminalCommandStream(
+      appStore.activeWorkspaceId,
+      {
+        command: raw,
+        cwd: appStore.terminalCwd || null,
+        timeout: 180,
+      },
+      {
+        onEvent: async (evt) => {
+          if (evt?.event === 'output') {
+            const line = String(evt?.data?.line || '')
+            if (line) {
+              liveStdout.value = liveStdout.value ? `${liveStdout.value}\n${line}` : line
+              await nextTick()
+              if (scrollRef.value) {
+                scrollRef.value.scrollTop = scrollRef.value.scrollHeight
+              }
+            }
+          } else if (evt?.event === 'error') {
+            const detail = String(evt?.data?.detail || '')
+            if (detail) {
+              liveStderr.value = detail
+            }
+          }
+        },
+      },
+    )
     shell.value = payload?.shell || shell.value
     if (payload?.cwd) appStore.setTerminalCwd(payload.cwd)
 
@@ -157,13 +191,19 @@ async function runCommand() {
       kind: 'command',
       source: 'terminal',
       command: raw,
-      stdout: payload?.stdout || '',
-      stderr: payload?.stderr || '',
+      stdout: payload?.stdout || liveStdout.value || '',
+      stderr: payload?.stderr || liveStderr.value || '',
       exitCode: Number.isInteger(payload?.exit_code) ? payload.exit_code : 1,
     })
 
-    appStore.setTerminalOutput([payload?.stdout || '', payload?.stderr || ''].filter(Boolean).join('\n'))
+    appStore.setTerminalOutput([
+      payload?.stdout || liveStdout.value || '',
+      payload?.stderr || liveStderr.value || '',
+    ].filter(Boolean).join('\n'))
     command.value = ''
+    liveCommand.value = ''
+    liveStdout.value = ''
+    liveStderr.value = ''
 
     await nextTick()
     if (scrollRef.value) {
@@ -182,6 +222,9 @@ async function runCommand() {
     appStore.setTerminalOutput(message)
     toast.error('Terminal command failed', message)
   } finally {
+    liveCommand.value = ''
+    liveStdout.value = ''
+    liveStderr.value = ''
     isRunning.value = false
   }
 }
