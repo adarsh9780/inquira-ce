@@ -10,7 +10,7 @@
     <div class="h-16 flex items-center px-4 border-b border-gray-200 shrink-0">
       <div class="flex items-center">
         <!-- Logo always visible -->
-        <img :src="logo" alt="Inquira Logo" class="w-8 h-8 rounded shrink-0 shadow-sm cursor-pointer hover:opacity-80 transition-opacity" @click="appStore.setSidebarCollapsed(false)" title="Expand Sidebar" />
+        <img :src="logo" alt="Inquira Logo" class="w-8 h-8 rounded shrink-0 shadow-sm cursor-pointer hover:opacity-80 transition-opacity" @click="appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)" title="Toggle Sidebar" />
         <!-- Brand Name (Hidden when collapsed) -->
         <div v-show="!appStore.isSidebarCollapsed" class="ml-3 truncate">
           <h1 class="text-sm font-bold text-gray-800 tracking-tight leading-none">Inquira</h1>
@@ -27,7 +27,7 @@
         @click="appStore.setSidebarCollapsed(true)"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
-          <path fill-rule="evenodd" d="M3 12a1 1 0 011-1h11.586l-3.293-3.293a1 1 0 111.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 11-1.414-1.414L15.586 13H4a1 1 0 01-1-1z" clip-rule="evenodd" />
+          <path fill-rule="evenodd" d="M21 12a1 1 0 01-1 1H8.414l3.293 3.293a1 1 0 11-1.414 1.414l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L8.414 11H20a1 1 0 011 1z" clip-rule="evenodd" />
         </svg>
       </button>
     </div>
@@ -98,7 +98,7 @@
           @click="appStore.setSidebarCollapsed(false)"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4">
-            <path fill-rule="evenodd" d="M21 12a1 1 0 01-1 1H8.414l3.293 3.293a1 1 0 11-1.414 1.414l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L8.414 11H20a1 1 0 011 1z" clip-rule="evenodd" />
+            <path fill-rule="evenodd" d="M3 12a1 1 0 011-1h11.586l-3.293-3.293a1 1 0 111.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 11-1.414-1.414L15.586 13H4a1 1 0 01-1-1z" clip-rule="evenodd" />
           </svg>
         </button>
       </div>
