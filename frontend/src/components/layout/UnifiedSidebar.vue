@@ -1,13 +1,16 @@
 <template>
   <div
-    class="flex flex-col border-r border-gray-200 bg-gray-50 transition-all duration-300 h-full overflow-hidden shrink-0 z-20 shadow-sm relative"
-    :class="appStore.isSidebarCollapsed ? 'w-16' : 'w-64'"
+    class="flex flex-col border-r border-gray-200 bg-gray-50 transition-all duration-300 h-full shrink-0 z-40 shadow-sm relative"
+    :class="[
+      appStore.isSidebarCollapsed ? 'w-16' : 'w-64',
+      isUserMenuOpen ? 'overflow-visible' : 'overflow-hidden'
+    ]"
   >
     <!-- Top Section: Brand & Header -->
     <div class="h-16 flex items-center px-4 border-b border-gray-200 shrink-0">
       <div class="flex items-center">
         <!-- Logo always visible -->
-        <img :src="logo" alt="Inquira Logo" class="w-8 h-8 rounded shrink-0 shadow-sm" />
+        <img :src="logo" alt="Inquira Logo" class="w-8 h-8 rounded shrink-0 shadow-sm cursor-pointer hover:opacity-80 transition-opacity" @click="appStore.setSidebarCollapsed(false)" title="Expand Sidebar" />
         <!-- Brand Name (Hidden when collapsed) -->
         <div v-show="!appStore.isSidebarCollapsed" class="ml-3 truncate">
           <h1 class="text-sm font-bold text-gray-800 tracking-tight leading-none">Inquira</h1>
