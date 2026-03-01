@@ -1,9 +1,11 @@
 <template>
   <div class="flex h-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
-    <div class="border-b border-gray-200 bg-gray-50 px-4 py-3">
-      <h3 class="text-sm font-semibold text-gray-900">Variable Explorer</h3>
-      <p class="mt-1 text-xs text-gray-600">Inspect scalars and execution artifacts from the latest run.</p>
-    </div>
+    <!-- Teleported Header -->
+    <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'varex'">
+      <div class="flex items-center justify-end w-full">
+        <p class="text-xs text-gray-500 hidden sm:block">Inspect scalars and artifacts from the latest run</p>
+      </div>
+    </Teleport>
 
     <div class="min-h-0 flex-1 overflow-y-auto p-4">
       <div v-if="!hasVariables" class="flex h-full items-center justify-center text-center text-gray-500">
@@ -64,10 +66,15 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 
 const appStore = useAppStore()
+const isMounted = ref(false)
+
+onMounted(() => {
+  isMounted.value = true
+})
 
 const hasVariables = computed(() => (
   (appStore.scalars?.length || 0) > 0 ||

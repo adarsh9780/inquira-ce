@@ -1,7 +1,7 @@
 <template>
   <div class="flex h-full flex-col bg-white">
-    <div class="flex-shrink-0 border-b border-gray-200 bg-white px-4 py-3 flex items-center justify-between">
-      <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+    <div class="flex-shrink-0 border-b border-gray-200 bg-white px-4 py-2 flex items-center justify-between">
+      <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 flex-shrink-0">
         <button
           @click="appStore.setDataPane('table')"
           class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors flex items-center gap-1.5"
@@ -30,9 +30,12 @@
           <span v-if="appStore.scalars?.length" class="ml-1 inline-flex items-center justify-center bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 rounded-full min-w-[1.25rem]">{{ appStore.scalars.length }}</span>
         </button>
       </div>
+      
+      <!-- Teleport Target for Table/Figure/VarEx Toolbar -->
+      <div id="workspace-right-pane-toolbar" class="flex-1 min-w-0 flex items-center justify-end ml-4"></div>
     </div>
 
-    <div class="min-h-0 flex-1 p-3 sm:p-4 bg-gray-50/50">
+    <div class="min-h-0 flex-1 p-3 sm:p-4 bg-gray-50/50 pb-0">
       <div v-show="appStore.dataPane === 'table'" class="h-full">
         <TableTab />
       </div>
