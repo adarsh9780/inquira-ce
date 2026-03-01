@@ -14,13 +14,11 @@ test('app store maps legacy code/chat tabs into workspace pane routing', () => {
   assert.equal(source.includes("activeTab.value = 'workspace'"), true)
 })
 
-test('right panel includes unified workspace tab component', () => {
+test('right panel includes unified workspace layout', () => {
   const panelPath = resolve(process.cwd(), 'src/components/layout/RightPanel.vue')
   const source = readFileSync(panelPath, 'utf-8')
 
-  assert.equal(source.includes('WorkspaceTab'), true)
-  assert.equal(source.includes("id: 'workspace'"), true)
-  assert.equal(source.includes("id: 'varex'"), true)
+  assert.equal(source.includes('WorkspaceLeftPane'), true)
+  assert.equal(source.includes('WorkspaceRightPane'), true)
   assert.equal(source.includes("appStore.activeTab === 'workspace'"), true)
-  assert.equal(source.includes('Chat Overlay'), false)
 })
