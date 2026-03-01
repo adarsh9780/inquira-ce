@@ -257,10 +257,7 @@ const authStore = useAuthStore()
 // State from RightPanel
 const flash = ref({})
 const counts = computed(() => ({
-  workspace: appStore.workspacePane === 'chat' ? appStore.chatHistory?.length || 0 : (!appStore.isCodeRunning && appStore.generatedCode ? 1 : 0),
-  table: appStore.dataframes?.length || 0,
-  figure: appStore.figures?.length || 0,
-  varex: appStore.scalars?.length || 0,
+  workspace: appStore.chatHistory?.length || (!appStore.isCodeRunning && appStore.generatedCode ? 1 : 0),
   terminal: appStore.terminalOutput && !appStore.isCodeRunning ? 1 : 0,
 }))
 
@@ -284,30 +281,6 @@ const tabs = computed(() => [
     count: null,
     badgeClass: '',
     badgeColor: 'bg-blue-600',
-  },
-  {
-    id: 'table',
-    name: 'Table',
-    icon: TableCellsIcon,
-    count: appStore.dataframes?.length ? String(appStore.dataframes.length) : null,
-    badgeClass: appStore.dataframes?.length ? 'bg-blue-100 text-blue-800' : '',
-    badgeColor: 'bg-sky-600',
-  },
-  {
-    id: 'figure',
-    name: 'Figure',
-    icon: ChartBarIcon,
-    count: appStore.figures?.length ? String(appStore.figures.length) : null,
-    badgeClass: appStore.figures?.length ? 'bg-purple-100 text-purple-800' : '',
-    badgeColor: 'bg-fuchsia-600',
-  },
-  {
-    id: 'varex',
-    name: 'VarEx',
-    icon: CircleStackIcon,
-    count: appStore.scalars?.length ? String(appStore.scalars.length) : null,
-    badgeClass: appStore.scalars?.length ? 'bg-emerald-100 text-emerald-800' : '',
-    badgeColor: 'bg-emerald-600',
   },
   ...(appStore.terminalEnabled ? [{
     id: 'terminal',

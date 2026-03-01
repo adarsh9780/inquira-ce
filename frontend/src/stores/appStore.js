@@ -60,6 +60,8 @@ export const useAppStore = defineStore('app', () => {
   const runtimeError = ref('')
   const activeTab = ref('workspace')
   const workspacePane = ref('code') // 'code' | 'chat'
+  const dataPane = ref('table') // 'table' | 'figure' | 'varex'
+  const leftPaneWidth = ref(50) // percentage
   const terminalConsentGranted = ref(false)
   const terminalCwd = ref('')
   const isChatOverlayOpen = ref(true)
@@ -100,6 +102,8 @@ export const useAppStore = defineStore('app', () => {
       ui: {
         active_tab: activeTab.value || 'workspace',
         workspace_pane: workspacePane.value || 'code',
+        data_pane: dataPane.value || 'table',
+        left_pane_width: Number(leftPaneWidth.value || 50),
         chat_overlay_open: !!isChatOverlayOpen.value,
         chat_overlay_width: Number(chatOverlayWidth.value || 0.25),
         is_sidebar_collapsed: !!isSidebarCollapsed.value,
@@ -138,6 +142,12 @@ export const useAppStore = defineStore('app', () => {
     }
     if (typeof ui.workspace_pane === 'string' && ui.workspace_pane.trim()) {
       workspacePane.value = ui.workspace_pane === 'chat' ? 'chat' : 'code'
+    }
+    if (typeof ui.data_pane === 'string' && ui.data_pane.trim()) {
+      dataPane.value = ['table', 'figure', 'varex'].includes(ui.data_pane) ? ui.data_pane : 'table'
+    }
+    if (typeof ui.left_pane_width === 'number' && ui.left_pane_width > 10 && ui.left_pane_width < 90) {
+      leftPaneWidth.value = ui.left_pane_width
     }
     if (typeof ui.chat_overlay_open === 'boolean') {
       isChatOverlayOpen.value = ui.chat_overlay_open
@@ -742,6 +752,17 @@ export const useAppStore = defineStore('app', () => {
     activeTab.value = 'workspace'
     saveLocalConfig()
   }
+  function setDataPane(pane) {
+    dataPane.value = ['table', 'figure', 'varex'].includes(pane) ? pane : 'table'
+    activeTab.value = 'workspace'
+    saveLocalConfig()
+  }
+  function setLeftPaneWidth(width) {
+    if (width > 10 && width < 90) {
+      leftPaneWidth.value = width
+      saveLocalConfig()
+    }
+  }
   function setTerminalConsentGranted(granted) {
     terminalConsentGranted.value = !!granted
   }
@@ -793,6 +814,8 @@ export const useAppStore = defineStore('app', () => {
     runtimeError.value = ''
     activeTab.value = 'workspace'
     workspacePane.value = 'code'
+    dataPane.value = 'table'
+    leftPaneWidth.value = 50
     terminalConsentGranted.value = false
     terminalCwd.value = ''
     isCodeRunning.value = false
@@ -903,6 +926,8 @@ export const useAppStore = defineStore('app', () => {
     runtimeError,
     activeTab,
     workspacePane,
+    dataPane,
+    leftPaneWidth,
     terminalConsentGranted,
     terminalCwd,
     isChatOverlayOpen,
@@ -970,6 +995,8 @@ export const useAppStore = defineStore('app', () => {
     clearTerminalEntries,
     setActiveTab,
     setWorkspacePane,
+    setDataPane,
+    setLeftPaneWidth,
     setTerminalConsentGranted,
     setTerminalCwd,
     toggleChatOverlay,
