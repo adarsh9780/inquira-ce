@@ -62,15 +62,6 @@
             >
               <TrashIcon class="h-4 w-4" />
             </button>
-            <div class="w-px h-4 bg-gray-200 mx-0.5"></div>
-            <button
-              type="button"
-              class="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-white hover:text-blue-600 transition-all hover:shadow-sm"
-              @click="openConversationHistory"
-              title="Conversation history"
-            >
-              <ClockIcon class="h-4 w-4" />
-            </button>
           </div>
         </div>
       </div>
@@ -111,14 +102,6 @@
       </div>
     </div>
   </div>
-
-  <ConversationHistoryModal
-    :is-open="isConversationHistoryOpen"
-    :conversations="appStore.conversations"
-    :active-conversation-id="appStore.activeConversationId"
-    @close="isConversationHistoryOpen = false"
-    @select="selectConversationFromHistory"
-  />
 </template>
 
 <script setup>
@@ -126,12 +109,10 @@ import { computed, onMounted, ref, watch, nextTick } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import ChatHistory from './ChatHistory.vue'
 import ChatInput from './ChatInput.vue'
-import ConversationHistoryModal from './ConversationHistoryModal.vue'
 import { 
   ChatBubbleLeftRightIcon, 
-  ArrowPathIcon, 
-  ClockIcon, 
-  PlusIcon, 
+  ArrowPathIcon,
+  PlusIcon,
   TrashIcon,
   PencilIcon
 } from '@heroicons/vue/24/outline'
@@ -139,7 +120,6 @@ import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 
 const appStore = useAppStore()
-const isConversationHistoryOpen = ref(false)
 const isMounted = ref(false)
 
 // Title Editing
@@ -193,16 +173,6 @@ async function createConversation() {
   }
 }
 
-async function selectConversation(conversationId) {
-  appStore.setActiveConversationId(conversationId)
-  await appStore.fetchConversationTurns({ reset: true })
-}
-
-async function selectConversationFromHistory(conversationId) {
-  await selectConversation(conversationId)
-  isConversationHistoryOpen.value = false
-}
-
 async function clearConversation() {
   if (!appStore.activeConversationId) return
   try {
@@ -222,17 +192,6 @@ async function deleteConversation() {
   } catch (error) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to delete conversation'))
   }
-}
-
-async function openConversationHistory() {
-  try {
-    if (appStore.activeWorkspaceId) {
-      await appStore.fetchConversations()
-    }
-  } catch (_error) {
-    // Keep dialog usable with already loaded list.
-  }
-  isConversationHistoryOpen.value = true
 }
 
 onMounted(async () => {

@@ -1,150 +1,65 @@
 <template>
   <div
-    class="flex flex-col border-r border-gray-200 bg-gray-50 transition-all duration-300 h-full shrink-0 z-40 shadow-sm relative"
-    :class="[
-      appStore.isSidebarCollapsed ? 'w-16' : 'w-64',
-      isUserMenuOpen ? 'overflow-visible' : 'overflow-hidden'
-    ]"
+    class="flex flex-col border-r border-gray-200 bg-gray-50 transition-all duration-300 h-full shrink-0 z-40 shadow-sm relative overflow-visible"
+    :class="appStore.isSidebarCollapsed ? 'w-16' : 'w-64'"
   >
     <!-- Top Section: Brand & Header -->
-    <div class="h-16 flex items-center px-3 border-b border-gray-200 shrink-0">
-      <div class="flex items-center justify-between w-full">
-        <div class="flex items-center min-w-0">
+    <div 
+      class="h-16 flex items-center px-3 border-b border-gray-200 shrink-0 cursor-pointer hover:bg-gray-100 transition-colors"
+      @click="toggleSidebar"
+      title="Toggle Sidebar"
+    >
+      <div class="flex items-center justify-center w-full">
+        <div class="flex items-center min-w-0" :class="appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start w-full'">
           <img :src="logo" alt="Inquira Logo" class="w-8 h-8 rounded shrink-0 shadow-sm" />
           <div v-show="!appStore.isSidebarCollapsed" class="ml-3 truncate">
             <h1 class="text-sm font-bold text-gray-800 tracking-tight leading-none">Inquira</h1>
             <p class="text-[10px] text-gray-500 font-medium mt-0.5">LLM-Powered Analysis</p>
           </div>
         </div>
-        <button
-          @click="toggleSidebar"
-          class="inline-flex items-center justify-center rounded-md p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors"
-          :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-          :aria-label="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-        >
-          <ChevronRightIcon v-if="appStore.isSidebarCollapsed" class="w-4 h-4" />
-          <ChevronLeftIcon v-else class="w-4 h-4" />
-        </button>
       </div>
     </div>
 
     <!-- Scrollable Middle Section -->
-    <div class="flex-1 overflow-y-auto overflow-x-hidden flex flex-col py-3">
+    <!-- Add padding right to avoid scrollbar overlapping content-->
+    <div class="flex-1 overflow-y-auto overflow-x-hidden flex flex-col py-3 custom-scrollbar">
       
-      <!-- Workspace & Dataset Switcher (Hidden when collapsed) -->
-      <div v-show="!appStore.isSidebarCollapsed" class="px-4 mb-6 space-y-3">
-        <div>
-          <label class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block px-1">Workspace</label>
-          <WorkspaceSwitcher />
-        </div>
-        <div>
-          <label class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block px-1">Data Source</label>
-          <DatasetSwitcher @open-settings="openSettings" />
-        </div>
-      </div>
-
-      <!-- Views / Tabs Navigation -->
-      <div class="px-2">
-        <div v-show="!appStore.isSidebarCollapsed" class="mb-2 px-3 flex items-center justify-between">
-          <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Views</span>
-        </div>
-        
-        <nav class="flex flex-col space-y-1.5" aria-label="Tabs">
-          <button
-            v-for="tab in tabs"
-            :key="tab.id"
-            @click="handleTabClick(tab.id)"
-            :class="[
-              appStore.activeTab === tab.id
-                ? 'bg-white text-blue-600 shadow-sm border border-gray-200/60 ring-1 ring-black/5'
-                : 'text-gray-600 hover:bg-gray-200/50 hover:text-gray-900 border border-transparent',
-              'relative w-full rounded-lg font-medium text-sm transition-all duration-200 flex items-center',
-              appStore.isSidebarCollapsed ? 'p-2.5 justify-center mx-auto aspect-square max-w-[40px]' : 'py-2 px-3 justify-start',
-              flash[tab.id] ? 'ring-2 ring-green-400 ring-offset-1 animate-pulse' : ''
-            ]"
-            :title="tab.name"
-          >
-            <!-- Highlight indicator line -->
-            <div v-if="appStore.activeTab === tab.id" class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1/2 bg-blue-600 rounded-r-full"></div>
-
-            <div class="relative flex w-full items-center" :class="appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start ml-1.5'">
-              <component :is="tab.icon" class="h-4 w-4 shrink-0 transition-transform" :class="appStore.activeTab === tab.id ? 'scale-110' : ''" />
-              <span v-show="!appStore.isSidebarCollapsed" class="ml-2.5 truncate" :class="appStore.activeTab === tab.id ? 'font-semibold' : ''">{{ tab.name }}</span>
-
-              <span v-if="appStore.isSidebarCollapsed && tab.count && Number(tab.count) > 0"
-                    class="absolute -right-1 -top-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold text-white shadow-sm ring-2 ring-gray-50"
-                    :class="tab.badgeColor">
-                {{ tab.count }}
-              </span>
-              <span v-else-if="!appStore.isSidebarCollapsed && tab.count && Number(tab.count) > 0"
-                    class="ml-auto inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm"
-                    :class="tab.badgeClass">
-                {{ tab.count }}
-              </span>
-            </div>
-          </button>
-        </nav>
-      </div>
-
-      <!-- Collapsed quick summary -->
-      <div v-if="appStore.isSidebarCollapsed" class="mt-4 px-2 space-y-2">
-        <div
-          class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[10px] text-gray-600 truncate"
-          :title="activeWorkspaceName ? `Workspace: ${activeWorkspaceName}` : 'No active workspace'"
-        >
-          <div class="flex items-center justify-center gap-1.5">
-            <RectangleGroupIcon class="h-3.5 w-3.5" />
-            <span class="truncate">{{ activeWorkspaceName ? 'WS' : '--' }}</span>
-          </div>
-        </div>
-        <div
-          class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[10px] text-gray-600 truncate"
-          :title="activeDatasetName ? `Dataset: ${activeDatasetName}` : 'No active dataset'"
-        >
-          <div class="flex items-center justify-center gap-1.5">
-            <CircleStackIcon class="h-3.5 w-3.5" />
-            <span class="truncate">{{ activeDatasetName ? 'DS' : '--' }}</span>
-          </div>
-        </div>
-        <div
-          class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[10px] text-gray-600 truncate"
-          :title="`Kernel: ${kernelStatusMeta.label}`"
-        >
-          <div class="flex items-center justify-center gap-1.5">
-            <span class="w-2 h-2 rounded-full shrink-0" :class="kernelStatusMeta.dotClass"></span>
-            <span class="truncate">{{ kernelStatusMeta.shortLabel }}</span>
-          </div>
-        </div>
+      <!-- File Explorer Sections -->
+      <div class="flex flex-col space-y-2 mt-2">
+        <SidebarWorkspaces 
+          :is-collapsed="appStore.isSidebarCollapsed"
+          @header-click="handleExplorerHeaderClick"
+          @select="handleWorkspaceSelect"
+        />
+        <SidebarDatasets 
+          :is-collapsed="appStore.isSidebarCollapsed"
+          @header-click="handleExplorerHeaderClick"
+          @select="handleDatasetSelect"
+          @open-settings="openSettings"
+        />
+        <SidebarConversations 
+          :is-collapsed="appStore.isSidebarCollapsed"
+          @header-click="handleExplorerHeaderClick"
+          @select="handleConversationSelect"
+        />
       </div>
 
     </div>
 
-    <!-- Bottom Section: User & Status -->
-    <div class="border-t border-gray-200 bg-gray-100/50 p-3 shrink-0">
-      <div v-show="!appStore.isSidebarCollapsed" class="mb-3 space-y-2">
-        <div class="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[11px] text-gray-700">
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-gray-500">Workspace</span>
-            <span class="truncate font-medium">{{ activeWorkspaceName || 'None' }}</span>
-          </div>
+    <!-- Bottom Section: Schema Link & User Menu -->
+    <div class="border-t border-gray-200 bg-gray-100/50 p-2 shrink-0 flex flex-col gap-2">
+      <!-- Schema Editor Link -->
+      <button
+        @click="handleTabClick('schema-editor')"
+        class="w-full flex items-center justify-between p-2 rounded-lg transition-colors border"
+        :class="appStore.activeTab === 'schema-editor' ? 'bg-white border-gray-200 shadow-sm text-blue-600' : 'border-transparent text-gray-600 hover:bg-gray-200/50'"
+        title="Schema Editor"
+      >
+        <div class="flex items-center gap-2 min-w-0" :class="appStore.isSidebarCollapsed ? 'justify-center w-full' : ''">
+          <DocumentTextIcon class="w-4 h-4 shrink-0 transition-transform" :class="appStore.activeTab === 'schema-editor' ? 'scale-110' : ''" />
+          <span v-show="!appStore.isSidebarCollapsed" class="text-xs font-medium truncate" :class="appStore.activeTab === 'schema-editor' ? 'font-semibold' : ''">Schema Editor</span>
         </div>
-        <div class="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[11px] text-gray-700">
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-gray-500">Dataset</span>
-            <span class="truncate font-medium">{{ activeDatasetName || 'None' }}</span>
-          </div>
-        </div>
-        <div class="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[11px] text-gray-700">
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-gray-500">Kernel</span>
-            <span class="inline-flex items-center gap-1">
-              <span class="w-2 h-2 rounded-full" :class="kernelStatusMeta.dotClass"></span>
-              <span class="font-medium">{{ kernelStatusMeta.label }}</span>
-            </span>
-          </div>
-        </div>
-      </div>
-      
+      </button>
       <!-- User Menu Toggle -->
       <div class="relative w-full" v-if="authStore.isAuthenticated">
         <button
@@ -245,13 +160,12 @@
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { useAuthStore } from '../../stores/authStore'
-import { apiService } from '../../services/apiService'
 import { settingsWebSocket } from '../../services/websocketService'
-import { toast } from '../../composables/useToast'
 import SettingsModal from '../modals/SettingsModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
-import DatasetSwitcher from '../DatasetSwitcher.vue'
-import WorkspaceSwitcher from '../WorkspaceSwitcher.vue'
+import SidebarWorkspaces from './sidebar/SidebarWorkspaces.vue'
+import SidebarDatasets from './sidebar/SidebarDatasets.vue'
+import SidebarConversations from './sidebar/SidebarConversations.vue'
 import logo from '../../assets/favicon.svg'
 
 import {
@@ -260,15 +174,13 @@ import {
   DocumentTextIcon,
   CogIcon,
   ArrowRightOnRectangleIcon,
-  ChevronUpIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon
+  ChevronUpIcon
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
 
-// State from RightPanel
+// State from RightPanel for notification counts
 const flash = ref({})
 const counts = computed(() => ({
   workspace: appStore.chatHistory?.length || (!appStore.isCodeRunning && appStore.generatedCode ? 1 : 0),
@@ -286,44 +198,12 @@ watch(counts, (n, o) => {
   }
 }, { deep: true })
 
-const tabs = computed(() => [
-  {
-    id: 'workspace',
-    name: 'Workspace',
-    icon: RectangleGroupIcon,
-    count: null,
-    badgeClass: '',
-    badgeColor: 'bg-blue-600',
-  },
-  {
-    id: 'schema-editor',
-    name: 'Schema',
-    icon: DocumentTextIcon,
-    count: null,
-    badgeClass: '',
-    badgeColor: 'bg-gray-400',
-  },
-])
-
-// State from TopToolbar
+// Toolbar & User State
 const isSettingsOpen = ref(false)
 const settingsInitialTab = ref('api')
 const isUserMenuOpen = ref(false)
 const isLogoutConfirmOpen = ref(false)
 const isWebSocketConnected = ref(false)
-const kernelStatus = ref('missing')
-const isKernelStatusRequestInFlight = ref(false)
-let kernelStatusPoller = null
-
-const activeWorkspaceName = computed(() => {
-  const workspace = appStore.workspaces.find((ws) => ws.id === appStore.activeWorkspaceId)
-  return workspace?.name || ''
-})
-const activeDatasetName = computed(() => appStore.ingestedTableName || '')
-
-const isConfigurationComplete = computed(() => {
-  return appStore.apiKeyConfigured && appStore.hasDataFile && isWebSocketConnected.value
-})
 
 function handleTabClick(tabId) {
   appStore.setActiveTab(tabId)
@@ -333,36 +213,25 @@ function toggleSidebar() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
 }
 
-const getStatusDotClasses = computed(() => {
-  if (isConfigurationComplete.value) {
-    return 'bg-green-500'
-  } else {
-    if (!isWebSocketConnected.value) {
-      return 'bg-red-500 animate-pulse'
-    } else {
-      return 'bg-gray-400'
-    }
-  }
-})
+function handleExplorerHeaderClick() {
+  // Toggle off if expanded, expand if collapsed
+  appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+}
 
-const kernelStatusMeta = computed(() => {
-  if (appStore.runtimeError && appStore.activeWorkspaceId) {
-    return { label: 'Error', shortLabel: 'ERR', dotClass: 'bg-red-500' }
-  }
-  switch (String(kernelStatus.value || '').toLowerCase()) {
-    case 'ready':
-      return { label: 'Ready', shortLabel: 'OK', dotClass: 'bg-green-500' }
-    case 'busy':
-      return { label: 'Busy', shortLabel: 'BUSY', dotClass: 'bg-amber-500' }
-    case 'starting':
-    case 'connecting':
-      return { label: 'Connecting', shortLabel: 'CON', dotClass: 'bg-blue-500' }
-    case 'error':
-      return { label: 'Error', shortLabel: 'ERR', dotClass: 'bg-red-500' }
-    default:
-      return { label: appStore.activeWorkspaceId ? 'Connecting' : 'No Workspace', shortLabel: appStore.activeWorkspaceId ? 'CON' : 'N/A', dotClass: appStore.activeWorkspaceId ? 'bg-blue-500' : 'bg-gray-300' }
-  }
-})
+function handleWorkspaceSelect() {
+  appStore.setActiveTab('workspace')
+  appStore.setSidebarCollapsed(true)
+}
+
+function handleDatasetSelect() {
+  appStore.setActiveTab('workspace')
+  appStore.setSidebarCollapsed(true)
+}
+
+function handleConversationSelect() {
+  appStore.setActiveTab('workspace')
+  // We intentionally do NOT setSidebarCollapsed(true) here!
+}
 
 // Lifecycle and Event Handling
 function setupWebSocketMonitoring() {
@@ -375,53 +244,17 @@ function setupWebSocketMonitoring() {
   })
 }
 
-async function refreshKernelStatus() {
-  if (!appStore.activeWorkspaceId) {
-    kernelStatus.value = 'missing'
-    return
-  }
-  if (isKernelStatusRequestInFlight.value) return
-  isKernelStatusRequestInFlight.value = true
-  try {
-    const status = await apiService.v1GetWorkspaceKernelStatus(appStore.activeWorkspaceId)
-    kernelStatus.value = String(status?.status || 'missing').toLowerCase()
-  } catch (_error) {
-    kernelStatus.value = 'error'
-  } finally {
-    isKernelStatusRequestInFlight.value = false
-  }
-}
-
-function startKernelStatusPolling() {
-  stopKernelStatusPolling()
-  refreshKernelStatus()
-  kernelStatusPoller = setInterval(() => {
-    if (!document.hidden) refreshKernelStatus()
-  }, 5000)
-}
-
-function stopKernelStatusPolling() {
-  if (kernelStatusPoller) {
-    clearInterval(kernelStatusPoller)
-    kernelStatusPoller = null
-  }
-}
-
 onMounted(() => {
   setupWebSocketMonitoring()
-  startKernelStatusPolling()
   document.addEventListener('keydown', handleKeydown)
   document.addEventListener('click', handleClickOutside)
 })
 
 onUnmounted(() => {
-  stopKernelStatusPolling()
   document.removeEventListener('keydown', handleKeydown)
   document.removeEventListener('click', handleClickOutside)
 })
-watch(() => appStore.activeWorkspaceId, async () => {
-  await refreshKernelStatus()
-})
+
 function openSettings(tab = 'api') {
   settingsInitialTab.value = tab
   isSettingsOpen.value = true
@@ -485,9 +318,20 @@ function handleClickOutside(event) {
 .animate-pulse {
   animation: urgentBlink 1.5s ease-in-out infinite;
 }
-/* Webkit Scrollbar */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0; 
+  border-radius: 4px;
+}
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
 </style>
