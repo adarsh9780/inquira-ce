@@ -8,7 +8,8 @@
         @keydown.shift.enter="handleNewLine"
         placeholder="Ask a question about your data... (Enter to send, Shift+Enter for new line)"
         rows="3"
-        class="w-full px-4 sm:px-5 py-2.5 sm:py-3.5 pr-14 sm:pr-18 border border-border rounded-2xl resize-none focus:outline-none focus:ring-0 focus:border-border-hover text-sm sm:text-base bg-surface text-text-main placeholder:text-text-muted shadow-sm transition-all duration-150 leading-relaxed"
+        class="w-full px-4 sm:px-5 py-2.5 sm:py-3.5 pr-14 sm:pr-18 border border-border rounded-2xl resize-none focus:outline-none focus:ring-0 focus:border-border-hover text-sm sm:text-base shadow-sm transition-all duration-150 leading-relaxed"
+        style="background-color: #ffffff; color: #27272A;"
         :class="{
           'opacity-70 cursor-not-allowed': !appStore.canAnalyze || appStore.isLoading,
           'hover:shadow': appStore.canAnalyze && !appStore.isLoading

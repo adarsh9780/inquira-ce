@@ -2,8 +2,8 @@
 
 @theme {
   /* Minimal, strict color palette inspired by Cursor/Vercel */
-  --color-base: #FAFAFA;
-  /* Warm off-white for the main app background */
+  --color-base: #FDFCF8;
+  /* Warm pastel yellow tint for the main app background */
   --color-surface: #FFFFFF;
   /* Pure white for cards, sidebars, and main panes */
 
