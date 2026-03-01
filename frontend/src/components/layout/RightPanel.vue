@@ -65,7 +65,7 @@
       </div>
     </div>
 
-    <!-- Other Full-Screen Views (Preview, Schema) -->
+    <!-- Other Full-Screen Views (Schema) -->
     <div v-show="appStore.activeTab !== 'workspace'" class="relative flex-1 overflow-hidden bg-gray-50/50">
       <div v-show="appStore.activeTab === 'schema-editor'" class="h-full p-3 sm:p-4">
         <SchemaEditorTab />
@@ -91,7 +91,6 @@ import { useAppStore } from '../../stores/appStore'
 import WorkspaceLeftPane from './WorkspaceLeftPane.vue'
 import WorkspaceRightPane from './WorkspaceRightPane.vue'
 import TerminalTab from '../analysis/TerminalTab.vue'
-import PreviewTab from '../preview/PreviewTab.vue'
 import SchemaEditorTab from '../preview/SchemaEditorTab.vue'
 import { CommandLineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 

@@ -194,27 +194,6 @@ export const apiService = {
     return { detail: 'API key saved securely.' }
   },
 
-  // Data preview
-  async getDataPreview(sampleType = 'random') {
-    const { useAppStore } = await import('../stores/appStore')
-    const appStore = useAppStore()
-    if (!appStore.activeWorkspaceId || !appStore.ingestedTableName) {
-      return {
-        success: true,
-        data: [],
-        row_count: 0,
-        sample_type: sampleType,
-        message: 'Select a workspace dataset to preview.'
-      }
-    }
-    return this.v1GetDatasetPreview(
-      appStore.activeWorkspaceId,
-      appStore.ingestedTableName,
-      sampleType,
-      100
-    )
-  },
-
   // Generate schema with context
   async generateSchema(filepath, context = null, forceRegenerate = false) {
     const { useAppStore } = await import('../stores/appStore')
@@ -640,12 +619,6 @@ export const apiService = {
 
   async v1ListSchemas(workspaceId) {
     return axios.get(`/api/v1/workspaces/${workspaceId}/schemas`)
-  },
-
-  async v1GetDatasetPreview(workspaceId, tableName, sampleType = 'random', limit = 100) {
-    return axios.get(`/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/preview`, {
-      params: { sample_type: sampleType, limit }
-    })
   },
 
   async v1SyncBrowserDataset(workspaceId, payload) {

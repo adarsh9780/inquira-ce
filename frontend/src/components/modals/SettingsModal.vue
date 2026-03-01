@@ -352,23 +352,12 @@ function handleSaveComplete(result) {
       // Generate and save schema
       await generateAndSaveSchema()
 
-      // Clear old preview cache and prefetch new data for faster loading when user opens preview modal
-      console.debug('🔄 Clearing old cache and prefetching new data preview and schema...')
+      // Clear old schema/settings cache and prefetch fresh schema metadata.
+      console.debug('🔄 Clearing schema cache and prefetching schema...')
 
-      // Update progress message for prefetching
-      currentProgressMessage.value = 'Preparing data preview for faster loading...'
+      currentProgressMessage.value = 'Preparing dataset schema...'
 
-      // Clear any existing preview cache to ensure fresh data
-      previewService.clearPreviewCache()
-
-      // Prefetch data preview
-      try {
-        await previewService.getDataPreview('random', false) // Use cached version, don't force refresh
-        console.debug('✅ Data preview prefetched successfully')
-      } catch (prefetchError) {
-        console.warn('⚠️ Data preview prefetch failed, but settings save was successful:', prefetchError)
-        // Don't show error to user - prefetch failure shouldn't affect settings save success
-      }
+      previewService.clearSchemaCache()
 
       // Prefetch schema data (only if we have a valid data file path)
       if (appStore.dataFilePath.trim()) {
@@ -382,7 +371,7 @@ function handleSaveComplete(result) {
       }
 
       // Update final message
-      currentProgressMessage.value = 'Data preview ready for instant loading'
+      currentProgressMessage.value = 'Schema metadata ready'
 
       // Close progress modal after showing completion
       setTimeout(() => {
@@ -395,7 +384,7 @@ function handleSaveComplete(result) {
           unsubscribeConnection.value = null
         }
 
-        toast.success('Settings Saved', 'Your settings have been saved successfully! Data preview is ready for instant loading.')
+        toast.success('Settings Saved', 'Your settings have been saved successfully.')
 
         emit('close')
       }, 1500) // Show completion for 1.5 seconds

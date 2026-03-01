@@ -141,6 +141,8 @@ export const useAppStore = defineStore('app', () => {
       } else if (restoredTab === 'chat') {
         activeTab.value = 'workspace'
         workspacePane.value = 'chat'
+      } else if (restoredTab === 'preview') {
+        activeTab.value = 'workspace'
       } else {
         activeTab.value = restoredTab
       }
@@ -740,6 +742,8 @@ export const useAppStore = defineStore('app', () => {
       // Open the bottom terminal pane instead of navigating away
       activeTab.value = 'workspace'
       isTerminalOpen.value = true
+    } else if (normalized === 'preview') {
+      activeTab.value = 'workspace'
     } else {
       activeTab.value = normalized || 'workspace'
     }
@@ -772,7 +776,7 @@ export const useAppStore = defineStore('app', () => {
   function toggleTerminal() {
     isTerminalOpen.value = !isTerminalOpen.value
     // If opening the terminal, ensure we are not hiding the workspace if we were previously in a full-screen view.
-    if (isTerminalOpen.value && ['preview', 'schema-editor'].includes(activeTab.value)) {
+    if (isTerminalOpen.value && activeTab.value === 'schema-editor') {
       activeTab.value = 'workspace'
     }
   }

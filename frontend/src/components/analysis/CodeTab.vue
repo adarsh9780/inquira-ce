@@ -180,18 +180,59 @@ const defaultCodeTemplate = computed(() => {
   const tableName = backendTable || getTableName(originalFilepath)
 
   return `import duckdb
-import narwhals as nw
-import plotly.express as px
 
 table_name = "${tableName}"
+limit_rows = 100
+
+def quote_ident(name: str) -> str:
+    return '"' + str(name).replace('"', '""') + '"'
+
+quoted_table = quote_ident(table_name)
+
 try:
     conn  # type: ignore  # noqa
 except NameError:
     conn = duckdb.connect(r"${dbPath || ''}") if "${dbPath || ''}".strip() else duckdb.connect()
 
-lazy_query = conn.sql(f"SELECT * FROM {table_name} LIMIT 10")
-df = nw.from_native(lazy_query.pl(), eager=True)
-df
+head_100 = conn.sql(f"SELECT * FROM {quoted_table} LIMIT {limit_rows}").df()
+tail_100 = conn.sql(
+    f"""
+    WITH numbered AS (
+      SELECT *, row_number() OVER () AS __rownum
+      FROM {quoted_table}
+    )
+    SELECT * EXCLUDE (__rownum)
+    FROM numbered
+    ORDER BY __rownum DESC
+    LIMIT {limit_rows}
+    """
+).df()
+sample_100 = conn.sql(f"SELECT * FROM {quoted_table} USING SAMPLE {limit_rows} ROWS").df()
+
+combined_preview = conn.sql(
+    f"""
+    SELECT 'head' AS sample_bucket, * FROM (
+      SELECT * FROM {quoted_table} LIMIT {limit_rows}
+    )
+    UNION ALL
+    SELECT 'tail' AS sample_bucket, * FROM (
+      WITH numbered AS (
+        SELECT *, row_number() OVER () AS __rownum
+        FROM {quoted_table}
+      )
+      SELECT * EXCLUDE (__rownum)
+      FROM numbered
+      ORDER BY __rownum DESC
+      LIMIT {limit_rows}
+    )
+    UNION ALL
+    SELECT 'sample' AS sample_bucket, * FROM (
+      SELECT * FROM {quoted_table} USING SAMPLE {limit_rows} ROWS
+    )
+    """
+).df()
+
+combined_preview
 `
 })
 

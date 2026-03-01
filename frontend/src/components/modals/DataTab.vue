@@ -232,7 +232,6 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { apiService } from '../../services/apiService'
 import { settingsWebSocket } from '../../services/websocketService'
-import { previewService } from '../../services/previewService'
 import { toast } from '../../composables/useToast'
 import {
   DocumentArrowUpIcon,

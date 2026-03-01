@@ -1,4 +1,4 @@
-"""API v1 runtime endpoints for workspace-scoped execution and preview."""
+"""API v1 runtime endpoints for workspace-scoped execution and schema."""
 
 from __future__ import annotations
 
@@ -146,13 +146,6 @@ class DatasetSchemaResponse(BaseModel):
     table_name: str
     context: str = ""
     columns: list[dict[str, Any]]
-
-
-class DatasetPreviewResponse(BaseModel):
-    table_name: str
-    sample_type: str
-    row_count: int
-    data: list[dict[str, Any]]
 
 
 class SaveSchemaRequest(BaseModel):
@@ -1021,50 +1014,6 @@ async def regenerate_workspace_dataset_schema(
         table_name=normalized,
         context=context,
         columns=merged_columns,
-    )
-
-
-@router.get(
-    "/workspaces/{workspace_id}/datasets/{table_name}/preview",
-    response_model=DatasetPreviewResponse,
-)
-async def get_workspace_dataset_preview(
-    workspace_id: str,
-    table_name: str,
-    sample_type: str = Query(default="random", pattern="^(random|first)$"),
-    limit: int = Query(default=100, ge=1, le=500),
-    session: AsyncSession = Depends(get_db_session),
-    current_user=Depends(get_current_user),
-):
-    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
-    normalized = _normalize_table_name(table_name)
-    if not normalized:
-        raise HTTPException(status_code=400, detail="Invalid table name")
-
-    dataset = await DatasetRepository.get_for_workspace_table(
-        session=session,
-        workspace_id=workspace_id,
-        table_name=normalized,
-    )
-    if dataset is None and not _table_exists_in_workspace_db(workspace.duckdb_path, normalized):
-        raise HTTPException(status_code=404, detail="Dataset table not found")
-
-    con = duckdb.connect(workspace.duckdb_path)
-    try:
-        if sample_type == "first":
-            query = f'SELECT * FROM "{normalized}" LIMIT {limit}'
-        else:
-            query = f'SELECT * FROM "{normalized}" USING SAMPLE {limit} ROWS'
-        df = con.execute(query).fetchdf()
-    finally:
-        con.close()
-
-    data = df.to_dict(orient="records")
-    return DatasetPreviewResponse(
-        table_name=normalized,
-        sample_type=sample_type,
-        row_count=len(data),
-        data=data,
     )
 
 

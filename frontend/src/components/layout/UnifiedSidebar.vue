@@ -193,15 +193,9 @@ import logo from '../../assets/favicon.svg'
 
 import {
   RectangleGroupIcon,
-  TableCellsIcon,
-  ChartBarIcon,
-  CommandLineIcon,
-  CircleStackIcon,
   DocumentTextIcon,
-  EyeIcon,
   CogIcon,
   ArrowRightOnRectangleIcon,
-  UserIcon,
   ChevronUpIcon
 } from '@heroicons/vue/24/outline'
 
@@ -234,14 +228,6 @@ const tabs = computed(() => [
     count: null,
     badgeClass: '',
     badgeColor: 'bg-blue-600',
-  },
-  {
-    id: 'preview',
-    name: 'Preview',
-    icon: EyeIcon,
-    count: null,
-    badgeClass: '',
-    badgeColor: 'bg-gray-400',
   },
   {
     id: 'schema-editor',
