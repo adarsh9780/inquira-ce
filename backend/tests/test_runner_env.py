@@ -41,3 +41,17 @@ def test_resolve_workspace_runner_venv_uses_workspace_root(tmp_path):
 
     venv_path = runner_env.resolve_workspace_runner_venv(str(duckdb_path))
     assert venv_path == duckdb_path.parent / ".venv"
+
+
+def test_ensure_workspace_pyproject_bootstraps_missing_metadata(tmp_path):
+    duckdb_path = tmp_path / "workspace-2" / "workspace.duckdb"
+    duckdb_path.parent.mkdir(parents=True, exist_ok=True)
+    duckdb_path.touch()
+
+    runner_env._ensure_workspace_pyproject(str(duckdb_path))
+    pyproject = duckdb_path.parent / "pyproject.toml"
+
+    assert pyproject.exists() is True
+    content = pyproject.read_text(encoding="utf-8")
+    assert "[project]" in content
+    assert 'name = "workspace-2"' in content

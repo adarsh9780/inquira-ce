@@ -25,33 +25,66 @@
     </div>
 
     <template v-else>
-      <div ref="scrollRef" class="min-h-0 flex-1 overflow-y-auto bg-[#0f172a] p-4 font-mono text-sm text-slate-100">
-        <div v-if="entries.length === 0" class="text-slate-400">
-          Terminal ready. Run commands with <code class="rounded bg-slate-800 px-1 py-0.5">Enter</code>.
+      <div
+        ref="scrollRef"
+        class="terminal-shell min-h-0 flex-1 overflow-y-auto bg-[#0b1228] p-4 font-mono text-sm text-slate-100"
+        @click="focusCommandInput"
+      >
+        <div class="mb-2 text-slate-400">
+          Terminal ready.
+          <span class="text-slate-300">Enter</span> to run,
+          <span class="text-slate-300">↑/↓</span> for history.
         </div>
+
         <div v-for="(entry, idx) in entries" :key="idx" class="mb-3">
-          <div v-if="entry.kind !== 'output'" class="text-sky-300">$ {{ entry.command }}</div>
-          <div v-else class="text-xs uppercase tracking-wide text-slate-400">{{ entry.label || 'Output' }}</div>
-          <pre v-if="entry.stdout" class="whitespace-pre-wrap break-words text-slate-100">{{ entry.stdout }}</pre>
-          <pre v-if="entry.stderr" class="whitespace-pre-wrap break-words text-rose-300">{{ entry.stderr }}</pre>
-          <div
-            v-if="entry.kind !== 'output'"
-            class="text-xs"
-            :class="entry.exitCode === 0 ? 'text-emerald-400' : 'text-amber-400'"
-          >
-            exit {{ entry.exitCode }}
-          </div>
+          <template v-if="entry.kind !== 'output'">
+            <div class="flex items-center gap-2">
+              <span class="text-emerald-300">{{ promptPrefix }}</span>
+              <span class="text-cyan-300">{{ entry.command }}</span>
+            </div>
+            <pre v-if="entry.stdout" class="whitespace-pre-wrap break-words text-slate-100">{{ entry.stdout }}</pre>
+            <pre v-if="entry.stderr" class="whitespace-pre-wrap break-words text-rose-300">{{ entry.stderr }}</pre>
+            <div class="text-xs" :class="entry.exitCode === 0 ? 'text-emerald-400' : 'text-amber-400'">
+              exit {{ entry.exitCode }}
+            </div>
+          </template>
+          <template v-else>
+            <div class="text-xs uppercase tracking-wide text-slate-400">{{ entry.label || 'Output' }}</div>
+            <pre v-if="entry.stdout" class="whitespace-pre-wrap break-words text-slate-100">{{ entry.stdout }}</pre>
+            <pre v-if="entry.stderr" class="whitespace-pre-wrap break-words text-rose-300">{{ entry.stderr }}</pre>
+          </template>
         </div>
+
         <div v-if="isRunning && liveCommand" class="mb-3">
-          <div class="text-sky-300">$ {{ liveCommand }}</div>
+          <div class="flex items-center gap-2">
+            <span class="text-emerald-300">{{ promptPrefix }}</span>
+            <span class="text-cyan-300">{{ liveCommand }}</span>
+          </div>
           <pre v-if="liveStdout" class="whitespace-pre-wrap break-words text-slate-100">{{ liveStdout }}</pre>
           <pre v-if="liveStderr" class="whitespace-pre-wrap break-words text-rose-300">{{ liveStderr }}</pre>
           <div class="text-xs text-amber-400">running...</div>
         </div>
+
+        <form class="mt-2 border-t border-slate-700/70 pt-3" @submit.prevent="runCommand">
+          <div class="flex items-center gap-2">
+            <span class="text-emerald-300">{{ promptPrefix }}</span>
+            <input
+              ref="commandInputRef"
+              v-model="command"
+              type="text"
+              class="w-full bg-transparent text-slate-100 outline-none placeholder:text-slate-500 caret-emerald-300"
+              placeholder="type command..."
+              autocomplete="off"
+              spellcheck="false"
+              :disabled="isRunning || !appStore.activeWorkspaceId"
+              @keydown="handleInputKeydown"
+            />
+          </div>
+        </form>
       </div>
 
-      <div class="border-t border-gray-200 bg-white p-3">
-        <div class="mb-2 flex items-center justify-between text-xs text-gray-600">
+      <div class="border-t border-gray-200 bg-white px-3 py-2">
+        <div class="flex items-center justify-between text-xs text-gray-600">
           <span>Shell: {{ shellLabel }}</span>
           <div class="flex items-center gap-2">
             <button
@@ -68,22 +101,6 @@
             </button>
           </div>
         </div>
-        <form class="flex items-center gap-2" @submit.prevent="runCommand">
-          <input
-            v-model="command"
-            type="text"
-            class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-            placeholder="Enter command (e.g., pwd, ls, pip install pandas==2.2.3)"
-            :disabled="isRunning || !appStore.activeWorkspaceId"
-          />
-          <button
-            type="submit"
-            class="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-            :disabled="isRunning || !command.trim() || !appStore.activeWorkspaceId"
-          >
-            {{ isRunning ? 'Running...' : 'Run' }}
-          </button>
-        </form>
       </div>
     </template>
   </div>
@@ -106,8 +123,12 @@ const shell = ref('')
 const liveCommand = ref('')
 const liveStdout = ref('')
 const liveStderr = ref('')
+const commandInputRef = ref(null)
+const commandHistory = ref([])
+const commandHistoryIndex = ref(-1)
 
 const displayCwd = computed(() => appStore.terminalCwd || 'n/a')
+const promptPrefix = computed(() => `${(displayCwd.value || '~').split('/').pop() || '~'} $`)
 const shellLabel = computed(() => {
   if (shell.value) return shell.value
   const p = navigator.platform.toLowerCase()
@@ -117,6 +138,7 @@ const shellLabel = computed(() => {
 
 onMounted(async () => {
   await ensureWorkspaceCwd()
+  focusCommandInput()
 })
 
 watch(() => appStore.activeWorkspaceId, async () => {
@@ -146,6 +168,37 @@ function grantConsent() {
 function clearTerminal() {
   appStore.clearTerminalEntries()
   appStore.setTerminalOutput('')
+  focusCommandInput()
+}
+
+function focusCommandInput() {
+  if (!commandInputRef.value) return
+  commandInputRef.value.focus()
+}
+
+function handleInputKeydown(event) {
+  if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    if (commandHistory.value.length === 0) return
+    if (commandHistoryIndex.value < 0) {
+      commandHistoryIndex.value = commandHistory.value.length - 1
+    } else if (commandHistoryIndex.value > 0) {
+      commandHistoryIndex.value -= 1
+    }
+    command.value = commandHistory.value[commandHistoryIndex.value] || ''
+    return
+  }
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    if (commandHistory.value.length === 0 || commandHistoryIndex.value < 0) return
+    if (commandHistoryIndex.value < commandHistory.value.length - 1) {
+      commandHistoryIndex.value += 1
+      command.value = commandHistory.value[commandHistoryIndex.value] || ''
+      return
+    }
+    commandHistoryIndex.value = -1
+    command.value = ''
+  }
 }
 
 async function runCommand() {
@@ -153,6 +206,8 @@ async function runCommand() {
   if (!raw || !appStore.activeWorkspaceId || isRunning.value) return
 
   isRunning.value = true
+  commandHistory.value.push(raw)
+  commandHistoryIndex.value = -1
   liveCommand.value = raw
   liveStdout.value = ''
   liveStderr.value = ''
@@ -209,6 +264,7 @@ async function runCommand() {
     if (scrollRef.value) {
       scrollRef.value.scrollTop = scrollRef.value.scrollHeight
     }
+    focusCommandInput()
   } catch (error) {
     const message = error?.message || 'Terminal execution failed.'
     appStore.appendTerminalEntry({
@@ -226,6 +282,7 @@ async function runCommand() {
     liveStdout.value = ''
     liveStderr.value = ''
     isRunning.value = false
+    focusCommandInput()
   }
 }
 
@@ -236,6 +293,10 @@ async function resetSession() {
     appStore.clearTerminalEntries()
     shell.value = ''
     await ensureWorkspaceCwd()
+    commandHistory.value = []
+    commandHistoryIndex.value = -1
+    command.value = ''
+    focusCommandInput()
     toast.success('Terminal session reset', 'Started a fresh shell for this workspace.')
   } catch (error) {
     const message = error?.message || 'Failed to reset terminal session.'
@@ -243,3 +304,11 @@ async function resetSession() {
   }
 }
 </script>
+
+<style scoped>
+.terminal-shell {
+  background-image:
+    radial-gradient(circle at 25% 15%, rgba(56, 189, 248, 0.07), transparent 30%),
+    radial-gradient(circle at 80% 85%, rgba(16, 185, 129, 0.05), transparent 35%);
+}
+</style>

@@ -25,3 +25,21 @@ async def test_hard_delete_workspace_removes_entire_workspace_directory(monkeypa
     await WorkspaceStorageService.hard_delete_workspace("alice", "ws-1")
 
     assert workspace_dir.exists() is False
+
+
+@pytest.mark.asyncio
+async def test_ensure_workspace_dirs_creates_pyproject_for_uv_commands(monkeypatch, tmp_path):
+    user_root = tmp_path / "workspaces-root"
+    monkeypatch.setattr(
+        WorkspaceStorageService,
+        "_user_root",
+        staticmethod(lambda _username: user_root),
+    )
+
+    workspace_dir = await WorkspaceStorageService.ensure_workspace_dirs("alice", "ws-2")
+    pyproject_path = workspace_dir / "pyproject.toml"
+
+    assert pyproject_path.exists() is True
+    content = pyproject_path.read_text(encoding="utf-8")
+    assert "[project]" in content
+    assert 'name = "ws-2"' in content

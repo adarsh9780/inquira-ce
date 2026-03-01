@@ -71,6 +71,7 @@ def ensure_workspace_runner_environment(
 ) -> RunnerEnvironmentStatus:
     """Create/update the workspace runner venv and return its status."""
     venv_path = resolve_workspace_runner_venv(workspace_duckdb_path)
+    _ensure_workspace_pyproject(workspace_duckdb_path)
     venv_path.parent.mkdir(parents=True, exist_ok=True)
     runner_python = _python_bin_from_venv(venv_path)
     created = False
@@ -222,3 +223,26 @@ def _build_runner_state(packages: list[str], index_url: str | None) -> str:
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _ensure_workspace_pyproject(workspace_duckdb_path: str) -> None:
+    workspace_root = Path(workspace_duckdb_path).expanduser().resolve().parent
+    pyproject_path = workspace_root / "pyproject.toml"
+    if pyproject_path.exists():
+        return
+
+    workspace_name = workspace_root.name or "workspace-project"
+    safe_name = "".join(ch if (ch.isalnum() or ch in {"-", "_"}) else "-" for ch in workspace_name).strip("-")
+    if not safe_name:
+        safe_name = "workspace-project"
+    pyproject_path.write_text(
+        (
+            "[project]\n"
+            f'name = "{safe_name}"\n'
+            'version = "0.1.0"\n'
+            'description = "Workspace-scoped runtime project metadata"\n'
+            'requires-python = ">=3.12"\n'
+            "dependencies = []\n"
+        ),
+        encoding="utf-8",
+    )

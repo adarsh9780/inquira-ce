@@ -49,6 +49,22 @@ class WorkspaceStorageService:
             workspace_dir.mkdir(parents=True, exist_ok=True)
             (workspace_dir / "context").mkdir(parents=True, exist_ok=True)
             (workspace_dir / "meta").mkdir(parents=True, exist_ok=True)
+            pyproject_path = workspace_dir / "pyproject.toml"
+            if not pyproject_path.exists():
+                safe_name = "".join(ch if (ch.isalnum() or ch in {"-", "_"}) else "-" for ch in workspace_id).strip("-")
+                if not safe_name:
+                    safe_name = "workspace-project"
+                pyproject_path.write_text(
+                    (
+                        "[project]\n"
+                        f'name = "{safe_name}"\n'
+                        'version = "0.1.0"\n'
+                        'description = "Workspace-scoped runtime project metadata"\n'
+                        'requires-python = ">=3.12"\n'
+                        "dependencies = []\n"
+                    ),
+                    encoding="utf-8",
+                )
 
         await asyncio.to_thread(_create)
         return workspace_dir

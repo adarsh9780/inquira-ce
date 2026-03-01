@@ -17,6 +17,7 @@ test('terminal tab renders output entries without shell command prompt', () => {
   const source = readFileSync(terminalPath, 'utf-8')
 
   assert.equal(source.includes("v-if=\"entry.kind !== 'output'\""), true)
-  assert.equal(source.includes("v-else class=\"text-xs uppercase tracking-wide text-slate-400\""), true)
+  assert.equal(source.includes('<template v-else>'), true)
+  assert.equal(source.includes("{{ entry.label || 'Output' }}"), true)
   assert.equal(source.includes('appStore.clearTerminalEntries()'), true)
 })
