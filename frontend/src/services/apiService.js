@@ -463,15 +463,6 @@ export const apiService = {
     throw new Error('Browser file uploads are not supported in v1 desktop mode. Use the native file picker.')
   },
 
-  // Chat and analysis
-  async analyzeData(data, signal = null) {
-    throw new Error('Legacy /chat endpoint removed. Use v1Analyze with workspace scope.')
-  },
-
-  async analyzeDataStream(data, { signal = null, onEvent = null } = {}) {
-    throw new Error('Legacy /chat/stream endpoint removed. Use v1AnalyzeStream with workspace scope.')
-  },
-
   async getHistory() {
     return client.getChatHistoryHistoryGet()
   },

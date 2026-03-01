@@ -499,18 +499,6 @@ function focusChatInput() {
   }
 }
 
-function focusCodeEditor() {
-  appStore.setWorkspacePane('code')
-  appStore.setActiveTab('workspace')
-  // Find and focus the code editor
-  const codeEditor = document.querySelector('.cm-editor')
-  if (codeEditor) {
-    codeEditor.focus()
-    // Scroll into view if needed
-    codeEditor.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }
-}
-
 function focusCodeEditorAtEnd() {
   appStore.setWorkspacePane('code')
   appStore.setActiveTab('workspace')

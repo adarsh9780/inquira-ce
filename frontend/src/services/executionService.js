@@ -39,21 +39,6 @@ class ExecutionService {
         }
     }
 
-    /**
-     * No-op: initialization is no longer needed.
-     * Kept for API compatibility if any component calls it.
-     */
-    async initialize(_opts) {
-        console.debug('[ExecutionService] Server-side execution ready (no initialization needed)')
-    }
-
-    /**
-     * No-op: State restoration via accumulated code blocks is no longer needed.
-     * The backend manages its own session state.
-     */
-    async restoreState(_codeBlocks) {
-        console.debug('[ExecutionService] Server manages state (no restoration needed)')
-    }
 }
 
 const executionService = new ExecutionService()
