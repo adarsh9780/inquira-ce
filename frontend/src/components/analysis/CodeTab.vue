@@ -1,37 +1,36 @@
 <template>
   <div class="flex h-full flex-col">
     <Teleport to="#workspace-left-pane-toolbar" v-if="isMounted && appStore.workspacePane === 'code'">
-      <div class="flex items-center justify-end w-full gap-4">
-        <div class="text-xs text-gray-500 hidden xl:block">
-          <span class="font-medium">Tip:</span> Select code and press <kbd class="rounded border border-gray-300 bg-white px-1 py-0.5">Shift+Enter</kbd> to run selection
-        </div>
-        <div class="flex items-center space-x-2">
+      <div class="flex items-center w-full justify-end">
+        <div class="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100">
           <button
             @click="runCode"
             :disabled="!canRunCode || isRunning"
             title="Run Code (R)"
-            class="inline-flex items-center rounded-md border border-transparent px-2 py-1.5 text-sm font-medium leading-4 text-white transition-colors"
+            class="flex items-center justify-center rounded-lg p-1.5 transition-all hover:shadow-sm"
             :class="canRunCode && !isRunning
-              ? 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2'
-              : 'cursor-not-allowed bg-gray-400'"
+              ? 'text-gray-600 hover:bg-white hover:text-green-600'
+              : 'cursor-not-allowed opacity-40 text-gray-400'"
           >
             <PlayIcon v-if="!isRunning" class="h-4 w-4" />
-            <div v-else class="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+            <div v-else class="h-4 w-4 animate-spin rounded-full border-b-2 border-gray-400"></div>
           </button>
 
           <button
             @click="syncTableNameInCode"
             title="Sync table name in code to current data file"
-            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            class="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-white hover:text-blue-600 transition-all hover:shadow-sm"
           >
             <ArrowPathIcon class="h-4 w-4" />
           </button>
 
+          <div class="w-px h-4 bg-gray-200 mx-0.5"></div>
+
           <button
             @click="undo"
             :disabled="!canUndo"
-            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            :class="!canUndo ? 'cursor-not-allowed opacity-50' : ''"
+            class="flex items-center justify-center rounded-lg p-1.5 transition-all hover:shadow-sm"
+            :class="canUndo ? 'text-gray-600 hover:bg-white hover:text-blue-600' : 'cursor-not-allowed opacity-40 text-gray-400'"
             title="Undo (Ctrl+Z)"
           >
             <ArrowUturnLeftIcon class="h-4 w-4" />
@@ -40,18 +39,20 @@
           <button
             @click="redo"
             :disabled="!canRedo"
-            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            :class="!canRedo ? 'cursor-not-allowed opacity-50' : ''"
+            class="flex items-center justify-center rounded-lg p-1.5 transition-all hover:shadow-sm"
+            :class="canRedo ? 'text-gray-600 hover:bg-white hover:text-blue-600' : 'cursor-not-allowed opacity-40 text-gray-400'"
             title="Redo (Ctrl+Y)"
           >
             <ArrowUturnRightIcon class="h-4 w-4" />
           </button>
+          
+          <div class="w-px h-4 bg-gray-200 mx-0.5"></div>
 
           <button
             @click="downloadCode"
             :disabled="!appStore.pythonFileContent"
-            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            :class="!appStore.pythonFileContent ? 'cursor-not-allowed opacity-50' : ''"
+            class="flex items-center justify-center rounded-lg p-1.5 transition-all hover:shadow-sm"
+            :class="appStore.pythonFileContent ? 'text-gray-600 hover:bg-white hover:text-blue-600' : 'cursor-not-allowed opacity-40 text-gray-400'"
             title="Download code"
           >
             <ArrowDownTrayIcon class="h-4 w-4" />

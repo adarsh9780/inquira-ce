@@ -2,37 +2,7 @@
   <div class="flex h-full min-w-0 bg-white rounded-xl overflow-hidden">
     <div class="flex-1 min-w-0 flex flex-col">
     <Teleport to="#workspace-left-pane-toolbar" v-if="isMounted && appStore.workspacePane === 'chat'">
-      <div class="flex items-center w-full gap-4 justify-between">
-        <div class="flex-1 min-w-0 flex items-center gap-2 group">
-          <div v-if="!isEditingTitle" class="min-w-0 flex items-center gap-2 overflow-hidden">
-            <h3 
-              class="min-w-0 truncate text-sm font-bold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
-              @click="startEditingTitle"
-              title="Click to rename"
-            >
-              {{ activeConversationTitle }}
-            </h3>
-            <button 
-              @click="startEditingTitle" 
-              class="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-100 rounded-md transition-all flex-shrink-0"
-              title="Rename conversation"
-            >
-              <PencilIcon class="h-3 w-3 text-gray-400" />
-            </button>
-          </div>
-          <div v-else class="flex-1 max-w-sm flex items-center gap-2">
-            <input
-              ref="titleInputRef"
-              v-model="editingTitleValue"
-              class="w-full px-2 py-1 text-sm font-bold text-gray-900 border border-blue-500 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-100 bg-blue-50/30"
-              @keydown.enter="saveTitle"
-              @keydown.esc="cancelEditingTitle"
-              @blur="saveTitle"
-            />
-          </div>
-        </div>
-
-        <div class="ml-auto flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+      <div class="flex items-center w-full justify-end">
           <div class="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100">
             <button
               type="button"
@@ -63,7 +33,6 @@
               <TrashIcon class="h-4 w-4" />
             </button>
           </div>
-        </div>
       </div>
     </Teleport>
 
@@ -113,56 +82,13 @@ import {
   ChatBubbleLeftRightIcon, 
   ArrowPathIcon,
   PlusIcon,
-  TrashIcon,
-  PencilIcon
+  TrashIcon
 } from '@heroicons/vue/24/outline'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 
 const appStore = useAppStore()
 const isMounted = ref(false)
-
-// Title Editing
-const isEditingTitle = ref(false)
-const editingTitleValue = ref('')
-const titleInputRef = ref(null)
-
-const activeConversationTitle = computed(() => {
-  const active = appStore.conversations.find((conv) => conv.id === appStore.activeConversationId)
-  return active?.title || 'New Conversation'
-})
-
-function startEditingTitle() {
-  if (!appStore.activeConversationId) return
-  editingTitleValue.value = activeConversationTitle.value
-  isEditingTitle.value = true
-  nextTick(() => {
-    titleInputRef.value?.focus()
-    titleInputRef.value?.select()
-  })
-}
-
-function cancelEditingTitle() {
-  isEditingTitle.value = false
-}
-
-async function saveTitle() {
-  if (!isEditingTitle.value) return
-  const newTitle = editingTitleValue.value.trim()
-  
-  if (!newTitle || newTitle === activeConversationTitle.value) {
-    isEditingTitle.value = false
-    return
-  }
-
-  try {
-    await appStore.updateConversationTitle(newTitle)
-    isEditingTitle.value = false
-    toast.success('Renamed', 'Conversation title updated')
-  } catch (error) {
-    toast.error('Rename Failed', extractApiErrorMessage(error, 'Failed to update title'))
-  }
-}
 
 async function createConversation() {
   try {

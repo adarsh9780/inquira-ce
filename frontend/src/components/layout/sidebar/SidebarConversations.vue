@@ -38,35 +38,61 @@
         :class="conv.id === appStore.activeConversationId ? 'bg-blue-50/50 border border-blue-100/50' : 'hover:bg-gray-200/50 border border-transparent'"
         @click="selectConversation(conv.id)"
       >
-        <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5">
+        <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5" @dblclick="startEditing(conv)">
           <CheckCircleIcon 
             v-if="conv.id === appStore.activeConversationId" 
             class="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" 
           />
           <div v-else class="w-3.5 h-3.5 shrink-0 mt-0.5"></div>
           <div class="flex-1 min-w-0">
-             <p class="truncate text-xs" :class="conv.id === appStore.activeConversationId ? 'font-medium text-blue-800' : 'text-gray-700'">
-              {{ conv.title || 'Conversation' }}
-             </p>
-             <p class="text-[9px] text-gray-400 truncate">{{ formatTimestamp(conv.updated_at || conv.created_at) }}</p>
+             <div v-if="editingId === conv.id" class="flex items-center gap-1 w-full relative z-10">
+               <input
+                 :ref="(el) => { if (el) editInputs[conv.id] = el }"
+                 v-model="editingTitleValue"
+                 class="w-full bg-white px-1 py-0.5 text-xs font-semibold text-gray-900 border border-blue-400 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
+                 @keydown.enter.prevent="saveTitle(conv.id)"
+                 @keydown.esc.prevent="cancelEditing"
+                 @blur="saveTitle(conv.id)"
+                 @click.stop
+               />
+             </div>
+             <template v-else>
+               <p 
+                 class="truncate text-xs" 
+                 :class="conv.id === appStore.activeConversationId ? 'font-medium text-blue-800' : 'text-gray-700'"
+                 :title="conv.title || 'Conversation'"
+               >
+                 {{ conv.title || 'Conversation' }}
+               </p>
+               <p class="text-[9px] text-gray-400 truncate">{{ formatTimestamp(conv.updated_at || conv.created_at) }}</p>
+             </template>
           </div>
         </div>
 
-        <button
-          v-if="conv.id !== appStore.activeConversationId"
-          @click.stop="deleteConv(conv.id)"
-          class="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-gray-200 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0"
-          title="Delete Conversation"
-        >
-           <TrashIcon class="w-3 h-3" />
-        </button>
+        <div v-if="editingId !== conv.id" class="flex-shrink-0 flex items-center opacity-0 group-hover/item:opacity-100 transition-opacity">
+          <button
+            @click.stop="startEditing(conv)"
+            class="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-200"
+            title="Rename Conversation"
+          >
+             <PencilIcon class="w-3 h-3" />
+          </button>
+          <button
+            v-if="conv.id !== appStore.activeConversationId"
+            @click.stop="deleteConv(conv.id)"
+            class="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-gray-200"
+            title="Delete Conversation"
+          >
+             <TrashIcon class="w-3 h-3" />
+          </button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, watch, onMounted } from 'vue'
+import { computed, watch, onMounted, ref } from 'vue'
 import { useAppStore } from '../../../stores/appStore'
 import { apiService } from '../../../services/apiService'
 import { formatTimestamp } from '../../../utils/dateUtils'
@@ -76,7 +102,8 @@ import {
   ChatBubbleLeftRightIcon, 
   PlusIcon,
   CheckCircleIcon,
-  TrashIcon
+  TrashIcon,
+  PencilIcon
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -86,6 +113,58 @@ const props = defineProps({
 const emit = defineEmits(['header-click', 'select'])
 
 const appStore = useAppStore()
+
+// Inline Editing
+const editingId = ref(null)
+const editingTitleValue = ref('')
+const editInputs = ref({})
+
+function startEditing(conv) {
+  editingId.value = conv.id
+  editingTitleValue.value = conv.title || 'Conversation'
+  // Focus next tick
+  setTimeout(() => {
+    const inputEl = editInputs.value[conv.id]
+    if (inputEl) {
+      inputEl.focus()
+      inputEl.select()
+    }
+  }, 50)
+}
+
+function cancelEditing() {
+  editingId.value = null
+  editingTitleValue.value = ''
+}
+
+async function saveTitle(id) {
+  if (editingId.value !== id) return
+  
+  const newTitle = editingTitleValue.value.trim()
+  const conv = appStore.conversations.find((c) => c.id === id)
+  
+  // No change or empty
+  if (!newTitle || newTitle === (conv?.title || 'Conversation')) {
+    cancelEditing()
+    return
+  }
+
+  try {
+    // If the renamed conversation is the active one, we can use the appStore's method
+    if (id === appStore.activeConversationId) {
+      await appStore.updateConversationTitle(newTitle)
+    } else {
+      // Otherwise, hit the API directly and mutate the list
+      await apiService.v1UpdateConversation(id, { title: newTitle })
+      if (conv) conv.title = newTitle
+    }
+    toast.success('Renamed', 'Conversation title updated')
+  } catch (error) {
+    toast.error('Rename Failed', extractApiErrorMessage(error, 'Failed to update title'))
+  } finally {
+    cancelEditing()
+  }
+}
 
 function handleHeaderClick() {
   if (!appStore.hasWorkspace) return
