@@ -44,9 +44,9 @@
           <button
             v-for="tab in tabs"
             :key="tab.id"
-            @click="appStore.setActiveTab(tab.id)"
+            @click="handleTabClick(tab.id)"
             :class="[
-              appStore.activeTab === tab.id
+              (tab.id === 'terminal' ? appStore.isTerminalOpen : appStore.activeTab === tab.id)
                 ? 'bg-white text-blue-600 shadow-sm border border-gray-200/60 ring-1 ring-black/5'
                 : 'text-gray-600 hover:bg-gray-200/50 hover:text-gray-900 border border-transparent',
               'relative w-full rounded-lg font-medium text-sm transition-all duration-200 flex items-center',
@@ -56,11 +56,11 @@
             :title="tab.name"
           >
             <!-- Highlight indicator line -->
-            <div v-if="appStore.activeTab === tab.id" class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1/2 bg-blue-600 rounded-r-full"></div>
+            <div v-if="(tab.id === 'terminal' ? appStore.isTerminalOpen : appStore.activeTab === tab.id)" class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1/2 bg-blue-600 rounded-r-full"></div>
 
             <div class="relative flex w-full items-center" :class="appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start ml-1.5'">
-              <component :is="tab.icon" class="h-4 w-4 shrink-0 transition-transform" :class="appStore.activeTab === tab.id ? 'scale-110' : ''" />
-              <span v-show="!appStore.isSidebarCollapsed" class="ml-2.5 truncate" :class="appStore.activeTab === tab.id ? 'font-semibold' : ''">{{ tab.name }}</span>
+              <component :is="tab.icon" class="h-4 w-4 shrink-0 transition-transform" :class="(tab.id === 'terminal' ? appStore.isTerminalOpen : appStore.activeTab === tab.id) ? 'scale-110' : ''" />
+              <span v-show="!appStore.isSidebarCollapsed" class="ml-2.5 truncate" :class="(tab.id === 'terminal' ? appStore.isTerminalOpen : appStore.activeTab === tab.id) ? 'font-semibold' : ''">{{ tab.name }}</span>
 
               <span v-if="appStore.isSidebarCollapsed && tab.count && Number(tab.count) > 0"
                     class="absolute -right-1 -top-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold text-white shadow-sm ring-2 ring-gray-50"
@@ -322,6 +322,19 @@ let kernelStatusPoller = null
 const isConfigurationComplete = computed(() => {
   return appStore.apiKeyConfigured && appStore.hasDataFile && isWebSocketConnected.value
 })
+
+function handleTabClick(tabId) {
+  if (tabId === 'terminal') {
+    appStore.toggleTerminal()
+  } else {
+    appStore.setActiveTab(tabId)
+    // Optional: Hide terminal if switching to a non-workspace full screen view
+    if (appStore.isTerminalOpen && ['preview', 'schema-editor'].includes(tabId)) {
+      // Keep it conceptually "open" for when we return to workspace, or close it
+      // we'll leave it as is, standard appStore logic handles visibility via v-show
+    }
+  }
+}
 
 const getStatusDotClasses = computed(() => {
   if (isConfigurationComplete.value) {

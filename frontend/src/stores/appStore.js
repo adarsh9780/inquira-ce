@@ -60,6 +60,8 @@ export const useAppStore = defineStore('app', () => {
   const dataPane = ref('table') // 'table' | 'figure' | 'varex'
   const leftPaneWidth = ref(50) // percentage
   const terminalConsentGranted = ref(false)
+  const isTerminalOpen = ref(false)
+  const terminalHeight = ref(30) // percentage
   const terminalCwd = ref('')
   const isChatOverlayOpen = ref(true)
   const chatOverlayWidth = ref(0.25) // 25% of area
@@ -103,6 +105,7 @@ export const useAppStore = defineStore('app', () => {
         left_pane_width: Number(leftPaneWidth.value || 50),
         chat_overlay_open: !!isChatOverlayOpen.value,
         chat_overlay_width: Number(chatOverlayWidth.value || 0.25),
+        terminal_height: Number(terminalHeight.value || 30),
         is_sidebar_collapsed: !!isSidebarCollapsed.value,
         hide_shortcuts_modal: !!hideShortcutsModal.value
       },
@@ -151,6 +154,9 @@ export const useAppStore = defineStore('app', () => {
     }
     if (typeof ui.chat_overlay_width === 'number' && ui.chat_overlay_width > 0.1 && ui.chat_overlay_width < 0.9) {
       chatOverlayWidth.value = ui.chat_overlay_width
+    }
+    if (typeof ui.terminal_height === 'number' && ui.terminal_height >= 10 && ui.terminal_height <= 90) {
+      terminalHeight.value = ui.terminal_height
     }
     if (typeof ui.is_sidebar_collapsed === 'boolean') {
       isSidebarCollapsed.value = ui.is_sidebar_collapsed
@@ -736,12 +742,28 @@ export const useAppStore = defineStore('app', () => {
     activeTab.value = 'workspace'
     saveLocalConfig()
   }
-  function setLeftPaneWidth(width) {
-    if (width > 10 && width < 90) {
-      leftPaneWidth.value = width
+  function setLeftPaneWidth(widthPct) {
+    if (widthPct >= 10 && widthPct <= 90) {
+      leftPaneWidth.value = widthPct
       saveLocalConfig()
     }
   }
+
+  function setTerminalHeight(heightPct) {
+    if (heightPct >= 10 && heightPct <= 90) {
+      terminalHeight.value = heightPct
+      saveLocalConfig()
+    }
+  }
+
+  function toggleTerminal() {
+    isTerminalOpen.value = !isTerminalOpen.value
+    // If opening the terminal, ensure we are not hiding the workspace if we were previously in a full-screen view.
+    if (isTerminalOpen.value && ['preview', 'schema-editor'].includes(activeTab.value)) {
+      activeTab.value = 'workspace'
+    }
+  }
+
   function setTerminalConsentGranted(granted) {
     terminalConsentGranted.value = !!granted
   }
@@ -904,6 +926,8 @@ export const useAppStore = defineStore('app', () => {
     workspacePane,
     dataPane,
     leftPaneWidth,
+    isTerminalOpen,
+    terminalHeight,
     terminalConsentGranted,
     terminalCwd,
     isChatOverlayOpen,
@@ -970,6 +994,8 @@ export const useAppStore = defineStore('app', () => {
     setWorkspacePane,
     setDataPane,
     setLeftPaneWidth,
+    setTerminalHeight,
+    toggleTerminal,
     setTerminalConsentGranted,
     setTerminalCwd,
     toggleChatOverlay,

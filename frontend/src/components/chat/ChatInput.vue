@@ -165,9 +165,6 @@ async function handleSubmit() {
   // Add user message immediately to show in chat history
   appStore.addChatMessage(questionText, '')
 
-  // Jump to the code tab so the user can watch generation progress
-  appStore.setActiveTab('code')
-
   appStore.setLoading(true)
 
   // Create AbortController for cancellation
@@ -265,7 +262,6 @@ async function handleSubmit() {
     if (!is_safe) {
       // Show the rejection reason in the chat window so user understands why
       appStore.updateLastMessageExplanation(explanation || 'Your query was flagged as potentially unsafe.')
-      appStore.setActiveTab('code')
       return
     }
 
@@ -292,11 +288,7 @@ async function handleSubmit() {
         appStore.setResultData(response.result)
         appStore.setPlotlyFigure(null)
         appStore.setActiveTab('table')
-      } else {
-        appStore.setActiveTab('code')
       }
-    } else {
-      appStore.setActiveTab('code')
     }
 
     // Trigger scroll to bottom after message is added
@@ -351,9 +343,6 @@ async function handleSubmit() {
     toast.error(errorTitle, errorMessage)
     appStore.setTerminalOutput(`Error: ${errorMessage}`)
     appStore.updateLastMessageExplanation(errorMessage)
-
-    // Ensure code editor is visible even on error
-    appStore.setActiveTab('code')
   } finally {
     // Clear timers
     if (warningTimer) clearTimeout(warningTimer)
