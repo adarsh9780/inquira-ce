@@ -727,6 +727,14 @@ export const useAppStore = defineStore('app', () => {
     } else if (normalized === 'chat') {
       activeTab.value = 'workspace'
       workspacePane.value = 'chat'
+    } else if (['table', 'figure', 'varex'].includes(normalized)) {
+      // Route data-related tabs to the right pane instead of a full-screen view
+      activeTab.value = 'workspace'
+      dataPane.value = normalized
+    } else if (normalized === 'terminal') {
+      // Open the bottom terminal pane instead of navigating away
+      activeTab.value = 'workspace'
+      isTerminalOpen.value = true
     } else {
       activeTab.value = normalized || 'workspace'
     }

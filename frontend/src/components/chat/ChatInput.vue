@@ -283,11 +283,11 @@ async function handleSubmit() {
       if (response.plotly_figure || (response.result?.data && response.result?.layout)) {
         appStore.setPlotlyFigure(response.plotly_figure || response.result)
         appStore.setResultData(null)
-        appStore.setActiveTab('figure')
+        appStore.setDataPane('figure')
       } else if (response.result?.columns && response.result?.data) {
         appStore.setResultData(response.result)
         appStore.setPlotlyFigure(null)
-        appStore.setActiveTab('table')
+        appStore.setDataPane('table')
       }
     }
 

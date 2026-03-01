@@ -3,11 +3,11 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('chat input routes chart-like responses to figure tab id', () => {
+test('chat input routes chart-like responses to figure data pane', () => {
   const chatInputPath = resolve(process.cwd(), 'src/components/chat/ChatInput.vue')
   const source = readFileSync(chatInputPath, 'utf-8')
 
-  assert.equal(source.includes("appStore.setActiveTab('figure')"), true)
+  assert.equal(source.includes("appStore.setDataPane('figure')"), true)
   assert.equal(source.includes("appStore.setActiveTab('chart')"), false)
 })
 

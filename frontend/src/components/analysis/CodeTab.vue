@@ -502,6 +502,13 @@ watch(() => appStore.generatedCode, (newCode) => {
     isGeneratingCode.value = false
     appStore.setLoading(false)
     appStore.setCodeRunning(false)
+
+    // Auto-run the newly generated code
+    nextTick(() => {
+      if (canRunCode.value) {
+        runCode()
+      }
+    })
   }
 })
 
