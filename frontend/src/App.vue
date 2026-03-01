@@ -7,6 +7,7 @@
     <ConnectionStatusIndicator />
 
     <!-- Authentication Modal -->
+    <!-- Auth Modal -->
     <AuthModal
       :is-open="!authStore.isAuthenticated && !authStore.isLoading"
       @close="handleAuthClose"
@@ -25,6 +26,9 @@
           <RightPanel />
         </div>
       </div>
+      
+      <!-- Footer Status Bar -->
+      <StatusBar />
     </div>
 
     <!-- Loading Screen -->
@@ -36,7 +40,7 @@
       </div>
     </div>
 
-    <!-- Backend Status Overlay (shown during first-time setup) -->
+    <!-- Backend Status Overlay ... -->
     <Teleport to="body">
       <Transition name="fade">
         <div
@@ -70,6 +74,7 @@ import { settingsWebSocket } from './services/websocketService'
 import AuthModal from './components/modals/AuthModal.vue'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
+import StatusBar from './components/layout/StatusBar.vue'
 import ToastContainer from './components/ui/ToastContainer.vue'
 import ConnectionStatusIndicator from './components/ui/ConnectionStatusIndicator.vue'
 

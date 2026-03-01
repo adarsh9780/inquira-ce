@@ -65,8 +65,13 @@ export const useAppStore = defineStore('app', () => {
   const terminalCwd = ref('')
   const isChatOverlayOpen = ref(true)
   const chatOverlayWidth = ref(0.25) // 25% of area
-  const isSidebarCollapsed = ref(true)
+  const isSidebarCollapsed = ref(false)
   const hideShortcutsModal = ref(false)
+
+  // Editor State
+  const editorLine = ref(1)
+  const editorCol = ref(1)
+  const isEditorFocused = ref(false)
 
   // UI State
   const isLoading = ref(false)
@@ -793,13 +798,21 @@ export const useAppStore = defineStore('app', () => {
     }
   }
   function setSidebarCollapsed(collapsed) {
-    isSidebarCollapsed.value = collapsed
+    isSidebarCollapsed.value = !!collapsed
+    saveLocalConfig()
+  }
+  function setHideShortcutsModal(hide) {
+    hideShortcutsModal.value = !!hide
     saveLocalConfig()
   }
 
-  function setHideShortcutsModal(hidden) {
-    hideShortcutsModal.value = !!hidden
-    saveLocalConfig()
+  // Editor tracking
+  function setEditorPosition(line, col) {
+    editorLine.value = line
+    editorCol.value = col
+  }
+  function setEditorFocused(focused) {
+    isEditorFocused.value = focused
   }
 
   function setLoading(loading) {
@@ -942,6 +955,9 @@ export const useAppStore = defineStore('app', () => {
     chatOverlayWidth,
     isSidebarCollapsed,
     hideShortcutsModal,
+    editorLine,
+    editorCol,
+    isEditorFocused,
     isLoading,
     isCodeRunning,
     historicalCodeBlocks,
@@ -1011,6 +1027,8 @@ export const useAppStore = defineStore('app', () => {
     setChatOverlayWidth,
     setSidebarCollapsed,
     setHideShortcutsModal,
+    setEditorPosition,
+    setEditorFocused,
     loadUserPreferences,
     setLoading,
     setCodeRunning,

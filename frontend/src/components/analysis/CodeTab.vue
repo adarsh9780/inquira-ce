@@ -422,6 +422,7 @@ async function initializeEditor() {
       '.cm-focused': { outline: 'none' },
     }),
     EditorView.updateListener.of((update) => {
+      // Handle content changes
       if (update.docChanged && !isUpdatingFromStore) {
         const content = editor.state.doc.toString()
         isUpdatingFromStore = true
@@ -429,6 +430,27 @@ async function initializeEditor() {
         setTimeout(() => {
           isUpdatingFromStore = false
         }, 10)
+      }
+
+      // Handle cursor position updates
+      if (update.selectionSet || update.docChanged) {
+        const head = update.state.selection.main.head
+        const line = update.state.doc.lineAt(head)
+        appStore.setEditorPosition(line.number, head - line.from + 1)
+      }
+    }),
+    EditorView.domEventHandlers({
+      focus: () => {
+        appStore.setEditorFocused(true)
+        // Ensure accurate position on initial focus
+        if (editor) {
+          const head = editor.state.selection.main.head
+          const line = editor.state.doc.lineAt(head)
+          appStore.setEditorPosition(line.number, head - line.from + 1)
+        }
+      },
+      blur: () => {
+        appStore.setEditorFocused(false)
       }
     }),
     EditorView.lineWrapping,

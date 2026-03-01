@@ -46,7 +46,7 @@
             :key="tab.id"
             @click="handleTabClick(tab.id)"
             :class="[
-              (tab.id === 'terminal' ? appStore.isTerminalOpen : appStore.activeTab === tab.id)
+              appStore.activeTab === tab.id
                 ? 'bg-white text-blue-600 shadow-sm border border-gray-200/60 ring-1 ring-black/5'
                 : 'text-gray-600 hover:bg-gray-200/50 hover:text-gray-900 border border-transparent',
               'relative w-full rounded-lg font-medium text-sm transition-all duration-200 flex items-center',
@@ -56,11 +56,11 @@
             :title="tab.name"
           >
             <!-- Highlight indicator line -->
-            <div v-if="(tab.id === 'terminal' ? appStore.isTerminalOpen : appStore.activeTab === tab.id)" class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1/2 bg-blue-600 rounded-r-full"></div>
+            <div v-if="appStore.activeTab === tab.id" class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1/2 bg-blue-600 rounded-r-full"></div>
 
             <div class="relative flex w-full items-center" :class="appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start ml-1.5'">
-              <component :is="tab.icon" class="h-4 w-4 shrink-0 transition-transform" :class="(tab.id === 'terminal' ? appStore.isTerminalOpen : appStore.activeTab === tab.id) ? 'scale-110' : ''" />
-              <span v-show="!appStore.isSidebarCollapsed" class="ml-2.5 truncate" :class="(tab.id === 'terminal' ? appStore.isTerminalOpen : appStore.activeTab === tab.id) ? 'font-semibold' : ''">{{ tab.name }}</span>
+              <component :is="tab.icon" class="h-4 w-4 shrink-0 transition-transform" :class="appStore.activeTab === tab.id ? 'scale-110' : ''" />
+              <span v-show="!appStore.isSidebarCollapsed" class="ml-2.5 truncate" :class="appStore.activeTab === tab.id ? 'font-semibold' : ''">{{ tab.name }}</span>
 
               <span v-if="appStore.isSidebarCollapsed && tab.count && Number(tab.count) > 0"
                     class="absolute -right-1 -top-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold text-white shadow-sm ring-2 ring-gray-50"
@@ -82,47 +82,6 @@
     <!-- Bottom Section: User & Status -->
     <div class="border-t border-gray-200 bg-gray-100/50 p-3 shrink-0">
       
-      <!-- Status Badges (Hidden when collapsed) -->
-      <div v-show="!appStore.isSidebarCollapsed" class="mb-3 space-y-2">
-        <!-- Kernel Status -->
-        <div class="flex items-center justify-between text-xs px-2 py-1.5 bg-white border border-gray-200 rounded-md shadow-sm">
-          <div class="flex items-center gap-1.5 truncate">
-            <span
-              v-if="kernelStatusMeta.showSpinner"
-              class="inline-block w-2.5 h-2.5 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin shrink-0"
-              aria-hidden="true"
-            ></span>
-            <span v-else class="w-2.5 h-2.5 rounded-full shrink-0" :class="kernelStatusMeta.dotClass"></span>
-            <span class="font-medium truncate" :class="kernelStatusMeta.textClass">
-              {{ kernelStatusMeta.label }}
-            </span>
-          </div>
-          
-          <div class="flex ml-1 gap-1 shrink-0">
-            <button
-              @click="interruptKernel"
-              :disabled="!appStore.activeWorkspaceId || isKernelActionRunning || kernelStatus === 'missing'"
-              class="p-1 rounded text-gray-400 hover:bg-gray-100 hover:text-amber-600 disabled:opacity-30 disabled:hover:bg-transparent"
-              title="Interrupt Kernel"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path d="M5.25 3A2.25 2.25 0 003 5.25v9.5A2.25 2.25 0 005.25 17h9.5A2.25 2.25 0 0017 14.75v-9.5A2.25 2.25 0 0014.75 3h-9.5zM6 6.75a.75.75 0 01.75-.75h6.5a.75.75 0 01.75.75v6.5a.75.75 0 01-.75.75h-6.5a.75.75 0 01-.75-.75v-6.5z" /></svg>
-            </button>
-            <button
-              @click="restartKernel"
-              :disabled="!appStore.activeWorkspaceId || isKernelActionRunning"
-              class="p-1 rounded text-gray-400 hover:bg-gray-100 hover:text-red-500 disabled:opacity-30 disabled:hover:bg-transparent"
-              title="Restart Kernel"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clip-rule="evenodd" /></svg>
-            </button>
-          </div>
-        </div>
-
-        <div v-if="appStore.runtimeError" class="text-[10px] text-red-600 px-1 truncate" :title="appStore.runtimeError">
-          {{ appStore.runtimeError }}
-        </div>
-      </div>
-
       <!-- User Menu Toggle -->
       <div class="relative w-full" v-if="authStore.isAuthenticated">
         <button
@@ -135,11 +94,6 @@
               <div class="w-7 h-7 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center shadow-sm text-white font-medium text-xs">
                 {{ authStore.username ? authStore.username.charAt(0).toUpperCase() : 'U' }}
               </div>
-              <!-- Status Dot Overlay on Avatar -->
-              <div
-                class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-gray-100"
-                :class="getStatusDotClasses"
-              ></div>
             </div>
             
             <div v-show="!appStore.isSidebarCollapsed" class="flex-1 text-left truncate">
@@ -258,7 +212,6 @@ const authStore = useAuthStore()
 const flash = ref({})
 const counts = computed(() => ({
   workspace: appStore.chatHistory?.length || (!appStore.isCodeRunning && appStore.generatedCode ? 1 : 0),
-  terminal: appStore.terminalOutput && !appStore.isCodeRunning ? 1 : 0,
 }))
 
 watch(counts, (n, o) => {
@@ -282,14 +235,6 @@ const tabs = computed(() => [
     badgeClass: '',
     badgeColor: 'bg-blue-600',
   },
-  ...(appStore.terminalEnabled ? [{
-    id: 'terminal',
-    name: 'Terminal',
-    icon: CommandLineIcon,
-    count: appStore.terminalOutput && !appStore.isCodeRunning ? '1' : null,
-    badgeClass: appStore.terminalOutput && !appStore.isCodeRunning ? 'bg-gray-100 text-gray-800' : '',
-    badgeColor: 'bg-slate-700',
-  }] : []),
   {
     id: 'preview',
     name: 'Preview',
@@ -314,26 +259,13 @@ const settingsInitialTab = ref('api')
 const isUserMenuOpen = ref(false)
 const isLogoutConfirmOpen = ref(false)
 const isWebSocketConnected = ref(false)
-const kernelStatus = ref('connecting')
-const isKernelActionRunning = ref(false)
-const isKernelStatusRequestInFlight = ref(false)
-let kernelStatusPoller = null
 
 const isConfigurationComplete = computed(() => {
   return appStore.apiKeyConfigured && appStore.hasDataFile && isWebSocketConnected.value
 })
 
 function handleTabClick(tabId) {
-  if (tabId === 'terminal') {
-    appStore.toggleTerminal()
-  } else {
-    appStore.setActiveTab(tabId)
-    // Optional: Hide terminal if switching to a non-workspace full screen view
-    if (appStore.isTerminalOpen && ['preview', 'schema-editor'].includes(tabId)) {
-      // Keep it conceptually "open" for when we return to workspace, or close it
-      // we'll leave it as is, standard appStore logic handles visibility via v-show
-    }
-  }
+  appStore.setActiveTab(tabId)
 }
 
 const getStatusDotClasses = computed(() => {
@@ -345,30 +277,6 @@ const getStatusDotClasses = computed(() => {
     } else {
       return 'bg-gray-400'
     }
-  }
-})
-
-const kernelStatusMeta = computed(() => {
-  if (appStore.runtimeError && appStore.activeWorkspaceId) {
-    return { label: 'Error', textClass: 'text-red-700', dotClass: 'bg-red-500', showSpinner: false }
-  }
-  switch (String(kernelStatus.value || '').toLowerCase()) {
-    case 'ready':
-      return { label: 'Ready', textClass: 'text-green-700', dotClass: 'bg-green-500', showSpinner: false }
-    case 'busy':
-      return { label: 'Busy', textClass: 'text-amber-700', dotClass: 'bg-amber-500', showSpinner: false }
-    case 'starting':
-    case 'connecting':
-      return { label: 'Connecting', textClass: 'text-blue-700', dotClass: 'bg-blue-500', showSpinner: true }
-    case 'error':
-      return { label: 'Error', textClass: 'text-red-700', dotClass: 'bg-red-500', showSpinner: false }
-    case 'missing':
-      if (appStore.activeWorkspaceId) {
-        return { label: 'Missing', textClass: 'text-amber-700', dotClass: 'bg-amber-500', showSpinner: false }
-      }
-      return { label: 'No WS', textClass: 'text-gray-500', dotClass: 'bg-gray-300', showSpinner: false }
-    default:
-      return { label: appStore.activeWorkspaceId ? 'Connecting' : 'No WS', textClass: appStore.activeWorkspaceId ? 'text-blue-700' : 'text-gray-500', dotClass: appStore.activeWorkspaceId ? 'bg-blue-500' : 'bg-gray-300', showSpinner: Boolean(appStore.activeWorkspaceId) }
   }
 })
 
@@ -385,93 +293,14 @@ function setupWebSocketMonitoring() {
 
 onMounted(() => {
   setupWebSocketMonitoring()
-  startKernelStatusPolling()
   document.addEventListener('keydown', handleKeydown)
   document.addEventListener('click', handleClickOutside)
 })
 
 onUnmounted(() => {
-  stopKernelStatusPolling()
   document.removeEventListener('keydown', handleKeydown)
   document.removeEventListener('click', handleClickOutside)
 })
-
-watch(() => appStore.activeWorkspaceId, async () => {
-    await refreshKernelStatus()
-})
-
-async function refreshKernelStatus() {
-  if (!appStore.activeWorkspaceId) {
-    kernelStatus.value = 'missing'
-    return
-  }
-  if (isKernelStatusRequestInFlight.value) return
-  isKernelStatusRequestInFlight.value = true
-  try {
-    const status = await apiService.v1GetWorkspaceKernelStatus(appStore.activeWorkspaceId)
-    kernelStatus.value = String(status?.status || 'missing').toLowerCase()
-    if (['ready', 'busy', 'starting'].includes(kernelStatus.value)) {
-      appStore.setRuntimeError('')
-    }
-  } catch (error) {
-    kernelStatus.value = 'error'
-    appStore.setRuntimeError(error?.response?.data?.detail || error?.message || 'Failed to fetch kernel status.')
-  } finally {
-    isKernelStatusRequestInFlight.value = false
-  }
-}
-
-function startKernelStatusPolling() {
-  stopKernelStatusPolling()
-  refreshKernelStatus()
-  kernelStatusPoller = setInterval(() => {
-    if (!document.hidden) refreshKernelStatus()
-  }, 5000)
-}
-
-function stopKernelStatusPolling() {
-  if (kernelStatusPoller) {
-    clearInterval(kernelStatusPoller)
-    kernelStatusPoller = null
-  }
-}
-
-async function interruptKernel() {
-  if (!appStore.activeWorkspaceId || isKernelActionRunning.value) return
-  isKernelActionRunning.value = true
-  try {
-    const response = await apiService.v1InterruptWorkspaceKernel(appStore.activeWorkspaceId)
-    if (response?.reset) toast.success('Kernel Interrupted', 'Execution interrupt signal sent.')
-    else toast.error('Interrupt Failed', 'No running kernel found.')
-    await refreshKernelStatus()
-  } catch (error) {
-    toast.error('Interrupt Failed', error?.response?.data?.detail || error.message)
-  } finally {
-    isKernelActionRunning.value = false
-  }
-}
-
-async function restartKernel() {
-  if (!appStore.activeWorkspaceId || isKernelActionRunning.value) return
-  isKernelActionRunning.value = true
-  kernelStatus.value = 'connecting'
-  try {
-    const response = await apiService.v1RestartWorkspaceKernel(appStore.activeWorkspaceId)
-    if (response?.reset) {
-      appStore.setCodeRunning(false)
-      toast.success('Kernel Restarted', 'Workspace kernel has been restarted.')
-    } else {
-      toast.error('Restart Failed', 'No kernel session existed.')
-    }
-    await refreshKernelStatus()
-  } catch (error) {
-    toast.error('Restart Failed', error?.response?.data?.detail || error.message)
-    await refreshKernelStatus()
-  } finally {
-    isKernelActionRunning.value = false
-  }
-}
-
 function openSettings(tab = 'api') {
   settingsInitialTab.value = tab
   isSettingsOpen.value = true
