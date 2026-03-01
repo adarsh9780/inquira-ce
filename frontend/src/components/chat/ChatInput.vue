@@ -8,9 +8,9 @@
         @keydown.shift.enter="handleNewLine"
         placeholder="Ask a question about your data... (Enter to send, Shift+Enter for new line)"
         rows="3"
-        class="w-full px-4 sm:px-5 py-2.5 sm:py-3.5 pr-14 sm:pr-18 border border-slate-200 rounded-2xl resize-none focus:outline-none focus:ring-0 focus:border-primary/60 text-sm sm:text-base bg-white shadow-sm transition-all duration-150 leading-relaxed"
+        class="w-full px-4 sm:px-5 py-2.5 sm:py-3.5 pr-14 sm:pr-18 border border-border rounded-2xl resize-none focus:outline-none focus:ring-0 focus:border-border-hover text-sm sm:text-base bg-surface text-text-main placeholder:text-text-muted shadow-sm transition-all duration-150 leading-relaxed"
         :class="{
-          'border-gray-200 bg-gray-50 text-gray-500': !appStore.canAnalyze || appStore.isLoading,
+          'opacity-70 cursor-not-allowed': !appStore.canAnalyze || appStore.isLoading,
           'hover:shadow': appStore.canAnalyze && !appStore.isLoading
         }"
         :disabled="!appStore.canAnalyze || appStore.isLoading"
@@ -20,11 +20,7 @@
       <button
         @click="handleSubmit"
         :disabled="!canSend"
-        class="absolute bottom-3 right-3 p-2.5 rounded-xl transition-all duration-200 shadow-sm z-40 flex-shrink-0"
-        :class="canSend
-          ? 'text-white bg-primary-600 hover:bg-primary-700 hover:scale-105 active:scale-95'
-          : 'text-gray-400 bg-gray-200 cursor-not-allowed'
-        "
+        class="absolute bottom-3 right-3 p-2.5 z-40 flex-shrink-0 btn-primary transition-transform hover:scale-105 active:scale-95 border-none"
         :title="canSend ? 'Send question' : 'Fill requirements to enable send'"
       >
         <PaperAirplaneIcon class="h-5 w-5" />
@@ -41,8 +37,8 @@
         </div>
         <div>
           <h4 class="text-sm font-semibold text-error mb-2">Setup Required</h4>
-          <p class="text-sm text-gray-700 mb-3">Before chatting, complete this setup:</p>
-          <ul class="space-y-2 text-sm text-gray-700">
+          <p class="text-sm text-text-muted mb-3">Before chatting, complete this setup:</p>
+          <ul class="space-y-2 text-sm text-text-muted">
             <li class="flex items-center space-x-2">
               <div class="w-1.5 h-1.5 rounded-full bg-error"></div>
               <span>Create or select a workspace from the header dropdown</span>
@@ -52,7 +48,7 @@
               <span>Enter your OpenRouter API key in Settings</span>
             </li>
           </ul>
-          <p class="text-xs text-gray-600 mt-3">Click the Settings button in the top toolbar to add your API key.</p>
+          <p class="text-xs text-text-muted mt-3">Click the Settings button in the top toolbar to add your API key.</p>
         </div>
       </div>
     </div>

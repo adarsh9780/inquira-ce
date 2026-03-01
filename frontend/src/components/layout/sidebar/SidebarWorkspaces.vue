@@ -3,7 +3,7 @@
     <!-- Header -->
     <div 
       class="flex items-center justify-between px-3 py-2 group cursor-pointer transition-colors"
-      :class="isCollapsed ? 'justify-center hover:bg-gray-200/50 rounded-lg mx-2 mb-1' : 'hover:bg-gray-200/50'"
+      :class="isCollapsed ? 'justify-center hover:bg-zinc-100/50 rounded-lg mx-2 mb-1' : 'hover:bg-zinc-100/50'"
       @click="$emit('header-click')"
       title="Workspaces"
     >
@@ -14,7 +14,7 @@
       <button 
         v-if="!isCollapsed"
         @click.stop="openCreateDialog" 
-        class="p-1 hover:bg-gray-300 rounded text-gray-500 transition-opacity"
+        class="btn-icon transition-opacity"
         :class="appStore.workspaces.length > 0 ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'"
         title="New Workspace"
       >
@@ -39,9 +39,9 @@
       <div 
         v-for="ws in appStore.workspaces" 
         :key="ws.id"
-        class="group/item relative flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors"
+        class="group/item relative flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors border"
         :class="[
-          ws.id === appStore.activeWorkspaceId ? 'bg-blue-50/50' : 'hover:bg-gray-200/50',
+          ws.id === appStore.activeWorkspaceId ? 'bg-zinc-100/80 border-zinc-200' : 'hover:bg-zinc-100/50 border-transparent',
           isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : ''
         ]"
         @click="!isWorkspaceDeleting(ws.id) && selectWorkspace(ws.id)"
@@ -60,7 +60,7 @@
         <button
           v-if="!isWorkspaceDeleting(ws.id) && ws.id !== appStore.activeWorkspaceId"
           @click.stop="confirmDeleteWorkspace(ws.id)"
-          class="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-gray-200 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0"
+          class="btn-icon p-1 text-zinc-400 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0"
           title="Delete Workspace"
         >
            <TrashIcon class="w-3.5 h-3.5" />

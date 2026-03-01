@@ -4,7 +4,7 @@
     <div 
       class="flex items-center justify-between px-3 py-2 group cursor-pointer transition-colors shrink-0"
       :class="[
-        isCollapsed ? 'justify-center hover:bg-gray-200/50 rounded-lg mx-2 mb-1' : 'hover:bg-gray-200/50',
+        isCollapsed ? 'justify-center hover:bg-zinc-100/50 rounded-lg mx-2 mb-1' : 'hover:bg-zinc-100/50',
         !appStore.hasWorkspace ? 'opacity-50 cursor-not-allowed' : ''
       ]"
       @click="handleHeaderClick"
@@ -17,7 +17,7 @@
       <button 
         v-if="!isCollapsed && appStore.hasWorkspace"
         @click.stop="createConversation" 
-        class="p-1 hover:bg-gray-300 rounded text-gray-500 transition-opacity"
+        class="btn-icon transition-opacity"
         :class="appStore.conversations.length > 0 ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'"
         title="New Conversation"
       >
@@ -34,8 +34,8 @@
       <div 
         v-for="conv in appStore.conversations" 
         :key="conv.id"
-        class="group/item relative flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors"
-        :class="conv.id === appStore.activeConversationId ? 'bg-blue-50/50 border border-blue-100/50' : 'hover:bg-gray-200/50 border border-transparent'"
+        class="group/item relative flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors border"
+        :class="conv.id === appStore.activeConversationId ? 'bg-zinc-100/80 border-zinc-200' : 'border-transparent hover:bg-zinc-100/50'"
         @click="selectConversation(conv.id)"
       >
         <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5" @dblclick="startEditing(conv)">
@@ -72,7 +72,7 @@
         <div v-if="editingId !== conv.id" class="flex-shrink-0 flex items-center opacity-0 group-hover/item:opacity-100 transition-opacity">
           <button
             @click.stop="startEditing(conv)"
-            class="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-gray-200"
+            class="btn-icon p-1 hover:text-blue-600"
             title="Rename Conversation"
           >
              <PencilIcon class="w-3 h-3" />
@@ -80,7 +80,7 @@
           <button
             v-if="conv.id !== appStore.activeConversationId"
             @click.stop="deleteConv(conv.id)"
-            class="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-gray-200"
+            class="btn-icon p-1 hover:text-red-500"
             title="Delete Conversation"
           >
              <TrashIcon class="w-3 h-3" />

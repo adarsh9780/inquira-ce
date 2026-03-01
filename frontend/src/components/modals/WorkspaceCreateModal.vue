@@ -34,7 +34,7 @@
         <div class="flex justify-end gap-2 border-t border-gray-200 px-5 py-4">
           <button
             type="button"
-            class="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            class="btn-secondary"
             :disabled="isSubmitting"
             @click="closeModal"
           >
@@ -42,7 +42,7 @@
           </button>
           <button
             type="button"
-            class="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            class="btn-primary"
             :disabled="isSubmitting || !name.trim()"
             @click="submit"
           >

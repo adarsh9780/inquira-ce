@@ -3,20 +3,20 @@
     <div class="flex-1 min-w-0 flex flex-col">
     <Teleport to="#workspace-left-pane-toolbar" v-if="isMounted && appStore.workspacePane === 'chat'">
       <div class="flex items-center w-full justify-end">
-          <div class="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100">
+          <div class="flex items-center gap-1 bg-zinc-50 p-1 rounded-xl border border-zinc-200">
             <button
               type="button"
-              class="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-white hover:text-blue-600 transition-all hover:shadow-sm"
+              class="btn-icon hover:text-blue-600 hover:bg-white hover:shadow-sm"
               @click="createConversation"
               :disabled="!appStore.hasWorkspace"
               title="New Conversation"
             >
               <PlusIcon class="h-4 w-4" />
             </button>
-            <div class="w-px h-4 bg-gray-200 mx-0.5"></div>
+            <div class="w-px h-4 bg-zinc-200 mx-0.5"></div>
             <button
               type="button"
-              class="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-white hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-40 transition-all hover:shadow-sm"
+              class="btn-icon hover:text-amber-600 hover:bg-white hover:shadow-sm"
               :disabled="!appStore.activeConversationId"
               @click="clearConversation"
               title="Clear Conversation"
@@ -25,7 +25,7 @@
             </button>
             <button
               type="button"
-              class="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-white hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 transition-all hover:shadow-sm"
+              class="btn-icon hover:text-red-600 hover:bg-white hover:shadow-sm"
               :disabled="!appStore.activeConversationId"
               @click="deleteConversation"
               title="Delete Conversation"

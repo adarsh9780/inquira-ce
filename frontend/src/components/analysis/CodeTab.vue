@@ -2,15 +2,15 @@
   <div class="flex h-full flex-col">
     <Teleport to="#workspace-left-pane-toolbar" v-if="isMounted && appStore.workspacePane === 'code'">
       <div class="flex items-center w-full justify-end">
-        <div class="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100">
+        <div class="flex items-center gap-1 bg-zinc-50 p-1 rounded-xl border border-zinc-200">
           <button
             @click="runCode"
             :disabled="!canRunCode || isRunning"
             title="Run Code (R)"
-            class="flex items-center justify-center rounded-lg p-1.5 transition-all hover:shadow-sm"
+            class="btn-icon"
             :class="canRunCode && !isRunning
-              ? 'text-gray-600 hover:bg-white hover:text-green-600'
-              : 'cursor-not-allowed opacity-40 text-gray-400'"
+              ? 'hover:bg-white hover:text-green-600 hover:shadow-sm'
+              : ''"
           >
             <PlayIcon v-if="!isRunning" class="h-4 w-4" />
             <div v-else class="h-4 w-4 animate-spin rounded-full border-b-2 border-gray-400"></div>
@@ -19,18 +19,18 @@
           <button
             @click="syncTableNameInCode"
             title="Sync table name in code to current data file"
-            class="flex items-center justify-center rounded-lg p-1.5 text-gray-600 hover:bg-white hover:text-blue-600 transition-all hover:shadow-sm"
+            class="btn-icon hover:bg-white hover:text-blue-600 hover:shadow-sm"
           >
             <ArrowPathIcon class="h-4 w-4" />
           </button>
 
-          <div class="w-px h-4 bg-gray-200 mx-0.5"></div>
+          <div class="w-px h-4 bg-zinc-200 mx-0.5"></div>
 
           <button
             @click="undo"
             :disabled="!canUndo"
-            class="flex items-center justify-center rounded-lg p-1.5 transition-all hover:shadow-sm"
-            :class="canUndo ? 'text-gray-600 hover:bg-white hover:text-blue-600' : 'cursor-not-allowed opacity-40 text-gray-400'"
+            class="btn-icon"
+            :class="canUndo ? 'hover:bg-white hover:text-blue-600 hover:shadow-sm' : ''"
             title="Undo (Ctrl+Z)"
           >
             <ArrowUturnLeftIcon class="h-4 w-4" />
@@ -39,20 +39,20 @@
           <button
             @click="redo"
             :disabled="!canRedo"
-            class="flex items-center justify-center rounded-lg p-1.5 transition-all hover:shadow-sm"
-            :class="canRedo ? 'text-gray-600 hover:bg-white hover:text-blue-600' : 'cursor-not-allowed opacity-40 text-gray-400'"
+            class="btn-icon"
+            :class="canRedo ? 'hover:bg-white hover:text-blue-600 hover:shadow-sm' : ''"
             title="Redo (Ctrl+Y)"
           >
             <ArrowUturnRightIcon class="h-4 w-4" />
           </button>
           
-          <div class="w-px h-4 bg-gray-200 mx-0.5"></div>
+          <div class="w-px h-4 bg-zinc-200 mx-0.5"></div>
 
           <button
             @click="downloadCode"
             :disabled="!appStore.pythonFileContent"
-            class="flex items-center justify-center rounded-lg p-1.5 transition-all hover:shadow-sm"
-            :class="appStore.pythonFileContent ? 'text-gray-600 hover:bg-white hover:text-blue-600' : 'cursor-not-allowed opacity-40 text-gray-400'"
+            class="btn-icon"
+            :class="appStore.pythonFileContent ? 'hover:bg-white hover:text-blue-600 hover:shadow-sm' : ''"
             title="Download code"
           >
             <ArrowDownTrayIcon class="h-4 w-4" />

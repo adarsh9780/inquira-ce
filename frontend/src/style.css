@@ -1,74 +1,56 @@
 @import "tailwindcss";
 
 @theme {
-  /* Minimal Color Palette */
-  --color-white: #ffffff;
-  --color-gray-50: #f8f9fa;
-  --color-gray-100: #e9ecef;
-  --color-gray-200: #dee2e6;
-  --color-gray-300: #ced4da;
-  --color-gray-400: #adb5bd;
-  --color-gray-500: #6c757d;
-  --color-gray-600: #495057;
-  --color-gray-700: #343a40;
-  --color-gray-800: #212529;
-  --color-gray-900: #2b2d42; /* space_cadet */
+  /* Minimal, strict color palette inspired by Cursor/Vercel */
+  --color-base: #FAFAFA;
+  /* Warm off-white for the main app background */
+  --color-surface: #FFFFFF;
+  /* Pure white for cards, sidebars, and main panes */
 
-  --color-primary: #2b2d42; /* space_cadet */
-  --color-primary-50: #f8f9fa;
-  --color-primary-100: #e9ecef;
-  --color-primary-200: #ced0df;
-  --color-primary-300: #9da0bf;
-  --color-primary-400: #6d71a0;
-  --color-primary-500: #4a4d72;
-  --color-primary-600: #2b2d42;
-  --color-primary-700: #222334;
-  --color-primary-800: #191b27;
-  --color-primary-900: #08090d;
+  --color-primary-900: #18181B;
+  /* Zinc 900 - Almost black for main buttons and heavy text */
+  --color-primary-800: #27272A;
+  /* Zinc 800 - Hover state for primary buttons */
 
-  --color-accent: #8a89c0; /* cool_gray */
-  --color-accent-50: #f8f9fa;
-  --color-accent-100: #e8e8f3;
-  --color-accent-200: #d1d1e6;
-  --color-accent-300: #bab9da;
-  --color-accent-400: #a3a2cd;
-  --color-accent-500: #8a89c0;
-  --color-accent-600: #6160a9;
-  --color-accent-700: #474681;
-  --color-accent-800: #2f2e56;
-  --color-accent-900: #18172b;
+  --color-border: #E4E4E7;
+  /* Zinc 200 - Clean, subtle borders */
+  --color-border-hover: #D4D4D8;
+  /* Zinc 300 - Slightly darker borders on hover */
 
-  --color-success: #659157; /* asparagus */
-  --color-error: #dc3545;
-  --color-warning: #ffc107;
-  --color-pastel: #ae8ca3; /* rose_quartz */
-  --color-pastel-50: #efe8ed;
-  --color-pastel-100: #dfd2db;
-  --color-pastel-200: #cfbbc8;
-  --color-pastel-300: #bfa4b6;
-  --color-pastel-400: #ae8ca3;
-  --color-pastel-500: #9d7590;
-  --color-pastel-600: #8c5e7d;
-  --color-pastel-700: #7b476a;
-  --color-pastel-800: #6a3057;
-  --color-pastel-900: #593944;
-  --color-pastel: #ae8ca3; /* rose_quartz */
+  --color-text-main: #27272A;
+  /* Zinc 800 - Highly readable body text */
+  --color-text-muted: #71717A;
+  /* Zinc 500 - Secondary text */
+
+  --color-accent: #3B82F6;
+  /* Blue 500 - Only use for strictly necessary highlights like active rings */
+
+  /* Status Colors */
+  --color-success: #16A34A;
+  /* Green 600 */
+  --color-error: #DC2626;
+  /* Red 600 */
+  --color-warning: #D97706;
+  /* Amber 600 */
 }
 
-/* Global styles for the Vue application */
+/* Global styles */
 * {
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   height: 100%;
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 1rem;
   line-height: 1.6;
-  color: #08090d; /* space_cadet-100 */
-  background-color: #ffffff; /* white */
+  color: var(--color-text-main);
+  background-color: var(--color-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #app {
@@ -76,110 +58,82 @@ html, body {
   width: 100vw;
 }
 
-/* Ensure proper text rendering */
-body {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer components {
+
+  /* Base Button - The foundation for all interactive elements */
+  .btn {
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2;
+  }
+
+  /* Primary Button - High emphasis actions (e.g., Save, Submit, Create) */
+  .btn-primary {
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 bg-zinc-900 text-white shadow-sm hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-900;
+  }
+
+  /* Secondary Button - Medium emphasis actions (e.g., Cancel, Refresh) */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 bg-white text-zinc-800 border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Ghost Button - Low emphasis actions (e.g., subtle navigation, links) */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 bg-transparent text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Icon Button - For small controls in headers and sidebars */
+  .btn-icon {
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 p-1.5 text-zinc-500 hover:bg-zinc-200/50 hover:text-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Danger Button - For destructive actions */
+  .btn-danger {
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 bg-red-600 text-white shadow-sm border border-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
 }
 
-/* Modern Minimal Design System */
-:root {
-  /* Core Colors */
-  --color-white: #ffffff;
-  --color-space-cadet: #2b2d42;
-  --color-cool-gray: #8a89c0;
-  --color-light-gray: #f8f9fa;
-  --color-border: #e9ecef;
-
-  /* Text Colors */
-  --text-primary: #2b2d42; /* space_cadet */
-  --text-secondary: #6c757d; /* muted */
-  --text-light: #ffffff; /* white */
-
-  /* Background Colors */
-  --bg-primary: #ffffff; /* white */
-  --bg-secondary: #f8f9fa; /* light gray */
-  --bg-dark: #2b2d42; /* space_cadet */
-
-  /* Interactive Colors */
-  --accent-primary: #8a89c0; /* cool_gray */
-  --accent-hover: #a3a2cd; /* cool_gray lighter */
-  --accent-active: #6160a9; /* cool_gray darker */
-
-  /* Status Colors */
-  --success: #659157; /* asparagus */
-  --error: #dc3545; /* clean red */
-  --warning: #ffc107; /* clean yellow */
-
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-
-  /* Spacing */
-  --spacing-xs: 0.5rem;
-  --spacing-sm: 0.75rem;
-  --spacing-md: 1rem;
-  --spacing-lg: 1.5rem;
-  --spacing-xl: 2rem;
+/* Typography Overrides for maximum crispness */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  @apply text-zinc-900 font-semibold tracking-tight;
 }
 
-/* Typography Scale */
-.text-xs { font-size: 0.75rem; line-height: 1.5; }
-.text-sm { font-size: 0.875rem; line-height: 1.5; }
-.text-base { font-size: 1rem; line-height: 1.6; }
-.text-lg { font-size: 1.125rem; line-height: 1.6; }
-.text-xl { font-size: 1.25rem; line-height: 1.4; }
-.text-2xl { font-size: 1.5rem; line-height: 1.3; }
-.text-3xl { font-size: 1.875rem; line-height: 1.2; }
-
-/* Font Weights */
-.font-light { font-weight: 300; }
-.font-normal { font-weight: 400; }
-.font-medium { font-weight: 500; }
-.font-semibold { font-weight: 600; }
-.font-bold { font-weight: 700; }
-
-/* Custom Components */
-.btn-primary {
-  @apply bg-primary-600 text-white font-medium px-4 py-2 rounded-lg shadow-sm hover:bg-primary-700 hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2;
+p {
+  @apply text-zinc-700;
 }
 
-.btn-secondary {
-  @apply bg-gray-100 text-primary font-medium px-4 py-2 rounded-lg shadow-sm hover:bg-gray-200 hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2;
-}
-
-.card {
-  @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
-}
-
-.card-hover {
-  @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200;
-}
-
-/* AG Grid Theme */
+/* AG Grid Theme Customization to match the minimal aesthetic */
 .ag-theme-alpine {
-  --ag-border-color: #e9ecef;
-  --ag-header-background-color: #f8f9fa;
-  --ag-odd-row-background-color: #ffffff;
-  --ag-even-row-background-color: #f8f9fa;
+  --ag-border-color: #E4E4E7;
+  /* Zinc 200 */
+  --ag-header-background-color: #FAFAFA;
+  /* Base background */
+  --ag-odd-row-background-color: #FFFFFF;
+  --ag-even-row-background-color: #FAFAFA;
+  --ag-header-foreground-color: #71717A;
+  /* Zinc 500 */
+  --ag-row-hover-color: #F4F4F5;
+  /* Zinc 100 */
 }
 
-/* Custom scrollbar */
+/* Custom Scrollbar - Minimal and subtle */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f8f9fa;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #adb5bd;
+  background: #D4D4D8;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6c757d;
+  background: #A1A1AA;
 }

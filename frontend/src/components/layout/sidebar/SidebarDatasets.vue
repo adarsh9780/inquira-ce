@@ -4,7 +4,7 @@
     <div 
       class="flex items-center justify-between px-3 py-2 group cursor-pointer transition-colors"
       :class="[
-        isCollapsed ? 'justify-center hover:bg-gray-200/50 rounded-lg mx-2 mb-1' : 'hover:bg-gray-200/50',
+        isCollapsed ? 'justify-center hover:bg-zinc-100/50 rounded-lg mx-2 mb-1' : 'hover:bg-zinc-100/50',
         !appStore.hasWorkspace ? 'opacity-50 cursor-not-allowed' : ''
       ]"
       @click="handleHeaderClick"
@@ -17,7 +17,7 @@
       <button 
         v-if="!isCollapsed && appStore.hasWorkspace"
         @click.stop="openSettings" 
-        class="p-1 hover:bg-gray-300 rounded text-gray-500 transition-opacity"
+        class="btn-icon transition-opacity"
         :class="datasets.length > 0 ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'"
         title="Add Dataset"
       >
@@ -39,8 +39,8 @@
       <div 
         v-for="ds in datasets" 
         :key="ds.table_name"
-        class="group/item relative flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors"
-        :class="ds.file_path === currentDataPath ? 'bg-blue-50/50' : 'hover:bg-gray-200/50'"
+        class="group/item relative flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors border"
+        :class="ds.file_path === currentDataPath ? 'bg-zinc-100/80 border-zinc-200' : 'hover:bg-zinc-100/50 border-transparent'"
         @click="selectDataset(ds)"
       >
         <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5">
