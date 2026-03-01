@@ -132,7 +132,7 @@
         >
           <div class="flex items-center gap-2 truncate">
             <div class="relative">
-              <div class="w-7 h-7 bg-gradient-to-br from-blue-600 to-indigo-600 rounded flex items-center justify-center shrink-0 shadow-sm text-white font-medium text-xs">
+              <div class="w-7 h-7 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center shrink-0 shadow-sm text-white font-medium text-xs">
                 {{ authStore.username ? authStore.username.charAt(0).toUpperCase() : 'U' }}
               </div>
               <!-- Status Dot Overlay on Avatar -->
