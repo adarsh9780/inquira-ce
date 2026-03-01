@@ -45,7 +45,7 @@ max-output-kb = 512
 
 [terminal]
 # Terminal access is opt-in for technical users.
-enable = false
+enable = true
 
 [backend.phoenix]
 # Enable Phoenix tracing for LangGraph/LangChain (used by backend startup)

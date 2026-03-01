@@ -46,14 +46,6 @@ struct BackendConfig {
 #[derive(Deserialize, Debug, Clone)]
 struct ExecutionConfig {
     provider: Option<String>,
-    runner: Option<RunnerConfig>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-struct RunnerConfig {
-    #[serde(rename = "venv-name")]
-    venv_name: Option<String>,
-    packages: Option<Vec<String>>,
 }
 
 fn load_config(config_path: &PathBuf) -> InquiraConfig {
@@ -221,121 +213,6 @@ fn bootstrap_python(
     Ok(())
 }
 
-fn bootstrap_runner_env(
-    uv_bin: &PathBuf,
-    runner_venv_path: &PathBuf,
-    config: &InquiraConfig,
-) -> Result<(), String> {
-    let python_spec = config
-        .python
-        .as_ref()
-        .and_then(|p| p.python_path.clone())
-        .or_else(|| config.python.as_ref().and_then(|p| p.version.clone()))
-        .unwrap_or_else(|| "3.12".to_string());
-
-    let runner_python = python_bin_from_venv(runner_venv_path);
-    let marker_file = runner_venv_path.join(".inquira_runner_bootstrapped");
-    let desired_runner_state = build_runner_state_marker(config);
-    let mut needs_package_install = false;
-    if !runner_python.exists() {
-        log::info!(
-            "Creating isolated execution runner venv at {}...",
-            runner_venv_path.display()
-        );
-        let mut cmd = Command::new(uv_bin);
-        cmd.arg("venv")
-            .arg(runner_venv_path.to_str().unwrap())
-            .args(["--python", &python_spec]);
-        apply_proxy_env(&mut cmd, config);
-        let status = cmd.status().map_err(|e| format!("uv venv failed: {}", e))?;
-        if !status.success() {
-            return Err("uv venv returned non-zero exit code".to_string());
-        }
-        needs_package_install = true;
-    }
-
-    match fs::read_to_string(&marker_file) {
-        Ok(existing) => {
-            if existing != desired_runner_state {
-                needs_package_install = true;
-            }
-        }
-        Err(_) => {
-            needs_package_install = true;
-        }
-    }
-
-    if !needs_package_install {
-        return Ok(());
-    }
-
-    let mut packages = vec![
-        "ipykernel".to_string(),
-        "narwhals".to_string(),
-        "duckdb".to_string(),
-        "pandas".to_string(),
-        "plotly".to_string(),
-    ];
-
-    if let Some(exec) = &config.execution {
-        if let Some(runner) = &exec.runner {
-            if let Some(custom) = &runner.packages {
-                if !custom.is_empty() {
-                    packages = custom.to_vec();
-                    if !packages.iter().any(|pkg| pkg == "ipykernel") {
-                        packages.push("ipykernel".to_string());
-                    }
-                }
-            }
-        }
-    }
-
-    let mut cmd = Command::new(uv_bin);
-    cmd.args(["pip", "install", "--python", runner_python.to_str().unwrap()]);
-
-    for pkg in packages {
-        cmd.arg(pkg);
-    }
-
-    apply_uv_package_env(&mut cmd, config);
-    let status = cmd
-        .status()
-        .map_err(|e| format!("runner package install failed: {}", e))?;
-    if !status.success() {
-        return Err("runner package install returned non-zero exit code".to_string());
-    }
-
-    let _ = fs::write(&marker_file, desired_runner_state);
-
-    Ok(())
-}
-
-fn build_runner_state_marker(config: &InquiraConfig) -> String {
-    let mut packages = vec![
-        "ipykernel".to_string(),
-        "narwhals".to_string(),
-        "duckdb".to_string(),
-        "pandas".to_string(),
-        "plotly".to_string(),
-    ];
-
-    if let Some(exec) = &config.execution {
-        if let Some(runner) = &exec.runner {
-            if let Some(custom) = &runner.packages {
-                if !custom.is_empty() {
-                    packages = custom.to_vec();
-                    if !packages.iter().any(|pkg| pkg == "ipykernel") {
-                        packages.push("ipykernel".to_string());
-                    }
-                }
-            }
-        }
-    }
-
-    packages.sort();
-    format!("packages={}", packages.join(","))
-}
-
 fn apply_proxy_env(cmd: &mut Command, config: &InquiraConfig) {
     if let Some(ref proxy) = config.proxy {
         if let Some(ref http) = proxy.http_proxy {
@@ -443,7 +320,6 @@ fn start_backend(
     uv_bin: &PathBuf,
     backend_dir: &PathBuf,
     venv_path: &PathBuf,
-    runner_python: Option<&PathBuf>,
     config: &InquiraConfig,
     inquira_toml_path: &PathBuf,
 ) -> Result<Child, String> {
@@ -480,10 +356,6 @@ fn start_backend(
         .env("INQUIRA_DESKTOP", "1")
         .env("INQUIRA_TOML_PATH", inquira_toml_path.to_string_lossy().to_string())
         .env("INQUIRA_EXECUTION_PROVIDER", execution_provider);
-
-    if let Some(py) = runner_python {
-        cmd.env("INQUIRA_RUNNER_PYTHON", py.to_string_lossy().to_string());
-    }
 
     apply_proxy_env(&mut cmd, config);
 
@@ -594,7 +466,6 @@ pub fn run() {
                 &uv_bin,
                 &backend_dir,
                 &venv_path,
-                None,
                 &config,
                 &runtime_config_path,
             ) {
