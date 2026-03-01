@@ -91,10 +91,11 @@ async def test_install_runner_package_success_resets_kernel(monkeypatch):
         ),
     )
 
-    def fake_install_runner_package(config, package_spec, index_url):
+    def fake_install_runner_package(config, package_spec, index_url, workspace_duckdb_path):
         _ = config
         assert package_spec == "seaborn==0.13.2"
         assert index_url is None
+        assert workspace_duckdb_path == "/tmp/ws.duckdb"
         return SimpleNamespace(
             installer="uv",
             command=["uv", "pip", "install", package_spec],

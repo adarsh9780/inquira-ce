@@ -2,7 +2,8 @@
 
 ## Commit & Testing Procedures
 
-1. Always update the `commit_message.txt` file in the root directory whenever a change is made. Make sure we industry practice to write commit message.
+1. Always update the `commit_message.txt` file in the root directory whenever a change is made. Append the new commit message to the file. Do not overwrite the file.
+2. Make sure to use industry practice to write commit message. Use industry standards while writing the commit message, use terms like feat, fix, chose etc. The git message should be detailed and descriptive.
 3. For every bug and feature we add or report, create a dedicated test case to prevent regressions.
 
 ## Environment & Communication

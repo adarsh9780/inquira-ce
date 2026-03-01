@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...services.code_executor import (
+    bootstrap_workspace_runtime,
     execute_code,
     get_workspace_dataframe_rows,
     get_workspace_kernel_status,
@@ -39,6 +40,7 @@ from ...services.terminal_executor import (
     stream_workspace_terminal_command,
     stop_workspace_terminal_session,
 )
+from ...services.websocket_manager import websocket_manager
 from ...core.logger import logprint
 
 router = APIRouter(tags=["V1 Runtime"])
@@ -137,6 +139,7 @@ class WorkspacePathsResponse(BaseModel):
     workspace_id: str
     workspace_dir: str
     duckdb_path: str
+    terminal_enabled: bool = False
 
 
 class DatasetSchemaResponse(BaseModel):
@@ -429,10 +432,12 @@ async def get_workspace_paths(
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     workspace_path = Path(workspace.duckdb_path).parent
+    runtime = load_execution_runtime_config()
     return WorkspacePathsResponse(
         workspace_id=workspace_id,
         workspace_dir=str(workspace_path),
         duckdb_path=str(workspace.duckdb_path),
+        terminal_enabled=bool(runtime.terminal_enabled),
     )
 
 
@@ -492,7 +497,7 @@ async def install_runner_runtime_package(
     session: AsyncSession = Depends(get_db_session),
     current_user=Depends(get_current_user),
 ):
-    await _require_workspace_access(session, current_user.id, payload.workspace_id)
+    workspace = await _require_workspace_access(session, current_user.id, payload.workspace_id)
     runtime = load_execution_runtime_config()
     package_spec, index_url = _validate_runner_install_request(payload, runtime)
 
@@ -502,6 +507,7 @@ async def install_runner_runtime_package(
             runtime,
             package_spec,
             index_url,
+            str(workspace.duckdb_path),
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -544,6 +550,7 @@ async def execute_workspace_terminal_command(
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     runtime = load_execution_runtime_config()
+    _enforce_terminal_enabled(runtime)
     _enforce_terminal_command_policy(payload.command, runtime)
     workspace_dir = str(Path(workspace.duckdb_path).parent)
     _validate_terminal_cwd(payload.cwd, workspace_dir)
@@ -578,6 +585,7 @@ async def stream_workspace_terminal_command_sse(
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     runtime = load_execution_runtime_config()
+    _enforce_terminal_enabled(runtime)
     _enforce_terminal_command_policy(payload.command, runtime)
     workspace_dir = str(Path(workspace.duckdb_path).parent)
     _validate_terminal_cwd(payload.cwd, workspace_dir)
@@ -630,6 +638,8 @@ async def reset_workspace_terminal_session(
     session: AsyncSession = Depends(get_db_session),
     current_user=Depends(get_current_user),
 ):
+    runtime = load_execution_runtime_config()
+    _enforce_terminal_enabled(runtime)
     await _require_workspace_access(session, current_user.id, workspace_id)
     reset = await stop_workspace_terminal_session(
         user_id=current_user.id,
@@ -651,6 +661,61 @@ async def get_workspace_kernel_runtime_status(
     await _require_workspace_access(session, current_user.id, workspace_id)
     status = await get_workspace_kernel_status(workspace_id)
     return KernelStatusResponse(workspace_id=workspace_id, status=status)
+
+
+@router.post(
+    "/workspaces/{workspace_id}/runtime/bootstrap",
+    response_model=KernelResetResponse,
+)
+async def bootstrap_workspace_runtime_endpoint(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_db_session),
+    current_user=Depends(get_current_user),
+):
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    websocket_user_id = _resolve_websocket_user_id(current_user.id)
+
+    async def _progress(stage: str, message: str) -> None:
+        if websocket_user_id:
+            await websocket_manager.send_to_user(
+                websocket_user_id,
+                {
+                    "type": "progress",
+                    "stage": stage,
+                    "message": message,
+                },
+            )
+        logprint(
+            f"Workspace runtime bootstrap [{workspace_id}] {stage}: {message}",
+            level="info",
+        )
+
+    try:
+        await _progress("workspace_runtime_start", f"Preparing runtime for workspace {workspace_id}...")
+        ready = await bootstrap_workspace_runtime(
+            workspace_id=workspace_id,
+            workspace_duckdb_path=str(workspace.duckdb_path),
+            progress_callback=_progress,
+        )
+        if websocket_user_id:
+            await websocket_manager.send_to_user(
+                websocket_user_id,
+                {
+                    "type": "completed",
+                    "result": {
+                        "workspace_id": workspace_id,
+                        "status": "ready" if ready else "not_ready",
+                    },
+                },
+            )
+    except Exception as exc:
+        if websocket_user_id:
+            await websocket_manager.send_error(
+                websocket_user_id,
+                f"Workspace runtime bootstrap failed: {str(exc)}",
+            )
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return KernelResetResponse(workspace_id=workspace_id, reset=bool(ready))
 
 
 @router.post(
@@ -699,17 +764,14 @@ async def restart_workspace_kernel_runtime(
 async def _restart_workspace_kernel(workspace_id: str, workspace: Any) -> KernelResetResponse:
     """Shared reset/restart flow: reset session then warm-start kernel."""
     await reset_workspace_kernel(workspace_id)
-    warm_result = await execute_code(
-        code="None",
-        timeout=15,
-        working_dir=str(Path(workspace.duckdb_path).parent),
-        workspace_id=workspace_id,
-        workspace_duckdb_path=str(workspace.duckdb_path),
-    )
-    if warm_result.get("success") is not True:
-        detail = warm_result.get("error") or warm_result.get("stderr") or "Failed to warm workspace kernel."
-        raise HTTPException(status_code=500, detail=str(detail))
-    return KernelResetResponse(workspace_id=workspace_id, reset=True)
+    try:
+        ready = await bootstrap_workspace_runtime(
+            workspace_id=workspace_id,
+            workspace_duckdb_path=str(workspace.duckdb_path),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return KernelResetResponse(workspace_id=workspace_id, reset=bool(ready))
 
 
 @router.get(
@@ -1096,3 +1158,20 @@ def _enforce_terminal_command_policy(command: str, config: Any) -> None:
                 status_code=400,
                 detail="cd accepts at most one path argument.",
             )
+
+
+def _enforce_terminal_enabled(config: Any) -> None:
+    if bool(getattr(config, "terminal_enabled", False)):
+        return
+    raise HTTPException(
+        status_code=403,
+        detail="Terminal feature is disabled. Enable [terminal].enable in inquira.toml.",
+    )
+
+
+def _resolve_websocket_user_id(user_id: str) -> str | None:
+    if websocket_manager.is_connected(user_id):
+        return user_id
+    if websocket_manager.is_connected("current_user"):
+        return "current_user"
+    return None

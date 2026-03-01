@@ -301,7 +301,8 @@ export const apiService = {
     return {
       database_path: paths?.duckdb_path || null,
       schema_path: paths?.workspace_dir || null,
-      base_directory: paths?.workspace_dir || null
+      base_directory: paths?.workspace_dir || null,
+      terminal_enabled: Boolean(paths?.terminal_enabled),
     }
   },
 
@@ -692,6 +693,10 @@ export const apiService = {
 
   async v1InstallRunnerPackage(payload) {
     return v1Api.runtime.installRunnerPackage(payload)
+  },
+
+  async v1BootstrapWorkspaceRuntime(workspaceId) {
+    return v1Api.runtime.bootstrapWorkspaceRuntime(workspaceId)
   },
 
   async v1GetWorkspaceKernelStatus(workspaceId) {

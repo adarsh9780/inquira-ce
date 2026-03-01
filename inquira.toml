@@ -32,16 +32,20 @@ host = "localhost"
 provider = "local_jupyter"
 
 [execution.runner]
-# Name of the dedicated code-runner virtual environment folder under app data (~/.inquira/*)
+# Legacy runner venv name (workspace runtime now uses <workspace>/.venv).
 venv-name = ".runner-venv"
 # Optional package list installed into the runner venv alongside ipykernel and defaults.
-packages = ["narwhals", "duckdb", "pandas", "plotly", "pyarrow", "polars", "nbformat>=5.10.4"]
+packages = ["narwhals", "duckdb", "pandas", "polars", "pyarrow", "plotly", "nbformat>=5.10.4", "statsmodels", "scikit-learn"]
 # Idle kernel eviction threshold in minutes.
 kernel-idle-minutes = 30
 # Runtime timeout guardrails.
 timeout-seconds = 60
 memory-limit-mb = 512
 max-output-kb = 512
+
+[terminal]
+# Terminal access is opt-in for technical users.
+enable = false
 
 [backend.phoenix]
 # Enable Phoenix tracing for LangGraph/LangChain (used by backend startup)

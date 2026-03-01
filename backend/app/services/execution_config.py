@@ -34,6 +34,7 @@ class ExecutionRuntimeConfig:
     runner_package_denylist: list[str] = field(default_factory=list)
     terminal_command_allowlist: list[str] = field(default_factory=list)
     terminal_command_denylist: list[str] = field(default_factory=list)
+    terminal_enabled: bool = False
     runner_install_max_packages_per_request: int = 1
     kernel_idle_minutes: int = 30
     runner_policy: RunnerPolicyConfig = field(default_factory=RunnerPolicyConfig)
@@ -54,6 +55,22 @@ def _as_str_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item) for item in value if str(item).strip()]
+
+
+def _as_bool(value: Any, default: bool) -> bool:
+    """Return ``value`` coerced to ``bool`` when possible."""
+
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    return default
 
 
 def _load_toml_data() -> dict[str, Any]:
@@ -89,6 +106,9 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
     runner = execution.get("runner", {})
     if not isinstance(runner, dict):
         runner = {}
+    terminal = data.get("terminal", {})
+    if not isinstance(terminal, dict):
+        terminal = {}
 
     provider = str(
         os.getenv("INQUIRA_EXECUTION_PROVIDER")
@@ -111,6 +131,10 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
     runner_package_denylist = _as_str_list(runner.get("package-denylist"))
     terminal_command_allowlist = _as_str_list(runner.get("terminal-command-allowlist"))
     terminal_command_denylist = _as_str_list(runner.get("terminal-command-denylist"))
+    terminal_enabled = _as_bool(
+        os.getenv("INQUIRA_TERMINAL_ENABLE", terminal.get("enable")),
+        False,
+    )
     runner_install_max_packages_per_request = _as_int(
         runner.get("install-max-packages-per-request", 1),
         1,
@@ -134,6 +158,7 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
         runner_package_denylist=runner_package_denylist,
         terminal_command_allowlist=terminal_command_allowlist,
         terminal_command_denylist=terminal_command_denylist,
+        terminal_enabled=terminal_enabled,
         runner_install_max_packages_per_request=max(1, runner_install_max_packages_per_request),
         kernel_idle_minutes=max(1, kernel_idle_minutes),
         runner_policy=policy,

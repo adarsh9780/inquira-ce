@@ -133,14 +133,14 @@ const tabs = computed(() => [
     badgeClass: appStore.scalars?.length ? 'bg-emerald-100 text-emerald-800' : '',
     badgeColor: 'bg-emerald-600',
   },
-  {
+  ...(appStore.terminalEnabled ? [{
     id: 'terminal',
     name: 'Terminal',
     icon: CommandLineIcon,
     count: appStore.terminalOutput && !appStore.isCodeRunning ? '1' : null,
     badgeClass: appStore.terminalOutput && !appStore.isCodeRunning ? 'bg-gray-100 text-gray-800' : '',
     badgeColor: 'bg-slate-700',
-  },
+  }] : []),
   {
     id: 'preview',
     name: 'Preview',

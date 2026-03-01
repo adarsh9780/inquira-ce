@@ -23,9 +23,21 @@ def test_build_required_packages_includes_defaults_and_dedupes():
     assert "nbformat>=5.10.4" in packages
     assert "pandas" in packages
     assert "plotly" in packages
-    assert "PyArrow" in packages
+    assert "polars" in packages
+    assert "statsmodels" in packages
+    assert "scikit-learn" in packages
+    assert any(pkg.lower() == "pyarrow" for pkg in packages)
 
 
 def test_resolve_runner_python_requires_path():
     with pytest.raises(RuntimeError):
         runner_env.resolve_runner_python(_cfg(runner_python_executable=""))
+
+
+def test_resolve_workspace_runner_venv_uses_workspace_root(tmp_path):
+    duckdb_path = tmp_path / "workspace-1" / "workspace.duckdb"
+    duckdb_path.parent.mkdir(parents=True, exist_ok=True)
+    duckdb_path.touch()
+
+    venv_path = runner_env.resolve_workspace_runner_venv(str(duckdb_path))
+    assert venv_path == duckdb_path.parent / ".venv"

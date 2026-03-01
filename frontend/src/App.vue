@@ -40,7 +40,7 @@
     <Teleport to="body">
       <Transition name="fade">
         <div
-          v-if="backendStatus.active"
+          v-if="backendStatus.active || workspaceRuntimeStatus.active"
           class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm"
         >
           <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center">
@@ -48,9 +48,13 @@
               <div class="absolute inset-0 rounded-full border-4 border-gray-200"></div>
               <div class="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
             </div>
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">Setting up Inquira</h3>
-            <p class="text-sm text-gray-500 mb-4">{{ backendStatus.message }}</p>
-            <p class="text-xs text-gray-400">This only happens once</p>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">
+              {{ workspaceRuntimeStatus.active ? 'Preparing Workspace Runtime' : 'Setting up Inquira' }}
+            </h3>
+            <p class="text-sm text-gray-500 mb-4">{{ workspaceRuntimeStatus.active ? workspaceRuntimeStatus.message : backendStatus.message }}</p>
+            <p class="text-xs text-gray-400">
+              {{ workspaceRuntimeStatus.active ? 'Creating virtual environment and kernel...' : 'This only happens once' }}
+            </p>
           </div>
         </div>
       </Transition>
@@ -59,7 +63,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, reactive } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useAppStore } from './stores/appStore'
 import { useAuthStore } from './stores/authStore'
 import { settingsWebSocket } from './services/websocketService'
@@ -77,6 +81,11 @@ const backendStatus = reactive({
   active: false,
   message: 'Starting backend...'
 })
+const workspaceRuntimeStatus = reactive({
+  active: false,
+  message: '',
+})
+const wsUnsubscribers = ref([])
 
 // Listen for Tauri backend-status events (if running in Tauri)
 function setupTauriListener() {
@@ -127,6 +136,28 @@ function handleAuthClose() {
 
 onMounted(async () => {
   setupTauriListener()
+  wsUnsubscribers.value.push(
+    settingsWebSocket.subscribeProgress((data) => {
+      const stage = String(data?.stage || '')
+      if (!stage.startsWith('workspace_runtime')) return
+      workspaceRuntimeStatus.active = true
+      workspaceRuntimeStatus.message = data?.message || 'Preparing workspace runtime...'
+    }),
+  )
+  wsUnsubscribers.value.push(
+    settingsWebSocket.subscribeComplete((result) => {
+      if (!result || !result.workspace_id) return
+      workspaceRuntimeStatus.active = false
+      workspaceRuntimeStatus.message = ''
+    }),
+  )
+  wsUnsubscribers.value.push(
+    settingsWebSocket.subscribeError((message) => {
+      if (!workspaceRuntimeStatus.active) return
+      workspaceRuntimeStatus.active = false
+      workspaceRuntimeStatus.message = message || ''
+    }),
+  )
   try {
     await appStore.loadLocalConfig()
     await authStore.checkAuth()
@@ -157,6 +188,10 @@ onUnmounted(() => {
     console.debug('🧹 Cleaning up persistent WebSocket connection')
     settingsWebSocket.disconnectPersistent()
   }
+  wsUnsubscribers.value.forEach((fn) => {
+    try { fn() } catch (_error) { }
+  })
+  wsUnsubscribers.value = []
 })
 </script>
 

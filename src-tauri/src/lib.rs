@@ -565,14 +565,6 @@ pub fn run() {
                 &expected_backend_env_fingerprint,
                 always_sync_backend_env,
             );
-            let runner_venv_name = config
-                .execution
-                .as_ref()
-                .and_then(|e| e.runner.as_ref())
-                .and_then(|r| r.venv_name.clone())
-                .unwrap_or_else(|| ".runner-venv".to_string());
-            let runner_venv_path = data_dir.join(runner_venv_name);
-
             // Phase 1: Bootstrap Python + venv (one-time)
             if should_bootstrap_python {
                 if always_sync_backend_env {
@@ -596,35 +588,13 @@ pub fn run() {
                 }
             }
 
-            let execution_provider = config
-                .execution
-                .as_ref()
-                .and_then(|e| e.provider.clone())
-                .unwrap_or_else(|| "local_jupyter".to_string())
-                .to_lowercase();
-            if execution_provider == "local_jupyter" {
-                app.emit("backend-status", "Preparing isolated code runner...").ok();
-                if let Err(e) = bootstrap_runner_env(&uv_bin, &runner_venv_path, &config) {
-                    log::error!("Runner bootstrap failed: {}", e);
-                    app.emit("backend-status", &format!("Runner setup failed: {}", e))
-                        .ok();
-                    return Ok(());
-                }
-            }
-
             // Phase 2: Start the backend
             app.emit("backend-status", "Starting backend...").ok();
-            let runner_python = if execution_provider == "local_jupyter" {
-                Some(python_bin_from_venv(&runner_venv_path))
-            } else {
-                None
-            };
-
             match start_backend(
                 &uv_bin,
                 &backend_dir,
                 &venv_path,
-                runner_python.as_ref(),
+                None,
                 &config,
                 &runtime_config_path,
             ) {

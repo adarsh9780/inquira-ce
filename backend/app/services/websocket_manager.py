@@ -8,11 +8,11 @@ class ProgressMessenger:
     """Manages progress messages for WebSocket communication"""
 
     def __init__(self):
-        self.processing_messages = []
-        self.schema_messages = []
-        self.context_messages = []
-        self.api_key_messages = []
-        self.finalization_messages = []
+        self.processing_messages: list[str] = []
+        self.schema_messages: list[str] = []
+        self.context_messages: list[str] = []
+        self.api_key_messages: list[str] = []
+        self.finalization_messages: list[str] = []
         self.current_processing_index = 0
         self.current_schema_index = 0
         self.current_context_index = 0
@@ -20,7 +20,7 @@ class ProgressMessenger:
         self.current_finalization_index = 0
         self._load_default_messages()
 
-    def _load_default_messages(self):
+    def _load_default_messages(self) -> None:
         """Load default progress messages"""
         self.processing_messages = [
             "🔄 Processing your data file...",

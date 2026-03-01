@@ -56,6 +56,7 @@ export const useAppStore = defineStore('app', () => {
   const scalars = ref([])
   const terminalOutput = ref('')
   const terminalEntries = ref([])
+  const terminalEnabled = ref(false)
   const activeTab = ref('workspace')
   const workspacePane = ref('code') // 'code' | 'chat'
   const terminalConsentGranted = ref(false)
@@ -423,14 +424,12 @@ export const useAppStore = defineStore('app', () => {
     kernelEnsureWorkspaceId = targetWorkspaceId
     kernelEnsurePromise = (async () => {
       try {
-        const status = await apiService.v1GetWorkspaceKernelStatus(targetWorkspaceId)
-        const normalized = String(status?.status || '').toLowerCase()
-        if (normalized === 'ready' || normalized === 'busy' || normalized === 'starting') {
-          return true
-        }
-        const restarted = await apiService.v1RestartWorkspaceKernel(targetWorkspaceId)
-        return restarted?.reset === true
+        const paths = await apiService.v1GetWorkspacePaths(targetWorkspaceId)
+        setTerminalEnabled(Boolean(paths?.terminal_enabled))
+        const bootstrapped = await apiService.v1BootstrapWorkspaceRuntime(targetWorkspaceId)
+        return bootstrapped?.reset === true
       } catch (_error) {
+        setTerminalEnabled(false)
         return false
       } finally {
         kernelEnsurePromise = null
@@ -477,6 +476,9 @@ export const useAppStore = defineStore('app', () => {
       activeConversationId.value = ''
       chatHistory.value = []
       turnsNextCursor.value = null
+      if (!activeWorkspaceId.value) {
+        setTerminalEnabled(false)
+      }
       saveLocalConfig()
     }
 
@@ -487,6 +489,7 @@ export const useAppStore = defineStore('app', () => {
       ingestedColumns.value = []
       schemaFileId.value = ''
       isSchemaFileUploaded.value = false
+      setTerminalEnabled(false)
       saveLocalConfig()
     }
 
@@ -497,6 +500,9 @@ export const useAppStore = defineStore('app', () => {
 
   async function createWorkspace(name) {
     const ws = await apiService.v1CreateWorkspace(name)
+    if (ws?.id) {
+      await ensureWorkspaceKernelConnected(ws.id)
+    }
     await fetchWorkspaces()
     if (activeWorkspaceId.value) {
       await ensureWorkspaceKernelConnected(activeWorkspaceId.value)
@@ -681,6 +687,14 @@ export const useAppStore = defineStore('app', () => {
     terminalOutput.value = output
   }
 
+  function setTerminalEnabled(enabled) {
+    terminalEnabled.value = !!enabled
+    if (!terminalEnabled.value && activeTab.value === 'terminal') {
+      activeTab.value = 'workspace'
+      workspacePane.value = 'code'
+    }
+  }
+
   function appendTerminalEntry(entry) {
     if (!entry || typeof entry !== 'object') return
     const kind = entry.kind === 'output' ? 'output' : 'command'
@@ -765,6 +779,7 @@ export const useAppStore = defineStore('app', () => {
     plotlyFigure.value = null
     terminalOutput.value = ''
     terminalEntries.value = []
+    terminalEnabled.value = false
     activeTab.value = 'workspace'
     workspacePane.value = 'code'
     terminalConsentGranted.value = false
@@ -873,6 +888,7 @@ export const useAppStore = defineStore('app', () => {
     scalars,
     terminalOutput,
     terminalEntries,
+    terminalEnabled,
     activeTab,
     workspacePane,
     terminalConsentGranted,
@@ -936,6 +952,7 @@ export const useAppStore = defineStore('app', () => {
     setFigures,
     setScalars,
     setTerminalOutput,
+    setTerminalEnabled,
     appendTerminalEntry,
     clearTerminalEntries,
     setActiveTab,

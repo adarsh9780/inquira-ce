@@ -43,6 +43,9 @@ class SettingsWebSocket {
     this.progressCallback = null
     this.errorCallback = null
     this.completeCallback = null
+    this.progressListeners = new Set()
+    this.errorListeners = new Set()
+    this.completeListeners = new Set()
     // Support multiple subscribers for connection state
     this.connectionListeners = new Set()
 
@@ -207,18 +210,45 @@ class SettingsWebSocket {
             progress: data.progress
           })
         }
+        this.progressListeners.forEach((listener) => {
+          try {
+            listener({
+              type: 'progress',
+              message: data.message,
+              fact: data.fact,
+              stage: data.stage,
+              progress: data.progress,
+            })
+          } catch (_error) {
+            // Keep processing other listeners.
+          }
+        })
         break
 
       case 'completed':
         if (this.completeCallback) {
           this.completeCallback(data.result)
         }
+        this.completeListeners.forEach((listener) => {
+          try {
+            listener(data.result)
+          } catch (_error) {
+            // Keep processing other listeners.
+          }
+        })
         break
 
       case 'error':
         if (this.errorCallback) {
           this.errorCallback(data.message || data.error)
         }
+        this.errorListeners.forEach((listener) => {
+          try {
+            listener(data.message || data.error)
+          } catch (_error) {
+            // Keep processing other listeners.
+          }
+        })
         break
 
       default:
@@ -271,6 +301,30 @@ class SettingsWebSocket {
 
   onError(callback) {
     this.errorCallback = callback
+  }
+
+  subscribeProgress(callback) {
+    if (typeof callback !== 'function') return () => { }
+    this.progressListeners.add(callback)
+    return () => {
+      this.progressListeners.delete(callback)
+    }
+  }
+
+  subscribeComplete(callback) {
+    if (typeof callback !== 'function') return () => { }
+    this.completeListeners.add(callback)
+    return () => {
+      this.completeListeners.delete(callback)
+    }
+  }
+
+  subscribeError(callback) {
+    if (typeof callback !== 'function') return () => { }
+    this.errorListeners.add(callback)
+    return () => {
+      this.errorListeners.delete(callback)
+    }
   }
 
   onConnection(callback) {

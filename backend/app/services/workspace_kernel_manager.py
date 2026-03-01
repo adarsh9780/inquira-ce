@@ -389,6 +389,23 @@ class WorkspaceKernelManager:
             "limit": safe_limit,
         }
 
+    async def ensure_ready(
+        self,
+        *,
+        workspace_id: str,
+        workspace_duckdb_path: str,
+        config: Any,
+        progress_callback: Any | None = None,
+    ) -> bool:
+        """Ensure workspace kernel session is running and bootstrapped."""
+        await self._get_or_start_session(
+            workspace_id=workspace_id,
+            workspace_duckdb_path=workspace_duckdb_path,
+            config=config,
+            progress_callback=progress_callback,
+        )
+        return True
+
     async def shutdown(self) -> None:
         """Shutdown all active kernels and clear session cache."""
         async with self._sessions_lock:
@@ -416,25 +433,47 @@ class WorkspaceKernelManager:
         workspace_id: str,
         workspace_duckdb_path: str,
         config: Any,
+        progress_callback: Any | None = None,
     ) -> WorkspaceKernelSession:
         async with self._sessions_lock:
             session = self._sessions.get(workspace_id)
             if session is None:
-                session = await self._start_session(
+                session = await self._start_session_compat(
                     workspace_id=workspace_id,
                     workspace_duckdb_path=workspace_duckdb_path,
                     config=config,
+                    progress_callback=progress_callback,
                 )
                 self._sessions[workspace_id] = session
             elif session.workspace_duckdb_path != workspace_duckdb_path:
                 await self._shutdown_session(session)
-                session = await self._start_session(
+                session = await self._start_session_compat(
                     workspace_id=workspace_id,
                     workspace_duckdb_path=workspace_duckdb_path,
                     config=config,
+                    progress_callback=progress_callback,
                 )
                 self._sessions[workspace_id] = session
         return session
+
+    async def _start_session_compat(
+        self,
+        *,
+        workspace_id: str,
+        workspace_duckdb_path: str,
+        config: Any,
+        progress_callback: Any | None = None,
+    ) -> WorkspaceKernelSession:
+        """Call `_start_session` with optional progress callback when supported."""
+        start_params = inspect.signature(self._start_session).parameters
+        kwargs: dict[str, Any] = {
+            "workspace_id": workspace_id,
+            "workspace_duckdb_path": workspace_duckdb_path,
+            "config": config,
+        }
+        if "progress_callback" in start_params:
+            kwargs["progress_callback"] = progress_callback
+        return await self._start_session(**kwargs)
 
     async def _start_session(
         self,
@@ -442,9 +481,21 @@ class WorkspaceKernelManager:
         workspace_id: str,
         workspace_duckdb_path: str,
         config: Any,
+        progress_callback: Any | None = None,
     ) -> WorkspaceKernelSession:
-        ensure_runner_kernel_dependencies(config)
-        runner_python = resolve_runner_python(config)
+        if progress_callback is not None:
+            await self._await_maybe(progress_callback("workspace_runtime_env", "Preparing workspace virtual environment..."))
+        env_status = ensure_runner_kernel_dependencies(config, workspace_duckdb_path)
+        if progress_callback is not None:
+            if env_status.created:
+                await self._await_maybe(progress_callback("workspace_runtime_env", f"Created virtual environment at {env_status.venv_path}"))
+            if env_status.packages_installed:
+                await self._await_maybe(progress_callback("workspace_runtime_packages", "Installing workspace data-science packages..."))
+            else:
+                await self._await_maybe(progress_callback("workspace_runtime_packages", "Workspace packages already up to date."))
+        runner_python = resolve_runner_python(config, workspace_duckdb_path)
+        if progress_callback is not None:
+            await self._await_maybe(progress_callback("workspace_runtime_kernel", "Starting Python kernel..."))
         km = AsyncKernelManager(kernel_name="python3")
         kernel_spec = km.kernel_spec
         if kernel_spec is None:
@@ -468,6 +519,8 @@ class WorkspaceKernelManager:
             artifact_db_path=str(Path(workspace_duckdb_path).with_name("workspace_runtime_artifacts.duckdb")),
             status="ready",
         )
+        if progress_callback is not None:
+            await self._await_maybe(progress_callback("workspace_runtime_bootstrap", "Warming workspace runtime..."))
         await self._bootstrap_workspace(session)
         return session
 

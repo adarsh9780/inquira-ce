@@ -11,6 +11,7 @@ from app.v1.api import runtime as runtime_api
 def _force_local_jupyter_provider(monkeypatch):
     load_execution_runtime_config.cache_clear()
     monkeypatch.setenv("INQUIRA_EXECUTION_PROVIDER", "local_jupyter")
+    monkeypatch.setenv("INQUIRA_TERMINAL_ENABLE", "true")
     yield
     load_execution_runtime_config.cache_clear()
 
@@ -206,31 +207,15 @@ async def test_workspace_kernel_reset_endpoint(monkeypatch, tmp_path):
         assert workspace_id == "ws-4"
         return True
 
-    async def fake_execute_code(
-        code,
-        timeout,
-        working_dir=None,
-        workspace_id=None,
-        workspace_duckdb_path=None,
-    ):
-        assert code == "None"
-        assert timeout == 15
+    async def fake_bootstrap_workspace_runtime(*, workspace_id, workspace_duckdb_path, progress_callback=None):
         assert workspace_id == "ws-4"
         assert workspace_duckdb_path == str(duckdb_path)
-        assert working_dir == str(workspace_dir)
-        return {
-            "success": True,
-            "stdout": "",
-            "stderr": "",
-            "error": None,
-            "result": None,
-            "result_type": None,
-            "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
-        }
+        assert progress_callback is None
+        return True
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(runtime_api, "reset_workspace_kernel", fake_reset)
-    monkeypatch.setattr(runtime_api, "execute_code", fake_execute_code)
+    monkeypatch.setattr(runtime_api, "bootstrap_workspace_runtime", fake_bootstrap_workspace_runtime)
 
     response = await runtime_api.reset_workspace_kernel_runtime(
         workspace_id="ws-4",
@@ -367,6 +352,7 @@ async def test_workspace_terminal_execute_enforces_allowlist_policy(monkeypatch,
 
     def fake_load_runtime_config():
         return SimpleNamespace(
+            terminal_enabled=True,
             terminal_command_allowlist=["pwd"],
             terminal_command_denylist=[],
         )
@@ -401,31 +387,15 @@ async def test_workspace_kernel_restart_endpoint(monkeypatch, tmp_path):
         assert workspace_id == "ws-7"
         return True
 
-    async def fake_execute_code(
-        code,
-        timeout,
-        working_dir=None,
-        workspace_id=None,
-        workspace_duckdb_path=None,
-    ):
-        assert code == "None"
-        assert timeout == 15
+    async def fake_bootstrap_workspace_runtime(*, workspace_id, workspace_duckdb_path, progress_callback=None):
         assert workspace_id == "ws-7"
         assert workspace_duckdb_path == str(duckdb_path)
-        assert working_dir == str(workspace_dir)
-        return {
-            "success": True,
-            "stdout": "",
-            "stderr": "",
-            "error": None,
-            "result": None,
-            "result_type": None,
-            "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
-        }
+        assert progress_callback is None
+        return True
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(runtime_api, "reset_workspace_kernel", fake_reset)
-    monkeypatch.setattr(runtime_api, "execute_code", fake_execute_code)
+    monkeypatch.setattr(runtime_api, "bootstrap_workspace_runtime", fake_bootstrap_workspace_runtime)
 
     response = await runtime_api.restart_workspace_kernel_runtime(
         workspace_id="ws-7",
@@ -453,31 +423,15 @@ async def test_workspace_kernel_restart_warms_when_no_existing_session(monkeypat
         assert workspace_id == "ws-8"
         return False
 
-    async def fake_execute_code(
-        code,
-        timeout,
-        working_dir=None,
-        workspace_id=None,
-        workspace_duckdb_path=None,
-    ):
-        assert code == "None"
-        assert timeout == 15
+    async def fake_bootstrap_workspace_runtime(*, workspace_id, workspace_duckdb_path, progress_callback=None):
         assert workspace_id == "ws-8"
         assert workspace_duckdb_path == str(duckdb_path)
-        assert working_dir == str(workspace_dir)
-        return {
-            "success": True,
-            "stdout": "",
-            "stderr": "",
-            "error": None,
-            "result": None,
-            "result_type": None,
-            "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
-        }
+        assert progress_callback is None
+        return True
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(runtime_api, "reset_workspace_kernel", fake_reset)
-    monkeypatch.setattr(runtime_api, "execute_code", fake_execute_code)
+    monkeypatch.setattr(runtime_api, "bootstrap_workspace_runtime", fake_bootstrap_workspace_runtime)
 
     response = await runtime_api.restart_workspace_kernel_runtime(
         workspace_id="ws-8",

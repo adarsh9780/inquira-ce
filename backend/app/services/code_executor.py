@@ -115,6 +115,26 @@ async def execute_code(
     )
 
 
+async def bootstrap_workspace_runtime(
+    *,
+    workspace_id: str,
+    workspace_duckdb_path: str,
+    progress_callback: Any | None = None,
+) -> bool:
+    """Ensure workspace runtime environment + kernel are ready."""
+    config = load_execution_runtime_config()
+    provider = config.provider.strip().lower()
+    if provider != "local_jupyter":
+        return False
+    manager = await get_workspace_kernel_manager()
+    return await manager.ensure_ready(
+        workspace_id=workspace_id,
+        workspace_duckdb_path=workspace_duckdb_path,
+        config=config,
+        progress_callback=progress_callback,
+    )
+
+
 def _error_payload(message: str) -> dict[str, Any]:
     """Return a standardized execution error payload."""
     return {
