@@ -1,13 +1,16 @@
 <template>
   <div class="flex h-full flex-col">
-    <div class="flex-shrink-0 border-b border-gray-200 bg-gray-50 px-4 py-3">
-      <div class="flex items-center justify-between">
+    <Teleport to="#workspace-left-pane-toolbar" v-if="isMounted && appStore.workspacePane === 'code'">
+      <div class="flex items-center justify-end w-full gap-4">
+        <div class="text-xs text-gray-500 hidden xl:block">
+          <span class="font-medium">Tip:</span> Select code and press <kbd class="rounded border border-gray-300 bg-white px-1 py-0.5">Shift+Enter</kbd> to run selection
+        </div>
         <div class="flex items-center space-x-2">
           <button
             @click="runCode"
             :disabled="!canRunCode || isRunning"
             title="Run Code (R)"
-            class="inline-flex items-center rounded-md border border-transparent px-2 py-2 text-sm font-medium leading-4 text-white transition-colors"
+            class="inline-flex items-center rounded-md border border-transparent px-2 py-1.5 text-sm font-medium leading-4 text-white transition-colors"
             :class="canRunCode && !isRunning
               ? 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2'
               : 'cursor-not-allowed bg-gray-400'"
@@ -19,7 +22,7 @@
           <button
             @click="syncTableNameInCode"
             title="Sync table name in code to current data file"
-            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
             <ArrowPathIcon class="h-4 w-4" />
           </button>
@@ -27,7 +30,7 @@
           <button
             @click="undo"
             :disabled="!canUndo"
-            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             :class="!canUndo ? 'cursor-not-allowed opacity-50' : ''"
             title="Undo (Ctrl+Z)"
           >
@@ -37,7 +40,7 @@
           <button
             @click="redo"
             :disabled="!canRedo"
-            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             :class="!canRedo ? 'cursor-not-allowed opacity-50' : ''"
             title="Redo (Ctrl+Y)"
           >
@@ -47,19 +50,15 @@
           <button
             @click="downloadCode"
             :disabled="!appStore.pythonFileContent"
-            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm font-medium leading-4 text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             :class="!appStore.pythonFileContent ? 'cursor-not-allowed opacity-50' : ''"
             title="Download code"
           >
             <ArrowDownTrayIcon class="h-4 w-4" />
           </button>
         </div>
-
-        <div class="text-xs text-gray-500">
-          <span class="font-medium">Tip:</span> Select code and press <kbd class="rounded border border-gray-300 bg-white px-1 py-0.5">Shift+Enter</kbd> to run selection
-        </div>
       </div>
-    </div>
+    </Teleport>
 
     <div class="relative flex-1" style="min-height: 400px;">
       <div ref="editorContainer" class="h-full w-full" style="min-height: 400px; position: relative; z-index: 1; background-color: white;"></div>
@@ -130,6 +129,7 @@ const isRunning = ref(false)
 const isGeneratingCode = ref(false)
 const databasePaths = ref(null)
 const settingsInfo = ref(null)
+const isMounted = ref(false)
 
 let editor = null
 let isUpdatingFromStore = false
@@ -477,6 +477,7 @@ function isDefaultEditorContent(content) {
 }
 
 onMounted(async () => {
+  isMounted.value = true
   await nextTick()
   await fetchSettings()
   await fetchDatabasePaths()

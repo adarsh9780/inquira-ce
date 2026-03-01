@@ -1,7 +1,8 @@
 <template>
   <div class="flex h-full min-w-0 bg-white rounded-xl overflow-hidden">
     <div class="flex-1 min-w-0 flex flex-col">
-      <div class="border-b border-gray-100 bg-white px-3 py-2 sm:px-4 flex items-center gap-2">
+    <Teleport to="#workspace-left-pane-toolbar" v-if="isMounted && appStore.workspacePane === 'chat'">
+      <div class="flex items-center w-full gap-4 justify-between">
         <div class="flex-1 min-w-0 flex items-center gap-2 group">
           <div v-if="!isEditingTitle" class="min-w-0 flex items-center gap-2 overflow-hidden">
             <h3 
@@ -73,6 +74,7 @@
           </div>
         </div>
       </div>
+    </Teleport>
 
       <div class="flex-1 min-h-0 overflow-y-auto bg-gray-50/30" data-chat-scroll-container>
         <div v-if="!appStore.hasWorkspace" class="flex items-center justify-center h-full px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-2 sm:pb-3 lg:pb-4">
@@ -138,6 +140,7 @@ import { extractApiErrorMessage } from '../../utils/apiError'
 
 const appStore = useAppStore()
 const isConversationHistoryOpen = ref(false)
+const isMounted = ref(false)
 
 // Title Editing
 const isEditingTitle = ref(false)
@@ -233,6 +236,7 @@ async function openConversationHistory() {
 }
 
 onMounted(async () => {
+  isMounted.value = true
   try {
     await appStore.fetchWorkspaces()
     if (!appStore.activeWorkspaceId) return
