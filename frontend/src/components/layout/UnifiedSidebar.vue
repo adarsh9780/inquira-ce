@@ -193,6 +193,7 @@ import logo from '../../assets/favicon.svg'
 
 import {
   RectangleGroupIcon,
+  CommandLineIcon,
   DocumentTextIcon,
   CogIcon,
   ArrowRightOnRectangleIcon,
@@ -206,6 +207,7 @@ const authStore = useAuthStore()
 const flash = ref({})
 const counts = computed(() => ({
   workspace: appStore.chatHistory?.length || (!appStore.isCodeRunning && appStore.generatedCode ? 1 : 0),
+  terminal: appStore.terminalOutput && !appStore.isCodeRunning ? 1 : 0,
 }))
 
 watch(counts, (n, o) => {
@@ -229,6 +231,14 @@ const tabs = computed(() => [
     badgeClass: '',
     badgeColor: 'bg-blue-600',
   },
+  ...(appStore.terminalEnabled ? [{
+    id: 'terminal',
+    name: 'Terminal',
+    icon: CommandLineIcon,
+    count: appStore.terminalOutput && !appStore.isCodeRunning ? '1' : null,
+    badgeClass: appStore.terminalOutput && !appStore.isCodeRunning ? 'bg-gray-100 text-gray-800' : '',
+    badgeColor: 'bg-slate-700',
+  }] : []),
   {
     id: 'schema-editor',
     name: 'Schema',
