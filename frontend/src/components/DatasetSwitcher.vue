@@ -44,40 +44,15 @@
         >
           <button 
             @click="selectDataset(ds)"
-            class="flex-1 min-w-0 text-left focus:outline-none pr-2"
+            class="flex-1 min-w-0 text-left focus:outline-none"
           >
             <p class="font-medium text-gray-900 truncate" :title="ds.table_name">{{ ds.table_name }}</p>
             <!-- Show full path as requested -->
             <p class="text-xs text-gray-500 truncate" :title="ds.file_path">{{ ds.file_path }}</p>
           </button>
-          
-          <div class="flex items-center space-x-1">
-            <svg v-if="ds.file_path === currentDataPath" class="w-4 h-4 text-blue-600 flex-shrink-0 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-            </svg>
-            
-            <!-- Refresh Button -->
-            <button 
-              @click.stop="promptRefresh(ds)"
-              class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-              title="Refresh Dataset"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
-            
-            <!-- Delete Button -->
-            <button 
-              @click.stop="promptDelete(ds)"
-              class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-              title="Delete Dataset"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
-          </div>
+          <svg v-if="ds.file_path === currentDataPath" class="w-4 h-4 text-blue-600 flex-shrink-0 ml-2" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+          </svg>
         </div>
       </div>
 
@@ -95,97 +70,6 @@
       </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
-    <div v-if="showDeleteModal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6" @click.stop>
-        <div class="flex items-center space-x-3 text-red-600 mb-4">
-          <div class="p-2 bg-red-100 rounded-full">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold text-gray-900">Delete Dataset?</h3>
-        </div>
-        
-        <p class="text-gray-600 mb-6">
-          Are you sure you want to delete <strong>{{ datasetToDelete?.table_name }}</strong>?
-          <br><br>
-          <span class="text-sm text-gray-500">
-            This will permanently remove:
-            <ul class="list-disc list-inside mt-1 ml-1">
-              <li>The DuckDB table</li>
-              <li>Schema file (schema.json)</li>
-              <li>Preview cache files</li>
-            </ul>
-          </span>
-        </p>
-
-        <div class="flex justify-end space-x-3">
-          <button 
-            @click="closeDeleteModal"
-            class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-            :disabled="loading"
-          >
-            Cancel
-          </button>
-          
-          <button 
-            @click="confirmDelete"
-            class="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 flex items-center"
-            :disabled="loading"
-          >
-            <span v-if="loading" class="mr-2 animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
-            {{ loading ? 'Deleting...' : 'Delete Dataset' }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Refresh Confirmation Modal -->
-    <div v-if="showRefreshModal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6" @click.stop>
-        <div class="flex items-center space-x-3 text-blue-600 mb-4">
-          <div class="p-2 bg-blue-100 rounded-full">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold text-gray-900">Refresh Dataset?</h3>
-        </div>
-        
-        <p class="text-gray-600 mb-6">
-          Refresh <strong>{{ datasetToRefresh?.table_name }}</strong> from source file?
-          <br><br>
-          <span class="text-sm text-gray-500">
-            This will:
-            <ul class="list-disc list-inside mt-1 ml-1">
-              <li>Reimport data from the original file</li>
-              <li>Regenerate the schema with AI</li>
-              <li>Create a backup (restored if refresh fails)</li>
-            </ul>
-          </span>
-        </p>
-
-        <div class="flex justify-end space-x-3">
-          <button 
-            @click="closeRefreshModal"
-            class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-            :disabled="loading"
-          >
-            Cancel
-          </button>
-          
-          <button 
-            @click="confirmRefresh"
-            class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center"
-            :disabled="loading"
-          >
-            <span v-if="loading" class="mr-2 animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
-            {{ loading ? 'Refreshing...' : 'Refresh Dataset' }}
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -205,14 +89,6 @@ const isOpen = ref(false)
 const loading = ref(false)
 const loadingMessage = ref('Loading datasets...')
 const datasets = ref([])
-
-// Delete modal state
-const showDeleteModal = ref(false)
-const datasetToDelete = ref(null)
-
-// Refresh modal state
-const showRefreshModal = ref(false)
-const datasetToRefresh = ref(null)
 
 const currentDataPath = computed(() => appStore.dataFilePath)
 const currentDatasetName = computed(() => {
@@ -272,42 +148,6 @@ function toggleDropdown() {
   }
 }
 
-// Prompt for delete - opens modal
-function promptDelete(ds) {
-  datasetToDelete.value = ds
-  showDeleteModal.value = true
-}
-
-function closeDeleteModal() {
-  showDeleteModal.value = false
-  datasetToDelete.value = null
-}
-
-async function confirmDelete() {
-  if (!datasetToDelete.value) return
-  const { toast } = await import('../composables/useToast.js')
-  closeDeleteModal()
-  toast.info('Not Available Yet', 'Dataset deletion is not part of the v1 workspace API yet.')
-}
-
-// Prompt for refresh - opens modal
-function promptRefresh(ds) {
-  datasetToRefresh.value = ds
-  showRefreshModal.value = true
-}
-
-function closeRefreshModal() {
-  showRefreshModal.value = false
-  datasetToRefresh.value = null
-}
-
-async function confirmRefresh() {
-  if (!datasetToRefresh.value) return
-  const { toast } = await import('../composables/useToast.js')
-  closeRefreshModal()
-  toast.info('Not Available Yet', 'Dataset refresh is not part of the v1 workspace API yet.')
-}
-
 async function selectDataset(ds) {
   if (ds.file_path === currentDataPath.value) {
     isOpen.value = false
@@ -364,9 +204,6 @@ function openSettings() {
 
 // Close dropdown on outside click
 function handleClickOutside(event) {
-  // If a modal is open, ignore click-outside
-  if (showDeleteModal.value || showRefreshModal.value) return
-
   // If click is outside this component's container, close the dropdown
   if (containerRef.value && !containerRef.value.contains(event.target)) {
     isOpen.value = false

@@ -165,14 +165,6 @@
               </button>
 
               <button
-                @click="openShortcuts"
-                class="flex items-center w-full px-4 py-2.5 text-sm text-primary hover:bg-gray-50 hover:text-primary transition-colors"
-              >
-                <CommandLineIcon class="h-4 w-4 mr-3 text-gray-500" />
-                Shortcuts
-              </button>
-
-              <button
                 @click="openTerms"
                 class="flex items-center w-full px-4 py-2.5 text-sm text-primary hover:bg-gray-50 hover:text-primary transition-colors"
               >
@@ -204,14 +196,6 @@
     @close="closeSettings"
   />
 
-  
-
-  <!-- Shortcuts Modal -->
-  <ShortcutsModal
-    :is-open="isShortcutsOpen"
-    @close="closeShortcuts"
-  />
-
   <!-- Logout Confirmation Modal -->
   <ConfirmationModal
     :is-open="isLogoutConfirmOpen"
@@ -233,9 +217,8 @@ import { apiService } from '../../services/apiService'
 import { toast } from '../../composables/useToast'
 import SettingsModal from '../modals/SettingsModal.vue'
 // PreviewModal removed; use in-panel tabs instead
-import ShortcutsModal from '../modals/ShortcutsModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
-import { CogIcon, ArrowRightOnRectangleIcon, UserIcon, CommandLineIcon, ChevronDownIcon, DocumentTextIcon } from '@heroicons/vue/24/outline'
+import { CogIcon, ArrowRightOnRectangleIcon, UserIcon, ChevronDownIcon, DocumentTextIcon } from '@heroicons/vue/24/outline'
 import logo from '../../assets/favicon.svg'
 import DatasetSwitcher from '../DatasetSwitcher.vue'
 import WorkspaceSwitcher from '../WorkspaceSwitcher.vue'
@@ -246,7 +229,6 @@ const isSettingsOpen = ref(false)
 const settingsInitialTab = ref('api') // 'api' | 'data' | 'account'
 // const isNewPreviewOpen = ref(false) // removed
 const isUserMenuOpen = ref(false)
-const isShortcutsOpen = ref(false)
 const isLogoutConfirmOpen = ref(false)
 const isWebSocketConnected = ref(false)
 const kernelStatus = ref('connecting')
@@ -297,19 +279,6 @@ const kernelStatusMeta = computed(() => {
   }
 })
 
-// Auto-show shortcuts modal after page load
-function autoShowShortcutsModal() {
-  // Only show if user is authenticated and hasn't opted out
-  if (authStore.isAuthenticated) {
-    if (!appStore.hideShortcutsModal) {
-      // Show modal after a short delay to let the page load first
-      setTimeout(() => {
-        isShortcutsOpen.value = true
-      }, 1500) // 1.5 seconds delay
-    }
-  }
-}
-
 // Setup WebSocket connection monitoring
 function setupWebSocketMonitoring() {
   // Monitor connection status
@@ -329,7 +298,6 @@ function setupWebSocketMonitoring() {
 
 // Call auto-show when component is mounted
 onMounted(() => {
-  autoShowShortcutsModal()
   setupWebSocketMonitoring()
   startKernelStatusPolling()
 })
@@ -446,23 +414,11 @@ function toggleUserMenu() {
   isUserMenuOpen.value = !isUserMenuOpen.value
 }
 
-function openShortcuts() {
-  isShortcutsOpen.value = true
-  isUserMenuOpen.value = false // Close dropdown when opening shortcuts
-}
-
 function openTerms() {
   isUserMenuOpen.value = false
   window.open('/terms-and-conditions.html', '_blank', 'noopener')
 }
 
-
-// Preview modal removed; use in-panel Preview tab
-// switchPreviewTab removed (Preview modal deprecated)
-
-function closeShortcuts() {
-  isShortcutsOpen.value = false
-}
 
 function handleLogout() {
   // Show custom confirmation modal
@@ -486,127 +442,6 @@ function cancelLogout() {
   isLogoutConfirmOpen.value = false
 }
 
-// Global shortcut helper functions
-function focusChatInput() {
-  appStore.setWorkspacePane('chat')
-  appStore.setActiveTab('workspace')
-  // Find and focus the chat input textarea
-  const chatInput = document.querySelector('textarea[placeholder*="Ask a question"]')
-  if (chatInput) {
-    chatInput.focus()
-    // Scroll into view if needed
-    chatInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }
-}
-
-function focusCodeEditorAtEnd() {
-  appStore.setWorkspacePane('code')
-  appStore.setActiveTab('workspace')
-  // Find and focus the code editor at the end of the current line
-  const codeEditor = document.querySelector('.cm-editor')
-  if (codeEditor) {
-    codeEditor.focus()
-    // Scroll into view if needed
-    codeEditor.scrollIntoView({ behavior: 'smooth', block: 'center' })
-
-    // Try to move cursor to end of line (this may need adjustment based on CodeMirror API)
-    try {
-      // For CodeMirror, we can try to dispatch an End key event
-      const endKeyEvent = new KeyboardEvent('keydown', {
-        key: 'End',
-        code: 'End',
-        keyCode: 35,
-        which: 35,
-        bubbles: true,
-        cancelable: true
-      })
-      codeEditor.dispatchEvent(endKeyEvent)
-    } catch (error) {
-      // Fallback: just focus the editor
-      console.debug('Could not move cursor to end of line:', error)
-    }
-  }
-}
-
-function runCode() {
-  // Trigger code execution
-  // This could be a button click or direct function call
-  const runButton = document.querySelector('button[title*="Run"], button[title*="Execute"]')
-  if (runButton) {
-    runButton.click()
-  } else {
-    // Fallback: try to find any run-related button
-    const buttons = document.querySelectorAll('button')
-    for (const button of buttons) {
-      if (button.textContent.toLowerCase().includes('run') ||
-          button.textContent.toLowerCase().includes('execute') ||
-          button.title.toLowerCase().includes('run')) {
-        button.click()
-        break
-      }
-    }
-  }
-}
-
-function downloadCode() {
-  try {
-    // Get the Python code from the app store
-    const code = appStore.pythonFileContent || '# No code in editor'
-
-    // Create a blob with the code
-    const blob = new Blob([code], { type: 'text/plain' })
-
-    // Create a download link
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-
-    // Generate filename with timestamp
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
-    link.download = `python_code_${timestamp}.py`
-
-    // Trigger download
-    document.body.appendChild(link)
-    link.click()
-
-    // Clean up
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
-
-    console.debug('Python code downloaded successfully')
-  } catch (error) {
-    console.error('Failed to download code:', error)
-  }
-}
-
-
-// Helper function to check if user is in a regular input field (not CodeMirror)
-function isInInputField() {
-  const activeElement = document.activeElement
-  const tagName = activeElement?.tagName?.toLowerCase()
-
-  // Treat CodeMirror as an input context (disable global shortcuts while editing)
-  if (activeElement?.closest && activeElement.closest('.cm-editor')) {
-    return true
-  }
-
-  // Standard inputs and textareas
-  if (tagName === 'input' || tagName === 'textarea') {
-    return true
-  }
-
-  // Any other contenteditable element
-  if (activeElement?.contentEditable === 'true') {
-    return true
-  }
-
-  return false
-}
-
-// Temporary kill-switch while UI navigation is being redesigned.
-const shortcutsEnabled = false
-
-// Keyboard shortcuts - Caps Lock + key combinations for cross-platform compatibility
 function handleKeydown(event) {
 
   // Don't handle Enter key - let it go to editors
@@ -629,15 +464,6 @@ function handleKeydown(event) {
       event.preventDefault()
       return
     }
-
-    if (isShortcutsOpen.value) {
-      console.debug('Closing shortcuts modal')
-      closeShortcuts()
-      event.preventDefault()
-      return
-    }
-
-    // Preview modal removed
 
     if (isSettingsOpen.value) {
       console.debug('Closing settings modal')
@@ -662,99 +488,6 @@ function handleKeydown(event) {
     }
   }
 
-  if (!shortcutsEnabled) {
-    return
-  }
-
-  // Only handle shortcuts when not in input fields
-  if (isInInputField()) {
-    return
-  }
-
-  // Single-letter shortcuts (no modifier keys needed) - only when NOT in input fields
-  if (!event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
-    const key = event.key.toLowerCase()
-    console.debug('Processing single-letter shortcut:', key)
-
-    switch (key) {
-      case 'c':
-        console.debug('c: Switching to workspace code pane')
-        event.preventDefault()
-        appStore.setWorkspacePane('code')
-        break
-      case 't':
-        console.debug('t: Switching to table tab')
-        event.preventDefault()
-        appStore.setActiveTab('table')
-        break
-      case 'i':
-        console.debug('i: Focusing chat input')
-        event.preventDefault()
-        focusChatInput()
-        break
-      case 'w':
-        console.debug('w: Focusing code editor at end')
-        event.preventDefault()
-        focusCodeEditorAtEnd()
-        break
-      case 'r':
-        console.debug('r: Running code')
-        event.preventDefault()
-        runCode()
-        break
-      case 'g':
-        console.debug('g: Downloading Python code')
-        event.preventDefault()
-        downloadCode()
-        break
-      case 'h':
-        console.debug('h: Switching to workspace chat pane')
-        event.preventDefault()
-        appStore.setWorkspacePane('chat')
-        focusChatInput()
-        break
-      case 'f':
-        console.debug('f: Switching to figure tab')
-        event.preventDefault()
-        appStore.setActiveTab('figure')
-        break
-      case 'v':
-        console.debug('v: Switching to preview tab')
-        event.preventDefault()
-        appStore.setActiveTab('preview')
-        break
-      case 'e':
-        console.debug('e: Switching to schema editor tab')
-        event.preventDefault()
-        appStore.setActiveTab('schema-editor')
-        break
-      case 'x':
-        console.debug('x: Switching to variable explorer tab')
-        event.preventDefault()
-        appStore.setActiveTab('varex')
-        break
-      case 'o':
-        console.debug('o: Switching to terminal tab')
-        event.preventDefault()
-        appStore.setActiveTab('terminal')
-        break
-      case ',':
-        console.debug(',: Opening settings')
-        event.preventDefault()
-        openSettings()
-        break
-      case 'k':
-        console.debug('k: Opening shortcuts')
-        event.preventDefault()
-        openShortcuts()
-        break
-      // Modal shortcuts removed; use v/e for tabs
-      default:
-        // Not a shortcut key, allow normal typing (don't prevent default)
-        console.debug('Not a shortcut key, allowing normal typing')
-        return
-    }
-  }
 }
 
 

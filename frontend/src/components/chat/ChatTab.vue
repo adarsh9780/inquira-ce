@@ -94,7 +94,7 @@
             </div>
             <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-2 sm:mb-3">Start Your Analysis</h3>
             <p class="text-sm sm:text-base text-gray-600 leading-relaxed">
-              Point Inquira at your local dataset path, add your Gemini API key in Settings, then ask a question to generate code and insights.
+              Point Inquira at your local dataset path, add your OpenRouter API key in Settings, then ask a question to generate code and insights.
             </p>
           </div>
         </div>

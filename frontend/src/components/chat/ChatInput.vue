@@ -49,7 +49,7 @@
             </li>
             <li class="flex items-center space-x-2">
               <div class="w-1.5 h-1.5 rounded-full bg-error"></div>
-              <span>Enter your Gemini API key in Settings</span>
+              <span>Enter your OpenRouter API key in Settings</span>
             </li>
           </ul>
           <p class="text-xs text-gray-600 mt-3">Click the Settings button in the top toolbar to add your API key.</p>
@@ -290,7 +290,7 @@ async function handleSubmit() {
       if (response.plotly_figure || (response.result?.data && response.result?.layout)) {
         appStore.setPlotlyFigure(response.plotly_figure || response.result)
         appStore.setResultData(null)
-        appStore.setActiveTab('chart')
+        appStore.setActiveTab('figure')
       } else if (response.result?.columns && response.result?.data) {
         appStore.setResultData(response.result)
         appStore.setPlotlyFigure(null)

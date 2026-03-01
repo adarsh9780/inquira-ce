@@ -33,7 +33,7 @@
       <!-- API Key Input -->
       <div>
         <label for="api-key-input" class="block text-sm font-medium text-gray-700 mb-2">
-          OpenRouter API Key
+          API Key (OpenRouter)
         </label>
         <div class="relative max-w-md">
           <input

@@ -214,11 +214,6 @@ sales_data,category,string,Product category,"Electronics,Clothing,Books"
 3. **Explore Visualizations**: View charts and interactive dashboards
 4. **Export Results**: Download data as CSV or charts as images
 
-### ⌨️ Navigation & Shortcuts
-- `H`: Switch Workspace pane to Chat
-- `C / T / F / O / V / E`: Switch to Code / Table / Figure / Terminal / Preview / Schema tabs
-- `Tab` / `Shift+Tab`: Indent / outdent code in the editor (4 spaces)
-
 The sidebar is vertical on the left. When collapsed, tabs show a small count badge (e.g., number of tables/figures, ✓ for ready code) and a brief green pulse when new output arrives.
 
 ### 🧭 Preview & Schema
