@@ -22,6 +22,7 @@ from ...services.code_executor import (
     get_workspace_dataframe_rows,
     get_workspace_kernel_status,
     interrupt_workspace_kernel,
+    list_workspace_artifacts_via_kernel,
     reset_workspace_kernel,
 )
 from ...services.artifact_scratchpad import get_artifact_scratchpad_store
@@ -602,10 +603,16 @@ async def list_workspace_artifacts(
     """List all non-expired artifacts for a workspace, optionally filtered by kind."""
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     store = get_artifact_scratchpad_store()
-    items = store.list_artifacts_for_workspace(
-        workspace_duckdb_path=str(workspace.duckdb_path),
-        kind=kind,
-    )
+    try:
+        items = store.list_artifacts_for_workspace(
+            workspace_duckdb_path=str(workspace.duckdb_path),
+            kind=kind,
+        )
+    except duckdb.IOException as exc:
+        if "Conflicting lock is held" not in str(exc):
+            raise HTTPException(status_code=503, detail=f"Artifact store unavailable: {exc}") from exc
+        # Lock-safe fallback: query through the kernel's in-process scratchpad connection.
+        items = await list_workspace_artifacts_via_kernel(workspace_id, kind=kind)
     summaries = [
         WorkspaceArtifactSummary(
             artifact_id=item["artifact_id"],

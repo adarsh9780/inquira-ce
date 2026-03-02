@@ -124,6 +124,21 @@
         </div>
       </div>
 
+      <!-- Empty state: error loading artifacts -->
+      <div
+        v-else-if="artifactListError"
+        class="absolute inset-0 flex items-center justify-center"
+        style="background-color: var(--color-base);"
+      >
+        <div class="text-center">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-10 w-10 mx-auto mb-3 text-red-400">
+            <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clip-rule="evenodd" />
+          </svg>
+          <p class="text-sm font-medium text-red-600">{{ artifactListError }}</p>
+          <p class="text-xs mt-1" style="color: var(--color-text-muted);">Try restarting the kernel</p>
+        </div>
+      </div>
+
       <!-- Empty state: no artifacts at all -->
       <div
         v-else
@@ -177,6 +192,7 @@ const windowEnd = ref(0)
 const datasourceVersion = ref(0)
 const useClientFallback = ref(false)
 const tableError = ref('')
+const artifactListError = ref('')
 const pendingControllers = new Set()
 let gridApi = null
 let listAbortController = null
@@ -238,6 +254,8 @@ async function loadWorkspaceArtifacts(workspaceId) {
   listAbortController?.abort()
   listAbortController = new AbortController()
   isLoadingArtifacts.value = true
+  artifactListError.value = ''
+  appStore.clearDataPaneError()
   try {
     const response = await apiService.v1ListWorkspaceArtifacts(
       workspaceId,
@@ -248,6 +266,9 @@ async function loadWorkspaceArtifacts(workspaceId) {
   } catch (error) {
     if (error?.name === 'AbortError') return
     console.warn('Failed to load workspace artifacts:', error)
+    const brief = error?.response?.data?.detail || error?.message || 'Failed to load tables'
+    artifactListError.value = brief
+    appStore.setDataPaneError(brief)
     workspaceArtifacts.value = []
   } finally {
     isLoadingArtifacts.value = false

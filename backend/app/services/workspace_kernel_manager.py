@@ -276,6 +276,61 @@ class WorkspaceKernelManager:
             return None
         return parsed.result
 
+    async def list_workspace_artifacts(
+        self,
+        *,
+        workspace_id: str,
+        kind: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List non-expired artifacts via the kernel's in-process scratchpad connection."""
+        async with self._sessions_lock:
+            session = self._sessions.get(workspace_id)
+        if session is None:
+            return []
+
+        escaped_kind = str(kind or "").replace("'", "''") if kind else ""
+        if kind:
+            where_clause = f"kind = '{escaped_kind}' AND"
+        else:
+            where_clause = ""
+        list_code = (
+            "import json as _json\n"
+            "from datetime import datetime as _dt, timezone as _tz\n"
+            "_now = _dt.now(_tz.utc)\n"
+            f"_rows = scratchpad_conn.execute(\"\"\"\n"
+            f"    SELECT artifact_id, logical_name, kind, row_count, schema_json, created_at, status\n"
+            f"    FROM artifact_manifest\n"
+            f"    WHERE {where_clause} expires_at > ? AND status = 'ready'\n"
+            f"    ORDER BY created_at DESC\n"
+            f"\"\"\", [_now]).fetchall()\n"
+            "_result = []\n"
+            "for _r in _rows:\n"
+            "    _schema = None\n"
+            "    try:\n"
+            "        if _r[4]:\n"
+            "            _schema = _json.loads(str(_r[4]))\n"
+            "    except Exception:\n"
+            "        pass\n"
+            "    _result.append({\n"
+            "        'artifact_id': str(_r[0]),\n"
+            "        'logical_name': str(_r[1]),\n"
+            "        'kind': str(_r[2]),\n"
+            "        'row_count': int(_r[3] or 0) if _r[3] is not None else None,\n"
+            "        'schema': _schema,\n"
+            "        'created_at': str(_r[5]),\n"
+            "        'status': str(_r[6]),\n"
+            "    })\n"
+            "_result\n"
+        )
+
+        async with session.lock:
+            session.last_used = datetime.now(UTC)
+            parsed = await self._execute_request(session, list_code)
+
+        if parsed.error is not None or not isinstance(parsed.result, list):
+            return []
+        return [item for item in parsed.result if isinstance(item, dict)]
+
     async def ensure_ready(
         self,
         *,

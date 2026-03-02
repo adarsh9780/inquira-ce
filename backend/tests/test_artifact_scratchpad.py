@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 import duckdb
 
 from app.services.artifact_scratchpad import ArtifactScratchpadStore
@@ -288,4 +290,114 @@ def test_list_artifacts_for_workspace_deduplicates_by_logical_name(tmp_path):
 
     finally:
         con.close()
+
+
+def test_read_only_methods_succeed_without_lock(tmp_path):
+    """Read-only methods should work directly when no write lock is held.
+
+    This verifies the refactoring: read-only methods use ``_open_readonly()``
+    instead of ``ensure_workspace()`` and succeed for normal read access.
+    """
+    workspace_db = tmp_path / "ws_ro" / "workspace.duckdb"
+    workspace_db.parent.mkdir(parents=True, exist_ok=True)
+    workspace_db.touch()
+
+    store = ArtifactScratchpadStore()
+    scratchpad_db = store.ensure_workspace(str(workspace_db))
+
+    # Seed data with a write connection, then close it.
+    con = duckdb.connect(str(scratchpad_db), read_only=False)
+    con.execute("CREATE TABLE art_ro (x INTEGER)")
+    con.execute("INSERT INTO art_ro VALUES (1), (2)")
+    con.execute(
+        """
+        INSERT INTO artifact_manifest (
+            artifact_id, run_id, workspace_id, logical_name, kind, table_name,
+            payload_json, schema_json, row_count, created_at, expires_at, status, error
+        ) VALUES (
+            'ro-test', 'run-ro', 'ws-ro', 'ro_table', 'dataframe', 'art_ro',
+            NULL, NULL, 2, NOW(), NOW() + INTERVAL 1 DAY, 'ready', NULL
+        )
+        """
+    )
+    con.close()
+
+    # All three read-only methods work WITHOUT calling ensure_workspace() again.
+    artifacts = store.list_artifacts_for_workspace(
+        workspace_duckdb_path=str(workspace_db), kind="dataframe"
+    )
+    assert len(artifacts) == 1
+    assert artifacts[0]["logical_name"] == "ro_table"
+
+    meta = store.get_artifact(workspace_duckdb_path=str(workspace_db), artifact_id="ro-test")
+    assert meta is not None
+    assert meta["kind"] == "dataframe"
+
+    rows = store.get_dataframe_rows(
+        workspace_duckdb_path=str(workspace_db), artifact_id="ro-test", offset=0, limit=10
+    )
+    assert rows is not None
+    assert rows["row_count"] == 2
+
+
+def test_read_only_methods_raise_ioerror_under_cross_process_lock(tmp_path):
+    """Regression: read-only methods raise IOException under a cross-process write lock.
+
+    The kernel holds a persistent write connection in its subprocess.  DuckDB
+    disallows even read-only connections from another process when a writer is
+    active.  Read-only methods raise ``duckdb.IOException`` which the API layer
+    catches and falls back to the kernel's in-process scratchpad connection.
+    """
+    import subprocess
+    import sys
+
+    workspace_db = tmp_path / "ws_lock" / "workspace.duckdb"
+    workspace_db.parent.mkdir(parents=True, exist_ok=True)
+    workspace_db.touch()
+
+    store = ArtifactScratchpadStore()
+    scratchpad_db = store.ensure_workspace(str(workspace_db))
+
+    import textwrap
+    child_script = textwrap.dedent(f"""\
+import duckdb, sys
+conn = duckdb.connect(r'{scratchpad_db}', read_only=False)
+conn.execute("CREATE TABLE IF NOT EXISTS art_data (x INTEGER)")
+conn.execute("INSERT INTO art_data VALUES (10), (20), (30)")
+conn.execute(
+    "INSERT INTO artifact_manifest "
+    "(artifact_id, run_id, workspace_id, logical_name, kind, table_name, "
+    "payload_json, schema_json, row_count, created_at, expires_at, status, error) "
+    "VALUES ('lock-test', 'run-lock', 'ws-lock', 'locked_table', 'dataframe', 'art_data', "
+    "NULL, NULL, 3, NOW(), NOW() + INTERVAL 1 DAY, 'ready', NULL)"
+)
+print("READY", flush=True)
+sys.stdin.readline()
+conn.close()
+""")
+
+    proc = subprocess.Popen(
+        [sys.executable, "-c", child_script],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        line = proc.stdout.readline().strip()
+        if line != "READY":
+            err = proc.stderr.read()
+            raise AssertionError(f"Child did not become ready, got: {line!r}, stderr: {err}")
+
+        # Read-only methods should raise IOException (lock conflict), which the
+        # API layer catches and falls back to the kernel.
+        with pytest.raises(duckdb.IOException) as exc_info:
+            store.list_artifacts_for_workspace(
+                workspace_duckdb_path=str(workspace_db), kind="dataframe"
+            )
+        assert ArtifactScratchpadStore._is_lock_conflict(exc_info.value)
+    finally:
+        proc.stdin.write("done\n")
+        proc.stdin.flush()
+        proc.wait(timeout=5)
 

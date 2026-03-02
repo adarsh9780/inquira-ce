@@ -51,9 +51,17 @@
       </div>
     </div>
 
-    <!-- Center Section: Tab-aware artifact count -->
+    <!-- Center Section: Tab-aware artifact count or data pane error -->
     <div class="flex items-center gap-2 h-full">
-      <template v-if="appStore.activeWorkspaceId && artifactCountLabel">
+      <!-- Data pane error takes priority -->
+      <template v-if="appStore.dataPaneError">
+        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-600 max-w-[280px] truncate"
+             :title="appStore.dataPaneError">
+          <span class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+          <span class="truncate">{{ appStore.dataPaneError }}</span>
+        </div>
+      </template>
+      <template v-else-if="appStore.activeWorkspaceId && artifactCountLabel">
         <div class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium"
              :class="artifactCountClass">
           <span>{{ artifactCountLabel }}</span>

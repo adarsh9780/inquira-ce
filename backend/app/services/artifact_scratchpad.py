@@ -49,6 +49,19 @@ class ArtifactScratchpadStore:
     def _is_lock_conflict(exc: duckdb.IOException) -> bool:
         return "Conflicting lock is held" in str(exc)
 
+    @staticmethod
+    def _open_readonly(workspace_duckdb_path: str) -> duckdb.DuckDBPyConnection | None:
+        """Open the scratchpad DB read-only; return *None* if the file doesn't exist.
+
+        If a conflicting write lock is held (e.g. by the workspace kernel), this
+        will raise ``duckdb.IOException`` — the caller / API layer should catch
+        it and fall back to the kernel's in-process scratchpad connection.
+        """
+        db_path = ArtifactScratchpadStore.build_scratchpad_db_path(workspace_duckdb_path)
+        if not db_path.exists():
+            return None
+        return duckdb.connect(str(db_path), read_only=True)
+
     def ensure_workspace(self, workspace_duckdb_path: str) -> Path:
         db_path = self.build_scratchpad_db_path(workspace_duckdb_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -196,8 +209,9 @@ class ArtifactScratchpadStore:
         return artifact_id
 
     def get_artifact(self, *, workspace_duckdb_path: str, artifact_id: str) -> dict[str, Any] | None:
-        db_path = self.ensure_workspace(workspace_duckdb_path)
-        con = duckdb.connect(str(db_path), read_only=True)
+        con = self._open_readonly(workspace_duckdb_path)
+        if con is None:
+            return None
         try:
             row = con.execute(
                 """
@@ -243,8 +257,9 @@ class ArtifactScratchpadStore:
         }
 
     def list_artifacts_for_run(self, *, workspace_duckdb_path: str, run_id: str) -> list[dict[str, Any]]:
-        db_path = self.ensure_workspace(workspace_duckdb_path)
-        con = duckdb.connect(str(db_path), read_only=True)
+        con = self._open_readonly(workspace_duckdb_path)
+        if con is None:
+            return []
         try:
             rows = con.execute(
                 """
@@ -279,9 +294,10 @@ class ArtifactScratchpadStore:
         Items are ordered newest-first.  Pass ``kind`` (e.g. ``'dataframe'``)
         to restrict results to a single artifact type.
         """
-        db_path = self.ensure_workspace(workspace_duckdb_path)
+        con = self._open_readonly(workspace_duckdb_path)
+        if con is None:
+            return []
         now = datetime.now(UTC)
-        con = duckdb.connect(str(db_path), read_only=True)
         try:
             if kind:
                 rows = con.execute(
@@ -341,10 +357,11 @@ class ArtifactScratchpadStore:
         table_name = str(meta.get("table_name") or "").strip()
         if not table_name:
             return None
-        db_path = self.ensure_workspace(workspace_duckdb_path)
         safe_offset = max(0, int(offset))
         safe_limit = max(1, min(1000, int(limit)))
-        con = duckdb.connect(str(db_path), read_only=True)
+        con = self._open_readonly(workspace_duckdb_path)
+        if con is None:
+            return None
         try:
             escaped = table_name.replace('"', '""')
             page_df = con.execute(

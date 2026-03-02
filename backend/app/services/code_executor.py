@@ -77,6 +77,18 @@ async def get_workspace_dataframe_rows(
     )
 
 
+async def list_workspace_artifacts_via_kernel(
+    workspace_id: str,
+    kind: str | None = None,
+) -> list[dict[str, Any]]:
+    """List artifacts via the kernel's in-process scratchpad connection (lock-safe)."""
+    manager = await get_workspace_kernel_manager()
+    return await manager.list_workspace_artifacts(
+        workspace_id=workspace_id,
+        kind=kind,
+    )
+
+
 async def get_workspace_run_exports(
     workspace_id: str,
     run_id: str,

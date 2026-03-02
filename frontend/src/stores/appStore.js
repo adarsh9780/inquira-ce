@@ -52,6 +52,7 @@ export const useAppStore = defineStore('app', () => {
   const figures = ref([])
   const scalars = ref([])
   const dataframeCount = ref(0)
+  const dataPaneError = ref('')
   const figureCount = ref(0)
   const terminalOutput = ref('')
   const terminalEntries = ref([])
@@ -777,6 +778,14 @@ export const useAppStore = defineStore('app', () => {
     figureCount.value = Number(count || 0)
   }
 
+  function setDataPaneError(msg) {
+    dataPaneError.value = String(msg || '')
+  }
+
+  function clearDataPaneError() {
+    dataPaneError.value = ''
+  }
+
   function setTerminalOutput(output) {
     terminalOutput.value = output
   }
@@ -1032,6 +1041,7 @@ export const useAppStore = defineStore('app', () => {
     figures,
     scalars,
     dataframeCount,
+    dataPaneError,
     figureCount,
     terminalOutput,
     terminalEntries,
@@ -1105,6 +1115,8 @@ export const useAppStore = defineStore('app', () => {
     setScalars,
     setDataframeCount,
     setFigureCount,
+    setDataPaneError,
+    clearDataPaneError,
     setTerminalOutput,
     setTerminalEnabled,
     setRuntimeError,
