@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...services.code_executor import (
     bootstrap_workspace_runtime,
     execute_code,
+    get_workspace_dataframe_rows,
     get_workspace_kernel_status,
     interrupt_workspace_kernel,
     reset_workspace_kernel,
@@ -491,12 +492,25 @@ async def get_workspace_dataframe_artifact_rows(
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     store = get_artifact_scratchpad_store()
-    rows = store.get_dataframe_rows(
-        workspace_duckdb_path=str(workspace.duckdb_path),
-        artifact_id=artifact_id,
-        offset=offset,
-        limit=limit,
-    )
+    rows: dict[str, Any] | None = None
+    try:
+        rows = store.get_dataframe_rows(
+            workspace_duckdb_path=str(workspace.duckdb_path),
+            artifact_id=artifact_id,
+            offset=offset,
+            limit=limit,
+        )
+    except duckdb.IOException as exc:
+        message = str(exc)
+        if "Conflicting lock is held" not in message:
+            raise HTTPException(status_code=503, detail=f"Artifact store unavailable: {message}") from exc
+        # Kernel path shares the in-process scratchpad connection, so use it as lock-safe fallback.
+        rows = await get_workspace_dataframe_rows(
+            workspace_id=workspace_id,
+            artifact_id=artifact_id,
+            offset=offset,
+            limit=limit,
+        )
     if rows is None:
         raise HTTPException(status_code=404, detail="Dataframe artifact not found")
     return DataframeArtifactRowsResponse(**rows)
@@ -516,12 +530,24 @@ async def get_workspace_artifact_rows(
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     store = get_artifact_scratchpad_store()
-    rows = store.get_dataframe_rows(
-        workspace_duckdb_path=str(workspace.duckdb_path),
-        artifact_id=artifact_id,
-        offset=offset,
-        limit=limit,
-    )
+    rows: dict[str, Any] | None = None
+    try:
+        rows = store.get_dataframe_rows(
+            workspace_duckdb_path=str(workspace.duckdb_path),
+            artifact_id=artifact_id,
+            offset=offset,
+            limit=limit,
+        )
+    except duckdb.IOException as exc:
+        message = str(exc)
+        if "Conflicting lock is held" not in message:
+            raise HTTPException(status_code=503, detail=f"Artifact store unavailable: {message}") from exc
+        rows = await get_workspace_dataframe_rows(
+            workspace_id=workspace_id,
+            artifact_id=artifact_id,
+            offset=offset,
+            limit=limit,
+        )
     if rows is None:
         raise HTTPException(status_code=404, detail="Artifact rows not found")
     return DataframeArtifactRowsResponse(**rows)

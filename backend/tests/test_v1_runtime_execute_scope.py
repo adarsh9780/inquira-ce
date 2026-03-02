@@ -171,6 +171,68 @@ async def test_workspace_dataframe_artifact_rows_endpoint(monkeypatch, tmp_path)
 
 
 @pytest.mark.asyncio
+async def test_workspace_dataframe_artifact_rows_endpoint_falls_back_on_duckdb_lock(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws5-lock"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    class _LockedStore:
+        def get_dataframe_rows(
+            self,
+            *,
+            workspace_duckdb_path: str,
+            artifact_id: str,
+            offset: int,
+            limit: int,
+        ):
+            _ = (workspace_duckdb_path, artifact_id, offset, limit)
+            raise runtime_api.duckdb.IOException("Conflicting lock is held")
+
+    async def fake_get_rows(
+        workspace_id: str,
+        artifact_id: str,
+        offset: int,
+        limit: int,
+    ):
+        assert workspace_id == "ws-5"
+        assert artifact_id == "art-1"
+        assert offset == 0
+        assert limit == 1000
+        return {
+            "artifact_id": "art-1",
+            "name": "summary",
+            "row_count": 2000,
+            "columns": ["a"],
+            "rows": [{"a": 1}],
+            "offset": 0,
+            "limit": 1000,
+        }
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _LockedStore())
+    monkeypatch.setattr(runtime_api, "get_workspace_dataframe_rows", fake_get_rows)
+
+    response = await runtime_api.get_workspace_dataframe_artifact_rows(
+        workspace_id="ws-5",
+        artifact_id="art-1",
+        offset=0,
+        limit=1000,
+        session=object(),
+        current_user=SimpleNamespace(id="user-1"),
+    )
+
+    assert response.artifact_id == "art-1"
+    assert response.row_count == 2000
+    assert response.rows == [{"a": 1}]
+
+
+@pytest.mark.asyncio
 async def test_workspace_kernel_status_endpoint(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws3"
     workspace_dir.mkdir(parents=True, exist_ok=True)
