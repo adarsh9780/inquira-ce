@@ -744,8 +744,8 @@ export const apiService = {
     return finalPayload
   },
 
-  async v1GetCurrentUser() {
-    return v1Api.auth.me()
+  async v1GetCurrentUser(options = {}) {
+    return v1Api.auth.me(options)
   },
 
   async v1Register(username, password) {

@@ -6,7 +6,7 @@ import axios from 'axios'
  */
 export const v1Api = {
   auth: {
-    me: () => axios.get('/api/v1/auth/me'),
+    me: (config = {}) => axios.get('/api/v1/auth/me', config),
     register: (username, password) => axios.post('/api/v1/auth/register', { username, password }),
     login: (username, password) => axios.post('/api/v1/auth/login', { username, password }),
     logout: () => axios.post('/api/v1/auth/logout')

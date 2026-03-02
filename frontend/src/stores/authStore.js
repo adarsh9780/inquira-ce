@@ -4,6 +4,8 @@ import { apiService } from '../services/apiService'
 import { settingsWebSocket } from '../services/websocketService'
 
 export const useAuthStore = defineStore('auth', () => {
+  const AUTH_PROBE_TIMEOUT_MS = 15000
+
   // State
   const user = ref(null)
   const isAuthenticated = ref(false)
@@ -18,7 +20,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function refreshPlan() {
     try {
-      const profile = await apiService.v1GetCurrentUser()
+      const profile = await apiService.v1GetCurrentUser({ timeout: AUTH_PROBE_TIMEOUT_MS })
       if (profile?.plan) {
         plan.value = profile.plan
       }
@@ -37,7 +39,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = ''
 
     try {
-      const profile = await apiService.v1GetCurrentUser()
+      const profile = await apiService.v1GetCurrentUser({ timeout: AUTH_PROBE_TIMEOUT_MS })
       if (profile && profile.user_id) {
         user.value = {
           user_id: profile.user_id,
