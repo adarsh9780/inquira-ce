@@ -6,7 +6,7 @@
           <div v-if="tableStatusMessage" class="flex items-center gap-2 text-xs" :class="tableStatusClass">
             <div
               v-if="isPageLoading"
-              class="h-3.5 w-3.5 animate-spin rounded-full border border-gray-400 border-t-transparent"
+              class="h-3.5 w-3.5 animate-spin rounded-full border border-gray-300 border-t-gray-800"
               aria-hidden="true"
             ></div>
             <span>{{ tableStatusMessage }}</span>
@@ -24,8 +24,9 @@
             </span>
           </div>
 
-          <div v-if="orderedDataframes && orderedDataframes.length > 1" class="flex items-center space-x-2">
+          <div v-if="orderedDataframes && orderedDataframes.length > 0" class="flex items-center space-x-2">
             <select
+              v-if="orderedDataframes.length > 1"
               id="dataframe-select"
               v-model="selectedDataframeIndex"
               class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -38,6 +39,12 @@
                 {{ df.name }}
               </option>
             </select>
+            <span
+              v-else
+              class="px-2 py-1 text-xs font-medium rounded border border-gray-200 bg-gray-50 text-gray-600"
+            >
+              {{ orderedDataframes[0]?.name }}
+            </span>
           </div>
 
           <button
@@ -68,7 +75,7 @@
         rowModelType="infinite"
         :suppressMenuHide="true"
         :animateRows="true"
-        :rowSelection="rowSelection"
+        @grid-pre-destroy="onGridPreDestroy"
         @grid-ready="onGridReady"
         @pagination-changed="onPaginationChanged"
       ></ag-grid-vue>
@@ -85,7 +92,7 @@
         :paginationPageSize="pageSize"
         :suppressMenuHide="true"
         :animateRows="true"
-        :rowSelection="rowSelection"
+        @grid-pre-destroy="onGridPreDestroy"
         @grid-ready="onGridReady"
         @pagination-changed="onPaginationChanged"
       ></ag-grid-vue>
@@ -106,7 +113,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed, onMounted } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import apiService from '../../services/apiService'
 import { AgGridVue } from 'ag-grid-vue3'
@@ -135,10 +142,16 @@ const windowEnd = ref(0)
 const datasourceVersion = ref(0)
 const useClientFallback = ref(false)
 const tableError = ref('')
+const pendingControllers = new Set()
 let gridApi = null
 
 onMounted(() => {
   isMounted.value = true
+})
+
+onUnmounted(() => {
+  cancelPendingRequests()
+  gridApi = null
 })
 
 const orderedDataframes = computed(() => {
@@ -208,9 +221,23 @@ const defaultColDef = {
   minWidth: 120
 }
 
-const rowSelection = {
-  mode: 'multiRow',
-  enableClickSelection: true
+function isGridAlive() {
+  if (!gridApi) return false
+  if (typeof gridApi.isDestroyed === 'function') {
+    return !gridApi.isDestroyed()
+  }
+  return true
+}
+
+function cancelPendingRequests() {
+  for (const controller of pendingControllers) {
+    try {
+      controller.abort()
+    } catch (_error) {
+      // no-op
+    }
+  }
+  pendingControllers.clear()
 }
 
 watch(
@@ -220,13 +247,14 @@ watch(
       selectedDataframeIndex.value = 0
       await prepareSelectedDataframe()
     } else {
+      cancelPendingRequests()
       clientRows.value = []
       serverRows.value = []
       serverColumns.value = []
       rowCountValue.value = 0
       windowStart.value = 0
       windowEnd.value = 0
-      if (gridApi) {
+      if (isGridAlive()) {
         gridApi.setGridOption?.('datasource', null)
       }
     }
@@ -245,8 +273,14 @@ function onGridReady(params) {
   }
 }
 
+function onGridPreDestroy() {
+  cancelPendingRequests()
+  datasourceVersion.value += 1
+  gridApi = null
+}
+
 function onPaginationChanged() {
-  if (!gridApi) return
+  if (!isGridAlive()) return
   const total = rowCount.value
   if (total <= 0) {
     windowStart.value = 0
@@ -261,6 +295,7 @@ function onPaginationChanged() {
 }
 
 async function prepareSelectedDataframe() {
+  cancelPendingRequests()
   const meta = selectedDataframeMeta.value
   tableError.value = ''
   useClientFallback.value = false
@@ -305,12 +340,15 @@ async function loadInitialServerPage() {
     return
   }
   isPageLoading.value = true
+  const controller = new AbortController()
+  pendingControllers.add(controller)
   try {
     const payload = await apiService.getDataframeArtifactRows(
       appStore.activeWorkspaceId,
       meta.artifact_id,
       0,
       pageSize,
+      { signal: controller.signal },
     )
     const rows = Array.isArray(payload?.rows) ? payload.rows : []
     serverRows.value = rows
@@ -320,6 +358,7 @@ async function loadInitialServerPage() {
     windowStart.value = rows.length > 0 ? 1 : 0
     windowEnd.value = rows.length > 0 ? Math.min(pageSize, rowCountValue.value || rows.length) : 0
   } catch (error) {
+    if (error?.name === 'AbortError') return
     console.error('Failed to load initial dataframe page:', error)
     tableError.value = error?.message || 'Failed to load table data.'
     serverRows.value = []
@@ -329,6 +368,7 @@ async function loadInitialServerPage() {
     windowStart.value = 0
     windowEnd.value = 0
   } finally {
+    pendingControllers.delete(controller)
     isPageLoading.value = false
   }
 }
@@ -336,8 +376,10 @@ async function loadInitialServerPage() {
 async function attachInfiniteDatasource() {
   const meta = selectedDataframeMeta.value
   if (!meta?.artifact_id || !appStore.activeWorkspaceId) return
+  cancelPendingRequests()
   datasourceVersion.value += 1
-  if (!gridApi) return
+  if (!isGridAlive()) return
+  const datasourceTag = datasourceVersion.value
 
   const artifactId = meta.artifact_id
   const workspaceId = appStore.activeWorkspaceId
@@ -345,6 +387,8 @@ async function attachInfiniteDatasource() {
     rowCount: null,
     getRows: async (params) => {
       isPageLoading.value = true
+      const controller = new AbortController()
+      pendingControllers.add(controller)
       try {
         const startRow = Number(params.startRow || 0)
         const endRow = Number(params.endRow || (startRow + pageSize))
@@ -354,7 +398,11 @@ async function attachInfiniteDatasource() {
           artifactId,
           startRow,
           requestLimit,
+          { signal: controller.signal },
         )
+        if (!isGridAlive() || datasourceTag !== datasourceVersion.value) {
+          return
+        }
         const rows = Array.isArray(payload?.rows) ? payload.rows : []
         serverRows.value = rows
         if (Array.isArray(payload?.columns) && payload.columns.length > 0) {
@@ -368,7 +416,11 @@ async function attachInfiniteDatasource() {
         windowStart.value = rows.length > 0 ? startRow + 1 : 0
         windowEnd.value = rows.length > 0 ? startRow + rows.length : 0
       } catch (error) {
+        if (error?.name === 'AbortError') return
         console.error('Failed to load dataframe page:', error)
+        if (!isGridAlive() || datasourceTag !== datasourceVersion.value) {
+          return
+        }
         tableError.value = error?.message || 'Failed to load paginated table data.'
         if (Array.isArray(serverRows.value) && serverRows.value.length > 0) {
           clientRows.value = [...serverRows.value]
@@ -377,11 +429,15 @@ async function attachInfiniteDatasource() {
         }
         params.failCallback()
       } finally {
-        isPageLoading.value = false
+        pendingControllers.delete(controller)
+        if (datasourceTag === datasourceVersion.value) {
+          isPageLoading.value = false
+        }
       }
     }
   }
 
+  if (!isGridAlive()) return
   if (typeof gridApi.setGridOption === 'function') {
     gridApi.setGridOption('datasource', datasource)
   } else if (typeof gridApi.setDatasource === 'function') {

@@ -311,12 +311,13 @@ export const apiService = {
     return normalizeExecutionResponse(payload)
   },
 
-  async getDataframeArtifactRows(workspaceId, artifactId, offset = 0, limit = 1000) {
+  async getDataframeArtifactRows(workspaceId, artifactId, offset = 0, limit = 1000, options = {}) {
     const response = await fetch(
       `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/${artifactId}/rows?offset=${offset}&limit=${limit}`,
       {
         method: 'GET',
         credentials: 'include',
+        signal: options?.signal || null,
       }
     )
     if (!response.ok) {
