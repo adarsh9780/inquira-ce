@@ -19,7 +19,7 @@ from langchain_core.messages import HumanMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...agent.graph import InputSchema
-from ...services.code_executor import execute_code
+from ...services.code_executor import execute_code, get_workspace_run_exports
 from ..repositories.conversation_repository import ConversationRepository
 from ..repositories.dataset_repository import DatasetRepository
 from ..repositories.workspace_repository import WorkspaceRepository
@@ -47,7 +47,7 @@ class ChatService:
         body = str(code or "").rstrip()
         if not body:
             return ""
-        return f"set_active_run({run_id!r})\\n{body}\\n"
+        return f"set_active_run({run_id!r})\n{body}\n"
 
     @staticmethod
     async def _finalize_kernel_run(
@@ -73,8 +73,8 @@ class ChatService:
             "retry_count": int(retry_count),
         }
         finalize_code = (
-            f"set_active_run({run_id!r})\\n"
-            f"finalize_run({run_id!r}, metadata={finalize_payload!r})\\n"
+            f"set_active_run({run_id!r})\n"
+            f"finalize_run({run_id!r}, metadata={finalize_payload!r})\n"
         )
         await execute_code(
             code=finalize_code,
@@ -140,7 +140,41 @@ class ChatService:
             f"finalize_run({run_id!r})",
             "",
         ]
-        return "\\n".join(lines)
+        return "\n".join(lines)
+
+    @staticmethod
+    def _build_inline_artifact_fallback(
+        *,
+        run_id: str,
+        execution_result: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        result = execution_result.get("result")
+        result_type = str(execution_result.get("result_type") or "").lower()
+        if result_type != "dataframe":
+            return []
+        if not isinstance(result, dict):
+            return []
+        columns = result.get("columns")
+        rows = result.get("data")
+        if not isinstance(columns, list) or not isinstance(rows, list):
+            return []
+        return [
+            {
+                "artifact_id": None,
+                "run_id": run_id,
+                "kind": "dataframe",
+                "pointer": None,
+                "logical_name": "result",
+                "row_count": len(rows),
+                "schema": [{"name": str(c), "dtype": ""} for c in columns],
+                "preview_rows": rows,
+                "created_at": "",
+                "expires_at": "",
+                "status": "ready",
+                "error": None,
+                "table_name": None,
+            }
+        ]
 
     @staticmethod
     async def _load_schema(filepath: str) -> dict[str, Any]:
@@ -460,6 +494,16 @@ class ChatService:
                 for item in (execution_result.get("artifacts") or [])
                 if isinstance(item, dict)
             ]
+            if not artifacts:
+                artifacts = await get_workspace_run_exports(
+                    workspace_id=workspace_id,
+                    run_id=run_id,
+                )
+            if not artifacts:
+                artifacts = ChatService._build_inline_artifact_fallback(
+                    run_id=run_id,
+                    execution_result=execution_result,
+                )
             response_payload["execution"] = {
                 "status": "success" if bool(execution_result.get("success")) else "failed",
                 "stdout": str(execution_result.get("stdout") or ""),
@@ -650,11 +694,22 @@ class ChatService:
                 execution_status="success" if bool(execution_result.get("success")) else "failed",
                 retry_count=retry_count,
             )
-            response_payload["artifacts"] = [
+            artifacts = [
                 item
                 for item in (execution_result.get("artifacts") or [])
                 if isinstance(item, dict)
             ]
+            if not artifacts:
+                artifacts = await get_workspace_run_exports(
+                    workspace_id=workspace_id,
+                    run_id=run_id,
+                )
+            if not artifacts:
+                artifacts = ChatService._build_inline_artifact_fallback(
+                    run_id=run_id,
+                    execution_result=execution_result,
+                )
+            response_payload["artifacts"] = artifacts
             response_payload["final_script_artifact_id"] = None
             response_payload["execution"] = {
                 "status": "success" if bool(execution_result.get("success")) else "failed",

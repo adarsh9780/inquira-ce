@@ -490,7 +490,7 @@ async def get_workspace_dataframe_artifact_rows(
     session: AsyncSession = Depends(get_db_session),
     current_user=Depends(get_current_user),
 ):
-    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    await _require_workspace_access(session, current_user.id, workspace_id)
     rows = await get_workspace_dataframe_rows(
         workspace_id=workspace_id,
         artifact_id=artifact_id,
@@ -514,7 +514,7 @@ async def get_workspace_artifact_rows(
     session: AsyncSession = Depends(get_db_session),
     current_user=Depends(get_current_user),
 ):
-    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    await _require_workspace_access(session, current_user.id, workspace_id)
     rows = await get_workspace_dataframe_rows(
         workspace_id=workspace_id,
         artifact_id=artifact_id,

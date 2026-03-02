@@ -1,12 +1,9 @@
 <template>
   <div class="flex flex-col h-full">
-    <!-- Table Header (Teleported to WorkspaceRightPane) -->
     <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'table'">
       <div class="flex items-center justify-end w-full gap-4">
-        <!-- Optional status indicators on the left side of the teleported area
-             but it's flex-end, so they show before the buttons -->
         <div class="flex items-center space-x-3 text-sm mr-auto">
-          <span v-if="appStore.isCodeRunning" class="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">
+          <span v-if="appStore.isCodeRunning || isPageLoading" class="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">
             Processing
           </span>
           <span v-else-if="rowCount > 0" class="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
@@ -15,28 +12,13 @@
         </div>
 
         <div class="flex items-center space-x-2">
-          <div v-if="selectedDataframeMeta?.artifact_id" class="flex items-center space-x-2 text-xs text-gray-600">
+          <div v-if="rowCount > 0" class="flex items-center space-x-2 text-xs text-gray-600">
             <span>
-              Showing {{ chunkStart.toLocaleString() }}-{{ chunkEnd.toLocaleString() }}
+              Showing {{ windowStart.toLocaleString() }}-{{ windowEnd.toLocaleString() }}
               of {{ rowCount.toLocaleString() }}
             </span>
-            <button
-              @click="loadPreviousChunk"
-              :disabled="chunkOffset === 0 || isChunkLoading"
-              class="px-2 py-1 border border-gray-300 rounded bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Prev
-            </button>
-            <button
-              @click="loadNextChunk"
-              :disabled="!canLoadNextChunk || isChunkLoading"
-              class="px-2 py-1 border border-gray-300 rounded bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
           </div>
 
-          <!-- Dataframe Selector -->
           <div v-if="orderedDataframes && orderedDataframes.length > 1" class="flex items-center space-x-2">
             <select
               id="dataframe-select"
@@ -53,12 +35,11 @@
             </select>
           </div>
 
-          <!-- Download CSV Button -->
           <button
             @click="downloadCsv"
-            :disabled="!rowData.length || isDownloading"
+            :disabled="!downloadRows.length || isDownloading"
             class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-            :class="!rowData.length ? 'opacity-50 cursor-not-allowed' : ''"
+            :class="!downloadRows.length ? 'opacity-50 cursor-not-allowed' : ''"
           >
             <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4 mr-1" />
             <div v-else class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-1"></div>
@@ -68,25 +49,42 @@
       </div>
     </Teleport>
 
-    <!-- AG Grid Container -->
     <div class="flex-1 relative mt-1">
       <ag-grid-vue
-        v-if="rowData.length"
-        :key="`${selectedDataframeIndex}-${chunkOffset}`"
+        v-if="hasRenderableRows && useInfiniteModel"
+        :key="`infinite-${selectedDataframeIndex}-${datasourceVersion}`"
         class="ag-theme-quartz absolute inset-0"
         :columnDefs="columnDefs"
-        :rowData="rowData"
         :defaultColDef="defaultColDef"
         :enableClipboard="true"
         :pagination="true"
-        :paginationPageSize="100"
+        :paginationPageSize="pageSize"
+        :cacheBlockSize="pageSize"
+        rowModelType="infinite"
         :suppressMenuHide="true"
         :animateRows="true"
         :rowSelection="rowSelection"
         @grid-ready="onGridReady"
+        @pagination-changed="onPaginationChanged"
       ></ag-grid-vue>
 
-      <!-- Empty State -->
+      <ag-grid-vue
+        v-else-if="hasRenderableRows"
+        :key="`client-${selectedDataframeIndex}`"
+        class="ag-theme-quartz absolute inset-0"
+        :columnDefs="columnDefs"
+        :rowData="clientRows"
+        :defaultColDef="defaultColDef"
+        :enableClipboard="true"
+        :pagination="true"
+        :paginationPageSize="pageSize"
+        :suppressMenuHide="true"
+        :animateRows="true"
+        :rowSelection="rowSelection"
+        @grid-ready="onGridReady"
+        @pagination-changed="onPaginationChanged"
+      ></ag-grid-vue>
+
       <div
         v-else
         class="absolute inset-0 flex items-center justify-center"
@@ -110,7 +108,6 @@ import { AgGridVue } from 'ag-grid-vue3'
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
-// Register AG Grid Community modules
 ModuleRegistry.registerModules([AllCommunityModule])
 import {
   ArrowDownTrayIcon,
@@ -119,13 +116,18 @@ import {
 
 const appStore = useAppStore()
 
+const pageSize = 100
 const isDownloading = ref(false)
-const isChunkLoading = ref(false)
+const isPageLoading = ref(false)
 const selectedDataframeIndex = ref(0)
-const chunkOffset = ref(0)
-const chunkLimit = 1000
-const chunkRows = ref([])
 const isMounted = ref(false)
+const serverRows = ref([])
+const clientRows = ref([])
+const serverColumns = ref([])
+const rowCountValue = ref(0)
+const windowStart = ref(0)
+const windowEnd = ref(0)
+const datasourceVersion = ref(0)
 let gridApi = null
 
 onMounted(() => {
@@ -134,7 +136,6 @@ onMounted(() => {
 
 const orderedDataframes = computed(() => {
   if (!appStore.dataframes) return []
-  // latest first
   return [...appStore.dataframes].slice().reverse()
 })
 
@@ -145,31 +146,41 @@ const selectedDataframeMeta = computed(() => {
   return df.data
 })
 
-const rowData = computed(() => {
+const useInfiniteModel = computed(() => {
   const meta = selectedDataframeMeta.value
-  if (!meta) return []
-  if (meta.artifact_id) return chunkRows.value
-  if (Array.isArray(meta)) return meta
-  if (Array.isArray(meta.data)) return meta.data
-  return []
+  return !!meta?.artifact_id
 })
 
 const rowCount = computed(() => {
-  const meta = selectedDataframeMeta.value
-  if (!meta) return 0
-  if (typeof meta.row_count === 'number') return meta.row_count
-  if (Array.isArray(meta.data)) return meta.data.length
-  if (Array.isArray(meta)) return meta.length
-  return rowData.value.length
+  if (useInfiniteModel.value) return Number(rowCountValue.value || 0)
+  return Number(clientRows.value.length || 0)
 })
 
-const chunkStart = computed(() => (rowData.value.length ? chunkOffset.value + 1 : 0))
-const chunkEnd = computed(() => chunkOffset.value + rowData.value.length)
-const canLoadNextChunk = computed(() => chunkEnd.value < rowCount.value)
+const downloadRows = computed(() => {
+  if (useInfiniteModel.value) return Array.isArray(serverRows.value) ? serverRows.value : []
+  return Array.isArray(clientRows.value) ? clientRows.value : []
+})
+
+const hasRenderableRows = computed(() => {
+  if (useInfiniteModel.value) return rowCount.value > 0
+  return clientRows.value.length > 0
+})
 
 const columnDefs = computed(() => {
-  if (!rowData.value || rowData.value.length === 0) return []
-  return generateColumnDefs(rowData.value)
+  if (serverColumns.value.length > 0) {
+    return serverColumns.value.map((name) => ({
+      headerName: String(name),
+      field: String(name),
+      cellRenderer: getCellRenderer(null),
+      tooltipField: String(name),
+      valueGetter: (params) => params.data?.[String(name)],
+      cellRendererParams: { truncate: 120 },
+      cellStyle: { whiteSpace: 'nowrap' }
+    }))
+  }
+  const sourceRows = downloadRows.value
+  if (!sourceRows || sourceRows.length === 0) return []
+  return generateColumnDefs(sourceRows)
 })
 
 const defaultColDef = {
@@ -189,86 +200,183 @@ watch(
   async (newDataframes) => {
     if (newDataframes && newDataframes.length > 0) {
       selectedDataframeIndex.value = 0
-      chunkOffset.value = 0
-      await refreshSelectedDataframe()
+      await prepareSelectedDataframe()
     } else {
-      chunkRows.value = []
+      clientRows.value = []
+      serverRows.value = []
+      serverColumns.value = []
+      rowCountValue.value = 0
+      windowStart.value = 0
+      windowEnd.value = 0
+      if (gridApi) {
+        gridApi.setGridOption?.('datasource', null)
+      }
     }
   },
   { immediate: true },
 )
 
 watch(selectedDataframeIndex, async () => {
-  chunkOffset.value = 0
-  await refreshSelectedDataframe()
+  await prepareSelectedDataframe()
 })
 
 function onGridReady(params) {
   gridApi = params.api
+  if (useInfiniteModel.value) {
+    void attachInfiniteDatasource()
+  }
 }
 
-async function refreshSelectedDataframe() {
-  const meta = selectedDataframeMeta.value
-  if (!meta || !meta.artifact_id) {
-    chunkRows.value = []
+function onPaginationChanged() {
+  if (!gridApi) return
+  const total = rowCount.value
+  if (total <= 0) {
+    windowStart.value = 0
+    windowEnd.value = 0
     return
   }
-  await loadChunk(chunkOffset.value)
+  const page = Math.max(0, Number(gridApi.paginationGetCurrentPage?.() || 0))
+  const start = page * pageSize + 1
+  const end = Math.min(total, start + pageSize - 1)
+  windowStart.value = start
+  windowEnd.value = end
 }
 
-async function loadChunk(offset) {
+async function prepareSelectedDataframe() {
   const meta = selectedDataframeMeta.value
-  if (!meta || !meta.artifact_id || !appStore.activeWorkspaceId) return
-  isChunkLoading.value = true
+  if (!meta) {
+    clientRows.value = []
+    serverRows.value = []
+    serverColumns.value = []
+    rowCountValue.value = 0
+    windowStart.value = 0
+    windowEnd.value = 0
+    return
+  }
+
+  if (useInfiniteModel.value) {
+    clientRows.value = []
+    await loadInitialServerPage()
+    await attachInfiniteDatasource()
+    return
+  }
+
+  serverRows.value = []
+  serverColumns.value = []
+  if (Array.isArray(meta)) {
+    clientRows.value = meta
+  } else if (Array.isArray(meta.data)) {
+    clientRows.value = meta.data
+  } else {
+    clientRows.value = []
+  }
+  rowCountValue.value = clientRows.value.length
+  windowStart.value = clientRows.value.length > 0 ? 1 : 0
+  windowEnd.value = clientRows.value.length > 0 ? Math.min(pageSize, clientRows.value.length) : 0
+}
+
+async function loadInitialServerPage() {
+  const meta = selectedDataframeMeta.value
+  if (!meta?.artifact_id || !appStore.activeWorkspaceId) {
+    serverRows.value = []
+    serverColumns.value = []
+    rowCountValue.value = 0
+    return
+  }
+  isPageLoading.value = true
   try {
     const payload = await apiService.getDataframeArtifactRows(
       appStore.activeWorkspaceId,
       meta.artifact_id,
-      offset,
-      chunkLimit,
+      0,
+      pageSize,
     )
-    chunkRows.value = Array.isArray(payload?.rows) ? payload.rows : []
-    chunkOffset.value = Number.isFinite(payload?.offset) ? payload.offset : offset
+    const rows = Array.isArray(payload?.rows) ? payload.rows : []
+    serverRows.value = rows
+    serverColumns.value = Array.isArray(payload?.columns) ? payload.columns.map((c) => String(c)) : (rows[0] ? Object.keys(rows[0]) : [])
+    rowCountValue.value = Number(payload?.row_count || rows.length || 0)
+    windowStart.value = rows.length > 0 ? 1 : 0
+    windowEnd.value = rows.length > 0 ? Math.min(pageSize, rowCountValue.value || rows.length) : 0
   } catch (error) {
-    console.error('Failed to load dataframe chunk:', error)
-    chunkRows.value = []
+    console.error('Failed to load initial dataframe page:', error)
+    serverRows.value = []
+    serverColumns.value = []
+    rowCountValue.value = 0
+    windowStart.value = 0
+    windowEnd.value = 0
   } finally {
-    isChunkLoading.value = false
+    isPageLoading.value = false
   }
 }
 
-async function loadPreviousChunk() {
-  if (chunkOffset.value === 0 || isChunkLoading.value) return
-  const nextOffset = Math.max(0, chunkOffset.value - chunkLimit)
-  await loadChunk(nextOffset)
-}
+async function attachInfiniteDatasource() {
+  const meta = selectedDataframeMeta.value
+  if (!meta?.artifact_id || !appStore.activeWorkspaceId) return
+  datasourceVersion.value += 1
+  if (!gridApi) return
 
-async function loadNextChunk() {
-  if (!canLoadNextChunk.value || isChunkLoading.value) return
-  await loadChunk(chunkOffset.value + chunkLimit)
+  const artifactId = meta.artifact_id
+  const workspaceId = appStore.activeWorkspaceId
+  const datasource = {
+    rowCount: null,
+    getRows: async (params) => {
+      isPageLoading.value = true
+      try {
+        const startRow = Number(params.startRow || 0)
+        const endRow = Number(params.endRow || (startRow + pageSize))
+        const requestLimit = Math.max(1, Math.min(pageSize, endRow - startRow))
+        const payload = await apiService.getDataframeArtifactRows(
+          workspaceId,
+          artifactId,
+          startRow,
+          requestLimit,
+        )
+        const rows = Array.isArray(payload?.rows) ? payload.rows : []
+        serverRows.value = rows
+        if (Array.isArray(payload?.columns) && payload.columns.length > 0) {
+          serverColumns.value = payload.columns.map((c) => String(c))
+        } else if (rows[0]) {
+          serverColumns.value = Object.keys(rows[0])
+        }
+        rowCountValue.value = Number(payload?.row_count || rowCountValue.value || 0)
+        const knownLastRow = Number.isFinite(rowCountValue.value) ? rowCountValue.value : undefined
+        params.successCallback(rows, knownLastRow)
+        windowStart.value = rows.length > 0 ? startRow + 1 : 0
+        windowEnd.value = rows.length > 0 ? startRow + rows.length : 0
+      } catch (error) {
+        console.error('Failed to load dataframe page:', error)
+        params.failCallback()
+      } finally {
+        isPageLoading.value = false
+      }
+    }
+  }
+
+  if (typeof gridApi.setGridOption === 'function') {
+    gridApi.setGridOption('datasource', datasource)
+  } else if (typeof gridApi.setDatasource === 'function') {
+    gridApi.setDatasource(datasource)
+  }
 }
 
 function generateColumnDefs(data) {
   if (!data || data.length === 0) return []
 
   const firstRow = data[0]
-  const columns = Object.keys(firstRow).map(key => {
+  return Object.keys(firstRow).map((key) => {
     const sampleValue = firstRow[key]
-
     return {
       headerName: key,
       field: key,
       cellRenderer: getCellRenderer(sampleValue),
       tooltipField: key,
-      valueGetter: params => params.data?.[key],
+      valueGetter: (params) => params.data?.[key],
       cellRendererParams: {
         truncate: 120
       },
       cellStyle: { whiteSpace: 'nowrap' }
     }
   })
-
-  return columns
 }
 
 function getCellRenderer(value) {
@@ -294,12 +402,12 @@ function getCellRenderer(value) {
 }
 
 async function downloadCsv() {
-  if (!rowData.value.length || isDownloading.value) return
+  if (!downloadRows.value.length || isDownloading.value) return
 
   isDownloading.value = true
 
   try {
-    const csvContent = convertToCSV(rowData.value)
+    const csvContent = convertToCSV(downloadRows.value)
     const dfName = orderedDataframes.value[selectedDataframeIndex.value]?.name || 'dataframe'
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -344,7 +452,6 @@ function convertToCSV(data) {
 </script>
 
 <style>
-/* AG Grid warm tint overrides — applies on top of ag-theme-quartz */
 .ag-theme-quartz {
   --ag-background-color: #FDFCF8;
   --ag-header-background-color: #F5F3ED;
