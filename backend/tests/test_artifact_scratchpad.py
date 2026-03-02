@@ -66,3 +66,22 @@ def test_get_dataframe_rows_reads_manifest_table(tmp_path):
     assert rows["artifact_id"] == "a1"
     assert rows["row_count"] == 3
     assert rows["rows"] == [{"a": 2}, {"a": 3}]
+
+
+def test_prune_workspace_ignores_duckdb_lock_conflict(monkeypatch, tmp_path):
+    workspace_db = tmp_path / "ws3" / "workspace.duckdb"
+    workspace_db.parent.mkdir(parents=True, exist_ok=True)
+    workspace_db.touch()
+
+    store = ArtifactScratchpadStore()
+    scratchpad_db = store.build_scratchpad_db_path(str(workspace_db))
+    scratchpad_db.parent.mkdir(parents=True, exist_ok=True)
+    scratchpad_db.touch()
+
+    def _raise_lock(*_args, **_kwargs):
+        raise duckdb.IOException("Conflicting lock is held")
+
+    monkeypatch.setattr(duckdb, "connect", _raise_lock)
+
+    # Should be a no-op when another process owns the lock.
+    store.prune_workspace(workspace_duckdb_path=str(workspace_db))

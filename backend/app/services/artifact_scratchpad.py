@@ -45,6 +45,10 @@ class ArtifactScratchpadStore:
         run_short = re.sub(r"[^A-Za-z0-9]", "", str(run_id))[:12] or "run"
         return f"art_{run_short}_{max(1, int(seq))}"
 
+    @staticmethod
+    def _is_lock_conflict(exc: duckdb.IOException) -> bool:
+        return "Conflicting lock is held" in str(exc)
+
     def ensure_workspace(self, workspace_duckdb_path: str) -> Path:
         db_path = self.build_scratchpad_db_path(workspace_duckdb_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -296,7 +300,13 @@ class ArtifactScratchpadStore:
         db_path = self.build_scratchpad_db_path(workspace_duckdb_path)
         if not db_path.exists():
             return
-        con = duckdb.connect(str(db_path), read_only=False)
+        try:
+            con = duckdb.connect(str(db_path), read_only=False)
+        except duckdb.IOException as exc:
+            # Best-effort retention cleanup: skip busy/locked workspaces and retry later.
+            if self._is_lock_conflict(exc):
+                return
+            raise
         now = datetime.now(UTC)
         try:
             expired_tables = con.execute(
