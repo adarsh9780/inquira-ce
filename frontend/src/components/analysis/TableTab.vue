@@ -3,9 +3,14 @@
     <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'table'">
       <div class="flex items-center justify-end w-full gap-4">
         <div class="flex items-center space-x-3 text-sm mr-auto">
-          <span v-if="appStore.isCodeRunning || isPageLoading" class="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">
-            Processing
-          </span>
+          <div v-if="tableStatusMessage" class="flex items-center gap-2 text-xs" :class="tableStatusClass">
+            <div
+              v-if="isPageLoading"
+              class="h-3.5 w-3.5 animate-spin rounded-full border border-gray-400 border-t-transparent"
+              aria-hidden="true"
+            ></div>
+            <span>{{ tableStatusMessage }}</span>
+          </div>
           <span v-else-if="rowCount > 0" class="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
             {{ rowCount.toLocaleString() }} rows
           </span>
@@ -128,6 +133,8 @@ const rowCountValue = ref(0)
 const windowStart = ref(0)
 const windowEnd = ref(0)
 const datasourceVersion = ref(0)
+const useClientFallback = ref(false)
+const tableError = ref('')
 let gridApi = null
 
 onMounted(() => {
@@ -148,7 +155,7 @@ const selectedDataframeMeta = computed(() => {
 
 const useInfiniteModel = computed(() => {
   const meta = selectedDataframeMeta.value
-  return !!meta?.artifact_id
+  return !!meta?.artifact_id && !useClientFallback.value
 })
 
 const rowCount = computed(() => {
@@ -164,6 +171,17 @@ const downloadRows = computed(() => {
 const hasRenderableRows = computed(() => {
   if (useInfiniteModel.value) return rowCount.value > 0
   return clientRows.value.length > 0
+})
+
+const tableStatusMessage = computed(() => {
+  if (isPageLoading.value) return 'Loading table data...'
+  if (tableError.value) return tableError.value
+  return ''
+})
+
+const tableStatusClass = computed(() => {
+  if (tableError.value) return 'text-red-700'
+  return 'text-gray-800'
 })
 
 const columnDefs = computed(() => {
@@ -244,6 +262,8 @@ function onPaginationChanged() {
 
 async function prepareSelectedDataframe() {
   const meta = selectedDataframeMeta.value
+  tableError.value = ''
+  useClientFallback.value = false
   if (!meta) {
     clientRows.value = []
     serverRows.value = []
@@ -257,6 +277,7 @@ async function prepareSelectedDataframe() {
   if (useInfiniteModel.value) {
     clientRows.value = []
     await loadInitialServerPage()
+    if (tableError.value) return
     await attachInfiniteDatasource()
     return
   }
@@ -295,12 +316,15 @@ async function loadInitialServerPage() {
     serverRows.value = rows
     serverColumns.value = Array.isArray(payload?.columns) ? payload.columns.map((c) => String(c)) : (rows[0] ? Object.keys(rows[0]) : [])
     rowCountValue.value = Number(payload?.row_count || rows.length || 0)
+    clientRows.value = rows
     windowStart.value = rows.length > 0 ? 1 : 0
     windowEnd.value = rows.length > 0 ? Math.min(pageSize, rowCountValue.value || rows.length) : 0
   } catch (error) {
     console.error('Failed to load initial dataframe page:', error)
+    tableError.value = error?.message || 'Failed to load table data.'
     serverRows.value = []
     serverColumns.value = []
+    clientRows.value = []
     rowCountValue.value = 0
     windowStart.value = 0
     windowEnd.value = 0
@@ -345,6 +369,12 @@ async function attachInfiniteDatasource() {
         windowEnd.value = rows.length > 0 ? startRow + rows.length : 0
       } catch (error) {
         console.error('Failed to load dataframe page:', error)
+        tableError.value = error?.message || 'Failed to load paginated table data.'
+        if (Array.isArray(serverRows.value) && serverRows.value.length > 0) {
+          clientRows.value = [...serverRows.value]
+          useClientFallback.value = true
+          datasourceVersion.value += 1
+        }
         params.failCallback()
       } finally {
         isPageLoading.value = false
