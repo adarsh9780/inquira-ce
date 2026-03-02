@@ -471,6 +471,73 @@ export const useAppStore = defineStore('app', () => {
       timestamp: turn.created_at || new Date().toISOString()
     }))
     chatHistory.value = [...mapped.reverse(), ...chatHistory.value]
+    rehydrateArtifactsFromChatHistory()
+  }
+
+  function rehydrateArtifactsFromChatHistory() {
+    const dataframeArtifacts = []
+    const figureArtifacts = []
+    const scalarArtifacts = []
+    const seenDataframes = new Set()
+    const seenFigures = new Set()
+    const seenScalars = new Set()
+
+    for (const message of chatHistory.value) {
+      const toolEvents = Array.isArray(message?.toolEvents) ? message.toolEvents : []
+      for (const event of toolEvents) {
+        if (!event || typeof event !== 'object' || String(event.type || '') !== 'artifact') continue
+        const artifact = event.data
+        if (!artifact || typeof artifact !== 'object') continue
+
+        const kind = String(artifact.kind || '').toLowerCase()
+        const artifactId = String(artifact.artifact_id || '').trim()
+        const logicalName = String(artifact.logical_name || kind || 'artifact')
+        const dedupeKey = artifactId || `${kind}:${logicalName}:${String(artifact.created_at || '')}`
+
+        if (kind === 'dataframe') {
+          if (seenDataframes.has(dedupeKey)) continue
+          seenDataframes.add(dedupeKey)
+          dataframeArtifacts.push({
+            name: logicalName || 'dataframe',
+            data: {
+              artifact_id: artifactId || null,
+              row_count: Number(artifact.row_count || 0),
+              columns: Array.isArray(artifact.schema)
+                ? artifact.schema.map((col) => String(col?.name || '')).filter(Boolean)
+                : [],
+              data: []
+            }
+          })
+          continue
+        }
+
+        if (kind === 'figure') {
+          if (seenFigures.has(dedupeKey)) continue
+          seenFigures.add(dedupeKey)
+          const figurePayload = artifact?.payload?.figure || null
+          if (figurePayload) {
+            figureArtifacts.push({
+              name: logicalName || 'figure',
+              data: figurePayload
+            })
+          }
+          continue
+        }
+
+        if (kind === 'scalar') {
+          if (seenScalars.has(dedupeKey)) continue
+          seenScalars.add(dedupeKey)
+          scalarArtifacts.push({
+            name: logicalName || 'scalar',
+            value: artifact?.payload?.value
+          })
+        }
+      }
+    }
+
+    setDataframes(dataframeArtifacts)
+    setFigures(figureArtifacts)
+    setScalars(scalarArtifacts)
   }
 
   async function fetchWorkspaces() {
@@ -566,6 +633,11 @@ export const useAppStore = defineStore('app', () => {
       chatHistory.value = []
     }
     prependChatHistoryFromTurns(turns)
+    if (reset && turns.length === 0) {
+      setDataframes([])
+      setFigures([])
+      setScalars([])
+    }
     turnsNextCursor.value = response?.next_cursor || null
   }
 

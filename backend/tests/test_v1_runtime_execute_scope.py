@@ -130,28 +130,31 @@ async def test_workspace_dataframe_artifact_rows_endpoint(monkeypatch, tmp_path)
         _ = (session, user_id, workspace_id)
         return workspace
 
-    async def fake_get_rows(
-        workspace_id: str,
-        artifact_id: str,
-        offset: int,
-        limit: int,
-    ):
-        assert workspace_id == "ws-5"
-        assert artifact_id == "art-1"
-        assert offset == 0
-        assert limit == 1000
-        return {
-            "artifact_id": "art-1",
-            "name": "summary",
-            "row_count": 2000,
-            "columns": ["a"],
-            "rows": [{"a": 1}],
-            "offset": 0,
-            "limit": 1000,
-        }
+    class _FakeStore:
+        def get_dataframe_rows(
+            self,
+            *,
+            workspace_duckdb_path: str,
+            artifact_id: str,
+            offset: int,
+            limit: int,
+        ):
+            assert workspace_duckdb_path == str(duckdb_path)
+            assert artifact_id == "art-1"
+            assert offset == 0
+            assert limit == 1000
+            return {
+                "artifact_id": "art-1",
+                "name": "summary",
+                "row_count": 2000,
+                "columns": ["a"],
+                "rows": [{"a": 1}],
+                "offset": 0,
+                "limit": 1000,
+            }
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    monkeypatch.setattr(runtime_api, "get_workspace_dataframe_rows", fake_get_rows)
+    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _FakeStore())
 
     response = await runtime_api.get_workspace_dataframe_artifact_rows(
         workspace_id="ws-5",

@@ -1,4 +1,5 @@
 import os
+import re
 import warnings
 
 from pydantic import BaseModel, Field
@@ -103,6 +104,7 @@ class State(BaseModel):
     code_guard_feedback: str = Field(default="")
     code_guard_retries: int = Field(default=0)
     guard_status: str = Field(default="ok")
+    output_contract: list[dict[str, str]] = Field(default_factory=list)
 
 
 class InputSchema(BaseModel):
@@ -128,6 +130,7 @@ class OutputSchema(BaseModel):
     table_name: str | None = Field(default=None)
     data_path: str | None = Field(default=None)
     context: str | None = Field(default=None)
+    output_contract: list[dict[str, str]] = Field(default_factory=list)
 
 
 class InquiraAgent:
@@ -182,6 +185,46 @@ class InquiraAgent:
             temperature=0,
             max_tokens=runtime.code_generation_max_tokens,
         )
+
+    @staticmethod
+    def _normalize_output_contract(contract: Any) -> list[dict[str, str]]:
+        if not isinstance(contract, list):
+            return []
+
+        kind_aliases = {
+            "dataframe": "dataframe",
+            "pandas": "dataframe",
+            "polars": "dataframe",
+            "pyarrow": "dataframe",
+            "arrow": "dataframe",
+            "figure": "figure",
+            "chart": "figure",
+            "plotly": "figure",
+            "scalar": "scalar",
+            "value": "scalar",
+            "number": "scalar",
+            "text": "scalar",
+        }
+
+        normalized: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for item in contract:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "").strip()
+            if not name or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) is None:
+                continue
+            dedupe_key = name.lower()
+            if dedupe_key in seen:
+                continue
+            kind = kind_aliases.get(str(item.get("kind") or "").strip().lower(), "")
+            if kind not in {"dataframe", "figure", "scalar"}:
+                continue
+            normalized.append({"name": name, "kind": kind})
+            seen.add(dedupe_key)
+            if len(normalized) >= 8:
+                break
+        return normalized
 
     @staticmethod
     def _invoke_structured_chain(chain: Any, payload: dict[str, Any]) -> Any:
@@ -311,6 +354,7 @@ class InquiraAgent:
     def code_generator(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         class Code(BaseModel):
             code: str | None
+            output_contract: list[dict[str, str]] = Field(default_factory=list)
 
         system_prompt_template = SystemMessagePromptTemplate.from_template_file(
             get_prompt_path("codegen_prompt.yaml"),
@@ -353,7 +397,10 @@ class InquiraAgent:
         )
         response = cast(Code, response)
 
-        updates = {"code": response.code}
+        updates = {
+            "code": response.code,
+            "output_contract": self._normalize_output_contract(response.output_contract),
+        }
         if response.code and response.code.strip():
             updates["current_code"] = response.code
 
@@ -372,6 +419,7 @@ class InquiraAgent:
     def retry_code_generator(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         class Code(BaseModel):
             code: str | None
+            output_contract: list[dict[str, str]] = Field(default_factory=list)
 
         system_prompt_template = SystemMessagePromptTemplate.from_template_file(
             get_prompt_path("codegen_prompt.yaml"),
@@ -420,7 +468,10 @@ class InquiraAgent:
         )
         response = cast(Code, response)
 
-        updates = {"code": response.code}
+        updates = {
+            "code": response.code,
+            "output_contract": self._normalize_output_contract(response.output_contract),
+        }
         if response.code and response.code.strip():
             updates["current_code"] = response.code
 
@@ -495,6 +546,7 @@ class InquiraAgent:
                 "guard_status": "retry",
                 "code_guard_retries": retries + 1,
                 "code_guard_feedback": result.reason or "",
+                "output_contract": [],
             }
 
         logprint(
@@ -510,6 +562,7 @@ class InquiraAgent:
             "current_code": "",
             "guard_status": "failed",
             "code_guard_feedback": result.reason or "",
+            "output_contract": [],
         }
 
     def general_purpose(self, state: State, config: RunnableConfig) -> dict[str, Any]:

@@ -43,11 +43,147 @@ class ChatService:
         return f"{normalized[:57]}..."
 
     @staticmethod
-    def _build_run_wrapped_code(code: str, run_id: str) -> str:
+    def _normalize_output_contract(contract: Any) -> list[dict[str, str]]:
+        if not isinstance(contract, list):
+            return []
+
+        kind_aliases = {
+            "dataframe": "dataframe",
+            "pandas": "dataframe",
+            "polars": "dataframe",
+            "pyarrow": "dataframe",
+            "arrow": "dataframe",
+            "figure": "figure",
+            "chart": "figure",
+            "plotly": "figure",
+            "scalar": "scalar",
+            "value": "scalar",
+            "number": "scalar",
+            "text": "scalar",
+        }
+
+        normalized: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for item in contract:
+            if not isinstance(item, dict):
+                continue
+            raw_name = str(item.get("name") or "").strip()
+            if not raw_name or not raw_name.isidentifier():
+                continue
+            key = raw_name.lower()
+            if key in seen:
+                continue
+            raw_kind = str(item.get("kind") or "").strip().lower()
+            kind = kind_aliases.get(raw_kind, "")
+            if kind not in {"dataframe", "figure", "scalar"}:
+                continue
+            seen.add(key)
+            normalized.append({"name": raw_name, "kind": kind})
+            if len(normalized) >= 8:
+                break
+        return normalized
+
+    @staticmethod
+    def _build_auto_capture_result_code(output_contract: list[dict[str, str]]) -> str:
+        declared_contract = json.dumps(output_contract, ensure_ascii=True)
+        return (
+            "import json as _json\n"
+            "try:\n"
+            "    import pandas as _inq_pd\n"
+            "except Exception:\n"
+            "    _inq_pd = None\n"
+            "try:\n"
+            "    import polars as _inq_pl\n"
+            "except Exception:\n"
+            "    _inq_pl = None\n"
+            "try:\n"
+            "    import pyarrow as _inq_pa\n"
+            "except Exception:\n"
+            "    _inq_pa = None\n"
+            "try:\n"
+            "    import plotly.graph_objects as _inq_go\n"
+            "except Exception:\n"
+            "    _inq_go = None\n"
+            f"_inq_declared = _json.loads(r'''{declared_contract}''')\n"
+            "if not isinstance(_inq_declared, list):\n"
+            "    _inq_declared = []\n"
+            "def _inq_kind_of(obj):\n"
+            "    if _inq_go is not None and isinstance(obj, _inq_go.Figure):\n"
+            "        return 'figure'\n"
+            "    if _inq_pd is not None and isinstance(obj, _inq_pd.DataFrame):\n"
+            "        return 'dataframe'\n"
+            "    if _inq_pl is not None and isinstance(obj, (_inq_pl.DataFrame, _inq_pl.LazyFrame)):\n"
+            "        return 'dataframe'\n"
+            "    if _inq_pa is not None and isinstance(obj, (_inq_pa.Table, _inq_pa.RecordBatch)):\n"
+            "        return 'dataframe'\n"
+            "    if _inq_pa is not None and hasattr(_inq_pa, 'RecordBatchReader') and isinstance(obj, _inq_pa.RecordBatchReader):\n"
+            "        return 'dataframe'\n"
+            "    return 'scalar'\n"
+            "def _inq_to_pandas(obj):\n"
+            "    if _inq_pd is not None and isinstance(obj, _inq_pd.DataFrame):\n"
+            "        return obj\n"
+            "    if _inq_pl is not None and isinstance(obj, _inq_pl.LazyFrame):\n"
+            "        return obj.collect().to_pandas()\n"
+            "    if _inq_pl is not None and isinstance(obj, _inq_pl.DataFrame):\n"
+            "        return obj.to_pandas()\n"
+            "    if _inq_pa is not None and isinstance(obj, _inq_pa.Table):\n"
+            "        return obj.to_pandas()\n"
+            "    if _inq_pa is not None and isinstance(obj, _inq_pa.RecordBatch):\n"
+            "        return _inq_pa.Table.from_batches([obj]).to_pandas()\n"
+            "    if _inq_pa is not None and hasattr(_inq_pa, 'RecordBatchReader') and isinstance(obj, _inq_pa.RecordBatchReader):\n"
+            "        return obj.read_all().to_pandas()\n"
+            "    return None\n"
+            "for _inq_item in list(_inq_declared):\n"
+            "    if not isinstance(_inq_item, dict):\n"
+            "        continue\n"
+            "    _inq_name = str(_inq_item.get('name') or '').strip()\n"
+            "    _inq_kind = str(_inq_item.get('kind') or '').strip().lower()\n"
+            "    if not _inq_name or _inq_name not in globals():\n"
+            "        continue\n"
+            "    _inq_obj = globals().get(_inq_name)\n"
+            "    try:\n"
+            "        if _inq_kind == 'dataframe':\n"
+            "            _inq_pdf = _inq_to_pandas(_inq_obj)\n"
+            "            if _inq_pdf is not None:\n"
+            "                export_dataframe(_inq_pdf, logical_name=_inq_name)\n"
+            "        elif _inq_kind == 'figure':\n"
+            "            if _inq_go is not None and isinstance(_inq_obj, _inq_go.Figure):\n"
+            "                export_figure(_inq_obj, logical_name=_inq_name)\n"
+            "        elif _inq_kind == 'scalar':\n"
+            "            export_scalar(_inq_obj, logical_name=_inq_name)\n"
+            "    except Exception:\n"
+            "        pass\n"
+            "if not _inq_declared:\n"
+            "    _inq_target = None\n"
+            "    for _inq_name in ('result', 'final_df', 'df', 'fig', 'figure'):\n"
+            "        if _inq_name in globals():\n"
+            "            _inq_target = (_inq_name, globals().get(_inq_name))\n"
+            "            break\n"
+            "    if _inq_target is None and '_' in globals():\n"
+            "        _inq_target = ('result', globals().get('_'))\n"
+            "    if _inq_target is not None:\n"
+            "        _inq_name, _inq_obj = _inq_target\n"
+            "        try:\n"
+            "            _inq_kind = _inq_kind_of(_inq_obj)\n"
+            "            if _inq_kind == 'dataframe':\n"
+            "                _inq_pdf = _inq_to_pandas(_inq_obj)\n"
+            "                if _inq_pdf is not None:\n"
+            "                    export_dataframe(_inq_pdf, logical_name=_inq_name)\n"
+            "            elif _inq_kind == 'figure':\n"
+            "                export_figure(_inq_obj, logical_name=_inq_name)\n"
+            "            else:\n"
+            "                export_scalar(_inq_obj, logical_name=_inq_name)\n"
+            "        except Exception:\n"
+            "            pass\n"
+        )
+
+    @staticmethod
+    def _build_run_wrapped_code(code: str, run_id: str, output_contract: list[dict[str, str]]) -> str:
         body = str(code or "").rstrip()
         if not body:
             return ""
-        return f"set_active_run({run_id!r})\n{body}\n"
+        auto_capture_code = ChatService._build_auto_capture_result_code(output_contract)
+        return f"set_active_run({run_id!r})\n{body}\n{auto_capture_code}\n"
 
     @staticmethod
     async def _finalize_kernel_run(
@@ -91,10 +227,11 @@ class ChatService:
         workspace_duckdb_path: str,
         generated_code: str,
         run_id: str,
+        output_contract: list[dict[str, str]],
         max_retries: int = 2,
     ) -> tuple[dict[str, Any], int, float, str]:
         retries = 0
-        wrapped_code = ChatService._build_run_wrapped_code(generated_code, run_id)
+        wrapped_code = ChatService._build_run_wrapped_code(generated_code, run_id, output_contract)
         last_result: dict[str, Any] = {
             "success": True,
             "stdout": "",
@@ -127,17 +264,12 @@ class ChatService:
     @staticmethod
     def _assemble_final_script(*, question: str, generated_code: str, run_id: str) -> str:
         lines = [
-            "# Inquira reproducible script",
-            f"# run_id: {run_id}",
+            "# Inquira portable script",
+            "# This code is designed to run outside Inquira without runtime helpers.",
+            f"# inquira_run_id: {run_id}",
             f"# question: {question}",
             "",
-            "# NOTE: Inquira runtime provides these helpers in-kernel:",
-            "# set_active_run, export_dataframe, export_figure, export_scalar, finalize_run",
-            f"set_active_run({run_id!r})",
-            "",
             generated_code.rstrip(),
-            "",
-            f"finalize_run({run_id!r})",
             "",
         ]
         return "\n".join(lines)
@@ -167,7 +299,7 @@ class ChatService:
                 "logical_name": "result",
                 "row_count": len(rows),
                 "schema": [{"name": str(c), "dtype": ""} for c in columns],
-                "preview_rows": rows,
+                "preview_rows": [],
                 "created_at": "",
                 "expires_at": "",
                 "status": "ready",
@@ -474,6 +606,7 @@ class ChatService:
                     workspace_duckdb_path=data_path,
                     generated_code=code_to_execute,
                     run_id=run_id,
+                    output_contract=response_payload.get("output_contract") or [],
                     max_retries=2,
                 )
             )
@@ -555,6 +688,7 @@ class ChatService:
             "code": code,
             "explanation": explanation,
             "metadata": metadata,
+            "output_contract": ChatService._normalize_output_contract(result.get("output_contract")),
             "run_id": None,
             "execution": None,
             "artifacts": [],
@@ -679,6 +813,7 @@ class ChatService:
                     workspace_duckdb_path=data_path,
                     generated_code=code_to_execute,
                     run_id=run_id,
+                    output_contract=response_payload.get("output_contract") or [],
                     max_retries=2,
                 )
             )

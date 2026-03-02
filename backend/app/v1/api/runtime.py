@@ -19,7 +19,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...services.code_executor import (
     bootstrap_workspace_runtime,
     execute_code,
-    get_workspace_dataframe_rows,
     get_workspace_kernel_status,
     interrupt_workspace_kernel,
     reset_workspace_kernel,
@@ -490,9 +489,10 @@ async def get_workspace_dataframe_artifact_rows(
     session: AsyncSession = Depends(get_db_session),
     current_user=Depends(get_current_user),
 ):
-    await _require_workspace_access(session, current_user.id, workspace_id)
-    rows = await get_workspace_dataframe_rows(
-        workspace_id=workspace_id,
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    store = get_artifact_scratchpad_store()
+    rows = store.get_dataframe_rows(
+        workspace_duckdb_path=str(workspace.duckdb_path),
         artifact_id=artifact_id,
         offset=offset,
         limit=limit,
@@ -514,9 +514,10 @@ async def get_workspace_artifact_rows(
     session: AsyncSession = Depends(get_db_session),
     current_user=Depends(get_current_user),
 ):
-    await _require_workspace_access(session, current_user.id, workspace_id)
-    rows = await get_workspace_dataframe_rows(
-        workspace_id=workspace_id,
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    store = get_artifact_scratchpad_store()
+    rows = store.get_dataframe_rows(
+        workspace_duckdb_path=str(workspace.duckdb_path),
         artifact_id=artifact_id,
         offset=offset,
         limit=limit,
