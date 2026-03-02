@@ -47,7 +47,7 @@
 
       <!-- Assistant Response -->
       <div v-if="message.explanation" class="w-full group">
-        <div class="px-4 py-3 rounded-2xl rounded-tl-sm" style="background-color: color-mix(in srgb, var(--color-base) 55%, #FDE68A 45%);">
+        <div class="px-4 py-3 rounded-2xl rounded-tl-sm" style="background-color: transparent">
           <div class="text-sm leading-relaxed prose prose-sm max-w-none prose-pre:overflow-x-auto prose-pre:break-words" style="color: var(--color-text-main);">
             <div v-html="renderMarkdown(message.explanation)"></div>
           </div>
