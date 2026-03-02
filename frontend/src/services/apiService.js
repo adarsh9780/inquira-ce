@@ -313,7 +313,7 @@ export const apiService = {
 
   async getDataframeArtifactRows(workspaceId, artifactId, offset = 0, limit = 1000) {
     const response = await fetch(
-      `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/dataframes/${artifactId}/rows?offset=${offset}&limit=${limit}`,
+      `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/${artifactId}/rows?offset=${offset}&limit=${limit}`,
       {
         method: 'GET',
         credentials: 'include',

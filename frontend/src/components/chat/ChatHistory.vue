@@ -3,7 +3,8 @@
     <div v-if="appStore.activeConversationId && appStore.turnsNextCursor" class="flex justify-center">
       <button
         type="button"
-        class="text-xs px-3 py-1.5 rounded border border-gray-300 bg-white hover:bg-gray-50"
+        class="text-xs px-3 py-1.5 rounded-full border transition-colors"
+        style="border-color: var(--color-border); background-color: var(--color-surface); color: var(--color-text-muted);"
         @click="loadMoreTurns"
       >
         Load more
@@ -12,8 +13,8 @@
 
     <!-- Loading indicator for first message when no history yet -->
     <div v-if="appStore.isLoading && appStore.chatHistory.length === 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
-      <div class="flex items-center space-x-3 text-blue-600 bg-blue-50 px-4 py-3 rounded-xl shadow-sm">
-        <div class="animate-spin rounded-full h-5 w-5 border-2 border-blue-200 border-t-blue-600" aria-hidden="true"></div>
+      <div class="flex items-center space-x-3 px-4 py-3 rounded-xl shadow-sm" style="color: var(--color-text-muted); background-color: color-mix(in srgb, var(--color-base) 60%, var(--color-border) 40%);">
+        <div class="animate-spin rounded-full h-5 w-5 border-2" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);" aria-hidden="true"></div>
         <span class="text-sm font-medium">Analyzing your question...</span>
       </div>
     </div>
@@ -25,17 +26,17 @@
     >
       <!-- User Message -->
       <div class="w-full mb-2">
-        <div class="bg-blue-50 px-4 py-3">
-          <p class="text-sm text-gray-900 whitespace-pre-wrap">{{ message.question }}</p>
+        <div class="px-4 py-3 rounded-2xl rounded-tl-sm" style="background-color: #EDE9DE;">
+          <p class="text-sm whitespace-pre-wrap" style="color: var(--color-text-main);">{{ message.question }}</p>
         </div>
-        <div class="flex items-center justify-between mt-1 px-4">
-          <p class="text-xs text-gray-500">{{ formatTimestamp(message.timestamp) }}</p>
+        <div class="flex items-center justify-between mt-1 px-1">
+          <p class="text-xs" style="color: var(--color-text-muted);">{{ formatTimestamp(message.timestamp) }}</p>
           <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
             <button
               @click="copyQuestion(message.question)"
               type="button"
               aria-label="Copy question"
-              class="text-xs text-gray-400 hover:text-gray-600 focus:text-gray-600 transition-colors p-1 focus:outline-none focus:ring-2 focus:ring-gray-300"
+              class="btn-icon text-xs p-1"
               title="Copy question"
             >
               <DocumentDuplicateIcon class="h-3 w-3" />
@@ -46,13 +47,13 @@
 
       <!-- Assistant Response -->
       <div v-if="message.explanation" class="w-full group">
-        <div class="bg-white px-4 py-3">
-          <div class="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none prose-pre:overflow-x-auto prose-pre:break-words">
+        <div class="px-4 py-3" style="background-color: transparent;">
+          <div class="text-sm leading-relaxed prose prose-sm max-w-none prose-pre:overflow-x-auto prose-pre:break-words" style="color: var(--color-text-main);">
             <div v-html="renderMarkdown(message.explanation)"></div>
           </div>
-          <details v-if="message.toolEvents && message.toolEvents.length" class="mt-3 border border-gray-200 rounded p-2">
-            <summary class="text-xs text-gray-600 cursor-pointer">Tool and node details</summary>
-            <pre class="text-xs text-gray-700 whitespace-pre-wrap mt-2">{{ formatToolEvents(message.toolEvents) }}</pre>
+          <details v-if="message.toolEvents && message.toolEvents.length" class="mt-3 rounded p-2" style="border: 1px solid var(--color-border);">
+            <summary class="text-xs cursor-pointer" style="color: var(--color-text-muted);">Tool and node details</summary>
+            <pre class="text-xs whitespace-pre-wrap mt-2" style="color: var(--color-text-main);">{{ formatToolEvents(message.toolEvents) }}</pre>
           </details>
         </div>
         <div class="flex items-center justify-end mt-1 px-4">
@@ -61,7 +62,7 @@
               @click="copyExplanation(message.explanation)"
               type="button"
               aria-label="Copy explanation"
-              class="text-xs text-gray-400 hover:text-gray-600 focus:text-gray-600 transition-colors p-1 focus:outline-none focus:ring-2 focus:ring-gray-300"
+              class="btn-icon text-xs p-1"
               title="Copy explanation"
             >
               <DocumentDuplicateIcon class="h-3 w-3" />
@@ -73,8 +74,8 @@
 
     <!-- Loading indicator when analyzing - shown below last message -->
     <div v-if="appStore.isLoading && appStore.chatHistory.length > 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
-      <div class="flex items-center space-x-3 text-blue-600 bg-blue-50 px-4 py-3 rounded-xl shadow-sm">
-        <div class="animate-spin rounded-full h-5 w-5 border-2 border-blue-200 border-t-blue-600" aria-hidden="true"></div>
+      <div class="flex items-center space-x-3 px-4 py-3 rounded-xl shadow-sm" style="color: var(--color-text-muted); background-color: color-mix(in srgb, var(--color-base) 60%, var(--color-border) 40%);">
+        <div class="animate-spin rounded-full h-5 w-5 border-2" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);" aria-hidden="true"></div>
         <span class="text-sm font-medium">Analyzing your question...</span>
       </div>
     </div>
@@ -82,13 +83,13 @@
     <!-- Placeholder message when no chat history -->
     <div v-once v-if="appStore.chatHistory.length === 0 && !appStore.isLoading" class="flex items-center justify-center py-12">
       <div class="text-center">
-        <div class="text-gray-400 mb-4">
+        <div class="mb-4" style="color: var(--color-border-hover);">
           <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
         </div>
-        <h3 class="text-lg font-medium text-gray-900 mb-2">Start Your Analysis</h3>
-        <p class="text-gray-500">Ask a question about your data to begin the conversation.</p>
+        <h3 class="text-lg font-medium mb-2" style="color: var(--color-text-main);">Start Your Analysis</h3>
+        <p style="color: var(--color-text-muted);">Ask a question about your data to begin the conversation.</p>
       </div>
     </div>
 

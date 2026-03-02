@@ -567,15 +567,7 @@ watch(() => appStore.generatedCode, (newCode) => {
     updateEditorContent()
     isGeneratingCode.value = false
     appStore.setLoading(false)
-    appStore.setCodeRunning(false)
-
-    // Auto-run the newly generated code
-    nextTick(() => {
-      if (canRunCode.value) {
-        runCode()
-      }
-    })
-  }
+    appStore.setCodeRunning(false)  }
 })
 
 watch(() => appStore.isLoading, (loading) => {

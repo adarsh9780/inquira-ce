@@ -48,6 +48,10 @@ async def analyze(
         is_relevant=response_payload["is_relevant"],
         code=response_payload["code"],
         explanation=response_payload["explanation"],
+        run_id=response_payload.get("run_id"),
+        execution=response_payload.get("execution"),
+        artifacts=response_payload.get("artifacts") or [],
+        final_script_artifact_id=response_payload.get("final_script_artifact_id"),
     )
 
 

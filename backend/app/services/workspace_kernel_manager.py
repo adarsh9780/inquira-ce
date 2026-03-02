@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import json
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -59,140 +58,18 @@ else:
 _inquira_payload
 """
 
-_ARTIFACT_SYNC_CODE = """
-import json as _json
-import uuid as _uuid
+_EXPORTS_PROBE_CODE = """
+_inquira_get_active_exports()
+"""
 
-try:
-    import pandas as _pd
-except Exception:
-    _pd = None
-
-try:
-    import polars as _pl
-except Exception:
-    _pl = None
-
-try:
-    import pyarrow as _pa
-except Exception:
-    _pa = None
-
-try:
-    import plotly.graph_objects as _go
-except Exception:
-    _go = None
-
-if "_inquira_df_artifacts" not in globals():
-    _inquira_df_artifacts = {}
-if "_inquira_fig_artifacts" not in globals():
-    _inquira_fig_artifacts = {}
-
-def _safe_name(name):
-    cleaned = "".join(ch if (ch.isalnum() or ch == "_") else "_" for ch in str(name))
-    if not cleaned:
-        cleaned = "value"
-    return cleaned[:96]
-
-def _quoted(name):
-    return '"' + str(name).replace('"', '""') + '"'
-
-def _to_pandas(value):
-    if _pd is not None and isinstance(value, _pd.DataFrame):
-        return value
-    if _pl is not None:
-        if isinstance(value, _pl.LazyFrame):
-            return value.collect().to_pandas()
-        if isinstance(value, _pl.DataFrame):
-            return value.to_pandas()
-    if _pa is not None:
-        if isinstance(value, _pa.Table):
-            return value.to_pandas()
-        if isinstance(value, _pa.RecordBatch):
-            return _pa.Table.from_batches([value]).to_pandas()
-    return None
-
-def _is_figure(value):
-    if _go is not None and isinstance(value, _go.Figure):
-        return True
-    return isinstance(value, dict) and {"data", "layout"}.issubset(value.keys())
-
-_bundle = {
-    "dataframes": {},
-    "figures": {},
-    "scalars": {},
-}
-
-_seen_df_names = set()
-_seen_fig_names = set()
-
-for _name, _value in list(globals().items()):
-    if _name.startswith("_"):
-        continue
-    _pdf = _to_pandas(_value)
-    if _pdf is not None and "artifact_conn" in globals() and artifact_conn is not None:
-        _seen_df_names.add(_name)
-        _artifact = _inquira_df_artifacts.get(_name, {})
-        _artifact_id = _artifact.get("artifact_id") or str(_uuid.uuid4())
-        _table_name = f"df_{_safe_name(_name)}"
-        artifact_conn.register("_inquira_df_tmp", _pdf)
-        artifact_conn.execute(f"CREATE OR REPLACE TABLE {_quoted(_table_name)} AS SELECT * FROM _inquira_df_tmp")
-        artifact_conn.unregister("_inquira_df_tmp")
-        _row_count = int(artifact_conn.execute(f"SELECT COUNT(*) FROM {_quoted(_table_name)}").fetchone()[0])
-        _preview_df = artifact_conn.execute(f"SELECT * FROM {_quoted(_table_name)} LIMIT 1000").fetchdf()
-        _columns = [str(c) for c in list(_preview_df.columns)]
-        _preview = _json.loads(_preview_df.to_json(orient="records", date_format="iso"))
-        _inquira_df_artifacts[_name] = {
-            "artifact_id": _artifact_id,
-            "table_name": _table_name,
-            "row_count": _row_count,
-            "columns": _columns,
-        }
-        _bundle["dataframes"][_name] = {
-            "artifact_id": _artifact_id,
-            "row_count": _row_count,
-            "columns": _columns,
-            "data": _preview,
-        }
-        continue
-
-    if _is_figure(_value):
-        _seen_fig_names.add(_name)
-        _artifact = _inquira_fig_artifacts.get(_name, {})
-        _artifact_id = _artifact.get("artifact_id") or str(_uuid.uuid4())
-        try:
-            if _go is not None and isinstance(_value, _go.Figure):
-                # Plotly's JSON encoder handles ndarray/typed values better than
-                # plain python repr and keeps payload frontend-compatible.
-                _fig_payload = _json.loads(_value.to_json())
-            else:
-                _fig_payload = _json.loads(_json.dumps(_value))
-        except Exception:
-            _fig_payload = _json.loads(_json.dumps(_value, default=str))
-        _inquira_fig_artifacts[_name] = {"artifact_id": _artifact_id}
-        _bundle["figures"][_name] = _fig_payload
-
-for _stale_name in list(_inquira_df_artifacts.keys()):
-    if _stale_name in _seen_df_names:
-        continue
-    _stale = _inquira_df_artifacts.pop(_stale_name, None)
-    if _stale and "table_name" in _stale and "artifact_conn" in globals() and artifact_conn is not None:
-        try:
-            artifact_conn.execute(f"DROP TABLE IF EXISTS {_quoted(_stale['table_name'])}")
-        except Exception:
-            pass
-
-for _stale_name in list(_inquira_fig_artifacts.keys()):
-    if _stale_name not in _seen_fig_names:
-        _inquira_fig_artifacts.pop(_stale_name, None)
-
-_bundle
+_RUN_EXPORTS_PROBE_TEMPLATE = """
+_inquira_get_active_exports(run_id={run_id!r})
 """
 
 _KERNEL_RESOURCE_CLEANUP_CODE = """
 try:
-    if "artifact_conn" in globals() and artifact_conn is not None:
-        artifact_conn.close()
+    if "scratchpad_conn" in globals() and scratchpad_conn is not None:
+        scratchpad_conn.close()
 except Exception:
     pass
 
@@ -214,13 +91,12 @@ class WorkspaceKernelSession:
     workspace_duckdb_path: str
     manager: AsyncKernelManager
     client: Any
-    artifact_db_path: str
+    scratchpad_db_path: str
     status: str = "starting"
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     last_used: datetime = field(default_factory=lambda: datetime.now(UTC))
     restart_count: int = 0
     bootstrap_completed: bool = False
-    artifact_registry: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 class WorkspaceKernelManager:
@@ -334,6 +210,24 @@ class WorkspaceKernelManager:
             session.status = "error"
             return False
 
+    async def get_run_exports(
+        self,
+        *,
+        workspace_id: str,
+        run_id: str,
+    ) -> list[dict[str, Any]]:
+        async with self._sessions_lock:
+            session = self._sessions.get(workspace_id)
+        if session is None:
+            return []
+        probe_code = _RUN_EXPORTS_PROBE_TEMPLATE.format(run_id=str(run_id))
+        async with session.lock:
+            session.last_used = datetime.now(UTC)
+            parsed = await self._execute_request(session, probe_code)
+        if parsed.error is not None or not isinstance(parsed.result, list):
+            return []
+        return [item for item in parsed.result if isinstance(item, dict)]
+
     async def get_dataframe_rows(
         self,
         *,
@@ -347,47 +241,40 @@ class WorkspaceKernelManager:
         if session is None:
             return None
 
-        artifact = session.artifact_registry.get(artifact_id)
-        if artifact is None or artifact.get("kind") != "dataframe":
-            return None
-
-        table_name = str(artifact.get("table_name") or "")
-        if not table_name:
-            return None
-
         safe_limit = max(1, min(1000, int(limit)))
         safe_offset = max(0, int(offset))
-        escaped = table_name.replace('"', '""')
+        escaped_artifact_id = str(artifact_id).replace("'", "''")
         page_code = (
             "import json as _json\n"
-            f"_page_df = artifact_conn.execute('SELECT * FROM \"{escaped}\" LIMIT {safe_limit} OFFSET {safe_offset}').fetchdf()\n"
-            "{\n"
-            "    'columns': [str(c) for c in list(_page_df.columns)],\n"
-            "    'rows': _json.loads(_page_df.to_json(orient='records', date_format='iso')),\n"
-            "}\n"
+            f"_art = scratchpad_conn.execute(\"SELECT logical_name, table_name FROM artifact_manifest WHERE artifact_id = '{escaped_artifact_id}' AND kind = 'dataframe' LIMIT 1\").fetchone()\n"
+            "if _art is None:\n"
+            "    _page = None\n"
+            "else:\n"
+            "    _name, _table_name = _art\n"
+            "    _escaped = str(_table_name).replace('\"', '\"\"')\n"
+            f"    _rows_df = scratchpad_conn.execute(f'SELECT * FROM \"{{_escaped}}\" LIMIT {safe_limit} OFFSET {safe_offset}').fetchdf()\n"
+            "    _count = int(scratchpad_conn.execute(f'SELECT COUNT(*) FROM \"{_escaped}\"').fetchone()[0])\n"
+            "    _page = {\n"
+            f"      'artifact_id': '{escaped_artifact_id}',\n"
+            "      'name': str(_name),\n"
+            "      'row_count': _count,\n"
+            "      'columns': [str(c) for c in list(_rows_df.columns)],\n"
+            "      'rows': _json.loads(_rows_df.to_json(orient='records', date_format='iso')),\n"
+            f"      'offset': {safe_offset},\n"
+            f"      'limit': {safe_limit},\n"
+            "    }\n"
+            "_page\n"
         )
 
         async with session.lock:
             session.last_used = datetime.now(UTC)
             parsed = await self._execute_request(session, page_code)
 
-        if parsed.error is not None or not isinstance(parsed.result, dict):
+        if parsed.error is not None or parsed.result is None:
             return None
-
-        columns = parsed.result.get("columns")
-        rows = parsed.result.get("rows")
-        if not isinstance(columns, list) or not isinstance(rows, list):
+        if not isinstance(parsed.result, dict):
             return None
-
-        return {
-            "artifact_id": artifact_id,
-            "name": artifact.get("name"),
-            "row_count": int(artifact.get("row_count") or 0),
-            "columns": [str(c) for c in columns],
-            "rows": rows,
-            "offset": safe_offset,
-            "limit": safe_limit,
-        }
+        return parsed.result
 
     async def ensure_ready(
         self,
@@ -519,7 +406,7 @@ class WorkspaceKernelManager:
                 workspace_duckdb_path=workspace_duckdb_path,
                 manager=km,
                 client=kc,
-                artifact_db_path=str(Path(workspace_duckdb_path).with_name("workspace_runtime_artifacts.duckdb")),
+                scratchpad_db_path=str(Path(workspace_duckdb_path).parent / "scratchpad" / "artifacts.duckdb"),
                 status="ready",
             )
             if progress_callback is not None:
@@ -537,10 +424,174 @@ class WorkspaceKernelManager:
 
     async def _bootstrap_workspace(self, session: WorkspaceKernelSession) -> None:
         duckdb_path = Path(session.workspace_duckdb_path).as_posix()
+        scratchpad_file = Path(session.scratchpad_db_path)
+        scratchpad_file.parent.mkdir(parents=True, exist_ok=True)
+        scratchpad_path = scratchpad_file.as_posix()
         bootstrap_code = (
             "import duckdb\n"
+            "import json as _json\n"
+            "import uuid as _uuid\n"
+            "from datetime import datetime as _dt, timedelta as _td, timezone as _tz\n"
             f"conn = duckdb.connect(r'''{duckdb_path}''', read_only=True)\n"
-            f"artifact_conn = duckdb.connect(r'''{session.artifact_db_path}''', read_only=False)\n"
+            f"scratchpad_conn = duckdb.connect(r'''{scratchpad_path}''', read_only=False)\n"
+            "scratchpad_conn.execute(\"\"\"\n"
+            "CREATE TABLE IF NOT EXISTS artifact_manifest (\n"
+            "  artifact_id VARCHAR PRIMARY KEY,\n"
+            "  run_id VARCHAR NOT NULL,\n"
+            "  workspace_id VARCHAR NOT NULL,\n"
+            "  logical_name VARCHAR NOT NULL,\n"
+            "  kind VARCHAR NOT NULL,\n"
+            "  table_name VARCHAR,\n"
+            "  payload_json TEXT,\n"
+            "  schema_json TEXT,\n"
+            "  row_count BIGINT,\n"
+            "  created_at TIMESTAMP NOT NULL,\n"
+            "  expires_at TIMESTAMP NOT NULL,\n"
+            "  status VARCHAR NOT NULL,\n"
+            "  error TEXT\n"
+            ")\n"
+            "\"\"\")\n"
+            "scratchpad_conn.execute(\"\"\"\n"
+            "CREATE TABLE IF NOT EXISTS run_manifest (\n"
+            "  run_id VARCHAR PRIMARY KEY,\n"
+            "  workspace_id VARCHAR NOT NULL,\n"
+            "  conversation_id VARCHAR,\n"
+            "  turn_id VARCHAR,\n"
+            "  question TEXT,\n"
+            "  generated_code TEXT,\n"
+            "  executed_code TEXT,\n"
+            "  stdout TEXT,\n"
+            "  stderr TEXT,\n"
+            "  execution_status VARCHAR NOT NULL,\n"
+            "  retry_count INTEGER NOT NULL,\n"
+            "  created_at TIMESTAMP NOT NULL,\n"
+            "  expires_at TIMESTAMP NOT NULL\n"
+            ")\n"
+            "\"\"\")\n"
+            "if \"_inquira_run_exports\" not in globals():\n"
+            "    _inquira_run_exports = {}\n"
+            "if \"_inquira_active_run_id\" not in globals():\n"
+            "    _inquira_active_run_id = None\n"
+            "if \"_inquira_workspace_id\" not in globals():\n"
+            f"    _inquira_workspace_id = {session.workspace_id!r}\n"
+            "if \"_inquira_ttl_hours\" not in globals():\n"
+            "    _inquira_ttl_hours = 48\n"
+            "def _inquira_safe_name(name):\n"
+            "    cleaned = ''.join(ch if (str(ch).isalnum() or str(ch) == '_') else '_' for ch in str(name or 'artifact'))\n"
+            "    return (cleaned[:96] or 'artifact')\n"
+            "def _inquira_now_and_expiry():\n"
+            "    now = _dt.now(_tz.utc)\n"
+            "    return now, now + _td(hours=max(1, int(_inquira_ttl_hours)))\n"
+            "def set_active_run(run_id):\n"
+            "    global _inquira_active_run_id\n"
+            "    _inquira_active_run_id = str(run_id)\n"
+            "    if _inquira_active_run_id not in _inquira_run_exports:\n"
+            "        _inquira_run_exports[_inquira_active_run_id] = []\n"
+            "    return _inquira_active_run_id\n"
+            "def _inquira_get_active_exports(run_id=None):\n"
+            "    key = str(run_id or _inquira_active_run_id or '')\n"
+            "    return list(_inquira_run_exports.get(key, []))\n"
+            "def _inquira_export_envelope(*, artifact_id, run_id, kind, logical_name, table_name=None, row_count=None, schema=None, preview_rows=None, status='ready', error=None):\n"
+            "    now, expires = _inquira_now_and_expiry()\n"
+            "    return {\n"
+            "      'artifact_id': str(artifact_id),\n"
+            "      'run_id': str(run_id),\n"
+            "      'kind': str(kind),\n"
+            "      'pointer': f'duckdb://scratchpad/artifacts.duckdb#artifact={artifact_id}',\n"
+            "      'logical_name': str(logical_name),\n"
+            "      'row_count': int(row_count) if row_count is not None else None,\n"
+            "      'schema': schema,\n"
+            "      'preview_rows': preview_rows or [],\n"
+            "      'created_at': now.isoformat(),\n"
+            "      'expires_at': expires.isoformat(),\n"
+            "      'status': status,\n"
+            "      'error': error,\n"
+            "      'table_name': table_name,\n"
+            "    }\n"
+            "def export_dataframe(df, logical_name, run_id=None, title=None, insight=None):\n"
+            "    active_run = str(run_id or _inquira_active_run_id or '')\n"
+            "    if not active_run:\n"
+            "        raise ValueError('No active run_id set. Call set_active_run(run_id) first.')\n"
+            "    import pandas as _pd\n"
+            "    try:\n"
+            "        import polars as _pl\n"
+            "    except Exception:\n"
+            "        _pl = None\n"
+            "    if _pl is not None and isinstance(df, _pl.LazyFrame):\n"
+            "        df = df.collect()\n"
+            "    if _pl is not None and isinstance(df, _pl.DataFrame):\n"
+            "        pdf = df.to_pandas()\n"
+            "    elif isinstance(df, _pd.DataFrame):\n"
+            "        pdf = df\n"
+            "    else:\n"
+            "        pdf = _pd.DataFrame(df)\n"
+            "    seq = len(_inquira_run_exports.get(active_run, [])) + 1\n"
+            "    run_short = ''.join(ch for ch in active_run if ch.isalnum())[:12] or 'run'\n"
+            "    table_name = f'art_{run_short}_{seq}'\n"
+            "    artifact_id = str(_uuid.uuid4())\n"
+            "    scratchpad_conn.register('_inquira_df_tmp', pdf)\n"
+            "    scratchpad_conn.execute(f'CREATE TABLE {table_name} AS SELECT * FROM _inquira_df_tmp')\n"
+            "    scratchpad_conn.unregister('_inquira_df_tmp')\n"
+            "    row_count = int(scratchpad_conn.execute(f'SELECT COUNT(*) FROM {table_name}').fetchone()[0])\n"
+            "    preview_df = scratchpad_conn.execute(f'SELECT * FROM {table_name} LIMIT 50').fetchdf()\n"
+            "    schema = [{'name': str(c), 'dtype': str(t)} for c, t in zip(list(preview_df.columns), list(preview_df.dtypes))]\n"
+            "    preview_rows = _json.loads(preview_df.to_json(orient='records', date_format='iso'))\n"
+            "    now, expires = _inquira_now_and_expiry()\n"
+            "    payload = _json.dumps({'title': title, 'insight': insight}, default=str)\n"
+            "    scratchpad_conn.execute(\n"
+            "      'INSERT INTO artifact_manifest (artifact_id, run_id, workspace_id, logical_name, kind, table_name, payload_json, schema_json, row_count, created_at, expires_at, status, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',\n"
+            "      [artifact_id, active_run, _inquira_workspace_id, str(logical_name), 'dataframe', table_name, payload, _json.dumps(schema), row_count, now, expires, 'ready', None]\n"
+            "    )\n"
+            "    envelope = _inquira_export_envelope(artifact_id=artifact_id, run_id=active_run, kind='dataframe', logical_name=str(logical_name), table_name=table_name, row_count=row_count, schema=schema, preview_rows=preview_rows)\n"
+            "    _inquira_run_exports.setdefault(active_run, []).append(envelope)\n"
+            "    return envelope\n"
+            "def export_figure(fig, logical_name, run_id=None, title=None, insight=None):\n"
+            "    active_run = str(run_id or _inquira_active_run_id or '')\n"
+            "    if not active_run:\n"
+            "        raise ValueError('No active run_id set. Call set_active_run(run_id) first.')\n"
+            "    try:\n"
+            "        import plotly.graph_objects as _go\n"
+            "    except Exception:\n"
+            "        _go = None\n"
+            "    if _go is not None and isinstance(fig, _go.Figure):\n"
+            "        fig_payload = _json.loads(fig.to_json())\n"
+            "    else:\n"
+            "        fig_payload = _json.loads(_json.dumps(fig, default=str))\n"
+            "    artifact_id = str(_uuid.uuid4())\n"
+            "    now, expires = _inquira_now_and_expiry()\n"
+            "    payload = _json.dumps({'figure': fig_payload, 'title': title, 'insight': insight}, default=str)\n"
+            "    scratchpad_conn.execute(\n"
+            "      'INSERT INTO artifact_manifest (artifact_id, run_id, workspace_id, logical_name, kind, table_name, payload_json, schema_json, row_count, created_at, expires_at, status, error) VALUES (?, ?, ?, ?, ?, NULL, ?, NULL, NULL, ?, ?, ?, ?)',\n"
+            "      [artifact_id, active_run, _inquira_workspace_id, str(logical_name), 'figure', payload, now, expires, 'ready', None]\n"
+            "    )\n"
+            "    envelope = _inquira_export_envelope(artifact_id=artifact_id, run_id=active_run, kind='figure', logical_name=str(logical_name), preview_rows=[])\n"
+            "    _inquira_run_exports.setdefault(active_run, []).append(envelope)\n"
+            "    return envelope\n"
+            "def export_scalar(value, logical_name, run_id=None, meta=None):\n"
+            "    active_run = str(run_id or _inquira_active_run_id or '')\n"
+            "    if not active_run:\n"
+            "        raise ValueError('No active run_id set. Call set_active_run(run_id) first.')\n"
+            "    artifact_id = str(_uuid.uuid4())\n"
+            "    now, expires = _inquira_now_and_expiry()\n"
+            "    payload = _json.dumps({'value': value, 'meta': meta}, default=str)\n"
+            "    scratchpad_conn.execute(\n"
+            "      'INSERT INTO artifact_manifest (artifact_id, run_id, workspace_id, logical_name, kind, table_name, payload_json, schema_json, row_count, created_at, expires_at, status, error) VALUES (?, ?, ?, ?, ?, NULL, ?, NULL, NULL, ?, ?, ?, ?)',\n"
+            "      [artifact_id, active_run, _inquira_workspace_id, str(logical_name), 'scalar', payload, now, expires, 'ready', None]\n"
+            "    )\n"
+            "    envelope = _inquira_export_envelope(artifact_id=artifact_id, run_id=active_run, kind='scalar', logical_name=str(logical_name), preview_rows=[])\n"
+            "    _inquira_run_exports.setdefault(active_run, []).append(envelope)\n"
+            "    return envelope\n"
+            "def finalize_run(run_id, metadata=None):\n"
+            "    active_run = str(run_id or _inquira_active_run_id or '')\n"
+            "    if not active_run:\n"
+            "        raise ValueError('No run_id provided to finalize_run')\n"
+            "    now, expires = _inquira_now_and_expiry()\n"
+            "    payload = metadata or {}\n"
+            "    scratchpad_conn.execute(\n"
+            "      'INSERT OR REPLACE INTO run_manifest (run_id, workspace_id, conversation_id, turn_id, question, generated_code, executed_code, stdout, stderr, execution_status, retry_count, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',\n"
+            "      [active_run, _inquira_workspace_id, None, None, str(payload.get('question') or ''), str(payload.get('generated_code') or ''), str(payload.get('executed_code') or ''), str(payload.get('stdout') or ''), str(payload.get('stderr') or ''), str(payload.get('execution_status') or 'completed'), int(payload.get('retry_count') or 0), now, expires]\n"
+            "    )\n"
+            "    return {'run_id': active_run, 'exports': list(_inquira_run_exports.get(active_run, []))}\n"
         )
         output = await self._execute_on_session(session, bootstrap_code)
         if output.get("success"):
@@ -580,21 +631,18 @@ class WorkspaceKernelManager:
                 parsed.result_type = probe.result_type
 
         variables: dict[str, dict[str, Any]] = {"dataframes": {}, "figures": {}, "scalars": {}}
+        artifacts: list[dict[str, Any]] = []
         if session.bootstrap_completed and parsed.error is None:
             try:
-                artifact_probe = await self._execute_request(session, _ARTIFACT_SYNC_CODE)
-                bundle = self._coerce_variable_bundle(artifact_probe.result)
-                variables = bundle
-                self._update_artifact_registry(session, bundle)
-            except Exception as exc:
-                variables = {
-                    "dataframes": {},
-                    "figures": {},
-                    "scalars": {"_artifact_sync_error": str(exc)},
-                }
+                exports_probe = await self._execute_request(session, _EXPORTS_PROBE_CODE)
+                if isinstance(exports_probe.result, list):
+                    artifacts = [item for item in exports_probe.result if isinstance(item, dict)]
+            except Exception:
+                artifacts = []
 
         response = parsed.as_response()
         response["variables"] = variables
+        response["artifacts"] = artifacts
         result_kind, result_name = self._resolve_canonical_result(
             code=code,
             parsed=parsed,
@@ -684,79 +732,6 @@ class WorkspaceKernelManager:
         if text:
             return text
         return exc.__class__.__name__
-
-    @staticmethod
-    def _coerce_variable_bundle(result: Any) -> dict[str, dict[str, Any]]:
-        default_bundle: dict[str, dict[str, Any]] = {"dataframes": {}, "figures": {}, "scalars": {}}
-        parsed_result: Any = result
-
-        # Some kernels may emit artifact payloads as JSON-encoded strings.
-        if isinstance(parsed_result, str):
-            stripped = parsed_result.strip()
-            if not stripped:
-                return default_bundle
-            try:
-                parsed_result = json.loads(stripped)
-            except json.JSONDecodeError:
-                return default_bundle
-
-        if not isinstance(parsed_result, dict):
-            return default_bundle
-        dataframes = parsed_result.get("dataframes")
-        figures = parsed_result.get("figures")
-        scalars = parsed_result.get("scalars")
-        if not isinstance(dataframes, dict):
-            dataframes = {}
-        if not isinstance(figures, dict):
-            figures = {}
-        if not isinstance(scalars, dict):
-            scalars = {}
-        return {
-            "dataframes": dataframes,
-            "figures": figures,
-            "scalars": scalars,
-        }
-
-    @staticmethod
-    def _update_artifact_registry(
-        session: WorkspaceKernelSession,
-        bundle: dict[str, dict[str, Any]],
-    ) -> None:
-        registry: dict[str, dict[str, Any]] = {}
-
-        for name, value in bundle.get("dataframes", {}).items():
-            if not isinstance(value, dict):
-                continue
-            artifact_id = value.get("artifact_id")
-            if artifact_id is None:
-                continue
-            registry[str(artifact_id)] = {
-                "kind": "dataframe",
-                "name": str(name),
-                "table_name": f"df_{WorkspaceKernelManager._sanitize_table_suffix(name)}",
-                "row_count": int(value.get("row_count") or 0),
-            }
-
-        for name, value in bundle.get("figures", {}).items():
-            if not isinstance(value, dict):
-                continue
-            artifact_id = value.get("artifact_id")
-            if artifact_id is None:
-                continue
-            registry[str(artifact_id)] = {
-                "kind": "figure",
-                "name": str(name),
-            }
-
-        session.artifact_registry = registry
-
-    @staticmethod
-    def _sanitize_table_suffix(value: Any) -> str:
-        raw = str(value)
-        cleaned = "".join(ch if (ch.isalnum() or ch == "_") else "_" for ch in raw)
-        if not cleaned:
-            return "value"
-        return cleaned[:96]
 
     @staticmethod
     def _extract_identifier_reference(code: str) -> str | None:

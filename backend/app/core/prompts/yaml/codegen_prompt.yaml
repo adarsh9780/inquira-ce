@@ -23,9 +23,10 @@ template: |
   - **User Context**: {context}
 
   ## UI Compatibility Rules
-  - The LAST line of your code should evaluate to either:
-    - a Pandas DataFrame (for table rendering), or
-    - a Plotly figure (for chart rendering).
+  - Runtime provides helpers: `set_active_run`, `export_dataframe`, `export_figure`, `export_scalar`, `finalize_run`.
+  - You MUST explicitly export user-facing outputs using these helpers.
+  - Prefer `export_dataframe(...)` and `export_figure(...)` for final deliverables.
+  - The LAST line of your code may still evaluate to a dataframe/figure, but explicit export is required.
 
   ## Code Generation Rules (ANTI-HALLUCINATION)
   - ALWAYS reuse the existing `conn` DuckDB connection when available.
@@ -58,6 +59,9 @@ template: |
   **PLOTTING EXAMPLE:**
   ```python
   runs_by_team_fig = px.bar(result, x="team", y="runs", title="Runs by Team")
+  export_dataframe(result, logical_name="runs_by_team_table")
+  export_figure(runs_by_team_fig, logical_name="runs_by_team_chart")
+  finalize_run("active")
   runs_by_team_fig
   ```
   - Respect existing context in `Current Code Context`; avoid re-defining everything unless needed.

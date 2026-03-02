@@ -281,7 +281,9 @@ async function handleSubmit() {
     }
 
     if (finalCode && finalCode.trim()) {
-      appStore.setTerminalOutput(response.stdout || response.terminal_output || 'Code generated successfully.')
+      const executionStderr = response?.execution?.stderr || ''
+      const executionStdout = response?.execution?.stdout || ''
+      appStore.setTerminalOutput(executionStderr || executionStdout || response.stdout || response.terminal_output || 'Code generated and executed.')
 
       if (response.plotly_figure || (response.result?.data && response.result?.layout)) {
         appStore.setPlotlyFigure(response.plotly_figure || response.result)
@@ -291,6 +293,37 @@ async function handleSubmit() {
         appStore.setResultData(response.result)
         appStore.setPlotlyFigure(null)
         appStore.setDataPane('table')
+      }
+    }
+
+    const artifactItems = Array.isArray(response?.artifacts) ? response.artifacts : []
+    if (artifactItems.length > 0) {
+      const dataframeArtifacts = artifactItems
+        .filter((item) => String(item?.kind || '') === 'dataframe')
+        .map((item) => ({
+          name: String(item?.logical_name || 'dataframe'),
+          data: {
+            artifact_id: item?.artifact_id,
+            row_count: Number(item?.row_count || 0),
+            columns: Array.isArray(item?.schema) ? item.schema.map((col) => String(col?.name || '')) : [],
+            data: Array.isArray(item?.preview_rows) ? item.preview_rows : []
+          }
+        }))
+      const figureArtifacts = artifactItems
+        .filter((item) => String(item?.kind || '') === 'figure')
+        .map((item) => ({
+          name: String(item?.logical_name || 'figure'),
+          data: item?.payload?.figure || null
+        }))
+
+      appStore.setDataframes(dataframeArtifacts)
+      appStore.setFigures(figureArtifacts)
+      if (dataframeArtifacts.length > 0) {
+        appStore.setResultData(dataframeArtifacts[0].data)
+        appStore.setDataPane('table')
+      } else if (figureArtifacts.length > 0) {
+        appStore.setPlotlyFigure(figureArtifacts[0].data)
+        appStore.setDataPane('figure')
       }
     }
 

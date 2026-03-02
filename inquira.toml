@@ -38,6 +38,10 @@ venv-name = ".runner-venv"
 packages = ["narwhals", "duckdb", "pandas", "polars", "pyarrow", "plotly", "nbformat>=5.10.4", "statsmodels", "scikit-learn"]
 # Idle kernel eviction threshold in minutes.
 kernel-idle-minutes = 30
+# Scratchpad artifact retention in hours.
+scratchpad-ttl-hours = 48
+# Per-workspace scratchpad max size in GB.
+scratchpad-max-size-gb = 10
 # Runtime timeout guardrails.
 timeout-seconds = 60
 memory-limit-mb = 512

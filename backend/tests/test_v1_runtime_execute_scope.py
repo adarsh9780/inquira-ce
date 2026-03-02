@@ -130,7 +130,12 @@ async def test_workspace_dataframe_artifact_rows_endpoint(monkeypatch, tmp_path)
         _ = (session, user_id, workspace_id)
         return workspace
 
-    async def fake_get_rows(workspace_id: str, artifact_id: str, offset: int, limit: int):
+    async def fake_get_rows(
+        workspace_id: str,
+        artifact_id: str,
+        offset: int,
+        limit: int,
+    ):
         assert workspace_id == "ws-5"
         assert artifact_id == "art-1"
         assert offset == 0

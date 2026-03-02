@@ -33,6 +33,8 @@ from .services.code_executor import (
     prune_idle_workspace_kernels,
     shutdown_workspace_kernel_manager,
 )
+from .services.artifact_scratchpad import get_artifact_scratchpad_store
+from .services.execution_config import load_execution_runtime_config
 from .services.terminal_executor import shutdown_terminal_sessions
 from .services.session_variable_store import session_variable_store
 from .services.websocket_manager import websocket_manager
@@ -187,6 +189,10 @@ async def session_cleanup_worker():
         try:
             session_variable_store.cleanup_expired_sessions()
             await prune_idle_workspace_kernels()
+            runtime_cfg = load_execution_runtime_config()
+            # Scratchpad retention enforcement for manifest-backed artifacts.
+            _ = runtime_cfg  # reserved for future per-config tunables
+            get_artifact_scratchpad_store().prune_all()
             await asyncio.sleep(300)  # Clean up every 5 minutes
         except Exception as e:
             logprint(f"Error in session cleanup: {e}", level="error")

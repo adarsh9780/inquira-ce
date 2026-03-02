@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
+import uuid
 from pathlib import Path
 from typing import Any
 from typing import cast
@@ -17,6 +19,7 @@ from langchain_core.messages import HumanMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...agent.graph import InputSchema
+from ...services.code_executor import execute_code
 from ..repositories.conversation_repository import ConversationRepository
 from ..repositories.dataset_repository import DatasetRepository
 from ..repositories.workspace_repository import WorkspaceRepository
@@ -38,6 +41,106 @@ class ChatService:
         if len(normalized) <= 60:
             return normalized
         return f"{normalized[:57]}..."
+
+    @staticmethod
+    def _build_run_wrapped_code(code: str, run_id: str) -> str:
+        body = str(code or "").rstrip()
+        if not body:
+            return ""
+        return f"set_active_run({run_id!r})\\n{body}\\n"
+
+    @staticmethod
+    async def _finalize_kernel_run(
+        *,
+        workspace_id: str,
+        workspace_duckdb_path: str,
+        run_id: str,
+        question: str,
+        generated_code: str,
+        executed_code: str,
+        stdout: str,
+        stderr: str,
+        execution_status: str,
+        retry_count: int,
+    ) -> None:
+        finalize_payload = {
+            "question": question,
+            "generated_code": generated_code,
+            "executed_code": executed_code,
+            "stdout": stdout,
+            "stderr": stderr,
+            "execution_status": execution_status,
+            "retry_count": int(retry_count),
+        }
+        finalize_code = (
+            f"set_active_run({run_id!r})\\n"
+            f"finalize_run({run_id!r}, metadata={finalize_payload!r})\\n"
+        )
+        await execute_code(
+            code=finalize_code,
+            timeout=30,
+            working_dir=str(Path(workspace_duckdb_path).parent),
+            workspace_id=workspace_id,
+            workspace_duckdb_path=workspace_duckdb_path,
+        )
+
+    @staticmethod
+    async def _execute_generated_code_with_retries(
+        *,
+        workspace_id: str,
+        workspace_duckdb_path: str,
+        generated_code: str,
+        run_id: str,
+        max_retries: int = 2,
+    ) -> tuple[dict[str, Any], int, float, str]:
+        retries = 0
+        wrapped_code = ChatService._build_run_wrapped_code(generated_code, run_id)
+        last_result: dict[str, Any] = {
+            "success": True,
+            "stdout": "",
+            "stderr": "",
+            "error": None,
+            "result": None,
+            "result_type": None,
+            "result_kind": "none",
+            "result_name": None,
+            "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
+            "artifacts": [],
+        }
+        started = time.perf_counter()
+        while True:
+            last_result = await execute_code(
+                code=wrapped_code,
+                timeout=90,
+                working_dir=str(Path(workspace_duckdb_path).parent),
+                workspace_id=workspace_id,
+                workspace_duckdb_path=workspace_duckdb_path,
+            )
+            if bool(last_result.get("success")):
+                break
+            if retries >= max_retries:
+                break
+            retries += 1
+        duration_ms = max(1, int((time.perf_counter() - started) * 1000))
+        return last_result, retries, float(duration_ms), wrapped_code
+
+    @staticmethod
+    def _assemble_final_script(*, question: str, generated_code: str, run_id: str) -> str:
+        lines = [
+            "# Inquira reproducible script",
+            f"# run_id: {run_id}",
+            f"# question: {question}",
+            "",
+            "# NOTE: Inquira runtime provides these helpers in-kernel:",
+            "# set_active_run, export_dataframe, export_figure, export_scalar, finalize_run",
+            f"set_active_run({run_id!r})",
+            "",
+            generated_code.rstrip(),
+            "",
+            f"finalize_run({run_id!r})",
+            "",
+        ]
+        return "\\n".join(lines)
 
     @staticmethod
     async def _load_schema(filepath: str) -> dict[str, Any]:
@@ -323,6 +426,49 @@ class ChatService:
 
         result = await graph.ainvoke(input_state, config=config)
         response_payload = ChatService._build_response_payload(result)
+        run_id = str(uuid.uuid4())
+        response_payload["run_id"] = run_id
+        response_payload["execution"] = None
+        response_payload["artifacts"] = []
+        response_payload["final_script_artifact_id"] = None
+
+        code_to_execute = str(response_payload.get("code") or "").strip()
+        if code_to_execute:
+            execution_result, retry_count, duration_ms, executed_code = (
+                await ChatService._execute_generated_code_with_retries(
+                    workspace_id=workspace_id,
+                    workspace_duckdb_path=data_path,
+                    generated_code=code_to_execute,
+                    run_id=run_id,
+                    max_retries=2,
+                )
+            )
+            await ChatService._finalize_kernel_run(
+                workspace_id=workspace_id,
+                workspace_duckdb_path=data_path,
+                run_id=run_id,
+                question=question,
+                generated_code=code_to_execute,
+                executed_code=executed_code,
+                stdout=str(execution_result.get("stdout") or ""),
+                stderr=str(execution_result.get("stderr") or execution_result.get("error") or ""),
+                execution_status="success" if bool(execution_result.get("success")) else "failed",
+                retry_count=retry_count,
+            )
+            artifacts = [
+                item
+                for item in (execution_result.get("artifacts") or [])
+                if isinstance(item, dict)
+            ]
+            response_payload["execution"] = {
+                "status": "success" if bool(execution_result.get("success")) else "failed",
+                "stdout": str(execution_result.get("stdout") or ""),
+                "stderr": str(execution_result.get("stderr") or execution_result.get("error") or ""),
+                "retry_count": int(retry_count),
+                "duration_ms": int(duration_ms),
+            }
+            response_payload["artifacts"] = artifacts
+            response_payload["final_script_artifact_id"] = None
 
         turn_id = await ChatService._persist_turn(
             session=session,
@@ -365,6 +511,10 @@ class ChatService:
             "code": code,
             "explanation": explanation,
             "metadata": metadata,
+            "run_id": None,
+            "execution": None,
+            "artifacts": [],
+            "final_script_artifact_id": None,
         }
 
     @staticmethod
@@ -387,7 +537,7 @@ class ChatService:
             seq_no=seq_no,
             user_text=question,
             assistant_text=response_payload["explanation"],
-            tool_events=[],
+            tool_events=[{"type": "artifact", "data": item} for item in (response_payload.get("artifacts") or [])],
             metadata=response_payload.get("metadata", {}),
             code_snapshot=response_payload["code"],
         )
@@ -472,6 +622,47 @@ class ChatService:
             pass
 
         response_payload = ChatService._build_response_payload(aggregated)
+        run_id = str(uuid.uuid4())
+        response_payload["run_id"] = run_id
+        response_payload["execution"] = None
+        response_payload["artifacts"] = []
+        response_payload["final_script_artifact_id"] = None
+        code_to_execute = str(response_payload.get("code") or "").strip()
+        if code_to_execute:
+            execution_result, retry_count, duration_ms, executed_code = (
+                await ChatService._execute_generated_code_with_retries(
+                    workspace_id=workspace_id,
+                    workspace_duckdb_path=data_path,
+                    generated_code=code_to_execute,
+                    run_id=run_id,
+                    max_retries=2,
+                )
+            )
+            await ChatService._finalize_kernel_run(
+                workspace_id=workspace_id,
+                workspace_duckdb_path=data_path,
+                run_id=run_id,
+                question=question,
+                generated_code=code_to_execute,
+                executed_code=executed_code,
+                stdout=str(execution_result.get("stdout") or ""),
+                stderr=str(execution_result.get("stderr") or execution_result.get("error") or ""),
+                execution_status="success" if bool(execution_result.get("success")) else "failed",
+                retry_count=retry_count,
+            )
+            response_payload["artifacts"] = [
+                item
+                for item in (execution_result.get("artifacts") or [])
+                if isinstance(item, dict)
+            ]
+            response_payload["final_script_artifact_id"] = None
+            response_payload["execution"] = {
+                "status": "success" if bool(execution_result.get("success")) else "failed",
+                "stdout": str(execution_result.get("stdout") or ""),
+                "stderr": str(execution_result.get("stderr") or execution_result.get("error") or ""),
+                "retry_count": int(retry_count),
+                "duration_ms": int(duration_ms),
+            }
         logprint(
             "[V1 Chat] final response summary",
             level="INFO",
@@ -492,7 +683,7 @@ class ChatService:
             response_payload=response_payload,
             result=aggregated,
         )
-        
+
         # Add IDs to payload for final UI update
         response_payload.update({
             "conversation_id": conversation_id,

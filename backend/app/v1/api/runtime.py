@@ -24,6 +24,7 @@ from ...services.code_executor import (
     interrupt_workspace_kernel,
     reset_workspace_kernel,
 )
+from ...services.artifact_scratchpad import get_artifact_scratchpad_store
 from ..db.session import get_db_session
 from ..repositories.preferences_repository import PreferencesRepository
 from ..repositories.dataset_repository import DatasetRepository
@@ -79,6 +80,23 @@ class DataframeArtifactRowsResponse(BaseModel):
     rows: list[dict[str, Any]]
     offset: int
     limit: int
+
+
+class ArtifactMetadataResponse(BaseModel):
+    artifact_id: str
+    run_id: str
+    workspace_id: str
+    logical_name: str
+    kind: str
+    pointer: str
+    table_name: str | None = None
+    schema_columns: list[dict[str, Any]] | None = Field(default=None, alias="schema")
+    row_count: int | None = None
+    payload: dict[str, Any] | None = None
+    created_at: str
+    expires_at: str
+    status: str
+    error: str | None = None
 
 
 class TerminalExecuteRequest(BaseModel):
@@ -472,7 +490,7 @@ async def get_workspace_dataframe_artifact_rows(
     session: AsyncSession = Depends(get_db_session),
     current_user=Depends(get_current_user),
 ):
-    await _require_workspace_access(session, current_user.id, workspace_id)
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     rows = await get_workspace_dataframe_rows(
         workspace_id=workspace_id,
         artifact_id=artifact_id,
@@ -482,6 +500,51 @@ async def get_workspace_dataframe_artifact_rows(
     if rows is None:
         raise HTTPException(status_code=404, detail="Dataframe artifact not found")
     return DataframeArtifactRowsResponse(**rows)
+
+
+@router.get(
+    "/workspaces/{workspace_id}/artifacts/{artifact_id}/rows",
+    response_model=DataframeArtifactRowsResponse,
+)
+async def get_workspace_artifact_rows(
+    workspace_id: str,
+    artifact_id: str,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=1000, ge=1, le=1000),
+    session: AsyncSession = Depends(get_db_session),
+    current_user=Depends(get_current_user),
+):
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    rows = await get_workspace_dataframe_rows(
+        workspace_id=workspace_id,
+        artifact_id=artifact_id,
+        offset=offset,
+        limit=limit,
+    )
+    if rows is None:
+        raise HTTPException(status_code=404, detail="Artifact rows not found")
+    return DataframeArtifactRowsResponse(**rows)
+
+
+@router.get(
+    "/workspaces/{workspace_id}/artifacts/{artifact_id}",
+    response_model=ArtifactMetadataResponse,
+)
+async def get_workspace_artifact_metadata(
+    workspace_id: str,
+    artifact_id: str,
+    session: AsyncSession = Depends(get_db_session),
+    current_user=Depends(get_current_user),
+):
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    store = get_artifact_scratchpad_store()
+    artifact = store.get_artifact(
+        workspace_duckdb_path=str(workspace.duckdb_path),
+        artifact_id=artifact_id,
+    )
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    return ArtifactMetadataResponse(**artifact)
 
 
 @router.post("/runtime/runner/packages/install", response_model=RunnerPackageInstallResponse)

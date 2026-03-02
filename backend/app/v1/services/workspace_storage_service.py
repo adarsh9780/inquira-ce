@@ -41,6 +41,16 @@ class WorkspaceStorageService:
         return WorkspaceStorageService.build_workspace_dir(username, workspace_id) / "workspace.json"
 
     @staticmethod
+    def build_scratchpad_dir(username: str, workspace_id: str) -> Path:
+        """Return workspace scratchpad directory path."""
+        return WorkspaceStorageService.build_workspace_dir(username, workspace_id) / "scratchpad"
+
+    @staticmethod
+    def build_scratchpad_db_path(username: str, workspace_id: str) -> Path:
+        """Return workspace scratchpad artifact DuckDB path."""
+        return WorkspaceStorageService.build_scratchpad_dir(username, workspace_id) / "artifacts.duckdb"
+
+    @staticmethod
     async def ensure_workspace_dirs(username: str, workspace_id: str) -> Path:
         """Create workspace directories and return workspace root path."""
         workspace_dir = WorkspaceStorageService.build_workspace_dir(username, workspace_id)

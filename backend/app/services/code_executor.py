@@ -77,6 +77,15 @@ async def get_workspace_dataframe_rows(
     )
 
 
+async def get_workspace_run_exports(
+    workspace_id: str,
+    run_id: str,
+) -> list[dict[str, Any]]:
+    """Read exported artifacts cached in kernel runtime for a run."""
+    manager = await get_workspace_kernel_manager()
+    return await manager.get_run_exports(workspace_id=workspace_id, run_id=run_id)
+
+
 async def execute_code(
     code: str,
     timeout: int = 60,
