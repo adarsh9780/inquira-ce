@@ -85,3 +85,117 @@ def test_prune_workspace_ignores_duckdb_lock_conflict(monkeypatch, tmp_path):
 
     # Should be a no-op when another process owns the lock.
     store.prune_workspace(workspace_duckdb_path=str(workspace_db))
+
+
+def _insert_dataframe_artifact(con, artifact_id, logical_name, expires_offset="+ INTERVAL 1 DAY"):
+    con.execute(
+        f"""
+        INSERT INTO artifact_manifest (
+            artifact_id, run_id, workspace_id, logical_name, kind, table_name,
+            payload_json, schema_json, row_count, created_at, expires_at, status, error
+        ) VALUES (
+            '{artifact_id}', 'run-list', 'ws-list', '{logical_name}', 'dataframe', 'tbl_{artifact_id}',
+            NULL, NULL, 10, NOW(), NOW() {expires_offset}, 'ready', NULL
+        )
+        """
+    )
+
+
+def test_list_artifacts_for_workspace_returns_only_dataframes(tmp_path):
+    """list_artifacts_for_workspace(kind='dataframe') should exclude non-dataframe kinds."""
+    workspace_db = tmp_path / "ws4" / "workspace.duckdb"
+    workspace_db.parent.mkdir(parents=True, exist_ok=True)
+    workspace_db.touch()
+
+    store = ArtifactScratchpadStore()
+    scratchpad_db = store.ensure_workspace(str(workspace_db))
+
+    con = duckdb.connect(str(scratchpad_db), read_only=False)
+    try:
+        # Dataframe artifact
+        _insert_dataframe_artifact(con, "df-1", "my_table")
+
+        # Script artifact — should NOT appear when filtering by 'dataframe'
+        con.execute(
+            """
+            INSERT INTO artifact_manifest (
+                artifact_id, run_id, workspace_id, logical_name, kind, table_name,
+                payload_json, schema_json, row_count, created_at, expires_at, status, error
+            ) VALUES (
+                'sc-1', 'run-list', 'ws-list', 'final_script', 'script', NULL,
+                '{"script": "pass"}', NULL, NULL, NOW(), NOW() + INTERVAL 1 DAY, 'ready', NULL
+            )
+            """
+        )
+    finally:
+        con.close()
+
+    results = store.list_artifacts_for_workspace(
+        workspace_duckdb_path=str(workspace_db),
+        kind="dataframe",
+    )
+
+    assert len(results) == 1
+    assert results[0]["artifact_id"] == "df-1"
+    assert results[0]["logical_name"] == "my_table"
+    assert results[0]["kind"] == "dataframe"
+
+
+def test_list_artifacts_for_workspace_excludes_expired(tmp_path):
+    """list_artifacts_for_workspace should not return artifacts past their expires_at."""
+    workspace_db = tmp_path / "ws5" / "workspace.duckdb"
+    workspace_db.parent.mkdir(parents=True, exist_ok=True)
+    workspace_db.touch()
+
+    store = ArtifactScratchpadStore()
+    scratchpad_db = store.ensure_workspace(str(workspace_db))
+
+    con = duckdb.connect(str(scratchpad_db), read_only=False)
+    try:
+        # Non-expired
+        _insert_dataframe_artifact(con, "df-fresh", "fresh_table", "+ INTERVAL 1 DAY")
+        # Expired
+        _insert_dataframe_artifact(con, "df-old", "old_table", "- INTERVAL 1 DAY")
+    finally:
+        con.close()
+
+    results = store.list_artifacts_for_workspace(
+        workspace_duckdb_path=str(workspace_db),
+        kind="dataframe",
+    )
+
+    ids = [r["artifact_id"] for r in results]
+    assert "df-fresh" in ids
+    assert "df-old" not in ids
+
+
+def test_list_artifacts_for_workspace_no_kind_filter(tmp_path):
+    """list_artifacts_for_workspace without kind filter returns all non-expired ready artifacts."""
+    workspace_db = tmp_path / "ws6" / "workspace.duckdb"
+    workspace_db.parent.mkdir(parents=True, exist_ok=True)
+    workspace_db.touch()
+
+    store = ArtifactScratchpadStore()
+    scratchpad_db = store.ensure_workspace(str(workspace_db))
+
+    con = duckdb.connect(str(scratchpad_db), read_only=False)
+    try:
+        _insert_dataframe_artifact(con, "df-a", "table_a")
+        con.execute(
+            """
+            INSERT INTO artifact_manifest (
+                artifact_id, run_id, workspace_id, logical_name, kind, table_name,
+                payload_json, schema_json, row_count, created_at, expires_at, status, error
+            ) VALUES (
+                'sc-a', 'run-list', 'ws-list', 'script_a', 'script', NULL,
+                '{"script": "pass"}', NULL, NULL, NOW(), NOW() + INTERVAL 1 DAY, 'ready', NULL
+            )
+            """
+        )
+    finally:
+        con.close()
+
+    results = store.list_artifacts_for_workspace(workspace_duckdb_path=str(workspace_db))
+    kinds = {r["kind"] for r in results}
+    assert "dataframe" in kinds
+    assert "script" in kinds

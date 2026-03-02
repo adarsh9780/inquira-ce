@@ -51,6 +51,8 @@ export const useAppStore = defineStore('app', () => {
   const dataframes = ref([])
   const figures = ref([])
   const scalars = ref([])
+  const dataframeCount = ref(0)
+  const figureCount = ref(0)
   const terminalOutput = ref('')
   const terminalEntries = ref([])
   const terminalEnabled = ref(false)
@@ -767,6 +769,14 @@ export const useAppStore = defineStore('app', () => {
     scalars.value = Array.isArray(scs) ? scs : []
   }
 
+  function setDataframeCount(count) {
+    dataframeCount.value = Number(count || 0)
+  }
+
+  function setFigureCount(count) {
+    figureCount.value = Number(count || 0)
+  }
+
   function setTerminalOutput(output) {
     terminalOutput.value = output
   }
@@ -1021,6 +1031,8 @@ export const useAppStore = defineStore('app', () => {
     dataframes,
     figures,
     scalars,
+    dataframeCount,
+    figureCount,
     terminalOutput,
     terminalEntries,
     terminalEnabled,
@@ -1091,6 +1103,8 @@ export const useAppStore = defineStore('app', () => {
     setDataframes,
     setFigures,
     setScalars,
+    setDataframeCount,
+    setFigureCount,
     setTerminalOutput,
     setTerminalEnabled,
     setRuntimeError,

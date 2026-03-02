@@ -99,6 +99,21 @@ class ArtifactMetadataResponse(BaseModel):
     error: str | None = None
 
 
+class WorkspaceArtifactSummary(BaseModel):
+    artifact_id: str
+    logical_name: str
+    kind: str
+    row_count: int | None = None
+    columns: list[dict[str, Any]] | None = None
+    created_at: str
+    status: str
+
+
+class WorkspaceArtifactListResponse(BaseModel):
+    artifacts: list[WorkspaceArtifactSummary]
+    total: int
+
+
 class TerminalExecuteRequest(BaseModel):
     command: str = Field(..., min_length=1, description="Shell command to run")
     cwd: str | None = Field(default=None, description="Optional working directory override")
@@ -572,6 +587,38 @@ async def get_workspace_artifact_metadata(
     if artifact is None:
         raise HTTPException(status_code=404, detail="Artifact not found")
     return ArtifactMetadataResponse(**artifact)
+
+
+@router.get(
+    "/workspaces/{workspace_id}/artifacts",
+    response_model=WorkspaceArtifactListResponse,
+)
+async def list_workspace_artifacts(
+    workspace_id: str,
+    kind: str | None = Query(default=None, description="Filter by artifact kind, e.g. 'dataframe' or 'figure'"),
+    session: AsyncSession = Depends(get_db_session),
+    current_user=Depends(get_current_user),
+):
+    """List all non-expired artifacts for a workspace, optionally filtered by kind."""
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    store = get_artifact_scratchpad_store()
+    items = store.list_artifacts_for_workspace(
+        workspace_duckdb_path=str(workspace.duckdb_path),
+        kind=kind,
+    )
+    summaries = [
+        WorkspaceArtifactSummary(
+            artifact_id=item["artifact_id"],
+            logical_name=item["logical_name"],
+            kind=item["kind"],
+            row_count=item.get("row_count"),
+            columns=item.get("schema"),
+            created_at=item["created_at"],
+            status=item["status"],
+        )
+        for item in items
+    ]
+    return WorkspaceArtifactListResponse(artifacts=summaries, total=len(summaries))
 
 
 @router.post("/runtime/runner/packages/install", response_model=RunnerPackageInstallResponse)

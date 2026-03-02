@@ -2,6 +2,7 @@
   <div class="flex flex-col h-full">
     <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'table'">
       <div class="flex items-center justify-end w-full gap-4">
+        <!-- Loading / error status (left) -->
         <div class="flex items-center space-x-3 text-sm mr-auto">
           <div v-if="tableStatusMessage" class="flex items-center gap-2 text-xs" :class="tableStatusClass">
             <div
@@ -11,42 +12,39 @@
             ></div>
             <span>{{ tableStatusMessage }}</span>
           </div>
-          <span v-else-if="rowCount > 0" class="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
+          <span v-else-if="selectedArtifactId && rowCount > 0" class="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
             {{ rowCount.toLocaleString() }} rows
           </span>
         </div>
 
         <div class="flex items-center space-x-2">
-          <div v-if="rowCount > 0" class="flex items-center space-x-2 text-xs text-gray-600">
+          <!-- Pagination info -->
+          <div v-if="selectedArtifactId && rowCount > 0" class="flex items-center space-x-2 text-xs text-gray-600">
             <span>
               Showing {{ windowStart.toLocaleString() }}-{{ windowEnd.toLocaleString() }}
               of {{ rowCount.toLocaleString() }}
             </span>
           </div>
 
-          <div v-if="orderedDataframes && orderedDataframes.length > 0" class="flex items-center space-x-2">
+          <!-- Table selector dropdown — always shown when artifacts are available -->
+          <div v-if="allArtifacts.length > 0" class="flex items-center space-x-2">
             <select
-              v-if="orderedDataframes.length > 1"
               id="dataframe-select"
-              v-model="selectedDataframeIndex"
-              class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              v-model="selectedArtifactId"
+              class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent max-w-[200px]"
             >
+              <option :value="null" disabled>— select a table —</option>
               <option
-                v-for="(df, index) in orderedDataframes"
-                :key="index"
-                :value="index"
+                v-for="artifact in allArtifacts"
+                :key="artifact.artifact_id"
+                :value="artifact.artifact_id"
               >
-                {{ df.name }}
+                {{ artifact.logical_name }}
               </option>
             </select>
-            <span
-              v-else
-              class="px-2 py-1 text-xs font-medium rounded border border-gray-200 bg-gray-50 text-gray-600"
-            >
-              {{ orderedDataframes[0]?.name }}
-            </span>
           </div>
 
+          <!-- CSV download -->
           <button
             @click="downloadCsv"
             :disabled="!downloadRows.length || isDownloading"
@@ -62,9 +60,10 @@
     </Teleport>
 
     <div class="flex-1 relative mt-1">
+      <!-- Grid: infinite model -->
       <ag-grid-vue
-        v-if="hasRenderableRows && useInfiniteModel"
-        :key="`infinite-${selectedDataframeIndex}-${datasourceVersion}`"
+        v-if="selectedArtifactId && hasRenderableRows && useInfiniteModel"
+        :key="`infinite-${selectedArtifactId}-${datasourceVersion}`"
         class="ag-theme-quartz absolute inset-0"
         :columnDefs="columnDefs"
         :defaultColDef="defaultColDef"
@@ -80,9 +79,10 @@
         @pagination-changed="onPaginationChanged"
       ></ag-grid-vue>
 
+      <!-- Grid: client-side fallback -->
       <ag-grid-vue
-        v-else-if="hasRenderableRows"
-        :key="`client-${selectedDataframeIndex}`"
+        v-else-if="selectedArtifactId && hasRenderableRows"
+        :key="`client-${selectedArtifactId}`"
         class="ag-theme-quartz absolute inset-0"
         :columnDefs="columnDefs"
         :rowData="clientRows"
@@ -97,6 +97,34 @@
         @pagination-changed="onPaginationChanged"
       ></ag-grid-vue>
 
+      <!-- Empty state: user hasn't selected a table yet but artifacts exist -->
+      <div
+        v-else-if="!selectedArtifactId && allArtifacts.length > 0"
+        class="absolute inset-0 flex items-center justify-center"
+        style="background-color: var(--color-base);"
+      >
+        <div class="text-center">
+          <TableCellsIcon class="h-12 w-12 mx-auto mb-3" style="color: var(--color-border);" />
+          <p class="text-sm font-medium" style="color: var(--color-text-muted);">
+            {{ allArtifacts.length }} table{{ allArtifacts.length === 1 ? '' : 's' }} available
+          </p>
+          <p class="text-xs mt-1" style="color: var(--color-text-muted);">Select a table from the dropdown above</p>
+        </div>
+      </div>
+
+      <!-- Empty state: loading artifacts -->
+      <div
+        v-else-if="isLoadingArtifacts"
+        class="absolute inset-0 flex items-center justify-center"
+        style="background-color: var(--color-base);"
+      >
+        <div class="text-center">
+          <div class="h-8 w-8 mx-auto mb-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700"></div>
+          <p class="text-xs" style="color: var(--color-text-muted);">Loading saved tables…</p>
+        </div>
+      </div>
+
+      <!-- Empty state: no artifacts at all -->
       <div
         v-else
         class="absolute inset-0 flex items-center justify-center"
@@ -131,7 +159,14 @@ const appStore = useAppStore()
 const pageSize = 100
 const isDownloading = ref(false)
 const isPageLoading = ref(false)
-const selectedDataframeIndex = ref(0)
+const isLoadingArtifacts = ref(false)
+
+// The artifact_id the user has explicitly selected (null = nothing selected)
+const selectedArtifactId = ref(null)
+
+// Artifacts fetched from the workspace scratchpad (persisted from previous runs)
+const workspaceArtifacts = ref([])
+
 const isMounted = ref(false)
 const serverRows = ref([])
 const clientRows = ref([])
@@ -144,6 +179,7 @@ const useClientFallback = ref(false)
 const tableError = ref('')
 const pendingControllers = new Set()
 let gridApi = null
+let listAbortController = null
 
 onMounted(() => {
   isMounted.value = true
@@ -151,24 +187,107 @@ onMounted(() => {
 
 onUnmounted(() => {
   cancelPendingRequests()
+  listAbortController?.abort()
   gridApi = null
 })
 
-const orderedDataframes = computed(() => {
-  if (!appStore.dataframes) return []
-  return [...appStore.dataframes].slice().reverse()
+// ---------------------------------------------------------------------------
+// Merge workspace-persisted artifacts with any live-run dataframes from the
+// chat history (appStore.dataframes).  Live entries take precedence if they
+// share the same artifact_id.
+// ---------------------------------------------------------------------------
+const allArtifacts = computed(() => {
+  const map = new Map()
+
+  // 1. Workspace-persisted (from scratchpad)
+  for (const a of workspaceArtifacts.value) {
+    map.set(a.artifact_id, {
+      artifact_id: a.artifact_id,
+      logical_name: a.logical_name,
+      row_count: a.row_count,
+    })
+  }
+
+  // 2. Live dataframes produced in the current session
+  for (const df of appStore.dataframes) {
+    const id = df?.data?.artifact_id
+    if (!id) continue
+    map.set(id, {
+      artifact_id: id,
+      logical_name: df.name || 'dataframe',
+      row_count: df?.data?.row_count ?? null,
+    })
+  }
+
+  return [...map.values()]
 })
 
-const selectedDataframeMeta = computed(() => {
-  if (!orderedDataframes.value || orderedDataframes.value.length === 0) return null
-  const df = orderedDataframes.value[selectedDataframeIndex.value]
-  if (!df || !df.data) return null
-  return df.data
+// Expose dataframe count to the store so StatusBar can read it
+watch(allArtifacts, (list) => {
+  appStore.setDataframeCount(list.length)
+}, { immediate: true })
+
+// ---------------------------------------------------------------------------
+// Load workspace artifact list whenever the workspace changes
+// ---------------------------------------------------------------------------
+async function loadWorkspaceArtifacts(workspaceId) {
+  if (!workspaceId) {
+    workspaceArtifacts.value = []
+    return
+  }
+  listAbortController?.abort()
+  listAbortController = new AbortController()
+  isLoadingArtifacts.value = true
+  try {
+    const response = await apiService.v1ListWorkspaceArtifacts(
+      workspaceId,
+      'dataframe',
+      { signal: listAbortController.signal }
+    )
+    workspaceArtifacts.value = Array.isArray(response?.artifacts) ? response.artifacts : []
+  } catch (error) {
+    if (error?.name === 'AbortError') return
+    console.warn('Failed to load workspace artifacts:', error)
+    workspaceArtifacts.value = []
+  } finally {
+    isLoadingArtifacts.value = false
+  }
+}
+
+watch(() => appStore.activeWorkspaceId, (id) => {
+  selectedArtifactId.value = null
+  resetTableState()
+  loadWorkspaceArtifacts(id)
+}, { immediate: true })
+
+// When a new live dataframe appears, refresh the workspace list so fresh rows
+// are picked up (the live entry is already in allArtifacts via appStore.dataframes,
+// this just keeps the persisted side in sync)
+watch(() => appStore.dataframes.length, () => {
+  if (appStore.activeWorkspaceId) {
+    loadWorkspaceArtifacts(appStore.activeWorkspaceId)
+  }
+})
+
+// ---------------------------------------------------------------------------
+// React to user selecting an artifact in the dropdown
+// ---------------------------------------------------------------------------
+watch(selectedArtifactId, async (newId) => {
+  resetTableState()
+  if (!newId) return
+  await prepareArtifact(newId)
+})
+
+// ---------------------------------------------------------------------------
+// Computed helpers
+// ---------------------------------------------------------------------------
+const selectedArtifactMeta = computed(() => {
+  if (!selectedArtifactId.value) return null
+  return allArtifacts.value.find(a => a.artifact_id === selectedArtifactId.value) ?? null
 })
 
 const useInfiniteModel = computed(() => {
-  const meta = selectedDataframeMeta.value
-  return !!meta?.artifact_id && !useClientFallback.value
+  return !!selectedArtifactId.value && !useClientFallback.value
 })
 
 const rowCount = computed(() => {
@@ -221,6 +340,9 @@ const defaultColDef = {
   minWidth: 120
 }
 
+// ---------------------------------------------------------------------------
+// Grid lifecycle
+// ---------------------------------------------------------------------------
 function isGridAlive() {
   if (!gridApi) return false
   if (typeof gridApi.isDestroyed === 'function') {
@@ -231,40 +353,25 @@ function isGridAlive() {
 
 function cancelPendingRequests() {
   for (const controller of pendingControllers) {
-    try {
-      controller.abort()
-    } catch (_error) {
-      // no-op
-    }
+    try { controller.abort() } catch (_) { /* no-op */ }
   }
   pendingControllers.clear()
 }
 
-watch(
-  () => appStore.dataframes,
-  async (newDataframes) => {
-    if (newDataframes && newDataframes.length > 0) {
-      selectedDataframeIndex.value = 0
-      await prepareSelectedDataframe()
-    } else {
-      cancelPendingRequests()
-      clientRows.value = []
-      serverRows.value = []
-      serverColumns.value = []
-      rowCountValue.value = 0
-      windowStart.value = 0
-      windowEnd.value = 0
-      if (isGridAlive()) {
-        gridApi.setGridOption?.('datasource', null)
-      }
-    }
-  },
-  { immediate: true },
-)
-
-watch(selectedDataframeIndex, async () => {
-  await prepareSelectedDataframe()
-})
+function resetTableState() {
+  cancelPendingRequests()
+  clientRows.value = []
+  serverRows.value = []
+  serverColumns.value = []
+  rowCountValue.value = 0
+  windowStart.value = 0
+  windowEnd.value = 0
+  tableError.value = ''
+  useClientFallback.value = false
+  if (isGridAlive()) {
+    gridApi.setGridOption?.('datasource', null)
+  }
+}
 
 function onGridReady(params) {
   gridApi = params.api
@@ -294,58 +401,30 @@ function onPaginationChanged() {
   windowEnd.value = end
 }
 
-async function prepareSelectedDataframe() {
-  cancelPendingRequests()
-  const meta = selectedDataframeMeta.value
+// ---------------------------------------------------------------------------
+// Data loading
+// ---------------------------------------------------------------------------
+async function prepareArtifact(artifactId) {
+  if (!artifactId || !appStore.activeWorkspaceId) return
   tableError.value = ''
   useClientFallback.value = false
-  if (!meta) {
-    clientRows.value = []
-    serverRows.value = []
-    serverColumns.value = []
-    rowCountValue.value = 0
-    windowStart.value = 0
-    windowEnd.value = 0
-    return
-  }
 
-  if (useInfiniteModel.value) {
-    clientRows.value = []
-    await loadInitialServerPage()
-    if (tableError.value) return
-    await attachInfiniteDatasource()
-    return
-  }
-
-  serverRows.value = []
-  serverColumns.value = []
-  if (Array.isArray(meta)) {
-    clientRows.value = meta
-  } else if (Array.isArray(meta.data)) {
-    clientRows.value = meta.data
-  } else {
-    clientRows.value = []
-  }
-  rowCountValue.value = clientRows.value.length
-  windowStart.value = clientRows.value.length > 0 ? 1 : 0
-  windowEnd.value = clientRows.value.length > 0 ? Math.min(pageSize, clientRows.value.length) : 0
+  // Always use server infinite model for persisted artifacts
+  clientRows.value = []
+  await loadInitialServerPage(artifactId)
+  if (tableError.value) return
+  await attachInfiniteDatasource(artifactId)
 }
 
-async function loadInitialServerPage() {
-  const meta = selectedDataframeMeta.value
-  if (!meta?.artifact_id || !appStore.activeWorkspaceId) {
-    serverRows.value = []
-    serverColumns.value = []
-    rowCountValue.value = 0
-    return
-  }
+async function loadInitialServerPage(artifactId) {
+  if (!artifactId || !appStore.activeWorkspaceId) return
   isPageLoading.value = true
   const controller = new AbortController()
   pendingControllers.add(controller)
   try {
     const payload = await apiService.getDataframeArtifactRows(
       appStore.activeWorkspaceId,
-      meta.artifact_id,
+      artifactId,
       0,
       pageSize,
       { signal: controller.signal },
@@ -373,15 +452,14 @@ async function loadInitialServerPage() {
   }
 }
 
-async function attachInfiniteDatasource() {
-  const meta = selectedDataframeMeta.value
-  if (!meta?.artifact_id || !appStore.activeWorkspaceId) return
+async function attachInfiniteDatasource(artifactId) {
+  const aid = artifactId || selectedArtifactId.value
+  if (!aid || !appStore.activeWorkspaceId) return
   cancelPendingRequests()
   datasourceVersion.value += 1
   if (!isGridAlive()) return
   const datasourceTag = datasourceVersion.value
 
-  const artifactId = meta.artifact_id
   const workspaceId = appStore.activeWorkspaceId
   const datasource = {
     rowCount: null,
@@ -395,14 +473,12 @@ async function attachInfiniteDatasource() {
         const requestLimit = Math.max(1, Math.min(pageSize, endRow - startRow))
         const payload = await apiService.getDataframeArtifactRows(
           workspaceId,
-          artifactId,
+          aid,
           startRow,
           requestLimit,
           { signal: controller.signal },
         )
-        if (!isGridAlive() || datasourceTag !== datasourceVersion.value) {
-          return
-        }
+        if (!isGridAlive() || datasourceTag !== datasourceVersion.value) return
         const rows = Array.isArray(payload?.rows) ? payload.rows : []
         serverRows.value = rows
         if (Array.isArray(payload?.columns) && payload.columns.length > 0) {
@@ -418,9 +494,7 @@ async function attachInfiniteDatasource() {
       } catch (error) {
         if (error?.name === 'AbortError') return
         console.error('Failed to load dataframe page:', error)
-        if (!isGridAlive() || datasourceTag !== datasourceVersion.value) {
-          return
-        }
+        if (!isGridAlive() || datasourceTag !== datasourceVersion.value) return
         tableError.value = error?.message || 'Failed to load paginated table data.'
         if (Array.isArray(serverRows.value) && serverRows.value.length > 0) {
           clientRows.value = [...serverRows.value]
@@ -445,9 +519,11 @@ async function attachInfiniteDatasource() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Column / cell helpers
+// ---------------------------------------------------------------------------
 function generateColumnDefs(data) {
   if (!data || data.length === 0) return []
-
   const firstRow = data[0]
   return Object.keys(firstRow).map((key) => {
     const sampleValue = firstRow[key]
@@ -457,9 +533,7 @@ function generateColumnDefs(data) {
       cellRenderer: getCellRenderer(sampleValue),
       tooltipField: key,
       valueGetter: (params) => params.data?.[key],
-      cellRendererParams: {
-        truncate: 120
-      },
+      cellRendererParams: { truncate: 120 },
       cellStyle: { whiteSpace: 'nowrap' }
     }
   })
@@ -487,28 +561,24 @@ function getCellRenderer(value) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// CSV download
+// ---------------------------------------------------------------------------
 async function downloadCsv() {
   if (!downloadRows.value.length || isDownloading.value) return
-
   isDownloading.value = true
-
   try {
     const csvContent = convertToCSV(downloadRows.value)
-    const dfName = orderedDataframes.value[selectedDataframeIndex.value]?.name || 'dataframe'
-
+    const dfName = selectedArtifactMeta.value?.logical_name || 'dataframe'
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
-
     link.setAttribute('href', url)
     link.setAttribute('download', `${dfName}_${new Date().toISOString().split('T')[0]}.csv`)
     link.style.visibility = 'hidden'
-
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-
-    console.debug('CSV downloaded successfully')
   } catch (error) {
     console.error('Failed to download CSV:', error)
   } finally {
@@ -518,12 +588,8 @@ async function downloadCsv() {
 
 function convertToCSV(data) {
   if (!data || data.length === 0) return ''
-
   const headers = Object.keys(data[0])
-  const csvRows = []
-
-  csvRows.push(headers.map(header => `"${header}"`).join(','))
-
+  const csvRows = [headers.map(header => `"${header}"`).join(',')]
   for (const row of data) {
     const values = headers.map(header => {
       const value = row[header]
@@ -532,7 +598,6 @@ function convertToCSV(data) {
     })
     csvRows.push(values.join(','))
   }
-
   return csvRows.join('\n')
 }
 </script>

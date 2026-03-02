@@ -745,6 +745,20 @@ export const apiService = {
     return finalPayload
   },
 
+  async v1ListWorkspaceArtifacts(workspaceId, kind = 'dataframe', options = {}) {
+    const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts?kind=${encodeURIComponent(kind)}`
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      signal: options?.signal || null,
+    })
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}))
+      throw new Error(detail.detail || `Artifact list fetch failed (${response.status})`)
+    }
+    return response.json()
+  },
+
   async v1GetCurrentUser(options = {}) {
     return v1Api.auth.me(options)
   },

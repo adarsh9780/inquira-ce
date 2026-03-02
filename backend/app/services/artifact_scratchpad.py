@@ -256,6 +256,65 @@ class ArtifactScratchpadStore:
             artifacts.append(item)
         return artifacts
 
+    def list_artifacts_for_workspace(
+        self,
+        *,
+        workspace_duckdb_path: str,
+        kind: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return lightweight summaries for all non-expired artifacts in the workspace.
+
+        Items are ordered newest-first.  Pass ``kind`` (e.g. ``'dataframe'``)
+        to restrict results to a single artifact type.
+        """
+        db_path = self.ensure_workspace(workspace_duckdb_path)
+        now = datetime.now(UTC)
+        con = duckdb.connect(str(db_path), read_only=True)
+        try:
+            if kind:
+                rows = con.execute(
+                    """
+                    SELECT artifact_id, logical_name, kind, row_count, schema_json, created_at, status
+                    FROM artifact_manifest
+                    WHERE kind = ? AND expires_at > ? AND status = 'ready'
+                    ORDER BY created_at DESC
+                    """,
+                    [kind, now],
+                ).fetchall()
+            else:
+                rows = con.execute(
+                    """
+                    SELECT artifact_id, logical_name, kind, row_count, schema_json, created_at, status
+                    FROM artifact_manifest
+                    WHERE expires_at > ? AND status = 'ready'
+                    ORDER BY created_at DESC
+                    """,
+                    [now],
+                ).fetchall()
+        finally:
+            con.close()
+
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            schema = None
+            try:
+                if row[4]:
+                    schema = json.loads(str(row[4]))
+            except Exception:
+                schema = None
+            result.append(
+                {
+                    "artifact_id": str(row[0]),
+                    "logical_name": str(row[1]),
+                    "kind": str(row[2]),
+                    "row_count": int(row[3] or 0) if row[3] is not None else None,
+                    "schema": schema,
+                    "created_at": str(row[5]),
+                    "status": str(row[6]),
+                }
+            )
+        return result
+
     def get_dataframe_rows(
         self,
         *,

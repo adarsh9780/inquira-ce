@@ -51,6 +51,16 @@
       </div>
     </div>
 
+    <!-- Center Section: Tab-aware artifact count -->
+    <div class="flex items-center gap-2 h-full">
+      <template v-if="appStore.activeWorkspaceId && artifactCountLabel">
+        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium"
+             :class="artifactCountClass">
+          <span>{{ artifactCountLabel }}</span>
+        </div>
+      </template>
+    </div>
+
     <!-- Right Section: Editor Position & Version -->
     <div class="flex items-center gap-4 h-full">
       <div v-show="appStore.isEditorFocused" class="flex items-center text-slate-500 font-mono tracking-tight gap-1 pr-2">
@@ -102,6 +112,26 @@ const kernelStatusMeta = computed(() => {
     default:
       return { dotClass: 'bg-gray-400', textClass: 'text-gray-500', label: 'No Kernel', showSpinner: false }
   }
+})
+
+// Tab-aware artifact count — single source of truth, shown only in status bar
+const artifactCountLabel = computed(() => {
+  if (appStore.dataPane === 'table') {
+    const n = appStore.dataframeCount
+    if (n === 0) return null
+    return `${n} table${n === 1 ? '' : 's'} saved`
+  }
+  if (appStore.dataPane === 'figure') {
+    const n = appStore.figureCount
+    if (n === 0) return null
+    return `${n} chart${n === 1 ? '' : 's'} saved`
+  }
+  return null
+})
+
+const artifactCountClass = computed(() => {
+  // Subtle muted pill — informational, not actionable
+  return 'bg-slate-100 text-slate-500'
 })
 
 async function refreshKernelStatus() {
