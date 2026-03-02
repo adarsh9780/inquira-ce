@@ -199,3 +199,93 @@ def test_list_artifacts_for_workspace_no_kind_filter(tmp_path):
     kinds = {r["kind"] for r in results}
     assert "dataframe" in kinds
     assert "script" in kinds
+
+
+def test_list_artifacts_for_workspace_deduplicates_by_logical_name(tmp_path):
+    """Regression: the UNIQUE(workspace_id, kind, logical_name) constraint must prevent duplicate rows.
+
+    Before the fix, export_dataframe always did a plain INSERT with a new UUID,
+    causing N rows for N runs of the same query — this is the root cause of the
+    '22 tables with the same name' bug.
+
+    The schema-level UNIQUE constraint makes this visible immediately: a second
+    INSERT for the same (workspace_id, kind, logical_name) raises a constraint
+    violation instead of silently accumulating rows.
+    """
+    workspace_db = tmp_path / "ws7" / "workspace.duckdb"
+    workspace_db.parent.mkdir(parents=True, exist_ok=True)
+    workspace_db.touch()
+
+    store = ArtifactScratchpadStore()
+    scratchpad_db = store.ensure_workspace(str(workspace_db))
+
+    con = duckdb.connect(str(scratchpad_db), read_only=False)
+    try:
+        # First export of 'results' for this workspace — must succeed.
+        con.execute(
+            """
+            INSERT INTO artifact_manifest (
+                artifact_id, run_id, workspace_id, logical_name, kind, table_name,
+                payload_json, schema_json, row_count, created_at, expires_at, status, error
+            ) VALUES (
+                'first-id', 'run-1', 'ws-dedup', 'results', 'dataframe', 'tbl_first',
+                NULL, NULL, 5, NOW(), NOW() + INTERVAL 1 DAY, 'ready', NULL
+            )
+            """
+        )
+
+        # Second export of the same 'results' name WITHOUT deleting the first row MUST fail.
+        # This is what export_dataframe used to do (plain INSERT), and it proves the
+        # UNIQUE constraint catches it.
+        raised = False
+        try:
+            con.execute(
+                """
+                INSERT INTO artifact_manifest (
+                    artifact_id, run_id, workspace_id, logical_name, kind, table_name,
+                    payload_json, schema_json, row_count, created_at, expires_at, status, error
+                ) VALUES (
+                    'second-id', 'run-2', 'ws-dedup', 'results', 'dataframe', 'tbl_second',
+                    NULL, NULL, 10, NOW(), NOW() + INTERVAL 1 DAY, 'ready', NULL
+                )
+                """
+            )
+        except Exception:
+            raised = True
+
+        assert raised, (
+            "Expected a UNIQUE constraint violation when inserting a second artifact "
+            "with the same (workspace_id, kind, logical_name). "
+            "This means the schema does NOT enforce uniqueness — duplicates will accumulate."
+        )
+
+        # Verify only one row exists after the failed duplicate insert.
+        count = con.execute(
+            "SELECT COUNT(*) FROM artifact_manifest WHERE workspace_id = 'ws-dedup' AND logical_name = 'results'"
+        ).fetchone()[0]
+        assert count == 1, f"Expected 1 artifact for 'results', got {count}"
+
+        # Now simulate the correct upsert: DELETE old + INSERT new — this must succeed.
+        con.execute("DELETE FROM artifact_manifest WHERE artifact_id = 'first-id'")
+        con.execute(
+            """
+            INSERT INTO artifact_manifest (
+                artifact_id, run_id, workspace_id, logical_name, kind, table_name,
+                payload_json, schema_json, row_count, created_at, expires_at, status, error
+            ) VALUES (
+                'replaced-id', 'run-2', 'ws-dedup', 'results', 'dataframe', 'tbl_replaced',
+                NULL, NULL, 10, NOW(), NOW() + INTERVAL 1 DAY, 'ready', NULL
+            )
+            """
+        )
+
+        # After upsert: still exactly one row, and it's the new one.
+        row = con.execute(
+            "SELECT artifact_id FROM artifact_manifest WHERE workspace_id = 'ws-dedup' AND logical_name = 'results'"
+        ).fetchone()
+        assert row is not None
+        assert row[0] == "replaced-id", f"Expected 'replaced-id' after upsert, got '{row[0]}'"
+
+    finally:
+        con.close()
+

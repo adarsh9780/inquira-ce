@@ -85,6 +85,15 @@ class ArtifactScratchpadStore:
                 ON artifact_manifest(workspace_id)
                 """
             )
+            # Enforce: at most one live artifact per (workspace_id, kind, logical_name).
+            # Using CREATE UNIQUE INDEX (not inline UNIQUE) so this is applied even when
+            # the table already existed without the constraint (stale DBs from older versions).
+            con.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_artifact_manifest_unique_name
+                ON artifact_manifest(workspace_id, kind, logical_name)
+                """
+            )
             con.execute(
                 """
                 CREATE TABLE IF NOT EXISTS run_manifest (
@@ -263,6 +272,9 @@ class ArtifactScratchpadStore:
         kind: str | None = None,
     ) -> list[dict[str, Any]]:
         """Return lightweight summaries for all non-expired artifacts in the workspace.
+
+        Because the schema enforces UNIQUE (workspace_id, kind, logical_name), there
+        is at most one live row per (kind, name) pair — no deduplication needed here.
 
         Items are ordered newest-first.  Pass ``kind`` (e.g. ``'dataframe'``)
         to restrict results to a single artifact type.
