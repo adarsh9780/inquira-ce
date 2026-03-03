@@ -4,11 +4,17 @@
     <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'figure'">
       <div class="flex items-center justify-end w-full gap-4">
         <div class="flex items-center space-x-3 text-sm mr-auto">
-          <span v-if="appStore.plotlyFigure || appStore.isCodeRunning" class="text-xs px-2 py-1 rounded"
-                :class="appStore.isCodeRunning
-                  ? 'text-orange-600 bg-orange-100'
-                  : 'text-purple-600 bg-purple-100'">
-            {{ appStore.isCodeRunning ? 'Processing' : 'Chart Ready' }}
+          <span v-if="appStore.isCodeRunning" class="text-xs px-2 py-1 rounded text-orange-600 bg-orange-100">
+            Processing
+          </span>
+          <span v-else-if="isLoadingArtifacts || isLoadingFigure" class="text-xs px-2 py-1 rounded text-gray-700 bg-gray-100">
+            Loading charts...
+          </span>
+          <span v-else-if="artifactListError" class="text-xs px-2 py-1 rounded text-red-700 bg-red-100">
+            {{ artifactListError }}
+          </span>
+          <span v-else-if="selectedFigure" class="text-xs px-2 py-1 rounded text-purple-600 bg-purple-100">
+            Chart Ready
           </span>
         </div>
         
@@ -17,7 +23,7 @@
           <div v-if="orderedFigures && orderedFigures.length > 1" class="flex items-center">
             <HeaderDropdown
               id="figure-select"
-              v-model="selectedFigureIndex"
+              v-model="selectedArtifactId"
               :options="figureDropdownOptions"
               placeholder="Select figure"
               aria-label="Select figure"
@@ -67,7 +73,7 @@
     <div class="flex-1 relative mt-1">
       <div
         v-if="selectedFigure"
-        :key="selectedFigureIndex"
+        :key="selectedArtifactId"
         ref="plotContainer"
         class="absolute inset-0 p-4"
       ></div>
@@ -104,7 +110,7 @@
             </button>
           </div>
           <div class="flex-1 relative">
-            <div :key="selectedFigureIndex" ref="fullscreenPlotContainer" class="absolute inset-0 p-4"></div>
+            <div :key="selectedArtifactId" ref="fullscreenPlotContainer" class="absolute inset-0 p-4"></div>
           </div>
         </div>
       </div>
@@ -117,6 +123,7 @@ import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import Plotly from 'plotly.js-dist-min'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
+import apiService from '../../services/apiService'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import { 
   PhotoIcon, 
@@ -133,26 +140,33 @@ let ro = null
 const fullscreenPlotContainer = ref(null)
 const isDownloading = ref(false)
 const isFullscreen = ref(false)
-const selectedFigureIndex = ref(0)
+const isLoadingArtifacts = ref(false)
+const isLoadingFigure = ref(false)
+const selectedArtifactId = ref(null)
 const isMounted = ref(false)
+const workspaceFigureArtifacts = ref([])
+const selectedFigurePayload = ref(null)
+const artifactListError = ref('')
+let listAbortController = null
+let figureAbortController = null
 
 const orderedFigures = computed(() => {
-  if (!appStore.figures) return []
-  return [...appStore.figures].slice().reverse()
+  if (!Array.isArray(workspaceFigureArtifacts.value)) return []
+  return workspaceFigureArtifacts.value
 })
 
 const figureDropdownOptions = computed(() => orderedFigures.value.map((fig, index) => ({
-  value: index,
-  label: fig.name || `Figure ${index + 1}`,
-  key: `${index}-${fig.name || 'figure'}`
+  value: fig.artifact_id,
+  label: fig.logical_name || `Figure ${index + 1}`,
+  key: fig.artifact_id || `${index}-figure`
 })))
 
-const selectedFigure = computed(() => {
-  if (!orderedFigures.value || orderedFigures.value.length === 0) return null
-  const fig = orderedFigures.value[selectedFigureIndex.value]
-  if (!fig) return null
-  return normalizePlotlyFigure(fig.data)
+const selectedFigureMeta = computed(() => {
+  if (!selectedArtifactId.value) return null
+  return orderedFigures.value.find((fig) => fig.artifact_id === selectedArtifactId.value) || null
 })
+
+const selectedFigure = computed(() => normalizePlotlyFigure(selectedFigurePayload.value))
 
 onMounted(async () => {
   isMounted.value = true
@@ -169,9 +183,15 @@ onMounted(async () => {
   if (selectedFigure.value) {
     await renderPlot()
   }
+
+  if (appStore.activeWorkspaceId) {
+    await loadWorkspaceFigureArtifacts(appStore.activeWorkspaceId)
+  }
 })
 
 onUnmounted(() => {
+  listAbortController?.abort()
+  figureAbortController?.abort()
   if (plotContainer.value) {
     Plotly.purge(plotContainer.value)
   }
@@ -192,15 +212,34 @@ watch(() => selectedFigure.value, (newFigure) => {
   }
 })
 
-// Watch for figures array changes to reset selection
-watch(() => appStore.figures, (newFigures) => {
-  if (newFigures && newFigures.length > 0) {
-    selectedFigureIndex.value = 0
+watch(() => appStore.activeWorkspaceId, (workspaceId) => {
+  selectedArtifactId.value = null
+  selectedFigurePayload.value = null
+  workspaceFigureArtifacts.value = []
+  artifactListError.value = ''
+  appStore.setFigureCount(0)
+  if (workspaceId) {
+    void loadWorkspaceFigureArtifacts(workspaceId)
   }
+}, { immediate: true })
+
+watch(
+  () => (Array.isArray(appStore.figures) ? appStore.figures.map((fig) => String(fig?.artifact_id || fig?.name || '')).join('|') : ''),
+  () => {
+    if (!appStore.activeWorkspaceId) return
+    void loadWorkspaceFigureArtifacts(appStore.activeWorkspaceId)
+  }
+)
+
+watch(selectedArtifactId, (artifactId) => {
+  void loadSelectedFigurePayload(artifactId)
 })
 
 // Re-render when the Figure pane becomes visible after being hidden by v-show
 watch(() => appStore.dataPane, (pane) => {
+  if (pane === 'figure' && appStore.activeWorkspaceId) {
+    void loadWorkspaceFigureArtifacts(appStore.activeWorkspaceId)
+  }
   if (pane === 'figure' && selectedFigure.value) {
     nextTick(() => {
       renderPlot()
@@ -208,7 +247,87 @@ watch(() => appStore.dataPane, (pane) => {
   }
 })
 
-// The plot container will re-render automatically due to the :key attribute
+async function loadWorkspaceFigureArtifacts(workspaceId) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId) {
+    workspaceFigureArtifacts.value = []
+    selectedArtifactId.value = null
+    selectedFigurePayload.value = null
+    appStore.setFigureCount(0)
+    return
+  }
+  listAbortController?.abort()
+  listAbortController = new AbortController()
+  isLoadingArtifacts.value = true
+  artifactListError.value = ''
+  try {
+    const response = await apiService.v1ListWorkspaceArtifacts(
+      normalizedWorkspaceId,
+      'figure',
+      { signal: listAbortController.signal },
+    )
+    const artifacts = Array.isArray(response?.artifacts) ? response.artifacts : []
+    workspaceFigureArtifacts.value = artifacts
+    appStore.setFigureCount(artifacts.length)
+
+    if (!artifacts.length) {
+      selectedArtifactId.value = null
+      selectedFigurePayload.value = null
+      appStore.setPlotlyFigure(null)
+      return
+    }
+    const hasExistingSelection = artifacts.some((item) => item.artifact_id === selectedArtifactId.value)
+    if (!hasExistingSelection) {
+      selectedArtifactId.value = artifacts[0].artifact_id
+    } else if (!selectedFigurePayload.value && selectedArtifactId.value) {
+      await loadSelectedFigurePayload(selectedArtifactId.value)
+    }
+  } catch (error) {
+    if (error?.name === 'AbortError') return
+    console.warn('Failed to load workspace figure artifacts:', error)
+    artifactListError.value = error?.message || 'Failed to load charts.'
+    workspaceFigureArtifacts.value = []
+    selectedArtifactId.value = null
+    selectedFigurePayload.value = null
+    appStore.setFigureCount(0)
+  } finally {
+    isLoadingArtifacts.value = false
+  }
+}
+
+async function loadSelectedFigurePayload(artifactId) {
+  const normalizedWorkspaceId = String(appStore.activeWorkspaceId || '').trim()
+  const normalizedArtifactId = String(artifactId || '').trim()
+  if (!normalizedWorkspaceId || !normalizedArtifactId) {
+    selectedFigurePayload.value = null
+    appStore.setPlotlyFigure(null)
+    return
+  }
+  figureAbortController?.abort()
+  figureAbortController = new AbortController()
+  isLoadingFigure.value = true
+  try {
+    const metadata = await apiService.v1GetWorkspaceArtifactMetadata(
+      normalizedWorkspaceId,
+      normalizedArtifactId,
+      { signal: figureAbortController.signal },
+    )
+    const figurePayload = normalizePlotlyFigure(metadata?.payload?.figure ?? metadata?.payload)
+    if (!figurePayload) {
+      throw new Error('Selected chart payload is unavailable.')
+    }
+    if (selectedArtifactId.value !== normalizedArtifactId) return
+    selectedFigurePayload.value = figurePayload
+    appStore.setPlotlyFigure(figurePayload)
+  } catch (error) {
+    if (error?.name === 'AbortError') return
+    console.warn('Failed to load selected figure payload:', error)
+    selectedFigurePayload.value = null
+    appStore.setPlotlyFigure(null)
+  } finally {
+    isLoadingFigure.value = false
+  }
+}
 
 async function waitForContainer(retries = 10) {
   while (retries-- > 0) {
@@ -303,7 +422,10 @@ async function downloadPng() {
   isDownloading.value = true
 
   try {
-    const filename = `chart_${new Date().toISOString().split('T')[0]}.png`
+    const logicalName = String(selectedFigureMeta.value?.logical_name || 'chart')
+      .replace(/[^A-Za-z0-9._-]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'chart'
+    const filename = `${logicalName}_${new Date().toISOString().split('T')[0]}.png`
 
     await Plotly.downloadImage(plotContainer.value, {
       format: 'png',
@@ -349,9 +471,12 @@ async function downloadHtml() {
     const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' })
     const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
+    const logicalName = String(selectedFigureMeta.value?.logical_name || 'chart')
+      .replace(/[^A-Za-z0-9._-]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'chart'
     
     link.setAttribute('href', url)
-    link.setAttribute('download', `chart_${new Date().toISOString().split('T')[0]}.html`)
+    link.setAttribute('download', `${logicalName}_${new Date().toISOString().split('T')[0]}.html`)
     link.style.visibility = 'hidden'
     
     document.body.appendChild(link)
