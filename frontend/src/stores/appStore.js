@@ -434,6 +434,15 @@ export const useAppStore = defineStore('app', () => {
     currentExplanation.value = explanation
   }
 
+  function appendLastMessageExplanationChunk(text) {
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage || typeof text !== 'string' || !text) return
+    const current = String(lastMessage.explanation || '')
+    const updated = current + text
+    lastMessage.explanation = updated
+    currentExplanation.value = updated
+  }
+
   function appendLastMessagePlanChunk(text, node = '') {
     const lastMessage = getLastChatMessage()
     if (!lastMessage || typeof text !== 'string' || !text) return
@@ -1290,6 +1299,7 @@ export const useAppStore = defineStore('app', () => {
     setPythonFileContent,
     addChatMessage,
     updateLastMessageExplanation,
+    appendLastMessageExplanationChunk,
     appendLastMessagePlanChunk,
     appendLastMessageTraceEvent,
     setLastMessageCodeSnapshot,

@@ -510,6 +510,20 @@ class InquiraAgent:
         response = chain.invoke(payload)
         return AIMessage(content=_stringify_content(getattr(response, "content", response)))
 
+    @staticmethod
+    def _emit_text_stream_chunks(
+        node_name: str,
+        text: str,
+        *,
+        chunk_size: int = 24,
+    ) -> None:
+        content = str(text or "")
+        if not content:
+            return
+        safe_chunk_size = max(1, int(chunk_size))
+        for start_idx in range(0, len(content), safe_chunk_size):
+            emit_stream_token(node_name, content[start_idx : start_idx + safe_chunk_size])
+
     def check_relevancy(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         class IsRelevant(BaseModel):
             is_relevant: bool | None = Field(
@@ -916,6 +930,8 @@ Guard status:
                 "Run the code and review the output table or chart.\n\n"
                 "How else can I help next?"
             )
+
+        self._emit_text_stream_chunks("explain_code", explanation)
 
         return {
             "final_explanation": explanation,

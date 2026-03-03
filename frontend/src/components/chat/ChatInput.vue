@@ -110,6 +110,13 @@ const canSend = computed(() =>
   !appStore.isLoading
 )
 
+const FINAL_STREAM_NODES = new Set([
+  'explain_code',
+  'noncode_generator',
+  'general_purpose',
+  'unsafe_rejector'
+])
+
 function handleModelChange(model) {
   appStore.setSelectedModel(model)
 }
@@ -234,7 +241,12 @@ async function handleSubmit() {
         signal,
         onEvent: (evt) => {
           if (evt.event === 'token' && typeof evt.data?.text === 'string') {
-            appStore.appendLastMessagePlanChunk(evt.data.text, evt.data.node || '')
+            const nodeName = String(evt.data?.node || '').trim().toLowerCase()
+            if (FINAL_STREAM_NODES.has(nodeName)) {
+              appStore.appendLastMessageExplanationChunk(evt.data.text)
+            } else {
+              appStore.appendLastMessagePlanChunk(evt.data.text, evt.data.node || '')
+            }
             return
           }
           if (evt.event === 'status' && evt.data?.message) {

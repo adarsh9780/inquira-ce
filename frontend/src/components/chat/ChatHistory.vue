@@ -48,30 +48,41 @@
       <!-- Assistant Response -->
       <div v-if="hasAssistantContent(message)" class="w-full group">
         <div class="px-4 py-3 rounded-2xl rounded-tl-sm" style="background-color: transparent">
-          <div v-if="ephemeralRows(message).length" class="space-y-3">
+          <div v-if="SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length" class="space-y-3">
             <div v-for="row in ephemeralRows(message)" :key="row.id">
-              <p class="text-sm font-medium" style="color: var(--color-text-muted);">{{ row.summary }}</p>
-              <details
+              <button
                 v-if="row.output"
-                class="mt-1 rounded border px-3 py-2"
-                style="border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-base) 88%, var(--color-border) 12%);"
+                type="button"
+                class="inline-flex items-center gap-1.5 text-sm font-medium"
+                style="color: var(--color-text-muted);"
+                @click="toggleEphemeralRow(row.id)"
               >
-                <summary class="text-xs cursor-pointer" style="color: var(--color-text-muted);">{{ row.dropdownLabel }}</summary>
-                <div class="mt-2 max-h-52 overflow-auto rounded border px-3 py-2" style="border-color: var(--color-border); background-color: var(--color-surface);">
-                  <div
-                    v-if="row.outputMode === 'markdown'"
-                    class="chat-markdown-content text-sm leading-relaxed prose prose-sm max-w-none prose-pre:overflow-x-auto prose-pre:break-words"
-                    style="color: var(--color-text-main);"
-                  >
-                    <div v-html="renderMarkdown(row.output)"></div>
-                  </div>
-                  <pre
-                    v-else
-                    class="text-xs whitespace-pre-wrap"
-                    style="color: var(--color-text-main);"
-                  >{{ row.output }}</pre>
-                </div>
-              </details>
+                <ChevronRightIcon
+                  v-if="!isEphemeralRowExpanded(row.id)"
+                  class="h-3.5 w-3.5"
+                  aria-hidden="true"
+                />
+                <ChevronDownIcon
+                  v-else
+                  class="h-3.5 w-3.5"
+                  aria-hidden="true"
+                />
+                <span>{{ row.summary }}</span>
+              </button>
+              <p
+                v-else
+                class="text-sm font-medium"
+                style="color: var(--color-text-muted);"
+              >
+                {{ row.summary }}
+              </p>
+              <div
+                v-if="row.output && isEphemeralRowExpanded(row.id)"
+                class="mt-1 pl-5 chat-markdown-content text-sm leading-relaxed max-w-none"
+                style="color: var(--color-text-main);"
+              >
+                <div v-html="renderMarkdown(row.output)"></div>
+              </div>
             </div>
           </div>
 
@@ -84,7 +95,7 @@
             <div class="h-px flex-1" style="background-color: var(--color-border);"></div>
           </div>
 
-          <div v-if="message.explanation" class="chat-markdown-content text-sm leading-relaxed prose prose-sm max-w-none prose-pre:overflow-x-auto prose-pre:break-words" style="color: var(--color-text-main);">
+          <div v-if="message.explanation" class="chat-markdown-content text-sm leading-relaxed max-w-none" style="color: var(--color-text-main);">
             <div v-html="renderMarkdown(message.explanation)"></div>
           </div>
 
@@ -154,7 +165,9 @@
 import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import {
-  DocumentDuplicateIcon
+  DocumentDuplicateIcon,
+  ChevronRightIcon,
+  ChevronDownIcon
 } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
 import markdownItKatex from 'markdown-it-katex'
@@ -178,6 +191,9 @@ DOMPurify.addHook('afterSanitizeAttributes', function(node) {
 const appStore = useAppStore()
 const chatContainer = ref(null)
 const end = ref(null)
+const ephemeralExpandedRows = ref(new Set())
+const suppressMutationAutoScroll = ref(false)
+const SHOW_EPHEMERAL_TRACE = false
 let shouldAutoScroll = true
 let mutationObserver = null
 
@@ -242,11 +258,14 @@ const EPHEMERAL_LABELS = {
   check_safety: 'Checking if query is safe to process',
   check_relevancy: 'Checking if query matches your data',
   require_code: 'Determining whether code generation is needed',
-  create_plan: 'Planning the analysis steps',
-  code_generator: 'Generating Python code',
-  retry_code_generator: 'Retrying Python code generation',
-  code_guard: 'Validating generated code'
+  create_plan: 'Planning the analysis steps'
 }
+const HIDDEN_EPHEMERAL_NODES = new Set([
+  'code_generator',
+  'retry_code_generator',
+  'code_guard',
+  'explain_code'
+])
 
 // Initialize shouldAutoScroll and setup listeners on mount
 onMounted(() => {
@@ -261,6 +280,7 @@ onMounted(() => {
   // Setup MutationObserver for dynamic content
   if (chatContainer.value) {
     mutationObserver = new MutationObserver(() => {
+      if (suppressMutationAutoScroll.value) return
       if (shouldAutoScroll) {
         scrollToBottom()
       }
@@ -391,15 +411,21 @@ function eventOutputText(event, message) {
 
 function ephemeralRows(message) {
   const events = streamTraceEvents(message)
-  return events.map((event, index) => {
+  return events
+    .filter((event) => {
+      const type = String(event?.type || '').toLowerCase()
+      const stage = String(event?.stage || '').trim().toLowerCase()
+      const node = normalizeNodeName(event?.node)
+      return !(type === 'status' && stage === 'start')
+        && !HIDDEN_EPHEMERAL_NODES.has(node)
+    })
+    .map((event, index) => {
     const type = String(event?.type || '').toLowerCase()
     const node = normalizeNodeName(event?.node)
     const stage = String(event?.stage || '').trim().toLowerCase()
 
     let summary = 'Processing update'
-    if (type === 'status' && stage === 'start') {
-      summary = 'Starting analysis'
-    } else if (type === 'status') {
+    if (type === 'status') {
       summary = String(event?.message || 'Updating analysis status')
     } else if (type === 'node') {
       summary = describeNode(node)
@@ -409,11 +435,9 @@ function ephemeralRows(message) {
     return {
       id: `${message?.id || 'msg'}-${type || 'event'}-${node || stage || index}-${index}`,
       summary,
-      output,
-      outputMode: node === 'create_plan' ? 'markdown' : 'text',
-      dropdownLabel: node === 'create_plan' ? 'View plan output' : 'View details'
+      output
     }
-  })
+    })
 }
 
 function hasStreamTrace(message) {
@@ -424,7 +448,7 @@ function hasAssistantContent(message) {
   return Boolean(
     message?.explanation ||
     shouldRenderCodeSnapshot(message) ||
-    hasStreamTrace(message) ||
+    (SHOW_EPHEMERAL_TRACE && hasStreamTrace(message)) ||
     (Array.isArray(message?.toolEvents) && message.toolEvents.length > 0)
   )
 }
@@ -443,6 +467,25 @@ function shouldRenderCodeSnapshot(message) {
 function openCodePane() {
   appStore.setActiveTab('workspace')
   appStore.setWorkspacePane('code')
+}
+
+function isEphemeralRowExpanded(rowId) {
+  if (appStore.isLoading) return true
+  return ephemeralExpandedRows.value.has(String(rowId))
+}
+
+function toggleEphemeralRow(rowId) {
+  if (appStore.isLoading) return
+  suppressMutationAutoScroll.value = true
+  const key = String(rowId)
+  if (ephemeralExpandedRows.value.has(key)) {
+    ephemeralExpandedRows.value.delete(key)
+  } else {
+    ephemeralExpandedRows.value.add(key)
+  }
+  nextTick(() => {
+    suppressMutationAutoScroll.value = false
+  })
 }
 
 async function loadMoreTurns() {
@@ -507,7 +550,10 @@ watch([() => appStore.chatHistory.length, lastMessageId], ([newLength], [oldLeng
 })
 
 // Watch for loading state changes
-watch(() => appStore.isLoading, (isLoading) => {
+watch(() => appStore.isLoading, (isLoading, wasLoading) => {
+  if (wasLoading && !isLoading) {
+    ephemeralExpandedRows.value.clear()
+  }
   if (shouldAutoScroll) {
     nextTick(() => scrollToBottom())
   }
@@ -518,6 +564,17 @@ watch(() => appStore.isLoading, (isLoading) => {
 :deep(.chat-markdown-content) {
   font-size: 15px;
   line-height: 1.78;
+  color: var(--color-text-main);
+}
+
+:deep(.chat-markdown-content strong),
+:deep(.chat-markdown-content em),
+:deep(.chat-markdown-content a) {
+  color: var(--color-text-main);
+}
+
+:deep(.chat-markdown-content a) {
+  text-decoration: underline;
 }
 
 :deep(.chat-markdown-content p) {

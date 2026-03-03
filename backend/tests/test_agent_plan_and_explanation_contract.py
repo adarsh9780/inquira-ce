@@ -43,6 +43,8 @@ def test_create_plan_prompt_requires_plain_english_steps_without_code():
     assert "Do NOT include Python, SQL, pseudocode" in prompt_text
     assert "one analytical step at a time" in prompt_text
     assert "Columns:" in prompt_text
+    assert "shown directly to end users" in prompt_text
+    assert "Use markdown formatting with numbered steps and bullet points" in prompt_text
 
 
 def test_explain_code_prompt_requires_sectioned_code_walkthrough():
@@ -50,6 +52,7 @@ def test_explain_code_prompt_requires_sectioned_code_walkthrough():
 
     assert "Break the long code into 3 to 6 logical pieces" in source
     assert "Next step" in source
+    assert '_emit_text_stream_chunks("explain_code", explanation)' in source
 
 
 def test_explanation_fallback_chunker_produces_multiple_sections():

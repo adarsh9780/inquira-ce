@@ -8,11 +8,14 @@ test('chat input consumes live token events and does not fall back to non-stream
   const source = readFileSync(chatInputPath, 'utf-8')
 
   assert.equal(source.includes("evt.event === 'token'"), true)
+  assert.equal(source.includes('FINAL_STREAM_NODES'), true)
+  assert.equal(source.includes("'explain_code'"), true)
+  assert.equal(source.includes("'noncode_generator'"), true)
+  assert.equal(source.includes("'general_purpose'"), true)
+  assert.equal(source.includes("'unsafe_rejector'"), true)
+  assert.equal(source.includes('appStore.appendLastMessageExplanationChunk(evt.data.text)'), true)
   assert.equal(source.includes("appStore.appendLastMessagePlanChunk(evt.data.text, evt.data.node || '')"), true)
   assert.equal(source.includes('appStore.appendLastMessageTraceEvent({'), true)
-  assert.equal(source.includes('streamedExplanation += evt.data.text'), false)
-  assert.equal(source.includes('appStore.updateLastMessageExplanation(streamedExplanation)'), false)
-  assert.equal(source.includes('if (hasTokenStream) return'), false)
   assert.equal(source.includes('response = await apiService.v1Analyze('), false)
 })
 
