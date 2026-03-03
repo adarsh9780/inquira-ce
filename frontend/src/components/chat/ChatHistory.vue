@@ -374,8 +374,15 @@ function hasAssistantContent(message) {
   )
 }
 
+function explanationHasCodeBlocks(message) {
+  const explanation = String(message?.explanation || '')
+  return /```[a-zA-Z0-9_-]*\n[\s\S]*?```/.test(explanation)
+}
+
 function shouldRenderCodeSnapshot(message) {
-  return Boolean(String(message?.codeSnapshot || '').trim())
+  const hasSnapshot = Boolean(String(message?.codeSnapshot || '').trim())
+  if (!hasSnapshot) return false
+  return !explanationHasCodeBlocks(message)
 }
 
 function openCodePane() {

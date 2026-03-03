@@ -275,6 +275,214 @@ class InquiraAgent:
             return str(chunk)
         return _stringify_content(content)
 
+    @staticmethod
+    def _sanitize_plan_text(plan_text: str) -> str:
+        text = str(plan_text or "").strip()
+        if not text:
+            return ""
+
+        # Remove fenced code blocks so the plan stays analytical and code-free.
+        sanitized = re.sub(
+            r"```[\s\S]*?```",
+            "[Code snippet removed from plan output]",
+            text,
+            flags=re.IGNORECASE,
+        )
+
+        # Drop highly code-like single lines that may still leak through.
+        filtered_lines: list[str] = []
+        removed_code_line = False
+        for raw_line in sanitized.splitlines():
+            line = raw_line.strip()
+            if not line:
+                filtered_lines.append("")
+                continue
+            looks_like_assignment = re.search(
+                r"^[A-Za-z_][A-Za-z0-9_]*\s*=\s*.+",
+                line,
+            )
+            has_import_stmt = re.search(
+                r"^(from\s+[A-Za-z0-9_.]+\s+import|import\s+[A-Za-z0-9_. ,]+)",
+                line,
+                flags=re.IGNORECASE,
+            )
+            has_sql_stmt = re.search(
+                r"^(with|select|update|delete|insert)\b",
+                line,
+                flags=re.IGNORECASE,
+            )
+            has_library_call = re.search(
+                r"\b(duckdb|pandas|plotly|conn|pd|px|df)\.[A-Za-z_][A-Za-z0-9_]*\(",
+                line,
+            )
+            if looks_like_assignment or has_import_stmt or has_sql_stmt or has_library_call:
+                removed_code_line = True
+                continue
+            filtered_lines.append(raw_line)
+
+        sanitized = "\n".join(filtered_lines).strip()
+        sanitized = re.sub(r"\n{3,}", "\n\n", sanitized)
+        if removed_code_line and sanitized:
+            sanitized = (
+                f"{sanitized}\n\nNote: Code-like lines were removed to keep this plan plain English."
+            )
+        return sanitized
+
+    @staticmethod
+    def _split_code_into_chunks(
+        code: str,
+        *,
+        min_sections: int = 3,
+        max_sections: int = 6,
+    ) -> list[str]:
+        text = str(code or "").strip()
+        if not text:
+            return []
+
+        chunks = [
+            part.strip("\n")
+            for part in re.split(r"\n{2,}", text)
+            if part and part.strip()
+        ]
+        if not chunks:
+            return []
+
+        while len(chunks) > max_sections:
+            chunks[-2] = f"{chunks[-2]}\n\n{chunks[-1]}"
+            chunks.pop()
+
+        # If the model/code gives too few chunks, split the longest blocks.
+        while len(chunks) < min_sections:
+            longest_index = max(range(len(chunks)), key=lambda idx: len(chunks[idx]))
+            lines = chunks[longest_index].splitlines()
+            if len(lines) < 6:
+                break
+            midpoint = len(lines) // 2
+            split_idx = midpoint
+            for offset in range(0, 6):
+                up = midpoint - offset
+                down = midpoint + offset
+                if up > 1 and not lines[up].strip():
+                    split_idx = up
+                    break
+                if down < len(lines) - 1 and not lines[down].strip():
+                    split_idx = down
+                    break
+            left = "\n".join(lines[:split_idx]).strip()
+            right = "\n".join(lines[split_idx:]).strip()
+            if not left or not right:
+                break
+            chunks[longest_index : longest_index + 1] = [left, right]
+
+        if len(chunks) < min_sections:
+            lines = text.splitlines()
+            target = min_sections
+            chunk_size = max(1, (len(lines) + target - 1) // target)
+            rebuilt: list[str] = []
+            for start in range(0, len(lines), chunk_size):
+                piece = "\n".join(lines[start : start + chunk_size]).strip()
+                if piece:
+                    rebuilt.append(piece)
+            if rebuilt:
+                chunks = rebuilt
+            while len(chunks) > max_sections:
+                chunks[-2] = f"{chunks[-2]}\n{chunks[-1]}"
+                chunks.pop()
+
+        return chunks[:max_sections]
+
+    @staticmethod
+    def _normalize_explanation_sections(
+        raw_sections: Any,
+        fallback_code: str,
+    ) -> list[dict[str, str]]:
+        normalized: list[dict[str, str]] = []
+
+        if isinstance(raw_sections, list):
+            for idx, section in enumerate(raw_sections, start=1):
+                item = section
+                if hasattr(section, "model_dump"):
+                    item = section.model_dump()
+                if not isinstance(item, dict):
+                    continue
+                title = str(item.get("title") or f"Step {idx}").strip()
+                language = str(item.get("language") or "python").strip().lower()
+                if language not in {"python", "sql"}:
+                    language = "python"
+                code = str(item.get("code") or "").strip()
+                explanation = str(item.get("explanation") or "").strip()
+                if not code or not explanation:
+                    continue
+                normalized.append(
+                    {
+                        "title": title or f"Step {idx}",
+                        "language": language,
+                        "code": code,
+                        "explanation": explanation,
+                    }
+                )
+
+        if normalized:
+            return normalized[:6]
+
+        fallback_chunks = InquiraAgent._split_code_into_chunks(fallback_code)
+        fallback_sections: list[dict[str, str]] = []
+        for idx, chunk in enumerate(fallback_chunks, start=1):
+            looks_like_sql = bool(
+                re.search(r"^\s*(with|select|update|delete|insert)\b", chunk, re.IGNORECASE)
+            )
+            fallback_sections.append(
+                {
+                    "title": f"Step {idx}",
+                    "language": "sql" if looks_like_sql else "python",
+                    "code": chunk,
+                    "explanation": (
+                        "This block handles one part of the workflow and passes results to the next step."
+                    ),
+                }
+            )
+        return fallback_sections[:6]
+
+    @staticmethod
+    def _compose_sectioned_explanation(
+        *,
+        overview: str,
+        sections: list[dict[str, str]],
+        next_step: str,
+        follow_up_question: str,
+    ) -> str:
+        parts: list[str] = []
+        clean_overview = str(overview or "").strip()
+        if clean_overview:
+            parts.append(f"### Overview\n{clean_overview}")
+
+        for idx, section in enumerate(sections, start=1):
+            title = str(section.get("title") or f"Step {idx}").strip()
+            language = str(section.get("language") or "python").strip().lower()
+            if language not in {"python", "sql"}:
+                language = "python"
+            code = str(section.get("code") or "").strip()
+            explanation = str(section.get("explanation") or "").strip()
+            if not code or not explanation:
+                continue
+            parts.append(
+                f"### {idx}. {title}\n"
+                f"```{language}\n{code}\n```\n"
+                f"{explanation}"
+            )
+
+        safe_next_step = str(next_step or "").strip() or "Run the code and review the output."
+        parts.append(f"### Next step\n{safe_next_step}")
+
+        safe_follow_up = str(follow_up_question or "").strip()
+        if not safe_follow_up:
+            safe_follow_up = "How can I help you next?"
+        if not safe_follow_up.endswith("?"):
+            safe_follow_up = f"{safe_follow_up}?"
+        parts.append(safe_follow_up)
+
+        return "\n\n".join(part for part in parts if part.strip())
+
     def _invoke_text_chain_with_streaming(
         self,
         chain: Any,
@@ -409,7 +617,8 @@ class InquiraAgent:
             },
             node_name="create_plan",
         )
-        return {"plan": _stringify_content(getattr(response, "content", "")).strip()}
+        plan_text = _stringify_content(getattr(response, "content", "")).strip()
+        return {"plan": self._sanitize_plan_text(plan_text)}
 
     def code_generator(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         class Code(BaseModel):
@@ -628,18 +837,36 @@ class InquiraAgent:
         }
 
     def explain_code(self, state: State, config: RunnableConfig) -> dict[str, Any]:
+        class ExplanationSection(BaseModel):
+            title: str
+            language: str = Field(default="python")
+            code: str
+            explanation: str
+
+        class CodeExplanation(BaseModel):
+            overview: str | None = Field(default=None)
+            sections: list[ExplanationSection] = Field(default_factory=list)
+            next_step: str | None = Field(default=None)
+            follow_up_question: str | None = Field(default=None)
+
         system_prompt_template = SystemMessagePromptTemplate.from_template(
             """You are the AI assistant for Inquira.
 
 Explain the generated Python code to a non-technical user in very simple language.
 
 Rules:
+- Break the long code into 3 to 6 logical pieces.
+- Each piece must include:
+  1) a short heading
+  2) a compact code snippet
+  3) 2-4 short plain-English lines explaining that snippet
 - Use plain words and short sentences.
-- Avoid jargon. If a technical word is unavoidable, immediately explain it.
-- Explain what the code does, what output it produces, and why that helps answer the user's question.
-- Include exactly one clear next step the user can take.
+- Avoid jargon. If a technical word is unavoidable, explain it immediately.
+- Explain what output each piece helps create.
+- Do not mention internal runtime details that a user does not need.
+- Include exactly one concrete next step.
 - End with one friendly question asking how you can help next.
-- Do not include raw code blocks or copy code lines.
+- Return structured content only via the provided schema fields.
 
 Plan:
 {plan}
@@ -657,9 +884,9 @@ Guard status:
         )
 
         model = self._get_model(config, "gemini-2.5-flash-lite")
-        chain = prompt | model
+        chain = prompt | model.with_structured_output(CodeExplanation)
 
-        response = self._invoke_text_chain_with_streaming(
+        response = self._invoke_structured_chain(
             chain,
             {
                 "messages": state.messages,
@@ -667,13 +894,27 @@ Guard status:
                 "code": state.current_code or state.code or "",
                 "guard_status": state.guard_status or "ok",
             },
-            node_name="explain_code",
         )
-        explanation = _stringify_content(getattr(response, "content", "")).strip()
+        response = cast(CodeExplanation, response)
+
+        source_code = (state.current_code or state.code or "").strip()
+        sections = self._normalize_explanation_sections(response.sections, source_code)
+        if len(sections) < 3 and source_code:
+            sections = self._normalize_explanation_sections([], source_code)
+
+        explanation = self._compose_sectioned_explanation(
+            overview=str(response.overview or "").strip(),
+            sections=sections[:6],
+            next_step=str(response.next_step or "").strip(),
+            follow_up_question=str(response.follow_up_question or "").strip(),
+        ).strip()
         if not explanation:
             explanation = (
-                "I generated code to answer your question. Next step: run it and review "
-                "the output table or chart. How else can I help?"
+                "### What I changed\n"
+                "I generated code to answer your question.\n\n"
+                "### Next step\n"
+                "Run the code and review the output table or chart.\n\n"
+                "How else can I help next?"
             )
 
         return {
