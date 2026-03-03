@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { apiService } from '../services/apiService'
 import { localStateService } from '../services/localStateService'
 import { useAuthStore } from './authStore'
+import { normalizePlotlyFigure } from '../utils/figurePayload'
 
 export const useAppStore = defineStore('app', () => {
   const authStore = useAuthStore()
@@ -549,11 +550,12 @@ export const useAppStore = defineStore('app', () => {
         if (kind === 'figure') {
           if (seenFigures.has(dedupeKey)) continue
           seenFigures.add(dedupeKey)
-          const figurePayload = artifact?.payload?.figure || null
+          const figurePayload = normalizePlotlyFigure(artifact?.payload?.figure ?? artifact?.payload)
           if (figurePayload) {
             figureArtifacts.push({
               name: logicalName || 'figure',
-              data: figurePayload
+              artifact_id: artifactId || null,
+              data: figurePayload,
             })
           }
           continue
@@ -795,7 +797,21 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setFigures(figs) {
-    figures.value = Array.isArray(figs) ? figs : []
+    if (!Array.isArray(figs)) {
+      figures.value = []
+      return
+    }
+    figures.value = figs
+      .map((fig, idx) => {
+        const normalizedFigure = normalizePlotlyFigure(fig?.data ?? fig)
+        if (!normalizedFigure) return null
+        return {
+          ...(fig || {}),
+          name: String(fig?.name || `figure_${idx + 1}`),
+          data: normalizedFigure,
+        }
+      })
+      .filter(Boolean)
   }
 
   function setScalars(scs) {

@@ -13,7 +13,10 @@ export function parseSseBuffer(buffer) {
       if (line.startsWith('event:')) {
         event = line.slice(6).trim()
       } else if (line.startsWith('data:')) {
-        dataLines.push(line.slice(5).trim())
+        // Preserve token spacing for stream chunks. SSE allows a single leading
+        // space after "data:", which should not be treated as part of payload.
+        const raw = line.slice(5)
+        dataLines.push(raw.startsWith(' ') ? raw.slice(1) : raw)
       }
     }
 

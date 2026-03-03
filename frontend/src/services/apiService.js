@@ -2,7 +2,6 @@ import axios from 'axios'
 import { getInquira } from './generatedApi'
 import { v1Api } from './contracts/v1Api'
 import { parseSseBuffer } from '../utils/sseParser'
-import { disableStreamingForUnsupportedStatus, isStreamingEnabled } from '../utils/streamingCapability'
 import { inferTableNameFromDataPath } from '../utils/chatBootstrap'
 import { normalizeExecutionResponse } from '../utils/runtimeExecution'
 
@@ -725,10 +724,6 @@ export const apiService = {
   },
 
   async v1AnalyzeStream(payload, { signal = null, onEvent = null } = {}) {
-    if (!isStreamingEnabled()) {
-      return this.v1Analyze(payload)
-    }
-
     const url = `${apiBaseUrl.replace(/\/+$/, '')}${v1Api.chat.stream}`
     const response = await fetch(url, {
       method: 'POST',
@@ -750,7 +745,6 @@ export const apiService = {
       }
       const err = new Error(detail)
       err.status = response.status
-      disableStreamingForUnsupportedStatus(response.status)
       throw err
     }
 

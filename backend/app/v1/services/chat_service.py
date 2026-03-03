@@ -6,6 +6,7 @@ Persists turns in app DB and uses per-workspace LangGraph checkpoint state.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import time
 import uuid
@@ -18,7 +19,7 @@ from fastapi import HTTPException
 from langchain_core.messages import HumanMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...agent.graph import InputSchema
+from ...agent.graph import InputSchema, set_stream_token_emitter, reset_stream_token_emitter
 from ...services.code_executor import execute_code, get_workspace_run_exports
 from ..repositories.conversation_repository import ConversationRepository
 from ..repositories.dataset_repository import DatasetRepository
@@ -738,146 +739,193 @@ class ChatService:
         api_key: str | None = None,
     ):
         """Async generator that yields incremental analysis events (SSE-compatible)."""
-        conversation, conversation_id, schema, table_name, data_path = await ChatService._preflight_check(
-            session=session,
-            user=user,
-            workspace_id=workspace_id,
-            conversation_id=conversation_id,
-            question=question,
-            table_name_override=table_name_override,
-            active_schema_override=active_schema_override,
-        )
+        event_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        active_emitter_token = None
 
-        yield {"event": "status", "data": {"stage": "start", "message": "Starting analysis"}}
+        def queue_event(event: str, data: dict[str, Any]) -> None:
+            event_queue.put_nowait({"event": event, "data": data})
 
-        memory_path = WorkspaceStorageService.build_agent_memory_path(user.username, workspace_id)
-        graph = await langgraph_manager.get_graph(workspace_id, memory_path)
-
-        input_state = InputSchema(
-            messages=[HumanMessage(content=question)],
-            active_schema=schema,
-            previous_code=current_code,
-            current_code=current_code,
-            table_name=table_name,
-            data_path=data_path,
-            context=context or "",
-        )
-        thread_id = f"{user.id}:{workspace_id}:{conversation_id}"
-        config = {
-            "configurable": {
-                "api_key": api_key,
-                "thread_id": thread_id,
-                "model": model,
-            }
-        }
-        resolved_api_key = (api_key or "").strip() or (SecretStorageService.get_api_key(user.id) or "")
-        config["configurable"]["api_key"] = resolved_api_key
-        if not resolved_api_key:
-            raise HTTPException(status_code=401, detail="API key not configured")
-
-        aggregated: dict[str, Any] = {}
-        async for step in graph.astream(input_state, config=config):
-            for node_name, payload in step.items():
-                if isinstance(payload, dict):
-                    aggregated.update(payload)
-                if node_name == "code_guard":
-                    logprint(
-                        "[V1 Chat] code_guard node",
-                        level="INFO",
-                        request_id=thread_id,
-                        guard_status=aggregated.get("guard_status"),
-                        retry_count=aggregated.get("code_guard_retries", 0),
-                        feedback=aggregated.get("code_guard_feedback", ""),
+        async def run_pipeline() -> None:
+            nonlocal active_emitter_token
+            try:
+                conversation, resolved_conversation_id, schema, table_name, data_path = (
+                    await ChatService._preflight_check(
+                        session=session,
+                        user=user,
+                        workspace_id=workspace_id,
+                        conversation_id=conversation_id,
+                        question=question,
+                        table_name_override=table_name_override,
+                        active_schema_override=active_schema_override,
                     )
-                yield {"event": "node", "data": {"node": node_name, "message": f"{node_name} completed"}}
+                )
 
-        # Final state merge if checkpointer is active
+                queue_event("status", {"stage": "start", "message": "Starting analysis"})
+
+                memory_path = WorkspaceStorageService.build_agent_memory_path(user.username, workspace_id)
+                graph = await langgraph_manager.get_graph(workspace_id, memory_path)
+
+                input_state = InputSchema(
+                    messages=[HumanMessage(content=question)],
+                    active_schema=schema,
+                    previous_code=current_code,
+                    current_code=current_code,
+                    table_name=table_name,
+                    data_path=data_path,
+                    context=context or "",
+                )
+                thread_id = f"{user.id}:{workspace_id}:{resolved_conversation_id}"
+                config = {
+                    "configurable": {
+                        "api_key": api_key,
+                        "thread_id": thread_id,
+                        "model": model,
+                    }
+                }
+                resolved_api_key = (api_key or "").strip() or (SecretStorageService.get_api_key(user.id) or "")
+                config["configurable"]["api_key"] = resolved_api_key
+                if not resolved_api_key:
+                    raise HTTPException(status_code=401, detail="API key not configured")
+
+                def emit_token(node_name: str, text: str) -> None:
+                    queue_event("token", {"node": node_name, "text": text})
+
+                active_emitter_token = set_stream_token_emitter(emit_token)
+
+                aggregated: dict[str, Any] = {}
+                async for step in graph.astream(input_state, config=config):
+                    for node_name, payload in step.items():
+                        if isinstance(payload, dict):
+                            aggregated.update(payload)
+                        if node_name == "code_guard":
+                            logprint(
+                                "[V1 Chat] code_guard node",
+                                level="INFO",
+                                request_id=thread_id,
+                                guard_status=aggregated.get("guard_status"),
+                                retry_count=aggregated.get("code_guard_retries", 0),
+                                feedback=aggregated.get("code_guard_feedback", ""),
+                            )
+                        queue_event(
+                            "node",
+                            {"node": node_name, "message": f"{node_name} completed"},
+                        )
+
+                # Final state merge if checkpointer is active
+                try:
+                    final_state = await graph.aget_state(config)
+                    if getattr(final_state, "values", None):
+                        aggregated = final_state.values
+                except Exception:
+                    pass
+
+                response_payload = ChatService._build_response_payload(aggregated)
+                run_id = str(uuid.uuid4())
+                response_payload["run_id"] = run_id
+                response_payload["execution"] = None
+                response_payload["artifacts"] = []
+                response_payload["final_script_artifact_id"] = None
+
+                code_to_execute = str(response_payload.get("code") or "").strip()
+                if code_to_execute:
+                    execution_result, retry_count, duration_ms, executed_code = (
+                        await ChatService._execute_generated_code_with_retries(
+                            workspace_id=workspace_id,
+                            workspace_duckdb_path=data_path,
+                            generated_code=code_to_execute,
+                            run_id=run_id,
+                            output_contract=response_payload.get("output_contract") or [],
+                            max_retries=2,
+                        )
+                    )
+                    await ChatService._finalize_kernel_run(
+                        workspace_id=workspace_id,
+                        workspace_duckdb_path=data_path,
+                        run_id=run_id,
+                        question=question,
+                        generated_code=code_to_execute,
+                        executed_code=executed_code,
+                        stdout=str(execution_result.get("stdout") or ""),
+                        stderr=str(execution_result.get("stderr") or execution_result.get("error") or ""),
+                        execution_status="success" if bool(execution_result.get("success")) else "failed",
+                        retry_count=retry_count,
+                    )
+                    artifacts = [
+                        item
+                        for item in (execution_result.get("artifacts") or [])
+                        if isinstance(item, dict)
+                    ]
+                    if not artifacts:
+                        artifacts = await get_workspace_run_exports(
+                            workspace_id=workspace_id,
+                            run_id=run_id,
+                        )
+                    if not artifacts:
+                        artifacts = ChatService._build_inline_artifact_fallback(
+                            run_id=run_id,
+                            execution_result=execution_result,
+                        )
+                    response_payload["artifacts"] = artifacts
+                    response_payload["final_script_artifact_id"] = None
+                    response_payload["execution"] = {
+                        "status": "success" if bool(execution_result.get("success")) else "failed",
+                        "stdout": str(execution_result.get("stdout") or ""),
+                        "stderr": str(execution_result.get("stderr") or execution_result.get("error") or ""),
+                        "retry_count": int(retry_count),
+                        "duration_ms": int(duration_ms),
+                    }
+
+                logprint(
+                    "[V1 Chat] final response summary",
+                    level="INFO",
+                    request_id=thread_id,
+                    has_code=bool((response_payload.get("code", "") or "").strip()),
+                    code_len=len(response_payload.get("code", "") or ""),
+                    has_await_query=("await query(" in (response_payload.get("code", "") or "")),
+                    guard_status=aggregated.get("guard_status", ""),
+                    guard_feedback=aggregated.get("code_guard_feedback", ""),
+                )
+
+                turn_id = await ChatService._persist_turn(
+                    session=session,
+                    conversation=conversation,
+                    conversation_id=resolved_conversation_id,
+                    question=question,
+                    response_payload=response_payload,
+                    result=aggregated,
+                )
+
+                response_payload.update(
+                    {
+                        "conversation_id": resolved_conversation_id,
+                        "turn_id": turn_id,
+                    }
+                )
+                queue_event("final", response_payload)
+            except HTTPException as exc:
+                queue_event(
+                    "error",
+                    {"detail": str(exc.detail), "status_code": int(exc.status_code)},
+                )
+            except Exception as exc:
+                queue_event("error", {"detail": str(exc), "status_code": 500})
+            finally:
+                if active_emitter_token is not None:
+                    reset_stream_token_emitter(active_emitter_token)
+
+        runner = asyncio.create_task(run_pipeline())
         try:
-            final_state = await graph.aget_state(config)
-            if getattr(final_state, "values", None):
-                aggregated = final_state.values
-        except Exception:
-            pass
-
-        response_payload = ChatService._build_response_payload(aggregated)
-        run_id = str(uuid.uuid4())
-        response_payload["run_id"] = run_id
-        response_payload["execution"] = None
-        response_payload["artifacts"] = []
-        response_payload["final_script_artifact_id"] = None
-        code_to_execute = str(response_payload.get("code") or "").strip()
-        if code_to_execute:
-            execution_result, retry_count, duration_ms, executed_code = (
-                await ChatService._execute_generated_code_with_retries(
-                    workspace_id=workspace_id,
-                    workspace_duckdb_path=data_path,
-                    generated_code=code_to_execute,
-                    run_id=run_id,
-                    output_contract=response_payload.get("output_contract") or [],
-                    max_retries=2,
-                )
-            )
-            await ChatService._finalize_kernel_run(
-                workspace_id=workspace_id,
-                workspace_duckdb_path=data_path,
-                run_id=run_id,
-                question=question,
-                generated_code=code_to_execute,
-                executed_code=executed_code,
-                stdout=str(execution_result.get("stdout") or ""),
-                stderr=str(execution_result.get("stderr") or execution_result.get("error") or ""),
-                execution_status="success" if bool(execution_result.get("success")) else "failed",
-                retry_count=retry_count,
-            )
-            artifacts = [
-                item
-                for item in (execution_result.get("artifacts") or [])
-                if isinstance(item, dict)
-            ]
-            if not artifacts:
-                artifacts = await get_workspace_run_exports(
-                    workspace_id=workspace_id,
-                    run_id=run_id,
-                )
-            if not artifacts:
-                artifacts = ChatService._build_inline_artifact_fallback(
-                    run_id=run_id,
-                    execution_result=execution_result,
-                )
-            response_payload["artifacts"] = artifacts
-            response_payload["final_script_artifact_id"] = None
-            response_payload["execution"] = {
-                "status": "success" if bool(execution_result.get("success")) else "failed",
-                "stdout": str(execution_result.get("stdout") or ""),
-                "stderr": str(execution_result.get("stderr") or execution_result.get("error") or ""),
-                "retry_count": int(retry_count),
-                "duration_ms": int(duration_ms),
-            }
-        logprint(
-            "[V1 Chat] final response summary",
-            level="INFO",
-            request_id=thread_id,
-            has_code=bool((response_payload.get("code", "") or "").strip()),
-            code_len=len(response_payload.get("code", "") or ""),
-            has_await_query=("await query(" in (response_payload.get("code", "") or "")),
-            guard_status=aggregated.get("guard_status", ""),
-            guard_feedback=aggregated.get("code_guard_feedback", ""),
-        )
-        
-        # Persist once at the end
-        turn_id = await ChatService._persist_turn(
-            session=session,
-            conversation=conversation,
-            conversation_id=conversation_id,
-            question=question,
-            response_payload=response_payload,
-            result=aggregated,
-        )
-
-        # Add IDs to payload for final UI update
-        response_payload.update({
-            "conversation_id": conversation_id,
-            "turn_id": turn_id
-        })
-        
-        yield {"event": "final", "data": response_payload}
+            while True:
+                if runner.done() and event_queue.empty():
+                    break
+                try:
+                    queued = await asyncio.wait_for(event_queue.get(), timeout=0.05)
+                except asyncio.TimeoutError:
+                    continue
+                if queued:
+                    yield queued
+        finally:
+            if not runner.done():
+                runner.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await runner

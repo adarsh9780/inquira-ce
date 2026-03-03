@@ -1,6 +1,7 @@
 import os
 import re
 import warnings
+from contextvars import ContextVar
 
 from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
@@ -17,6 +18,7 @@ from dotenv import load_dotenv
 
 from typing import Annotated, Any, cast, Mapping
 from collections.abc import Iterator
+from collections.abc import Callable
 
 import json
 from pathlib import Path
@@ -26,6 +28,28 @@ from ..services.llm_runtime_config import load_llm_runtime_config, normalize_mod
 
 
 MAX_CODE_GUARD_RETRIES = 2
+_STREAM_TOKEN_EMITTER: ContextVar[Callable[[str, str], None] | None] = ContextVar(
+    "_stream_token_emitter",
+    default=None,
+)
+
+
+def set_stream_token_emitter(emitter: Callable[[str, str], None] | None):
+    return _STREAM_TOKEN_EMITTER.set(emitter)
+
+
+def reset_stream_token_emitter(token) -> None:
+    _STREAM_TOKEN_EMITTER.reset(token)
+
+
+def emit_stream_token(node_name: str, text: str) -> None:
+    emitter = _STREAM_TOKEN_EMITTER.get()
+    if not callable(emitter):
+        return
+    chunk = str(text or "")
+    if not chunk:
+        return
+    emitter(str(node_name or ""), chunk)
 
 
 def get_prompt_path(filename: str) -> Path:
@@ -238,6 +262,44 @@ class InquiraAgent:
             )
             return chain.invoke(payload)
 
+    @staticmethod
+    def _extract_chunk_text(chunk: Any) -> str:
+        if chunk is None:
+            return ""
+        if isinstance(chunk, str):
+            return chunk
+        content = getattr(chunk, "content", None)
+        if content is None:
+            return str(chunk)
+        return _stringify_content(content)
+
+    def _invoke_text_chain_with_streaming(
+        self,
+        chain: Any,
+        payload: dict[str, Any],
+        *,
+        node_name: str,
+    ) -> AIMessage:
+        collected_parts: list[str] = []
+
+        try:
+            for chunk in chain.stream(payload):
+                text = self._extract_chunk_text(chunk)
+                if not text:
+                    continue
+                emit_stream_token(node_name, text)
+                collected_parts.append(text)
+        except Exception:
+            # Fall back to normal invoke path if provider/runtime cannot stream chunks.
+            response = chain.invoke(payload)
+            return AIMessage(content=_stringify_content(getattr(response, "content", response)))
+
+        if collected_parts:
+            return AIMessage(content="".join(collected_parts))
+
+        response = chain.invoke(payload)
+        return AIMessage(content=_stringify_content(getattr(response, "content", response)))
+
     def check_relevancy(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         class IsRelevant(BaseModel):
             is_relevant: bool | None = Field(
@@ -324,9 +386,6 @@ class InquiraAgent:
         }
 
     def create_plan(self, state: State, config: RunnableConfig) -> dict[str, Any]:
-        class Plan(BaseModel):
-            plan: str | None
-
         system_prompt_template = SystemMessagePromptTemplate.from_template_file(
             get_prompt_path("create_plan_prompt.yaml"),
             input_variables=["schema", "current_code", "context"],
@@ -336,9 +395,9 @@ class InquiraAgent:
         )
 
         model = self._get_model(config, "gemini-2.5-flash-lite")
-        chain = prompt | model.with_structured_output(Plan)
+        chain = prompt | model
 
-        response = self._invoke_structured_chain(
+        response = self._invoke_text_chain_with_streaming(
             chain,
             {
                 "messages": state.messages,
@@ -346,10 +405,9 @@ class InquiraAgent:
                 "current_code": state.previous_code,
                 "context": state.context or "",
             },
+            node_name="create_plan",
         )
-        response = cast(Plan, response)
-
-        return {"plan": response.plan}
+        return {"plan": _stringify_content(getattr(response, "content", "")).strip()}
 
     def code_generator(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         class Code(BaseModel):
@@ -499,16 +557,18 @@ class InquiraAgent:
         model = self._get_model(config, "gemini-2.5-flash")
         chain = prompt | model
 
-        response = chain.invoke(
+        response = self._invoke_text_chain_with_streaming(
+            chain,
             {
                 "messages": state.messages,
                 "schema": state.active_schema,
                 "current_code": state.previous_code,
                 "context": state.context or "",
-            }
+            },
+            node_name="noncode_generator",
         )
 
-        return {"messages": [AIMessage(content=response.content)]}
+        return {"messages": [AIMessage(content=_stringify_content(getattr(response, "content", "")))]}
 
     def code_guard(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         # Preserve visibility into model output: if retry generation returns empty code,
@@ -591,9 +651,13 @@ The platform uses DuckDB for efficient querying, Pandas for transformations, and
         model = self._get_model(config, "gemini-2.5-flash")
         chain = prompt | model
 
-        response = chain.invoke({"messages": state.messages})
+        response = self._invoke_text_chain_with_streaming(
+            chain,
+            {"messages": state.messages},
+            node_name="general_purpose",
+        )
 
-        return {"messages": [AIMessage(content=response.content)]}
+        return {"messages": [AIMessage(content=_stringify_content(getattr(response, "content", "")))]}
 
     def unsafe_rejector(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         reasoning = (
@@ -612,14 +676,16 @@ The platform uses DuckDB for efficient querying, Pandas for transformations, and
         model = self._get_model(config, "gemini-2.5-flash-lite")
         chain = prompt | model
 
-        response = chain.invoke(
+        response = self._invoke_text_chain_with_streaming(
+            chain,
             {
                 "messages": state.messages,
                 "safety_reasoning": reasoning,
-            }
+            },
+            node_name="unsafe_rejector",
         )
 
-        return {"messages": [AIMessage(content=response.content)]}
+        return {"messages": [AIMessage(content=_stringify_content(getattr(response, "content", "")))]}
 
     def compile(self, checkpointer=None) -> CompiledStateGraph:
         builder = StateGraph(

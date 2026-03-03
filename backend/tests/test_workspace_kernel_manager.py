@@ -403,3 +403,36 @@ async def test_bootstrap_workspace_creates_scratchpad_parent_dir(tmp_path):
     assert not scratchpad_db.parent.exists()
     await manager._bootstrap_workspace(session)
     assert scratchpad_db.parent.exists()
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_workspace_exports_figure_payload_in_run_envelope(tmp_path):
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    workspace_db = tmp_path / "ws-fig" / "workspace.duckdb"
+    workspace_db.parent.mkdir(parents=True, exist_ok=True)
+    workspace_db.touch()
+    scratchpad_db = tmp_path / "ws-fig" / "scratchpad" / "artifacts.duckdb"
+    session = WorkspaceKernelSession(
+        workspace_id="ws-fig",
+        workspace_duckdb_path=str(workspace_db),
+        manager=SimpleNamespace(),
+        client=SimpleNamespace(),
+        scratchpad_db_path=str(scratchpad_db),
+    )
+
+    captured: dict[str, str] = {}
+
+    async def fake_execute_on_session(current_session, code):
+        _ = current_session
+        captured["code"] = code
+        return {"success": True}
+
+    manager._execute_on_session = fake_execute_on_session  # type: ignore[method-assign]
+
+    await manager._bootstrap_workspace(session)
+
+    bootstrap_code = captured.get("code", "")
+    assert "payload=None, status='ready', error=None" in bootstrap_code
+    assert "'payload': payload" in bootstrap_code
+    assert "kind='figure'" in bootstrap_code
+    assert "payload={'figure': fig_payload, 'title': title, 'insight': insight}" in bootstrap_code

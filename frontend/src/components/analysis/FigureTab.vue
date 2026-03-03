@@ -118,6 +118,7 @@ import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import Plotly from 'plotly.js-dist-min'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
+import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import { 
   PhotoIcon, 
   DocumentIcon, 
@@ -150,8 +151,8 @@ const figureDropdownOptions = computed(() => orderedFigures.value.map((fig, inde
 const selectedFigure = computed(() => {
   if (!orderedFigures.value || orderedFigures.value.length === 0) return null
   const fig = orderedFigures.value[selectedFigureIndex.value]
-  if (!fig || !fig.data) return null
-  return fig.data
+  if (!fig) return null
+  return normalizePlotlyFigure(fig.data)
 })
 
 onMounted(async () => {
@@ -199,9 +200,9 @@ watch(() => appStore.figures, (newFigures) => {
   }
 })
 
-// Re-render when the Figure tab becomes visible after being hidden by v-show
-watch(() => appStore.activeTab, (tab) => {
-  if (tab === 'figure' && selectedFigure.value) {
+// Re-render when the Figure pane becomes visible after being hidden by v-show
+watch(() => appStore.dataPane, (pane) => {
+  if (pane === 'figure' && selectedFigure.value) {
     nextTick(() => {
       renderPlot()
     })

@@ -89,6 +89,7 @@ import apiService from '../../services/apiService'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { buildBrowserDataPath, inferTableNameFromDataPath } from '../../utils/chatBootstrap'
+import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import ModelSelector from '../ui/ModelSelector.vue'
 import {
   PlusIcon,
@@ -217,49 +218,43 @@ async function handleSubmit() {
 
     let response
     const schemaPayload = buildActiveSchemaPayload()
-    try {
-      response = await apiService.v1AnalyzeStream(
-        {
-          workspace_id: workspaceId,
-          conversation_id: appStore.activeConversationId || null,
-          question: questionText,
-          current_code: appStore.pythonFileContent || '',
-          model: appStore.selectedModel,
-          context: appStore.schemaContext.trim() || null,
-          table_name: schemaPayload.tableName,
-          active_schema: schemaPayload.activeSchema,
-          api_key: null
-        },
-        {
-          signal,
-          onEvent: (evt) => {
-            if (evt.event === 'status' && evt.data?.message) {
-              appStore.updateLastMessageExplanation(evt.data.message)
-              return
+    let hasTokenStream = false
+    let streamedExplanation = ''
+    response = await apiService.v1AnalyzeStream(
+      {
+        workspace_id: workspaceId,
+        conversation_id: appStore.activeConversationId || null,
+        question: questionText,
+        current_code: appStore.pythonFileContent || '',
+        model: appStore.selectedModel,
+        context: appStore.schemaContext.trim() || null,
+        table_name: schemaPayload.tableName,
+        active_schema: schemaPayload.activeSchema,
+        api_key: null
+      },
+      {
+        signal,
+        onEvent: (evt) => {
+          if (evt.event === 'token' && typeof evt.data?.text === 'string') {
+            if (!hasTokenStream) {
+              hasTokenStream = true
+              streamedExplanation = ''
             }
-            if (evt.event === 'node' && evt.data?.node) {
-              appStore.updateLastMessageExplanation(`Running: ${evt.data.node}...`)
-            }
+            streamedExplanation += evt.data.text
+            appStore.updateLastMessageExplanation(streamedExplanation)
+            return
+          }
+          if (hasTokenStream) return
+          if (evt.event === 'status' && evt.data?.message) {
+            appStore.updateLastMessageExplanation(evt.data.message)
+            return
+          }
+          if (evt.event === 'node' && evt.data?.node) {
+            appStore.updateLastMessageExplanation(`Running: ${evt.data.node}...`)
           }
         }
-      )
-    } catch (streamError) {
-      if (streamError?.status === 404 || streamError?.status === 405) {
-        response = await apiService.v1Analyze({
-          workspace_id: workspaceId,
-          conversation_id: appStore.activeConversationId || null,
-          question: questionText,
-          current_code: appStore.pythonFileContent || '',
-          model: appStore.selectedModel,
-          context: appStore.schemaContext.trim() || null,
-          table_name: schemaPayload.tableName,
-          active_schema: schemaPayload.activeSchema,
-          api_key: null
-        })
-      } else {
-        throw streamError
       }
-    }
+    )
 
     if (response?.conversation_id && response.conversation_id !== appStore.activeConversationId) {
       appStore.setActiveConversationId(response.conversation_id)
@@ -285,8 +280,9 @@ async function handleSubmit() {
       const executionStdout = response?.execution?.stdout || ''
       appStore.setTerminalOutput(executionStderr || executionStdout || response.stdout || response.terminal_output || 'Code generated and executed.')
 
-      if (response.plotly_figure || (response.result?.data && response.result?.layout)) {
-        appStore.setPlotlyFigure(response.plotly_figure || response.result)
+      const inlineFigure = normalizePlotlyFigure(response.plotly_figure || response.result)
+      if (inlineFigure) {
+        appStore.setPlotlyFigure(inlineFigure)
         appStore.setResultData(null)
         appStore.setDataPane('figure')
       } else if (response.result?.columns && response.result?.data) {
@@ -311,10 +307,16 @@ async function handleSubmit() {
         }))
       const figureArtifacts = artifactItems
         .filter((item) => String(item?.kind || '') === 'figure')
-        .map((item) => ({
-          name: String(item?.logical_name || 'figure'),
-          data: item?.payload?.figure || null
-        }))
+        .map((item) => {
+          const figure = normalizePlotlyFigure(item?.payload?.figure ?? item?.payload)
+          if (!figure) return null
+          return {
+            name: String(item?.logical_name || 'figure'),
+            artifact_id: item?.artifact_id || null,
+            data: figure,
+          }
+        })
+        .filter(Boolean)
 
       appStore.setDataframes(dataframeArtifacts)
       appStore.setFigures(figureArtifacts)

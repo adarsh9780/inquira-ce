@@ -32,3 +32,20 @@ test('parseSseBuffer preserves incomplete tail', () => {
   assert.equal(events[0].event, 'status')
   assert.ok(remainder.startsWith('event: node'))
 })
+
+test('parseSseBuffer preserves spacing in plain-text token chunks', () => {
+  const input = [
+    'event: token',
+    'data: {"text":"Hello "}',
+    '',
+    'event: token',
+    'data: {"text":"world"}',
+    '',
+    ''
+  ].join('\n')
+
+  const { events } = parseSseBuffer(input)
+  assert.equal(events.length, 2)
+  assert.equal(events[0].data.text, 'Hello ')
+  assert.equal(events[1].data.text, 'world')
+})

@@ -1,3 +1,5 @@
+import { normalizePlotlyFigure } from './figurePayload.js'
+
 function parseObjectBucket(bucket, { parseJson = false } = {}) {
   if (!bucket || typeof bucket !== 'object') {
     return { entries: [], rawCount: 0, failed: 0 }
@@ -86,10 +88,17 @@ export function buildExecutionViewModel(response, options = {}) {
     outputParts.push(opts.successLine)
   }
 
+  const figureEntries = parsedFigures.entries
+    .map(({ name, value }) => ({
+      name,
+      data: normalizePlotlyFigure(value),
+    }))
+    .filter((entry) => Boolean(entry.data))
+
   return {
     output: outputParts.join('\n\n'),
     dataframes: parsedDataframes.entries.map(({ name, value }) => ({ name, data: value })),
-    figures: parsedFigures.entries.map(({ name, value }) => ({ name, data: value })),
+    figures: figureEntries,
     scalars: parsedScalars.entries.map(({ name, value }) => ({ name, value })),
     counts: {
       dataframes: parsedDataframes.rawCount,
