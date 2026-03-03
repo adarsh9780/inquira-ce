@@ -31,7 +31,8 @@
             <select
               id="dataframe-select"
               v-model="selectedArtifactId"
-              class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent max-w-[200px]"
+              class="px-2.5 py-1 text-xs font-medium border rounded-md focus:outline-none transition-colors cursor-pointer max-w-[200px]"
+              style="color: var(--color-text-muted); background-color: var(--color-surface); border-color: var(--color-border);"
             >
               <option :value="null" disabled>— select a table —</option>
               <option

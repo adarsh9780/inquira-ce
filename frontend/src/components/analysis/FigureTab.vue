@@ -15,11 +15,12 @@
         <div class="flex items-center space-x-2">
           <!-- Figure Selector -->
           <div v-if="orderedFigures && orderedFigures.length > 1" class="flex items-center space-x-2">
-            <label for="figure-select" class="text-sm font-medium text-gray-700">Figure:</label>
+            <label for="figure-select" class="text-xs font-medium" style="color: var(--color-text-muted);">Figure:</label>
             <select
               id="figure-select"
               v-model="selectedFigureIndex"
-              class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              class="px-2.5 py-1 text-xs font-medium border rounded-md focus:outline-none transition-colors cursor-pointer"
+              style="color: var(--color-text-muted); background-color: var(--color-surface); border-color: var(--color-border);"
             >
               <option
                 v-for="(fig, index) in orderedFigures"

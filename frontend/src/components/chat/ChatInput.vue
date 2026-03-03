@@ -48,7 +48,7 @@
           <button
             @click="handleSubmit"
             :disabled="appStore.isLoading || !appStore.canAnalyze"
-            class="transition-all duration-150 focus:outline-none"
+            class="w-6 h-6 flex items-center justify-center transition-all duration-150 focus:outline-none"
             :class="
               question.trim().length > 0
                 ? 'text-zinc-900 hover:text-zinc-700'
