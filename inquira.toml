@@ -35,7 +35,17 @@ provider = "local_jupyter"
 # Legacy runner venv name (workspace runtime now uses <workspace>/.venv).
 venv-name = ".runner-venv"
 # Optional package list installed into the runner venv alongside ipykernel and defaults.
-packages = ["narwhals", "duckdb", "pandas", "polars", "pyarrow", "plotly", "nbformat>=5.10.4", "statsmodels", "scikit-learn"]
+packages = [
+  "narwhals",
+  "duckdb",
+  "pandas",
+  "polars",
+  "pyarrow",
+  "plotly",
+  "nbformat>=5.10.4",
+  "statsmodels",
+  "scikit-learn",
+]
 # Idle kernel eviction threshold in minutes.
 kernel-idle-minutes = 30
 # Scratchpad artifact retention in hours.
@@ -80,3 +90,10 @@ default = 4096
 schema = 2048
 # Code-generation/chat execution cap.
 code_generation = 4096
+
+[ui]
+# Global Plotly chart styling behavior in the UI.
+# Supported values:
+# - "soft": apply UI-coherent colors only (recommended default)
+# - "hard": apply broader chart styling defaults (colors + typography/margins/legend behavior)
+plotly-theme-mode = "hard"

@@ -28,6 +28,17 @@
             />
           </div>
 
+          <!-- Delete selected table -->
+          <button
+            @click="deleteSelectedArtifact"
+            :disabled="!selectedArtifactId || isDeletingArtifact"
+            class="inline-flex items-center px-3 py-1.5 border border-red-200 text-sm leading-4 font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+            :class="(!selectedArtifactId || isDeletingArtifact) ? 'opacity-50 cursor-not-allowed' : ''"
+          >
+            <TrashIcon class="h-4 w-4 mr-1" />
+            {{ isDeletingArtifact ? 'Deleting...' : 'Delete' }}
+          </button>
+
           <!-- CSV download -->
           <button
             @click="downloadCsv"
@@ -176,13 +187,15 @@ import HeaderDropdown from '../ui/HeaderDropdown.vue'
 ModuleRegistry.registerModules([AllCommunityModule])
 import {
   ArrowDownTrayIcon,
-  TableCellsIcon
+  TableCellsIcon,
+  TrashIcon
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
 
 const pageSize = 100
 const isDownloading = ref(false)
+const isDeletingArtifact = ref(false)
 const isPageLoading = ref(false)
 const isLoadingArtifacts = ref(false)
 
@@ -449,6 +462,7 @@ const hasRenderableRows = computed(() => {
 })
 
 const tableStatusMessage = computed(() => {
+  if (isDeletingArtifact.value) return 'Deleting table...'
   if (isPageLoading.value) return 'Loading table data...'
   if (tableError.value) return tableError.value
   return ''
@@ -834,6 +848,34 @@ async function retrySelectedArtifact() {
   } catch (error) {
     if (isAbortError(error)) return
     tableError.value = error?.message || 'Failed to load selected table.'
+  }
+}
+
+async function deleteSelectedArtifact() {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  const artifactId = String(selectedArtifactId.value || '').trim()
+  if (!workspaceId || !artifactId || isDeletingArtifact.value) return
+
+  const artifactLabel = String(selectedArtifactMeta.value?.logical_name || artifactId)
+  const confirmed = window.confirm(`Delete table "${artifactLabel}"? This cannot be undone.`)
+  if (!confirmed) return
+
+  isDeletingArtifact.value = true
+  tableError.value = ''
+  try {
+    await apiService.v1DeleteWorkspaceArtifact(workspaceId, artifactId)
+    await loadWorkspaceArtifacts(workspaceId)
+    const fallbackId = allArtifacts.value[0]?.artifact_id || null
+    selectedArtifactId.value = fallbackId
+    if (!fallbackId) {
+      resetTableState()
+      appStore.clearTableViewport()
+    }
+  } catch (error) {
+    if (isAbortError(error)) return
+    tableError.value = error?.message || 'Failed to delete table artifact.'
+  } finally {
+    isDeletingArtifact.value = false
   }
 }
 </script>

@@ -401,6 +401,46 @@ class WorkspaceKernelManager:
             return None
         return parsed.result
 
+    async def delete_workspace_artifact(
+        self,
+        *,
+        workspace_id: str,
+        artifact_id: str,
+    ) -> bool:
+        """Delete one artifact through the kernel-owned scratchpad connection."""
+        async with self._sessions_lock:
+            session = self._sessions.get(workspace_id)
+        if session is None:
+            return False
+
+        escaped_artifact_id = str(artifact_id).replace("'", "''")
+        delete_code = (
+            f"_aid = '{escaped_artifact_id}'\n"
+            "_row = scratchpad_conn.execute(\n"
+            "    \"SELECT kind, table_name FROM artifact_manifest WHERE artifact_id = ? LIMIT 1\",\n"
+            "    [_aid],\n"
+            ").fetchone()\n"
+            "if _row is None:\n"
+            "    _deleted = False\n"
+            "else:\n"
+            "    _kind, _table_name = _row\n"
+            "    if str(_kind) == 'dataframe' and _table_name:\n"
+            "        _escaped = str(_table_name).replace('\"', '\"\"')\n"
+            "        try:\n"
+            "            scratchpad_conn.execute('DROP TABLE IF EXISTS \"' + _escaped + '\"')\n"
+            "        except Exception:\n"
+            "            pass\n"
+            "    scratchpad_conn.execute('DELETE FROM artifact_manifest WHERE artifact_id = ?', [_aid])\n"
+            "    _deleted = True\n"
+            "_deleted\n"
+        )
+
+        async with session.lock:
+            session.last_used = datetime.now(UTC)
+            parsed = await self._execute_request(session, delete_code)
+
+        return parsed.error is None and bool(parsed.result)
+
     async def ensure_ready(
         self,
         *,
@@ -730,6 +770,13 @@ class WorkspaceKernelManager:
             "    artifact_id = str(_uuid.uuid4())\n"
             "    now, expires = _inquira_now_and_expiry()\n"
             "    payload = _json.dumps({'value': value, 'meta': meta}, default=str)\n"
+            "    # Upsert: remove old manifest row if this scalar name already exists\n"
+            "    _old_scalar = scratchpad_conn.execute(\n"
+            "        \"SELECT artifact_id FROM artifact_manifest WHERE workspace_id = ? AND kind = 'scalar' AND logical_name = ?\",\n"
+            "        [_inquira_workspace_id, str(logical_name)]\n"
+            "    ).fetchone()\n"
+            "    if _old_scalar is not None:\n"
+            "        scratchpad_conn.execute('DELETE FROM artifact_manifest WHERE artifact_id = ?', [_old_scalar[0]])\n"
             "    scratchpad_conn.execute(\n"
             "      'INSERT INTO artifact_manifest (artifact_id, run_id, workspace_id, logical_name, kind, table_name, payload_json, schema_json, row_count, created_at, expires_at, status, error) VALUES (?, ?, ?, ?, ?, NULL, ?, NULL, NULL, ?, ?, ?, ?)',\n"
             "      [artifact_id, active_run, _inquira_workspace_id, str(logical_name), 'scalar', payload, now, expires, 'ready', None]\n"

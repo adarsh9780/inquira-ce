@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...services.code_executor import (
     bootstrap_workspace_runtime,
+    delete_workspace_artifact_via_kernel,
     execute_code,
     get_workspace_artifact_metadata_via_kernel,
     get_workspace_dataframe_rows,
@@ -114,6 +115,11 @@ class WorkspaceArtifactSummary(BaseModel):
 class WorkspaceArtifactListResponse(BaseModel):
     artifacts: list[WorkspaceArtifactSummary]
     total: int
+
+
+class ArtifactDeleteResponse(BaseModel):
+    artifact_id: str
+    deleted: bool
 
 
 class TerminalExecuteRequest(BaseModel):
@@ -600,6 +606,37 @@ async def get_workspace_artifact_metadata(
     if artifact is None:
         raise HTTPException(status_code=404, detail="Artifact not found")
     return ArtifactMetadataResponse(**artifact)
+
+
+@router.delete(
+    "/workspaces/{workspace_id}/artifacts/{artifact_id}",
+    response_model=ArtifactDeleteResponse,
+)
+async def delete_workspace_artifact(
+    workspace_id: str,
+    artifact_id: str,
+    session: AsyncSession = Depends(get_db_session),
+    current_user=Depends(get_current_user),
+):
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    store = get_artifact_scratchpad_store()
+    deleted = False
+    try:
+        deleted = store.delete_artifact(
+            workspace_duckdb_path=str(workspace.duckdb_path),
+            artifact_id=artifact_id,
+        )
+    except duckdb.IOException as exc:
+        message = str(exc)
+        if "Conflicting lock is held" not in message:
+            raise HTTPException(status_code=503, detail=f"Artifact store unavailable: {message}") from exc
+        deleted = await delete_workspace_artifact_via_kernel(
+            workspace_id=workspace_id,
+            artifact_id=artifact_id,
+        )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    return ArtifactDeleteResponse(artifact_id=artifact_id, deleted=True)
 
 
 @router.get(

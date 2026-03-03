@@ -101,6 +101,18 @@ async def get_workspace_artifact_metadata_via_kernel(
     )
 
 
+async def delete_workspace_artifact_via_kernel(
+    workspace_id: str,
+    artifact_id: str,
+) -> bool:
+    """Delete one artifact using the kernel-owned scratchpad connection."""
+    manager = await get_workspace_kernel_manager()
+    return await manager.delete_workspace_artifact(
+        workspace_id=workspace_id,
+        artifact_id=artifact_id,
+    )
+
+
 async def get_workspace_run_exports(
     workspace_id: str,
     run_id: str,

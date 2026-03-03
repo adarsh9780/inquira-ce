@@ -28,6 +28,7 @@ export const useAppStore = defineStore('app', () => {
   // Schema Context
   const schemaContext = ref('')
   const allowSchemaSampleValues = ref(false)
+  const plotlyThemeMode = ref('soft')
 
 
   // Single Python File per Session (simplified)
@@ -1057,6 +1058,10 @@ export const useAppStore = defineStore('app', () => {
       if (typeof prefs?.allow_schema_sample_values === 'boolean') {
         allowSchemaSampleValues.value = prefs.allow_schema_sample_values
       }
+      if (typeof prefs?.plotly_theme_mode === 'string') {
+        const normalizedPlotlyThemeMode = prefs.plotly_theme_mode.trim().toLowerCase()
+        plotlyThemeMode.value = normalizedPlotlyThemeMode === 'hard' ? 'hard' : 'soft'
+      }
       if (
         typeof prefs?.chat_overlay_width === 'number' &&
         prefs.chat_overlay_width > 0.1 &&
@@ -1113,6 +1118,7 @@ export const useAppStore = defineStore('app', () => {
     apiKeyConfigured,
     schemaContext,
     allowSchemaSampleValues,
+    plotlyThemeMode,
     pythonFileContent,
     chatHistory,
     currentQuestion,

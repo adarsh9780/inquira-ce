@@ -318,6 +318,41 @@ async def test_get_dataframe_rows_reads_paginated_chunk(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_delete_workspace_artifact_executes_manifest_delete_via_kernel():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-del", "/tmp/ws-del.duckdb")
+    manager._sessions["ws-del"] = session
+
+    async def fake_execute_request(current_session, code):
+        _ = current_session
+        assert "SELECT kind, table_name FROM artifact_manifest" in code
+        assert "DELETE FROM artifact_manifest WHERE artifact_id = ?" in code
+        parsed = ParsedExecutionOutput()
+        parsed.result = True
+        parsed.result_type = "scalar"
+        return parsed
+
+    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
+
+    deleted = await manager.delete_workspace_artifact(
+        workspace_id="ws-del",
+        artifact_id="artifact-1",
+    )
+
+    assert deleted is True
+
+
+@pytest.mark.asyncio
+async def test_delete_workspace_artifact_returns_false_without_session():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    deleted = await manager.delete_workspace_artifact(
+        workspace_id="missing-ws",
+        artifact_id="artifact-1",
+    )
+    assert deleted is False
+
+
+@pytest.mark.asyncio
 async def test_execute_on_session_returns_empty_artifacts_when_probe_fails():
     manager = WorkspaceKernelManager(idle_minutes=30)
     session = _session("ws-3", "/tmp/a.duckdb")
@@ -436,3 +471,5 @@ async def test_bootstrap_workspace_exports_figure_payload_in_run_envelope(tmp_pa
     assert "'payload': payload" in bootstrap_code
     assert "kind='figure'" in bootstrap_code
     assert "payload={'figure': fig_payload, 'title': title, 'insight': insight}" in bootstrap_code
+    assert "kind = 'scalar' AND logical_name = ?" in bootstrap_code
+    assert "_old_scalar is not None" in bootstrap_code

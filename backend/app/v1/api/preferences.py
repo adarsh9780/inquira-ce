@@ -15,6 +15,7 @@ from ..schemas.preferences import (
 )
 from ..services.secret_storage_service import SecretStorageService
 from ...services.llm_runtime_config import load_llm_runtime_config
+from ...services.execution_config import load_execution_runtime_config
 from .deps import get_current_user
 
 router = APIRouter(prefix="/preferences", tags=["V1 Preferences"])
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/preferences", tags=["V1 Preferences"])
 
 def _to_response(prefs, api_key_present: bool) -> PreferencesResponse:
     runtime = load_llm_runtime_config()
+    execution_runtime = load_execution_runtime_config()
     return PreferencesResponse(
         selected_model=prefs.selected_model,
         schema_context=prefs.schema_context,
@@ -34,6 +36,7 @@ def _to_response(prefs, api_key_present: bool) -> PreferencesResponse:
         active_table_name=prefs.active_table_name,
         api_key_present=api_key_present,
         available_models=list(runtime.supported_models),
+        plotly_theme_mode=execution_runtime.plotly_theme_mode,
     )
 
 

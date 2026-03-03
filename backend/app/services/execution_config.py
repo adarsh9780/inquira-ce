@@ -39,6 +39,7 @@ class ExecutionRuntimeConfig:
     kernel_idle_minutes: int = 30
     scratchpad_ttl_hours: int = 48
     scratchpad_max_size_gb: int = 10
+    plotly_theme_mode: str = "soft"
     runner_policy: RunnerPolicyConfig = field(default_factory=RunnerPolicyConfig)
 
 
@@ -73,6 +74,15 @@ def _as_bool(value: Any, default: bool) -> bool:
         if normalized in {"0", "false", "no", "off"}:
             return False
     return default
+
+
+def _normalize_plotly_theme_mode(value: Any) -> str:
+    """Return supported Plotly theme mode (``soft`` or ``hard``)."""
+
+    normalized = str(value or "").strip().lower()
+    if normalized == "hard":
+        return "hard"
+    return "soft"
 
 
 def _load_toml_data() -> dict[str, Any]:
@@ -111,6 +121,9 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
     terminal = data.get("terminal", {})
     if not isinstance(terminal, dict):
         terminal = {}
+    ui = data.get("ui", {})
+    if not isinstance(ui, dict):
+        ui = {}
 
     provider = str(
         os.getenv("INQUIRA_EXECUTION_PROVIDER")
@@ -144,6 +157,7 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
     kernel_idle_minutes = _as_int(runner.get("kernel-idle-minutes", 30), 30)
     scratchpad_ttl_hours = _as_int(runner.get("scratchpad-ttl-hours", 48), 48)
     scratchpad_max_size_gb = _as_int(runner.get("scratchpad-max-size-gb", 10), 10)
+    plotly_theme_mode = _normalize_plotly_theme_mode(ui.get("plotly-theme-mode", "soft"))
 
     policy = RunnerPolicyConfig(
         timeout_seconds=_as_int(runner.get("timeout-seconds", 60), 60),
@@ -167,5 +181,6 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
         kernel_idle_minutes=max(1, kernel_idle_minutes),
         scratchpad_ttl_hours=max(1, scratchpad_ttl_hours),
         scratchpad_max_size_gb=max(1, scratchpad_max_size_gb),
+        plotly_theme_mode=plotly_theme_mode,
         runner_policy=policy,
     )

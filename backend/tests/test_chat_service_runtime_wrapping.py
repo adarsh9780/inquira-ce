@@ -43,3 +43,13 @@ def test_normalize_output_contract_accepts_dataframe_aliases_and_filters_invalid
         {"name": "arrow_table", "kind": "dataframe"},
         {"name": "arrow_batch", "kind": "dataframe"},
     ]
+
+
+def test_auto_capture_code_reports_export_errors_instead_of_swallowing_them():
+    code = ChatService._build_auto_capture_result_code(
+        [{"name": "result_value", "kind": "scalar"}]
+    )
+    assert "_inq_capture_errors = []" in code
+    assert "_inq_record_error(" in code
+    assert "[auto-capture] failed to export" in code
+    assert "except Exception:\n        pass" not in code

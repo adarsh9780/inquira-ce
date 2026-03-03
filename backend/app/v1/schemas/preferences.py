@@ -17,6 +17,7 @@ class PreferencesResponse(BaseModel):
     active_table_name: str | None = None
     api_key_present: bool = False
     available_models: list[str] = Field(default_factory=list)
+    plotly_theme_mode: str = "soft"
 
 
 class PreferencesUpdateRequest(BaseModel):

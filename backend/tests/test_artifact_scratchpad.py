@@ -70,6 +70,68 @@ def test_get_dataframe_rows_reads_manifest_table(tmp_path):
     assert rows["rows"] == [{"a": 2}, {"a": 3}]
 
 
+def test_delete_artifact_removes_manifest_row_and_dataframe_table(tmp_path):
+    workspace_db = tmp_path / "ws-del" / "workspace.duckdb"
+    workspace_db.parent.mkdir(parents=True, exist_ok=True)
+    workspace_db.touch()
+
+    store = ArtifactScratchpadStore()
+    scratchpad_db = store.ensure_workspace(str(workspace_db))
+
+    con = duckdb.connect(str(scratchpad_db), read_only=False)
+    try:
+        con.execute("CREATE TABLE art_to_delete (a INTEGER)")
+        con.execute("INSERT INTO art_to_delete VALUES (1), (2)")
+        con.execute(
+            """
+            INSERT INTO artifact_manifest (
+                artifact_id, run_id, workspace_id, logical_name, kind, table_name,
+                payload_json, schema_json, row_count, created_at, expires_at, status, error
+            ) VALUES (
+                'df-del', 'run-del', 'ws-del', 'summary', 'dataframe', 'art_to_delete',
+                NULL, NULL, 2, NOW(), NOW() + INTERVAL 1 DAY, 'ready', NULL
+            )
+            """
+        )
+    finally:
+        con.close()
+
+    deleted = store.delete_artifact(
+        workspace_duckdb_path=str(workspace_db),
+        artifact_id="df-del",
+    )
+    assert deleted is True
+
+    con = duckdb.connect(str(scratchpad_db), read_only=False)
+    try:
+        manifest_count = con.execute(
+            "SELECT COUNT(*) FROM artifact_manifest WHERE artifact_id = 'df-del'"
+        ).fetchone()[0]
+        table_count = con.execute(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'art_to_delete'"
+        ).fetchone()[0]
+    finally:
+        con.close()
+
+    assert manifest_count == 0
+    assert table_count == 0
+
+
+def test_delete_artifact_returns_false_when_missing(tmp_path):
+    workspace_db = tmp_path / "ws-del-missing" / "workspace.duckdb"
+    workspace_db.parent.mkdir(parents=True, exist_ok=True)
+    workspace_db.touch()
+
+    store = ArtifactScratchpadStore()
+    store.ensure_workspace(str(workspace_db))
+
+    deleted = store.delete_artifact(
+        workspace_duckdb_path=str(workspace_db),
+        artifact_id="missing-id",
+    )
+    assert deleted is False
+
+
 def test_prune_workspace_ignores_duckdb_lock_conflict(monkeypatch, tmp_path):
     workspace_db = tmp_path / "ws3" / "workspace.duckdb"
     workspace_db.parent.mkdir(parents=True, exist_ok=True)
@@ -400,4 +462,3 @@ conn.close()
         proc.stdin.write("done\n")
         proc.stdin.flush()
         proc.wait(timeout=5)
-

@@ -7,12 +7,13 @@ def _codegen_prompt_text() -> str:
     return prompt_path.read_text(encoding="utf-8")
 
 
-def test_codegen_prompt_requires_descriptive_immutable_variable_names():
+def test_codegen_prompt_requires_descriptive_variable_names_with_stable_final_outputs():
     source = _codegen_prompt_text()
     assert "NEVER use generic output names such as `result`, `final_df`, `fig`, `data`, or `output`." in source
-    assert "Treat variables as immutable: once a name is assigned, do not assign to that name again." in source
-    assert "If data is modified (filter/sort/group/join/pivot/enrich), create a new variable name for that stage." in source
-    assert "Never reuse the same variable name for a later transformation or chart." in source
+    assert "Intermediate/helper variables should be single-purpose and immutable within a snippet." in source
+    assert "If data is modified (filter/sort/group/join/pivot/enrich), create a new intermediate variable name for that stage." in source
+    assert "Final persisted output names should be stable across similar reruns so artifacts overwrite cleanly." in source
+    assert "Reuse a final output name intentionally only when it represents the same business meaning; use a new final name when meaning changes." in source
     assert "`output_contract` is a list of objects like" in source
     assert "monthly_revenue_summary_df" in source
 

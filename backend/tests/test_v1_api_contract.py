@@ -37,3 +37,4 @@ def test_v1_preferences_response_exposes_available_models():
     prefs = components.get("PreferencesResponse", {})
     properties = prefs.get("properties", {})
     assert "available_models" in properties
+    assert "plotly_theme_mode" in properties

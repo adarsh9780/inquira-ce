@@ -384,6 +384,49 @@ class ArtifactScratchpadStore:
             "limit": safe_limit,
         }
 
+    def delete_artifact(
+        self,
+        *,
+        workspace_duckdb_path: str,
+        artifact_id: str,
+    ) -> bool:
+        """Delete one artifact by ID.
+
+        For dataframe artifacts, also drops the backing table (best effort).
+        Returns ``True`` only when an artifact row existed and was deleted.
+        """
+        db_path = self.build_scratchpad_db_path(workspace_duckdb_path)
+        if not db_path.exists():
+            return False
+
+        con = duckdb.connect(str(db_path), read_only=False)
+        try:
+            row = con.execute(
+                """
+                SELECT kind, table_name
+                FROM artifact_manifest
+                WHERE artifact_id = ?
+                LIMIT 1
+                """,
+                [artifact_id],
+            ).fetchone()
+            if row is None:
+                return False
+
+            kind = str(row[0] or "")
+            table_name = str(row[1] or "").strip()
+            con.execute("DELETE FROM artifact_manifest WHERE artifact_id = ?", [artifact_id])
+            if kind == "dataframe" and table_name:
+                escaped = table_name.replace('"', '""')
+                try:
+                    con.execute(f'DROP TABLE IF EXISTS "{escaped}"')
+                except Exception:
+                    # Manifest delete has already succeeded; avoid surfacing stale-table cleanup errors.
+                    pass
+            return True
+        finally:
+            con.close()
+
     def prune_workspace(self, *, workspace_duckdb_path: str) -> None:
         db_path = self.build_scratchpad_db_path(workspace_duckdb_path)
         if not db_path.exists():

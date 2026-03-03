@@ -15,6 +15,7 @@ def test_openapi_contains_v1_runtime_routes():
     assert "/api/v1/workspaces/{workspace_id}/artifacts/dataframes/{artifact_id}/rows" in paths
     assert "/api/v1/workspaces/{workspace_id}/artifacts/{artifact_id}/rows" in paths
     assert "/api/v1/workspaces/{workspace_id}/artifacts/{artifact_id}" in paths
+    assert "delete" in paths["/api/v1/workspaces/{workspace_id}/artifacts/{artifact_id}"]
     assert "/api/v1/workspaces/{workspace_id}/datasets/{table_name}/schema" in paths
     assert "/api/v1/workspaces/{workspace_id}/datasets/{table_name}/schema/regenerate" in paths
     assert "/api/v1/workspaces/{workspace_id}/datasets/{table_name}/preview" not in paths

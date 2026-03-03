@@ -7,8 +7,8 @@
           <span v-if="appStore.isCodeRunning" class="text-xs px-2 py-1 rounded text-orange-600 bg-orange-100">
             Processing
           </span>
-          <span v-else-if="isLoadingArtifacts || isLoadingFigure" class="text-xs px-2 py-1 rounded text-gray-700 bg-gray-100">
-            Loading charts...
+          <span v-else-if="isLoadingArtifacts || isLoadingFigure || isDeletingArtifact" class="text-xs px-2 py-1 rounded text-gray-700 bg-gray-100">
+            {{ isDeletingArtifact ? 'Deleting chart...' : 'Loading charts...' }}
           </span>
           <span v-else-if="artifactListError" class="text-xs px-2 py-1 rounded text-red-700 bg-red-100">
             {{ artifactListError }}
@@ -31,6 +31,17 @@
               max-width-class="min-w-[240px]"
             />
           </div>
+
+          <!-- Delete Figure -->
+          <button
+            @click="deleteSelectedFigure"
+            :disabled="!selectedArtifactId || isDeletingArtifact"
+            class="inline-flex items-center px-3 py-1.5 border border-red-200 text-sm leading-4 font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+            :class="(!selectedArtifactId || isDeletingArtifact) ? 'opacity-50 cursor-not-allowed' : ''"
+          >
+            <TrashIcon class="h-4 w-4 mr-1" />
+            {{ isDeletingArtifact ? 'Deleting...' : 'Delete' }}
+          </button>
 
           <!-- Download PNG Button -->
           <button
@@ -125,12 +136,14 @@ import Plotly from 'plotly.js-dist-min'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import apiService from '../../services/apiService'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
+import { applyPlotlyTheme, applyPlotlyConfigTheme, PLOTLY_THEME_MODE } from '../../utils/plotlyTheme'
 import { 
   PhotoIcon, 
   DocumentIcon, 
   ArrowsPointingOutIcon, 
   ChartBarIcon,
-  XMarkIcon 
+  XMarkIcon,
+  TrashIcon
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
@@ -142,6 +155,7 @@ const isDownloading = ref(false)
 const isFullscreen = ref(false)
 const isLoadingArtifacts = ref(false)
 const isLoadingFigure = ref(false)
+const isDeletingArtifact = ref(false)
 const selectedArtifactId = ref(null)
 const isMounted = ref(false)
 const workspaceFigureArtifacts = ref([])
@@ -149,6 +163,7 @@ const selectedFigurePayload = ref(null)
 const artifactListError = ref('')
 let listAbortController = null
 let figureAbortController = null
+const DEFAULT_PLOTLY_THEME_MODE = PLOTLY_THEME_MODE.SOFT
 
 const orderedFigures = computed(() => {
   if (!Array.isArray(workspaceFigureArtifacts.value)) return []
@@ -339,6 +354,21 @@ async function waitForContainer(retries = 10) {
   return false
 }
 
+function resolvePlotThemeMode() {
+  const appMode = String(appStore.plotlyThemeMode || '').trim().toLowerCase()
+  if (appMode === PLOTLY_THEME_MODE.HARD) return PLOTLY_THEME_MODE.HARD
+  return DEFAULT_PLOTLY_THEME_MODE
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 async function renderPlot() {
   if (!selectedFigure.value || !plotContainer.value) return
 
@@ -351,23 +381,25 @@ async function renderPlot() {
     plotContainer.value.style.width = '100%'
     plotContainer.value.style.height = '100%'
 
-    const figureData = selectedFigure.value
+    const rawFigureData = selectedFigure.value
+    const themeMode = resolvePlotThemeMode()
+    const figureData = applyPlotlyTheme(rawFigureData, { mode: themeMode, context: 'panel' }) || rawFigureData
 
     const layout = {
-      ...figureData.layout,
+      ...(figureData.layout || {}),
       autosize: true,
       responsive: true,
-      paper_bgcolor: '#FDFCF8',
-      plot_bgcolor: '#FAF8F3',
-      margin: { l: 50, r: 50, t: 50, b: 50 }
     }
 
-    const config = {
-      displayModeBar: true,
-      displaylogo: false,
-      modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
-      responsive: true
-    }
+    const config = applyPlotlyConfigTheme(
+      {
+        displayModeBar: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
+        responsive: true,
+      },
+      { mode: themeMode },
+    )
 
     // Render (use newPlot for clean re-render)
     Plotly.purge(plotContainer.value)
@@ -387,23 +419,25 @@ async function renderFullscreenPlot() {
   if (!selectedFigure.value || !fullscreenPlotContainer.value) return
 
   try {
-    const figureData = selectedFigure.value
-    
+    const rawFigureData = selectedFigure.value
+    const themeMode = resolvePlotThemeMode()
+    const figureData = applyPlotlyTheme(rawFigureData, { mode: themeMode, context: 'fullscreen' }) || rawFigureData
+
     const layout = {
-      ...figureData.layout,
+      ...(figureData.layout || {}),
       autosize: true,
       responsive: true,
-      paper_bgcolor: '#FDFCF8',
-      plot_bgcolor: '#FAF8F3',
-      margin: { l: 60, r: 60, t: 60, b: 60 }
     }
-    
-    const config = {
-      displayModeBar: true,
-      displaylogo: false,
-      responsive: true
-    }
-    
+
+    const config = applyPlotlyConfigTheme(
+      {
+        displayModeBar: true,
+        displaylogo: false,
+        responsive: true,
+      },
+      { mode: themeMode },
+    )
+
     await Plotly.newPlot(
       fullscreenPlotContainer.value,
       figureData.data || [],
@@ -447,23 +481,40 @@ async function downloadHtml() {
   if (!selectedFigure.value) return
 
   try {
-    const figureData = selectedFigure.value
+    const rawFigureData = selectedFigure.value
+    const themeMode = resolvePlotThemeMode()
+    const figureData = applyPlotlyTheme(rawFigureData, { mode: themeMode, context: 'export' }) || rawFigureData
+    const plotlyConfig = applyPlotlyConfigTheme({}, { mode: themeMode })
+    const chartTitle = String(selectedFigureMeta.value?.logical_name || 'Chart Visualization')
+    const escapedChartTitle = escapeHtml(chartTitle)
     
     const htmlContent = `<!DOCTYPE html>
 <html>
 <head>
-    <title>Chart Visualization</title>
+    <title>${escapedChartTitle}</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"><\/script>
     <style>
-        body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
-        #chart { width: 100%; height: 600px; }
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #FDFCF8;
+            color: #27272A;
+        }
+        h1 { font-size: 1rem; margin: 0 0 12px 0; }
+        #chart { width: 100%; height: calc(100vh - 84px); min-height: 600px; }
     </style>
 </head>
 <body>
-    <h1>Chart Visualization</h1>
+    <h1>${escapedChartTitle}</h1>
     <div id="chart"></div>
     <script>
-        Plotly.newPlot('chart', ${JSON.stringify(figureData.data || [])}, ${JSON.stringify(figureData.layout || {})});
+        Plotly.newPlot(
+          'chart',
+          ${JSON.stringify(figureData.data || [])},
+          ${JSON.stringify(figureData.layout || {})},
+          ${JSON.stringify(plotlyConfig)}
+        );
     <\/script>
 </body>
 </html>`
@@ -487,6 +538,34 @@ async function downloadHtml() {
     
   } catch (error) {
     console.error('Failed to download HTML:', error)
+  }
+}
+
+async function deleteSelectedFigure() {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  const artifactId = String(selectedArtifactId.value || '').trim()
+  if (!workspaceId || !artifactId || isDeletingArtifact.value) return
+
+  const logicalName = String(selectedFigureMeta.value?.logical_name || artifactId)
+  const confirmed = window.confirm(`Delete chart "${logicalName}"? This cannot be undone.`)
+  if (!confirmed) return
+
+  isDeletingArtifact.value = true
+  artifactListError.value = ''
+  try {
+    await apiService.v1DeleteWorkspaceArtifact(workspaceId, artifactId)
+    await loadWorkspaceFigureArtifacts(workspaceId)
+    const fallbackId = workspaceFigureArtifacts.value[0]?.artifact_id || null
+    selectedArtifactId.value = fallbackId
+    if (!fallbackId) {
+      selectedFigurePayload.value = null
+      appStore.setPlotlyFigure(null)
+    }
+  } catch (error) {
+    if (error?.name === 'AbortError') return
+    artifactListError.value = error?.message || 'Failed to delete chart.'
+  } finally {
+    isDeletingArtifact.value = false
   }
 }
 

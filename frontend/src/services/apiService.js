@@ -811,6 +811,20 @@ export const apiService = {
     return response.json()
   },
 
+  async v1DeleteWorkspaceArtifact(workspaceId, artifactId, options = {}) {
+    const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/${artifactId}`
+    const response = await fetch(url, {
+      method: 'DELETE',
+      credentials: 'include',
+      signal: options?.signal || null,
+    })
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}))
+      throw new Error(detail.detail || `Artifact delete failed (${response.status})`)
+    }
+    return response.json()
+  },
+
   async v1GetCurrentUser(options = {}) {
     return v1Api.auth.me(options)
   },

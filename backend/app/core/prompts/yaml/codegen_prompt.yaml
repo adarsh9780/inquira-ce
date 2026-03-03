@@ -27,9 +27,10 @@ template: |
   - Do NOT use Inquira-specific runtime helpers/functions.
   - Every user-facing output variable must use a descriptive, domain-specific name (for example: `monthly_revenue_summary_df`, `revenue_by_region_fig`).
   - NEVER use generic output names such as `result`, `final_df`, `fig`, `data`, or `output`.
-  - Treat variables as immutable: once a name is assigned, do not assign to that name again.
-  - If data is modified (filter/sort/group/join/pivot/enrich), create a new variable name for that stage.
-  - Never reuse the same variable name for a later transformation or chart.
+  - Intermediate/helper variables should be single-purpose and immutable within a snippet.
+  - If data is modified (filter/sort/group/join/pivot/enrich), create a new intermediate variable name for that stage.
+  - Final persisted output names should be stable across similar reruns so artifacts overwrite cleanly.
+  - Reuse a final output name intentionally only when it represents the same business meaning; use a new final name when meaning changes.
   - You MUST populate `output_contract` with final variables backend should persist.
   - `output_contract` is a list of objects like `{{"name": "monthly_revenue_summary_df", "kind": "dataframe"}}`.
   - Valid kinds: `dataframe`, `figure`, `scalar` (aliases like `pandas`/`polars`/`pyarrow`/`arrow` and `plotly` are acceptable).
