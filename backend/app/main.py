@@ -40,7 +40,7 @@ from .services.session_variable_store import session_variable_store
 from .services.websocket_manager import websocket_manager
 from .services.tracing import init_phoenix_tracing
 
-APP_VERSION = "0.5.7a5"
+APP_VERSION = "0.5.7a6"
 
 
 def _default_cors_origins() -> list[str]:

@@ -26,8 +26,9 @@ It does:
 
 ## Practical release behavior
 
-- Releases are created as draft prereleases in the current setup.
-- You can review release notes/assets and publish manually.
+- Release waits for CI to finish successfully for the same commit before build/publish steps begin.
+- Releases are published immediately as prereleases (not drafts).
+- Release title/body are synchronized from `.github/release/metadata.json` during the workflow run.
 - Windows desktop is currently non-blocking in release workflow.
 
 Detailed steps: [Release Process](./release_process.md)

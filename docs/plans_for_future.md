@@ -1,4 +1,20 @@
-- [ ] We should take a look at the Inquira Langgraph agent and try to truncate the conversation history after a certain number of messages. We should also try to summarise the conversation if it exceeds a certain length.
-- [ ] Right now, we have to make sure that the agent/graph is not trying to solve all queries in the conversation history.
-- [ ] Implement a queue system for the Inquira tool.
-- [ ] We should also try to implement a parallel execution system so that users can work on multiple queries spanning multiple datasets at the same time.
+- [ ] Panels: make left/right panel toggleable with rule that only one can be hidden at a time; both open remains allowed.
+- [ ] Panels: add smooth open/close animation.
+- [ ] Shortcuts: add VS Code-like shortcuts (`Ctrl+J` terminal, `Ctrl+L` left panel, `Ctrl+B` right panel).
+- [ ] Responsive UI: remove fixed-width behavior in controls such as table/chart selector dropdown.
+- [ ] Auth page: align background color with app theme.
+- [ ] Schema editor: add dropdown to switch among all workspace schemas.
+- [ ] Dataset selector: remove single-dataset highlight style and move toward querying across all workspace datasets.
+- [ ] Multi-dataset agent path: support combined schema context instead of one-table-only emphasis.
+- [ ] Data model: split conversation/turn tables from global users/payment-status tables.
+- [ ] Workspace code persistence: save generated code as one Python script per workspace.
+- [ ] Code runtime visibility: add websocket status channel for run state and kernel state in code UI.
+- [ ] Image payload policy: stream base64 image output when payload size exceeds threshold, instead of sending interactive image payload.
+- [ ] Agent memory scaling: add background summarize+truncate node based on token thresholds (use `tiktoken` or API token usage).
+- [ ] Agent memory scaling: ensure summarization/truncation does not block UI.
+- [ ] Grid UX: fix AG Grid sort/filter behavior.
+- [ ] Artifact behavior: remove inline fallback when artifact file is missing; show explicit “artifact missing on disk”.
+- [ ] Artifact switching (`df1 -> df2 -> df1`): add at least offset/limit cache first; evaluate deeper backend page cache later.
+- [ ] DuckDB support: enable direct DuckDB file support where currently unsupported.
+- [ ] Runtime failure loop: evaluate optional “regenerate/fix code then retry” path, since current retries only rerun same code.
+- [ ] Lifecycle behavior: hidden/idle tab currently does not evict chat history; define and implement explicit policy if needed.

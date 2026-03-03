@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/adarsh9780/inquira-ce/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/adarsh9780/inquira-ce/ci.yml?branch=master&label=CI" alt="CI Status"></a>
-  <a href="https://github.com/adarsh9780/inquira-ce/releases"><img src="https://img.shields.io/github/v/release/adarsh9780/inquira-ce?display_name=tag" alt="Latest Release"></a>
+  <a href="https://github.com/adarsh9780/inquira-ce/releases"><img src="https://img.shields.io/github/v/tag/adarsh9780/inquira-ce?label=release" alt="Latest Release Tag"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License MIT"></a>
   <img src="https://img.shields.io/badge/python-3.12%2B-blue.svg" alt="Python 3.12+">
   <img src="https://img.shields.io/badge/stage-alpha-orange.svg" alt="Alpha">
@@ -16,13 +16,22 @@ Local-first desktop data analysis with AI-assisted Python generation and executi
 
 Tags: `desktop`, `local-first`, `fastapi`, `vue`, `tauri`, `duckdb`, `langgraph`, `gemini`.
 
-Hosted docs site (GitHub Pages): `https://adarsh9780.github.io/inquira-ce/`
+Hosted docs site (GitHub Pages): [https://adarsh9780.github.io/inquira-ce/](https://adarsh9780.github.io/inquira-ce/)
 
 ## Why Inquira
 
 - Keep data local while using AI-assisted analysis workflows.
 - Turn natural language requests into reproducible Python/data operations.
 - Package the app as a desktop experience with backend + frontend + Tauri shell.
+
+## What's New (Since v0.5.7a5)
+
+- Real-time chat token streaming with smoother incremental response rendering.
+- Redesigned workspace layout with a unified collapsible sidebar and dual resizable panes.
+- Stronger built-in terminal workflow with persistent sessions and improved output visibility.
+- Better runtime reliability around DuckDB locks, kernel lifecycle, and artifact rendering.
+- Clearer agent answer structure for analysis plans and explain-code responses.
+- Desktop icon sizing normalized for consistent Dock appearance.
 
 ## Quick Start
 
@@ -35,18 +44,19 @@ inquira
 ```
 
 Desktop binaries (`.dmg`, `.exe`) are available on:
-`https://github.com/adarsh9780/inquira-ce/releases/latest`
+[https://github.com/adarsh9780/inquira-ce/releases/latest](https://github.com/adarsh9780/inquira-ce/releases/latest)
 
 ### Contributors (Run From Source)
 
 ```bash
 git clone https://github.com/adarsh9780/inquira-ce.git
 cd inquira-ce
-cargo tauri dev --manifest-path src-tauri/Cargo.toml
+cd src-tauri
+cargo tauri dev
 ```
 
 Before running `make git-commit`, create a local root `commit_message.txt` file and write your commit message in it.
-This file is intentionally untracked so each contributor manages their own local commit text.
+Keep this file updated for each commit so team commit flow remains consistent.
 
 ## Common Commands
 

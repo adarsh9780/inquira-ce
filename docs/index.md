@@ -6,6 +6,13 @@ Inquira CE is a local-first AI data analysis app with three distribution channel
 - Desktop installers (macOS/Windows) via GitHub Releases
 - Open-source docs and release notes on this site
 
+## Major recent updates
+
+- Real-time chat token streaming.
+- Unified collapsible sidebar and dual-pane workspace layout.
+- Persistent built-in terminal workflow for workspace analysis.
+- Improved runtime/artifact stability, including DuckDB lock handling.
+
 ## Quick Actions
 
 - [Open latest release](https://github.com/adarsh9780/inquira-ce/releases/latest)

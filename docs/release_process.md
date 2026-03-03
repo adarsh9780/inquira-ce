@@ -19,7 +19,7 @@ It also blocks same-or-lower version values.
 
 ## 3. Generate release metadata
 
-Create local `release_metadata.md` in repo root (untracked) with:
+Update `release_metadata.md` in repo root with:
 - first non-empty line as title
 - remaining content as release body
 
@@ -53,15 +53,15 @@ Workflow file: `.github/workflows/release.yml`
 What it does:
 
 1. Verifies tag commit is on `master`.
-2. Verifies `ci.yml` already succeeded for the same commit SHA.
+2. Waits for `ci.yml` to complete and requires success for the same commit SHA.
 3. Builds frontend assets for wheel packaging, syncs them into `backend/app/frontend/dist`, and builds backend wheel (`backend/dist/*.whl`).
 4. Uploads wheel to GitHub Release and publishes wheel to PyPI (environment: `pypi`).
 5. Builds desktop artifacts via Tauri action (macOS + Windows matrix; Windows uses NSIS bundle).
 6. Desktop and wheel publishing are independent: one can fail while the other still publishes.
 
-## 7. Publish release
+## 7. Verify published release
 
-Open GitHub Releases, review draft notes/artifacts, then publish.
+Open GitHub Releases and verify notes/artifacts on the published prerelease.
 
 ## Notes
 

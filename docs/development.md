@@ -14,7 +14,8 @@ This page describes the local development workflow used by the project.
 ```bash
 git clone https://github.com/adarsh9780/inquira-ce.git
 cd inquira-ce
-cargo tauri dev --manifest-path src-tauri/Cargo.toml
+cd src-tauri
+cargo tauri dev
 ```
 
 This command runs the desktop shell and wires frontend/backend development pieces together.

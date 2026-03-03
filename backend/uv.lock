@@ -864,7 +864,7 @@ wheels = [
 
 [[package]]
 name = "inquira-ce"
-version = "0.5.7a5"
+version = "0.5.7a6"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },

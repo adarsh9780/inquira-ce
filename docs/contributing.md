@@ -45,7 +45,7 @@ Use PEP 440 input (`0.5.0a7`). Tag style (`v0.5.0a7`) is normalized automaticall
 
 ## Updating Release Metadata
 
-1. Create or edit `release_metadata.md` in repo root (this file is intentionally untracked).
+1. Edit `release_metadata.md` in repo root.
 2. Generate tracked metadata JSON used by the release workflow:
 
 ```bash
@@ -74,7 +74,7 @@ This writes `.github/release/metadata.json`.
 ## Commit Hygiene
 
 - Keep commit messages clear and scoped.
-- Create a local root `commit_message.txt` before running `make git-commit`, and keep it updated for each commit.
-- `commit_message.txt` is intentionally untracked; contributors should maintain their own local file content.
+- Keep root `commit_message.txt` updated before running `make git-commit`.
+- Append new commit messages; do not overwrite previous entries.
 
 Next: [Changelog](./changelog.md)

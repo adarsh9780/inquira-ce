@@ -4,6 +4,13 @@ Inquira CE is a local-first desktop app for AI-assisted data analysis.
 
 In plain terms: you ask a question about data in natural language, and Inquira helps generate and run analysis workflows while keeping your data and runtime under your control.
 
+## Current product highlights
+
+- Real-time chat streaming with clearer final response presentation.
+- Unified workspace interface with collapsible navigation and dual resizable panes.
+- Built-in terminal support with persistent sessions for workspace-focused development.
+- Stronger artifact and runtime reliability (DuckDB lock handling and stable table/figure recovery).
+
 Version source of truth: root `VERSION` file.
 
 ## Who this is for
