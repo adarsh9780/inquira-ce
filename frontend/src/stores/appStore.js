@@ -453,6 +453,7 @@ export const useAppStore = defineStore('app', () => {
       node: String(event.node || ''),
       stage: String(event.stage || ''),
       message: String(event.message || event.node || ''),
+      output: String(event.output || ''),
       timestamp: new Date().toISOString()
     })
   }

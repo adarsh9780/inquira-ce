@@ -115,6 +115,7 @@ class State(BaseModel):
     metadata: Annotated[MetaData, merge_metadata] = Field(default=MetaData())
     plan: str | None = Field(default=None)
     code: str | None = Field(default=None)
+    final_explanation: str | None = Field(default=None)
     active_schema: dict[str, Any] | None = Field(default=None)
     previous_code: str = Field(
         default="", description="previous code used as context for generation"
@@ -150,6 +151,7 @@ class OutputSchema(BaseModel):
     metadata: MetaData | None = Field(default=None)
     plan: str | None = Field(default=None)
     code: str | None = Field(default=None)
+    final_explanation: str | None = Field(default=None)
     # We might want to pass these through
     table_name: str | None = Field(default=None)
     data_path: str | None = Field(default=None)
@@ -625,6 +627,60 @@ class InquiraAgent:
             "output_contract": [],
         }
 
+    def explain_code(self, state: State, config: RunnableConfig) -> dict[str, Any]:
+        system_prompt_template = SystemMessagePromptTemplate.from_template(
+            """You are the AI assistant for Inquira.
+
+Explain the generated Python code to a non-technical user in very simple language.
+
+Rules:
+- Use plain words and short sentences.
+- Avoid jargon. If a technical word is unavoidable, immediately explain it.
+- Explain what the code does, what output it produces, and why that helps answer the user's question.
+- Include exactly one clear next step the user can take.
+- End with one friendly question asking how you can help next.
+- Do not include raw code blocks or copy code lines.
+
+Plan:
+{plan}
+
+Code:
+{code}
+
+Guard status:
+{guard_status}
+""",
+            input_variables=["plan", "code", "guard_status"],
+        )
+        prompt = ChatPromptTemplate.from_messages(
+            [system_prompt_template, MessagesPlaceholder("messages")]
+        )
+
+        model = self._get_model(config, "gemini-2.5-flash-lite")
+        chain = prompt | model
+
+        response = self._invoke_text_chain_with_streaming(
+            chain,
+            {
+                "messages": state.messages,
+                "plan": state.plan or "",
+                "code": state.current_code or state.code or "",
+                "guard_status": state.guard_status or "ok",
+            },
+            node_name="explain_code",
+        )
+        explanation = _stringify_content(getattr(response, "content", "")).strip()
+        if not explanation:
+            explanation = (
+                "I generated code to answer your question. Next step: run it and review "
+                "the output table or chart. How else can I help?"
+            )
+
+        return {
+            "final_explanation": explanation,
+            "messages": [AIMessage(content=explanation)],
+        }
+
     def general_purpose(self, state: State, config: RunnableConfig) -> dict[str, Any]:
         system_prompt_template = """You are the AI assistant for **Inquira**, a data analysis platform.
 
@@ -699,6 +755,7 @@ The platform uses DuckDB for efficient querying, Pandas for transformations, and
         builder.add_node("code_generator", self.code_generator)
         builder.add_node("retry_code_generator", self.retry_code_generator)
         builder.add_node("code_guard", self.code_guard)
+        builder.add_node("explain_code", self.explain_code)
         builder.add_node("noncode_generator", self.noncode_generator)
         builder.add_node("general_purpose", self.general_purpose)
         builder.add_node("unsafe_rejector", self.unsafe_rejector)
@@ -753,9 +810,10 @@ The platform uses DuckDB for efficient querying, Pandas for transformations, and
         builder.add_conditional_edges(
             "code_guard",
             code_guard_router,
-            {"retry": "retry_code_generator", "failed": END, "ok": END},
+            {"retry": "retry_code_generator", "failed": END, "ok": "explain_code"},
         )
         builder.add_edge("retry_code_generator", "code_guard")
+        builder.add_edge("explain_code", END)
         builder.add_edge("general_purpose", END)
         builder.add_edge("unsafe_rejector", END)
 

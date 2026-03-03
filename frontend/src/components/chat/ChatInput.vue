@@ -241,7 +241,8 @@ async function handleSubmit() {
             appStore.appendLastMessageTraceEvent({
               type: 'status',
               stage: evt.data?.stage || '',
-              message: evt.data.message
+              message: evt.data.message,
+              output: evt.data?.output || ''
             })
             return
           }
@@ -249,7 +250,8 @@ async function handleSubmit() {
             appStore.appendLastMessageTraceEvent({
               type: 'node',
               node: evt.data.node,
-              message: evt.data.message || `${evt.data.node} completed`
+              message: evt.data.message || '',
+              output: evt.data?.output || ''
             })
           }
         }

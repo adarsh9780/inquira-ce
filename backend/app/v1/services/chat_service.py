@@ -85,6 +85,125 @@ class ChatService:
         return normalized
 
     @staticmethod
+    def _as_plain_dict(value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            return value
+        if hasattr(value, "model_dump"):
+            dumped = value.model_dump()
+            if isinstance(dumped, dict):
+                return dumped
+            return {}
+        if hasattr(value, "dict"):
+            dumped = value.dict()
+            if isinstance(dumped, dict):
+                return dumped
+            return {}
+        return {}
+
+    @staticmethod
+    def _extract_last_message_text(messages: Any) -> str:
+        if not isinstance(messages, list) or not messages:
+            return ""
+        last_message = messages[-1]
+        content = getattr(last_message, "content", None)
+        if content is None and isinstance(last_message, dict):
+            content = last_message.get("content")
+        return str(content or "").strip()
+
+    @staticmethod
+    def _build_node_stream_payload(
+        node_name: str,
+        payload: Any,
+        aggregated: dict[str, Any],
+    ) -> dict[str, Any]:
+        node = str(node_name or "").strip()
+        payload_dict = ChatService._as_plain_dict(payload)
+        aggregated_dict = ChatService._as_plain_dict(aggregated)
+
+        payload_meta = ChatService._as_plain_dict(payload_dict.get("metadata"))
+        aggregated_meta = ChatService._as_plain_dict(aggregated_dict.get("metadata"))
+        metadata = dict(aggregated_meta)
+        metadata.update(payload_meta)
+
+        event_payload: dict[str, Any] = {
+            "node": node,
+            "message": f"{node} completed",
+            "output": "",
+        }
+
+        if node == "check_safety":
+            decision = metadata.get("is_safe")
+            event_payload["decision"] = "safe" if bool(decision) else "unsafe"
+            event_payload["output"] = str(metadata.get("safety_reasoning") or "").strip()
+            return event_payload
+
+        if node == "check_relevancy":
+            decision = metadata.get("is_relevant")
+            event_payload["decision"] = "relevant" if bool(decision) else "irrelevant"
+            event_payload["output"] = str(metadata.get("relevancy_reasoning") or "").strip()
+            return event_payload
+
+        if node == "require_code":
+            require_code = metadata.get("require_code")
+            event_payload["decision"] = "code" if bool(require_code) else "noncode"
+            if require_code is True:
+                event_payload["output"] = "Code generation is required for this request."
+            elif require_code is False:
+                event_payload["output"] = "A direct language response is enough; code is not required."
+            return event_payload
+
+        if node == "create_plan":
+            event_payload["output"] = str(
+                payload_dict.get("plan")
+                or aggregated_dict.get("plan")
+                or ""
+            ).strip()
+            return event_payload
+
+        if node in {"code_generator", "retry_code_generator"}:
+            event_payload["output"] = str(
+                payload_dict.get("code")
+                or payload_dict.get("current_code")
+                or aggregated_dict.get("current_code")
+                or aggregated_dict.get("code")
+                or ""
+            ).strip()
+            return event_payload
+
+        if node == "code_guard":
+            status = str(
+                payload_dict.get("guard_status")
+                or aggregated_dict.get("guard_status")
+                or ""
+            ).strip()
+            feedback = str(
+                payload_dict.get("code_guard_feedback")
+                or aggregated_dict.get("code_guard_feedback")
+                or ""
+            ).strip()
+            if status:
+                event_payload["decision"] = status
+            event_payload["output"] = feedback
+            return event_payload
+
+        if node == "explain_code":
+            event_payload["output"] = str(
+                payload_dict.get("final_explanation")
+                or aggregated_dict.get("final_explanation")
+                or ChatService._extract_last_message_text(payload_dict.get("messages"))
+                or ""
+            ).strip()
+            return event_payload
+
+        if node in {"noncode_generator", "general_purpose", "unsafe_rejector"}:
+            event_payload["output"] = ChatService._extract_last_message_text(
+                payload_dict.get("messages")
+            )
+            return event_payload
+
+        return event_payload
+
+    @staticmethod
     def _build_auto_capture_result_code(output_contract: list[dict[str, str]]) -> str:
         declared_contract = json.dumps(output_contract, ensure_ascii=True)
         return (
@@ -684,7 +803,8 @@ class ChatService:
 
         code = result.get("current_code", "") or result.get("code", "") or ""
         code_guard_feedback = result.get("code_guard_feedback", "") or ""
-        explanation = result.get("plan", "") if code else ""
+        final_explanation = str(result.get("final_explanation") or "").strip()
+        explanation = final_explanation if code else ""
 
         if not code and code_guard_feedback:
             explanation = (
@@ -696,6 +816,8 @@ class ChatService:
             if not explanation and final_messages:
                 last_message = final_messages[-1]
                 explanation = str(getattr(last_message, "content", ""))
+            if code and not explanation:
+                explanation = str(result.get("plan", "") or "").strip()
 
         return {
             "is_safe": bool(metadata.get("is_safe", True)),
@@ -822,7 +944,11 @@ class ChatService:
                             )
                         queue_event(
                             "node",
-                            {"node": node_name, "message": f"{node_name} completed"},
+                            ChatService._build_node_stream_payload(
+                                node_name=node_name,
+                                payload=payload,
+                                aggregated=aggregated,
+                            ),
                         )
 
                 # Final state merge if checkpointer is active

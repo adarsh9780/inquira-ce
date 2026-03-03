@@ -60,9 +60,13 @@ async def test_v1_chat_stream_emits_token_events_before_final(monkeypatch):
         events.append(event)
 
     token_events = [evt for evt in events if evt.get("event") == "token"]
+    node_events = [evt for evt in events if evt.get("event") == "node"]
     final_events = [evt for evt in events if evt.get("event") == "final"]
 
     assert token_events
     assert "".join(evt["data"]["text"] for evt in token_events) == "Hello world"
+    assert node_events
+    assert node_events[0]["data"]["node"] == "create_plan"
+    assert node_events[0]["data"]["output"] == "Hello world"
     assert final_events
     assert events.index(token_events[0]) < events.index(final_events[0])

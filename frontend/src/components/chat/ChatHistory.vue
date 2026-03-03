@@ -48,75 +48,60 @@
       <!-- Assistant Response -->
       <div v-if="hasAssistantContent(message)" class="w-full group">
         <div class="px-4 py-3 rounded-2xl rounded-tl-sm" style="background-color: transparent">
+          <div v-if="ephemeralRows(message).length" class="space-y-3">
+            <div v-for="row in ephemeralRows(message)" :key="row.id">
+              <p class="text-sm font-medium" style="color: var(--color-text-muted);">{{ row.summary }}</p>
+              <details
+                v-if="row.output"
+                class="mt-1 rounded border px-3 py-2"
+                style="border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-base) 88%, var(--color-border) 12%);"
+              >
+                <summary class="text-xs cursor-pointer" style="color: var(--color-text-muted);">{{ row.dropdownLabel }}</summary>
+                <div class="mt-2 max-h-52 overflow-auto rounded border px-3 py-2" style="border-color: var(--color-border); background-color: var(--color-surface);">
+                  <div
+                    v-if="row.outputMode === 'markdown'"
+                    class="text-sm leading-relaxed prose prose-sm max-w-none prose-pre:overflow-x-auto prose-pre:break-words"
+                    style="color: var(--color-text-main);"
+                  >
+                    <div v-html="renderMarkdown(row.output)"></div>
+                  </div>
+                  <pre
+                    v-else
+                    class="text-xs whitespace-pre-wrap"
+                    style="color: var(--color-text-main);"
+                  >{{ row.output }}</pre>
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <div
+            v-if="message.explanation"
+            class="mt-4 mb-3 flex items-center gap-3"
+          >
+            <div class="h-px flex-1" style="background-color: var(--color-border);"></div>
+            <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Final response</span>
+            <div class="h-px flex-1" style="background-color: var(--color-border);"></div>
+          </div>
+
           <div v-if="message.explanation" class="text-sm leading-relaxed prose prose-sm max-w-none prose-pre:overflow-x-auto prose-pre:break-words" style="color: var(--color-text-main);">
             <div v-html="renderMarkdown(message.explanation)"></div>
           </div>
 
-          <div
-            v-if="message.codeUpdated"
-            class="mt-3 flex items-center justify-between rounded-lg border px-3 py-2"
-            style="border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-base) 75%, var(--color-border) 25%);"
-          >
-            <p class="text-xs font-medium" style="color: var(--color-text-main);">Code updated in editor.</p>
-            <button
-              type="button"
-              class="text-xs font-medium underline-offset-2 hover:underline"
-              style="color: var(--color-text-muted);"
-              @click="openCodePane"
-            >
-              Open Code
-            </button>
-          </div>
-
-          <details
-            v-if="hasStreamTrace(message)"
-            class="mt-3 rounded-lg p-2"
-            style="border: 1px solid var(--color-border); background-color: color-mix(in srgb, var(--color-base) 82%, var(--color-border) 18%);"
-          >
-            <summary class="text-xs cursor-pointer font-medium" style="color: var(--color-text-muted);">
-              Analysis trace
-            </summary>
-            <div class="mt-2 space-y-2">
-              <details
-                v-if="streamPlanText(message)"
-                class="rounded p-2"
-                style="border: 1px solid var(--color-border); background-color: var(--color-surface);"
+          <div v-if="shouldRenderCodeSnapshot(message)" class="chat-code-block mt-3">
+            <div class="chat-code-header">
+              <span>python</span>
+              <button
+                type="button"
+                class="text-xs font-medium underline-offset-2 hover:underline"
+                style="color: #A1A1AA;"
+                @click="openCodePane"
               >
-                <summary class="text-xs cursor-pointer" style="color: var(--color-text-muted);">Plan</summary>
-                <div
-                  class="mt-2 max-h-56 overflow-auto rounded border px-3 py-2"
-                  style="border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-base) 85%, transparent);"
-                >
-                  <div
-                    class="text-sm leading-relaxed prose prose-sm max-w-none prose-pre:overflow-x-auto prose-pre:break-words"
-                    style="color: var(--color-text-main);"
-                  >
-                    <div v-html="renderMarkdown(streamPlanText(message))"></div>
-                  </div>
-                </div>
-              </details>
-
-              <details
-                v-if="streamTraceEvents(message).length"
-                class="rounded p-2"
-                style="border: 1px solid var(--color-border); background-color: var(--color-surface);"
-              >
-                <summary class="text-xs cursor-pointer" style="color: var(--color-text-muted);">
-                  Steps ({{ streamTraceEvents(message).length }})
-                </summary>
-                <div class="mt-2 max-h-48 overflow-auto space-y-1 pr-1">
-                  <div
-                    v-for="(event, index) in streamTraceEvents(message)"
-                    :key="`${message.id}-trace-${index}`"
-                    class="rounded border px-2 py-1.5 text-xs"
-                    style="border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-base) 80%, transparent);"
-                  >
-                    <p class="font-medium" style="color: var(--color-text-main);">{{ formatTraceEvent(event) }}</p>
-                  </div>
-                </div>
-              </details>
+                Open Code
+              </button>
             </div>
-          </details>
+            <pre class="chat-code-scroll"><code>{{ message.codeSnapshot }}</code></pre>
+          </div>
 
           <details v-if="message.toolEvents && message.toolEvents.length" class="mt-3 rounded p-2" style="border: 1px solid var(--color-border);">
             <summary class="text-xs cursor-pointer" style="color: var(--color-text-muted);">Tool artifacts</summary>
@@ -205,6 +190,31 @@ const md = new MarkdownIt({
   breaks: true
 })
 md.use(markdownItKatex)
+md.renderer.rules.fence = (tokens, idx) => {
+  const token = tokens[idx]
+  const rawInfo = String(token.info || '').trim()
+  const language = rawInfo.split(/\s+/).filter(Boolean)[0] || 'python'
+  const langEscaped = md.utils.escapeHtml(language)
+  const classSafeLang = langEscaped.toLowerCase().replace(/[^a-z0-9_-]/g, '')
+  const codeEscaped = md.utils.escapeHtml(token.content || '')
+
+  return (
+    `<div class="chat-code-block">` +
+      `<div class="chat-code-header"><span>${langEscaped}</span></div>` +
+      `<pre class="chat-code-scroll"><code class="language-${classSafeLang}">${codeEscaped}</code></pre>` +
+    `</div>`
+  )
+}
+
+const EPHEMERAL_LABELS = {
+  check_safety: 'Checking if query is safe to process',
+  check_relevancy: 'Checking if query matches your data',
+  require_code: 'Determining whether code generation is needed',
+  create_plan: 'Planning the analysis steps',
+  code_generator: 'Generating Python code',
+  retry_code_generator: 'Retrying Python code generation',
+  code_guard: 'Validating generated code'
+}
 
 // Initialize shouldAutoScroll and setup listeners on mount
 onMounted(() => {
@@ -283,35 +293,89 @@ function streamTraceEvents(message) {
   return Array.isArray(events) ? events : []
 }
 
+function normalizeNodeName(nodeName) {
+  return String(nodeName || '')
+    .trim()
+    .toLowerCase()
+}
+
+function describeNode(nodeName) {
+  const normalized = normalizeNodeName(nodeName)
+  if (EPHEMERAL_LABELS[normalized]) return EPHEMERAL_LABELS[normalized]
+  if (!normalized) return 'Processing update'
+  return normalized
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function eventOutputText(event, message) {
+  const type = String(event?.type || '').toLowerCase()
+  const node = normalizeNodeName(event?.node)
+  const stage = String(event?.stage || '').trim().toLowerCase()
+  const eventMessage = String(event?.message || '').trim()
+  const explicitOutput = String(event?.output || '').trim()
+
+  if (explicitOutput) return explicitOutput
+
+  if (type === 'status' && stage === 'start') {
+    return ''
+  }
+
+  if (type === 'node' && node === 'create_plan') {
+    const plan = streamPlanText(message)
+    return plan || ''
+  }
+
+  if (eventMessage && eventMessage !== `${node} completed`) {
+    return eventMessage
+  }
+  return ''
+}
+
+function ephemeralRows(message) {
+  const events = streamTraceEvents(message)
+  return events.map((event, index) => {
+    const type = String(event?.type || '').toLowerCase()
+    const node = normalizeNodeName(event?.node)
+    const stage = String(event?.stage || '').trim().toLowerCase()
+
+    let summary = 'Processing update'
+    if (type === 'status' && stage === 'start') {
+      summary = 'Starting analysis'
+    } else if (type === 'status') {
+      summary = String(event?.message || 'Updating analysis status')
+    } else if (type === 'node') {
+      summary = describeNode(node)
+    }
+
+    const output = eventOutputText(event, message)
+    return {
+      id: `${message?.id || 'msg'}-${type || 'event'}-${node || stage || index}-${index}`,
+      summary,
+      output,
+      outputMode: node === 'create_plan' ? 'markdown' : 'text',
+      dropdownLabel: node === 'create_plan' ? 'View plan output' : 'View details'
+    }
+  })
+}
+
 function hasStreamTrace(message) {
-  return Boolean(streamPlanText(message) || streamTraceEvents(message).length > 0)
+  return ephemeralRows(message).length > 0
 }
 
 function hasAssistantContent(message) {
   return Boolean(
     message?.explanation ||
-    message?.codeUpdated ||
+    shouldRenderCodeSnapshot(message) ||
     hasStreamTrace(message) ||
     (Array.isArray(message?.toolEvents) && message.toolEvents.length > 0)
   )
 }
 
-function formatTraceEvent(event) {
-  const type = String(event?.type || '').trim().toLowerCase()
-  const node = String(event?.node || '').trim()
-  const stage = String(event?.stage || '').trim()
-  const message = String(event?.message || '').trim()
-
-  if (type === 'node') {
-    if (node && message) return `Node ${node}: ${message}`
-    if (node) return `Node ${node}`
-    return message || 'Node update'
-  }
-  if (type === 'status') {
-    if (stage && message) return `Status ${stage}: ${message}`
-    return message || 'Status update'
-  }
-  return message || 'Update'
+function shouldRenderCodeSnapshot(message) {
+  return Boolean(String(message?.codeSnapshot || '').trim())
 }
 
 function openCodePane() {
@@ -362,3 +426,42 @@ watch(() => appStore.isLoading, (isLoading) => {
   }
 })
 </script>
+
+<style scoped>
+.chat-code-block {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: #f4f4f5;
+}
+
+.chat-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+  background-color: #e4e4e7;
+  color: #3f3f46;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
+
+.chat-code-scroll {
+  margin: 0;
+  padding: 14px;
+  max-height: 320px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  background-color: #f4f4f5;
+  color: #1f2937;
+}
+
+.chat-code-scroll code {
+  font-family: Monaco, Menlo, "Ubuntu Mono", monospace;
+  white-space: pre;
+}
+</style>
