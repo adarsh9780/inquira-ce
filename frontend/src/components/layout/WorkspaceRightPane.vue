@@ -4,33 +4,36 @@
       <div class="inline-flex rounded-lg border p-1 flex-shrink-0" style="border-color: var(--color-border); background-color: var(--color-base);">
         <button
           @click="appStore.setDataPane('table')"
-          class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors flex items-center gap-1.5"
+          class="rounded-md p-2 transition-colors flex items-center justify-center"
           :class="appStore.dataPane === 'table' ? 'bg-white shadow-sm' : ''"
           :style="appStore.dataPane === 'table' ? 'color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
+          title="Table"
+          aria-label="Table"
         >
           <TableCellsIcon class="w-4 h-4" />
-          Table
-          <span v-if="appStore.dataframes?.length" class="ml-1 inline-flex items-center justify-center text-[10px] font-bold px-1.5 rounded-full min-w-[1.25rem]" style="background-color: color-mix(in srgb, var(--color-text-main) 10%, transparent); color: var(--color-text-main);">{{ appStore.dataframes.length }}</span>
+          <span class="sr-only">Table</span>
         </button>
         <button
           @click="appStore.setDataPane('figure')"
-          class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors flex items-center gap-1.5"
+          class="rounded-md p-2 transition-colors flex items-center justify-center"
           :class="appStore.dataPane === 'figure' ? 'bg-white shadow-sm' : ''"
           :style="appStore.dataPane === 'figure' ? 'color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
+          title="Chart"
+          aria-label="Chart"
         >
           <ChartBarIcon class="w-4 h-4" />
-          Figure
-          <span v-if="appStore.figures?.length" class="ml-1 inline-flex items-center justify-center text-[10px] font-bold px-1.5 rounded-full min-w-[1.25rem]" style="background-color: color-mix(in srgb, var(--color-text-main) 10%, transparent); color: var(--color-text-main);">{{ appStore.figures.length }}</span>
+          <span class="sr-only">Chart</span>
         </button>
         <button
           @click="appStore.setDataPane('varex')"
-          class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors flex items-center gap-1.5"
+          class="rounded-md p-2 transition-colors flex items-center justify-center"
           :class="appStore.dataPane === 'varex' ? 'bg-white shadow-sm' : ''"
           :style="appStore.dataPane === 'varex' ? 'color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
+          title="Var Ex"
+          aria-label="Var Ex"
         >
           <CircleStackIcon class="w-4 h-4" />
-          Var Ex
-          <span v-if="appStore.scalars?.length" class="ml-1 inline-flex items-center justify-center text-[10px] font-bold px-1.5 rounded-full min-w-[1.25rem]" style="background-color: color-mix(in srgb, var(--color-text-main) 10%, transparent); color: var(--color-text-main);">{{ appStore.scalars.length }}</span>
+          <span class="sr-only">Var Ex</span>
         </button>
       </div>
       

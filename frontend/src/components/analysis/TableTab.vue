@@ -240,6 +240,10 @@ watch(allArtifacts, (list) => {
 watch(
   () => (Array.isArray(appStore.dataframes) ? appStore.dataframes.map((df) => String(df?.data?.artifact_id || '')).filter(Boolean).join('|') : ''),
   () => {
+    const latestArtifactId = String(appStore.dataframes?.[0]?.data?.artifact_id || '').trim()
+    if (latestArtifactId && latestArtifactId !== selectedArtifactId.value) {
+      selectedArtifactId.value = latestArtifactId
+    }
     if (!appStore.activeWorkspaceId) return
     void loadWorkspaceArtifacts(appStore.activeWorkspaceId)
   }

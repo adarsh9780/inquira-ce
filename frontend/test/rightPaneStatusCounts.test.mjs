@@ -1,0 +1,48 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+test('workspace right pane uses icon-only data tabs without inline count badges', () => {
+  const rightPanePath = resolve(process.cwd(), 'src/components/layout/WorkspaceRightPane.vue')
+  const source = readFileSync(rightPanePath, 'utf-8')
+
+  assert.equal(source.includes('title="Table"'), true)
+  assert.equal(source.includes('title="Chart"'), true)
+  assert.equal(source.includes('title="Var Ex"'), true)
+  assert.equal(source.includes('<span class="sr-only">Table</span>'), true)
+  assert.equal(source.includes('<span class="sr-only">Chart</span>'), true)
+  assert.equal(source.includes('<span class="sr-only">Var Ex</span>'), true)
+  assert.equal(source.includes('appStore.dataframes.length'), false)
+  assert.equal(source.includes('appStore.figures.length'), false)
+  assert.equal(source.includes('appStore.scalars.length'), false)
+})
+
+test('status bar renders pane count from canonical table/chart counts and keeps table viewport label in parallel', () => {
+  const statusBarPath = resolve(process.cwd(), 'src/components/layout/StatusBar.vue')
+  const source = readFileSync(statusBarPath, 'utf-8')
+
+  assert.equal(source.includes('const paneArtifactCountLabel = computed(() => {'), true)
+  assert.equal(source.includes('Math.max('), true)
+  assert.equal(source.includes('Number(appStore.dataframeCount || 0)'), true)
+  assert.equal(source.includes('Number(appStore.figureCount || 0)'), true)
+  assert.equal(source.includes('v-if="appStore.activeWorkspaceId && paneArtifactCountLabel"'), true)
+  assert.equal(source.includes('v-if="appStore.activeWorkspaceId && tableViewportLabel"'), true)
+})
+
+test('figure tab header removes explicit Figure label next to dropdown', () => {
+  const figureTabPath = resolve(process.cwd(), 'src/components/analysis/FigureTab.vue')
+  const source = readFileSync(figureTabPath, 'utf-8')
+
+  assert.equal(source.includes('>Figure:</label>'), false)
+  assert.equal(source.includes('id="figure-select"'), true)
+  assert.equal(source.includes('<HeaderDropdown'), true)
+})
+
+test('app store keeps figureCount synchronized with setFigures output', () => {
+  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const source = readFileSync(storePath, 'utf-8')
+
+  assert.equal(source.includes('figureCount.value = 0'), true)
+  assert.equal(source.includes('figureCount.value = figures.value.length'), true)
+})

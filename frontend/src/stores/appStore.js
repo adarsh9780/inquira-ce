@@ -799,6 +799,7 @@ export const useAppStore = defineStore('app', () => {
   function setFigures(figs) {
     if (!Array.isArray(figs)) {
       figures.value = []
+      figureCount.value = 0
       return
     }
     figures.value = figs
@@ -812,6 +813,7 @@ export const useAppStore = defineStore('app', () => {
         }
       })
       .filter(Boolean)
+    figureCount.value = figures.value.length
   }
 
   function setScalars(scs) {

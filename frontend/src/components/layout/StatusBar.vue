@@ -61,15 +61,13 @@
           <span class="truncate">{{ appStore.dataPaneError }}</span>
         </div>
       </template>
-      <template v-else-if="appStore.activeWorkspaceId && tableViewportLabel">
-        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700">
-          <span>{{ tableViewportLabel }}</span>
-        </div>
-      </template>
-      <template v-else-if="appStore.activeWorkspaceId && artifactCountLabel">
-        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium"
+      <template v-else>
+        <div v-if="appStore.activeWorkspaceId && paneArtifactCountLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium"
              :class="artifactCountClass">
-          <span>{{ artifactCountLabel }}</span>
+          <span>{{ paneArtifactCountLabel }}</span>
+        </div>
+        <div v-if="appStore.activeWorkspaceId && tableViewportLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700">
+          <span>{{ tableViewportLabel }}</span>
         </div>
       </template>
     </div>
@@ -139,16 +137,22 @@ const tableViewportLabel = computed(() => {
   return `${total.toLocaleString()} rows`
 })
 
-// Tab-aware artifact count fallback when no active table viewport is available.
-const artifactCountLabel = computed(() => {
+// Tab-aware artifact count for the currently visible data pane.
+const paneArtifactCountLabel = computed(() => {
   if (appStore.dataPane === 'table') {
-    const n = appStore.dataframeCount
-    if (n === 0) return null
+    const n = Math.max(
+      Number(appStore.dataframeCount || 0),
+      Number(Array.isArray(appStore.dataframes) ? appStore.dataframes.length : 0)
+    )
+    if (n <= 0) return null
     return `${n} table${n === 1 ? '' : 's'} saved`
   }
   if (appStore.dataPane === 'figure') {
-    const n = appStore.figureCount
-    if (n === 0) return null
+    const n = Math.max(
+      Number(appStore.figureCount || 0),
+      Number(Array.isArray(appStore.figures) ? appStore.figures.length : 0)
+    )
+    if (n <= 0) return null
     return `${n} chart${n === 1 ? '' : 's'} saved`
   }
   return null

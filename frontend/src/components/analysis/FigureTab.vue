@@ -14,8 +14,7 @@
         
         <div class="flex items-center space-x-2">
           <!-- Figure Selector -->
-          <div v-if="orderedFigures && orderedFigures.length > 1" class="flex items-center space-x-2">
-            <label for="figure-select" class="text-xs font-medium" style="color: var(--color-text-muted);">Figure:</label>
+          <div v-if="orderedFigures && orderedFigures.length > 1" class="flex items-center">
             <HeaderDropdown
               id="figure-select"
               v-model="selectedFigureIndex"

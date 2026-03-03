@@ -176,7 +176,11 @@ function handleHeaderClick() {
 }
 
 async function selectConversation(id) {
-  if (id === appStore.activeConversationId) return
+  if (id === appStore.activeConversationId) {
+    appStore.setSidebarCollapsed(true)
+    emit('select')
+    return
+  }
   try {
     appStore.setActiveConversationId(id)
     await appStore.fetchConversationTurns({ reset: true })
