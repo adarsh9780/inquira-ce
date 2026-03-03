@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...services.code_executor import (
     bootstrap_workspace_runtime,
     execute_code,
+    get_workspace_artifact_metadata_via_kernel,
     get_workspace_dataframe_rows,
     get_workspace_kernel_status,
     interrupt_workspace_kernel,
@@ -581,10 +582,21 @@ async def get_workspace_artifact_metadata(
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     store = get_artifact_scratchpad_store()
-    artifact = store.get_artifact(
-        workspace_duckdb_path=str(workspace.duckdb_path),
-        artifact_id=artifact_id,
-    )
+    artifact: dict[str, Any] | None = None
+    try:
+        artifact = store.get_artifact(
+            workspace_duckdb_path=str(workspace.duckdb_path),
+            artifact_id=artifact_id,
+        )
+    except duckdb.IOException as exc:
+        message = str(exc)
+        if "Conflicting lock is held" not in message:
+            raise HTTPException(status_code=503, detail=f"Artifact store unavailable: {message}") from exc
+        # Lock-safe fallback: query through the kernel's in-process scratchpad connection.
+        artifact = await get_workspace_artifact_metadata_via_kernel(
+            workspace_id=workspace_id,
+            artifact_id=artifact_id,
+        )
     if artifact is None:
         raise HTTPException(status_code=404, detail="Artifact not found")
     return ArtifactMetadataResponse(**artifact)

@@ -9,7 +9,7 @@
     <!-- Authentication Modal -->
     <!-- Auth Modal -->
     <AuthModal
-      :is-open="!authStore.isAuthenticated && !authStore.isLoading"
+      :is-open="!authStore.isAuthenticated"
       @close="handleAuthClose"
       @authenticated="handleAuthenticated"
     />
@@ -29,15 +29,6 @@
       
       <!-- Footer Status Bar -->
       <StatusBar />
-    </div>
-
-    <!-- Loading Screen -->
-    <div v-else-if="authStore.isLoading" class="flex items-center justify-center h-screen bg-gray-50">
-      <div class="text-center">
-        <div class="animate-spin rounded-full h-16 w-16 border-4 border-gray-300 border-t-primary mx-auto mb-6"></div>
-        <h2 class="text-2xl font-semibold text-primary mb-2">Loading Inquira</h2>
-        <p class="text-gray-600 text-lg">Preparing your data analysis workspace...</p>
-      </div>
     </div>
 
     <!-- Backend Status Overlay ... -->

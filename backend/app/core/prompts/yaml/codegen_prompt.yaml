@@ -25,17 +25,27 @@ template: |
   ## Portability Rule (CRITICAL)
   - Generated code must be portable plain Python that can run outside Inquira.
   - Do NOT use Inquira-specific runtime helpers/functions.
-  - Prefer ending with a clear user-facing variable (`result`, `final_df`, `fig`) or final expression.
+  - Every user-facing output variable must use a descriptive, domain-specific name (for example: `monthly_revenue_summary_df`, `revenue_by_region_fig`).
+  - NEVER use generic output names such as `result`, `final_df`, `fig`, `data`, or `output`.
+  - Treat variables as immutable: once a name is assigned, do not assign to that name again.
+  - If data is modified (filter/sort/group/join/pivot/enrich), create a new variable name for that stage.
+  - Never reuse the same variable name for a later transformation or chart.
   - You MUST populate `output_contract` with final variables backend should persist.
-  - `output_contract` is a list of objects like `{{"name": "result", "kind": "dataframe"}}`.
+  - `output_contract` is a list of objects like `{{"name": "monthly_revenue_summary_df", "kind": "dataframe"}}`.
   - Valid kinds: `dataframe`, `figure`, `scalar` (aliases like `pandas`/`polars`/`pyarrow`/`arrow` and `plotly` are acceptable).
   - Include only final user-facing outputs; do not include transient helper variables.
+  - Names listed in `output_contract` must match the exact final variable names from the generated code.
 
   ## Code Generation Rules (ANTI-HALLUCINATION)
   - ALWAYS reuse the existing `conn` DuckDB connection when available.
   - NEVER call `read_csv_auto`, `read_parquet`, `read_json_auto`, `read_json`, or `read_excel` in generated code.
   - Use ONLY exact column names present in `Schema`; NEVER invent aliases/synonyms (e.g., do not use `Runs` if schema contains `Batter Runs`).
   - When writing SQL, always quote column identifiers with double quotes, especially for names with spaces/special chars (e.g., `"Batter Runs"`).
+
+  ## Plotly Standards (CRITICAL)
+  - Structure & clarity: order data logically (numeric/alphabetical/sequential), remove non-essential visual clutter, and keep the visual focused on the business question.
+  - Color: use 2-3 intentional colors with intuitive meaning (for example, red=high risk, blue=stable), enough contrast for highlights, and avoid noisy multi-color palettes.
+  - Labels & typography: label title + axes + legends, use one font family, and keep a clear hierarchy with no more than three text sizes.
 
   **MANDATORY SETUP PATTERN:**
   ```python
@@ -48,20 +58,26 @@ template: |
   workspace_duckdb_path = "{data_path}"
 
   # Query the already-registered backend table
-  df = conn.sql(f'SELECT * FROM "{table_name}" LIMIT 100').df()
+  raw_sample_df = conn.sql(f'SELECT * FROM "{table_name}" LIMIT 100').df()
   
   # Example Pandas usage:
-  result = (
-    df
-    .query("age > 30")
-    .group_by("department", as_index=False)
+  filtered_sample_df = raw_sample_df.query("age > 30")
+  department_salary_mean_df = (
+    filtered_sample_df
+    .groupby("department", as_index=False)
     .agg({{"salary": "mean"}})  
   )
   
   ```
   **PLOTTING EXAMPLE:**
   ```python
-  runs_by_team_fig = px.bar(result, x="team", y="runs", title="Runs by Team")
+  runs_by_team_fig = px.bar(department_salary_mean_df, x="department", y="salary", title="Average Salary by Department")
+  runs_by_team_fig.update_layout(
+      xaxis_title="Department",
+      yaxis_title="Average Salary",
+      font=dict(family="Arial", size=12),
+  )
+  runs_by_team_fig.update_traces(marker_color="#1f77b4")
   runs_by_team_fig
   ```
   - Respect existing context in `Current Code Context`; avoid re-defining everything unless needed.

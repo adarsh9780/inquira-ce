@@ -89,6 +89,18 @@ async def list_workspace_artifacts_via_kernel(
     )
 
 
+async def get_workspace_artifact_metadata_via_kernel(
+    workspace_id: str,
+    artifact_id: str,
+) -> dict[str, Any] | None:
+    """Fetch one artifact metadata payload via kernel-owned scratchpad connection."""
+    manager = await get_workspace_kernel_manager()
+    return await manager.get_workspace_artifact(
+        workspace_id=workspace_id,
+        artifact_id=artifact_id,
+    )
+
+
 async def get_workspace_run_exports(
     workspace_id: str,
     run_id: str,

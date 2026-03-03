@@ -233,6 +233,108 @@ async def test_workspace_dataframe_artifact_rows_endpoint_falls_back_on_duckdb_l
 
 
 @pytest.mark.asyncio
+async def test_workspace_artifact_metadata_endpoint(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws5-meta"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    class _FakeStore:
+        def get_artifact(self, *, workspace_duckdb_path: str, artifact_id: str):
+            assert workspace_duckdb_path == str(duckdb_path)
+            assert artifact_id == "fig-1"
+            return {
+                "artifact_id": "fig-1",
+                "run_id": "run-1",
+                "workspace_id": "ws-5",
+                "logical_name": "chart_one",
+                "kind": "figure",
+                "pointer": "duckdb://scratchpad/artifacts.duckdb#artifact=fig-1",
+                "table_name": None,
+                "schema": None,
+                "row_count": None,
+                "payload": {"figure": {"data": [], "layout": {}}},
+                "created_at": "2026-03-03T00:00:00+00:00",
+                "expires_at": "2026-03-04T00:00:00+00:00",
+                "status": "ready",
+                "error": None,
+            }
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _FakeStore())
+
+    response = await runtime_api.get_workspace_artifact_metadata(
+        workspace_id="ws-5",
+        artifact_id="fig-1",
+        session=object(),
+        current_user=SimpleNamespace(id="user-1"),
+    )
+
+    assert response.artifact_id == "fig-1"
+    assert response.kind == "figure"
+    assert response.logical_name == "chart_one"
+    assert response.payload == {"figure": {"data": [], "layout": {}}}
+
+
+@pytest.mark.asyncio
+async def test_workspace_artifact_metadata_endpoint_falls_back_on_duckdb_lock(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws5-meta-lock"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    class _LockedStore:
+        def get_artifact(self, *, workspace_duckdb_path: str, artifact_id: str):
+            _ = (workspace_duckdb_path, artifact_id)
+            raise runtime_api.duckdb.IOException("Conflicting lock is held")
+
+    async def fake_get_meta(workspace_id: str, artifact_id: str):
+        assert workspace_id == "ws-5"
+        assert artifact_id == "fig-1"
+        return {
+            "artifact_id": "fig-1",
+            "run_id": "run-1",
+            "workspace_id": "ws-5",
+            "logical_name": "chart_one",
+            "kind": "figure",
+            "pointer": "duckdb://scratchpad/artifacts.duckdb#artifact=fig-1",
+            "table_name": None,
+            "schema": None,
+            "row_count": None,
+            "payload": {"figure": {"data": [], "layout": {}}},
+            "created_at": "2026-03-03T00:00:00+00:00",
+            "expires_at": "2026-03-04T00:00:00+00:00",
+            "status": "ready",
+            "error": None,
+        }
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _LockedStore())
+    monkeypatch.setattr(runtime_api, "get_workspace_artifact_metadata_via_kernel", fake_get_meta)
+
+    response = await runtime_api.get_workspace_artifact_metadata(
+        workspace_id="ws-5",
+        artifact_id="fig-1",
+        session=object(),
+        current_user=SimpleNamespace(id="user-1"),
+    )
+
+    assert response.artifact_id == "fig-1"
+    assert response.kind == "figure"
+    assert response.logical_name == "chart_one"
+
+
+@pytest.mark.asyncio
 async def test_workspace_kernel_status_endpoint(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws3"
     workspace_dir.mkdir(parents=True, exist_ok=True)

@@ -209,6 +209,7 @@ let kernelReadyWorkspaceId = ''
 let serializedRequestQueue = Promise.resolve()
 let selectedArtifactLoadToken = 0
 let currentDatasourceToken = 0
+let isRecoveringMissingArtifact = false
 const pendingRestorePageByArtifact = new Map()
 
 onMounted(() => {
@@ -257,6 +258,12 @@ function createAbortError(message = 'Request aborted') {
 
 function isAbortError(error) {
   return error?.name === 'AbortError'
+}
+
+function isMissingArtifactRowsError(error) {
+  const message = String(error?.message || '')
+  if (!message) return false
+  return message.includes('Artifact rows not found') || message.includes('Artifact row fetch failed (404)')
 }
 
 function enqueueSerializedRequest(task) {
@@ -352,6 +359,31 @@ async function loadWorkspaceArtifacts(workspaceId) {
     workspaceArtifacts.value = []
   } finally {
     isLoadingArtifacts.value = false
+  }
+}
+
+async function recoverFromMissingArtifact(artifactId) {
+  const missingArtifactId = String(artifactId || '').trim()
+  if (!missingArtifactId || !appStore.activeWorkspaceId) return
+  if (isRecoveringMissingArtifact) return
+  isRecoveringMissingArtifact = true
+  try {
+    tableError.value = 'Selected table was removed. Refreshing table list...'
+    await loadWorkspaceArtifacts(appStore.activeWorkspaceId)
+    const stillExists = allArtifacts.value.some((item) => item.artifact_id === missingArtifactId)
+    if (stillExists) {
+      tableError.value = ''
+      return
+    }
+    const fallbackId = allArtifacts.value[0]?.artifact_id || null
+    selectedArtifactId.value = fallbackId
+    if (!fallbackId) {
+      tableError.value = 'Selected table no longer exists. Run code to create a new table.'
+    } else {
+      tableError.value = ''
+    }
+  } finally {
+    isRecoveringMissingArtifact = false
   }
 }
 
@@ -609,6 +641,10 @@ async function loadInitialServerPage(artifactId) {
     appStore.setTableViewport(windowStart.value, windowEnd.value, rowCountValue.value)
   } catch (error) {
     if (isAbortError(error)) return
+    if (isMissingArtifactRowsError(error)) {
+      await recoverFromMissingArtifact(artifactId)
+      return
+    }
     console.error('Failed to load initial dataframe page:', error)
     tableError.value = error?.message || 'Failed to load table data.'
     serverRows.value = []
@@ -675,6 +711,12 @@ async function attachInfiniteDatasource(artifactId) {
         appStore.setTableViewport(windowStart.value, windowEnd.value, rowCountValue.value)
       } catch (error) {
         if (isAbortError(error)) return
+        if (isMissingArtifactRowsError(error)) {
+          await recoverFromMissingArtifact(aid)
+          if (!isGridAlive() || datasourceTag !== currentDatasourceToken) return
+          params.successCallback([], 0)
+          return
+        }
         console.error('Failed to load dataframe page:', error)
         if (!isGridAlive() || datasourceTag !== currentDatasourceToken) return
         tableError.value = error?.message || 'Failed to load paginated table data.'

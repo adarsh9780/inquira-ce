@@ -331,6 +331,76 @@ class WorkspaceKernelManager:
             return []
         return [item for item in parsed.result if isinstance(item, dict)]
 
+    async def get_workspace_artifact(
+        self,
+        *,
+        workspace_id: str,
+        artifact_id: str,
+    ) -> dict[str, Any] | None:
+        """Read one artifact via the kernel's in-process scratchpad connection."""
+        async with self._sessions_lock:
+            session = self._sessions.get(workspace_id)
+        if session is None:
+            return None
+
+        escaped_artifact_id = str(artifact_id).replace("'", "''")
+        meta_code = (
+            "import json as _json\n"
+            "from datetime import datetime as _dt, timezone as _tz\n"
+            "_now = _dt.now(_tz.utc)\n"
+            f"_row = scratchpad_conn.execute(\"\"\"\n"
+            f"    SELECT artifact_id, run_id, workspace_id, logical_name, kind, table_name,\n"
+            f"           payload_json, schema_json, row_count, created_at, expires_at, status, error\n"
+            f"    FROM artifact_manifest\n"
+            f"    WHERE artifact_id = '{escaped_artifact_id}' AND expires_at > ?\n"
+            f"    LIMIT 1\n"
+            f"\"\"\", [_now]).fetchone()\n"
+            "if _row is None:\n"
+            "    _result = None\n"
+            "else:\n"
+            "    _payload = None\n"
+            "    _schema = None\n"
+            "    try:\n"
+            "        if _row[6]:\n"
+            "            _payload = _json.loads(str(_row[6]))\n"
+            "    except Exception:\n"
+            "        _payload = None\n"
+            "    try:\n"
+            "        if _row[7]:\n"
+            "            _schema = _json.loads(str(_row[7]))\n"
+            "    except Exception:\n"
+            "        _schema = None\n"
+            "    _result = {\n"
+            "        'artifact_id': str(_row[0]),\n"
+            "        'run_id': str(_row[1]),\n"
+            "        'workspace_id': str(_row[2]),\n"
+            "        'logical_name': str(_row[3]),\n"
+            "        'kind': str(_row[4]),\n"
+            "        'table_name': str(_row[5]) if _row[5] is not None else None,\n"
+            "        'payload': _payload,\n"
+            "        'schema': _schema,\n"
+            "        'row_count': int(_row[8] or 0) if _row[8] is not None else None,\n"
+            "        'created_at': str(_row[9]),\n"
+            "        'expires_at': str(_row[10]),\n"
+            "        'status': str(_row[11]),\n"
+            "        'error': str(_row[12]) if _row[12] is not None else None,\n"
+            "        'pointer': f'duckdb://scratchpad/artifacts.duckdb#artifact={_row[0]}',\n"
+            "    }\n"
+            "_result\n"
+        )
+
+        async with session.lock:
+            session.last_used = datetime.now(UTC)
+            parsed = await self._execute_request(session, meta_code)
+
+        if parsed.error is not None:
+            return None
+        if parsed.result is None:
+            return None
+        if not isinstance(parsed.result, dict):
+            return None
+        return parsed.result
+
     async def ensure_ready(
         self,
         *,
