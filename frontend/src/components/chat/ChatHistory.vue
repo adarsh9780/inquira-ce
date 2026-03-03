@@ -287,6 +287,11 @@ onMounted(() => {
     })
     mutationObserver.observe(chatContainer.value, { childList: true, subtree: true })
   }
+
+  // Hydrated conversations mount with existing messages, so force initial bottom alignment.
+  if (appStore.chatHistory.length > 0) {
+    nextTick(() => scrollToBottom())
+  }
 })
 
 // Clean up event listener and observer when component unmounts
