@@ -30,7 +30,14 @@ batting_totals = team_df.sort_values("Batter Runs", ascending=False)
 
 
 def test_create_plan_prompt_requires_plain_english_steps_without_code():
-    prompt_path = Path("backend/app/core/prompts/yaml/create_plan_prompt.yaml")
+    prompt_path = (
+        Path(__file__).resolve().parents[1]
+        / "app"
+        / "core"
+        / "prompts"
+        / "yaml"
+        / "create_plan_prompt.yaml"
+    )
     prompt_text = prompt_path.read_text(encoding="utf-8")
 
     assert "Do NOT include Python, SQL, pseudocode" in prompt_text

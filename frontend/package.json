@@ -24,6 +24,8 @@
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-fs": "^2.4.5",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
     "ag-grid-community": "^34.1.0",
     "ag-grid-vue3": "^34.1.0",
     "axios": "^1.11.0",
@@ -34,10 +36,9 @@
     "markdown-it-katex": "^2.0.3",
     "pinia": "^3.0.3",
     "plotly.js-dist-min": "^3.0.3",
+    "prismjs": "^1.30.0",
     "tailwindcss": "^4.1.11",
-    "vue": "^3.5.17",
-    "@xterm/xterm": "^5.5.0",
-    "@xterm/addon-fit": "^0.10.0"
+    "vue": "^3.5.17"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.0",
