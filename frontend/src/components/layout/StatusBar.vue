@@ -51,7 +51,7 @@
       </div>
     </div>
 
-    <!-- Center Section: Tab-aware artifact count or data pane error -->
+    <!-- Center Section: Data pane status -->
     <div class="flex items-center gap-2 h-full">
       <!-- Data pane error takes priority -->
       <template v-if="appStore.dataPaneError">
@@ -59,6 +59,11 @@
              :title="appStore.dataPaneError">
           <span class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
           <span class="truncate">{{ appStore.dataPaneError }}</span>
+        </div>
+      </template>
+      <template v-else-if="appStore.activeWorkspaceId && tableViewportLabel">
+        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700">
+          <span>{{ tableViewportLabel }}</span>
         </div>
       </template>
       <template v-else-if="appStore.activeWorkspaceId && artifactCountLabel">
@@ -122,7 +127,19 @@ const kernelStatusMeta = computed(() => {
   }
 })
 
-// Tab-aware artifact count — single source of truth, shown only in status bar
+const tableViewportLabel = computed(() => {
+  if (appStore.dataPane !== 'table') return null
+  const total = Number(appStore.tableRowCount || 0)
+  if (total <= 0) return null
+  const start = Math.max(0, Number(appStore.tableWindowStart || 0))
+  const end = Math.max(0, Number(appStore.tableWindowEnd || 0))
+  if (start > 0 && end > 0) {
+    return `${total.toLocaleString()} rows - Showing ${start.toLocaleString()}-${end.toLocaleString()} of ${total.toLocaleString()}`
+  }
+  return `${total.toLocaleString()} rows`
+})
+
+// Tab-aware artifact count fallback when no active table viewport is available.
 const artifactCountLabel = computed(() => {
   if (appStore.dataPane === 'table') {
     const n = appStore.dataframeCount

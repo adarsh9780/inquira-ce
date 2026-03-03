@@ -2,8 +2,10 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { apiService } from '../services/apiService'
 import { localStateService } from '../services/localStateService'
+import { useAuthStore } from './authStore'
 
 export const useAppStore = defineStore('app', () => {
+  const authStore = useAuthStore()
 
   // Files
   const dataFilePath = ref('')
@@ -52,6 +54,10 @@ export const useAppStore = defineStore('app', () => {
   const figures = ref([])
   const scalars = ref([])
   const dataframeCount = ref(0)
+  const tableRowCount = ref(0)
+  const tableWindowStart = ref(0)
+  const tableWindowEnd = ref(0)
+  const tablePageOffsets = ref({})
   const dataPaneError = ref('')
   const figureCount = ref(0)
   const terminalOutput = ref('')
@@ -116,7 +122,11 @@ export const useAppStore = defineStore('app', () => {
         terminal_open: !!isTerminalOpen.value,
         terminal_height: Number(terminalHeight.value || 30),
         is_sidebar_collapsed: !!isSidebarCollapsed.value,
-        hide_shortcuts_modal: !!hideShortcutsModal.value
+        hide_shortcuts_modal: !!hideShortcutsModal.value,
+        table_row_count: Number(tableRowCount.value || 0),
+        table_window_start: Number(tableWindowStart.value || 0),
+        table_window_end: Number(tableWindowEnd.value || 0),
+        table_page_offsets: tablePageOffsets.value || {}
       },
       session: {
         active_workspace_id: activeWorkspaceId.value || '',
@@ -178,6 +188,18 @@ export const useAppStore = defineStore('app', () => {
     if (typeof ui.hide_shortcuts_modal === 'boolean') {
       hideShortcutsModal.value = ui.hide_shortcuts_modal
     }
+    if (typeof ui.table_row_count === 'number' && ui.table_row_count >= 0) {
+      tableRowCount.value = Math.max(0, Math.floor(ui.table_row_count))
+    }
+    if (typeof ui.table_window_start === 'number' && ui.table_window_start >= 0) {
+      tableWindowStart.value = Math.max(0, Math.floor(ui.table_window_start))
+    }
+    if (typeof ui.table_window_end === 'number' && ui.table_window_end >= 0) {
+      tableWindowEnd.value = Math.max(0, Math.floor(ui.table_window_end))
+    }
+    if (ui.table_page_offsets && typeof ui.table_page_offsets === 'object') {
+      tablePageOffsets.value = { ...ui.table_page_offsets }
+    }
 
     if (typeof sessionState.active_workspace_id === 'string') {
       activeWorkspaceId.value = sessionState.active_workspace_id
@@ -228,6 +250,10 @@ export const useAppStore = defineStore('app', () => {
 
   function saveLocalConfig() {
     schedulePreferenceSync()
+    scheduleLocalSnapshotSave()
+  }
+
+  function scheduleLocalSnapshotSave() {
     if (localStateSyncTimer) clearTimeout(localStateSyncTimer)
     localStateSyncTimer = setTimeout(() => {
       void localStateService.saveSnapshot(buildLocalStateSnapshot())
@@ -270,7 +296,12 @@ export const useAppStore = defineStore('app', () => {
       activeConversationId.value = ''
       historicalCodeBlocks.value = []
       hideShortcutsModal.value = false
+      tableRowCount.value = 0
+      tableWindowStart.value = 0
+      tableWindowEnd.value = 0
+      tablePageOffsets.value = {}
       schedulePreferenceSync()
+      scheduleLocalSnapshotSave()
 
       return true
     } catch (error) {
@@ -424,6 +455,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function ensureWorkspaceKernelConnected(workspaceId = activeWorkspaceId.value) {
+    if (!authStore.isAuthenticated) return false
     const targetWorkspaceId = (workspaceId || '').trim()
     if (!targetWorkspaceId) return false
 
@@ -786,6 +818,41 @@ export const useAppStore = defineStore('app', () => {
     dataPaneError.value = ''
   }
 
+  function setTableViewport(start, end, total) {
+    tableWindowStart.value = Math.max(0, Number(start || 0))
+    tableWindowEnd.value = Math.max(0, Number(end || 0))
+    tableRowCount.value = Math.max(0, Number(total || 0))
+    scheduleLocalSnapshotSave()
+  }
+
+  function clearTableViewport() {
+    tableWindowStart.value = 0
+    tableWindowEnd.value = 0
+    tableRowCount.value = 0
+    scheduleLocalSnapshotSave()
+  }
+
+  function tableOffsetKey(workspaceId, artifactId) {
+    return `${String(workspaceId || '').trim()}::${String(artifactId || '').trim()}`
+  }
+
+  function setTablePageOffset(workspaceId, artifactId, page) {
+    const key = tableOffsetKey(workspaceId, artifactId)
+    if (!key || key === '::') return
+    const normalizedPage = Math.max(0, Number(page || 0))
+    tablePageOffsets.value = {
+      ...tablePageOffsets.value,
+      [key]: normalizedPage
+    }
+    scheduleLocalSnapshotSave()
+  }
+
+  function getTablePageOffset(workspaceId, artifactId) {
+    const key = tableOffsetKey(workspaceId, artifactId)
+    if (!key || key === '::') return 0
+    return Math.max(0, Number(tablePageOffsets.value?.[key] || 0))
+  }
+
   function setTerminalOutput(output) {
     terminalOutput.value = output
   }
@@ -934,6 +1001,10 @@ export const useAppStore = defineStore('app', () => {
     terminalEntries.value = []
     terminalEnabled.value = false
     runtimeError.value = ''
+    tableRowCount.value = 0
+    tableWindowStart.value = 0
+    tableWindowEnd.value = 0
+    tablePageOffsets.value = {}
     activeTab.value = 'workspace'
     workspacePane.value = 'code'
     dataPane.value = 'table'
@@ -1007,7 +1078,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   watch(activeWorkspaceId, (workspaceId) => {
-    if (!workspaceId) return
+    if (!workspaceId || !authStore.isAuthenticated) return
     void ensureWorkspaceKernelConnected(workspaceId)
   })
 
@@ -1041,6 +1112,10 @@ export const useAppStore = defineStore('app', () => {
     figures,
     scalars,
     dataframeCount,
+    tableRowCount,
+    tableWindowStart,
+    tableWindowEnd,
+    tablePageOffsets,
     dataPaneError,
     figureCount,
     terminalOutput,
@@ -1114,6 +1189,10 @@ export const useAppStore = defineStore('app', () => {
     setFigures,
     setScalars,
     setDataframeCount,
+    setTableViewport,
+    clearTableViewport,
+    setTablePageOffset,
+    getTablePageOffset,
     setFigureCount,
     setDataPaneError,
     clearDataPaneError,

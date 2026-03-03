@@ -1,5 +1,5 @@
 <template>
-  <div class="relative" :class="maxWidthClass">
+  <div class="relative" :class="maxWidthClass" :style="containerStyle">
     <Listbox :model-value="modelValue" @update:model-value="handleChange">
       <div class="relative">
         <ListboxButton
@@ -7,7 +7,7 @@
           :style="triggerStyle"
           :aria-label="ariaLabel"
         >
-          <span class="truncate">{{ selectedLabel }}</span>
+          <span class="truncate" :title="selectedLabel">{{ selectedLabel }}</span>
           <ChevronUpDownIcon class="h-3.5 w-3.5 shrink-0 opacity-70" />
         </ListboxButton>
 
@@ -37,7 +37,7 @@
                 }"
                 class="relative cursor-default select-none py-2 pl-3 pr-9 text-[13px]"
               >
-                <span :class="selected ? 'font-semibold' : 'font-normal'" class="block truncate">
+                <span :class="selected ? 'font-semibold' : 'font-normal'" class="block truncate pr-2" :title="option.label">
                   {{ option.label }}
                 </span>
                 <span v-if="selected" class="absolute right-2.5 top-1/2 -translate-y-1/2">
@@ -77,6 +77,18 @@ const props = defineProps({
   maxWidthClass: {
     type: String,
     default: 'max-w-[220px]'
+  },
+  fitToLongestLabel: {
+    type: Boolean,
+    default: false
+  },
+  minChars: {
+    type: Number,
+    default: 24
+  },
+  maxChars: {
+    type: Number,
+    default: 52
   }
 })
 
@@ -85,6 +97,22 @@ const emit = defineEmits(['update:modelValue'])
 const selectedOption = computed(() => props.options.find((option) => option.value === props.modelValue) ?? null)
 const selectedLabel = computed(() => selectedOption.value?.label || props.placeholder)
 const hasSelection = computed(() => !!selectedOption.value)
+const maxLabelChars = computed(() => {
+  const optionChars = props.options.reduce((maxChars, option) => {
+    const label = String(option?.label || '')
+    return Math.max(maxChars, label.length)
+  }, 0)
+  return Math.max(optionChars, String(props.placeholder || '').length)
+})
+const containerStyle = computed(() => {
+  if (!props.fitToLongestLabel) return null
+  const desiredChars = maxLabelChars.value + 5 // icon + horizontal padding
+  const widthChars = Math.min(Math.max(desiredChars, Number(props.minChars || 24)), Number(props.maxChars || 52))
+  return {
+    width: `${widthChars}ch`,
+    maxWidth: '45vw'
+  }
+})
 const triggerStyle = computed(() => ({
   color: hasSelection.value ? 'var(--color-text-main)' : 'var(--color-text-muted)',
   backgroundColor: 'var(--color-surface)',

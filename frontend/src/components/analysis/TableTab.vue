@@ -12,20 +12,9 @@
             ></div>
             <span>{{ tableStatusMessage }}</span>
           </div>
-          <span v-else-if="selectedArtifactId && rowCount > 0" class="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
-            {{ rowCount.toLocaleString() }} rows
-          </span>
         </div>
 
         <div class="flex items-center space-x-2">
-          <!-- Pagination info -->
-          <div v-if="selectedArtifactId && rowCount > 0" class="flex items-center space-x-2 text-xs text-gray-600">
-            <span>
-              Showing {{ windowStart.toLocaleString() }}-{{ windowEnd.toLocaleString() }}
-              of {{ rowCount.toLocaleString() }}
-            </span>
-          </div>
-
           <!-- Table selector dropdown — always shown when artifacts are available -->
           <div v-if="allArtifacts.length > 0" class="flex items-center space-x-2">
             <HeaderDropdown
@@ -34,7 +23,8 @@
               :options="tableDropdownOptions"
               placeholder="Select table"
               aria-label="Select table"
-              max-width-class="max-w-[220px]"
+              :fit-to-longest-label="true"
+              max-width-class="min-w-[240px]"
             />
           </div>
 
@@ -219,6 +209,7 @@ let kernelReadyWorkspaceId = ''
 let serializedRequestQueue = Promise.resolve()
 let selectedArtifactLoadToken = 0
 let currentDatasourceToken = 0
+const pendingRestorePageByArtifact = new Map()
 
 onMounted(() => {
   isMounted.value = true
@@ -230,36 +221,7 @@ onUnmounted(() => {
   gridApi = null
 })
 
-// ---------------------------------------------------------------------------
-// Merge workspace-persisted artifacts with any live-run dataframes from the
-// chat history (appStore.dataframes).  Live entries take precedence if they
-// share the same artifact_id.
-// ---------------------------------------------------------------------------
-const allArtifacts = computed(() => {
-  const map = new Map()
-
-  // 1. Workspace-persisted (from scratchpad)
-  for (const a of workspaceArtifacts.value) {
-    map.set(a.artifact_id, {
-      artifact_id: a.artifact_id,
-      logical_name: a.logical_name,
-      row_count: a.row_count,
-    })
-  }
-
-  // 2. Live dataframes produced in the current session
-  for (const df of appStore.dataframes) {
-    const id = df?.data?.artifact_id
-    if (!id) continue
-    map.set(id, {
-      artifact_id: id,
-      logical_name: df.name || 'dataframe',
-      row_count: df?.data?.row_count ?? null,
-    })
-  }
-
-  return [...map.values()]
-})
+const allArtifacts = computed(() => (Array.isArray(workspaceArtifacts.value) ? workspaceArtifacts.value : []))
 
 const tableDropdownOptions = computed(() => allArtifacts.value.map((artifact) => ({
   value: artifact.artifact_id,
@@ -270,7 +232,18 @@ const tableDropdownOptions = computed(() => allArtifacts.value.map((artifact) =>
 // Expose dataframe count to the store so StatusBar can read it
 watch(allArtifacts, (list) => {
   appStore.setDataframeCount(list.length)
+  if (selectedArtifactId.value && !list.some((item) => item.artifact_id === selectedArtifactId.value)) {
+    selectedArtifactId.value = null
+  }
 }, { immediate: true })
+
+watch(
+  () => (Array.isArray(appStore.dataframes) ? appStore.dataframes.map((df) => String(df?.data?.artifact_id || '')).filter(Boolean).join('|') : ''),
+  () => {
+    if (!appStore.activeWorkspaceId) return
+    void loadWorkspaceArtifacts(appStore.activeWorkspaceId)
+  }
+)
 
 function createAbortError(message = 'Request aborted') {
   const error = new Error(message)
@@ -380,6 +353,7 @@ async function loadWorkspaceArtifacts(workspaceId) {
 
 watch(() => appStore.activeWorkspaceId, (id) => {
   kernelReadyWorkspaceId = ''
+  pendingRestorePageByArtifact.clear()
   selectedArtifactLoadToken += 1
   selectedArtifactId.value = null
   resetTableState()
@@ -392,7 +366,16 @@ watch(() => appStore.activeWorkspaceId, (id) => {
 watch(selectedArtifactId, async (newId) => {
   const loadToken = ++selectedArtifactLoadToken
   resetTableState()
-  if (!newId) return
+  if (!newId) {
+    appStore.clearTableViewport()
+    return
+  }
+  const rememberedPage = appStore.getTablePageOffset(appStore.activeWorkspaceId, newId)
+  if (Number.isInteger(rememberedPage) && rememberedPage > 0) {
+    pendingRestorePageByArtifact.set(newId, rememberedPage)
+  } else {
+    pendingRestorePageByArtifact.delete(newId)
+  }
   if (loadToken !== selectedArtifactLoadToken) return
   try {
     await prepareArtifact(newId)
@@ -491,6 +474,7 @@ function resetTableState() {
   rowCountValue.value = 0
   windowStart.value = 0
   windowEnd.value = 0
+  appStore.clearTableViewport()
   tableError.value = ''
   useClientFallback.value = false
   if (isGridAlive()) {
@@ -501,7 +485,9 @@ function resetTableState() {
 function onGridReady(params) {
   gridApi = params.api
   if (useInfiniteModel.value) {
-    void attachInfiniteDatasource()
+    void attachInfiniteDatasource().then(() => {
+      restoreArtifactPage(selectedArtifactId.value)
+    })
   }
 }
 
@@ -517,13 +503,43 @@ function onPaginationChanged() {
   if (total <= 0) {
     windowStart.value = 0
     windowEnd.value = 0
+    appStore.clearTableViewport()
     return
   }
   const page = Math.max(0, Number(gridApi.paginationGetCurrentPage?.() || 0))
+  const aid = selectedArtifactId.value
+  if (aid) {
+    const pendingPage = pendingRestorePageByArtifact.get(aid)
+    if (Number.isInteger(pendingPage) && pendingPage > 0) {
+      // Ignore the transient page-0 event fired while grid is reinitializing.
+      if (page === 0) return
+      if (page === pendingPage) {
+        pendingRestorePageByArtifact.delete(aid)
+      }
+    }
+    appStore.setTablePageOffset(appStore.activeWorkspaceId, aid, page)
+  }
   const start = page * pageSize + 1
   const end = Math.min(total, start + pageSize - 1)
   windowStart.value = start
   windowEnd.value = end
+  appStore.setTableViewport(start, end, total)
+}
+
+function restoreArtifactPage(artifactId) {
+  if (!artifactId || !isGridAlive()) return
+  const rememberedPage = pendingRestorePageByArtifact.get(artifactId)
+    ?? appStore.getTablePageOffset(appStore.activeWorkspaceId, artifactId)
+  if (!Number.isInteger(rememberedPage) || rememberedPage <= 0) return
+  const total = Number(rowCountValue.value || 0)
+  if (total <= 0) return
+  const maxPage = Math.max(0, Math.ceil(total / pageSize) - 1)
+  const targetPage = Math.min(rememberedPage, maxPage)
+  if (targetPage > 0) {
+    gridApi.paginationGoToPage?.(targetPage)
+  } else {
+    pendingRestorePageByArtifact.delete(artifactId)
+  }
 }
 
 function columnsChanged(nextColumns) {
@@ -554,6 +570,7 @@ async function prepareArtifact(artifactId) {
     })
     if (tableError.value) return
     await attachInfiniteDatasource(artifactId)
+    restoreArtifactPage(artifactId)
   } catch (error) {
     if (isAbortError(error)) return
     tableError.value = error?.message || 'Failed to load selected table.'
@@ -585,6 +602,7 @@ async function loadInitialServerPage(artifactId) {
     clientRows.value = rows
     windowStart.value = rows.length > 0 ? 1 : 0
     windowEnd.value = rows.length > 0 ? Math.min(pageSize, rowCountValue.value || rows.length) : 0
+    appStore.setTableViewport(windowStart.value, windowEnd.value, rowCountValue.value)
   } catch (error) {
     if (isAbortError(error)) return
     console.error('Failed to load initial dataframe page:', error)
@@ -595,6 +613,7 @@ async function loadInitialServerPage(artifactId) {
     rowCountValue.value = 0
     windowStart.value = 0
     windowEnd.value = 0
+    appStore.clearTableViewport()
   } finally {
     pendingControllers.delete(controller)
     isPageLoading.value = false
@@ -649,6 +668,7 @@ async function attachInfiniteDatasource(artifactId) {
         params.successCallback(rows, knownLastRow)
         windowStart.value = rows.length > 0 ? startRow + 1 : 0
         windowEnd.value = rows.length > 0 ? startRow + rows.length : 0
+        appStore.setTableViewport(windowStart.value, windowEnd.value, rowCountValue.value)
       } catch (error) {
         if (isAbortError(error)) return
         console.error('Failed to load dataframe page:', error)

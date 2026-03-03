@@ -67,10 +67,11 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useAppStore } from './stores/appStore'
 import { useAuthStore } from './stores/authStore'
 import { settingsWebSocket } from './services/websocketService'
+import { toast } from './composables/useToast'
 import AuthModal from './components/modals/AuthModal.vue'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
@@ -91,6 +92,7 @@ const workspaceRuntimeStatus = reactive({
   message: '',
 })
 const wsUnsubscribers = ref([])
+const lastRuntimeErrorToast = ref('')
 
 // Listen for Tauri backend-status events (if running in Tauri)
 function setupTauriListener() {
@@ -158,6 +160,7 @@ onMounted(async () => {
   )
   wsUnsubscribers.value.push(
     settingsWebSocket.subscribeError((message) => {
+      if (!authStore.isAuthenticated) return
       appStore.setRuntimeError(message || 'Workspace runtime bootstrap failed.')
       if (!workspaceRuntimeStatus.active) return
       workspaceRuntimeStatus.active = false
@@ -174,6 +177,27 @@ onMounted(async () => {
     console.error('❌ Error during app initialization:', error)
   }
 })
+
+watch(
+  () => appStore.runtimeError,
+  (message) => {
+    if (!authStore.isAuthenticated) return
+    const normalized = String(message || '').trim()
+    if (!normalized) return
+    if (normalized === lastRuntimeErrorToast.value) return
+    lastRuntimeErrorToast.value = normalized
+    toast.error('Workspace Runtime Error', normalized)
+  }
+)
+
+watch(
+  () => authStore.isAuthenticated,
+  (isAuthenticated) => {
+    if (isAuthenticated) return
+    lastRuntimeErrorToast.value = ''
+    appStore.setRuntimeError('')
+  }
+)
 
 // Warn user about data loss on refresh/close when data is loaded
 function handleBeforeUnload(e) {

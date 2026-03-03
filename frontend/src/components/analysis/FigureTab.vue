@@ -22,7 +22,8 @@
               :options="figureDropdownOptions"
               placeholder="Select figure"
               aria-label="Select figure"
-              max-width-class="max-w-[220px]"
+              :fit-to-longest-label="true"
+              max-width-class="min-w-[240px]"
             />
           </div>
 
