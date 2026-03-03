@@ -13,7 +13,8 @@
     </filter>
   </defs>
   
-  <rect width="200" height="200" fill="#0f172a" rx="40" />
+  <!-- Inset card to keep optical padding so Dock icon doesn't appear oversized -->
+  <rect x="18" y="18" width="164" height="164" fill="#0f172a" rx="34" />
   
   <g transform="translate(100, 100)" filter="url(#glow)">
     <!-- Central Node -->
