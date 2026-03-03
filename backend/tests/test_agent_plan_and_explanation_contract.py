@@ -52,7 +52,8 @@ def test_explain_code_prompt_requires_sectioned_code_walkthrough():
 
     assert "Break the long code into 3 to 6 logical pieces" in source
     assert "Next step" in source
-    assert '_emit_text_stream_chunks("explain_code", explanation)' in source
+    assert "_invoke_text_chain_with_streaming(" in source
+    assert 'node_name="explain_code"' in source
 
 
 def test_explanation_fallback_chunker_produces_multiple_sections():

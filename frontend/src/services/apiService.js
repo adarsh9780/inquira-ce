@@ -420,6 +420,10 @@ export const apiService = {
 
       for (const evt of events) {
         if (onEvent) onEvent(evt)
+        if (evt.event === 'token' && events.length > 1) {
+          // Allow UI paint between dense token bursts that arrive in one SSE chunk.
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        }
         if (evt.event === 'final') {
           finalPayload = evt.data
         } else if (evt.event === 'error') {

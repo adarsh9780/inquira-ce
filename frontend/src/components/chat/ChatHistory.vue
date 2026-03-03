@@ -544,9 +544,15 @@ function handleChatContainerClick(event) {
 
 // Watch for chat history changes and auto-scroll if user is near bottom
 watch([() => appStore.chatHistory.length, lastMessageId], ([newLength], [oldLength]) => {
-  if (shouldAutoScroll && newLength > oldLength) {
+  const previousLength = Number.isFinite(oldLength) ? oldLength : 0
+  if (shouldAutoScroll && newLength > previousLength) {
     nextTick(() => scrollToBottom())
   }
+})
+
+watch(() => appStore.activeConversationId, () => {
+  shouldAutoScroll = true
+  nextTick(() => scrollToBottom())
 })
 
 // Watch for loading state changes

@@ -26,4 +26,6 @@ test('v1AnalyzeStream always uses stream endpoint without local non-stream fallb
   assert.equal(source.includes('if (!isStreamingEnabled()) {'), false)
   assert.equal(source.includes('disableStreamingForUnsupportedStatus(response.status)'), false)
   assert.equal(source.includes('${v1Api.chat.stream}'), true)
+  assert.equal(source.includes("evt.event === 'token' && events.length > 1"), true)
+  assert.equal(source.includes('await new Promise((resolve) => setTimeout(resolve, 0))'), true)
 })

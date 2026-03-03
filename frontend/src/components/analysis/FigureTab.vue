@@ -13,9 +13,6 @@
           <span v-else-if="artifactListError" class="text-xs px-2 py-1 rounded text-red-700 bg-red-100">
             {{ artifactListError }}
           </span>
-          <span v-else-if="selectedFigure" class="text-xs px-2 py-1 rounded text-purple-600 bg-purple-100">
-            Chart Ready
-          </span>
         </div>
         
         <div class="flex items-center space-x-2">
@@ -43,39 +40,59 @@
             {{ isDeletingArtifact ? 'Deleting...' : 'Delete' }}
           </button>
 
-          <!-- Download PNG Button -->
-          <button
-            @click="downloadPng"
-            :disabled="!selectedFigure || isDownloading"
-            class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-            :class="!selectedFigure ? 'opacity-50 cursor-not-allowed' : ''"
-          >
-            <PhotoIcon v-if="!isDownloading" class="h-4 w-4 mr-1" />
-            <div v-else class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-1"></div>
-            {{ isDownloading ? 'Downloading...' : 'PNG' }}
-          </button>
-          
-          <!-- Download HTML Button -->
-          <button
-            @click="downloadHtml"
-            :disabled="!selectedFigure"
-            class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-            :class="!selectedFigure ? 'opacity-50 cursor-not-allowed' : ''"
-          >
-            <DocumentIcon class="h-4 w-4 mr-1" />
-            HTML
-          </button>
-
-          <!-- Fullscreen Button -->
-          <button
-            @click="toggleFullscreen"
-            :disabled="!selectedFigure"
-            class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-            :class="!selectedFigure ? 'opacity-50 cursor-not-allowed' : ''"
-          >
-            <ArrowsPointingOutIcon class="h-4 w-4 mr-1" />
-            Fullscreen
-          </button>
+          <!-- Export Menu -->
+          <Menu as="div" class="relative inline-flex">
+            <MenuButton
+              :disabled="!selectedFigure || isDownloading"
+              class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+              :class="(!selectedFigure || isDownloading) ? 'opacity-50 cursor-not-allowed' : ''"
+            >
+              <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4 mr-1.5" />
+              <div v-else class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-1.5"></div>
+              <span>{{ isDownloading ? 'Exporting...' : 'Export' }}</span>
+              <ChevronDownIcon class="h-4 w-4 ml-1.5" />
+            </MenuButton>
+            <transition
+              enter-active-class="transition duration-100 ease-out"
+              enter-from-class="opacity-0 scale-95 -translate-y-1"
+              enter-to-class="opacity-100 scale-100 translate-y-0"
+              leave-active-class="transition duration-75 ease-in"
+              leave-from-class="opacity-100"
+              leave-to-class="opacity-0"
+            >
+              <MenuItems
+                class="absolute right-0 z-30 mt-9 min-w-[180px] overflow-hidden rounded-md border shadow-lg focus:outline-none"
+                style="background-color: var(--color-surface); border-color: var(--color-border);"
+              >
+                <MenuItem v-slot="{ active }">
+                  <button
+                    type="button"
+                    class="w-full text-left px-3 py-2 text-sm transition-colors"
+                    :style="{
+                      color: 'var(--color-text-main)',
+                      backgroundColor: active ? 'color-mix(in srgb, var(--color-text-main) 7%, transparent)' : 'transparent'
+                    }"
+                    @click="downloadPng"
+                  >
+                    PNG image (.png)
+                  </button>
+                </MenuItem>
+                <MenuItem v-slot="{ active }">
+                  <button
+                    type="button"
+                    class="w-full text-left px-3 py-2 text-sm transition-colors"
+                    :style="{
+                      color: 'var(--color-text-main)',
+                      backgroundColor: active ? 'color-mix(in srgb, var(--color-text-main) 7%, transparent)' : 'transparent'
+                    }"
+                    @click="downloadHtml"
+                  >
+                    HTML file (.html)
+                  </button>
+                </MenuItem>
+              </MenuItems>
+            </transition>
+          </Menu>
         </div>
       </div>
     </Teleport>
@@ -102,47 +119,23 @@
         </div>
       </div>
     </div>
-    
-    <!-- Fullscreen Modal -->
-    <div
-      v-if="isFullscreen"
-      class="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center"
-      @click="closeFullscreen"
-    >
-      <div class="w-full h-full max-w-7xl max-h-full p-8">
-        <div class="bg-white rounded-lg h-full flex flex-col">
-          <div class="flex-shrink-0 flex items-center justify-between p-4 border-b">
-            <h3 class="text-lg font-medium">Chart - Fullscreen View</h3>
-            <button
-              @click="closeFullscreen"
-              class="text-gray-400 hover:text-gray-600"
-            >
-              <XMarkIcon class="h-6 w-6" />
-            </button>
-          </div>
-          <div class="flex-1 relative">
-            <div :key="selectedArtifactId" ref="fullscreenPlotContainer" class="absolute inset-0 p-4"></div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
+import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
 import { useAppStore } from '../../stores/appStore'
 import Plotly from 'plotly.js-dist-min'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import apiService from '../../services/apiService'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import { applyPlotlyTheme, applyPlotlyConfigTheme, PLOTLY_THEME_MODE } from '../../utils/plotlyTheme'
+import { toast } from '../../composables/useToast'
 import { 
-  PhotoIcon, 
-  DocumentIcon, 
-  ArrowsPointingOutIcon, 
+  ArrowDownTrayIcon,
+  ChevronDownIcon,
   ChartBarIcon,
-  XMarkIcon,
   TrashIcon
 } from '@heroicons/vue/24/outline'
 
@@ -150,9 +143,7 @@ const appStore = useAppStore()
 
 const plotContainer = ref(null)
 let ro = null
-const fullscreenPlotContainer = ref(null)
 const isDownloading = ref(false)
-const isFullscreen = ref(false)
 const isLoadingArtifacts = ref(false)
 const isLoadingFigure = ref(false)
 const isDeletingArtifact = ref(false)
@@ -209,9 +200,6 @@ onUnmounted(() => {
   figureAbortController?.abort()
   if (plotContainer.value) {
     Plotly.purge(plotContainer.value)
-  }
-  if (fullscreenPlotContainer.value) {
-    Plotly.purge(fullscreenPlotContainer.value)
   }
   if (ro && plotContainer.value) {
     try { ro.unobserve(plotContainer.value) } catch (e) {}
@@ -415,39 +403,69 @@ async function renderPlot() {
   }
 }
 
-async function renderFullscreenPlot() {
-  if (!selectedFigure.value || !fullscreenPlotContainer.value) return
+function getExportBaseName() {
+  const logicalName = String(selectedFigureMeta.value?.logical_name || 'chart')
+    .replace(/[^A-Za-z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  return logicalName || 'chart'
+}
 
-  try {
-    const rawFigureData = selectedFigure.value
-    const themeMode = resolvePlotThemeMode()
-    const figureData = applyPlotlyTheme(rawFigureData, { mode: themeMode, context: 'fullscreen' }) || rawFigureData
-
-    const layout = {
-      ...(figureData.layout || {}),
-      autosize: true,
-      responsive: true,
-    }
-
-    const config = applyPlotlyConfigTheme(
-      {
-        displayModeBar: true,
-        displaylogo: false,
-        responsive: true,
-      },
-      { mode: themeMode },
-    )
-
-    await Plotly.newPlot(
-      fullscreenPlotContainer.value,
-      figureData.data || [],
-      layout,
-      config
-    )
-    
-  } catch (error) {
-    console.error('Failed to render fullscreen plot:', error)
+function decodeBase64ToBytes(base64Text) {
+  const raw = atob(String(base64Text || ''))
+  const bytes = new Uint8Array(raw.length)
+  for (let i = 0; i < raw.length; i += 1) {
+    bytes[i] = raw.charCodeAt(i)
   }
+  return bytes
+}
+
+async function persistExportFile({
+  defaultFileName,
+  mimeType,
+  payload,
+  tauriFilters,
+  browserFileTypes
+}) {
+  if (window.__TAURI_INTERNALS__) {
+    const { save } = await import('@tauri-apps/plugin-dialog')
+    const savePath = await save({
+      defaultPath: defaultFileName,
+      filters: Array.isArray(tauriFilters) ? tauriFilters : []
+    })
+    if (!savePath) return false
+    const { writeFile } = await import('@tauri-apps/plugin-fs')
+    await writeFile(savePath, payload)
+    return true
+  }
+
+  if (typeof window.showSaveFilePicker === 'function') {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: defaultFileName,
+        types: Array.isArray(browserFileTypes) ? browserFileTypes : []
+      })
+      const writable = await handle.createWritable()
+      await writable.write(payload)
+      await writable.close()
+      return true
+    } catch (error) {
+      if (error?.name === 'AbortError') return false
+      throw error
+    }
+  }
+
+  const blobData = payload instanceof Uint8Array ? payload : new TextEncoder().encode(String(payload || ''))
+  const blob = new Blob([blobData], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.setAttribute('href', url)
+  link.setAttribute('download', defaultFileName)
+  link.style.visibility = 'hidden'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+  return true
 }
 
 async function downloadPng() {
@@ -456,29 +474,35 @@ async function downloadPng() {
   isDownloading.value = true
 
   try {
-    const logicalName = String(selectedFigureMeta.value?.logical_name || 'chart')
-      .replace(/[^A-Za-z0-9._-]+/g, '_')
-      .replace(/^_+|_+$/g, '') || 'chart'
-    const filename = `${logicalName}_${new Date().toISOString().split('T')[0]}.png`
-
-    await Plotly.downloadImage(plotContainer.value, {
+    const filename = `${getExportBaseName()}_${new Date().toISOString().split('T')[0]}.png`
+    const dataUrl = await Plotly.toImage(plotContainer.value, {
       format: 'png',
       width: 1200,
-      height: 800,
-      filename: filename
+      height: 800
     })
-
-    console.debug('PNG downloaded successfully')
-
+    const encoded = String(dataUrl || '')
+    const base64 = encoded.includes(',') ? encoded.split(',')[1] : encoded
+    const bytes = decodeBase64ToBytes(base64)
+    const exported = await persistExportFile({
+      defaultFileName: filename,
+      mimeType: 'image/png',
+      payload: bytes,
+      tauriFilters: [{ name: 'PNG Image', extensions: ['png'] }],
+      browserFileTypes: [{ description: 'PNG Image', accept: { 'image/png': ['.png'] } }]
+    })
+    if (exported) toast.success('Export complete', 'Chart saved as PNG.')
   } catch (error) {
     console.error('Failed to download PNG:', error)
+    toast.error('Export failed', 'Unable to save PNG file.')
   } finally {
     isDownloading.value = false
   }
 }
 
 async function downloadHtml() {
-  if (!selectedFigure.value) return
+  if (!selectedFigure.value || isDownloading.value) return
+
+  isDownloading.value = true
 
   try {
     const rawFigureData = selectedFigure.value
@@ -516,28 +540,24 @@ async function downloadHtml() {
           ${JSON.stringify(plotlyConfig)}
         );
     <\/script>
-</body>
+        </body>
 </html>`
-    
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    const logicalName = String(selectedFigureMeta.value?.logical_name || 'chart')
-      .replace(/[^A-Za-z0-9._-]+/g, '_')
-      .replace(/^_+|_+$/g, '') || 'chart'
-    
-    link.setAttribute('href', url)
-    link.setAttribute('download', `${logicalName}_${new Date().toISOString().split('T')[0]}.html`)
-    link.style.visibility = 'hidden'
-    
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    
-    console.debug('HTML downloaded successfully')
-    
+
+    const filename = `${getExportBaseName()}_${new Date().toISOString().split('T')[0]}.html`
+    const bytes = new TextEncoder().encode(htmlContent)
+    const exported = await persistExportFile({
+      defaultFileName: filename,
+      mimeType: 'text/html',
+      payload: bytes,
+      tauriFilters: [{ name: 'HTML File', extensions: ['html'] }],
+      browserFileTypes: [{ description: 'HTML File', accept: { 'text/html': ['.html'] } }]
+    })
+    if (exported) toast.success('Export complete', 'Chart saved as HTML.')
   } catch (error) {
     console.error('Failed to download HTML:', error)
+    toast.error('Export failed', 'Unable to save HTML file.')
+  } finally {
+    isDownloading.value = false
   }
 }
 
@@ -569,21 +589,6 @@ async function deleteSelectedFigure() {
   }
 }
 
-async function toggleFullscreen() {
-  if (!selectedFigure.value) return
-
-  isFullscreen.value = true
-
-  await nextTick()
-  await renderFullscreenPlot()
-}
-
-function closeFullscreen() {
-  if (fullscreenPlotContainer.value) {
-    Plotly.purge(fullscreenPlotContainer.value)
-  }
-  isFullscreen.value = false
-}
 </script>
 
 <style scoped>

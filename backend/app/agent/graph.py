@@ -851,18 +851,6 @@ class InquiraAgent:
         }
 
     def explain_code(self, state: State, config: RunnableConfig) -> dict[str, Any]:
-        class ExplanationSection(BaseModel):
-            title: str
-            language: str = Field(default="python")
-            code: str
-            explanation: str
-
-        class CodeExplanation(BaseModel):
-            overview: str | None = Field(default=None)
-            sections: list[ExplanationSection] = Field(default_factory=list)
-            next_step: str | None = Field(default=None)
-            follow_up_question: str | None = Field(default=None)
-
         system_prompt_template = SystemMessagePromptTemplate.from_template(
             """You are the AI assistant for Inquira.
 
@@ -872,7 +860,7 @@ Rules:
 - Break the long code into 3 to 6 logical pieces.
 - Each piece must include:
   1) a short heading
-  2) a compact code snippet
+  2) a compact fenced code snippet
   3) 2-4 short plain-English lines explaining that snippet
 - Use plain words and short sentences.
 - Avoid jargon. If a technical word is unavoidable, explain it immediately.
@@ -880,7 +868,14 @@ Rules:
 - Do not mention internal runtime details that a user does not need.
 - Include exactly one concrete next step.
 - End with one friendly question asking how you can help next.
-- Return structured content only via the provided schema fields.
+- Return markdown only.
+
+Output format:
+- Start with: `### Overview`
+- For each piece use: `### <number>. <short title>`
+- Under each piece include one fenced code block with language tag `python` or `sql`
+- After the code block, include the 2-4 plain-English explanation lines
+- Add `### Next step` near the end, then one final friendly question on the last line
 
 Plan:
 {plan}
@@ -898,9 +893,9 @@ Guard status:
         )
 
         model = self._get_model(config, "gemini-2.5-flash-lite")
-        chain = prompt | model.with_structured_output(CodeExplanation)
+        chain = prompt | model
 
-        response = self._invoke_structured_chain(
+        response = self._invoke_text_chain_with_streaming(
             chain,
             {
                 "messages": state.messages,
@@ -908,20 +903,9 @@ Guard status:
                 "code": state.current_code or state.code or "",
                 "guard_status": state.guard_status or "ok",
             },
+            node_name="explain_code",
         )
-        response = cast(CodeExplanation, response)
-
-        source_code = (state.current_code or state.code or "").strip()
-        sections = self._normalize_explanation_sections(response.sections, source_code)
-        if len(sections) < 3 and source_code:
-            sections = self._normalize_explanation_sections([], source_code)
-
-        explanation = self._compose_sectioned_explanation(
-            overview=str(response.overview or "").strip(),
-            sections=sections[:6],
-            next_step=str(response.next_step or "").strip(),
-            follow_up_question=str(response.follow_up_question or "").strip(),
-        ).strip()
+        explanation = _stringify_content(getattr(response, "content", "")).strip()
         if not explanation:
             explanation = (
                 "### What I changed\n"
@@ -930,8 +914,7 @@ Guard status:
                 "Run the code and review the output table or chart.\n\n"
                 "How else can I help next?"
             )
-
-        self._emit_text_stream_chunks("explain_code", explanation)
+            self._emit_text_stream_chunks("explain_code", explanation)
 
         return {
             "final_explanation": explanation,
