@@ -34,6 +34,38 @@ function getDefaultApiBase() {
 
 const resolvedEnvBase = (import.meta.env.VITE_API_BASE || '').trim()
 const apiBaseUrl = resolvedEnvBase || getDefaultApiBase()
+const artifactRowsInFlight = new Map()
+
+function createAbortError(message = 'Request aborted') {
+  const error = new Error(message)
+  error.name = 'AbortError'
+  return error
+}
+
+function withAbortSignal(promise, signal) {
+  if (!signal) return promise
+  if (signal.aborted) return Promise.reject(createAbortError())
+
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      cleanup()
+      reject(createAbortError())
+    }
+    const cleanup = () => {
+      signal.removeEventListener('abort', onAbort)
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    promise
+      .then((value) => {
+        cleanup()
+        resolve(value)
+      })
+      .catch((error) => {
+        cleanup()
+        reject(error)
+      })
+  })
+}
 
 // Configure GLOBAL axios defaults
 axios.defaults.baseURL = apiBaseUrl
@@ -312,19 +344,31 @@ export const apiService = {
   },
 
   async getDataframeArtifactRows(workspaceId, artifactId, offset = 0, limit = 1000, options = {}) {
-    const response = await fetch(
-      `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/${artifactId}/rows?offset=${offset}&limit=${limit}`,
-      {
-        method: 'GET',
-        credentials: 'include',
-        signal: options?.signal || null,
-      }
-    )
-    if (!response.ok) {
-      const detail = await response.json().catch(() => ({}))
-      throw new Error(detail.detail || `Artifact row fetch failed (${response.status})`)
+    const requestKey = `${workspaceId}:${artifactId}:${Number(offset || 0)}:${Number(limit || 0)}`
+    let inFlight = artifactRowsInFlight.get(requestKey)
+
+    if (!inFlight) {
+      inFlight = (async () => {
+        const response = await fetch(
+          `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/${artifactId}/rows?offset=${offset}&limit=${limit}`,
+          {
+            method: 'GET',
+            credentials: 'include',
+          }
+        )
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}))
+          throw new Error(detail.detail || `Artifact row fetch failed (${response.status})`)
+        }
+        return response.json()
+      })().finally(() => {
+        artifactRowsInFlight.delete(requestKey)
+      })
+
+      artifactRowsInFlight.set(requestKey, inFlight)
     }
-    return response.json()
+
+    return withAbortSignal(inFlight, options?.signal || null)
   },
 
   async executeTerminalCommand(workspaceId, payload) {

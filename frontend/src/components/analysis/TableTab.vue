@@ -63,7 +63,7 @@
       <!-- Grid: infinite model -->
       <ag-grid-vue
         v-if="selectedArtifactId && hasRenderableRows && useInfiniteModel"
-        :key="`infinite-${selectedArtifactId}-${datasourceVersion}`"
+        :key="`infinite-${selectedArtifactId}`"
         class="ag-theme-quartz absolute inset-0"
         :columnDefs="columnDefs"
         :defaultColDef="defaultColDef"
@@ -109,6 +109,31 @@
             {{ allArtifacts.length }} table{{ allArtifacts.length === 1 ? '' : 's' }} available
           </p>
           <p class="text-xs mt-1" style="color: var(--color-text-muted);">Select a table from the dropdown above</p>
+        </div>
+      </div>
+
+      <!-- Selected artifact failed to load -->
+      <div
+        v-else-if="selectedArtifactId && tableError"
+        class="absolute inset-0 flex items-center justify-center px-8"
+        style="background-color: var(--color-base);"
+      >
+        <div class="max-w-3xl w-full text-center">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-10 w-10 mx-auto mb-3 text-red-500">
+            <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clip-rule="evenodd" />
+          </svg>
+          <p class="text-base font-semibold text-red-700">Failed to load selected table</p>
+          <p class="text-sm mt-2 text-red-700 break-words">{{ tableError }}</p>
+          <p class="text-xs mt-3" style="color: var(--color-text-muted);">
+            Table:
+            <span class="font-medium">{{ selectedArtifactMeta?.logical_name || selectedArtifactId }}</span>
+          </p>
+          <button
+            class="mt-4 inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+            @click="retrySelectedArtifact"
+          >
+            Retry
+          </button>
         </div>
       </div>
 
@@ -189,13 +214,16 @@ const serverColumns = ref([])
 const rowCountValue = ref(0)
 const windowStart = ref(0)
 const windowEnd = ref(0)
-const datasourceVersion = ref(0)
 const useClientFallback = ref(false)
 const tableError = ref('')
 const artifactListError = ref('')
 const pendingControllers = new Set()
 let gridApi = null
 let listAbortController = null
+let kernelReadyWorkspaceId = ''
+let serializedRequestQueue = Promise.resolve()
+let selectedArtifactLoadToken = 0
+let currentDatasourceToken = 0
 
 onMounted(() => {
   isMounted.value = true
@@ -243,6 +271,77 @@ watch(allArtifacts, (list) => {
   appStore.setDataframeCount(list.length)
 }, { immediate: true })
 
+function createAbortError(message = 'Request aborted') {
+  const error = new Error(message)
+  error.name = 'AbortError'
+  return error
+}
+
+function isAbortError(error) {
+  return error?.name === 'AbortError'
+}
+
+function enqueueSerializedRequest(task) {
+  const next = serializedRequestQueue.catch(() => {}).then(task)
+  serializedRequestQueue = next.catch(() => {})
+  return next
+}
+
+function waitMs(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup()
+      resolve()
+    }, ms)
+    const onAbort = () => {
+      cleanup()
+      reject(createAbortError())
+    }
+    const cleanup = () => {
+      clearTimeout(timer)
+      signal?.removeEventListener?.('abort', onAbort)
+    }
+    if (signal?.aborted) {
+      cleanup()
+      reject(createAbortError())
+      return
+    }
+    signal?.addEventListener?.('abort', onAbort, { once: true })
+  })
+}
+
+async function waitForKernelReady(workspaceId, signal) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId) {
+    throw new Error('No active workspace selected.')
+  }
+  if (kernelReadyWorkspaceId === normalizedWorkspaceId) {
+    return
+  }
+
+  const timeoutMs = 120000
+  const pollIntervalMs = 700
+  const start = Date.now()
+  let lastStatus = 'unknown'
+
+  while (Date.now() - start < timeoutMs) {
+    if (signal?.aborted) throw createAbortError()
+
+    const statusPayload = await apiService.v1GetWorkspaceKernelStatus(normalizedWorkspaceId)
+    const status = String(statusPayload?.status || '').trim().toLowerCase()
+    lastStatus = status || lastStatus
+
+    if (status === 'ready') {
+      kernelReadyWorkspaceId = normalizedWorkspaceId
+      return
+    }
+
+    await waitMs(pollIntervalMs, signal)
+  }
+
+  throw new Error(`Kernel did not become ready in 120 seconds (last status: ${lastStatus}).`)
+}
+
 // ---------------------------------------------------------------------------
 // Load workspace artifact list whenever the workspace changes
 // ---------------------------------------------------------------------------
@@ -257,14 +356,17 @@ async function loadWorkspaceArtifacts(workspaceId) {
   artifactListError.value = ''
   appStore.clearDataPaneError()
   try {
-    const response = await apiService.v1ListWorkspaceArtifacts(
-      workspaceId,
-      'dataframe',
-      { signal: listAbortController.signal }
-    )
+    const response = await enqueueSerializedRequest(async () => {
+      await waitForKernelReady(workspaceId, listAbortController.signal)
+      return apiService.v1ListWorkspaceArtifacts(
+        workspaceId,
+        'dataframe',
+        { signal: listAbortController.signal }
+      )
+    })
     workspaceArtifacts.value = Array.isArray(response?.artifacts) ? response.artifacts : []
   } catch (error) {
-    if (error?.name === 'AbortError') return
+    if (isAbortError(error)) return
     console.warn('Failed to load workspace artifacts:', error)
     const brief = error?.response?.data?.detail || error?.message || 'Failed to load tables'
     artifactListError.value = brief
@@ -276,27 +378,27 @@ async function loadWorkspaceArtifacts(workspaceId) {
 }
 
 watch(() => appStore.activeWorkspaceId, (id) => {
+  kernelReadyWorkspaceId = ''
+  selectedArtifactLoadToken += 1
   selectedArtifactId.value = null
   resetTableState()
   loadWorkspaceArtifacts(id)
 }, { immediate: true })
 
-// When a new live dataframe appears, refresh the workspace list so fresh rows
-// are picked up (the live entry is already in allArtifacts via appStore.dataframes,
-// this just keeps the persisted side in sync)
-watch(() => appStore.dataframes.length, () => {
-  if (appStore.activeWorkspaceId) {
-    loadWorkspaceArtifacts(appStore.activeWorkspaceId)
-  }
-})
-
 // ---------------------------------------------------------------------------
 // React to user selecting an artifact in the dropdown
 // ---------------------------------------------------------------------------
 watch(selectedArtifactId, async (newId) => {
+  const loadToken = ++selectedArtifactLoadToken
   resetTableState()
   if (!newId) return
-  await prepareArtifact(newId)
+  if (loadToken !== selectedArtifactLoadToken) return
+  try {
+    await prepareArtifact(newId)
+  } catch (error) {
+    if (isAbortError(error)) return
+    tableError.value = error?.message || 'Failed to load selected table.'
+  }
 })
 
 // ---------------------------------------------------------------------------
@@ -380,6 +482,7 @@ function cancelPendingRequests() {
 }
 
 function resetTableState() {
+  currentDatasourceToken += 1
   cancelPendingRequests()
   clientRows.value = []
   serverRows.value = []
@@ -402,8 +505,8 @@ function onGridReady(params) {
 }
 
 function onGridPreDestroy() {
+  currentDatasourceToken += 1
   cancelPendingRequests()
-  datasourceVersion.value += 1
   gridApi = null
 }
 
@@ -422,6 +525,15 @@ function onPaginationChanged() {
   windowEnd.value = end
 }
 
+function columnsChanged(nextColumns) {
+  if (!Array.isArray(nextColumns)) return false
+  if (nextColumns.length !== serverColumns.value.length) return true
+  for (let i = 0; i < nextColumns.length; i += 1) {
+    if (String(nextColumns[i]) !== String(serverColumns.value[i])) return true
+  }
+  return false
+}
+
 // ---------------------------------------------------------------------------
 // Data loading
 // ---------------------------------------------------------------------------
@@ -430,11 +542,21 @@ async function prepareArtifact(artifactId) {
   tableError.value = ''
   useClientFallback.value = false
 
-  // Always use server infinite model for persisted artifacts
-  clientRows.value = []
-  await loadInitialServerPage(artifactId)
-  if (tableError.value) return
-  await attachInfiniteDatasource(artifactId)
+  try {
+    const workspaceId = appStore.activeWorkspaceId
+    await enqueueSerializedRequest(async () => {
+      await waitForKernelReady(workspaceId, listAbortController?.signal || null)
+      if (workspaceId !== appStore.activeWorkspaceId) throw createAbortError()
+      // Always use server infinite model for persisted artifacts
+      clientRows.value = []
+      await loadInitialServerPage(artifactId)
+    })
+    if (tableError.value) return
+    await attachInfiniteDatasource(artifactId)
+  } catch (error) {
+    if (isAbortError(error)) return
+    tableError.value = error?.message || 'Failed to load selected table.'
+  }
 }
 
 async function loadInitialServerPage(artifactId) {
@@ -452,13 +574,18 @@ async function loadInitialServerPage(artifactId) {
     )
     const rows = Array.isArray(payload?.rows) ? payload.rows : []
     serverRows.value = rows
-    serverColumns.value = Array.isArray(payload?.columns) ? payload.columns.map((c) => String(c)) : (rows[0] ? Object.keys(rows[0]) : [])
+    const nextColumns = Array.isArray(payload?.columns)
+      ? payload.columns.map((c) => String(c))
+      : (rows[0] ? Object.keys(rows[0]) : [])
+    if (columnsChanged(nextColumns)) {
+      serverColumns.value = nextColumns
+    }
     rowCountValue.value = Number(payload?.row_count || rows.length || 0)
     clientRows.value = rows
     windowStart.value = rows.length > 0 ? 1 : 0
     windowEnd.value = rows.length > 0 ? Math.min(pageSize, rowCountValue.value || rows.length) : 0
   } catch (error) {
-    if (error?.name === 'AbortError') return
+    if (isAbortError(error)) return
     console.error('Failed to load initial dataframe page:', error)
     tableError.value = error?.message || 'Failed to load table data.'
     serverRows.value = []
@@ -477,9 +604,9 @@ async function attachInfiniteDatasource(artifactId) {
   const aid = artifactId || selectedArtifactId.value
   if (!aid || !appStore.activeWorkspaceId) return
   cancelPendingRequests()
-  datasourceVersion.value += 1
+  currentDatasourceToken += 1
   if (!isGridAlive()) return
-  const datasourceTag = datasourceVersion.value
+  const datasourceTag = currentDatasourceToken
 
   const workspaceId = appStore.activeWorkspaceId
   const datasource = {
@@ -489,23 +616,32 @@ async function attachInfiniteDatasource(artifactId) {
       const controller = new AbortController()
       pendingControllers.add(controller)
       try {
+        const payload = await enqueueSerializedRequest(async () => {
+          const startRow = Number(params.startRow || 0)
+          const endRow = Number(params.endRow || (startRow + pageSize))
+          const requestLimit = Math.max(1, Math.min(pageSize, endRow - startRow))
+          return apiService.getDataframeArtifactRows(
+            workspaceId,
+            aid,
+            startRow,
+            requestLimit,
+            { signal: controller.signal },
+          )
+        })
+        if (!isGridAlive() || datasourceTag !== currentDatasourceToken) return
         const startRow = Number(params.startRow || 0)
-        const endRow = Number(params.endRow || (startRow + pageSize))
-        const requestLimit = Math.max(1, Math.min(pageSize, endRow - startRow))
-        const payload = await apiService.getDataframeArtifactRows(
-          workspaceId,
-          aid,
-          startRow,
-          requestLimit,
-          { signal: controller.signal },
-        )
-        if (!isGridAlive() || datasourceTag !== datasourceVersion.value) return
         const rows = Array.isArray(payload?.rows) ? payload.rows : []
         serverRows.value = rows
         if (Array.isArray(payload?.columns) && payload.columns.length > 0) {
-          serverColumns.value = payload.columns.map((c) => String(c))
+          const nextColumns = payload.columns.map((c) => String(c))
+          if (columnsChanged(nextColumns)) {
+            serverColumns.value = nextColumns
+          }
         } else if (rows[0]) {
-          serverColumns.value = Object.keys(rows[0])
+          const nextColumns = Object.keys(rows[0])
+          if (columnsChanged(nextColumns)) {
+            serverColumns.value = nextColumns
+          }
         }
         rowCountValue.value = Number(payload?.row_count || rowCountValue.value || 0)
         const knownLastRow = Number.isFinite(rowCountValue.value) ? rowCountValue.value : undefined
@@ -513,19 +649,20 @@ async function attachInfiniteDatasource(artifactId) {
         windowStart.value = rows.length > 0 ? startRow + 1 : 0
         windowEnd.value = rows.length > 0 ? startRow + rows.length : 0
       } catch (error) {
-        if (error?.name === 'AbortError') return
+        if (isAbortError(error)) return
         console.error('Failed to load dataframe page:', error)
-        if (!isGridAlive() || datasourceTag !== datasourceVersion.value) return
+        if (!isGridAlive() || datasourceTag !== currentDatasourceToken) return
         tableError.value = error?.message || 'Failed to load paginated table data.'
-        if (Array.isArray(serverRows.value) && serverRows.value.length > 0) {
-          clientRows.value = [...serverRows.value]
-          useClientFallback.value = true
-          datasourceVersion.value += 1
+        // Fail once and stop AG Grid retries that can flood the backend.
+        if (typeof gridApi?.setGridOption === 'function') {
+          gridApi.setGridOption('datasource', null)
+        } else if (typeof gridApi?.setDatasource === 'function') {
+          gridApi.setDatasource(null)
         }
-        params.failCallback()
+        params.successCallback([], Number(rowCountValue.value || 0))
       } finally {
         pendingControllers.delete(controller)
-        if (datasourceTag === datasourceVersion.value) {
+        if (datasourceTag === currentDatasourceToken) {
           isPageLoading.value = false
         }
       }
@@ -620,6 +757,17 @@ function convertToCSV(data) {
     csvRows.push(values.join(','))
   }
   return csvRows.join('\n')
+}
+
+async function retrySelectedArtifact() {
+  if (!selectedArtifactId.value) return
+  resetTableState()
+  try {
+    await prepareArtifact(selectedArtifactId.value)
+  } catch (error) {
+    if (isAbortError(error)) return
+    tableError.value = error?.message || 'Failed to load selected table.'
+  }
 }
 </script>
 
