@@ -28,21 +28,14 @@
 
           <!-- Table selector dropdown — always shown when artifacts are available -->
           <div v-if="allArtifacts.length > 0" class="flex items-center space-x-2">
-            <select
+            <HeaderDropdown
               id="dataframe-select"
               v-model="selectedArtifactId"
-              class="px-2.5 py-1 text-xs font-medium border rounded-md focus:outline-none transition-colors cursor-pointer max-w-[200px]"
-              style="color: var(--color-text-muted); background-color: var(--color-surface); border-color: var(--color-border);"
-            >
-              <option :value="null" disabled>— select a table —</option>
-              <option
-                v-for="artifact in allArtifacts"
-                :key="artifact.artifact_id"
-                :value="artifact.artifact_id"
-              >
-                {{ artifact.logical_name }}
-              </option>
-            </select>
+              :options="tableDropdownOptions"
+              placeholder="Select table"
+              aria-label="Select table"
+              max-width-class="max-w-[220px]"
+            />
           </div>
 
           <!-- CSV download -->
@@ -188,6 +181,7 @@ import apiService from '../../services/apiService'
 import { AgGridVue } from 'ag-grid-vue3'
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
+import HeaderDropdown from '../ui/HeaderDropdown.vue'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 import {
@@ -266,6 +260,12 @@ const allArtifacts = computed(() => {
 
   return [...map.values()]
 })
+
+const tableDropdownOptions = computed(() => allArtifacts.value.map((artifact) => ({
+  value: artifact.artifact_id,
+  label: artifact.logical_name || artifact.artifact_id,
+  key: artifact.artifact_id
+})))
 
 // Expose dataframe count to the store so StatusBar can read it
 watch(allArtifacts, (list) => {

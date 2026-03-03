@@ -1,6 +1,6 @@
 <template>
   <div class="flex h-full flex-col" style="background-color: var(--color-surface);">
-    <div class="flex-shrink-0 border-b px-4 py-2 flex items-center justify-between" style="background-color: var(--color-base); border-color: var(--color-border);">
+    <div class="flex-shrink-0 h-16 border-b px-4 flex items-center gap-4" style="background-color: var(--color-base); border-color: var(--color-border);">
       <div class="inline-flex rounded-lg border p-1 flex-shrink-0" style="border-color: var(--color-border); background-color: var(--color-base);">
         <button
           @click="appStore.setDataPane('table')"
@@ -35,7 +35,7 @@
       </div>
       
       <!-- Teleport Target for Table/Figure/VarEx Toolbar -->
-      <div id="workspace-right-pane-toolbar" class="flex-1 min-w-0 flex items-center justify-end ml-4"></div>
+      <div id="workspace-right-pane-toolbar" class="flex-1 min-w-0 flex items-center justify-end"></div>
     </div>
 
     <div class="min-h-0 flex-1 p-3 sm:p-4 pb-0" style="background-color: var(--color-base);">

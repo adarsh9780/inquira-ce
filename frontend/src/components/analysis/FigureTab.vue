@@ -16,20 +16,14 @@
           <!-- Figure Selector -->
           <div v-if="orderedFigures && orderedFigures.length > 1" class="flex items-center space-x-2">
             <label for="figure-select" class="text-xs font-medium" style="color: var(--color-text-muted);">Figure:</label>
-            <select
+            <HeaderDropdown
               id="figure-select"
               v-model="selectedFigureIndex"
-              class="px-2.5 py-1 text-xs font-medium border rounded-md focus:outline-none transition-colors cursor-pointer"
-              style="color: var(--color-text-muted); background-color: var(--color-surface); border-color: var(--color-border);"
-            >
-              <option
-                v-for="(fig, index) in orderedFigures"
-                :key="index"
-                :value="index"
-              >
-                {{ fig.name }}
-              </option>
-            </select>
+              :options="figureDropdownOptions"
+              placeholder="Select figure"
+              aria-label="Select figure"
+              max-width-class="max-w-[220px]"
+            />
           </div>
 
           <!-- Download PNG Button -->
@@ -122,6 +116,7 @@
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import Plotly from 'plotly.js-dist-min'
+import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import { 
   PhotoIcon, 
   DocumentIcon, 
@@ -144,6 +139,12 @@ const orderedFigures = computed(() => {
   if (!appStore.figures) return []
   return [...appStore.figures].slice().reverse()
 })
+
+const figureDropdownOptions = computed(() => orderedFigures.value.map((fig, index) => ({
+  value: index,
+  label: fig.name || `Figure ${index + 1}`,
+  key: `${index}-${fig.name || 'figure'}`
+})))
 
 const selectedFigure = computed(() => {
   if (!orderedFigures.value || orderedFigures.value.length === 0) return null
