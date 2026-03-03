@@ -218,8 +218,6 @@ async function handleSubmit() {
 
     let response
     const schemaPayload = buildActiveSchemaPayload()
-    let hasTokenStream = false
-    let streamedExplanation = ''
     response = await apiService.v1AnalyzeStream(
       {
         workspace_id: workspaceId,
@@ -236,21 +234,23 @@ async function handleSubmit() {
         signal,
         onEvent: (evt) => {
           if (evt.event === 'token' && typeof evt.data?.text === 'string') {
-            if (!hasTokenStream) {
-              hasTokenStream = true
-              streamedExplanation = ''
-            }
-            streamedExplanation += evt.data.text
-            appStore.updateLastMessageExplanation(streamedExplanation)
+            appStore.appendLastMessagePlanChunk(evt.data.text, evt.data.node || '')
             return
           }
-          if (hasTokenStream) return
           if (evt.event === 'status' && evt.data?.message) {
-            appStore.updateLastMessageExplanation(evt.data.message)
+            appStore.appendLastMessageTraceEvent({
+              type: 'status',
+              stage: evt.data?.stage || '',
+              message: evt.data.message
+            })
             return
           }
           if (evt.event === 'node' && evt.data?.node) {
-            appStore.updateLastMessageExplanation(`Running: ${evt.data.node}...`)
+            appStore.appendLastMessageTraceEvent({
+              type: 'node',
+              node: evt.data.node,
+              message: evt.data.message || `${evt.data.node} completed`
+            })
           }
         }
       }
@@ -263,6 +263,7 @@ async function handleSubmit() {
 
     const { is_safe, code, current_code, explanation } = response
     const finalCode = (code ?? current_code ?? '').toString()
+    appStore.setLastMessageCodeSnapshot(finalCode)
 
     if (!is_safe) {
       appStore.updateLastMessageExplanation(explanation || 'Your query was flagged as potentially unsafe.')

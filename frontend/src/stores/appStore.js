@@ -372,12 +372,55 @@ export const useAppStore = defineStore('app', () => {
     saveLocalConfig()
   }
 
-  function addChatMessage(question, explanation) {
+  function createEmptyStreamTrace() {
+    return {
+      planText: '',
+      planNode: '',
+      events: []
+    }
+  }
+
+  function getLastChatMessage() {
+    if (chatHistory.value.length === 0) return null
+    return chatHistory.value[chatHistory.value.length - 1]
+  }
+
+  function ensureMessageStreamTrace(message) {
+    if (!message || typeof message !== 'object') return null
+    if (!message.streamTrace || typeof message.streamTrace !== 'object') {
+      message.streamTrace = createEmptyStreamTrace()
+    }
+    if (!Array.isArray(message.streamTrace.events)) {
+      message.streamTrace.events = []
+    }
+    if (typeof message.streamTrace.planText !== 'string') {
+      message.streamTrace.planText = ''
+    }
+    if (typeof message.streamTrace.planNode !== 'string') {
+      message.streamTrace.planNode = ''
+    }
+    return message.streamTrace
+  }
+
+  function addChatMessage(question, explanation, options = {}) {
+    const codeSnapshot = String(options?.codeSnapshot || '')
+    const streamTrace = options?.streamTrace && typeof options.streamTrace === 'object'
+      ? {
+          planText: String(options.streamTrace.planText || ''),
+          planNode: String(options.streamTrace.planNode || ''),
+          events: Array.isArray(options.streamTrace.events) ? options.streamTrace.events : []
+        }
+      : createEmptyStreamTrace()
+
     // Add to local state
     chatHistory.value.push({
       id: Date.now(),
       question,
       explanation,
+      streamTrace,
+      codeSnapshot,
+      codeUpdated: Boolean(codeSnapshot.trim()),
+      toolEvents: Array.isArray(options?.toolEvents) ? options.toolEvents : null,
       timestamp: new Date().toISOString()
     })
     currentQuestion.value = question
@@ -385,10 +428,41 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function updateLastMessageExplanation(explanation) {
-    if (chatHistory.value.length > 0) {
-      chatHistory.value[chatHistory.value.length - 1].explanation = explanation
-      currentExplanation.value = explanation
-    }
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage) return
+    lastMessage.explanation = explanation
+    currentExplanation.value = explanation
+  }
+
+  function appendLastMessagePlanChunk(text, node = '') {
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage || typeof text !== 'string' || !text) return
+    const trace = ensureMessageStreamTrace(lastMessage)
+    if (!trace) return
+    trace.planText += text
+    if (node) trace.planNode = String(node)
+  }
+
+  function appendLastMessageTraceEvent(event) {
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage || !event || typeof event !== 'object') return
+    const trace = ensureMessageStreamTrace(lastMessage)
+    if (!trace) return
+    trace.events.push({
+      type: String(event.type || 'status'),
+      node: String(event.node || ''),
+      stage: String(event.stage || ''),
+      message: String(event.message || event.node || ''),
+      timestamp: new Date().toISOString()
+    })
+  }
+
+  function setLastMessageCodeSnapshot(code) {
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage) return
+    const codeSnapshot = String(code || '')
+    lastMessage.codeSnapshot = codeSnapshot
+    lastMessage.codeUpdated = Boolean(codeSnapshot.trim())
   }
 
   async function fetchChatHistory() {
@@ -417,20 +491,44 @@ export const useAppStore = defineStore('app', () => {
         messages.forEach((msg, index) => {
           if (msg.role === 'user') {
             if (currentPair.question) {
-              history.push({ ...currentPair, id: Date.now() + index, timestamp: new Date().toISOString() })
+              history.push({
+                ...currentPair,
+                id: Date.now() + index,
+                streamTrace: null,
+                codeSnapshot: '',
+                codeUpdated: false,
+                toolEvents: null,
+                timestamp: new Date().toISOString()
+              })
             }
             currentPair = { question: msg.content }
           } else if (msg.role === 'assistant') {
             if (currentPair.question) {
               currentPair.explanation = msg.content
-              history.push({ ...currentPair, id: Date.now() + index, timestamp: new Date().toISOString() })
+              history.push({
+                ...currentPair,
+                id: Date.now() + index,
+                streamTrace: null,
+                codeSnapshot: '',
+                codeUpdated: false,
+                toolEvents: null,
+                timestamp: new Date().toISOString()
+              })
               currentPair = {}
             }
           }
         })
 
         if (currentPair.question) {
-          history.push({ ...currentPair, id: Date.now(), timestamp: new Date().toISOString() })
+          history.push({
+            ...currentPair,
+            id: Date.now(),
+            streamTrace: null,
+            codeSnapshot: '',
+            codeUpdated: false,
+            toolEvents: null,
+            timestamp: new Date().toISOString()
+          })
         }
 
 
@@ -505,6 +603,9 @@ export const useAppStore = defineStore('app', () => {
       question: turn.user_text,
       explanation: turn.assistant_text,
       toolEvents: turn.tool_events || null,
+      streamTrace: null,
+      codeSnapshot: turn.code_snapshot || '',
+      codeUpdated: Boolean(String(turn.code_snapshot || '').trim()),
       timestamp: turn.created_at || new Date().toISOString()
     }))
     chatHistory.value = [...mapped.reverse(), ...chatHistory.value]
@@ -1188,6 +1289,9 @@ export const useAppStore = defineStore('app', () => {
     setPythonFileContent,
     addChatMessage,
     updateLastMessageExplanation,
+    appendLastMessagePlanChunk,
+    appendLastMessageTraceEvent,
+    setLastMessageCodeSnapshot,
     setWorkspaces,
     setWorkspaceDeletionJobs,
     setActiveWorkspaceId,

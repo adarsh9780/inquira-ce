@@ -46,17 +46,84 @@
       </div>
 
       <!-- Assistant Response -->
-      <div v-if="message.explanation" class="w-full group">
+      <div v-if="hasAssistantContent(message)" class="w-full group">
         <div class="px-4 py-3 rounded-2xl rounded-tl-sm" style="background-color: transparent">
-          <div class="text-sm leading-relaxed prose prose-sm max-w-none prose-pre:overflow-x-auto prose-pre:break-words" style="color: var(--color-text-main);">
+          <div v-if="message.explanation" class="text-sm leading-relaxed prose prose-sm max-w-none prose-pre:overflow-x-auto prose-pre:break-words" style="color: var(--color-text-main);">
             <div v-html="renderMarkdown(message.explanation)"></div>
           </div>
+
+          <div
+            v-if="message.codeUpdated"
+            class="mt-3 flex items-center justify-between rounded-lg border px-3 py-2"
+            style="border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-base) 75%, var(--color-border) 25%);"
+          >
+            <p class="text-xs font-medium" style="color: var(--color-text-main);">Code updated in editor.</p>
+            <button
+              type="button"
+              class="text-xs font-medium underline-offset-2 hover:underline"
+              style="color: var(--color-text-muted);"
+              @click="openCodePane"
+            >
+              Open Code
+            </button>
+          </div>
+
+          <details
+            v-if="hasStreamTrace(message)"
+            class="mt-3 rounded-lg p-2"
+            style="border: 1px solid var(--color-border); background-color: color-mix(in srgb, var(--color-base) 82%, var(--color-border) 18%);"
+          >
+            <summary class="text-xs cursor-pointer font-medium" style="color: var(--color-text-muted);">
+              Analysis trace
+            </summary>
+            <div class="mt-2 space-y-2">
+              <details
+                v-if="streamPlanText(message)"
+                class="rounded p-2"
+                style="border: 1px solid var(--color-border); background-color: var(--color-surface);"
+              >
+                <summary class="text-xs cursor-pointer" style="color: var(--color-text-muted);">Plan</summary>
+                <div
+                  class="mt-2 max-h-56 overflow-auto rounded border px-3 py-2"
+                  style="border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-base) 85%, transparent);"
+                >
+                  <div
+                    class="text-sm leading-relaxed prose prose-sm max-w-none prose-pre:overflow-x-auto prose-pre:break-words"
+                    style="color: var(--color-text-main);"
+                  >
+                    <div v-html="renderMarkdown(streamPlanText(message))"></div>
+                  </div>
+                </div>
+              </details>
+
+              <details
+                v-if="streamTraceEvents(message).length"
+                class="rounded p-2"
+                style="border: 1px solid var(--color-border); background-color: var(--color-surface);"
+              >
+                <summary class="text-xs cursor-pointer" style="color: var(--color-text-muted);">
+                  Steps ({{ streamTraceEvents(message).length }})
+                </summary>
+                <div class="mt-2 max-h-48 overflow-auto space-y-1 pr-1">
+                  <div
+                    v-for="(event, index) in streamTraceEvents(message)"
+                    :key="`${message.id}-trace-${index}`"
+                    class="rounded border px-2 py-1.5 text-xs"
+                    style="border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-base) 80%, transparent);"
+                  >
+                    <p class="font-medium" style="color: var(--color-text-main);">{{ formatTraceEvent(event) }}</p>
+                  </div>
+                </div>
+              </details>
+            </div>
+          </details>
+
           <details v-if="message.toolEvents && message.toolEvents.length" class="mt-3 rounded p-2" style="border: 1px solid var(--color-border);">
-            <summary class="text-xs cursor-pointer" style="color: var(--color-text-muted);">Tool and node details</summary>
-            <pre class="text-xs whitespace-pre-wrap mt-2" style="color: var(--color-text-main);">{{ formatToolEvents(message.toolEvents) }}</pre>
+            <summary class="text-xs cursor-pointer" style="color: var(--color-text-muted);">Tool artifacts</summary>
+            <pre class="text-xs whitespace-pre-wrap mt-2 max-h-48 overflow-auto" style="color: var(--color-text-main);">{{ formatToolEvents(message.toolEvents) }}</pre>
           </details>
         </div>
-        <div class="flex items-center justify-end mt-1 px-4">
+        <div v-if="message.explanation" class="flex items-center justify-end mt-1 px-4">
           <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
             <button
               @click="copyExplanation(message.explanation)"
@@ -205,6 +272,51 @@ function formatToolEvents(events) {
   } catch (_error) {
     return String(events)
   }
+}
+
+function streamPlanText(message) {
+  return String(message?.streamTrace?.planText || '').trim()
+}
+
+function streamTraceEvents(message) {
+  const events = message?.streamTrace?.events
+  return Array.isArray(events) ? events : []
+}
+
+function hasStreamTrace(message) {
+  return Boolean(streamPlanText(message) || streamTraceEvents(message).length > 0)
+}
+
+function hasAssistantContent(message) {
+  return Boolean(
+    message?.explanation ||
+    message?.codeUpdated ||
+    hasStreamTrace(message) ||
+    (Array.isArray(message?.toolEvents) && message.toolEvents.length > 0)
+  )
+}
+
+function formatTraceEvent(event) {
+  const type = String(event?.type || '').trim().toLowerCase()
+  const node = String(event?.node || '').trim()
+  const stage = String(event?.stage || '').trim()
+  const message = String(event?.message || '').trim()
+
+  if (type === 'node') {
+    if (node && message) return `Node ${node}: ${message}`
+    if (node) return `Node ${node}`
+    return message || 'Node update'
+  }
+  if (type === 'status') {
+    if (stage && message) return `Status ${stage}: ${message}`
+    return message || 'Status update'
+  }
+  return message || 'Update'
+}
+
+function openCodePane() {
+  appStore.setActiveTab('workspace')
+  appStore.setWorkspacePane('code')
 }
 
 async function loadMoreTurns() {
