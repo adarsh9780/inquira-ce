@@ -14,6 +14,7 @@ test('sidebar uses file explorer layout without arrow toggle', () => {
   assert.equal(source.includes('SidebarWorkspaces'), true)
   assert.equal(source.includes('SidebarDatasets'), true)
   assert.equal(source.includes('SidebarConversations'), true)
-  assert.equal(source.includes('v-else-if="!appStore.isSidebarCollapsed"'), true)
+  assert.equal(source.includes(':is-collapsed="false"'), true)
+  assert.equal(source.includes('v-else-if="!appStore.isSidebarCollapsed"'), false)
   assert.equal(source.includes('Kernel'), false)
 })

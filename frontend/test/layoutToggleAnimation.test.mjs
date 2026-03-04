@@ -35,9 +35,9 @@ test('sidebar and explorer sections use animated collapse transitions', () => {
     'utf-8',
   )
 
-  assert.equal(sidebarSource.includes('transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'), true)
   assert.equal(sidebarSource.includes('<Transition name="sidebar-section">'), true)
-  assert.equal(sidebarSource.includes('<Transition name="sidebar-brand">'), true)
+  assert.equal(sidebarSource.includes(':is-collapsed="false"'), true)
+  assert.equal(sidebarSource.includes('<Transition name="sidebar-brand">'), false)
   assert.equal(sidebarSource.includes('.sidebar-section-enter-active'), true)
   assert.equal(workspacesSource.includes('<Transition name="sidebar-list">'), true)
   assert.equal(datasetsSource.includes('<Transition name="sidebar-list">'), true)
@@ -45,4 +45,22 @@ test('sidebar and explorer sections use animated collapse transitions', () => {
   assert.equal(workspacesSource.includes('.sidebar-list-enter-active'), true)
   assert.equal(datasetsSource.includes('.sidebar-list-enter-active'), true)
   assert.equal(conversationsSource.includes('.sidebar-list-enter-active'), true)
+})
+
+test('sidebar icons keep fixed size to avoid toggle jitter', () => {
+  const sidebarSource = readFileSync(
+    resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'),
+    'utf-8',
+  )
+  const workspacesSource = readFileSync(
+    resolve(process.cwd(), 'src/components/layout/sidebar/SidebarWorkspaces.vue'),
+    'utf-8',
+  )
+
+  assert.equal(workspacesSource.includes('BuildingOffice2Icon class="w-3.5 h-3.5"'), true)
+  assert.equal(workspacesSource.includes('scale-110'), false)
+  assert.equal(sidebarSource.includes("FolderOpenIcon class=\"w-4 h-4 shrink-0\""), true)
+  assert.equal(sidebarSource.includes("DocumentTextIcon class=\"w-4 h-4 shrink-0\""), true)
+  assert.equal(sidebarSource.includes("appStore.activeTab === 'workspace' ? 'scale-110' : ''"), false)
+  assert.equal(sidebarSource.includes("appStore.activeTab === 'schema-editor' ? 'scale-110' : ''"), false)
 })

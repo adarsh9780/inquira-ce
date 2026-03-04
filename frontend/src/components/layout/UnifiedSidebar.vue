@@ -1,7 +1,6 @@
 <template>
   <div
-    class="flex flex-col border-r transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] h-full shrink-0 z-40 shadow-sm relative overflow-visible"
-    :class="appStore.isSidebarCollapsed ? 'w-16' : 'w-64'"
+    class="flex flex-col w-64 border-r h-full shrink-0 z-40 shadow-sm relative overflow-visible"
     style="background-color: var(--color-base); border-color: var(--color-border);"
   >
     <!-- Top Section: Brand & Header -->
@@ -12,14 +11,12 @@
       title="Click to collapse/expand"
     >
       <div class="flex items-center justify-center w-full">
-        <div class="flex items-center min-w-0" :class="appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start w-full'">
+        <div class="flex items-center justify-start w-full min-w-0">
           <img :src="logo" alt="Inquira Logo" class="w-8 h-8 rounded shrink-0 shadow-sm" />
-          <Transition name="sidebar-brand">
-            <div v-show="!appStore.isSidebarCollapsed" class="ml-3 min-w-0">
-              <h1 class="text-sm font-bold tracking-tight leading-none truncate" style="color: var(--color-text-main);">Inquira</h1>
-              <p class="text-[10px] font-medium mt-0.5 truncate" style="color: var(--color-text-muted);">LLM-Powered Analysis</p>
-            </div>
-          </Transition>
+          <div class="ml-3 min-w-0">
+            <h1 class="text-sm font-bold tracking-tight leading-none truncate" style="color: var(--color-text-main);">Inquira</h1>
+            <p class="text-[10px] font-medium mt-0.5 truncate" style="color: var(--color-text-muted);">LLM-Powered Analysis</p>
+          </div>
         </div>
       </div>
     </div>
@@ -31,14 +28,14 @@
       <!-- Workspace root + explorer tree -->
       <div class="flex flex-col space-y-2 mt-2">
         <SidebarWorkspaces 
-          :is-collapsed="appStore.isSidebarCollapsed"
+          :is-collapsed="false"
           @header-click="handleExplorerHeaderClick"
           @select="handleWorkspaceSelect"
         />
 
         <Transition name="sidebar-section">
           <div
-            v-if="!appStore.isSidebarCollapsed && appStore.hasWorkspace"
+            v-if="appStore.hasWorkspace"
             key="workspace-tree-attached"
             class="ml-5 mr-2 rounded-lg border"
             style="border-color: color-mix(in srgb, var(--color-border) 80%, transparent); background-color: color-mix(in srgb, var(--color-surface) 55%, var(--color-base));"
@@ -53,28 +50,28 @@
             </div>
             <div class="py-1">
               <SidebarDatasets 
-                :is-collapsed="appStore.isSidebarCollapsed"
+                :is-collapsed="false"
                 @header-click="handleExplorerHeaderClick"
                 @select="handleDatasetSelect"
                 @open-settings="openSettings"
               />
               <SidebarConversations 
-                :is-collapsed="appStore.isSidebarCollapsed"
+                :is-collapsed="false"
                 @header-click="handleExplorerHeaderClick"
                 @select="handleConversationSelect"
               />
             </div>
           </div>
 
-          <div v-else-if="!appStore.isSidebarCollapsed" key="workspace-tree-detached" class="flex flex-col space-y-1">
+          <div v-else key="workspace-tree-detached" class="flex flex-col space-y-1">
             <SidebarDatasets 
-              :is-collapsed="appStore.isSidebarCollapsed"
+              :is-collapsed="false"
               @header-click="handleExplorerHeaderClick"
               @select="handleDatasetSelect"
               @open-settings="openSettings"
             />
             <SidebarConversations 
-              :is-collapsed="appStore.isSidebarCollapsed"
+              :is-collapsed="false"
               @header-click="handleExplorerHeaderClick"
               @select="handleConversationSelect"
             />
@@ -93,15 +90,9 @@
         :style="appStore.activeTab === 'workspace' ? 'background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent); color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
         title="Workspace"
       >
-        <div class="flex items-center min-w-0 transition-[gap] duration-200 ease-out" :class="appStore.isSidebarCollapsed ? 'justify-center w-full gap-0' : 'gap-2'">
-          <FolderOpenIcon class="w-4 h-4 shrink-0 transition-transform" :class="appStore.activeTab === 'workspace' ? 'scale-110' : ''" />
-          <span
-            class="text-xs font-medium truncate overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-out"
-            :class="[
-              appStore.isSidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-[110px] opacity-100',
-              appStore.activeTab === 'workspace' ? 'font-semibold' : ''
-            ]"
-          >Workspace</span>
+        <div class="flex items-center gap-2 min-w-0">
+          <FolderOpenIcon class="w-4 h-4 shrink-0" />
+          <span class="text-xs font-medium truncate" :class="appStore.activeTab === 'workspace' ? 'font-semibold' : ''">Workspace</span>
         </div>
       </button>
 
@@ -112,15 +103,9 @@
         :style="appStore.activeTab === 'schema-editor' ? 'background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent); color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
         title="Schema Editor"
       >
-        <div class="flex items-center min-w-0 transition-[gap] duration-200 ease-out" :class="appStore.isSidebarCollapsed ? 'justify-center w-full gap-0' : 'gap-2'">
-          <DocumentTextIcon class="w-4 h-4 shrink-0 transition-transform" :class="appStore.activeTab === 'schema-editor' ? 'scale-110' : ''" />
-          <span
-            class="text-xs font-medium truncate overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-out"
-            :class="[
-              appStore.isSidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-[110px] opacity-100',
-              appStore.activeTab === 'schema-editor' ? 'font-semibold' : ''
-            ]"
-          >Schema Editor</span>
+        <div class="flex items-center gap-2 min-w-0">
+          <DocumentTextIcon class="w-4 h-4 shrink-0" />
+          <span class="text-xs font-medium truncate" :class="appStore.activeTab === 'schema-editor' ? 'font-semibold' : ''">Schema Editor</span>
         </div>
       </button>
       <!-- User Menu Toggle -->
@@ -130,25 +115,19 @@
           class="w-full flex items-center justify-between p-1.5 rounded-lg hover:bg-white border border-transparent hover:border-gray-200 transition-colors"
           title="Account & Settings"
         >
-          <div class="flex items-center min-w-0 transition-[gap] duration-200 ease-out" :class="appStore.isSidebarCollapsed ? 'justify-center w-full gap-0' : 'gap-2'">
+          <div class="flex items-center gap-2 min-w-0">
             <div class="relative shrink-0">
               <div class="w-7 h-7 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center shadow-sm text-white font-medium text-xs">
                 {{ authStore.username ? authStore.username.charAt(0).toUpperCase() : 'U' }}
               </div>
             </div>
             
-            <div
-              class="flex-1 text-left truncate overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-out"
-              :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-[150px] opacity-100'"
-            >
+            <div class="flex-1 text-left truncate">
               <p class="text-xs font-semibold truncate" style="color: var(--color-text-main);">{{ authStore.username }}</p>
               <p class="text-[10px] truncate" style="color: var(--color-text-muted);">{{ authStore.planLabel }}</p>
             </div>
           </div>
-          <div
-            class="shrink-0 overflow-hidden transition-[max-width,opacity] duration-200 ease-out"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-4 opacity-100'"
-          >
+          <div class="shrink-0">
             <ChevronUpIcon class="h-3.5 w-3.5" style="color: var(--color-text-muted);" />
           </div>
         </button>
@@ -274,7 +253,7 @@ function handleTabClick(tabId) {
   const normalized = String(tabId || '').trim().toLowerCase()
   if (normalized === 'schema-editor') {
     if (appStore.activeTab === 'schema-editor') {
-      appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+      appStore.setSidebarCollapsed(true)
       return
     }
     appStore.setActiveTab('schema-editor')
@@ -282,7 +261,7 @@ function handleTabClick(tabId) {
   }
   if (normalized === 'workspace') {
     if (appStore.activeTab === 'workspace') {
-      appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+      appStore.setSidebarCollapsed(true)
       return
     }
     appStore.setActiveTab('workspace')
@@ -292,13 +271,11 @@ function handleTabClick(tabId) {
 }
 
 function toggleSidebar() {
-  appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+  appStore.setSidebarCollapsed(true)
 }
 
 function handleExplorerHeaderClick() {
-  if (appStore.isSidebarCollapsed) {
-    appStore.setSidebarCollapsed(false)
-  }
+  // Binary visibility mode: sidebar is always expanded while mounted.
 }
 
 function handleWorkspaceSelect() {
@@ -408,16 +385,6 @@ function handleClickOutside(event) {
 .sidebar-section-leave-to {
   opacity: 0;
   transform: translateY(-4px);
-}
-
-.sidebar-brand-enter-active,
-.sidebar-brand-leave-active {
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-.sidebar-brand-enter-from,
-.sidebar-brand-leave-to {
-  opacity: 0;
-  transform: translateX(-4px);
 }
 
 /* Custom Scrollbar */

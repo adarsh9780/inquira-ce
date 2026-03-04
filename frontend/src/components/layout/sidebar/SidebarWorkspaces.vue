@@ -8,7 +8,7 @@
       title="Workspaces"
     >
       <div class="flex items-center gap-2">
-        <BuildingOffice2Icon class="w-4 h-4 transition-transform" :class="!isCollapsed && 'scale-110'" style="color: var(--color-text-muted);"/>
+        <BuildingOffice2Icon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
         <span
           class="section-label overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-out"
           :class="isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[120px] opacity-100'"

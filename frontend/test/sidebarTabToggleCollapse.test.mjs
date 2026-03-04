@@ -13,5 +13,5 @@ test('sidebar tab icons toggle collapse when clicked again on active workspace/s
   assert.equal(source.includes("if (appStore.activeTab === 'workspace')"), true)
   assert.equal(source.includes("if (normalized === 'schema-editor')"), true)
   assert.equal(source.includes("if (appStore.activeTab === 'schema-editor')"), true)
-  assert.equal(source.includes('appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)'), true)
+  assert.equal(source.includes('appStore.setSidebarCollapsed(true)'), true)
 })
