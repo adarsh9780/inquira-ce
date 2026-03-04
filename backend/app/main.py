@@ -2,13 +2,11 @@ import argparse
 import asyncio
 import os
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import aiosqlite
 
 # Monkey patch aiosqlite.Connection to add is_alive method
@@ -92,36 +90,6 @@ async def lifespan(app: FastAPI):
     app.state.workspace_langgraph_manager = WorkspaceLangGraphManager()
     app.state.workspace_deletion_service = WorkspaceDeletionService()
 
-    # Initialize LangGraph Agent with Persistence
-    try:
-        from .agent.graph import build_graph
-
-        # Use dedicated chat_history.db in the user's home directory
-        db_path = Path.home() / ".inquira" / "chat_history.db"
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # We need to store the checkpointer itself to close it later,
-        # or we rely on the fact that build_graph uses it.
-        # However, AsyncSqliteSaver is an async context manager.
-        # We need to enter it to get the usable checkpointer.
-
-        # AsyncSqliteSaver.from_conn_string returns an async context manager.
-        # We must assign the context manager to a variable, then await __aenter__()
-        # to get the *actual* checkpointer instance.
-
-        checkpointer_cm = AsyncSqliteSaver.from_conn_string(str(db_path))
-        checkpointer = await checkpointer_cm.__aenter__()
-
-        # Store context manager for cleanup, and checkpointer for reference (if needed)
-        app.state.checkpointer_cm = checkpointer_cm
-
-        app.state.agent_graph = build_graph(checkpointer=checkpointer)
-        logprint(f"LangGraph agent initialized with persistence at: {db_path}")
-    except Exception as e:
-        logprint(f"Failed to initialize LangGraph agent: {e}", level="error")
-        app.state.agent_graph = None
-        app.state.checkpointer_cm = None
-
     # Load merged configuration
     try:
         default_config_path = os.path.join(os.path.dirname(__file__), "app_config.json")
@@ -165,13 +133,6 @@ async def lifespan(app: FastAPI):
             await app.state.workspace_deletion_service.shutdown()
         except Exception as e:
             logprint(f"Error closing workspace deletion service: {e}", level="error")
-
-    if hasattr(app.state, "checkpointer_cm") and app.state.checkpointer_cm:
-        logprint("Closing LangGraph checkpointer connection...")
-        try:
-            await app.state.checkpointer_cm.__aexit__(None, None, None)
-        except Exception as e:
-            logprint(f"Error closing checkpointer: {e}", level="error")
 
     try:
         await shutdown_workspace_kernel_manager()

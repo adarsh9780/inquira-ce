@@ -15,3 +15,9 @@ def test_main_no_longer_initializes_legacy_database_manager():
 def test_main_websocket_flow_avoids_legacy_settings_database_imports():
     source = _main_source()
     assert "from .database.database import get_user_settings" not in source
+
+
+def test_main_no_longer_bootstraps_global_chat_history_database():
+    source = _main_source()
+    assert "chat_history.db" not in source
+    assert "app.state.checkpointer_cm" not in source

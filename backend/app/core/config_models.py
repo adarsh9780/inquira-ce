@@ -46,18 +46,12 @@ class AppConfig(BaseModel):
         # Get user config path
         user_config_path = cls.get_user_config_path()
 
-        # Create user config directory if it doesn't exist
-        user_config_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Load or create user config
+        # Load optional user config if present.
         if user_config_path.exists():
             with open(user_config_path, 'r') as f:
                 user_data = json.load(f)
         else:
-            # Create empty user config
             user_data = {}
-            with open(user_config_path, 'w') as f:
-                json.dump(user_data, f, indent=2)
 
         # Merge configs (user config overrides defaults)
         merged_data = default_config.model_dump()
