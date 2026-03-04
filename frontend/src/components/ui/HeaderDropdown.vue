@@ -110,7 +110,7 @@ const containerStyle = computed(() => {
   const widthChars = Math.min(Math.max(desiredChars, Number(props.minChars || 24)), Number(props.maxChars || 52))
   return {
     width: `${widthChars}ch`,
-    maxWidth: '45vw'
+    maxWidth: '100%'
   }
 })
 const triggerStyle = computed(() => ({

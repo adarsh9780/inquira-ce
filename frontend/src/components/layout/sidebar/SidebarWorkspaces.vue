@@ -8,7 +8,7 @@
       title="Workspaces"
     >
       <div class="flex items-center gap-2">
-        <RectangleGroupIcon class="w-4 h-4 transition-transform" :class="!isCollapsed && 'scale-110'" style="color: var(--color-text-muted);"/>
+        <BuildingOffice2Icon class="w-4 h-4 transition-transform" :class="!isCollapsed && 'scale-110'" style="color: var(--color-text-muted);"/>
         <span v-if="!isCollapsed" class="section-label">Workspaces</span>
       </div>
       <button 
@@ -34,13 +34,6 @@
 
       <div v-if="appStore.workspaces.length === 0" class="px-2 py-2 text-xs text-center" style="color: var(--color-text-muted);">
         No workspaces yet
-      </div>
-      <div
-        v-else-if="visibleWorkspaces.length === 0"
-        class="px-2 py-2 text-xs text-center"
-        style="color: var(--color-text-muted);"
-      >
-        No other workspaces
       </div>
       
       <div 
@@ -100,7 +93,7 @@ import { extractApiErrorMessage } from '../../../utils/apiError'
 import WorkspaceCreateModal from '../../modals/WorkspaceCreateModal.vue'
 import ConfirmationModal from '../../modals/ConfirmationModal.vue'
 import { 
-  RectangleGroupIcon, 
+  BuildingOffice2Icon, 
   PlusIcon,
   TrashIcon
 } from '@heroicons/vue/24/outline'

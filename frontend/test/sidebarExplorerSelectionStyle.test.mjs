@@ -18,6 +18,7 @@ test('sidebar renders workspace-root explorer style with compact green active hi
   )
 
   assert.equal(unifiedSource.includes('CheckCircleIcon'), true)
+  assert.equal(unifiedSource.includes('BuildingOffice2Icon'), true)
   assert.equal(unifiedSource.includes('const activeWorkspaceName = computed(() => {'), true)
   assert.equal(datasetsSource.includes("bg-green-50/50 text-green-700"), true)
   assert.equal(conversationsSource.includes("bg-green-50/50 text-green-700"), true)

@@ -13,6 +13,8 @@ test('output tab renders collapsible cards with header-level filters and run sta
   assert.equal(source.includes('title: `Run ${runId}`'), true)
   assert.equal(source.includes('No output generated.'), true)
   assert.equal(source.includes('toggleExpanded(event.id)'), true)
+  assert.equal(source.includes('<HeaderDropdown'), true)
+  assert.equal(source.includes('v-for="option in filterOptions"'), false)
   assert.equal(source.includes("const lastAutoOpenedRunId = ref('')"), true)
   assert.equal(source.includes('watch(analysisLogEvents, (events) => {'), true)
   assert.equal(source.includes("activeFilter.value = 'all'"), true)

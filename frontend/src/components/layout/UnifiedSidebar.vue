@@ -36,12 +36,16 @@
 
         <div
           v-if="!appStore.isSidebarCollapsed && appStore.hasWorkspace"
-          class="mx-2 rounded-lg border"
+          class="ml-5 mr-2 rounded-lg border"
           style="border-color: color-mix(in srgb, var(--color-border) 80%, transparent); background-color: color-mix(in srgb, var(--color-surface) 55%, var(--color-base));"
         >
-          <div class="flex items-center gap-2 px-3 py-2 border-b" style="border-color: color-mix(in srgb, var(--color-border) 80%, transparent);">
-            <CheckCircleIcon class="w-4 h-4" style="color: var(--color-success);" />
-            <span class="text-xs font-semibold truncate" style="color: var(--color-text-main);">{{ activeWorkspaceName }}</span>
+          <div class="px-3 py-2 border-b" style="border-color: color-mix(in srgb, var(--color-border) 80%, transparent);">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Active Workspace</p>
+            <div class="mt-1 flex items-center gap-2 min-w-0">
+              <BuildingOffice2Icon class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
+              <span class="text-xs font-semibold truncate" style="color: var(--color-text-main);">{{ activeWorkspaceName }}</span>
+              <CheckCircleIcon class="w-4 h-4 shrink-0 ml-auto" style="color: var(--color-success);" />
+            </div>
           </div>
           <div class="py-1">
             <SidebarDatasets 
@@ -203,6 +207,7 @@ import logo from '../../assets/favicon.svg'
 import {
   DocumentTextIcon,
   CheckCircleIcon,
+  BuildingOffice2Icon,
   CogIcon,
   ArrowRightOnRectangleIcon,
   ChevronUpIcon

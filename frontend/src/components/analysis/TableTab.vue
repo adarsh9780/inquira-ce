@@ -16,7 +16,7 @@
 
         <div class="flex items-center space-x-2">
           <!-- Table selector dropdown — always shown when artifacts are available -->
-          <div v-if="displayArtifacts.length > 0" class="flex items-center space-x-2">
+          <div v-if="displayArtifacts.length > 0" class="flex min-w-0 items-center" style="max-width: min(42vw, 24rem);">
             <HeaderDropdown
               id="dataframe-select"
               v-model="selectedArtifactId"
@@ -24,7 +24,9 @@
               placeholder="Select table"
               aria-label="Select table"
               :fit-to-longest-label="true"
-              max-width-class="min-w-[240px]"
+              :min-chars="12"
+              :max-chars="36"
+              max-width-class="w-full"
             />
           </div>
 

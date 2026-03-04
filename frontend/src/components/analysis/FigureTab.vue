@@ -17,7 +17,7 @@
         
         <div class="flex items-center space-x-2">
           <!-- Figure Selector -->
-          <div v-if="orderedFigures && orderedFigures.length > 1" class="flex items-center">
+          <div v-if="orderedFigures && orderedFigures.length > 1" class="flex min-w-0 items-center" style="max-width: min(42vw, 24rem);">
             <HeaderDropdown
               id="figure-select"
               v-model="selectedArtifactId"
@@ -25,7 +25,9 @@
               placeholder="Select figure"
               aria-label="Select figure"
               :fit-to-longest-label="true"
-              max-width-class="min-w-[240px]"
+              :min-chars="12"
+              :max-chars="36"
+              max-width-class="w-full"
             />
           </div>
 

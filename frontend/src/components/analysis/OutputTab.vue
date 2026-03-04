@@ -1,22 +1,17 @@
 <template>
   <div class="flex h-full flex-col overflow-hidden">
     <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'output'">
-      <div class="flex w-full items-center gap-3">
-        <div class="inline-flex items-center rounded-xl p-0.5" style="background-color: color-mix(in srgb, var(--color-border) 35%, transparent);">
-          <button
-            v-for="option in filterOptions"
-            :key="option.value"
-            @click="activeFilter = option.value"
-            class="rounded-lg px-2.5 py-1 text-xs transition-colors"
-            :class="activeFilter === option.value ? 'bg-white shadow-sm' : ''"
-            :style="activeFilter === option.value ? 'color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
-          >
-            {{ option.label }}
-          </button>
-        </div>
-        <div class="ml-auto text-xs tabular-nums" style="color: var(--color-text-muted);">
+      <div class="flex w-full items-center justify-end gap-2">
+        <div class="text-xs tabular-nums" style="color: var(--color-text-muted);">
           {{ filteredEvents.length }} {{ filteredEvents.length === 1 ? 'event' : 'events' }}
         </div>
+        <HeaderDropdown
+          v-model="activeFilter"
+          :options="filterOptions"
+          placeholder="All"
+          aria-label="Filter output events"
+          max-width-class="w-[136px]"
+        />
       </div>
     </Teleport>
 
@@ -127,6 +122,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
+import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import {
   ArrowPathIcon,
   CheckCircleIcon,
