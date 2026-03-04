@@ -58,3 +58,13 @@ def test_makefile_git_commit_uses_commit_message_txt():
     assert 'current_msg="$$(cat commit_message.txt)"' in text
     assert "git commit -F commit_message.txt" in text
     assert ": > commit_message.txt" in text
+
+
+def test_makefile_pins_uv_and_stages_bundled_uv_for_local_desktop_build():
+    text = MAKEFILE.read_text(encoding="utf-8")
+    assert "UV_VERSION := 0.6.3" in text
+    assert "check-uv-version:" in text
+    assert 'actual="$$(uv --version | awk \'{print $$2}\')"' in text
+    assert "stage-bundled-uv-local: check-uv-version" in text
+    assert 'cp "$$(command -v uv)" src-tauri/bundled-tools/uv' in text
+    assert "build-desktop: stage-bundled-uv-local" in text

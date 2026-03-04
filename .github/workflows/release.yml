@@ -85,6 +85,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
+        with:
+          uv-version: "0.6.3"
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -140,6 +142,8 @@ jobs:
 
       - name: Setup UV
         uses: astral-sh/setup-uv@v4
+        with:
+          uv-version: "0.6.3"
 
       - name: Stage bundled uv (macOS)
         if: matrix.os == 'macos-latest'

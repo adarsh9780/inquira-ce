@@ -3,8 +3,9 @@ SHELL := /bin/bash
 VERSION ?=
 POS_VERSION := $(word 2,$(MAKECMDGOALS))
 EFFECTIVE_VERSION := $(if $(VERSION),$(VERSION),$(POS_VERSION))
+UV_VERSION := 0.6.3
 
-.PHONY: help help-release help-push help-tag check-version check-version-pretty check-message check-input-version check-input-version-greater check-version-file check-no-version-arg check-tag-not-latest set-version metadata test test-pretty ruff-test ruff-test-pretty mypy-test mypy-test-pretty test-backend test-backend-pretty test-frontend test-frontend-pretty build-frontend sync-frontend-dist build-wheel build-desktop git-add git-commit git-push git-tag push release
+.PHONY: help help-release help-push help-tag check-version check-version-pretty check-message check-input-version check-input-version-greater check-version-file check-no-version-arg check-tag-not-latest check-uv-version stage-bundled-uv-local set-version metadata test test-pretty ruff-test ruff-test-pretty mypy-test mypy-test-pretty test-backend test-backend-pretty test-frontend test-frontend-pretty build-frontend sync-frontend-dist build-wheel build-desktop git-add git-commit git-push git-tag push release
 
 help:
 	@echo "Usage:"
@@ -26,6 +27,7 @@ help:
 	@echo "  make git-push"
 	@echo "  make set-version 0.5.0a7"
 	@echo "  make check-version"
+	@echo "  make check-uv-version"
 	@echo "  make metadata"
 	@echo "  make git-tag"
 	@echo "  make push"
@@ -38,6 +40,7 @@ help:
 	@echo "  help-tag      Show details for tag workflow"
 	@echo "  set-version   Update VERSION and apply across backend/frontend/tauri/installers"
 	@echo "  check-version Print current versions from all version-bearing files"
+	@echo "  check-uv-version Ensure local uv version matches pinned release version"
 	@echo "  check-version-pretty Pretty formatted version check output (rich text + wrapping)"
 	@echo "  metadata      Regenerate .github/release/metadata.json from release_metadata.md"
 	@echo "  test          Run backend and frontend test suites"
@@ -131,6 +134,19 @@ check-tag-not-latest: check-no-version-arg check-version-file
 		exit 1; \
 	fi
 
+check-uv-version:
+	@actual="$$(uv --version | awk '{print $$2}')"; \
+	if [ "$$actual" != "$(UV_VERSION)" ]; then \
+		echo "uv version mismatch: expected $(UV_VERSION), found $$actual."; \
+		echo "Please install or switch to uv $(UV_VERSION) to keep local builds aligned with GitHub releases."; \
+		exit 1; \
+	fi
+
+stage-bundled-uv-local: check-uv-version
+	@mkdir -p src-tauri/bundled-tools
+	@cp "$$(command -v uv)" src-tauri/bundled-tools/uv
+	@chmod +x src-tauri/bundled-tools/uv
+
 set-version: check-input-version-greater
 	uv run python scripts/maintenance/bump_versions.py --version "$(EFFECTIVE_VERSION)" --write-version-file
 
@@ -182,7 +198,7 @@ sync-frontend-dist:
 build-wheel: build-frontend sync-frontend-dist
 	cd backend && uv build --wheel
 
-build-desktop:
+build-desktop: stage-bundled-uv-local
 	cd frontend && npm ci
 	cargo tauri build
 
