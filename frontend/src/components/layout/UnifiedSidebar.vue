@@ -81,6 +81,19 @@
 
     <!-- Bottom Section: Schema Link & User Menu -->
     <div class="border-t p-2 shrink-0 flex flex-col gap-2" style="border-color: var(--color-border); background-color: var(--color-base);">
+      <!-- Workspace Link -->
+      <button
+        @click="handleTabClick('workspace')"
+        class="w-full flex items-center justify-between p-2 rounded-lg transition-colors"
+        :style="appStore.activeTab === 'workspace' ? 'background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent); color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
+        title="Workspace"
+      >
+        <div class="flex items-center gap-2 min-w-0" :class="appStore.isSidebarCollapsed ? 'justify-center w-full' : ''">
+          <FolderOpenIcon class="w-4 h-4 shrink-0 transition-transform" :class="appStore.activeTab === 'workspace' ? 'scale-110' : ''" />
+          <span v-show="!appStore.isSidebarCollapsed" class="text-xs font-medium truncate" :class="appStore.activeTab === 'workspace' ? 'font-semibold' : ''">Workspace</span>
+        </div>
+      </button>
+
       <!-- Schema Editor Link -->
       <button
         @click="handleTabClick('schema-editor')"
@@ -208,6 +221,7 @@ import {
   DocumentTextIcon,
   CheckCircleIcon,
   BuildingOffice2Icon,
+  FolderOpenIcon,
   CogIcon,
   ArrowRightOnRectangleIcon,
   ChevronUpIcon
@@ -232,6 +246,23 @@ const activeWorkspaceName = computed(() => {
 })
 
 function handleTabClick(tabId) {
+  const normalized = String(tabId || '').trim().toLowerCase()
+  if (normalized === 'schema-editor') {
+    if (appStore.activeTab === 'schema-editor') {
+      appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+      return
+    }
+    appStore.setActiveTab('schema-editor')
+    return
+  }
+  if (normalized === 'workspace') {
+    if (appStore.activeTab === 'workspace') {
+      appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+      return
+    }
+    appStore.setActiveTab('workspace')
+    return
+  }
   appStore.setActiveTab(tabId)
 }
 

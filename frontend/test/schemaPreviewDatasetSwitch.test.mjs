@@ -24,7 +24,8 @@ test('schema editor auto-regenerates on dataset switch/load failures with progre
   const schemaEditorPath = resolve(process.cwd(), 'src/components/preview/SchemaEditorTab.vue')
   const source = readFileSync(schemaEditorPath, 'utf-8')
 
-  assert.equal(source.includes('await regenerateSchemaForPath(dataPath, appStore.ingestedTableName || null)'), true)
+  assert.equal(source.includes('return await regenerateSchemaForPath('), true)
+  assert.equal(source.includes('allowWhileLoading: true'), true)
   assert.equal(source.includes('loadError?.status === 422 || loadError?.response?.status === 422'), true)
   assert.equal(source.includes('const newTableName = event?.detail?.tableName'), true)
   assert.equal(source.includes('apiService.v1RegenerateDatasetSchema('), true)

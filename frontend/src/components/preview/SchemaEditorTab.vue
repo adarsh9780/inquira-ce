@@ -1,124 +1,176 @@
 <template>
-  <div class="h-full flex flex-col relative">
-    <!-- Regeneration Progress Modal Overlay -->
+  <div class="h-full flex flex-col relative overflow-hidden">
     <Teleport to="body">
-      <div v-if="isRegenerating" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-        <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
-          <!-- Header -->
-          <div class="text-center mb-6">
-            <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-              <svg class="w-8 h-8 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+      <div
+        v-if="isRegenerating"
+        class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+        style="background-color: color-mix(in srgb, var(--color-text-main) 26%, transparent);"
+      >
+        <div
+          class="w-full max-w-md rounded-xl border px-5 py-4 shadow-xl"
+          style="background-color: var(--color-surface); border-color: var(--color-border);"
+        >
+          <div class="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-semibold" style="color: var(--color-text-main);">Generating Schema</h3>
+              <p class="mt-0.5 text-xs" style="color: var(--color-text-muted);">{{ regenerationStatus }}</p>
             </div>
-            <h3 class="text-lg font-semibold text-gray-900">Generating Schema</h3>
-            <p class="text-sm text-gray-500 mt-1">Using AI to analyze your data columns</p>
+            <div class="h-5 w-5 animate-spin rounded-full border-2 border-transparent border-t-current" style="color: var(--color-accent);"></div>
           </div>
 
-          <!-- Progress Info -->
-          <div class="space-y-3">
-            <div class="flex items-center justify-between text-sm">
-              <span class="text-gray-600">{{ regenerationStatus }}</span>
-              <span class="text-blue-600 font-medium">{{ formatElapsedTime(elapsedTime) }}</span>
-            </div>
-            
-            <!-- Progress Bar -->
-            <div class="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                class="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                :style="{ width: regenerationProgress + '%' }"
-              ></div>
-            </div>
+          <div class="mb-2 h-2 w-full rounded-full" style="background-color: color-mix(in srgb, var(--color-border) 45%, transparent);">
+            <div
+              class="h-2 rounded-full transition-all duration-300"
+              :style="{
+                width: `${regenerationProgress}%`,
+                backgroundColor: 'var(--color-accent)',
+              }"
+            ></div>
+          </div>
 
-            <!-- Tips -->
-            <p class="text-xs text-gray-400 text-center mt-4">
-              💡 The AI is generating meaningful descriptions for each column based on sample data
-            </p>
+          <div class="text-right text-[11px] tabular-nums" style="color: var(--color-text-muted);">
+            {{ formatElapsedTime(elapsedTime) }}
           </div>
         </div>
       </div>
     </Teleport>
 
-    <div class="flex items-center justify-between mb-3">
-      <div class="text-sm text-gray-700">Schema Editor</div>
-      <div class="flex items-center space-x-2">
-        <button @click="refreshSchema" :disabled="schemaLoading" class="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded border disabled:opacity-50">Refresh</button>
-        <button @click="regenerateSchema" :disabled="schemaLoading" class="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded border disabled:opacity-50" title="Regenerate schema with AI descriptions">Regenerate</button>
-        <button @click="clearCache" class="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded border">Clear Cache</button>
-        <button @click="exportSchema" class="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded border">Export</button>
-        <button @click="saveSchema" :disabled="schemaLoading || !schemaEdited" class="text-sm px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded disabled:opacity-50">Save</button>
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex min-w-0 flex-wrap items-center gap-2">
+        <div class="text-sm font-semibold" style="color: var(--color-text-main);">Schema Editor</div>
+        <div class="w-[220px] max-w-[46vw] min-w-[170px]">
+          <HeaderDropdown
+            v-model="selectedDatasetTable"
+            :options="datasetDropdownOptions"
+            placeholder="Select dataset"
+            aria-label="Select dataset for schema editor"
+            :fit-to-longest-label="true"
+            :min-chars="12"
+            :max-chars="34"
+            max-width-class="w-full"
+            @update:model-value="handleDatasetSelection"
+          />
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <button
+          @click="refreshSchema"
+          :disabled="schemaLoading || !hasActiveDataset"
+          class="inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          style="border-color: var(--color-border); color: var(--color-text-main);"
+        >
+          Refresh
+        </button>
+        <button
+          @click="regenerateSchema"
+          :disabled="schemaLoading || !hasActiveDataset"
+          class="inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          style="border-color: var(--color-border); color: var(--color-text-main);"
+          title="Regenerate schema with AI descriptions"
+        >
+          Regenerate
+        </button>
+        <button
+          @click="clearCache"
+          class="inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
+          style="border-color: var(--color-border); color: var(--color-text-main);"
+        >
+          Clear Cache
+        </button>
+        <button
+          @click="exportSchema"
+          :disabled="schema.length === 0"
+          class="inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          style="border-color: var(--color-border); color: var(--color-text-main);"
+        >
+          Export
+        </button>
+        <button
+          @click="saveSchema"
+          :disabled="schemaLoading || !schemaEdited || !hasActiveDataset"
+          class="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          style="background-color: var(--color-accent); color: white;"
+        >
+          Save
+        </button>
       </div>
     </div>
-    <div class="flex-1 min-h-0 overflow-auto bg-white rounded-lg border p-3">
-      <!-- Empty State - No dataset selected -->
-      <div v-if="!hasActiveDataset && !schemaLoading" class="flex flex-col items-center justify-center h-full text-center py-12">
-        <div class="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-          <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-          </svg>
-        </div>
-        <h3 class="text-lg font-medium text-gray-900 mb-2">No Dataset Selected</h3>
-        <p class="text-sm text-gray-500 max-w-xs">
-          Select a dataset from the dropdown above to view and edit its schema.
+
+    <div
+      class="min-h-0 flex-1 overflow-auto rounded-lg border p-3"
+      style="background-color: var(--color-base); border-color: var(--color-border);"
+    >
+      <div
+        v-if="!hasActiveDataset && !schemaLoading"
+        class="flex h-full flex-col items-center justify-center py-12 text-center"
+      >
+        <div class="mb-3 h-12 w-12 rounded-full border" style="border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-surface) 65%, var(--color-base));"></div>
+        <h3 class="text-sm font-semibold" style="color: var(--color-text-main);">No Dataset Selected</h3>
+        <p class="mt-1 max-w-xs text-xs" style="color: var(--color-text-muted);">
+          Select a dataset from the dropdown above to view and edit schema for any table directly from this tab.
         </p>
       </div>
-      
-      <!-- Loading State -->
-      <div v-else-if="schemaLoading && !isRegenerating" class="text-sm text-gray-500">
+
+      <div v-else-if="schemaLoading && !isRegenerating" class="text-xs" style="color: var(--color-text-muted);">
         Loading schema...
       </div>
-      
-      <!-- Error State -->
-      <div v-else-if="schemaError" class="text-sm text-red-600">{{ schemaError }}</div>
-      
-      <!-- Schema Content -->
-      <div v-else-if="hasActiveDataset">
-        <!-- Schema Hint Banner -->
-        <div v-if="schemaNeedsDescriptions && !isRegenerating" class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-          <div class="flex items-center gap-3">
-            <div class="flex-shrink-0">
-              <svg class="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"></circle>
-                <path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 8v5"></path>
-                <circle cx="12" cy="16.5" r="1" fill="currentColor"></circle>
-              </svg>
-            </div>
-            <div class="flex-1">
-              <h4 class="text-sm font-medium text-amber-800">Schema Descriptions Not Generated Yet</h4>
-              <p class="text-xs text-amber-600 mt-0.5">
-                These column descriptions are still blank. Click <strong>Regenerate</strong> to generate AI descriptions.
-              </p>
-            </div>
-          </div>
+
+      <div v-else-if="schemaError" class="rounded-md border px-3 py-2 text-xs" style="border-color: color-mix(in srgb, #fca5a5 70%, var(--color-border)); color: #b42318; background-color: color-mix(in srgb, #fef2f2 75%, var(--color-base));">
+        {{ schemaError }}
+      </div>
+
+      <div v-else-if="hasActiveDataset" class="space-y-4">
+        <div
+          v-if="schemaNeedsDescriptions && !isRegenerating"
+          class="rounded-lg border px-3 py-2"
+          style="border-color: color-mix(in srgb, #facc15 55%, var(--color-border)); background-color: color-mix(in srgb, #fefce8 70%, var(--color-base));"
+        >
+          <h4 class="text-xs font-semibold" style="color: #854d0e;">Schema Descriptions Not Generated Yet</h4>
+          <p class="mt-0.5 text-xs" style="color: #a16207;">
+            Descriptions are blank. Click <strong>Regenerate</strong> to generate AI descriptions.
+          </p>
         </div>
-        
-        <!-- Data Context/Description -->
-        <div v-if="schemaContext" class="mb-4 p-3 bg-gray-50 rounded-lg border">
-          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Data Description</label>
-          <textarea 
-            v-model="schemaContext" 
+
+        <div class="pb-2">
+          <label class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Data Description</label>
+          <textarea
+            v-model="schemaContext"
             @input="schemaEdited = true"
-            class="w-full text-sm text-gray-700 bg-white border rounded px-2 py-1.5 resize-none"
-            rows="2"
-            placeholder="Describe your data..."
+            rows="3"
+            class="w-full resize-y rounded-md border px-2 py-2 text-sm leading-5 outline-none"
+            style="border-color: color-mix(in srgb, var(--color-border) 45%, transparent); color: var(--color-text-main); background-color: color-mix(in srgb, var(--color-surface) 72%, var(--color-base));"
+            placeholder="Describe your dataset context..."
           ></textarea>
         </div>
-        
-        <!-- Schema Table -->
-        <div class="overflow-x-auto w-full">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+
+        <div class="overflow-x-auto rounded-lg border" style="border-color: var(--color-border);">
+          <table class="min-w-full table-fixed">
+            <thead style="background-color: color-mix(in srgb, var(--color-surface) 78%, var(--color-base));">
               <tr>
-                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Column</th>
-                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                <th class="w-[28%] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Column</th>
+                <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Description</th>
               </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-for="(col, i) in schema" :key="i">
-                <td class="px-3 py-2 text-sm text-gray-900">{{ col.name }}</td>
-                <td class="px-3 py-2 text-sm text-gray-700">
-                  <input type="text" class="w-full border rounded px-2 py-1 text-sm" :value="col.description" @input="e => updateSchemaDescription(i, e.target.value)" placeholder="Enter description for this column..." />
+            <tbody>
+              <tr
+                v-for="(col, i) in schema"
+                :key="i"
+                class="align-top"
+                style="border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);"
+              >
+                <td class="px-3 py-2 text-sm font-medium break-words" style="color: var(--color-text-main);">
+                  {{ col.name }}
+                </td>
+                <td class="px-3 py-2">
+                  <textarea
+                    rows="2"
+                    class="w-full resize-y rounded-md px-2 py-1.5 text-sm leading-5 outline-none"
+                    style="border: none; color: var(--color-text-main); background-color: transparent;"
+                    :value="col.description"
+                    @input="e => updateSchemaDescription(i, e.target.value)"
+                    placeholder="Enter one or more lines to describe this column..."
+                  ></textarea>
                 </td>
               </tr>
             </tbody>
@@ -130,10 +182,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { previewService } from '../../services/previewService'
 import { apiService } from '../../services/apiService'
 import { useAppStore } from '../../stores/appStore'
+import { toast } from '../../composables/useToast'
+import HeaderDropdown from '../ui/HeaderDropdown.vue'
 
 const appStore = useAppStore()
 
@@ -143,13 +197,23 @@ const schemaLoading = ref(false)
 const schemaError = ref('')
 const schemaEdited = ref(false)
 const isRegenerating = ref(false)
+const datasetOptions = ref([])
+const selectedDatasetTable = ref('')
+const selectedDatasetPath = ref('')
 
-// Computed to check if we have an active dataset
-const hasActiveDataset = computed(() => {
-  return appStore.dataFilePath && appStore.dataFilePath.trim() !== ''
+const hasActiveDataset = computed(() => selectedDatasetTable.value.trim() !== '')
+
+const datasetDropdownOptions = computed(() => {
+  if (!Array.isArray(datasetOptions.value) || datasetOptions.value.length === 0) {
+    return [{ value: '', label: 'No datasets' }]
+  }
+  return datasetOptions.value.map((item) => ({
+    value: item.tableName,
+    label: item.tableName,
+    key: item.tableName,
+  }))
 })
 
-// Computed to detect placeholder schema rows with blank descriptions.
 const schemaNeedsDescriptions = computed(() => {
   if (!schema.value || schema.value.length === 0) return false
   const allEmpty = schema.value.every(col => !col.description || col.description.trim() === '')
@@ -157,7 +221,6 @@ const schemaNeedsDescriptions = computed(() => {
   return allEmpty && emptyContext
 })
 
-// Progress tracking for modal
 const regenerationStatus = ref('Initializing...')
 const regenerationProgress = ref(0)
 const elapsedTime = ref(0)
@@ -187,88 +250,150 @@ function formatElapsedTime(ms) {
   return `${remainingSeconds}s`
 }
 
-onUnmounted(() => {
-  stopTimer()
-})
+function normalizeDatasetEntries(items) {
+  return (Array.isArray(items) ? items : [])
+    .map((item) => {
+      const tableName = String(item?.table_name || '').trim()
+      const sourcePath = String(item?.source_path || item?.file_path || '').trim()
+      if (!tableName) return null
+      return { tableName, sourcePath }
+    })
+    .filter(Boolean)
+}
+
+function getSelectedDatasetEntry() {
+  const tableName = String(selectedDatasetTable.value || '').trim()
+  if (!tableName) return null
+  return datasetOptions.value.find((item) => item.tableName === tableName) || null
+}
+
+function applyDatasetSelection(tableName) {
+  const normalized = String(tableName || '').trim()
+  if (!normalized) {
+    selectedDatasetTable.value = ''
+    selectedDatasetPath.value = ''
+    return null
+  }
+  const found = datasetOptions.value.find((item) => item.tableName === normalized) || null
+  if (!found) return null
+  selectedDatasetTable.value = found.tableName
+  selectedDatasetPath.value = found.sourcePath
+  return found
+}
+
+async function loadSchemaDatasets() {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (!workspaceId) {
+    datasetOptions.value = []
+    selectedDatasetTable.value = ''
+    selectedDatasetPath.value = ''
+    return
+  }
+
+  try {
+    const response = await apiService.v1ListDatasets(workspaceId)
+    datasetOptions.value = normalizeDatasetEntries(response?.datasets || [])
+  } catch (error) {
+    datasetOptions.value = []
+  }
+
+  if (datasetOptions.value.length === 0) {
+    selectedDatasetTable.value = ''
+    selectedDatasetPath.value = ''
+    return
+  }
+
+  const activeTable = String(appStore.ingestedTableName || '').trim()
+  const keepCurrent = applyDatasetSelection(selectedDatasetTable.value)
+  if (keepCurrent) return
+
+  const fromActive = applyDatasetSelection(activeTable)
+  if (fromActive) return
+
+  applyDatasetSelection(datasetOptions.value[0].tableName)
+}
 
 async function fetchSchemaData(forceRefresh = false) {
-  if (schemaLoading.value) return
+  const selected = getSelectedDatasetEntry()
+  if (!selected || schemaLoading.value) return false
   schemaLoading.value = true
   schemaError.value = ''
   schema.value = []
   try {
-    const settings = await previewService.getSettings(forceRefresh)
-    console.debug('📋 [Schema] Settings loaded:', settings.data_path)
-    if (!settings.data_path) {
-      schemaError.value = 'Please configure your data file path in settings first.'
-      return
-    }
-    try {
-      console.debug('📋 [Schema] Loading schema for:', settings.data_path, 'forceRefresh:', forceRefresh)
-      const existingSchema = await previewService.loadSchema(
-        settings.data_path,
-        forceRefresh,
-        appStore.ingestedTableName || null
-      )
-      console.debug('📋 [Schema] Response:', existingSchema)
-      if (existingSchema && existingSchema.columns) {
-        console.debug('📋 [Schema] Loaded', existingSchema.columns.length, 'columns')
-        schema.value = existingSchema.columns
-        schemaContext.value = existingSchema.context || ''
-      } else {
-        console.warn('📋 [Schema] No columns in response:', existingSchema)
-        schemaError.value = 'Schema has no columns. Try clicking Refresh.'
-      }
-    } catch (loadError) {
-      console.error('📋 [Schema] Failed to load schema:', loadError)
-      schemaError.value = `Failed to load schema: ${loadError.message || 'Unknown error'}`
+    const existingSchema = await previewService.loadSchema(
+      selected.sourcePath,
+      forceRefresh,
+      selected.tableName
+    )
+    if (existingSchema && existingSchema.columns) {
+      schema.value = existingSchema.columns
+      schemaContext.value = existingSchema.context || ''
+      schemaEdited.value = false
+      return true
+    } else {
+      schemaError.value = 'Schema has no columns. Try clicking Refresh.'
+      return false
     }
   } catch (e) {
-    console.error('📋 [Schema] Failed to get settings:', e)
-    schemaError.value = 'Failed to load schema'
+    schemaError.value = `Failed to load schema: ${e?.message || 'Unknown error'}`
+    return false
   } finally {
     schemaLoading.value = false
   }
 }
 
-// Fetch schema for a specific path (used when switching datasets to avoid settings race condition)
-async function fetchSchemaDataForPath(dataPath) {
-  if (schemaLoading.value || !dataPath) return
+async function fetchSchemaDataForPath(dataPath, tableNameOverride = null) {
+  if (schemaLoading.value || !dataPath) return false
   schemaLoading.value = true
   schemaError.value = ''
   schema.value = []
   try {
-    console.debug('📋 [Schema] Loading schema for path (direct):', dataPath)
-    // Force refresh to bypass cache
+    const tableName = (tableNameOverride || selectedDatasetTable.value || appStore.ingestedTableName || '').trim()
+    if (tableName) {
+      applyDatasetSelection(tableName)
+    }
     const existingSchema = await previewService.loadSchema(
       dataPath,
       true,
-      appStore.ingestedTableName || null
+      tableName
     )
-    console.debug('📋 [Schema] Response:', existingSchema)
     if (existingSchema && existingSchema.columns) {
-      console.debug('📋 [Schema] Loaded', existingSchema.columns.length, 'columns')
       schema.value = existingSchema.columns
       schemaContext.value = existingSchema.context || ''
-      // Auto-trigger generation when schema is placeholder-only for a newly selected dataset.
+      schemaEdited.value = false
       if (schemaNeedsDescriptions.value && appStore.apiKeyConfigured) {
-        await regenerateSchemaForPath(dataPath, appStore.ingestedTableName || null)
+        return await regenerateSchemaForPath(
+          dataPath,
+          tableName || appStore.ingestedTableName || null,
+          { allowWhileLoading: true }
+        )
       }
+      return true
     } else {
-      console.warn('📋 [Schema] No columns in response:', existingSchema)
-      if (appStore.apiKeyConfigured) {
-        await regenerateSchemaForPath(dataPath, appStore.ingestedTableName || null)
+      if (tableName && appStore.apiKeyConfigured) {
+        return await regenerateSchemaForPath(
+          dataPath,
+          tableName || appStore.ingestedTableName || null,
+          { allowWhileLoading: true }
+        )
+      } else if (appStore.ingestedTableName) {
+        return await regenerateSchemaForPath(
+          dataPath,
+          appStore.ingestedTableName || null,
+          { allowWhileLoading: true }
+        )
       } else {
         schemaError.value = 'Schema has no columns. Set API key and click Regenerate.'
+        return false
       }
     }
   } catch (loadError) {
-    console.error('📋 [Schema] Failed to load schema:', loadError)
     if ((loadError?.status === 422 || loadError?.response?.status === 422) && appStore.apiKeyConfigured) {
-      await regenerateSchemaForPath(dataPath, appStore.ingestedTableName || null)
-      return
+      const tableName = (tableNameOverride || selectedDatasetTable.value || appStore.ingestedTableName || null)
+      return await regenerateSchemaForPath(dataPath, tableName, { allowWhileLoading: true })
     }
-    schemaError.value = `Failed to load schema: ${loadError.message || 'Unknown error'}`
+    schemaError.value = `Failed to load schema: ${loadError?.message || 'Unknown error'}`
+    return false
   } finally {
     schemaLoading.value = false
   }
@@ -282,34 +407,62 @@ function updateSchemaDescription(index, newDescription) {
 }
 
 async function saveSchema() {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  const tableName = String(selectedDatasetTable.value || appStore.ingestedTableName || '').trim()
+  const dataPath = String(selectedDatasetPath.value || appStore.dataFilePath || '').trim()
+
   try {
-    const settings = await previewService.getSettings()
-    if (!settings.data_path) {
-      schemaError.value = 'Please configure your data file path in settings first.'
+    if (workspaceId && tableName) {
+      await apiService.v1SaveDatasetSchema(workspaceId, tableName, {
+        context: schemaContext.value || '',
+        columns: schema.value,
+      })
+    } else if (dataPath) {
+      await apiService.saveSchema(dataPath, schemaContext.value || null, schema.value)
+    } else {
+      schemaError.value = 'Please select a dataset first.'
+      toast.info('Select a dataset first')
       return
     }
-    await apiService.saveSchema(settings.data_path, schemaContext.value || null, schema.value)
     schemaEdited.value = false
-    console.debug('Schema saved successfully')
+    toast.success('Schema saved', tableName ? `Saved schema for ${tableName}.` : 'Schema changes were saved.')
   } catch (e) {
-    console.error('Failed to save schema:', e)
     schemaError.value = 'Failed to save schema'
+    toast.error('Schema save failed', e?.message || 'Unable to save schema changes.')
   }
 }
 
-function refreshSchema() {
-  fetchSchemaData(true)
+async function refreshSchema() {
+  if (!hasActiveDataset.value) {
+    toast.info('Select a dataset first')
+    return
+  }
+  const ok = await fetchSchemaData(true)
+  if (ok) {
+    toast.success('Schema refreshed', `Reloaded ${selectedDatasetTable.value}.`)
+  } else {
+    toast.error('Schema refresh failed', schemaError.value || 'Unable to refresh schema.')
+  }
 }
 
 async function regenerateSchema() {
+  if (!hasActiveDataset.value) {
+    toast.info('Select a dataset first')
+    return
+  }
   const settings = await previewService.getSettings()
-  const dataPath = settings?.data_path || appStore.dataFilePath || ''
-  const tableName = appStore.ingestedTableName || null
-  await regenerateSchemaForPath(dataPath, tableName)
+  const dataPath = selectedDatasetPath.value || settings?.data_path || appStore.dataFilePath || ''
+  const tableName = selectedDatasetTable.value || appStore.ingestedTableName || null
+  const ok = await regenerateSchemaForPath(dataPath, tableName)
+  if (ok) {
+    toast.success('Schema regenerated', tableName ? `Generated descriptions for ${tableName}.` : 'Generated schema descriptions.')
+  } else {
+    toast.error('Schema regeneration failed', schemaError.value || 'Unable to regenerate schema.')
+  }
 }
 
-async function regenerateSchemaForPath(dataPath, tableName = null) {
-  if (schemaLoading.value) return
+async function regenerateSchemaForPath(dataPath, tableName = null, options = {}) {
+  if (schemaLoading.value && options?.allowWhileLoading !== true) return false
   schemaLoading.value = true
   schemaError.value = ''
   isRegenerating.value = true
@@ -323,27 +476,23 @@ async function regenerateSchemaForPath(dataPath, tableName = null) {
     const normalizedPath = (dataPath || '').trim()
     if (!normalizedPath) {
       schemaError.value = 'Please configure your data file path in settings first.'
-      return
+      return false
     }
 
     regenerationStatus.value = 'Analyzing data columns with AI...'
     regenerationProgress.value = 30
-    console.debug('🔄 [Schema] Regenerating schema with LLM for:', normalizedPath)
 
-    // Use v1 backend regeneration endpoint when workspace/table context is available.
-    const saveTableName = (tableName || appStore.ingestedTableName || '').trim()
+    const saveTableName = (tableName || selectedDatasetTable.value || appStore.ingestedTableName || '').trim()
     const generatedSchema = (saveTableName && appStore.activeWorkspaceId)
       ? await apiService.v1RegenerateDatasetSchema(appStore.activeWorkspaceId, saveTableName, {
           context: schemaContext.value || ''
         })
       : await apiService.generateSchema(normalizedPath, schemaContext.value || null, true)
-    console.debug('🔄 [Schema] Generated:', generatedSchema)
 
     if (generatedSchema && generatedSchema.columns) {
       regenerationStatus.value = `Saving ${generatedSchema.columns.length} column descriptions...`
       regenerationProgress.value = 80
 
-      // Legacy fallback path requires explicit save after generation.
       if (!saveTableName || !appStore.activeWorkspaceId) {
         await apiService.saveSchema(
           normalizedPath,
@@ -351,33 +500,30 @@ async function regenerateSchemaForPath(dataPath, tableName = null) {
           generatedSchema.columns
         )
       }
-      console.debug('✅ [Schema] Saved regenerated schema')
 
       regenerationStatus.value = 'Finalizing...'
       regenerationProgress.value = 95
-
-      // Clear cache and reload
       previewService.clearSchemaCache()
       schema.value = generatedSchema.columns
       schemaContext.value = generatedSchema.context || ''
-      
+      schemaEdited.value = false
       regenerationProgress.value = 100
-      regenerationStatus.value = `✅ Generated ${generatedSchema.columns.length} descriptions!`
-      console.debug('✅ [Schema] Loaded', generatedSchema.columns.length, 'columns with descriptions')
-      
-      // Brief pause to show success message
+      regenerationStatus.value = `Generated ${generatedSchema.columns.length} descriptions`
+
       await new Promise(resolve => setTimeout(resolve, 500))
+      return true
     } else {
       schemaError.value = 'Failed to generate schema. Please try again.'
+      return false
     }
   } catch (error) {
-    console.error('❌ [Schema] Regeneration failed:', error)
     const status = error?.response?.status || error?.status
     const detail = error?.response?.data?.detail || error?.data?.detail || error?.message || 'Unknown error'
     schemaError.value = `Failed to regenerate schema: ${detail}`
     if (status === 401) {
       schemaError.value = 'Failed to regenerate schema: please log in again (session expired).'
     }
+    return false
   } finally {
     stopTimer()
     schemaLoading.value = false
@@ -385,84 +531,104 @@ async function regenerateSchemaForPath(dataPath, tableName = null) {
   }
 }
 
-// Handle dataset switch event
-function handleDatasetSwitch(event) {
-  // Get path from event detail, or fallback to appStore
-  const newDataPath = event?.detail?.dataPath
-  const newTableName = event?.detail?.tableName
-  console.debug('📢 Dataset switched event:', event)
-  console.debug('📢 Event detail:', event?.detail)
-  console.debug('📢 Data path from event:', newDataPath)
-  
+async function handleDatasetSelection(value) {
+  const selected = applyDatasetSelection(value)
   schemaEdited.value = false
   schema.value = []
   schemaContext.value = ''
   schemaError.value = ''
-  
-  // Clear cache to force fresh load from backend
   previewService.clearSchemaCache()
-  
-  // If event.detail is null, the last dataset was deleted - show empty state
+
+  if (!selected?.sourcePath) return
+  await fetchSchemaDataForPath(selected.sourcePath, selected.tableName)
+}
+
+function handleDatasetSwitch(event) {
+  const newDataPath = event?.detail?.dataPath
+  const newTableName = event?.detail?.tableName
+
+  schemaEdited.value = false
+  schema.value = []
+  schemaContext.value = ''
+  schemaError.value = ''
+  previewService.clearSchemaCache()
+
   if (event?.detail === null) {
-    console.debug('📢 Last dataset deleted - showing empty state')
-    return // Let the empty state UI show
+    void loadSchemaDatasets()
+    return
   }
-  
-  // If we have the new path from the event, use it directly
+
+  if (newTableName) {
+    applyDatasetSelection(newTableName)
+  }
   if (newDataPath) {
-    console.debug('📢 Using path from event:', newDataPath)
+    selectedDatasetPath.value = newDataPath
     if (newTableName) {
       appStore.setIngestedTableName(newTableName)
     }
-    fetchSchemaDataForPath(newDataPath)
-  } else {
-    // Fallback: try to get from appStore (should be set before event is dispatched)
-    const appStorePath = appStore.dataFilePath
-    console.debug('📢 No path in event, trying appStore:', appStorePath)
-    if (appStorePath) {
-      fetchSchemaDataForPath(appStorePath)
-    } else {
-      // No dataset selected - show empty state
-      console.debug('📢 No active dataset - showing empty state')
-    }
+    void fetchSchemaDataForPath(newDataPath, newTableName || selectedDatasetTable.value || null)
   }
 }
 
-onMounted(() => {
-  fetchSchemaData()
+onMounted(async () => {
+  await loadSchemaDatasets()
+  if (selectedDatasetPath.value && selectedDatasetTable.value) {
+    await fetchSchemaDataForPath(selectedDatasetPath.value, selectedDatasetTable.value)
+  }
   window.addEventListener('dataset-switched', handleDatasetSwitch)
 })
 
 onUnmounted(() => {
+  stopTimer()
   window.removeEventListener('dataset-switched', handleDatasetSwitch)
 })
+
+watch(
+  () => appStore.activeWorkspaceId,
+  async () => {
+    schemaEdited.value = false
+    schema.value = []
+    schemaContext.value = ''
+    schemaError.value = ''
+    await loadSchemaDatasets()
+    if (selectedDatasetPath.value && selectedDatasetTable.value) {
+      await fetchSchemaDataForPath(selectedDatasetPath.value, selectedDatasetTable.value)
+    }
+  }
+)
 
 function clearCache() {
   try {
     previewService.clearSchemaCache()
-    console.debug('Schema cache cleared')
-  } catch (e) {
-    console.warn('Failed to clear cache')
+    toast.info('Schema cache cleared')
+  } catch (_e) {
+    toast.error('Cache clear failed', 'Unable to clear schema cache.')
   }
 }
 
 async function exportSchema() {
   try {
-    const settings = await previewService.getSettings()
-    if (!settings.data_path) return
-    const existingSchema = await previewService.loadSchema(settings.data_path)
-    if (!existingSchema || !existingSchema.columns) return
-    const blob = new Blob([JSON.stringify(existingSchema, null, 2)], { type: 'application/json' })
+    if (!schema.value || schema.value.length === 0) {
+      toast.info('Nothing to export', 'Load a schema first.')
+      return
+    }
+    const payload = {
+      table_name: selectedDatasetTable.value || '',
+      context: schemaContext.value || '',
+      columns: schema.value,
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'schema.json'
+    a.download = `${selectedDatasetTable.value || 'schema'}.json`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-  } catch (e) {
-    console.warn('Failed to export schema')
+    toast.success('Schema exported', `${selectedDatasetTable.value || 'schema'}.json downloaded.`)
+  } catch (_e) {
+    toast.error('Export failed', 'Unable to export schema file.')
   }
 }
 </script>
