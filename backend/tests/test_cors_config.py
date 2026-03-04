@@ -10,6 +10,13 @@ def _load_main_module():
     return importlib.import_module("app.main")
 
 
+def _get_cors_kwargs(main):
+    for middleware in main.app.user_middleware:
+        if middleware.cls.__name__ == "CORSMiddleware":
+            return middleware.kwargs
+    raise AssertionError("CORSMiddleware is not configured on app.main.app")
+
+
 def test_load_cors_origins_defaults_when_env_missing(monkeypatch):
     monkeypatch.delenv("CORS_ORIGINS", raising=False)
     main = _load_main_module()
@@ -23,3 +30,10 @@ def test_load_cors_origins_from_comma_separated_env(monkeypatch):
     main = _load_main_module()
     origins = main._load_cors_origins()
     assert origins == ["http://localhost:5173", "https://app.example.com"]
+
+
+def test_cors_allows_patch_method():
+    main = _load_main_module()
+    cors_kwargs = _get_cors_kwargs(main)
+    methods = cors_kwargs.get("allow_methods", [])
+    assert "PATCH" in methods

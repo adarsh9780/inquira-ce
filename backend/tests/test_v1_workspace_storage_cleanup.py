@@ -1,4 +1,5 @@
 import pytest
+import duckdb
 
 from app.v1.services.workspace_storage_service import WorkspaceStorageService
 
@@ -43,3 +44,26 @@ async def test_ensure_workspace_dirs_creates_pyproject_for_uv_commands(monkeypat
     content = pyproject_path.read_text(encoding="utf-8")
     assert "[project]" in content
     assert 'name = "ws-2"' in content
+
+
+@pytest.mark.asyncio
+async def test_ensure_workspace_dirs_bootstraps_valid_workspace_duckdb(monkeypatch, tmp_path):
+    user_root = tmp_path / "workspaces-root"
+    monkeypatch.setattr(
+        WorkspaceStorageService,
+        "_user_root",
+        staticmethod(lambda _username: user_root),
+    )
+
+    workspace_dir = await WorkspaceStorageService.ensure_workspace_dirs("test", "ws-3")
+    duckdb_path = workspace_dir / "workspace.duckdb"
+
+    assert duckdb_path.exists() is True
+
+    con = duckdb.connect(str(duckdb_path), read_only=True)
+    try:
+        rows = con.execute("SELECT 1").fetchall()
+    finally:
+        con.close()
+
+    assert rows == [(1,)]

@@ -225,7 +225,7 @@ app.add_middleware(
     # Keep local-dev origins resilient across Vite/Tauri port changes.
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$|^https://tauri\.localhost$|^tauri://localhost$",
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["set-cookie"],
 )

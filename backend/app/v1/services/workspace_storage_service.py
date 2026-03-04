@@ -54,8 +54,11 @@ class WorkspaceStorageService:
     async def ensure_workspace_dirs(username: str, workspace_id: str) -> Path:
         """Create workspace directories and return workspace root path."""
         workspace_dir = WorkspaceStorageService.build_workspace_dir(username, workspace_id)
+        duckdb_path = WorkspaceStorageService.build_duckdb_path(username, workspace_id)
 
         def _create() -> None:
+            import duckdb
+
             workspace_dir.mkdir(parents=True, exist_ok=True)
             (workspace_dir / "context").mkdir(parents=True, exist_ok=True)
             (workspace_dir / "meta").mkdir(parents=True, exist_ok=True)
@@ -75,6 +78,12 @@ class WorkspaceStorageService:
                     ),
                     encoding="utf-8",
                 )
+
+            # Bootstrap an empty but valid workspace DuckDB file so kernel read-only
+            # connections do not fail for fresh workspaces with no datasets yet.
+            if not duckdb_path.exists():
+                con = duckdb.connect(str(duckdb_path))
+                con.close()
 
         await asyncio.to_thread(_create)
         return workspace_dir
