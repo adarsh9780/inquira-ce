@@ -62,6 +62,7 @@ import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useAppStore } from './stores/appStore'
 import { useAuthStore } from './stores/authStore'
 import { settingsWebSocket } from './services/websocketService'
+import { previewService } from './services/previewService'
 import { toast } from './composables/useToast'
 import AuthModal from './components/modals/AuthModal.vue'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
@@ -84,6 +85,7 @@ const workspaceRuntimeStatus = reactive({
 })
 const wsUnsubscribers = ref([])
 const lastRuntimeErrorToast = ref('')
+const activeSnapshotUserId = ref('')
 
 // Listen for Tauri backend-status events (if running in Tauri)
 function setupTauriListener() {
@@ -102,9 +104,19 @@ function setupTauriListener() {
 }
 
 async function handleAuthenticated(userData) {
+  const userId = String(userData?.user_id || '').trim()
+  if (!userId) return
+
+  if (activeSnapshotUserId.value !== userId) {
+    appStore.resetForAuthBoundary()
+    previewService.clearSchemaCache()
+    activeSnapshotUserId.value = userId
+    await appStore.loadLocalConfig(userId)
+  }
+
   // Establish persistent WebSocket connection
   try {
-    await settingsWebSocket.connectPersistent(userData.user_id)
+    await settingsWebSocket.connectPersistent(userId)
   } catch (wsError) {
     console.error('❌ Failed to establish persistent WebSocket connection:', wsError)
   }
@@ -159,7 +171,6 @@ onMounted(async () => {
     }),
   )
   try {
-    await appStore.loadLocalConfig()
     await authStore.checkAuth()
     if (authStore.isAuthenticated) {
       await handleAuthenticated(authStore.user)
@@ -185,6 +196,12 @@ watch(
   () => authStore.isAuthenticated,
   (isAuthenticated) => {
     if (isAuthenticated) return
+    activeSnapshotUserId.value = ''
+    appStore.resetForAuthBoundary()
+    previewService.clearSchemaCache()
+    if (settingsWebSocket.isPersistentMode) {
+      settingsWebSocket.disconnectPersistent()
+    }
     lastRuntimeErrorToast.value = ''
     appStore.setRuntimeError('')
   }

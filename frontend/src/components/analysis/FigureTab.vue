@@ -190,7 +190,7 @@ onMounted(async () => {
     await renderPlot()
   }
 
-  if (appStore.activeWorkspaceId) {
+  if (appStore.activeWorkspaceId && appStore.hasWorkspace) {
     await loadWorkspaceFigureArtifacts(appStore.activeWorkspaceId)
   }
 })
@@ -221,7 +221,7 @@ watch(() => appStore.activeWorkspaceId, (workspaceId) => {
   workspaceFigureArtifacts.value = []
   artifactListError.value = ''
   appStore.setFigureCount(0)
-  if (workspaceId) {
+  if (workspaceId && appStore.hasWorkspace) {
     void loadWorkspaceFigureArtifacts(workspaceId)
   }
 }, { immediate: true })
@@ -229,7 +229,7 @@ watch(() => appStore.activeWorkspaceId, (workspaceId) => {
 watch(
   () => (Array.isArray(appStore.figures) ? appStore.figures.map((fig) => String(fig?.artifact_id || fig?.name || '')).join('|') : ''),
   () => {
-    if (!appStore.activeWorkspaceId) return
+    if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) return
     void loadWorkspaceFigureArtifacts(appStore.activeWorkspaceId)
   }
 )
@@ -240,7 +240,7 @@ watch(selectedArtifactId, (artifactId) => {
 
 // Re-render when the Figure pane becomes visible after being hidden by v-show
 watch(() => appStore.dataPane, (pane) => {
-  if (pane === 'figure' && appStore.activeWorkspaceId) {
+  if (pane === 'figure' && appStore.activeWorkspaceId && appStore.hasWorkspace) {
     void loadWorkspaceFigureArtifacts(appStore.activeWorkspaceId)
   }
   if (pane === 'figure' && selectedFigure.value) {
@@ -252,7 +252,7 @@ watch(() => appStore.dataPane, (pane) => {
 
 async function loadWorkspaceFigureArtifacts(workspaceId) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
-  if (!normalizedWorkspaceId) {
+  if (!normalizedWorkspaceId || !appStore.hasWorkspace) {
     workspaceFigureArtifacts.value = []
     selectedArtifactId.value = null
     selectedFigurePayload.value = null
@@ -301,7 +301,7 @@ async function loadWorkspaceFigureArtifacts(workspaceId) {
 async function loadSelectedFigurePayload(artifactId) {
   const normalizedWorkspaceId = String(appStore.activeWorkspaceId || '').trim()
   const normalizedArtifactId = String(artifactId || '').trim()
-  if (!normalizedWorkspaceId || !normalizedArtifactId) {
+  if (!normalizedWorkspaceId || !normalizedArtifactId || !appStore.hasWorkspace) {
     selectedFigurePayload.value = null
     appStore.setPlotlyFigure(null)
     return

@@ -97,7 +97,13 @@ def test_llm_service_ask_suppresses_known_pydantic_serializer_warning(monkeypatc
     class SchemaOutput(BaseModel):
         value: str
 
+    captured = {"max_tokens": None}
+
     class FakeStructuredChain:
+        def bind(self, **kwargs):
+            captured["max_tokens"] = kwargs.get("max_tokens")
+            return self
+
         def invoke(self, _query):
             import warnings
 
@@ -109,8 +115,8 @@ def test_llm_service_ask_suppresses_known_pydantic_serializer_warning(monkeypatc
             return SchemaOutput(value="ok")
 
     class FakeBoundClient:
-        def with_structured_output(self, _fmt):
-            return FakeStructuredChain()
+        def invoke(self, _query):
+            return type("Resp", (), {"content": "OK"})()
 
     class FakeChatOpenAI:
         def __init__(self, **_kwargs):
@@ -118,6 +124,9 @@ def test_llm_service_ask_suppresses_known_pydantic_serializer_warning(monkeypatc
 
         def bind(self, **_kwargs):
             return FakeBoundClient()
+
+        def with_structured_output(self, _fmt):
+            return FakeStructuredChain()
 
     monkeypatch.setattr("app.services.llm_service.ChatOpenAI", FakeChatOpenAI)
     svc = LLMService(api_key="k")
@@ -129,3 +138,4 @@ def test_llm_service_ask_suppresses_known_pydantic_serializer_warning(monkeypatc
     assert isinstance(result, SchemaOutput)
     assert result.value == "ok"
     assert len(captured_warnings) == 0
+    assert captured["max_tokens"] == 4096

@@ -134,7 +134,7 @@
 
       <!-- Empty state: loading artifacts -->
       <div
-        v-else-if="isLoadingArtifacts"
+        v-else-if="showArtifactListLoadingState"
         class="absolute inset-0 flex items-center justify-center"
         style="background-color: var(--color-base);"
       >
@@ -198,6 +198,7 @@ const isDownloading = ref(false)
 const isDeletingArtifact = ref(false)
 const isPageLoading = ref(false)
 const isLoadingArtifacts = ref(false)
+const workspaceKnownSavedTables = ref({})
 
 // The artifact_id the user has explicitly selected (null = nothing selected)
 const selectedArtifactId = ref(null)
@@ -237,6 +238,17 @@ onUnmounted(() => {
 
 const allArtifacts = computed(() => (Array.isArray(workspaceArtifacts.value) ? workspaceArtifacts.value : []))
 
+const activeWorkspaceHasKnownSavedTables = computed(() => {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (!workspaceId) return false
+  return workspaceKnownSavedTables.value[workspaceId] === true
+})
+
+const showArtifactListLoadingState = computed(() => {
+  if (!isLoadingArtifacts.value) return false
+  return activeWorkspaceHasKnownSavedTables.value
+})
+
 const tableDropdownOptions = computed(() => allArtifacts.value.map((artifact) => ({
   value: artifact.artifact_id,
   label: artifact.logical_name || artifact.artifact_id,
@@ -258,7 +270,7 @@ watch(
     if (latestArtifactId && latestArtifactId !== selectedArtifactId.value) {
       selectedArtifactId.value = latestArtifactId
     }
-    if (!appStore.activeWorkspaceId) return
+    if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) return
     void loadWorkspaceArtifacts(appStore.activeWorkspaceId)
   }
 )
@@ -344,7 +356,8 @@ async function waitForKernelReady(workspaceId, signal) {
 // Load workspace artifact list whenever the workspace changes
 // ---------------------------------------------------------------------------
 async function loadWorkspaceArtifacts(workspaceId) {
-  if (!workspaceId) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId || !appStore.hasWorkspace) {
     workspaceArtifacts.value = []
     return
   }
@@ -355,14 +368,19 @@ async function loadWorkspaceArtifacts(workspaceId) {
   appStore.clearDataPaneError()
   try {
     const response = await enqueueSerializedRequest(async () => {
-      await waitForKernelReady(workspaceId, listAbortController.signal)
+      await waitForKernelReady(normalizedWorkspaceId, listAbortController.signal)
       return apiService.v1ListWorkspaceArtifacts(
-        workspaceId,
+        normalizedWorkspaceId,
         'dataframe',
         { signal: listAbortController.signal }
       )
     })
-    workspaceArtifacts.value = Array.isArray(response?.artifacts) ? response.artifacts : []
+    const artifacts = Array.isArray(response?.artifacts) ? response.artifacts : []
+    workspaceArtifacts.value = artifacts
+    workspaceKnownSavedTables.value = {
+      ...workspaceKnownSavedTables.value,
+      [normalizedWorkspaceId]: artifacts.length > 0
+    }
   } catch (error) {
     if (isAbortError(error)) return
     console.warn('Failed to load workspace artifacts:', error)
@@ -377,7 +395,7 @@ async function loadWorkspaceArtifacts(workspaceId) {
 
 async function recoverFromMissingArtifact(artifactId) {
   const missingArtifactId = String(artifactId || '').trim()
-  if (!missingArtifactId || !appStore.activeWorkspaceId) return
+  if (!missingArtifactId || !appStore.activeWorkspaceId || !appStore.hasWorkspace) return
   if (isRecoveringMissingArtifact) return
   isRecoveringMissingArtifact = true
   try {

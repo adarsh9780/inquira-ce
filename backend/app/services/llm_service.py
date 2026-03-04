@@ -103,7 +103,10 @@ class LLMService:
                     message=r"^Pydantic serializer warnings:",
                     category=UserWarning,
                 )
-                chain = client.with_structured_output(structured_output_format)
+                # Bind max_tokens *after* structured-output wrapping. Some LangChain
+                # wrappers can drop pre-bound kwargs otherwise.
+                structured = self.client.with_structured_output(structured_output_format)
+                chain = cast(Any, structured.bind(max_tokens=effective_max_tokens))
                 return chain.invoke(user_query)
         except HTTPException:
             raise

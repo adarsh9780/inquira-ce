@@ -17,7 +17,7 @@ class PreviewService {
       appStore.ingestedTableName ||
       inferTableNameFromDataPath(dataPath || '')
     ).trim()
-    if (!appStore.activeWorkspaceId || !tableName) {
+    if (!appStore.activeWorkspaceId || !appStore.hasWorkspace || !tableName) {
       return { table_name: '', columns: [] }
     }
     const cacheKey = cacheService.generateKey('schema/load', { workspace: appStore.activeWorkspaceId, tableName })

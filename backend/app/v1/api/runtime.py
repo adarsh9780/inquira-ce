@@ -240,6 +240,10 @@ def _normalize_table_name(raw: str) -> str:
     return "".join(c if c.isalnum() or c == "_" else "_" for c in raw.strip()).lower()
 
 
+def _normalize_schema_item_name(raw: str) -> str:
+    return "".join(c for c in str(raw or "").strip().lower() if c.isalnum())
+
+
 def _validate_runner_install_request(
     payload: RunnerPackageInstallRequest,
     config: Any,
@@ -1153,6 +1157,12 @@ async def regenerate_workspace_dataset_schema(
             SchemaDescriptionList,
             runtime.schema_max_tokens,
         )
+    except HTTPException as exc:
+        detail = exc.detail if getattr(exc, "detail", None) is not None else str(exc)
+        raise HTTPException(
+            status_code=int(getattr(exc, "status_code", 500) or 500),
+            detail=f"Failed to generate schema via LLM: {detail}",
+        ) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=500,
@@ -1164,13 +1174,27 @@ async def regenerate_workspace_dataset_schema(
         if hasattr(schema_response, "schemas")
         else (schema_response if isinstance(schema_response, list) else [])
     )
-    generated_by_name = {str(item.name): str(item.description) for item in generated_items}
+    generated_by_name: dict[str, str] = {}
+    generated_by_normalized_name: dict[str, str] = {}
+    for item in generated_items:
+        name = str(getattr(item, "name", "")).strip()
+        description = str(getattr(item, "description", "")).strip()
+        if not name:
+            continue
+        generated_by_name[name] = description
+        normalized_name = _normalize_schema_item_name(name)
+        if normalized_name and normalized_name not in generated_by_normalized_name:
+            generated_by_normalized_name[normalized_name] = description
 
     merged_columns = [
         {
             "name": col["name"],
             "dtype": col["dtype"],
-            "description": generated_by_name.get(col["name"], ""),
+            "description": (
+                generated_by_name.get(col["name"], "").strip()
+                or generated_by_normalized_name.get(_normalize_schema_item_name(col["name"]), "").strip()
+                or str(col.get("description", "")).strip()
+            ),
             "samples": col.get("samples", []),
         }
         for col in columns

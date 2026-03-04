@@ -12,7 +12,7 @@ test('TableTab serializes artifact requests and gates list fetch on kernel readi
 
   assert.equal(source.includes('function enqueueSerializedRequest(task)'), true)
   assert.equal(source.includes('async function waitForKernelReady(workspaceId, signal)'), true)
-  assert.equal(source.includes('await waitForKernelReady(workspaceId, listAbortController.signal)'), true)
+  assert.equal(source.includes('await waitForKernelReady(normalizedWorkspaceId, listAbortController.signal)'), true)
   assert.equal(source.includes('watch(() => appStore.dataframes.length'), false)
   assert.equal(source.includes('params.failCallback()'), false)
   assert.equal(source.includes('`infinite-${selectedArtifactId}-${datasourceVersion}`'), false)

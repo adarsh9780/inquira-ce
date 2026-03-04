@@ -164,7 +164,7 @@ const artifactCountClass = computed(() => {
 })
 
 async function refreshKernelStatus() {
-  if (!appStore.activeWorkspaceId) {
+  if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {
     kernelStatus.value = 'missing'
     return
   }
@@ -200,7 +200,7 @@ function stopKernelStatusPolling() {
 }
 
 async function interruptKernel() {
-  if (!appStore.activeWorkspaceId || isKernelActionRunning.value) return
+  if (!appStore.activeWorkspaceId || !appStore.hasWorkspace || isKernelActionRunning.value) return
   isKernelActionRunning.value = true
   try {
     const response = await apiService.v1InterruptWorkspaceKernel(appStore.activeWorkspaceId)
@@ -215,7 +215,7 @@ async function interruptKernel() {
 }
 
 async function restartKernel() {
-  if (!appStore.activeWorkspaceId || isKernelActionRunning.value) return
+  if (!appStore.activeWorkspaceId || !appStore.hasWorkspace || isKernelActionRunning.value) return
   isKernelActionRunning.value = true
   kernelStatus.value = 'connecting'
   try {
@@ -237,12 +237,12 @@ async function restartKernel() {
 
 // Named handler so we can remove the exact same reference on unmount
 function handleVisibilityChange() {
-  if (!document.hidden && appStore.activeWorkspaceId) refreshKernelStatus()
+  if (!document.hidden && appStore.activeWorkspaceId && appStore.hasWorkspace) refreshKernelStatus()
 }
 
 // Lifecycle and Watchers
 onMounted(() => {
-  if (appStore.activeWorkspaceId) startKernelStatusPolling()
+  if (appStore.activeWorkspaceId && appStore.hasWorkspace) startKernelStatusPolling()
   document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
@@ -251,8 +251,8 @@ onUnmounted(() => {
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
-watch(() => appStore.activeWorkspaceId, (newId) => {
-  if (newId) startKernelStatusPolling()
+watch([() => appStore.activeWorkspaceId, () => appStore.hasWorkspace], ([newId, hasWorkspace]) => {
+  if (newId && hasWorkspace) startKernelStatusPolling()
   else stopKernelStatusPolling()
 })
 </script>

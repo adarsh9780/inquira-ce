@@ -156,7 +156,7 @@ watch(() => appStore.activeWorkspaceId, async () => {
 })
 
 async function ensureWorkspaceCwd() {
-  if (!appStore.activeWorkspaceId) {
+  if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {
     appStore.setTerminalCwd('')
     return
   }

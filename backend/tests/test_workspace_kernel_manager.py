@@ -1,5 +1,6 @@
 import asyncio
 from pathlib import Path
+from queue import Empty as QueueEmpty
 from types import SimpleNamespace
 
 import pytest
@@ -135,6 +136,45 @@ async def test_execute_serializes_requests_per_workspace():
         ["start-a", "end-a", "start-b", "end-b"],
         ["start-b", "end-b", "start-a", "end-a"],
     )
+
+
+@pytest.mark.asyncio
+async def test_execute_request_tolerates_transient_iopub_empty_events():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-io", "/tmp/ws-io.duckdb")
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def execute(self, code, store_history=True, stop_on_error=True):
+            _ = (code, store_history, stop_on_error)
+            return "msg-1"
+
+        async def get_iopub_msg(self, timeout=1):
+            _ = timeout
+            self.calls += 1
+            if self.calls == 1:
+                raise QueueEmpty()
+            if self.calls == 2:
+                return {
+                    "parent_header": {"msg_id": "msg-1"},
+                    "msg_type": "execute_result",
+                    "content": {"data": {"text/plain": "1"}},
+                }
+            return {
+                "parent_header": {"msg_id": "msg-1"},
+                "msg_type": "status",
+                "content": {"execution_state": "idle"},
+            }
+
+    fake_client = FakeClient()
+    session.client = fake_client
+
+    parsed = await manager._execute_request(session, "1", iopub_idle_timeout=2)
+
+    assert parsed.error is None
+    assert fake_client.calls >= 3
 
 
 @pytest.mark.asyncio
@@ -438,6 +478,31 @@ async def test_bootstrap_workspace_creates_scratchpad_parent_dir(tmp_path):
     assert not scratchpad_db.parent.exists()
     await manager._bootstrap_workspace(session)
     assert scratchpad_db.parent.exists()
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_workspace_creates_missing_workspace_duckdb(tmp_path):
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    workspace_db = tmp_path / "ws-new" / "workspace.duckdb"
+    scratchpad_db = tmp_path / "ws-new" / "scratchpad" / "artifacts.duckdb"
+    session = WorkspaceKernelSession(
+        workspace_id="ws-new",
+        workspace_duckdb_path=str(workspace_db),
+        manager=SimpleNamespace(),
+        client=SimpleNamespace(),
+        scratchpad_db_path=str(scratchpad_db),
+    )
+
+    async def fake_execute_on_session(current_session, code):
+        _ = current_session
+        assert str(workspace_db.as_posix()) in code
+        return {"success": True}
+
+    manager._execute_on_session = fake_execute_on_session  # type: ignore[method-assign]
+
+    assert not workspace_db.exists()
+    await manager._bootstrap_workspace(session)
+    assert workspace_db.exists()
 
 
 @pytest.mark.asyncio

@@ -9,8 +9,9 @@ test('app store persists local session snapshot via Tauri app data file service'
 
   assert.equal(source.includes("import { localStateService } from '../services/localStateService'"), true)
   assert.equal(source.includes('buildLocalStateSnapshot()'), true)
-  assert.equal(source.includes('await localStateService.saveSnapshot(buildLocalStateSnapshot())'), true)
-  assert.equal(source.includes('await localStateService.loadSnapshot()'), true)
+  assert.equal(source.includes('localStateService.saveSnapshot(snapshot, targetUserId)'), true)
+  assert.equal(source.includes('await localStateService.saveSnapshot(buildLocalStateSnapshot(), targetUserId)'), true)
+  assert.equal(source.includes('await localStateService.loadSnapshot(targetUserId)'), true)
   assert.equal(source.includes('terminal_open: !!isTerminalOpen.value'), true)
   assert.equal(source.includes('if (typeof ui.terminal_open === \'boolean\')'), true)
 })
@@ -20,13 +21,17 @@ test('local snapshot writer is compatible when Tauri file handle has no sync met
   const source = readFileSync(servicePath, 'utf-8')
 
   assert.equal(source.includes("if (typeof file.sync === 'function')"), true)
+  assert.equal(source.includes('function snapshotPath(scope) {'), true)
+  assert.equal(source.includes('session_state_${key}.json'), true)
+  assert.equal(source.includes('normalizeScope(scope)'), true)
 })
 
 test('app boot and unload flows load and flush local snapshot state', () => {
   const appPath = resolve(process.cwd(), 'src/App.vue')
   const source = readFileSync(appPath, 'utf-8')
 
-  assert.equal(source.includes('await appStore.loadLocalConfig()'), true)
+  assert.equal(source.includes('await appStore.loadLocalConfig(userId)'), true)
+  assert.equal(source.includes('appStore.resetForAuthBoundary()'), true)
   assert.equal(source.includes('void appStore.flushLocalConfig?.()'), true)
 })
 

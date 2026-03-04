@@ -181,12 +181,13 @@ export const apiService = {
   async getSettings() {
     const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
+    const hasWorkspace = !!appStore.hasWorkspace
     return {
       api_key: null,
       api_key_present: !!appStore.apiKeyConfigured,
-      data_path: appStore.dataFilePath || null,
+      data_path: hasWorkspace ? (appStore.dataFilePath || null) : null,
       context: appStore.schemaContext || '',
-      table_name: appStore.ingestedTableName || null
+      table_name: hasWorkspace ? (appStore.ingestedTableName || null) : null
     }
   },
 
@@ -304,7 +305,7 @@ export const apiService = {
   async getDatabasePaths() {
     const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
-    if (!appStore.activeWorkspaceId) {
+    if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {
       return { database_path: null, schema_path: null, base_directory: null }
     }
     const paths = await this.v1GetWorkspacePaths(appStore.activeWorkspaceId)
@@ -463,6 +464,11 @@ export const apiService = {
     }
 
     const ds = await this.v1AddDataset(appStore.activeWorkspaceId, filePath)
+    const kernelReady = await appStore.ensureWorkspaceKernelConnected(appStore.activeWorkspaceId)
+    if (!kernelReady) {
+      const reason = String(appStore.runtimeError || 'Workspace runtime bootstrap failed.')
+      throw new Error(reason)
+    }
     let columns = []
     try {
       const schema = await this.v1GetDatasetSchema(appStore.activeWorkspaceId, ds.table_name)

@@ -5,11 +5,14 @@ from __future__ import annotations
 import asyncio
 import inspect
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from queue import Empty as QueueEmpty
 from typing import Any
 
+import duckdb
 from jupyter_client import AsyncKernelManager
 
 from app.services.jupyter_message_parser import (
@@ -588,6 +591,7 @@ class WorkspaceKernelManager:
             raise RuntimeError(f"Failed to start workspace kernel: {self._describe_exception(exc)}") from exc
 
     async def _bootstrap_workspace(self, session: WorkspaceKernelSession) -> None:
+        self._ensure_workspace_duckdb_file(session.workspace_duckdb_path)
         duckdb_path = Path(session.workspace_duckdb_path).as_posix()
         scratchpad_file = Path(session.scratchpad_db_path)
         scratchpad_file.parent.mkdir(parents=True, exist_ok=True)
@@ -802,6 +806,14 @@ class WorkspaceKernelManager:
             return
         raise RuntimeError(output.get("error") or "Workspace kernel bootstrap failed")
 
+    def _ensure_workspace_duckdb_file(self, workspace_duckdb_path: str) -> None:
+        workspace_db = Path(workspace_duckdb_path)
+        workspace_db.parent.mkdir(parents=True, exist_ok=True)
+        if workspace_db.exists():
+            return
+        con = duckdb.connect(str(workspace_db))
+        con.close()
+
     async def _execute_on_session(
         self,
         session: WorkspaceKernelSession,
@@ -859,12 +871,21 @@ class WorkspaceKernelManager:
         self,
         session: WorkspaceKernelSession,
         code: str,
+        *,
+        iopub_idle_timeout: float = 90.0,
     ) -> ParsedExecutionOutput:
         msg_id = session.client.execute(code, store_history=True, stop_on_error=True)
         parsed = ParsedExecutionOutput()
+        deadline = time.monotonic() + max(1.0, float(iopub_idle_timeout))
 
         while True:
-            msg = await session.client.get_iopub_msg(timeout=1)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("Timed out waiting for kernel IOPub idle status.")
+            try:
+                msg = await session.client.get_iopub_msg(timeout=min(1, remaining))
+            except (QueueEmpty, asyncio.TimeoutError):
+                continue
             parent_id = (
                 msg.get("parent_header", {}).get("msg_id")
                 if isinstance(msg, dict)

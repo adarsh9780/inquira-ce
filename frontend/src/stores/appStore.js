@@ -7,21 +7,24 @@ import { normalizePlotlyFigure } from '../utils/figurePayload'
 
 export const useAppStore = defineStore('app', () => {
   const authStore = useAuthStore()
+  const DEFAULT_MODELS = [
+    'google/gemini-3-flash-preview',
+    'google/gemini-2.5-flash',
+    'google/gemini-2.5-flash-lite',
+    'openrouter/free'
+  ]
 
   // Files
   const dataFilePath = ref('')
   const schemaFilePath = ref('')
+  const schemaFileId = ref('')
+  const isSchemaFileUploaded = ref(false)
   const ingestedTableName = ref('')
   const ingestedColumns = ref([])
 
   // LLM Configuration
   const selectedModel = ref('google/gemini-2.5-flash')
-  const availableModels = ref([
-    'google/gemini-3-flash-preview',
-    'google/gemini-2.5-flash',
-    'google/gemini-2.5-flash-lite',
-    'openrouter/free'
-  ])
+  const availableModels = ref([...DEFAULT_MODELS])
   const apiKey = ref('')
   const apiKeyConfigured = ref(false)
 
@@ -110,6 +113,11 @@ export const useAppStore = defineStore('app', () => {
   let kernelEnsurePromise = null
   const LOCAL_SNAPSHOT_VERSION = 1
 
+  function resolveSnapshotUserId(explicitUserId = null) {
+    const candidate = String(explicitUserId ?? authStore.userId ?? '').trim()
+    return candidate || ''
+  }
+
   function buildLocalStateSnapshot() {
     return {
       version: LOCAL_SNAPSHOT_VERSION,
@@ -134,7 +142,9 @@ export const useAppStore = defineStore('app', () => {
         active_workspace_id: activeWorkspaceId.value || '',
         active_dataset_path: dataFilePath.value || '',
         active_table_name: ingestedTableName.value || '',
-        active_conversation_id: activeConversationId.value || ''
+        active_conversation_id: activeConversationId.value || '',
+        schema_file_id: schemaFileId.value || '',
+        schema_uploaded: !!isSchemaFileUploaded.value,
       },
       editor: {
         generated_code: generatedCode.value || '',
@@ -215,6 +225,12 @@ export const useAppStore = defineStore('app', () => {
     if (typeof sessionState.active_conversation_id === 'string') {
       activeConversationId.value = sessionState.active_conversation_id
     }
+    if (typeof sessionState.schema_file_id === 'string') {
+      schemaFileId.value = sessionState.schema_file_id
+    }
+    if (typeof sessionState.schema_uploaded === 'boolean') {
+      isSchemaFileUploaded.value = sessionState.schema_uploaded
+    }
 
     if (typeof editor.generated_code === 'string') {
       generatedCode.value = editor.generated_code
@@ -230,8 +246,12 @@ export const useAppStore = defineStore('app', () => {
 
   function schedulePreferenceSync() {
     if (suppressPreferenceSync) return
+    const targetUserId = resolveSnapshotUserId()
+    if (!authStore.isAuthenticated || !targetUserId) return
     if (preferenceSyncTimer) clearTimeout(preferenceSyncTimer)
     preferenceSyncTimer = setTimeout(async () => {
+      const activeUserId = resolveSnapshotUserId()
+      if (!authStore.isAuthenticated || !activeUserId || activeUserId !== targetUserId) return
       try {
         await apiService.v1UpdatePreferences({
           selected_model: selectedModel.value,
@@ -256,52 +276,101 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function scheduleLocalSnapshotSave() {
+    const targetUserId = resolveSnapshotUserId()
+    if (!authStore.isAuthenticated || !targetUserId) return
+    const snapshot = buildLocalStateSnapshot()
     if (localStateSyncTimer) clearTimeout(localStateSyncTimer)
     localStateSyncTimer = setTimeout(() => {
-      void localStateService.saveSnapshot(buildLocalStateSnapshot())
+      void localStateService.saveSnapshot(snapshot, targetUserId)
     }, 250)
   }
 
-  async function flushLocalConfig() {
+  async function flushLocalConfig(explicitUserId = null) {
+    const targetUserId = resolveSnapshotUserId(explicitUserId)
+    if (!targetUserId) return false
     if (localStateSyncTimer) {
       clearTimeout(localStateSyncTimer)
       localStateSyncTimer = null
     }
-    await localStateService.saveSnapshot(buildLocalStateSnapshot())
+    await localStateService.saveSnapshot(buildLocalStateSnapshot(), targetUserId)
+    return true
   }
 
-  async function loadLocalConfig() {
-    const snapshot = await localStateService.loadSnapshot()
+  async function loadLocalConfig(explicitUserId = null) {
+    const targetUserId = resolveSnapshotUserId(explicitUserId)
+    if (!targetUserId) return false
+    const snapshot = await localStateService.loadSnapshot(targetUserId)
     if (!snapshot) return false
     return applyLocalStateSnapshot(snapshot)
   }
 
+  function clearInMemoryUserState() {
+    apiKey.value = ''
+    apiKeyConfigured.value = false
+    selectedModel.value = 'google/gemini-2.5-flash'
+    availableModels.value = [...DEFAULT_MODELS]
+    dataFilePath.value = ''
+    schemaFilePath.value = ''
+    schemaFileId.value = ''
+    isSchemaFileUploaded.value = false
+    ingestedTableName.value = ''
+    ingestedColumns.value = []
+    schemaContext.value = ''
+    allowSchemaSampleValues.value = false
+    pythonFileContent.value = ''
+
+    chatHistory.value = []
+    currentQuestion.value = ''
+    currentExplanation.value = ''
+    workspaces.value = []
+    workspaceDeletionJobs.value = []
+    activeWorkspaceId.value = ''
+    conversations.value = []
+    activeConversationId.value = ''
+    turnsNextCursor.value = null
+
+    generatedCode.value = ''
+    resultData.value = null
+    plotlyFigure.value = null
+    dataframes.value = []
+    figures.value = []
+    scalars.value = []
+    dataframeCount.value = 0
+    figureCount.value = 0
+    tableRowCount.value = 0
+    tableWindowStart.value = 0
+    tableWindowEnd.value = 0
+    tablePageOffsets.value = {}
+    dataPaneError.value = ''
+    terminalOutput.value = ''
+    terminalEntries.value = []
+    terminalEnabled.value = false
+    runtimeError.value = ''
+    terminalConsentGranted.value = false
+    terminalCwd.value = ''
+    historicalCodeBlocks.value = []
+  }
+
+  function clearPendingSyncTimers() {
+    if (preferenceSyncTimer) {
+      clearTimeout(preferenceSyncTimer)
+      preferenceSyncTimer = null
+    }
+    if (localStateSyncTimer) {
+      clearTimeout(localStateSyncTimer)
+      localStateSyncTimer = null
+    }
+  }
+
+  function resetForAuthBoundary() {
+    clearPendingSyncTimers()
+    clearInMemoryUserState()
+  }
+
   function clearLocalConfig() {
     try {
-      // Reset all configuration values
-      apiKey.value = ''
-      apiKeyConfigured.value = false
-      selectedModel.value = 'google/gemini-2.5-flash'
-      availableModels.value = [
-        'google/gemini-3-flash-preview',
-        'google/gemini-2.5-flash',
-        'google/gemini-2.5-flash-lite',
-        'openrouter/free'
-      ]
-      dataFilePath.value = ''
-      schemaFilePath.value = ''
-      ingestedTableName.value = ''
-      ingestedColumns.value = []
-      schemaContext.value = ''
-      allowSchemaSampleValues.value = false
-      activeWorkspaceId.value = ''
-      activeConversationId.value = ''
-      historicalCodeBlocks.value = []
+      clearInMemoryUserState()
       hideShortcutsModal.value = false
-      tableRowCount.value = 0
-      tableWindowStart.value = 0
-      tableWindowEnd.value = 0
-      tablePageOffsets.value = {}
       schedulePreferenceSync()
       scheduleLocalSnapshotSave()
 
@@ -321,6 +390,8 @@ export const useAppStore = defineStore('app', () => {
       chatHistory.value = []
       generatedCode.value = ''
       pythonFileContent.value = ''
+      schemaFileId.value = ''
+      isSchemaFileUploaded.value = false
       ingestedTableName.value = ''
       ingestedColumns.value = []
     }
@@ -328,6 +399,16 @@ export const useAppStore = defineStore('app', () => {
 
   function setSchemaFilePath(path) {
     schemaFilePath.value = path
+    saveLocalConfig()
+  }
+
+  function setSchemaFileId(schemaId) {
+    schemaFileId.value = schemaId || ''
+    saveLocalConfig()
+  }
+
+  function setIsSchemaFileUploaded(uploaded) {
+    isSchemaFileUploaded.value = !!uploaded
     saveLocalConfig()
   }
 
@@ -568,6 +649,7 @@ export const useAppStore = defineStore('app', () => {
     if (!authStore.isAuthenticated) return false
     const targetWorkspaceId = (workspaceId || '').trim()
     if (!targetWorkspaceId) return false
+    if (!workspaces.value.some((ws) => ws.id === targetWorkspaceId)) return false
 
     if (kernelEnsurePromise && kernelEnsureWorkspaceId === targetWorkspaceId) {
       return kernelEnsurePromise
@@ -721,20 +803,11 @@ export const useAppStore = defineStore('app', () => {
       saveLocalConfig()
     }
 
-    if (activeWorkspaceId.value) {
-      await ensureWorkspaceKernelConnected(activeWorkspaceId.value)
-    }
   }
 
   async function createWorkspace(name) {
     const ws = await apiService.v1CreateWorkspace(name)
-    if (ws?.id) {
-      await ensureWorkspaceKernelConnected(ws.id)
-    }
     await fetchWorkspaces()
-    if (activeWorkspaceId.value) {
-      await ensureWorkspaceKernelConnected(activeWorkspaceId.value)
-    }
     return ws
   }
 
@@ -747,7 +820,6 @@ export const useAppStore = defineStore('app', () => {
     chatHistory.value = []
     turnsNextCursor.value = null
     saveLocalConfig()
-    await ensureWorkspaceKernelConnected(workspaceId)
   }
 
   async function fetchConversations() {
@@ -1143,6 +1215,8 @@ export const useAppStore = defineStore('app', () => {
     terminalConsentGranted.value = false
     terminalCwd.value = ''
     isCodeRunning.value = false
+    schemaFileId.value = ''
+    isSchemaFileUploaded.value = false
     historicalCodeBlocks.value = []
     saveLocalConfig()
   }
@@ -1211,16 +1285,12 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  watch(activeWorkspaceId, (workspaceId) => {
-    if (!workspaceId || !authStore.isAuthenticated) return
-    void ensureWorkspaceKernelConnected(workspaceId)
-  })
-
-
   return {
     // State
     dataFilePath,
     schemaFilePath,
+    schemaFileId,
+    isSchemaFileUploaded,
     ingestedTableName,
     ingestedColumns,
     selectedModel,
@@ -1287,8 +1357,11 @@ export const useAppStore = defineStore('app', () => {
     loadLocalConfig,
     flushLocalConfig,
     clearLocalConfig,
+    resetForAuthBoundary,
     setDataFilePath,
     setSchemaFilePath,
+    setSchemaFileId,
+    setIsSchemaFileUploaded,
     setIngestedTableName,
     setIngestedColumns,
     setApiKey,

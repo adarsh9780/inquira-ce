@@ -7,8 +7,7 @@ import {
 } from '@tauri-apps/plugin-fs'
 
 const SNAPSHOT_DIR = 'state'
-const SNAPSHOT_FILE = `${SNAPSHOT_DIR}/session_state.json`
-const TMP_FILE = `${SNAPSHOT_FILE}.tmp`
+const DEFAULT_SCOPE = 'anonymous'
 
 function isTauriRuntime() {
   return typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
@@ -16,6 +15,22 @@ function isTauriRuntime() {
 
 async function ensureDirectory() {
   await mkdir(SNAPSHOT_DIR, { baseDir: BaseDirectory.AppData, recursive: true })
+}
+
+function normalizeScope(scope) {
+  const raw = String(scope || '').trim().toLowerCase()
+  if (!raw) return DEFAULT_SCOPE
+  const cleaned = raw.replace(/[^a-z0-9_-]/g, '_')
+  return cleaned || DEFAULT_SCOPE
+}
+
+function snapshotPath(scope) {
+  const key = normalizeScope(scope)
+  return `${SNAPSHOT_DIR}/session_state_${key}.json`
+}
+
+function tmpSnapshotPath(scope) {
+  return `${snapshotPath(scope)}.tmp`
 }
 
 async function atomicWriteJson(path, payload) {
@@ -33,12 +48,13 @@ async function atomicWriteJson(path, payload) {
 }
 
 export const localStateService = {
-  async loadSnapshot() {
+  async loadSnapshot(scope = DEFAULT_SCOPE) {
     if (!isTauriRuntime()) return null
     try {
-      const fileExists = await exists(SNAPSHOT_FILE, { baseDir: BaseDirectory.AppData })
+      const resolvedPath = snapshotPath(scope)
+      const fileExists = await exists(resolvedPath, { baseDir: BaseDirectory.AppData })
       if (!fileExists) return null
-      const raw = await readTextFile(SNAPSHOT_FILE, { baseDir: BaseDirectory.AppData })
+      const raw = await readTextFile(resolvedPath, { baseDir: BaseDirectory.AppData })
       if (!raw || !raw.trim()) return null
       return JSON.parse(raw)
     } catch (error) {
@@ -47,13 +63,15 @@ export const localStateService = {
     }
   },
 
-  async saveSnapshot(snapshot) {
+  async saveSnapshot(snapshot, scope = DEFAULT_SCOPE) {
     if (!isTauriRuntime()) return false
     try {
+      const resolvedPath = snapshotPath(scope)
+      const tmpPath = tmpSnapshotPath(scope)
       await ensureDirectory()
       // Write temp first to reduce chance of partial-file corruption.
-      await atomicWriteJson(TMP_FILE, snapshot)
-      await atomicWriteJson(SNAPSHOT_FILE, snapshot)
+      await atomicWriteJson(tmpPath, snapshot)
+      await atomicWriteJson(resolvedPath, snapshot)
       return true
     } catch (error) {
       console.warn('Failed to save local state snapshot:', error)
