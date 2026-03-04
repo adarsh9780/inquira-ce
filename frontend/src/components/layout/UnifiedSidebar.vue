@@ -108,86 +108,6 @@
           <span class="text-xs font-medium truncate" :class="appStore.activeTab === 'schema-editor' ? 'font-semibold' : ''">Schema Editor</span>
         </div>
       </button>
-      <!-- User Menu Toggle -->
-      <div class="relative w-full" v-if="authStore.isAuthenticated">
-        <button
-          @click="toggleUserMenu"
-          class="w-full flex items-center justify-between p-1.5 rounded-lg hover:bg-white border border-transparent hover:border-gray-200 transition-colors"
-          title="Account & Settings"
-        >
-          <div class="flex items-center gap-2 min-w-0">
-            <div class="relative shrink-0">
-              <div class="w-7 h-7 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center shadow-sm text-white font-medium text-xs">
-                {{ authStore.username ? authStore.username.charAt(0).toUpperCase() : 'U' }}
-              </div>
-            </div>
-            
-            <div class="flex-1 text-left truncate">
-              <p class="text-xs font-semibold truncate" style="color: var(--color-text-main);">{{ authStore.username }}</p>
-              <p class="text-[10px] truncate" style="color: var(--color-text-muted);">{{ authStore.planLabel }}</p>
-            </div>
-          </div>
-          <div class="shrink-0">
-            <ChevronUpIcon class="h-3.5 w-3.5" style="color: var(--color-text-muted);" />
-          </div>
-        </button>
-
-        <!-- Dropdown Menu (Renders above the button) -->
-        <div
-          v-if="isUserMenuOpen"
-          class="absolute bottom-full left-0 mb-2 w-56 rounded-xl shadow-xl z-50 overflow-hidden text-left"
-          style="background-color: var(--color-surface); border: 1px solid var(--color-border);"
-          @click.stop
-        >
-          <!-- User Info Header -->
-          <div class="px-3 py-2.5 border-b" style="border-color: var(--color-border); background-color: var(--color-base);">
-            <p class="text-sm font-semibold" style="color: var(--color-text-main);">{{ authStore.username }}</p>
-            <p class="text-[10px] font-medium px-1.5 py-0.5 rounded w-max mt-0.5" style="background-color: color-mix(in srgb, var(--color-accent) 12%, transparent); color: var(--color-accent);">{{ authStore.planLabel }}</p>
-          </div>
-
-          <!-- Configuration Status Overview -->
-          <div class="px-3 py-2 border-b border-gray-100 text-[10px]" @click="openSettings('api')">
-            <div class="flex items-center justify-between mb-1 hover:bg-gray-50 cursor-pointer p-1 rounded">
-              <span class="text-gray-600">WS Connection</span>
-              <span class="w-2 h-2 rounded-full" :class="isWebSocketConnected ? 'bg-green-500' : 'bg-red-500'"></span>
-            </div>
-            <div class="flex items-center justify-between mb-1 hover:bg-gray-50 cursor-pointer p-1 rounded">
-              <span class="text-gray-600">API Key Config</span>
-              <span class="w-2 h-2 rounded-full" :class="appStore.apiKeyConfigured ? 'bg-green-500' : 'bg-red-500'"></span>
-            </div>
-          </div>
-
-          <div class="py-1">
-            <button
-              @click="openSettings('api')"
-              class="flex items-center w-full px-4 py-2 text-xs font-medium transition-colors hover:bg-zinc-50"
-              style="color: var(--color-text-main);"
-            >
-              <CogIcon class="h-4 w-4 mr-2.5" style="color: var(--color-text-muted);" />
-              Settings
-            </button>
-
-            <button
-              @click="openTerms"
-              class="flex items-center w-full px-4 py-2 text-xs font-medium transition-colors hover:bg-zinc-50"
-              style="color: var(--color-text-main);"
-            >
-              <DocumentTextIcon class="h-4 w-4 mr-2.5" style="color: var(--color-text-muted);" />
-              Terms &amp; Conditions
-            </button>
-
-            <div class="border-t my-1" style="border-color: var(--color-border);"></div>
-
-            <button
-              @click="handleLogout"
-              class="flex items-center w-full px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
-            >
-              <ArrowRightOnRectangleIcon class="h-4 w-4 mr-2.5" />
-              Logout
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Modals -->
@@ -196,26 +116,13 @@
       :initial-tab="settingsInitialTab"
       @close="closeSettings"
     />
-
-    <ConfirmationModal
-      :is-open="isLogoutConfirmOpen"
-      title="Confirm Logout"
-      :message="`Are you sure you want to log out, ${authStore.username}?`"
-      confirm-text="Log Out"
-      cancel-text="Cancel"
-      @close="cancelLogout"
-      @confirm="confirmLogout"
-    />
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref } from 'vue'
 import { useAppStore } from '../../stores/appStore'
-import { useAuthStore } from '../../stores/authStore'
-import { settingsWebSocket } from '../../services/websocketService'
 import SettingsModal from '../modals/SettingsModal.vue'
-import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import SidebarWorkspaces from './sidebar/SidebarWorkspaces.vue'
 import SidebarDatasets from './sidebar/SidebarDatasets.vue'
 import SidebarConversations from './sidebar/SidebarConversations.vue'
@@ -225,22 +132,15 @@ import {
   DocumentTextIcon,
   CheckCircleIcon,
   BuildingOffice2Icon,
-  FolderOpenIcon,
-  CogIcon,
-  ArrowRightOnRectangleIcon,
-  ChevronUpIcon
+  FolderOpenIcon
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
-const authStore = useAuthStore()
 
 
 // Toolbar & User State
 const isSettingsOpen = ref(false)
 const settingsInitialTab = ref('api')
-const isUserMenuOpen = ref(false)
-const isLogoutConfirmOpen = ref(false)
-const isWebSocketConnected = ref(false)
 
 const activeWorkspaceName = computed(() => {
   const activeId = String(appStore.activeWorkspaceId || '').trim()
@@ -291,80 +191,14 @@ function handleConversationSelect() {
   // We intentionally do NOT setSidebarCollapsed(true) here!
 }
 
-// Lifecycle and Event Handling
-function setupWebSocketMonitoring() {
-  const unsubscribe = settingsWebSocket.onConnection((connected) => {
-    isWebSocketConnected.value = connected
-  })
-  isWebSocketConnected.value = settingsWebSocket.isConnected
-  onUnmounted(() => {
-    if (typeof unsubscribe === 'function') unsubscribe()
-  })
-}
-
-onMounted(() => {
-  setupWebSocketMonitoring()
-  document.addEventListener('keydown', handleKeydown)
-  document.addEventListener('click', handleClickOutside)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeydown)
-  document.removeEventListener('click', handleClickOutside)
-})
-
 function openSettings(tab = 'api') {
   settingsInitialTab.value = tab
   isSettingsOpen.value = true
-  isUserMenuOpen.value = false
 }
 
 function closeSettings() {
   isSettingsOpen.value = false
   settingsInitialTab.value = 'api'
-}
-
-function toggleUserMenu() {
-  isUserMenuOpen.value = !isUserMenuOpen.value
-}
-
-function openTerms() {
-  isUserMenuOpen.value = false
-  window.open('/terms-and-conditions.html', '_blank', 'noopener')
-}
-
-function handleLogout() {
-  isLogoutConfirmOpen.value = true
-  isUserMenuOpen.value = false
-}
-
-async function confirmLogout() {
-  isLogoutConfirmOpen.value = false
-  try { await authStore.logout() } catch (e) { console.error('Logout failed:', e) }
-}
-
-function cancelLogout() {
-  isLogoutConfirmOpen.value = false
-}
-
-function handleKeydown(event) {
-  if (event.key === 'Escape') {
-    if (isLogoutConfirmOpen.value) return cancelLogout()
-    if (isSettingsOpen.value) return closeSettings()
-    if (isUserMenuOpen.value) return (isUserMenuOpen.value = false)
-    
-    const activeE = document.activeElement
-    if (activeE && ['INPUT', 'TEXTAREA'].includes(activeE.tagName) || activeE.contentEditable === 'true') {
-      activeE.blur()
-    }
-  }
-}
-
-function handleClickOutside(event) {
-  if (isUserMenuOpen.value) {
-    const el = event.target.closest('.relative.w-full')
-    if (!el) isUserMenuOpen.value = false
-  }
 }
 </script>
 

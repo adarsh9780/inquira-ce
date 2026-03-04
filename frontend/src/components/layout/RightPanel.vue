@@ -45,18 +45,18 @@
       :class="appStore.isTerminalOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'"
       :style="{ height: terminalVisualHeight + '%', borderColor: appStore.isTerminalOpen ? 'var(--color-border)' : 'transparent', backgroundColor: 'var(--color-base)' }"
     >
-      <div class="flex justify-between items-center px-4 py-1.5 border-b" style="background-color: var(--color-base); border-color: var(--color-border);">
-        <div class="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5" style="color: var(--color-text-muted);">
+      <div class="flex h-7 justify-between items-center px-3 border-b" style="background-color: var(--color-base); border-color: var(--color-border);">
+        <div class="text-[10px] font-medium uppercase tracking-wide flex items-center gap-1" style="color: var(--color-text-muted);">
           <CommandLineIcon class="w-3.5 h-3.5" />
           Terminal
         </div>
         
         <!-- Teleport Target for Terminal Toolbar -->
-        <div id="terminal-toolbar" class="flex-1 min-w-0 flex items-center justify-end ml-4 mr-2"></div>
+        <div id="terminal-toolbar" class="flex-1 min-w-0 flex items-center justify-end ml-2 mr-1"></div>
 
         <button 
           @click="appStore.toggleTerminal()" 
-          class="btn-icon"
+          class="btn-icon h-5 w-5 p-1"
           title="Close Terminal"
         >
           <XMarkIcon class="w-4 h-4" />

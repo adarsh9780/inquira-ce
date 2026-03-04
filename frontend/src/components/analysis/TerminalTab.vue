@@ -2,8 +2,8 @@
   <div class="flex h-full flex-col overflow-hidden rounded-lg border" style="background-color: var(--color-base); border-color: var(--color-border);">
     <!-- Terminal Header (Teleported to RightPanel) -->
     <Teleport to="#terminal-toolbar" v-if="isMounted && !(useTauriPty && appStore.terminalConsentGranted)">
-      <div class="flex items-center gap-2 text-[10px] sm:text-xs text-gray-600">
-        <span class="rounded bg-gray-200 px-1.5 py-0.5 font-medium text-gray-700">{{ shellLabel }}</span>
+      <div class="flex items-center gap-1.5 text-[10px]" style="color: var(--color-text-muted);">
+        <span class="rounded px-1.5 py-0.5 font-medium" style="background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent); color: var(--color-text-main);">{{ shellLabel }}</span>
         <span class="hidden md:inline font-mono truncate max-w-[150px]" :title="displayCwd">cwd: {{ displayCwd }}</span>
       </div>
     </Teleport>
@@ -30,52 +30,54 @@
     <template v-else>
       <div
         ref="scrollRef"
-        class="terminal-shell min-h-0 flex-1 overflow-y-auto bg-[#0b1228] p-4 font-mono text-sm text-slate-100"
+        class="terminal-shell min-h-0 flex-1 overflow-y-auto p-4 font-mono text-sm"
+        style="background-color: var(--color-base); color: var(--color-text-main);"
         @click="focusCommandInput"
       >
-        <div class="mb-2 text-slate-400">
+        <div class="mb-2" style="color: var(--color-text-muted);">
           Terminal ready.
-          <span class="text-slate-300">Enter</span> to run,
-          <span class="text-slate-300">↑/↓</span> for history.
+          <span style="color: var(--color-text-main);">Enter</span> to run,
+          <span style="color: var(--color-text-main);">↑/↓</span> for history.
         </div>
 
         <div v-for="(entry, idx) in entries" :key="idx" class="mb-3">
           <template v-if="entry.kind !== 'output'">
             <div class="flex items-center gap-2">
-              <span class="text-emerald-300">{{ promptPrefix }}</span>
-              <span class="text-cyan-300">{{ entry.command }}</span>
+              <span class="text-emerald-700">{{ promptPrefix }}</span>
+              <span class="text-blue-700">{{ entry.command }}</span>
             </div>
-            <pre v-if="entry.stdout" class="whitespace-pre-wrap break-words text-slate-100">{{ entry.stdout }}</pre>
-            <pre v-if="entry.stderr" class="whitespace-pre-wrap break-words text-rose-300">{{ entry.stderr }}</pre>
-            <div class="text-xs" :class="entry.exitCode === 0 ? 'text-emerald-400' : 'text-amber-400'">
+            <pre v-if="entry.stdout" class="whitespace-pre-wrap break-words">{{ entry.stdout }}</pre>
+            <pre v-if="entry.stderr" class="whitespace-pre-wrap break-words text-red-700">{{ entry.stderr }}</pre>
+            <div class="text-xs" :class="entry.exitCode === 0 ? 'text-emerald-700' : 'text-amber-700'">
               exit {{ entry.exitCode }}
             </div>
           </template>
           <template v-else>
-            <div class="text-xs uppercase tracking-wide text-slate-400">{{ entry.label || 'Output' }}</div>
-            <pre v-if="entry.stdout" class="whitespace-pre-wrap break-words text-slate-100">{{ entry.stdout }}</pre>
-            <pre v-if="entry.stderr" class="whitespace-pre-wrap break-words text-rose-300">{{ entry.stderr }}</pre>
+            <div class="text-xs uppercase tracking-wide" style="color: var(--color-text-muted);">{{ entry.label || 'Output' }}</div>
+            <pre v-if="entry.stdout" class="whitespace-pre-wrap break-words">{{ entry.stdout }}</pre>
+            <pre v-if="entry.stderr" class="whitespace-pre-wrap break-words text-red-700">{{ entry.stderr }}</pre>
           </template>
         </div>
 
         <div v-if="isRunning && liveCommand" class="mb-3">
           <div class="flex items-center gap-2">
-            <span class="text-emerald-300">{{ promptPrefix }}</span>
-            <span class="text-cyan-300">{{ liveCommand }}</span>
+            <span class="text-emerald-700">{{ promptPrefix }}</span>
+            <span class="text-blue-700">{{ liveCommand }}</span>
           </div>
-          <pre v-if="liveStdout" class="whitespace-pre-wrap break-words text-slate-100">{{ liveStdout }}</pre>
-          <pre v-if="liveStderr" class="whitespace-pre-wrap break-words text-rose-300">{{ liveStderr }}</pre>
-          <div class="text-xs text-amber-400">running...</div>
+          <pre v-if="liveStdout" class="whitespace-pre-wrap break-words">{{ liveStdout }}</pre>
+          <pre v-if="liveStderr" class="whitespace-pre-wrap break-words text-red-700">{{ liveStderr }}</pre>
+          <div class="text-xs text-amber-700">running...</div>
         </div>
 
-        <form class="mt-2 border-t border-slate-700/70 pt-3" @submit.prevent="runCommand">
+        <form class="mt-2 border-t pt-3" style="border-color: var(--color-border);" @submit.prevent="runCommand">
           <div class="flex items-center gap-2">
-            <span class="text-emerald-300">{{ promptPrefix }}</span>
+            <span class="text-emerald-700">{{ promptPrefix }}</span>
             <input
               ref="commandInputRef"
               v-model="command"
               type="text"
-              class="w-full bg-transparent text-slate-100 outline-none placeholder:text-slate-500 caret-emerald-300"
+              class="w-full bg-transparent outline-none placeholder:text-slate-400"
+              style="color: var(--color-text-main); caret-color: var(--color-accent);"
               placeholder="type command..."
               autocomplete="off"
               spellcheck="false"
@@ -91,16 +93,22 @@
           <span>Shell: {{ shellLabel }}</span>
           <div class="flex items-center gap-2">
             <button
-              class="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50"
+              class="btn-icon h-7 w-7 p-1.5 border"
+              style="border-color: var(--color-border); color: var(--color-text-main); background-color: var(--color-surface);"
+              title="Reset terminal session"
+              aria-label="Reset terminal session"
               @click="resetSession"
             >
-              Reset Session
+              <ArrowPathIcon class="h-4 w-4" />
             </button>
             <button
-              class="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50"
+              class="btn-icon h-7 w-7 p-1.5 border"
+              style="border-color: var(--color-border); color: var(--color-text-main); background-color: var(--color-surface);"
+              title="Clear terminal output"
+              aria-label="Clear terminal output"
               @click="clearTerminal"
             >
-              Clear
+              <TrashIcon class="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -111,7 +119,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { CommandLineIcon } from '@heroicons/vue/24/outline'
+import { ArrowPathIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { useAppStore } from '../../stores/appStore'
 import apiService from '../../services/apiService'
 import { toast } from '../../composables/useToast'
@@ -313,11 +321,3 @@ async function resetSession() {
   }
 }
 </script>
-
-<style scoped>
-.terminal-shell {
-  background-image:
-    radial-gradient(circle at 25% 15%, rgba(56, 189, 248, 0.07), transparent 30%),
-    radial-gradient(circle at 80% 85%, rgba(16, 185, 129, 0.05), transparent 35%);
-}
-</style>

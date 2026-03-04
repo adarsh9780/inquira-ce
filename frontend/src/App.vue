@@ -24,20 +24,6 @@
           </div>
         </Transition>
 
-        <button
-          v-if="appStore.isSidebarCollapsed"
-          @click="toggleSidebarVisibility"
-          class="absolute left-0 top-1/2 -translate-y-1/2 z-40 h-12 w-7 rounded-r-md border border-l-0 flex items-center justify-center transition-colors hover:bg-zinc-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
-          style="background-color: var(--color-base); border-color: var(--color-border); color: var(--color-text-muted);"
-          title="Show sidebar"
-          aria-label="Show sidebar"
-        >
-          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <rect x="2.5" y="3.5" width="4" height="13" rx="1.2" stroke="currentColor" stroke-width="1.4" />
-            <path d="M9 5.5H16.5M9 10H16.5M9 14.5H16.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
-          </svg>
-        </button>
-
         <!-- Single Panel - Tabs include Chat -->
         <div class="flex-1 bg-white flex flex-col overflow-hidden">
           <RightPanel />
@@ -108,6 +94,27 @@ function toggleSidebarVisibility() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
 }
 
+function handleGlobalShortcuts(event) {
+  if (!authStore.isAuthenticated) return
+  if (event.defaultPrevented) return
+  if (event.repeat) return
+
+  const key = String(event.key || '').toLowerCase()
+  const hasPrimaryModifier = event.metaKey || event.ctrlKey
+  if (!hasPrimaryModifier || event.altKey) return
+
+  if (key === 'b') {
+    event.preventDefault()
+    toggleSidebarVisibility()
+    return
+  }
+
+  if (key === 'j') {
+    event.preventDefault()
+    appStore.toggleTerminal()
+  }
+}
+
 // Listen for Tauri backend-status events (if running in Tauri)
 function setupTauriListener() {
   if (window.__TAURI_INTERNALS__) {
@@ -167,6 +174,7 @@ function handleAuthClose() {
 
 onMounted(async () => {
   setupTauriListener()
+  document.addEventListener('keydown', handleGlobalShortcuts)
   wsUnsubscribers.value.push(
     settingsWebSocket.subscribeProgress((data) => {
       const stage = String(data?.stage || '')
@@ -241,6 +249,7 @@ window.addEventListener('beforeunload', handleBeforeUnload)
 // Cleanup on unmount
 onUnmounted(() => {
   void appStore.flushLocalConfig?.()
+  document.removeEventListener('keydown', handleGlobalShortcuts)
   window.removeEventListener('beforeunload', handleBeforeUnload)
   // Disconnect persistent WebSocket connection
   if (settingsWebSocket.isPersistentMode) {

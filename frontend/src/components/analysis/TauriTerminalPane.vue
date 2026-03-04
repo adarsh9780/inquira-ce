@@ -1,30 +1,34 @@
 <template>
-  <div class="flex h-full min-h-0 flex-col overflow-hidden bg-white">
+  <div class="flex h-full min-h-0 flex-col overflow-hidden" style="background-color: var(--color-base);">
     <!-- Terminal Header (Teleported to RightPanel) -->
     <Teleport to="#terminal-toolbar" v-if="isMounted">
-      <div class="flex items-center gap-3 text-[10px] sm:text-xs text-gray-600">
-        <span class="rounded bg-gray-200 px-1.5 py-0.5 font-medium text-gray-700">{{ shellLabel }}</span>
+      <div class="flex items-center gap-1.5 text-[10px]" style="color: var(--color-text-muted);">
+        <span class="rounded px-1.5 py-0.5 font-medium" style="background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent); color: var(--color-text-main);">{{ shellLabel }}</span>
         <span class="hidden md:inline font-mono truncate max-w-[150px]" :title="displayCwd">cwd: {{ displayCwd }}</span>
         <div class="flex items-center gap-1">
           <button 
-            class="rounded border border-gray-300 px-2 py-0.5 bg-white hover:bg-gray-100 transition-colors" 
+            class="btn-icon h-5 w-5 p-1 border" 
+            style="border-color: var(--color-border); color: var(--color-text-main); background-color: var(--color-surface);"
             @click="resetSession"
-            title="Reset Session"
+            title="Reset terminal session"
+            aria-label="Reset terminal session"
           >
-            Reset
+            <ArrowPathIcon class="h-3.5 w-3.5" />
           </button>
           <button 
-            class="rounded border border-gray-300 px-2 py-0.5 bg-white hover:bg-gray-100 transition-colors" 
+            class="btn-icon h-5 w-5 p-1 border" 
+            style="border-color: var(--color-border); color: var(--color-text-main); background-color: var(--color-surface);"
             @click="clearScreen"
-            title="Clear Screen"
+            title="Clear terminal output"
+            aria-label="Clear terminal output"
           >
-            Clear
+            <TrashIcon class="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
     </Teleport>
 
-    <div class="flex-1 min-h-0 bg-[#0b1228] p-2">
+    <div class="flex-1 min-h-0 p-2" style="background-color: var(--color-base);">
       <div ref="terminalHostRef" class="h-full w-full"></div>
     </div>
   </div>
@@ -35,6 +39,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
+import { ArrowPathIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { useAppStore } from '../../stores/appStore'
 import { toast } from '../../composables/useToast'
 import tauriTerminalService from '../../services/tauriTerminalService'
@@ -53,6 +58,12 @@ let resizeObserver = null
 let sessionCleanup = null
 
 const displayCwd = computed(() => sessionCwd.value || appStore.terminalCwd || 'n/a')
+
+function readThemeColor(tokenName, fallback) {
+  if (typeof window === 'undefined') return fallback
+  const value = String(getComputedStyle(document.documentElement).getPropertyValue(tokenName) || '').trim()
+  return value || fallback
+}
 
 function normalizeErrorMessage(error, fallback) {
   if (!error) return fallback
@@ -144,13 +155,19 @@ onMounted(async () => {
   if (!tauriTerminalService.isTauriRuntime()) return
   if (!terminalHostRef.value) return
 
+  const terminalBackground = readThemeColor('--color-base', '#ffffff')
+  const terminalForeground = readThemeColor('--color-text-main', '#27272A')
+  const terminalCursor = readThemeColor('--color-accent', '#3B82F6')
+
   terminal = new Terminal({
     cursorBlink: true,
     fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace',
     fontSize: 13,
     theme: {
-      background: '#0b1228',
-      foreground: '#e2e8f0',
+      background: terminalBackground,
+      foreground: terminalForeground,
+      cursor: terminalCursor,
+      selectionBackground: 'rgba(59, 130, 246, 0.18)',
     },
     allowProposedApi: false,
     convertEol: true,

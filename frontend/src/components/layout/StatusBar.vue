@@ -1,21 +1,97 @@
 <template>
   <div class="h-7 w-full bg-slate-50 border-t border-slate-200 flex items-center justify-between px-3 text-[11px] text-slate-600 select-none z-50 shrink-0">
     
-    <!-- Left Section: Terminal & Kernel Status -->
-    <div class="flex items-center gap-4 h-full">
-      <!-- Terminal Toggle -->
-      <button 
-        @click="appStore.toggleTerminal()"
-        class="flex items-center gap-1.5 h-full px-1.5 hover:bg-slate-200/50 hover:text-slate-900 transition-colors"
-        :class="appStore.isTerminalOpen ? 'text-blue-600 font-medium' : ''"
-        title="Toggle Terminal Panel"
-      >
-        <CommandLineIcon class="w-3.5 h-3.5" />
-        <span>Terminal</span>
-      </button>
+    <!-- Left Section: Account, Kernel Status, and Editor Position -->
+    <div class="flex items-center gap-2 h-full">
+      <div ref="accountMenuRef" class="relative" v-if="authStore.isAuthenticated">
+        <div class="flex items-center h-full gap-0.5">
+          <button
+            @click.stop="toggleAccountMenu"
+            class="max-w-[120px] truncate px-1 text-blue-600 text-left rounded hover:bg-slate-200/70 transition-colors"
+            :title="accountMenuTitle"
+            aria-label="Toggle account menu"
+          >
+            {{ accountDisplayLabel }}
+          </button>
+          <button
+            @click.stop="toggleAccountMenu"
+            class="h-5 w-5 rounded hover:bg-slate-200/70 flex items-center justify-center transition-colors"
+            :class="isAccountMenuOpen ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'"
+            :title="accountMenuTitle"
+            aria-label="Toggle account menu"
+          >
+            <ChevronDownIcon v-if="isAccountMenuOpen" class="w-3.5 h-3.5" />
+            <ChevronUpIcon v-else class="w-3.5 h-3.5" />
+          </button>
+          <button
+            @click.stop="toggleSidebarFromStatusBar"
+            class="h-5 w-5 rounded hover:bg-slate-200/70 flex items-center justify-center transition-colors"
+            :class="appStore.isSidebarCollapsed ? 'text-slate-500 hover:text-slate-700' : 'text-blue-600'"
+            :title="sidebarToggleTitle"
+            aria-label="Toggle sidebar"
+          >
+            <ChevronRightIcon v-if="appStore.isSidebarCollapsed" class="w-3.5 h-3.5" />
+            <ChevronLeftIcon v-else class="w-3.5 h-3.5" />
+          </button>
+        </div>
 
-      <!-- Vertical Divider -->
-      <div class="w-px h-3.5 bg-slate-300"></div>
+        <div
+          v-if="isAccountMenuOpen"
+          class="absolute bottom-full left-0 mb-1 w-56 rounded-lg shadow-lg z-50 overflow-hidden text-left"
+          style="background-color: var(--color-surface); border: 1px solid var(--color-border);"
+        >
+          <div class="px-3 py-2 border-b" style="border-color: var(--color-border); background-color: var(--color-base);">
+            <p class="text-[11px] font-semibold truncate" style="color: var(--color-text-main);">{{ accountDisplayLabel }}</p>
+            <p class="text-[10px] truncate" style="color: var(--color-text-muted);">{{ authStore.planLabel }}</p>
+          </div>
+          <div class="px-3 py-2 border-b text-[10px] space-y-1.5" style="border-color: var(--color-border);">
+            <div class="flex items-center justify-between gap-3">
+              <span style="color: var(--color-text-muted);">WS Connection</span>
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full shrink-0" :class="wsConnectionMeta.dotClass"></span>
+                <span class="font-medium" :class="wsConnectionMeta.textClass">{{ wsConnectionMeta.label }}</span>
+              </div>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <span style="color: var(--color-text-muted);">Kernel Status</span>
+              <div class="flex items-center gap-1.5">
+                <span
+                  v-if="kernelStatusMeta.showSpinner"
+                  class="inline-block w-2 h-2 rounded-full border-[1.5px] border-blue-200 border-t-blue-600 animate-spin shrink-0"
+                  aria-hidden="true"
+                ></span>
+                <span v-else class="w-2 h-2 rounded-full shrink-0" :class="kernelStatusMeta.dotClass"></span>
+                <span class="font-medium" :class="kernelStatusMeta.textClass">{{ kernelStatusMeta.label }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="py-1">
+            <button
+              @click="openSettings('api')"
+              class="w-full text-left px-3 py-1.5 text-[11px] font-medium hover:bg-zinc-50 transition-colors"
+              style="color: var(--color-text-main);"
+            >
+              Settings
+            </button>
+            <button
+              @click="openTerms"
+              class="w-full text-left px-3 py-1.5 text-[11px] font-medium hover:bg-zinc-50 transition-colors"
+              style="color: var(--color-text-main);"
+            >
+              Terms &amp; Conditions
+            </button>
+            <div class="border-t my-1" style="border-color: var(--color-border);"></div>
+            <button
+              @click="promptLogout"
+              class="w-full text-left px-3 py-1.5 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="authStore.isAuthenticated" class="w-px h-3.5 bg-slate-300"></div>
 
       <!-- Kernel Status -->
       <div class="flex items-center gap-1.5 h-full px-1">
@@ -49,6 +125,14 @@
           </button>
         </div>
       </div>
+
+      <template v-if="appStore.isEditorFocused">
+        <div class="w-px h-3.5 bg-slate-300"></div>
+        <div class="flex items-center text-slate-500 font-mono tracking-tight gap-1 px-1">
+          <span>Ln {{ appStore.editorLine }},</span>
+          <span>Col {{ appStore.editorCol }}</span>
+        </div>
+      </template>
     </div>
 
     <!-- Center Section: Data pane status -->
@@ -72,14 +156,22 @@
       </template>
     </div>
 
-    <!-- Right Section: Editor Position & Version -->
-    <div class="flex items-center gap-4 h-full">
-      <div v-show="appStore.isEditorFocused" class="flex items-center text-slate-500 font-mono tracking-tight gap-1 pr-2">
-        <span>Ln {{ appStore.editorLine }},</span>
-        <span>Col {{ appStore.editorCol }}</span>
-      </div>
-      
-      <!-- Version (Optional, thin) -->
+    <!-- Right Section: Terminal & Version -->
+    <div class="flex items-center gap-2 h-full">
+      <!-- Terminal Toggle -->
+      <button 
+        @click="appStore.toggleTerminal()"
+        class="flex items-center gap-1.5 h-full px-1.5 hover:bg-slate-200/50 hover:text-slate-900 transition-colors"
+        :class="appStore.isTerminalOpen ? 'text-blue-600 font-medium' : ''"
+        title="Toggle terminal panel (Cmd/Ctrl+J)"
+      >
+        <CommandLineIcon class="w-3.5 h-3.5" />
+        <span>Terminal</span>
+      </button>
+
+      <div class="w-px h-3.5 bg-slate-300"></div>
+
+      <!-- Version -->
       <a 
         href="https://github.com/adarsh9780/inquira" 
         target="_blank" 
@@ -90,23 +182,107 @@
       </a>
     </div>
 
+    <SettingsModal
+      :is-open="isSettingsOpen"
+      :initial-tab="settingsInitialTab"
+      @close="closeSettings"
+    />
+    <ConfirmationModal
+      :is-open="isLogoutConfirmOpen"
+      title="Confirm Logout"
+      :message="`Are you sure you want to log out, ${accountDisplayLabel}?`"
+      confirm-text="Log Out"
+      cancel-text="Cancel"
+      @close="cancelLogout"
+      @confirm="confirmLogout"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
+import { useAuthStore } from '../../stores/authStore'
 import apiService from '../../services/apiService'
-import { CommandLineIcon } from '@heroicons/vue/24/outline'
+import { settingsWebSocket } from '../../services/websocketService'
+import {
+  CommandLineIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  ChevronLeftIcon
+} from '@heroicons/vue/24/outline'
 import { toast } from '../../composables/useToast'
+import SettingsModal from '../modals/SettingsModal.vue'
+import ConfirmationModal from '../modals/ConfirmationModal.vue'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 
 // --- Kernel Status Management ---
 const kernelStatus = ref('missing')
 const isKernelStatusRequestInFlight = ref(false)
 const isKernelActionRunning = ref(false)
 let kernelStatusPoller = null
+
+const accountMenuRef = ref(null)
+const isAccountMenuOpen = ref(false)
+const isSettingsOpen = ref(false)
+const settingsInitialTab = ref('api')
+const isLogoutConfirmOpen = ref(false)
+const isWebSocketConnected = ref(false)
+const isWebSocketMonitoringActive = ref(false)
+let unsubscribeWebSocketConnection = null
+
+const accountLabel = computed(() => {
+  const username = String(authStore.username || '').trim()
+  return username || 'Account'
+})
+
+const accountDisplayLabel = computed(() => {
+  const value = String(accountLabel.value || '').trim()
+  if (!value) return 'Account'
+  if (value.includes('@')) return value
+  if (!value.includes(' ')) {
+    return value.charAt(0).toUpperCase() + value.slice(1)
+  }
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase())
+    .join(' ')
+})
+
+const accountMenuTitle = computed(() => {
+  return isAccountMenuOpen.value ? 'Close account menu' : 'Open account menu'
+})
+
+const sidebarToggleTitle = computed(() => {
+  if (appStore.isSidebarCollapsed) return 'Show sidebar (Cmd/Ctrl+B)'
+  return 'Hide sidebar (Cmd/Ctrl+B)'
+})
+
+const wsConnectionMeta = computed(() => {
+  if (!isWebSocketMonitoringActive.value) {
+    return {
+      dotClass: 'bg-slate-300',
+      textClass: 'text-slate-500',
+      label: 'Inactive'
+    }
+  }
+  if (isWebSocketConnected.value) {
+    return {
+      dotClass: 'bg-green-500',
+      textClass: 'text-green-700',
+      label: 'Connected'
+    }
+  }
+  return {
+    dotClass: 'bg-red-500',
+    textClass: 'text-red-600',
+    label: 'Disconnected'
+  }
+})
 
 const kernelStatusMeta = computed(() => {
   switch (kernelStatus.value) {
@@ -162,6 +338,66 @@ const artifactCountClass = computed(() => {
   // Subtle muted pill — informational, not actionable
   return 'bg-slate-100 text-slate-500'
 })
+
+function toggleSidebarFromStatusBar() {
+  appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+}
+
+function toggleAccountMenu() {
+  isAccountMenuOpen.value = !isAccountMenuOpen.value
+}
+
+function updateWebSocketStatus(connected) {
+  const status = settingsWebSocket.getConnectionStatus()
+  const shouldMonitor = Boolean(status.isPersistentMode || status.lastConnectionAttempt)
+  isWebSocketMonitoringActive.value = shouldMonitor
+  isWebSocketConnected.value = shouldMonitor ? connected : false
+}
+
+function setupWebSocketMonitoring() {
+  if (typeof unsubscribeWebSocketConnection === 'function') {
+    unsubscribeWebSocketConnection()
+    unsubscribeWebSocketConnection = null
+  }
+  updateWebSocketStatus(settingsWebSocket.isConnected)
+  unsubscribeWebSocketConnection = settingsWebSocket.onConnection((connected) => {
+    updateWebSocketStatus(connected)
+  })
+}
+
+function openSettings(tab = 'api') {
+  settingsInitialTab.value = tab
+  isSettingsOpen.value = true
+  isAccountMenuOpen.value = false
+}
+
+function closeSettings() {
+  isSettingsOpen.value = false
+  settingsInitialTab.value = 'api'
+}
+
+function openTerms() {
+  isAccountMenuOpen.value = false
+  window.open('/terms-and-conditions.html', '_blank', 'noopener')
+}
+
+function promptLogout() {
+  isLogoutConfirmOpen.value = true
+  isAccountMenuOpen.value = false
+}
+
+function cancelLogout() {
+  isLogoutConfirmOpen.value = false
+}
+
+async function confirmLogout() {
+  isLogoutConfirmOpen.value = false
+  try {
+    await authStore.logout()
+  } catch (error) {
+    toast.error('Logout Failed', error?.message || 'Failed to logout.')
+  }
+}
 
 async function refreshKernelStatus() {
   if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {
@@ -240,15 +476,48 @@ function handleVisibilityChange() {
   if (!document.hidden && appStore.activeWorkspaceId && appStore.hasWorkspace) refreshKernelStatus()
 }
 
+function handleDocumentClick(event) {
+  if (!isAccountMenuOpen.value) return
+  const root = accountMenuRef.value
+  if (!root) return
+  if (!root.contains(event.target)) {
+    isAccountMenuOpen.value = false
+  }
+}
+
+function handleDocumentKeydown(event) {
+  if (event.key !== 'Escape') return
+  if (isLogoutConfirmOpen.value) {
+    cancelLogout()
+    return
+  }
+  if (isSettingsOpen.value) {
+    closeSettings()
+    return
+  }
+  if (isAccountMenuOpen.value) {
+    isAccountMenuOpen.value = false
+  }
+}
+
 // Lifecycle and Watchers
 onMounted(() => {
   if (appStore.activeWorkspaceId && appStore.hasWorkspace) startKernelStatusPolling()
+  setupWebSocketMonitoring()
   document.addEventListener('visibilitychange', handleVisibilityChange)
+  document.addEventListener('click', handleDocumentClick)
+  document.addEventListener('keydown', handleDocumentKeydown)
 })
 
 onUnmounted(() => {
   stopKernelStatusPolling()
+  if (typeof unsubscribeWebSocketConnection === 'function') {
+    unsubscribeWebSocketConnection()
+    unsubscribeWebSocketConnection = null
+  }
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  document.removeEventListener('click', handleDocumentClick)
+  document.removeEventListener('keydown', handleDocumentKeydown)
 })
 
 watch([() => appStore.activeWorkspaceId, () => appStore.hasWorkspace], ([newId, hasWorkspace]) => {
