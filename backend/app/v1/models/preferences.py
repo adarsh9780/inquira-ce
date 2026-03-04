@@ -7,16 +7,16 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..db.base import Base
+from ..db.base import AppDataBase
 
 
-class UserPreferences(Base):
+class UserPreferences(AppDataBase):
     """Per-user persisted UI/runtime preferences."""
 
     __tablename__ = "v1_user_preferences"
 
-    user_id: Mapped[str] = mapped_column(
-        ForeignKey("v1_users.id", ondelete="CASCADE"),
+    principal_id: Mapped[str] = mapped_column(
+        ForeignKey("v1_principals.id", ondelete="CASCADE"),
         primary_key=True,
     )
     selected_model: Mapped[str] = mapped_column(
@@ -38,4 +38,4 @@ class UserPreferences(Base):
         nullable=False,
     )
 
-    user = relationship("User", back_populates="preferences")
+    principal = relationship("Principal", back_populates="preferences")

@@ -46,7 +46,7 @@ def test_cleanup_dry_run_reports_orphans_and_safe_legacy_db(monkeypatch, tmp_pat
 
     monkeypatch.setattr(
         "app.v1.services.legacy_cleanup_service.settings",
-        SimpleNamespace(database_url=f"sqlite+aiosqlite:///{v1_db}"),
+        SimpleNamespace(auth_db_url=f"sqlite+aiosqlite:///{v1_db}"),
     )
     monkeypatch.setattr(
         "app.v1.services.legacy_cleanup_service.Path.home",
@@ -90,7 +90,7 @@ def test_cleanup_apply_skips_legacy_db_when_v1_missing_user(monkeypatch, tmp_pat
 
     monkeypatch.setattr(
         "app.v1.services.legacy_cleanup_service.settings",
-        SimpleNamespace(database_url=f"sqlite+aiosqlite:///{v1_db}"),
+        SimpleNamespace(auth_db_url=f"sqlite+aiosqlite:///{v1_db}"),
     )
     monkeypatch.setattr(
         "app.v1.services.legacy_cleanup_service.Path.home",

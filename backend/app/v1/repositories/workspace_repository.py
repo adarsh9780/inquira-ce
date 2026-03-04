@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import update, select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Workspace
@@ -12,37 +12,42 @@ class WorkspaceRepository:
     """Workspace DB access abstraction."""
 
     @staticmethod
-    async def list_for_user(session: AsyncSession, user_id: str) -> list[Workspace]:
-        """List all workspaces for a user."""
+    async def list_for_principal(session: AsyncSession, principal_id: str) -> list[Workspace]:
+        """List all workspaces for a principal."""
         result = await session.execute(
-            select(Workspace).where(Workspace.user_id == user_id).order_by(Workspace.updated_at.desc())
+            select(Workspace)
+            .where(Workspace.owner_principal_id == principal_id)
+            .order_by(Workspace.updated_at.desc())
         )
         return list(result.scalars().all())
 
     @staticmethod
-    async def count_for_user(session: AsyncSession, user_id: str) -> int:
-        """Count user workspaces."""
-        rows = await WorkspaceRepository.list_for_user(session, user_id)
+    async def count_for_principal(session: AsyncSession, principal_id: str) -> int:
+        """Count principal workspaces."""
+        rows = await WorkspaceRepository.list_for_principal(session, principal_id)
         return len(rows)
 
     @staticmethod
-    async def get_by_id(session: AsyncSession, workspace_id: str, user_id: str) -> Workspace | None:
-        """Get workspace by id and user ownership."""
+    async def get_by_id(session: AsyncSession, workspace_id: str, principal_id: str) -> Workspace | None:
+        """Get workspace by id and principal ownership."""
         result = await session.execute(
-            select(Workspace).where(Workspace.id == workspace_id, Workspace.user_id == user_id)
+            select(Workspace).where(
+                Workspace.id == workspace_id,
+                Workspace.owner_principal_id == principal_id,
+            )
         )
         return result.scalar_one_or_none()
 
     @staticmethod
     async def get_by_name_normalized(
         session: AsyncSession,
-        user_id: str,
+        principal_id: str,
         name_normalized: str,
     ) -> Workspace | None:
         """Fetch workspace by normalized name for uniqueness checks."""
         result = await session.execute(
             select(Workspace).where(
-                Workspace.user_id == user_id,
+                Workspace.owner_principal_id == principal_id,
                 Workspace.name_normalized == name_normalized,
             )
         )
@@ -51,7 +56,7 @@ class WorkspaceRepository:
     @staticmethod
     async def create(
         session: AsyncSession,
-        user_id: str,
+        principal_id: str,
         name: str,
         name_normalized: str,
         duckdb_path: str,
@@ -59,7 +64,7 @@ class WorkspaceRepository:
     ) -> Workspace:
         """Create workspace row."""
         workspace = Workspace(
-            user_id=user_id,
+            owner_principal_id=principal_id,
             name=name,
             name_normalized=name_normalized,
             duckdb_path=duckdb_path,
@@ -70,10 +75,12 @@ class WorkspaceRepository:
         return workspace
 
     @staticmethod
-    async def deactivate_all_for_user(session: AsyncSession, user_id: str) -> None:
-        """Mark all user workspaces inactive."""
+    async def deactivate_all_for_principal(session: AsyncSession, principal_id: str) -> None:
+        """Mark all principal workspaces inactive."""
         await session.execute(
-            update(Workspace).where(Workspace.user_id == user_id).values(is_active=0)
+            update(Workspace)
+            .where(Workspace.owner_principal_id == principal_id)
+            .values(is_active=0)
         )
 
     @staticmethod

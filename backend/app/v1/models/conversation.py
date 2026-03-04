@@ -8,10 +8,10 @@ from datetime import datetime
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..db.base import Base
+from ..db.base import AppDataBase
 
 
-class Conversation(Base):
+class Conversation(AppDataBase):
     """Conversation container within a workspace."""
 
     __tablename__ = "v1_conversations"
@@ -20,16 +20,21 @@ class Conversation(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     workspace_id: Mapped[str] = mapped_column(ForeignKey("v1_workspaces.id", ondelete="CASCADE"), index=True, nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    created_by_user_id: Mapped[str] = mapped_column(ForeignKey("v1_users.id", ondelete="CASCADE"), index=True, nullable=False)
+    created_by_principal_id: Mapped[str] = mapped_column(
+        ForeignKey("v1_principals.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
     last_turn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     workspace = relationship("Workspace", back_populates="conversations")
+    created_by_principal = relationship("Principal", back_populates="conversations")
     turns = relationship("Turn", back_populates="conversation", cascade="all, delete-orphan")
 
 
-class Turn(Base):
+class Turn(AppDataBase):
     """One user+assistant turn in a conversation."""
 
     __tablename__ = "v1_turns"

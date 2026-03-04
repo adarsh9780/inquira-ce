@@ -591,7 +591,7 @@ class ChatService:
         if conversation is None:
             created_conversation = await ConversationService.create_conversation(
                 session=session,
-                user_id=user.id,
+                principal_id=user.id,
                 workspace_id=workspace_id,
                 title=ChatService._derive_conversation_title(question),
             )

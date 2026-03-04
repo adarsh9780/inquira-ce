@@ -12,10 +12,14 @@ class WorkspaceDeletionRepository:
     """Repository for workspace deletion job lifecycle."""
 
     @staticmethod
-    async def create_job(session: AsyncSession, user_id: str, workspace_id: str) -> WorkspaceDeletionJob:
+    async def create_job(
+        session: AsyncSession,
+        principal_id: str,
+        workspace_id: str,
+    ) -> WorkspaceDeletionJob:
         """Create a new queued deletion job."""
         job = WorkspaceDeletionJob(
-            user_id=user_id,
+            owner_principal_id=principal_id,
             workspace_id=workspace_id,
             status="queued",
         )
@@ -34,14 +38,14 @@ class WorkspaceDeletionRepository:
     @staticmethod
     async def get_active_for_workspace(
         session: AsyncSession,
-        user_id: str,
+        principal_id: str,
         workspace_id: str,
     ) -> WorkspaceDeletionJob | None:
         """Get an active (queued/running) deletion job for a workspace."""
         result = await session.execute(
             select(WorkspaceDeletionJob)
             .where(
-                WorkspaceDeletionJob.user_id == user_id,
+                WorkspaceDeletionJob.owner_principal_id == principal_id,
                 WorkspaceDeletionJob.workspace_id == workspace_id,
                 WorkspaceDeletionJob.status.in_(("queued", "running")),
             )
@@ -51,12 +55,15 @@ class WorkspaceDeletionRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def list_active_for_user(session: AsyncSession, user_id: str) -> list[WorkspaceDeletionJob]:
+    async def list_active_for_principal(
+        session: AsyncSession,
+        principal_id: str,
+    ) -> list[WorkspaceDeletionJob]:
         """List active deletion jobs for the user."""
         result = await session.execute(
             select(WorkspaceDeletionJob)
             .where(
-                WorkspaceDeletionJob.user_id == user_id,
+                WorkspaceDeletionJob.owner_principal_id == principal_id,
                 WorkspaceDeletionJob.status.in_(("queued", "running")),
             )
             .order_by(desc(WorkspaceDeletionJob.created_at))

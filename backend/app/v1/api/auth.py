@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.session import get_db_session
+from ..db.session import get_auth_db_session
 from ..schemas.common import MessageResponse
 from ..schemas.auth import AuthUserResponse, LoginRequest, RegisterRequest
 from ..services.auth_service import AuthService
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/auth", tags=["V1 Authentication"])
 async def register_user(
     payload: RegisterRequest,
     response: Response,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_auth_db_session),
 ):
     """Register a new user and immediately issue login session cookie."""
     session_token, user_id, plan = await AuthService.register_and_login(
@@ -42,7 +42,7 @@ async def register_user(
 async def login_user(
     payload: LoginRequest,
     response: Response,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_auth_db_session),
 ):
     """Login user and issue session cookie."""
     session_token, user_id, plan = await AuthService.login(
@@ -78,7 +78,7 @@ async def get_current_user_profile(current_user=Depends(get_current_user)):
 async def logout_user(
     request: Request,
     response: Response,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_auth_db_session),
 ):
     """Logout user by deleting current v1 session token and clearing cookie."""
     session_token = request.cookies.get("session_token")

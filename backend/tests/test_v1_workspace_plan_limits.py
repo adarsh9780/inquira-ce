@@ -8,10 +8,10 @@ from app.v1.services.workspace_service import WorkspaceService
 
 @pytest.mark.asyncio
 async def test_free_plan_workspace_limit_error_is_descriptive(monkeypatch):
-    async def fake_get_by_name_normalized(_session, _user_id, _normalized):
+    async def fake_get_by_name_normalized(_session, _principal_id, _normalized):
         return None
 
-    async def fake_count_for_user(_session, _user_id):
+    async def fake_count_for_principal(_session, _principal_id):
         return 1
 
     monkeypatch.setattr(
@@ -19,8 +19,8 @@ async def test_free_plan_workspace_limit_error_is_descriptive(monkeypatch):
         fake_get_by_name_normalized,
     )
     monkeypatch.setattr(
-        "app.v1.services.workspace_service.WorkspaceRepository.count_for_user",
-        fake_count_for_user,
+        "app.v1.services.workspace_service.WorkspaceRepository.count_for_principal",
+        fake_count_for_principal,
     )
 
     user = SimpleNamespace(id="user-1", username="alice", plan=SimpleNamespace(value="FREE"))

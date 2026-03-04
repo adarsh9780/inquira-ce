@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.session import get_db_session
+from ..db.session import get_appdata_db_session
 from ..repositories.preferences_repository import PreferencesRepository
 from ..schemas.common import MessageResponse
 from ..schemas.preferences import (
@@ -16,9 +16,13 @@ from ..schemas.preferences import (
 from ..services.secret_storage_service import SecretStorageService
 from ...services.llm_runtime_config import load_llm_runtime_config
 from ...services.execution_config import load_execution_runtime_config
-from .deps import get_current_user
+from .deps import ensure_appdata_principal, get_current_user
 
-router = APIRouter(prefix="/preferences", tags=["V1 Preferences"])
+router = APIRouter(
+    prefix="/preferences",
+    tags=["V1 Preferences"],
+    dependencies=[Depends(ensure_appdata_principal)],
+)
 
 
 def _to_response(prefs, api_key_present: bool) -> PreferencesResponse:
@@ -42,7 +46,7 @@ def _to_response(prefs, api_key_present: bool) -> PreferencesResponse:
 
 @router.get("", response_model=PreferencesResponse)
 async def get_preferences(
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     prefs = await PreferencesRepository.get_or_create(session, current_user.id)
@@ -54,7 +58,7 @@ async def get_preferences(
 @router.put("", response_model=PreferencesResponse)
 async def update_preferences(
     payload: PreferencesUpdateRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     prefs = await PreferencesRepository.get_or_create(session, current_user.id)

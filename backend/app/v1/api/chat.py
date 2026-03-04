@@ -5,13 +5,17 @@ from typing import Any
 import json
 import traceback
 
-from ..db.session import get_db_session
+from ..db.session import get_appdata_db_session
 from ..schemas.chat import AnalyzeRequest, AnalyzeResponse
 from ..services.chat_service import ChatService
-from .deps import get_current_user, get_langgraph_manager
+from .deps import ensure_appdata_principal, get_current_user, get_langgraph_manager
 from ...core.logger import logprint
 
-router = APIRouter(prefix="/chat", tags=["V1 Chat"])
+router = APIRouter(
+    prefix="/chat",
+    tags=["V1 Chat"],
+    dependencies=[Depends(ensure_appdata_principal)],
+)
 
 
 def _to_sse(event: str, payload: dict[str, Any]) -> str:
@@ -21,7 +25,7 @@ def _to_sse(event: str, payload: dict[str, Any]) -> str:
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(
     payload: AnalyzeRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
     langgraph_manager=Depends(get_langgraph_manager),
 ):
@@ -58,7 +62,7 @@ async def analyze(
 @router.post("/stream")
 async def stream_analyze(
     payload: AnalyzeRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
     langgraph_manager=Depends(get_langgraph_manager),
 ):

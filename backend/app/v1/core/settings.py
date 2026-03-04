@@ -15,7 +15,8 @@ from pathlib import Path
 class V1Settings:
     """Immutable configuration values for v1 services."""
 
-    database_url: str
+    auth_db_url: str
+    appdata_db_url: str
     reset_enabled: bool
     reset_token: str
     allow_schema_bootstrap: bool
@@ -26,15 +27,17 @@ class V1Settings:
         """Load settings from environment variables.
 
         Returns:
-            V1Settings object with DB URL and reset command guards.
+            V1Settings object with DB URLs and reset command guards.
         """
 
-        default_sqlite_path = Path.home() / ".inquira" / "app_v1.db"
-        default_sqlite_path.parent.mkdir(parents=True, exist_ok=True)
-        default_db = f"sqlite+aiosqlite:///{default_sqlite_path}"
+        default_dir = Path.home() / ".inquira"
+        default_dir.mkdir(parents=True, exist_ok=True)
+        default_auth_db = f"sqlite+aiosqlite:///{default_dir / 'auth_v1.db'}"
+        default_appdata_db = f"sqlite+aiosqlite:///{default_dir / 'appdata_v1.db'}"
 
         return V1Settings(
-            database_url=os.getenv("INQUIRA_DB_URL", default_db),
+            auth_db_url=os.getenv("INQUIRA_AUTH_DB_URL", default_auth_db),
+            appdata_db_url=os.getenv("INQUIRA_APPDATA_DB_URL", default_appdata_db),
             reset_enabled=os.getenv("INQUIRA_ENABLE_RESET", "0") == "1",
             reset_token=os.getenv("INQUIRA_RESET_TOKEN", ""),
             allow_schema_bootstrap=os.getenv("INQUIRA_ALLOW_SCHEMA_BOOTSTRAP", "0") == "1",

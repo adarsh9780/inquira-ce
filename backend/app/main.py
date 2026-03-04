@@ -23,7 +23,7 @@ if not hasattr(aiosqlite.Connection, "is_alive"):
 
 from .v1.api.router import router as v1_router
 from .v1.services.auth_service import AuthService
-from .v1.db.session import SessionLocal
+from .v1.db.session import AuthSessionLocal
 from .v1.db.init import init_v1_database
 from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
 from .v1.services.workspace_deletion_service import WorkspaceDeletionService
@@ -240,7 +240,7 @@ async def _resolve_websocket_user(websocket: WebSocket):
     if not session_token:
         return None
 
-    async with SessionLocal() as session:
+    async with AuthSessionLocal() as session:
         try:
             return await AuthService.resolve_user_from_session(session, session_token)
         except Exception:

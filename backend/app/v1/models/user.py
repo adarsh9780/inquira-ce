@@ -8,11 +8,11 @@ from datetime import datetime
 from sqlalchemy import DateTime, Enum, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..db.base import Base
+from ..db.base import AuthBase
 from .enums import UserPlan
 
 
-class User(Base):
+class User(AuthBase):
     """Application user account."""
 
     __tablename__ = "v1_users"
@@ -25,12 +25,10 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    workspaces = relationship("Workspace", back_populates="user", cascade="all, delete-orphan")
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
-    preferences = relationship("UserPreferences", back_populates="user", cascade="all, delete-orphan", uselist=False)
 
 
-class UserSession(Base):
+class UserSession(AuthBase):
     """Cookie-backed user session record."""
 
     __tablename__ = "v1_user_sessions"

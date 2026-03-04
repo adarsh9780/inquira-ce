@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.session import get_db_session
+from ..db.session import get_appdata_db_session
 from ..schemas.dataset import (
     BrowserDatasetSyncRequest,
     DatasetAddRequest,
@@ -13,15 +13,18 @@ from ..schemas.dataset import (
     DatasetResponse,
 )
 from ..services.dataset_service import DatasetService
-from .deps import get_current_user
+from .deps import ensure_appdata_principal, get_current_user
 
-router = APIRouter(tags=["V1 Datasets"])
+router = APIRouter(
+    tags=["V1 Datasets"],
+    dependencies=[Depends(ensure_appdata_principal)],
+)
 
 
 @router.get("/workspaces/{workspace_id}/datasets", response_model=DatasetListResponse)
 async def list_workspace_datasets(
     workspace_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     """List datasets inside one workspace."""
@@ -47,7 +50,7 @@ async def list_workspace_datasets(
 async def add_workspace_dataset(
     workspace_id: str,
     payload: DatasetAddRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     """Add or refresh a dataset in the workspace DuckDB."""
@@ -68,7 +71,7 @@ async def add_workspace_dataset(
 async def sync_browser_workspace_dataset(
     workspace_id: str,
     payload: BrowserDatasetSyncRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     """Sync browser-loaded table into workspace dataset catalog/schema metadata."""

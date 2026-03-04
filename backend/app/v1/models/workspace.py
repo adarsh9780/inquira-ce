@@ -1,4 +1,4 @@
-"""Workspace and dataset ORM models."""
+"""Workspace, principal, and dataset ORM models."""
 
 from __future__ import annotations
 
@@ -8,19 +8,40 @@ from datetime import datetime
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..db.base import Base
+from ..db.base import AppDataBase
 
 
-class Workspace(Base):
+class Principal(AppDataBase):
+    """App-data identity anchor mirroring authenticated user identity."""
+
+    __tablename__ = "v1_principals"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    username_cached: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
+    plan_cached: Mapped[str] = mapped_column(String(32), nullable=False, default="FREE")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    workspaces = relationship("Workspace", back_populates="owner_principal", cascade="all, delete-orphan")
+    conversations = relationship("Conversation", back_populates="created_by_principal", cascade="all, delete-orphan")
+    preferences = relationship("UserPreferences", back_populates="principal", cascade="all, delete-orphan", uselist=False)
+    deletion_jobs = relationship("WorkspaceDeletionJob", back_populates="owner_principal", cascade="all, delete-orphan")
+
+
+class Workspace(AppDataBase):
     """User workspace containing one DuckDB database and related assets."""
 
     __tablename__ = "v1_workspaces"
     __table_args__ = (
-        UniqueConstraint("user_id", "name_normalized", name="uq_v1_workspace_user_name_norm"),
+        UniqueConstraint("owner_principal_id", "name_normalized", name="uq_v1_workspace_owner_name_norm"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id: Mapped[str] = mapped_column(ForeignKey("v1_users.id", ondelete="CASCADE"), index=True, nullable=False)
+    owner_principal_id: Mapped[str] = mapped_column(
+        ForeignKey("v1_principals.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     name_normalized: Mapped[str] = mapped_column(String(120), nullable=False)
     is_active: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -28,12 +49,12 @@ class Workspace(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    user = relationship("User", back_populates="workspaces")
+    owner_principal = relationship("Principal", back_populates="workspaces")
     datasets = relationship("WorkspaceDataset", back_populates="workspace", cascade="all, delete-orphan")
     conversations = relationship("Conversation", back_populates="workspace", cascade="all, delete-orphan")
 
 
-class WorkspaceDataset(Base):
+class WorkspaceDataset(AppDataBase):
     """Catalog entry for a dataset imported into a workspace DuckDB."""
 
     __tablename__ = "v1_workspace_datasets"
@@ -58,19 +79,25 @@ class WorkspaceDataset(Base):
     workspace = relationship("Workspace", back_populates="datasets")
 
 
-class WorkspaceDeletionJob(Base):
+class WorkspaceDeletionJob(AppDataBase):
     """Asynchronous workspace deletion job tracker."""
 
     __tablename__ = "v1_workspace_deletion_jobs"
     __table_args__ = (
-        Index("ix_v1_ws_delete_jobs_user_created", "user_id", "created_at"),
+        Index("ix_v1_ws_delete_jobs_owner_created", "owner_principal_id", "created_at"),
         Index("ix_v1_ws_delete_jobs_workspace_status", "workspace_id", "status"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id: Mapped[str] = mapped_column(ForeignKey("v1_users.id", ondelete="CASCADE"), index=True, nullable=False)
+    owner_principal_id: Mapped[str] = mapped_column(
+        ForeignKey("v1_principals.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
     workspace_id: Mapped[str] = mapped_column(String(36), index=True, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued")
     error_message: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    owner_principal = relationship("Principal", back_populates="deletion_jobs")

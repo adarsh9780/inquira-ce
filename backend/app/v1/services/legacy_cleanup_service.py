@@ -23,7 +23,7 @@ class LegacyCleanupService:
 
     @staticmethod
     def _resolve_v1_db_path() -> Path | None:
-        raw = settings.database_url.strip()
+        raw = settings.auth_db_url.strip()
         marker = "sqlite+aiosqlite:///"
         if raw.startswith(marker):
             return Path(raw.replace(marker, "", 1))

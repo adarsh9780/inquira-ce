@@ -37,9 +37,9 @@ class DatasetService:
         return hashlib.md5(source_path.strip().encode("utf-8")).hexdigest()
 
     @staticmethod
-    async def list_datasets(session: AsyncSession, user_id: str, workspace_id: str) -> list[WorkspaceDataset]:
+    async def list_datasets(session: AsyncSession, principal_id: str, workspace_id: str) -> list[WorkspaceDataset]:
         """List datasets in a workspace owned by user."""
-        workspace = await WorkspaceRepository.get_by_id(session, workspace_id, user_id)
+        workspace = await WorkspaceRepository.get_by_id(session, workspace_id, principal_id)
         if workspace is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
 

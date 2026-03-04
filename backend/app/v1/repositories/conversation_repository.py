@@ -18,11 +18,15 @@ class ConversationRepository:
     async def create_conversation(
         session: AsyncSession,
         workspace_id: str,
-        user_id: str,
+        principal_id: str,
         title: str,
     ) -> Conversation:
         """Create a new conversation."""
-        conv = Conversation(workspace_id=workspace_id, created_by_user_id=user_id, title=title)
+        conv = Conversation(
+            workspace_id=workspace_id,
+            created_by_principal_id=principal_id,
+            title=title,
+        )
         session.add(conv)
         await session.flush()
         return conv

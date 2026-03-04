@@ -39,16 +39,16 @@ async def test_write_workspace_manifest_persists_expected_fields(monkeypatch, tm
 
 @pytest.mark.asyncio
 async def test_create_workspace_writes_manifest(monkeypatch):
-    async def fake_get_by_name_normalized(_session, _user_id, _normalized):
+    async def fake_get_by_name_normalized(_session, _principal_id, _normalized):
         return None
 
-    async def fake_count_for_user(_session, _user_id):
+    async def fake_count_for_principal(_session, _principal_id):
         return 0
 
-    async def fake_create(*, session, user_id, name, name_normalized, duckdb_path, is_active):
+    async def fake_create(*, session, principal_id, name, name_normalized, duckdb_path, is_active):
         return SimpleNamespace(
             id="ws-123",
-            user_id=user_id,
+            owner_principal_id=principal_id,
             name=name,
             name_normalized=name_normalized,
             duckdb_path=duckdb_path,
@@ -84,8 +84,8 @@ async def test_create_workspace_writes_manifest(monkeypatch):
         fake_get_by_name_normalized,
     )
     monkeypatch.setattr(
-        "app.v1.services.workspace_service.WorkspaceRepository.count_for_user",
-        fake_count_for_user,
+        "app.v1.services.workspace_service.WorkspaceRepository.count_for_principal",
+        fake_count_for_principal,
     )
     monkeypatch.setattr(
         "app.v1.services.workspace_service.WorkspaceRepository.create",
@@ -135,16 +135,12 @@ async def test_activate_workspace_refreshes_manifest(monkeypatch):
     user = SimpleNamespace(id="user-1", username="alice")
     calls = {}
 
-    async def fake_get_by_id(_session, workspace_id, user_id):
-        calls["workspace_lookup"] = (workspace_id, user_id)
+    async def fake_get_by_id(_session, workspace_id, principal_id):
+        calls["workspace_lookup"] = (workspace_id, principal_id)
         return workspace
 
-    async def fake_get_user(_session, user_id):
-        calls["user_lookup"] = user_id
-        return user
-
-    async def fake_deactivate_all(_session, user_id):
-        calls["deactivate"] = user_id
+    async def fake_deactivate_all(_session, principal_id):
+        calls["deactivate"] = principal_id
 
     async def fake_write_manifest(
         username,
@@ -168,11 +164,7 @@ async def test_activate_workspace_refreshes_manifest(monkeypatch):
         fake_get_by_id,
     )
     monkeypatch.setattr(
-        "app.v1.services.workspace_service.UserRepository.get_by_id",
-        fake_get_user,
-    )
-    monkeypatch.setattr(
-        "app.v1.services.workspace_service.WorkspaceRepository.deactivate_all_for_user",
+        "app.v1.services.workspace_service.WorkspaceRepository.deactivate_all_for_principal",
         fake_deactivate_all,
     )
     monkeypatch.setattr(
@@ -189,7 +181,7 @@ async def test_activate_workspace_refreshes_manifest(monkeypatch):
 
     activated = await WorkspaceService.activate_workspace(
         session=DummySession(),
-        user_id="user-1",
+        user=user,
         workspace_id="ws-9",
     )
 

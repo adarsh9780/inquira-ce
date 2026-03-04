@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.session import SessionLocal
+from ..db.session import AppDataSessionLocal
 from ..repositories.workspace_deletion_repository import WorkspaceDeletionRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .workspace_storage_service import WorkspaceStorageService
@@ -35,7 +35,7 @@ class WorkspaceDeletionService:
 
         active_job = await WorkspaceDeletionRepository.get_active_for_workspace(
             session=session,
-            user_id=user.id,
+            principal_id=user.id,
             workspace_id=workspace_id,
         )
         if active_job is not None:
@@ -43,7 +43,7 @@ class WorkspaceDeletionService:
 
         job = await WorkspaceDeletionRepository.create_job(
             session=session,
-            user_id=user.id,
+            principal_id=user.id,
             workspace_id=workspace_id,
         )
         await session.commit()
@@ -52,27 +52,27 @@ class WorkspaceDeletionService:
         await self._schedule_job(
             job_id=job.id,
             workspace_id=workspace_id,
-            user_id=user.id,
+            principal_id=user.id,
             username=user.username,
             langgraph_manager=langgraph_manager,
         )
         return job
 
-    async def get_job_for_user(
+    async def get_job_for_principal(
         self,
         session: AsyncSession,
-        user_id: str,
+        principal_id: str,
         job_id: str,
     ):
         """Get one delete job and enforce ownership."""
         job = await WorkspaceDeletionRepository.get_by_id(session, job_id)
-        if job is None or job.user_id != user_id:
+        if job is None or job.owner_principal_id != principal_id:
             raise HTTPException(status_code=404, detail="Deletion job not found")
         return job
 
-    async def list_active_jobs_for_user(self, session: AsyncSession, user_id: str):
+    async def list_active_jobs_for_principal(self, session: AsyncSession, principal_id: str):
         """List active delete jobs for workspace dropdown status."""
-        return await WorkspaceDeletionRepository.list_active_for_user(session, user_id)
+        return await WorkspaceDeletionRepository.list_active_for_principal(session, principal_id)
 
     async def shutdown(self) -> None:
         """Cancel all active background deletion tasks."""
@@ -85,7 +85,7 @@ class WorkspaceDeletionService:
         self,
         job_id: str,
         workspace_id: str,
-        user_id: str,
+        principal_id: str,
         username: str,
         langgraph_manager,
     ) -> None:
@@ -97,7 +97,7 @@ class WorkspaceDeletionService:
                 self._run_delete_job(
                     job_id=job_id,
                     workspace_id=workspace_id,
-                    user_id=user_id,
+                    principal_id=principal_id,
                     username=username,
                     langgraph_manager=langgraph_manager,
                 )
@@ -109,12 +109,12 @@ class WorkspaceDeletionService:
         self,
         job_id: str,
         workspace_id: str,
-        user_id: str,
+        principal_id: str,
         username: str,
         langgraph_manager,
     ) -> None:
         """Execute delete job: close graph, delete files, remove DB row, update status."""
-        async with SessionLocal() as session:
+        async with AppDataSessionLocal() as session:
             job = await WorkspaceDeletionRepository.get_by_id(session, job_id)
             if job is None:
                 return
@@ -126,12 +126,12 @@ class WorkspaceDeletionService:
             await langgraph_manager.close_workspace(workspace_id)
             await WorkspaceStorageService.hard_delete_workspace(username, workspace_id)
 
-            async with SessionLocal() as session:
-                workspace = await WorkspaceRepository.get_by_id(session, workspace_id, user_id)
+            async with AppDataSessionLocal() as session:
+                workspace = await WorkspaceRepository.get_by_id(session, workspace_id, principal_id)
                 if workspace is not None:
                     await WorkspaceRepository.delete(session, workspace)
 
-                remaining = await WorkspaceRepository.list_for_user(session, user_id)
+                remaining = await WorkspaceRepository.list_for_principal(session, principal_id)
                 if remaining and not any(ws.is_active == 1 for ws in remaining):
                     remaining[0].is_active = 1
 
@@ -142,7 +142,7 @@ class WorkspaceDeletionService:
 
                 await session.commit()
         except Exception as exc:  # noqa: BLE001
-            async with SessionLocal() as session:
+            async with AppDataSessionLocal() as session:
                 job = await WorkspaceDeletionRepository.get_by_id(session, job_id)
                 if job is not None:
                     job.status = "failed"

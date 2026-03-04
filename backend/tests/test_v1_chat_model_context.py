@@ -15,7 +15,7 @@ async def test_chat_service_passes_model_and_context_to_graph(monkeypatch):
     async def fake_get_workspace(_session, _workspace_id, _user_id):
         return SimpleNamespace(id="ws-1", duckdb_path="/tmp/ws.duckdb")
 
-    async def fake_create_conversation(*, session, user_id, workspace_id, title):
+    async def fake_create_conversation(*, session, principal_id, workspace_id, title):
         return SimpleNamespace(id="conv-1", title=title)
 
     async def fake_get_latest_dataset(_session, _workspace_id):

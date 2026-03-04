@@ -9,8 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..core.settings import settings
-from ..db.base import Base
-from ..db.session import engine
+from ..db.base import AppDataBase, AuthBase
+from ..db.session import appdata_engine, auth_engine
 from ..schemas.common import MessageResponse
 from .deps import get_current_user
 from ...services.llm_service import LLMService
@@ -38,9 +38,13 @@ async def reset_everything(token: str):
     if not settings.reset_token or token != settings.reset_token:
         raise HTTPException(status_code=401, detail="Invalid reset token")
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+    async with appdata_engine.begin() as conn:
+        await conn.run_sync(AppDataBase.metadata.drop_all)
+        await conn.run_sync(AppDataBase.metadata.create_all)
+
+    async with auth_engine.begin() as conn:
+        await conn.run_sync(AuthBase.metadata.drop_all)
+        await conn.run_sync(AuthBase.metadata.create_all)
 
     def _delete_legacy() -> None:
         legacy = Path.home() / ".inquira" / "app.db"

@@ -19,11 +19,11 @@ class ConversationService:
     @staticmethod
     async def ensure_workspace_access(
         session: AsyncSession,
-        user_id: str,
+        principal_id: str,
         workspace_id: str,
     ) -> Workspace:
         """Validate workspace ownership and return workspace."""
-        workspace = await WorkspaceRepository.get_by_id(session, workspace_id, user_id)
+        workspace = await WorkspaceRepository.get_by_id(session, workspace_id, principal_id)
         if workspace is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
         return workspace
@@ -31,17 +31,17 @@ class ConversationService:
     @staticmethod
     async def create_conversation(
         session: AsyncSession,
-        user_id: str,
+        principal_id: str,
         workspace_id: str,
         title: str | None,
     ) -> Conversation:
         """Create conversation with default title fallback."""
-        await ConversationService.ensure_workspace_access(session, user_id, workspace_id)
+        await ConversationService.ensure_workspace_access(session, principal_id, workspace_id)
         conv_title = title.strip() if title and title.strip() else "New Conversation"
         conversation = await ConversationRepository.create_conversation(
             session,
             workspace_id,
-            user_id,
+            principal_id,
             conv_title,
         )
         await session.commit()
@@ -51,46 +51,46 @@ class ConversationService:
     @staticmethod
     async def list_conversations(
         session: AsyncSession,
-        user_id: str,
+        principal_id: str,
         workspace_id: str,
         limit: int = 50,
     ) -> list[Conversation]:
         """List conversations for a workspace."""
-        await ConversationService.ensure_workspace_access(session, user_id, workspace_id)
+        await ConversationService.ensure_workspace_access(session, principal_id, workspace_id)
         return await ConversationRepository.list_conversations(session, workspace_id, limit)
 
     @staticmethod
     async def clear_conversation(
         session: AsyncSession,
-        user_id: str,
+        principal_id: str,
         conversation_id: str,
     ) -> None:
         """Delete all turns for a conversation but keep conversation row."""
         conversation = await ConversationRepository.get_conversation(session, conversation_id)
         if conversation is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
-        await ConversationService.ensure_workspace_access(session, user_id, conversation.workspace_id)
+        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
         await ConversationRepository.clear_conversation(session, conversation_id)
         await session.commit()
 
     @staticmethod
     async def delete_conversation(
         session: AsyncSession,
-        user_id: str,
+        principal_id: str,
         conversation_id: str,
     ) -> None:
         """Delete full conversation including turns."""
         conversation = await ConversationRepository.get_conversation(session, conversation_id)
         if conversation is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
-        await ConversationService.ensure_workspace_access(session, user_id, conversation.workspace_id)
+        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
         await ConversationRepository.delete_conversation(session, conversation)
         await session.commit()
 
     @staticmethod
     async def update_conversation(
         session: AsyncSession,
-        user_id: str,
+        principal_id: str,
         conversation_id: str,
         title: str | None,
     ) -> Conversation:
@@ -98,7 +98,7 @@ class ConversationService:
         conversation = await ConversationRepository.get_conversation(session, conversation_id)
         if conversation is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
-        await ConversationService.ensure_workspace_access(session, user_id, conversation.workspace_id)
+        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
 
         if title is not None:
             new_title = title.strip() or "Untitled Conversation"
@@ -111,7 +111,7 @@ class ConversationService:
     @staticmethod
     async def list_turns(
         session: AsyncSession,
-        user_id: str,
+        principal_id: str,
         conversation_id: str,
         limit: int = 5,
         before: str | None = None,
@@ -120,7 +120,7 @@ class ConversationService:
         conversation = await ConversationRepository.get_conversation(session, conversation_id)
         if conversation is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
-        await ConversationService.ensure_workspace_access(session, user_id, conversation.workspace_id)
+        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
 
         before_created_at, before_turn_id = decode_cursor(before)
         turns = await ConversationRepository.list_turns_page(

@@ -13,7 +13,7 @@ async def test_chat_uses_empty_schema_when_workspace_has_no_dataset(monkeypatch)
     async def fake_get_workspace(_session, _workspace_id, _user_id):
         return SimpleNamespace(id="ws-1", duckdb_path="/tmp/ws.duckdb")
 
-    async def fake_create_conversation(*, session, user_id, workspace_id, title):
+    async def fake_create_conversation(*, session, principal_id, workspace_id, title):
         return SimpleNamespace(id="conv-1", title=title)
 
     async def fake_get_conversation(_session, _conversation_id):
@@ -88,7 +88,7 @@ async def test_chat_keeps_backend_columns_when_client_schema_override_present(mo
     async def fake_get_workspace(_session, _workspace_id, _user_id):
         return SimpleNamespace(id="ws-1", duckdb_path="/tmp/ws.duckdb")
 
-    async def fake_create_conversation(*, session, user_id, workspace_id, title):
+    async def fake_create_conversation(*, session, principal_id, workspace_id, title):
         return SimpleNamespace(id="conv-2", title=title)
 
     async def fake_get_conversation(_session, _conversation_id):
@@ -187,7 +187,7 @@ async def test_chat_fails_when_explicit_table_override_is_missing(monkeypatch):
     async def fake_get_workspace(_session, _workspace_id, _user_id):
         return SimpleNamespace(id="ws-1", duckdb_path="/tmp/ws.duckdb")
 
-    async def fake_create_conversation(*, session, user_id, workspace_id, title):
+    async def fake_create_conversation(*, session, principal_id, workspace_id, title):
         return SimpleNamespace(id="conv-missing", title=title)
 
     async def fake_get_for_workspace_table(*, session, workspace_id, table_name):
@@ -229,7 +229,7 @@ async def test_chat_falls_back_to_live_columns_when_schema_file_missing(monkeypa
     async def fake_get_workspace(_session, _workspace_id, _user_id):
         return SimpleNamespace(id="ws-1", duckdb_path="/tmp/ws.duckdb")
 
-    async def fake_create_conversation(*, session, user_id, workspace_id, title):
+    async def fake_create_conversation(*, session, principal_id, workspace_id, title):
         return SimpleNamespace(id="conv-2b", title=title)
 
     async def fake_get_for_workspace_table(*, session, workspace_id, table_name):
@@ -308,7 +308,7 @@ async def test_chat_uses_keychain_api_key_when_payload_key_missing(monkeypatch):
     async def fake_get_workspace(_session, _workspace_id, _user_id):
         return SimpleNamespace(id="ws-1", duckdb_path="/tmp/ws.duckdb")
 
-    async def fake_create_conversation(*, session, user_id, workspace_id, title):
+    async def fake_create_conversation(*, session, principal_id, workspace_id, title):
         return SimpleNamespace(id="conv-3", title=title)
 
     async def fake_get_latest_dataset(_session, _workspace_id):
@@ -378,7 +378,7 @@ async def test_chat_merges_saved_schema_with_live_duckdb_columns(monkeypatch):
     async def fake_get_workspace(_session, _workspace_id, _user_id):
         return SimpleNamespace(id="ws-1", duckdb_path="/tmp/ws.duckdb")
 
-    async def fake_create_conversation(*, session, user_id, workspace_id, title):
+    async def fake_create_conversation(*, session, principal_id, workspace_id, title):
         return SimpleNamespace(id="conv-4", title=title)
 
     async def fake_get_conversation(_session, _conversation_id):

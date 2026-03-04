@@ -28,12 +28,12 @@ from ...services.code_executor import (
     reset_workspace_kernel,
 )
 from ...services.artifact_scratchpad import get_artifact_scratchpad_store
-from ..db.session import get_db_session
+from ..db.session import get_appdata_db_session
 from ..repositories.preferences_repository import PreferencesRepository
 from ..repositories.dataset_repository import DatasetRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from ..services.secret_storage_service import SecretStorageService
-from .deps import get_current_user
+from .deps import ensure_appdata_principal, get_current_user
 from ...core.prompt_library import get_prompt
 from ...services.llm_service import LLMService
 from ...services.llm_runtime_config import load_llm_runtime_config
@@ -47,7 +47,7 @@ from ...services.terminal_executor import (
 from ...services.websocket_manager import websocket_manager
 from ...core.logger import logprint
 
-router = APIRouter(tags=["V1 Runtime"])
+router = APIRouter(tags=["V1 Runtime"], dependencies=[Depends(ensure_appdata_principal)])
 
 
 def _default_variable_bundle() -> dict[str, dict[str, Any]]:
@@ -461,7 +461,7 @@ async def _require_workspace_access(
 @router.get("/workspaces/{workspace_id}/paths", response_model=WorkspacePathsResponse)
 async def get_workspace_paths(
     workspace_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
@@ -479,7 +479,7 @@ async def get_workspace_paths(
 async def execute_workspace_code(
     workspace_id: str,
     payload: ExecuteRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
@@ -510,7 +510,7 @@ async def get_workspace_dataframe_artifact_rows(
     artifact_id: str,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=1000, ge=1, le=1000),
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
@@ -548,7 +548,7 @@ async def get_workspace_artifact_rows(
     artifact_id: str,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=1000, ge=1, le=1000),
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
@@ -583,7 +583,7 @@ async def get_workspace_artifact_rows(
 async def get_workspace_artifact_metadata(
     workspace_id: str,
     artifact_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
@@ -615,7 +615,7 @@ async def get_workspace_artifact_metadata(
 async def delete_workspace_artifact(
     workspace_id: str,
     artifact_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
@@ -646,7 +646,7 @@ async def delete_workspace_artifact(
 async def list_workspace_artifacts(
     workspace_id: str,
     kind: str | None = Query(default=None, description="Filter by artifact kind, e.g. 'dataframe' or 'figure'"),
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     """List all non-expired artifacts for a workspace, optionally filtered by kind."""
@@ -680,7 +680,7 @@ async def list_workspace_artifacts(
 @router.post("/runtime/runner/packages/install", response_model=RunnerPackageInstallResponse)
 async def install_runner_runtime_package(
     payload: RunnerPackageInstallRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, payload.workspace_id)
@@ -731,7 +731,7 @@ async def install_runner_runtime_package(
 async def execute_workspace_terminal_command(
     workspace_id: str,
     payload: TerminalExecuteRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
@@ -766,7 +766,7 @@ async def execute_workspace_terminal_command(
 async def stream_workspace_terminal_command_sse(
     workspace_id: str,
     payload: TerminalExecuteRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
@@ -821,7 +821,7 @@ async def stream_workspace_terminal_command_sse(
 )
 async def reset_workspace_terminal_session(
     workspace_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     runtime = load_execution_runtime_config()
@@ -840,7 +840,7 @@ async def reset_workspace_terminal_session(
 )
 async def get_workspace_kernel_runtime_status(
     workspace_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     """Return current workspace kernel status."""
@@ -855,7 +855,7 @@ async def get_workspace_kernel_runtime_status(
 )
 async def bootstrap_workspace_runtime_endpoint(
     workspace_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
@@ -911,7 +911,7 @@ async def bootstrap_workspace_runtime_endpoint(
 )
 async def interrupt_workspace_kernel_runtime(
     workspace_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     """Interrupt currently running code in workspace kernel."""
@@ -926,7 +926,7 @@ async def interrupt_workspace_kernel_runtime(
 )
 async def reset_workspace_kernel_runtime(
     workspace_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     """Reset workspace kernel and clear in-memory execution context."""
@@ -940,7 +940,7 @@ async def reset_workspace_kernel_runtime(
 )
 async def restart_workspace_kernel_runtime(
     workspace_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     """Restart workspace kernel and warm it immediately."""
@@ -968,7 +968,7 @@ async def _restart_workspace_kernel(workspace_id: str, workspace: Any) -> Kernel
 async def get_workspace_dataset_schema(
     workspace_id: str,
     table_name: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
@@ -1033,7 +1033,7 @@ async def save_workspace_dataset_schema(
     workspace_id: str,
     table_name: str,
     payload: SaveSchemaRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
@@ -1082,7 +1082,7 @@ async def regenerate_workspace_dataset_schema(
     workspace_id: str,
     table_name: str,
     payload: RegenerateSchemaRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
@@ -1213,7 +1213,7 @@ async def regenerate_workspace_dataset_schema(
 @router.get("/workspaces/{workspace_id}/schemas", response_model=SchemaListResponse)
 async def list_workspace_schemas(
     workspace_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     await _require_workspace_access(session, current_user.id, workspace_id)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.session import get_db_session
+from ..db.session import get_appdata_db_session
 from ..schemas.workspace import (
     WorkspaceCreateRequest,
     WorkspaceDeletionJobListResponse,
@@ -15,14 +15,23 @@ from ..schemas.workspace import (
 )
 from ..services.workspace_deletion_service import WorkspaceDeletionService
 from ..services.workspace_service import WorkspaceService
-from .deps import get_current_user, get_langgraph_manager, get_workspace_deletion_service
+from .deps import (
+    ensure_appdata_principal,
+    get_current_user,
+    get_langgraph_manager,
+    get_workspace_deletion_service,
+)
 
-router = APIRouter(prefix="/workspaces", tags=["V1 Workspaces"])
+router = APIRouter(
+    prefix="/workspaces",
+    tags=["V1 Workspaces"],
+    dependencies=[Depends(ensure_appdata_principal)],
+)
 
 
 @router.get("", response_model=WorkspaceListResponse)
 async def list_workspaces(
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     """List all workspaces for the authenticated user."""
@@ -45,7 +54,7 @@ async def list_workspaces(
 @router.post("", response_model=WorkspaceResponse)
 async def create_workspace(
     payload: WorkspaceCreateRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     """Create a workspace for the authenticated user."""
@@ -63,11 +72,11 @@ async def create_workspace(
 @router.put("/{workspace_id}/activate", response_model=WorkspaceResponse)
 async def activate_workspace(
     workspace_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     """Set the active workspace for the authenticated user."""
-    ws = await WorkspaceService.activate_workspace(session, current_user.id, workspace_id)
+    ws = await WorkspaceService.activate_workspace(session, current_user, workspace_id)
     return WorkspaceResponse(
         id=ws.id,
         name=ws.name,
@@ -85,7 +94,7 @@ async def activate_workspace(
 )
 async def delete_workspace(
     workspace_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
     langgraph_manager=Depends(get_langgraph_manager),
     workspace_deletion_service: WorkspaceDeletionService = Depends(get_workspace_deletion_service),
@@ -109,12 +118,12 @@ async def delete_workspace(
 
 @router.get("/deletions", response_model=WorkspaceDeletionJobListResponse)
 async def list_workspace_deletions(
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
     workspace_deletion_service: WorkspaceDeletionService = Depends(get_workspace_deletion_service),
 ):
     """List active workspace deletion jobs for the current user."""
-    jobs = await workspace_deletion_service.list_active_jobs_for_user(session, current_user.id)
+    jobs = await workspace_deletion_service.list_active_jobs_for_principal(session, current_user.id)
     return WorkspaceDeletionJobListResponse(
         jobs=[
             WorkspaceDeletionJobResponse(
@@ -133,12 +142,12 @@ async def list_workspace_deletions(
 @router.get("/deletions/{job_id}", response_model=WorkspaceDeletionJobResponse)
 async def get_workspace_deletion(
     job_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
     workspace_deletion_service: WorkspaceDeletionService = Depends(get_workspace_deletion_service),
 ):
     """Get one workspace deletion job status by id."""
-    job = await workspace_deletion_service.get_job_for_user(session, current_user.id, job_id)
+    job = await workspace_deletion_service.get_job_for_principal(session, current_user.id, job_id)
     return WorkspaceDeletionJobResponse(
         job_id=job.id,
         workspace_id=job.workspace_id,
