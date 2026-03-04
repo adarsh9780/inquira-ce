@@ -35,31 +35,32 @@
       <div v-if="appStore.workspaces.length === 0" class="px-2 py-2 text-xs text-center" style="color: var(--color-text-muted);">
         No workspaces yet
       </div>
+      <div
+        v-else-if="visibleWorkspaces.length === 0"
+        class="px-2 py-2 text-xs text-center"
+        style="color: var(--color-text-muted);"
+      >
+        No other workspaces
+      </div>
       
       <div 
-        v-for="ws in appStore.workspaces" 
+        v-for="ws in visibleWorkspaces" 
         :key="ws.id"
         class="group/item relative flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors border"
         :class="[
-          ws.id === appStore.activeWorkspaceId ? 'bg-zinc-100/80 border-zinc-200' : 'hover:bg-zinc-100/50 border-transparent',
+          'hover:bg-zinc-100/50 border-transparent',
           isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : ''
         ]"
         @click="!isWorkspaceDeleting(ws.id) && selectWorkspace(ws.id)"
       >
         <div class="flex items-center gap-2 min-w-0 pr-2">
-          <CheckCircleIcon 
-            v-if="ws.id === appStore.activeWorkspaceId" 
-            class="w-3.5 h-3.5 shrink-0" 
-            style="color: var(--color-success);"
-          />
-          <div v-else class="w-3.5 h-3.5 shrink-0"></div>
-          <span class="truncate text-xs" :style="ws.id === appStore.activeWorkspaceId ? 'font-weight: 600; color: var(--color-text-main);' : 'color: var(--color-text-muted);'">
+          <span class="truncate text-xs" style="color: var(--color-text-muted);">
             {{ ws.name }}
           </span>
         </div>
         
         <button
-          v-if="!isWorkspaceDeleting(ws.id) && ws.id !== appStore.activeWorkspaceId"
+          v-if="!isWorkspaceDeleting(ws.id)"
           @click.stop="confirmDeleteWorkspace(ws.id)"
           class="btn-icon p-1 text-zinc-400 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0"
           title="Delete Workspace"
@@ -101,7 +102,6 @@ import ConfirmationModal from '../../modals/ConfirmationModal.vue'
 import { 
   RectangleGroupIcon, 
   PlusIcon,
-  CheckCircleIcon,
   TrashIcon
 } from '@heroicons/vue/24/outline'
 
@@ -118,6 +118,11 @@ const isCreateDialogOpen = ref(false)
 const isCreatingWorkspace = ref(false)
 const isDeleteDialogOpen = ref(false)
 const pendingDeleteWorkspaceId = ref('')
+const visibleWorkspaces = computed(() => {
+  const activeId = String(appStore.activeWorkspaceId || '').trim()
+  if (!activeId) return appStore.workspaces
+  return appStore.workspaces.filter((ws) => ws.id !== activeId)
+})
 
 async function selectWorkspace(id) {
   if (id === appStore.activeWorkspaceId) {

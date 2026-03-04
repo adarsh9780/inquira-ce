@@ -1,13 +1,7 @@
 <template>
-  <div class="flex h-full flex-col overflow-hidden rounded-lg border" style="background-color: var(--color-base); border-color: var(--color-border);">
+  <div class="flex h-full flex-col overflow-hidden">
     <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'output'">
-      <div class="flex items-center justify-end w-full">
-        <p class="text-xs hidden sm:block" style="color: var(--color-text-muted);">Execution timeline with logs, table artifacts, and chart artifacts</p>
-      </div>
-    </Teleport>
-
-    <div class="border-b px-4 py-2.5" style="border-color: var(--color-border); background-color: var(--color-surface);">
-      <div class="flex items-center justify-between gap-3">
+      <div class="flex w-full items-center gap-3">
         <div class="inline-flex items-center rounded-xl p-0.5" style="background-color: color-mix(in srgb, var(--color-border) 35%, transparent);">
           <button
             v-for="option in filterOptions"
@@ -20,18 +14,19 @@
             {{ option.label }}
           </button>
         </div>
-        <div class="text-xs tabular-nums" style="color: var(--color-text-muted);">
+        <div class="ml-auto text-xs tabular-nums" style="color: var(--color-text-muted);">
           {{ filteredEvents.length }} {{ filteredEvents.length === 1 ? 'event' : 'events' }}
         </div>
       </div>
-      <p
-        v-if="appStore.terminalEntriesTrimmedCount > 0"
-        class="mt-2 text-[11px]"
-        style="color: var(--color-text-muted);"
-      >
-        Older output entries were trimmed to keep memory usage stable.
-      </p>
-    </div>
+    </Teleport>
+
+    <p
+      v-if="appStore.terminalEntriesTrimmedCount > 0"
+      class="px-1 py-1 text-[11px]"
+      style="color: var(--color-text-muted);"
+    >
+      Older output entries were trimmed to keep memory usage stable.
+    </p>
 
     <div class="min-h-0 flex-1 overflow-hidden">
       <div v-if="filteredEvents.length === 0" class="flex h-full items-center justify-center text-center" style="color: var(--color-text-muted);">
@@ -41,82 +36,89 @@
         </div>
       </div>
 
-      <div v-else class="h-full flex flex-col lg:flex-row">
-        <aside
-          class="min-h-0 w-full overflow-y-auto border-b lg:w-[46%] lg:border-b-0 lg:border-r"
-          style="border-color: color-mix(in srgb, var(--color-border) 80%, transparent);"
+      <div v-else class="h-full overflow-y-auto pr-1">
+        <article
+          v-for="event in filteredEvents"
+          :key="event.id"
+          class="mb-2 overflow-hidden rounded-xl border"
+          style="border-color: color-mix(in srgb, var(--color-border) 85%, transparent); background-color: color-mix(in srgb, var(--color-surface) 70%, var(--color-base));"
         >
           <button
-            v-for="event in filteredEvents"
-            :key="event.id"
-            class="w-full px-4 py-3 text-left transition-colors border-b"
-            style="border-color: color-mix(in srgb, var(--color-border) 70%, transparent);"
-            :style="selectedEventId === event.id ? selectedTimelineStyle : defaultTimelineStyle"
-            @click="selectedEventId = event.id"
+            class="flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-black/[0.02]"
+            :style="isExpanded(event.id) ? 'background-color: color-mix(in srgb, var(--color-surface) 82%, transparent);' : ''"
+            @click="toggleExpanded(event.id)"
           >
-            <div class="flex items-center justify-between gap-3 text-[11px] uppercase tracking-wide" style="color: var(--color-text-muted);">
-              <span class="font-medium">{{ event.badgeLabel }}</span>
-              <span>{{ formatTimestamp(event.createdAt) }}</span>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 text-[11px] uppercase tracking-wide" style="color: var(--color-text-muted);">
+                <span class="inline-flex items-center gap-1.5">
+                  <ArrowPathIcon v-if="event.status === 'running'" class="h-3.5 w-3.5 animate-spin" style="color: var(--color-text-muted);" />
+                  <CheckCircleIcon v-else-if="event.status === 'success'" class="h-3.5 w-3.5" style="color: var(--color-success);" />
+                  <ExclamationTriangleIcon v-else-if="event.status === 'error'" class="h-3.5 w-3.5" style="color: #dc2626;" />
+                  <span>{{ event.badgeLabel }}</span>
+                </span>
+                <span>{{ formatTimestamp(event.createdAt) }}</span>
+              </div>
+              <p class="mt-1 truncate text-sm font-medium" style="color: var(--color-text-main);">{{ event.title }}</p>
+              <p v-if="event.meta" class="mt-1 text-xs" style="color: var(--color-text-muted);">{{ event.meta }}</p>
             </div>
-            <p class="mt-1 text-sm font-medium" style="color: var(--color-text-main);">{{ event.title }}</p>
-            <p v-if="event.preview" class="mt-1 text-xs break-words" style="color: var(--color-text-muted);">{{ event.preview }}</p>
+            <ChevronDownIcon
+              class="h-4 w-4 shrink-0 transition-transform"
+              :class="isExpanded(event.id) ? 'rotate-180' : ''"
+              style="color: var(--color-text-muted);"
+            />
           </button>
-        </aside>
 
-        <section class="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          <div v-if="selectedEvent">
-            <div class="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wide" style="color: var(--color-text-muted);">
-              <span>{{ selectedEvent.badgeLabel }}</span>
-              <span>{{ formatTimestamp(selectedEvent.createdAt) }}</span>
-            </div>
-            <h3 class="text-sm font-semibold" style="color: var(--color-text-main);">{{ selectedEvent.title }}</h3>
-
-            <template v-if="selectedEvent.type === 'log'">
+          <div v-if="isExpanded(event.id)" class="px-3 pb-3">
+            <template v-if="event.type === 'log'">
               <pre
-                v-if="selectedEvent.stdout"
-                class="mt-3 whitespace-pre-wrap break-words rounded-md px-3 py-2 text-xs font-mono leading-5"
-                style="color: var(--color-text-main); background-color: color-mix(in srgb, var(--color-surface) 70%, transparent);"
-              >{{ selectedEvent.stdout }}</pre>
+                v-if="event.stdout"
+                class="mt-1 whitespace-pre-wrap break-words rounded-md px-3 py-2 text-xs font-mono leading-5"
+                style="color: var(--color-text-main); background-color: color-mix(in srgb, var(--color-base) 85%, var(--color-surface));"
+              >{{ event.stdout }}</pre>
               <pre
-                v-if="selectedEvent.stderr"
-                class="mt-2 whitespace-pre-wrap break-words rounded-r-md border-l-2 bg-red-50/55 px-3 py-2 text-xs font-mono leading-5 text-red-700"
-                style="border-left-color: color-mix(in srgb, #ef4444 75%, var(--color-border));"
-              >{{ selectedEvent.stderr }}</pre>
+                v-if="event.stderr"
+                class="mt-2 whitespace-pre-wrap break-words rounded-md border px-3 py-2 text-xs font-mono leading-5"
+                style="color: #b42318; border-color: color-mix(in srgb, #fca5a5 70%, var(--color-border)); background-color: color-mix(in srgb, #fef2f2 75%, var(--color-base));"
+              >{{ event.stderr }}</pre>
+              <p
+                v-if="!event.stdout && !event.stderr"
+                class="mt-2 rounded-md px-3 py-2 text-xs"
+                style="color: var(--color-text-muted); background-color: color-mix(in srgb, var(--color-base) 85%, var(--color-surface));"
+              >
+                No output generated.
+              </p>
             </template>
 
-            <template v-else-if="selectedEvent.type === 'table'">
-              <div class="mt-3 rounded-md border px-3 py-2 text-xs" style="border-color: var(--color-border); color: var(--color-text-main);">
-                <p><strong>Rows:</strong> {{ formatCount(selectedEvent.rowCount) }}</p>
-                <p><strong>Columns:</strong> {{ formatCount(selectedEvent.columnCount) }}</p>
-                <p v-if="selectedEvent.artifactId"><strong>Artifact ID:</strong> {{ selectedEvent.artifactId }}</p>
+            <template v-else-if="event.type === 'table'">
+              <div class="mt-1 rounded-md px-3 py-2 text-xs" style="background-color: color-mix(in srgb, var(--color-base) 85%, var(--color-surface)); color: var(--color-text-main);">
+                <p>Rows: {{ formatCount(event.rowCount) }}</p>
+                <p>Columns: {{ formatCount(event.columnCount) }}</p>
+                <p v-if="event.artifactId">Artifact: {{ event.artifactId }}</p>
               </div>
               <button
-                class="mt-3 inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
+                class="mt-2 inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
                 style="border-color: var(--color-border); color: var(--color-text-main);"
-                @click="openTableInspector(selectedEvent)"
+                @click="openTableInspector(event)"
               >
                 Open in Table tab
               </button>
             </template>
 
-            <template v-else-if="selectedEvent.type === 'chart'">
-              <div class="mt-3 rounded-md border px-3 py-2 text-xs" style="border-color: var(--color-border); color: var(--color-text-main);">
-                <p v-if="selectedEvent.artifactId"><strong>Artifact ID:</strong> {{ selectedEvent.artifactId }}</p>
-                <p><strong>Status:</strong> Ready to inspect in the chart pane.</p>
+            <template v-else-if="event.type === 'chart'">
+              <div class="mt-1 rounded-md px-3 py-2 text-xs" style="background-color: color-mix(in srgb, var(--color-base) 85%, var(--color-surface)); color: var(--color-text-main);">
+                <p v-if="event.artifactId">Artifact: {{ event.artifactId }}</p>
+                <p>Ready to inspect in chart pane.</p>
               </div>
               <button
-                class="mt-3 inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
+                class="mt-2 inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
                 style="border-color: var(--color-border); color: var(--color-text-main);"
-                @click="openFigureInspector(selectedEvent)"
+                @click="openFigureInspector(event)"
               >
                 Open in Chart tab
               </button>
             </template>
           </div>
-          <div v-else class="h-full flex items-center justify-center text-xs text-center" style="color: var(--color-text-muted);">
-            Select an event to inspect details.
-          </div>
-        </section>
+        </article>
       </div>
     </div>
   </div>
@@ -125,11 +127,18 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
+import {
+  ArrowPathIcon,
+  CheckCircleIcon,
+  ChevronDownIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
 const isMounted = ref(false)
 const activeFilter = ref('all')
-const selectedEventId = ref('')
+const expandedEventIds = ref([])
+const lastAutoOpenedRunId = ref('')
 
 const filterOptions = [
   { value: 'all', label: 'All' },
@@ -143,8 +152,17 @@ onMounted(() => {
   isMounted.value = true
 })
 
-const defaultTimelineStyle = 'background-color: transparent;'
-const selectedTimelineStyle = 'background-color: color-mix(in srgb, var(--color-surface) 80%, transparent);'
+function normalizeStatus(status, fallback = 'success') {
+  const normalized = String(status || '').trim().toLowerCase()
+  if (['running', 'success', 'error'].includes(normalized)) return normalized
+  return fallback
+}
+
+function fallbackRunId(entry, index) {
+  const createdAt = String(entry?.createdAt || '').trim()
+  if (createdAt) return `legacy-${createdAt.slice(11, 19).replaceAll(':', '')}-${index + 1}`
+  return `legacy-${index + 1}`
+}
 
 const analysisLogEvents = computed(() => {
   const entries = Array.isArray(appStore.terminalEntries) ? appStore.terminalEntries : []
@@ -155,20 +173,22 @@ const analysisLogEvents = computed(() => {
     .map((entry, index) => {
       const stdout = String(entry?.stdout || '')
       const stderr = String(entry?.stderr || '')
-      const previewSource = stderr || stdout
-      const preview = previewSource ? previewSource.slice(0, 180) : ''
-      const severity = stderr.trim() ? 'error' : 'log'
+      const status = normalizeStatus(entry?.status, stderr.trim() ? 'error' : 'success')
+      const runId = String(entry?.runId || '').trim() || fallbackRunId(entry, index)
+      const durationMs = Number(entry?.durationMs)
+      const hasDuration = Number.isFinite(durationMs) && durationMs >= 0
       return {
-        id: `log:${String(entry?.createdAt || '')}:${index}`,
+        id: String(entry?.id || `log:${String(entry?.createdAt || '')}:${index}`),
         type: 'log',
-        badgeLabel: severity === 'error' ? 'stderr' : 'stdout',
-        title: String(entry?.label || 'Python output'),
-        preview,
+        badgeLabel: status,
+        title: `Run ${runId}`,
+        meta: hasDuration ? `${(durationMs / 1000).toFixed(2)}s` : '',
         stdout,
         stderr,
+        status,
+        runId,
         createdAt: String(entry?.createdAt || ''),
         sequence: 100000 - index,
-        severity,
       }
     })
 })
@@ -185,11 +205,12 @@ const tableEvents = computed(() => {
       id: `table:${artifactId || tableName}:${index}`,
       type: 'table',
       badgeLabel: 'table',
-      title: `Table: ${tableName}`,
-      preview: `${formatCount(rowCount)} rows, ${formatCount(columnCount)} columns`,
+      title: tableName,
+      meta: `${formatCount(rowCount)} rows, ${formatCount(columnCount)} columns`,
       rowCount,
       columnCount,
       artifactId,
+      status: 'success',
       createdAt: String(item?.createdAt || item?.created_at || payload?.created_at || ''),
       sequence: 50000 - index,
     }
@@ -205,9 +226,10 @@ const chartEvents = computed(() => {
       id: `chart:${artifactId || chartName}:${index}`,
       type: 'chart',
       badgeLabel: 'chart',
-      title: `Chart: ${chartName}`,
-      preview: 'Interactive chart artifact',
+      title: chartName,
+      meta: artifactId ? `artifact ${artifactId}` : 'chart artifact',
       artifactId,
+      status: 'success',
       createdAt: String(item?.createdAt || item?.created_at || item?.data?.created_at || ''),
       sequence: 40000 - index,
     }
@@ -238,7 +260,7 @@ const filteredEvents = computed(() => {
     return timelineEvents.value.filter((event) => event.type === 'log')
   }
   if (activeFilter.value === 'errors') {
-    return timelineEvents.value.filter((event) => event.type === 'log' && event.severity === 'error')
+    return timelineEvents.value.filter((event) => event.type === 'log' && event.status === 'error')
   }
   if (activeFilter.value === 'tables') {
     return timelineEvents.value.filter((event) => event.type === 'table')
@@ -249,21 +271,39 @@ const filteredEvents = computed(() => {
   return timelineEvents.value
 })
 
-const selectedEvent = computed(() => {
-  if (!selectedEventId.value) return filteredEvents.value[0] || null
-  return filteredEvents.value.find((event) => event.id === selectedEventId.value) || null
-})
-
 watch(filteredEvents, (events) => {
-  if (!Array.isArray(events) || events.length === 0) {
-    selectedEventId.value = ''
-    return
-  }
-  const exists = events.some((event) => event.id === selectedEventId.value)
-  if (!exists) {
-    selectedEventId.value = events[0].id
+  const visibleIds = new Set(events.map((event) => event.id))
+  expandedEventIds.value = expandedEventIds.value.filter((id) => visibleIds.has(id))
+  if (events.length > 0 && expandedEventIds.value.length === 0) {
+    expandedEventIds.value = [events[0].id]
   }
 }, { immediate: true })
+
+watch(analysisLogEvents, (events) => {
+  const newest = events[0]
+  if (!newest || newest.type !== 'log') return
+  const runId = String(newest.runId || '').trim()
+  if (!runId || runId === lastAutoOpenedRunId.value) return
+
+  lastAutoOpenedRunId.value = runId
+  activeFilter.value = 'all'
+  expandedEventIds.value = [
+    newest.id,
+    ...expandedEventIds.value.filter((id) => id !== newest.id),
+  ]
+}, { immediate: true })
+
+function isExpanded(eventId) {
+  return expandedEventIds.value.includes(eventId)
+}
+
+function toggleExpanded(eventId) {
+  if (isExpanded(eventId)) {
+    expandedEventIds.value = expandedEventIds.value.filter((id) => id !== eventId)
+    return
+  }
+  expandedEventIds.value = [...expandedEventIds.value, eventId]
+}
 
 function formatCount(value) {
   const n = Number(value || 0)

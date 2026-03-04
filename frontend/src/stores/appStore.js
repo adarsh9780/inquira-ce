@@ -112,7 +112,7 @@ export const useAppStore = defineStore('app', () => {
   let kernelEnsureWorkspaceId = ''
   let kernelEnsurePromise = null
   const LOCAL_SNAPSHOT_VERSION = 1
-  const MAX_TERMINAL_ENTRIES = 400
+  const MAX_TERMINAL_ENTRIES = 50
   const MAX_TERMINAL_STREAM_CHARS = 200000
   const MAX_TERMINAL_TOTAL_CHARS = 2000000
 
@@ -1069,6 +1069,12 @@ export const useAppStore = defineStore('app', () => {
     return `${normalized.slice(0, maxChars)}\n[truncated ${droppedChars} chars]`
   }
 
+  function normalizeTerminalEntryStatus(status) {
+    const normalized = String(status || '').trim().toLowerCase()
+    if (['running', 'success', 'error'].includes(normalized)) return normalized
+    return 'success'
+  }
+
   function terminalEntryCharSize(entry) {
     if (!entry || typeof entry !== 'object') return 0
     return (
@@ -1104,7 +1110,8 @@ export const useAppStore = defineStore('app', () => {
     const kind = entry.kind === 'output' ? 'output' : 'command'
     const stdout = trimTerminalStream(entry.stdout)
     const stderr = trimTerminalStream(entry.stderr)
-    terminalEntries.value.push({
+    const normalizedEntry = {
+      id: String(entry.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
       kind,
       source: String(entry.source || (kind === 'output' ? 'analysis' : 'terminal')),
       label: String(entry.label || (kind === 'output' ? 'Python output' : '')),
@@ -1112,9 +1119,64 @@ export const useAppStore = defineStore('app', () => {
       stdout,
       stderr,
       exitCode: Number.isInteger(entry.exitCode) ? entry.exitCode : 0,
+      runId: String(entry.runId || ''),
+      status: normalizeTerminalEntryStatus(
+        entry.status || (kind === 'output' ? (stderr.trim() ? 'error' : 'success') : 'success')
+      ),
+      durationMs: Number.isFinite(Number(entry.durationMs)) ? Math.max(0, Number(entry.durationMs)) : null,
       createdAt: entry.createdAt || new Date().toISOString(),
-    })
+      updatedAt: entry.updatedAt || new Date().toISOString(),
+    }
+    terminalEntries.value.push(normalizedEntry)
     enforceTerminalEntryLimits()
+    return normalizedEntry.id
+  }
+
+  function updateTerminalEntry(entryId, patch = {}) {
+    const targetId = String(entryId || '').trim()
+    if (!targetId || !patch || typeof patch !== 'object') return false
+    const index = terminalEntries.value.findIndex((item) => String(item?.id || '') === targetId)
+    if (index < 0) return false
+
+    const current = terminalEntries.value[index] || {}
+    const kind = patch.kind === 'output'
+      ? 'output'
+      : (patch.kind === 'command' ? 'command' : (current.kind === 'output' ? 'output' : 'command'))
+
+    const stdout = patch.stdout !== undefined
+      ? trimTerminalStream(patch.stdout)
+      : String(current.stdout || '')
+    const stderr = patch.stderr !== undefined
+      ? trimTerminalStream(patch.stderr)
+      : String(current.stderr || '')
+
+    terminalEntries.value[index] = {
+      ...current,
+      kind,
+      source: patch.source !== undefined
+        ? String(patch.source || (kind === 'output' ? 'analysis' : 'terminal'))
+        : String(current.source || (kind === 'output' ? 'analysis' : 'terminal')),
+      label: patch.label !== undefined
+        ? String(patch.label || (kind === 'output' ? 'Run output' : ''))
+        : String(current.label || (kind === 'output' ? 'Run output' : '')),
+      command: patch.command !== undefined ? String(patch.command || '') : String(current.command || ''),
+      stdout,
+      stderr,
+      exitCode: Number.isInteger(patch.exitCode)
+        ? patch.exitCode
+        : (Number.isInteger(current.exitCode) ? current.exitCode : 0),
+      runId: patch.runId !== undefined ? String(patch.runId || '') : String(current.runId || ''),
+      status: patch.status !== undefined
+        ? normalizeTerminalEntryStatus(patch.status)
+        : normalizeTerminalEntryStatus(current.status || (stderr.trim() ? 'error' : 'success')),
+      durationMs: patch.durationMs !== undefined
+        ? (Number.isFinite(Number(patch.durationMs)) ? Math.max(0, Number(patch.durationMs)) : null)
+        : (Number.isFinite(Number(current.durationMs)) ? Math.max(0, Number(current.durationMs)) : null),
+      createdAt: patch.createdAt || current.createdAt || new Date().toISOString(),
+      updatedAt: patch.updatedAt || new Date().toISOString(),
+    }
+    enforceTerminalEntryLimits()
+    return true
   }
 
   function clearTerminalEntries() {
@@ -1445,6 +1507,7 @@ export const useAppStore = defineStore('app', () => {
     setTerminalEnabled,
     setRuntimeError,
     appendTerminalEntry,
+    updateTerminalEntry,
     clearTerminalEntries,
     setActiveTab,
     setWorkspacePane,

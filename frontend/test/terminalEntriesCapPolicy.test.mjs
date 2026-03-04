@@ -7,7 +7,7 @@ test('app store caps and trims terminal entries to bound memory usage', () => {
   const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
   const source = readFileSync(storePath, 'utf-8')
 
-  assert.equal(source.includes('const MAX_TERMINAL_ENTRIES = 400'), true)
+  assert.equal(source.includes('const MAX_TERMINAL_ENTRIES = 50'), true)
   assert.equal(source.includes('const MAX_TERMINAL_STREAM_CHARS = 200000'), true)
   assert.equal(source.includes('const MAX_TERMINAL_TOTAL_CHARS = 2000000'), true)
   assert.equal(source.includes('const terminalEntriesTrimmedCount = ref(0)'), true)
@@ -17,4 +17,7 @@ test('app store caps and trims terminal entries to bound memory usage', () => {
   assert.equal(source.includes('while (totalChars > MAX_TERMINAL_TOTAL_CHARS && terminalEntries.value.length > 1)'), true)
   assert.equal(source.includes('terminalEntriesTrimmedCount.value += trimmed'), true)
   assert.equal(source.includes('enforceTerminalEntryLimits()'), true)
+  assert.equal(source.includes('function updateTerminalEntry(entryId, patch = {}) {'), true)
+  assert.equal(source.includes('runId: String(entry.runId || \'\')'), true)
+  assert.equal(source.includes('status: normalizeTerminalEntryStatus('), true)
 })

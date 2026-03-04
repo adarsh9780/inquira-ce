@@ -131,6 +131,7 @@ const isGeneratingCode = ref(false)
 const databasePaths = ref(null)
 const settingsInfo = ref(null)
 const isMounted = ref(false)
+let lastRunBlockedToastAt = 0
 
 let editor = null
 let isUpdatingFromStore = false
@@ -271,9 +272,20 @@ async function syncTableNameInCode(silent = false) {
   }
 }
 
-const canRunCode = computed(() => appStore.pythonFileContent.trim() && !isRunning.value)
+const canRunCode = computed(() => appStore.pythonFileContent.trim() && !isRunning.value && !appStore.isCodeRunning)
 const canUndo = computed(() => editor && editor.state && editor.state.undoDepth > 0)
 const canRedo = computed(() => editor && editor.state && editor.state.redoDepth > 0)
+
+function executionInProgress() {
+  return isRunning.value || appStore.isCodeRunning
+}
+
+function notifyExecutionInProgress() {
+  const now = Date.now()
+  if (now - lastRunBlockedToastAt < 1500) return
+  lastRunBlockedToastAt = now
+  toast.warning('Execution in progress', 'Please wait for the current run to finish.')
+}
 
 function getSelectedSnippet() {
   if (!editor || !editor.state) return ''
@@ -289,7 +301,35 @@ function getSelectedSnippet() {
   return snippets.join('\n\n')
 }
 
-async function executeSnippet(code, successLine) {
+function createRunId() {
+  const ts = Date.now().toString(36)
+  const rand = Math.random().toString(36).slice(2, 7)
+  return `run_${ts}_${rand}`
+}
+
+function startRunEntry(scopeLabel) {
+  const runId = createRunId()
+  const entryId = appStore.appendTerminalEntry({
+    kind: 'output',
+    source: 'analysis',
+    label: scopeLabel,
+    runId,
+    status: 'running',
+    stdout: '',
+    stderr: '',
+    exitCode: 0,
+  })
+  return {
+    entryId,
+    runId,
+    startedAtMs: performance.now(),
+  }
+}
+
+async function executeSnippet(code, successLine, options = {}) {
+  const preferOutputPane = options?.preferOutputPane === true
+  const runEntryId = String(options?.runEntryId || '').trim()
+  const runId = String(options?.runId || '').trim()
   const start = performance.now()
   const pyResponse = await executionService.executePython(code)
   const execTime = (performance.now() - start) / 1000
@@ -320,21 +360,38 @@ async function executeSnippet(code, successLine) {
 
   const outputStdout = String(normalized?.stdout || '')
   const outputStderr = String(normalized?.stderr || normalized?.error || '')
-  if (outputStdout || outputStderr) {
+  const status = normalized?.error ? 'error' : 'success'
+  const runEntryPayload = {
+    kind: 'output',
+    source: 'analysis',
+    label: 'Run output',
+    runId,
+    status,
+    stdout: outputStdout,
+    stderr: outputStderr,
+    exitCode: normalized?.error ? 1 : 0,
+    durationMs: Math.round(execTime * 1000),
+  }
+  if (runEntryId) {
+    appStore.updateTerminalEntry(runEntryId, runEntryPayload)
+  } else {
     appStore.appendTerminalEntry({
       kind: 'output',
       source: 'analysis',
-      label: 'Python output',
-      stdout: outputStdout,
-      stderr: outputStderr,
-      exitCode: normalized?.error ? 1 : 0,
+      ...runEntryPayload,
     })
   }
 
   if (normalized?.error) {
     appStore.setTerminalOutput(viewModel.output)
     appStore.setActiveTab('output')
-    return
+    return {
+      ok: false,
+      execTime,
+      hasDataframes: false,
+      hasFigures: false,
+      hasConsoleOutput: Boolean(outputStdout || outputStderr),
+    }
   }
 
   const preferred = resolvePreferredArtifactNames(viewModel, normalized)
@@ -356,25 +413,51 @@ async function executeSnippet(code, successLine) {
     dataframeNames: orderedViewModel.dataframes.map((df) => String(df?.name || '')),
     figureNames: orderedViewModel.figures.map((fig) => String(fig?.name || '')),
   })
-  if (targetTab) {
+  if (preferOutputPane) {
+    appStore.setActiveTab('output')
+  } else if (targetTab) {
     appStore.setActiveTab(targetTab)
   } else if (outputStdout || outputStderr) {
     appStore.setActiveTab('output')
+  } else {
+    appStore.setActiveTab('output')
   }
   appStore.setTerminalOutput(viewModel.output)
+  return {
+    ok: true,
+    execTime,
+    hasDataframes: orderedViewModel.dataframes.length > 0,
+    hasFigures: orderedViewModel.figures.length > 0,
+    hasConsoleOutput: Boolean(outputStdout || outputStderr),
+  }
 }
 
 async function runCode() {
-  if (!canRunCode.value) return
+  if (!canRunCode.value) {
+    if (executionInProgress()) notifyExecutionInProgress()
+    return
+  }
   isRunning.value = true
   appStore.setCodeRunning(true)
+  appStore.setActiveTab('output')
   appStore.setTerminalOutput('Running code...')
+  const runMeta = startRunEntry('Code run')
   try {
-    await executeSnippet(appStore.pythonFileContent, 'Code executed successfully!')
+    await executeSnippet(appStore.pythonFileContent, 'Code executed successfully!', {
+      runEntryId: runMeta.entryId,
+      runId: runMeta.runId,
+    })
   } catch (error) {
     const errorMessage = error.response?.data?.detail || error.message || 'Code execution failed'
     appStore.setTerminalOutput(`Error: ${errorMessage}`)
-    toast.error('Execution Failed', errorMessage)
+    appStore.updateTerminalEntry(runMeta.entryId, {
+      status: 'error',
+      runId: runMeta.runId,
+      stdout: '',
+      stderr: errorMessage,
+      exitCode: 1,
+      durationMs: Math.round(performance.now() - runMeta.startedAtMs),
+    })
   } finally {
     isRunning.value = false
     appStore.setCodeRunning(false)
@@ -382,7 +465,10 @@ async function runCode() {
 }
 
 async function runSelectedCode() {
-  if (isRunning.value) return
+  if (executionInProgress()) {
+    notifyExecutionInProgress()
+    return
+  }
   const selectedCode = getSelectedSnippet()
   if (!selectedCode) {
     toast.info('No selected code or non-empty current line to run.')
@@ -391,14 +477,31 @@ async function runSelectedCode() {
 
   isRunning.value = true
   appStore.setCodeRunning(true)
+  appStore.setActiveTab('output')
   appStore.setTerminalOutput('Running selected code...')
+  const runMeta = startRunEntry('Selection run')
 
   try {
-    await executeSnippet(selectedCode, 'Selected code executed successfully!')
+    await executeSnippet(
+      selectedCode,
+      'Selected code executed successfully!',
+      {
+        preferOutputPane: true,
+        runEntryId: runMeta.entryId,
+        runId: runMeta.runId,
+      },
+    )
   } catch (error) {
     const errorMessage = error.response?.data?.detail || error.message || 'Code execution failed'
     appStore.setTerminalOutput(`Error: ${errorMessage}`)
-    toast.error('Execution Failed', errorMessage)
+    appStore.updateTerminalEntry(runMeta.entryId, {
+      status: 'error',
+      runId: runMeta.runId,
+      stdout: '',
+      stderr: errorMessage,
+      exitCode: 1,
+      durationMs: Math.round(performance.now() - runMeta.startedAtMs),
+    })
   } finally {
     isRunning.value = false
     appStore.setCodeRunning(false)

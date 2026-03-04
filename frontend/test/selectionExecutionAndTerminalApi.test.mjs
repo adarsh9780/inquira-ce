@@ -12,6 +12,14 @@ test('code tab binds Shift+Enter to selected code execution', () => {
   assert.equal(source.includes('getSelectedSnippet()'), true)
   assert.equal(source.includes('if (!range.empty)'), true)
   assert.equal(source.includes('editor.state.doc.lineAt(range.head)'), true)
+  assert.equal(source.includes('preferOutputPane: true'), true)
+  assert.equal(source.includes("appStore.setActiveTab('output')"), true)
+  assert.equal(source.includes('function startRunEntry(scopeLabel) {'), true)
+  assert.equal(source.includes("status: 'running'"), true)
+  assert.equal(source.includes('appStore.updateTerminalEntry(runMeta.entryId, {'), true)
+  assert.equal(source.includes("toast.success('Selection Complete'"), false)
+  assert.equal(source.includes("toast.success('Execution Complete'"), false)
+  assert.equal(source.includes("toast.warning('Execution in progress'"), true)
 })
 
 test('api service exposes workspace terminal execute endpoint', () => {

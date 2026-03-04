@@ -40,7 +40,7 @@
           style="border-color: color-mix(in srgb, var(--color-border) 80%, transparent); background-color: color-mix(in srgb, var(--color-surface) 55%, var(--color-base));"
         >
           <div class="flex items-center gap-2 px-3 py-2 border-b" style="border-color: color-mix(in srgb, var(--color-border) 80%, transparent);">
-            <FolderOpenIcon class="w-4 h-4" style="color: var(--color-text-muted);" />
+            <CheckCircleIcon class="w-4 h-4" style="color: var(--color-success);" />
             <span class="text-xs font-semibold truncate" style="color: var(--color-text-main);">{{ activeWorkspaceName }}</span>
           </div>
           <div class="py-1">
@@ -58,7 +58,7 @@
           </div>
         </div>
 
-        <template v-else>
+        <template v-else-if="!appStore.isSidebarCollapsed">
           <SidebarDatasets 
             :is-collapsed="appStore.isSidebarCollapsed"
             @header-click="handleExplorerHeaderClick"
@@ -202,7 +202,7 @@ import logo from '../../assets/favicon.svg'
 
 import {
   DocumentTextIcon,
-  FolderOpenIcon,
+  CheckCircleIcon,
   CogIcon,
   ArrowRightOnRectangleIcon,
   ChevronUpIcon
@@ -242,12 +242,10 @@ function handleExplorerHeaderClick() {
 
 function handleWorkspaceSelect() {
   appStore.setActiveTab('workspace')
-  appStore.setSidebarCollapsed(true)
 }
 
 function handleDatasetSelect() {
   appStore.setActiveTab('workspace')
-  appStore.setSidebarCollapsed(true)
 }
 
 function handleConversationSelect() {
