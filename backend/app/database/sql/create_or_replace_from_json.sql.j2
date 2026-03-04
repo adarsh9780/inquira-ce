@@ -1,3 +1,0 @@
-CREATE OR REPLACE TABLE {{ table_name | sql_ident }} AS
-SELECT * FROM read_json_auto('{{ file_path | sql_quote }}')
-
