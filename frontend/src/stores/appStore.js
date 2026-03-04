@@ -66,6 +66,7 @@ export const useAppStore = defineStore('app', () => {
   const figureCount = ref(0)
   const terminalOutput = ref('')
   const terminalEntries = ref([])
+  const terminalEntriesTrimmedCount = ref(0)
   const terminalEnabled = ref(false)
   const runtimeError = ref('')
   const activeTab = ref('workspace')
@@ -111,6 +112,9 @@ export const useAppStore = defineStore('app', () => {
   let kernelEnsureWorkspaceId = ''
   let kernelEnsurePromise = null
   const LOCAL_SNAPSHOT_VERSION = 1
+  const MAX_TERMINAL_ENTRIES = 400
+  const MAX_TERMINAL_STREAM_CHARS = 200000
+  const MAX_TERMINAL_TOTAL_CHARS = 2000000
 
   function resolveSnapshotUserId(explicitUserId = null) {
     const candidate = String(explicitUserId ?? authStore.userId ?? '').trim()
@@ -342,6 +346,7 @@ export const useAppStore = defineStore('app', () => {
     dataPaneError.value = ''
     terminalOutput.value = ''
     terminalEntries.value = []
+    terminalEntriesTrimmedCount.value = 0
     terminalEnabled.value = false
     runtimeError.value = ''
     terminalConsentGranted.value = false
@@ -1057,23 +1062,64 @@ export const useAppStore = defineStore('app', () => {
     runtimeError.value = String(message || '')
   }
 
+  function trimTerminalStream(text, maxChars = MAX_TERMINAL_STREAM_CHARS) {
+    const normalized = String(text || '')
+    if (normalized.length <= maxChars) return normalized
+    const droppedChars = normalized.length - maxChars
+    return `${normalized.slice(0, maxChars)}\n[truncated ${droppedChars} chars]`
+  }
+
+  function terminalEntryCharSize(entry) {
+    if (!entry || typeof entry !== 'object') return 0
+    return (
+      String(entry.command || '').length +
+      String(entry.stdout || '').length +
+      String(entry.stderr || '').length +
+      String(entry.label || '').length +
+      32
+    )
+  }
+
+  function enforceTerminalEntryLimits() {
+    let trimmed = 0
+    while (terminalEntries.value.length > MAX_TERMINAL_ENTRIES) {
+      terminalEntries.value.shift()
+      trimmed += 1
+    }
+
+    let totalChars = terminalEntries.value.reduce((sum, item) => sum + terminalEntryCharSize(item), 0)
+    while (totalChars > MAX_TERMINAL_TOTAL_CHARS && terminalEntries.value.length > 1) {
+      const removed = terminalEntries.value.shift()
+      totalChars -= terminalEntryCharSize(removed)
+      trimmed += 1
+    }
+
+    if (trimmed > 0) {
+      terminalEntriesTrimmedCount.value += trimmed
+    }
+  }
+
   function appendTerminalEntry(entry) {
     if (!entry || typeof entry !== 'object') return
     const kind = entry.kind === 'output' ? 'output' : 'command'
+    const stdout = trimTerminalStream(entry.stdout)
+    const stderr = trimTerminalStream(entry.stderr)
     terminalEntries.value.push({
       kind,
       source: String(entry.source || (kind === 'output' ? 'analysis' : 'terminal')),
       label: String(entry.label || (kind === 'output' ? 'Python output' : '')),
       command: String(entry.command || ''),
-      stdout: String(entry.stdout || ''),
-      stderr: String(entry.stderr || ''),
+      stdout,
+      stderr,
       exitCode: Number.isInteger(entry.exitCode) ? entry.exitCode : 0,
       createdAt: entry.createdAt || new Date().toISOString(),
     })
+    enforceTerminalEntryLimits()
   }
 
   function clearTerminalEntries() {
     terminalEntries.value = []
+    terminalEntriesTrimmedCount.value = 0
   }
 
   function setActiveTab(tab) {
@@ -1188,6 +1234,7 @@ export const useAppStore = defineStore('app', () => {
     plotlyFigure.value = null
     terminalOutput.value = ''
     terminalEntries.value = []
+    terminalEntriesTrimmedCount.value = 0
     terminalEnabled.value = false
     runtimeError.value = ''
     tableRowCount.value = 0
@@ -1311,6 +1358,7 @@ export const useAppStore = defineStore('app', () => {
     figureCount,
     terminalOutput,
     terminalEntries,
+    terminalEntriesTrimmedCount,
     terminalEnabled,
     runtimeError,
     activeTab,

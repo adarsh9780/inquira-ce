@@ -52,13 +52,13 @@
     </div>
 
     <div class="min-h-0 flex-1 p-3 sm:p-4 pb-0" style="background-color: var(--color-base);">
-      <div v-show="appStore.dataPane === 'table'" class="h-full">
+      <div v-if="appStore.dataPane === 'table'" class="h-full">
         <TableTab />
       </div>
-      <div v-show="appStore.dataPane === 'figure'" class="h-full">
+      <div v-else-if="appStore.dataPane === 'figure'" class="h-full">
         <FigureTab />
       </div>
-      <div v-show="appStore.dataPane === 'output'" class="h-full">
+      <div v-else class="h-full">
         <OutputTab />
       </div>
     </div>

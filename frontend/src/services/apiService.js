@@ -204,13 +204,6 @@ export const apiService = {
     }
   },
 
-  async setDataPath(dataPath) {
-    const { useAppStore } = await import('../stores/appStore')
-    const appStore = useAppStore()
-    appStore.setDataFilePath(dataPath || '')
-    return { detail: 'Data path saved.' }
-  },
-
   async setContext(context) {
     const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
@@ -533,72 +526,6 @@ export const apiService = {
       const response = await client.openFileDialogSystemOpenFileDialogPost()
       return response
     } catch (error) {
-      throw error
-    }
-  },
-
-  // Dataset management
-  async listDatasets() {
-    try {
-      const response = await client.listUserDatasetsDatasetsListGet()
-      console.debug('📋 [API] Datasets loaded:', response)
-      return response
-    } catch (error) {
-      console.error('Failed to list datasets:', error)
-      return []
-    }
-  },
-
-  async setDataPathSimple(dataPath) {
-    const { useAppStore } = await import('../stores/appStore')
-    const appStore = useAppStore()
-    appStore.setDataFilePath(dataPath || '')
-    return { detail: 'Data path saved locally.' }
-  },
-
-  async checkDatasetHealth(tableName) {
-    try {
-      const response = await client.checkDatasetHealthDatasetsHealthTableNameGet(tableName)
-      return response
-    } catch (error) {
-      console.error('Failed to check dataset health:', error)
-      throw error
-    }
-  },
-
-  async deleteDataset(tableName) {
-    try {
-      // Use direct axios call to avoid issues with generated client update
-      const response = await axios.delete(`/datasets/${tableName}`)
-      return response
-    } catch (error) {
-      console.error('Failed to delete dataset:', error)
-      throw error
-    }
-  },
-
-  async refreshDataset(tableName, regenerateSchema = true) {
-    try {
-      console.debug(`🔄 [API] Refreshing dataset: ${tableName}`)
-      const response = await axios.post(`/datasets/${tableName}/refresh`, {
-        regenerate_schema: regenerateSchema
-      })
-      console.debug('✅ [API] Dataset refreshed:', response)
-      return response
-    } catch (error) {
-      console.error('Failed to refresh dataset:', error)
-      throw error
-    }
-  },
-
-  async downloadDatasetBlob(tableName) {
-    try {
-      const response = await axios.get(`/datasets/${tableName}/download`, {
-        responseType: 'blob'
-      })
-      return response
-    } catch (error) {
-      console.error('Failed to download dataset blob:', error)
       throw error
     }
   },
