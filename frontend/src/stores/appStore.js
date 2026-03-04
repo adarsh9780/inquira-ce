@@ -57,7 +57,6 @@ export const useAppStore = defineStore('app', () => {
   const plotlyFigure = ref(null)
   const dataframes = ref([])
   const figures = ref([])
-  const scalars = ref([])
   const dataframeCount = ref(0)
   const tableRowCount = ref(0)
   const tableWindowStart = ref(0)
@@ -71,7 +70,7 @@ export const useAppStore = defineStore('app', () => {
   const runtimeError = ref('')
   const activeTab = ref('workspace')
   const workspacePane = ref('code') // 'code' | 'chat'
-  const dataPane = ref('table') // 'table' | 'figure' | 'varex'
+  const dataPane = ref('table') // 'table' | 'figure' | 'output'
   const leftPaneWidth = ref(50) // percentage
   const terminalConsentGranted = ref(false)
   const isTerminalOpen = ref(false)
@@ -177,7 +176,7 @@ export const useAppStore = defineStore('app', () => {
       workspacePane.value = ui.workspace_pane === 'chat' ? 'chat' : 'code'
     }
     if (typeof ui.data_pane === 'string' && ui.data_pane.trim()) {
-      dataPane.value = ['table', 'figure', 'varex'].includes(ui.data_pane) ? ui.data_pane : 'table'
+      dataPane.value = ['table', 'figure', 'output'].includes(ui.data_pane) ? ui.data_pane : 'table'
     }
     if (typeof ui.left_pane_width === 'number' && ui.left_pane_width > 10 && ui.left_pane_width < 90) {
       leftPaneWidth.value = ui.left_pane_width
@@ -334,7 +333,6 @@ export const useAppStore = defineStore('app', () => {
     plotlyFigure.value = null
     dataframes.value = []
     figures.value = []
-    scalars.value = []
     dataframeCount.value = 0
     figureCount.value = 0
     tableRowCount.value = 0
@@ -707,10 +705,8 @@ export const useAppStore = defineStore('app', () => {
   function rehydrateArtifactsFromChatHistory() {
     const dataframeArtifacts = []
     const figureArtifacts = []
-    const scalarArtifacts = []
     const seenDataframes = new Set()
     const seenFigures = new Set()
-    const seenScalars = new Set()
 
     for (const message of chatHistory.value) {
       const toolEvents = Array.isArray(message?.toolEvents) ? message.toolEvents : []
@@ -755,20 +751,11 @@ export const useAppStore = defineStore('app', () => {
           continue
         }
 
-        if (kind === 'scalar') {
-          if (seenScalars.has(dedupeKey)) continue
-          seenScalars.add(dedupeKey)
-          scalarArtifacts.push({
-            name: logicalName || 'scalar',
-            value: artifact?.payload?.value
-          })
-        }
       }
     }
 
     setDataframes(dataframeArtifacts)
     setFigures(figureArtifacts)
-    setScalars(scalarArtifacts)
   }
 
   async function fetchWorkspaces() {
@@ -857,7 +844,6 @@ export const useAppStore = defineStore('app', () => {
     if (reset && turns.length === 0) {
       setDataframes([])
       setFigures([])
-      setScalars([])
     }
     turnsNextCursor.value = response?.next_cursor || null
   }
@@ -1000,10 +986,6 @@ export const useAppStore = defineStore('app', () => {
     figureCount.value = figures.value.length
   }
 
-  function setScalars(scs) {
-    scalars.value = Array.isArray(scs) ? scs : []
-  }
-
   function setDataframeCount(count) {
     dataframeCount.value = Number(count || 0)
   }
@@ -1098,7 +1080,7 @@ export const useAppStore = defineStore('app', () => {
     } else if (normalized === 'chat') {
       activeTab.value = 'workspace'
       workspacePane.value = 'chat'
-    } else if (['table', 'figure', 'varex'].includes(normalized)) {
+    } else if (['table', 'figure', 'output'].includes(normalized)) {
       // Route data-related tabs to the right pane instead of a full-screen view
       activeTab.value = 'workspace'
       dataPane.value = normalized
@@ -1119,7 +1101,8 @@ export const useAppStore = defineStore('app', () => {
     saveLocalConfig()
   }
   function setDataPane(pane) {
-    dataPane.value = ['table', 'figure', 'varex'].includes(pane) ? pane : 'table'
+    const normalizedPane = String(pane || '').trim().toLowerCase()
+    dataPane.value = ['table', 'figure', 'output'].includes(normalizedPane) ? normalizedPane : 'table'
     activeTab.value = 'workspace'
     saveLocalConfig()
   }
@@ -1315,7 +1298,6 @@ export const useAppStore = defineStore('app', () => {
     plotlyFigure,
     dataframes,
     figures,
-    scalars,
     dataframeCount,
     tableRowCount,
     tableWindowStart,
@@ -1399,7 +1381,6 @@ export const useAppStore = defineStore('app', () => {
     setPlotlyFigure,
     setDataframes,
     setFigures,
-    setScalars,
     setDataframeCount,
     setTableViewport,
     clearTableViewport,

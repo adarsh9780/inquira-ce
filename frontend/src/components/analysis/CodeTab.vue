@@ -151,8 +151,6 @@ function applyExecutionArtifactsToStore(viewModel) {
   if (viewModel.figures.length > 0) {
     appStore.setPlotlyFigure(viewModel.figures[0].data)
   }
-
-  appStore.setScalars(viewModel.scalars)
 }
 
 async function fetchDatabasePaths() {
@@ -335,7 +333,7 @@ async function executeSnippet(code, successLine) {
 
   if (normalized?.error) {
     appStore.setTerminalOutput(viewModel.output)
-    appStore.setActiveTab('terminal')
+    appStore.setActiveTab('output')
     return
   }
 
@@ -358,7 +356,11 @@ async function executeSnippet(code, successLine) {
     dataframeNames: orderedViewModel.dataframes.map((df) => String(df?.name || '')),
     figureNames: orderedViewModel.figures.map((fig) => String(fig?.name || '')),
   })
-  if (targetTab) appStore.setActiveTab(targetTab)
+  if (targetTab) {
+    appStore.setActiveTab(targetTab)
+  } else if (outputStdout || outputStderr) {
+    appStore.setActiveTab('output')
+  }
   appStore.setTerminalOutput(viewModel.output)
 }
 

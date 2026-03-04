@@ -181,7 +181,6 @@ async function selectDataset(ds) {
     appStore.setPlotlyFigure(null)
     appStore.setDataframes([])
     appStore.setFigures([])
-    appStore.setScalars([])
     appStore.setTerminalOutput('')
     
     // Emit custom event for other components (e.g., SchemaEditorTab) to refresh
