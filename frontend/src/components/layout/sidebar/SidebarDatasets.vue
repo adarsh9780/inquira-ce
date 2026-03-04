@@ -161,7 +161,6 @@ async function selectDataset(ds) {
     appStore.setPlotlyFigure(null)
     appStore.setDataframes([])
     appStore.setFigures([])
-    appStore.setScalars([])
     appStore.setTerminalOutput('')
     
     window.dispatchEvent(new CustomEvent('dataset-switched', { 

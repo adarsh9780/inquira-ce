@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import duckdb
 from jupyter_client import AsyncKernelManager
 
 from app.services.jupyter_message_parser import (
@@ -588,6 +589,7 @@ class WorkspaceKernelManager:
             raise RuntimeError(f"Failed to start workspace kernel: {self._describe_exception(exc)}") from exc
 
     async def _bootstrap_workspace(self, session: WorkspaceKernelSession) -> None:
+        self._ensure_workspace_duckdb_file(session.workspace_duckdb_path)
         duckdb_path = Path(session.workspace_duckdb_path).as_posix()
         scratchpad_file = Path(session.scratchpad_db_path)
         scratchpad_file.parent.mkdir(parents=True, exist_ok=True)
@@ -801,6 +803,14 @@ class WorkspaceKernelManager:
             session.bootstrap_completed = True
             return
         raise RuntimeError(output.get("error") or "Workspace kernel bootstrap failed")
+
+    def _ensure_workspace_duckdb_file(self, workspace_duckdb_path: str) -> None:
+        workspace_db = Path(workspace_duckdb_path)
+        workspace_db.parent.mkdir(parents=True, exist_ok=True)
+        if workspace_db.exists():
+            return
+        con = duckdb.connect(str(workspace_db))
+        con.close()
 
     async def _execute_on_session(
         self,

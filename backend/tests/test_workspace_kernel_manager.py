@@ -441,6 +441,31 @@ async def test_bootstrap_workspace_creates_scratchpad_parent_dir(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_bootstrap_workspace_creates_missing_workspace_duckdb(tmp_path):
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    workspace_db = tmp_path / "ws-new" / "workspace.duckdb"
+    scratchpad_db = tmp_path / "ws-new" / "scratchpad" / "artifacts.duckdb"
+    session = WorkspaceKernelSession(
+        workspace_id="ws-new",
+        workspace_duckdb_path=str(workspace_db),
+        manager=SimpleNamespace(),
+        client=SimpleNamespace(),
+        scratchpad_db_path=str(scratchpad_db),
+    )
+
+    async def fake_execute_on_session(current_session, code):
+        _ = current_session
+        assert str(workspace_db.as_posix()) in code
+        return {"success": True}
+
+    manager._execute_on_session = fake_execute_on_session  # type: ignore[method-assign]
+
+    assert not workspace_db.exists()
+    await manager._bootstrap_workspace(session)
+    assert workspace_db.exists()
+
+
+@pytest.mark.asyncio
 async def test_bootstrap_workspace_exports_figure_payload_in_run_envelope(tmp_path):
     manager = WorkspaceKernelManager(idle_minutes=30)
     workspace_db = tmp_path / "ws-fig" / "workspace.duckdb"

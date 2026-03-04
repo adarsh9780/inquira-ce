@@ -19,3 +19,14 @@ test('app store clears stale dataset state when workspace list is empty', () => 
   assert.equal(source.includes("dataFilePath.value = ''"), true)
   assert.equal(source.includes("ingestedTableName.value = ''"), true)
 })
+
+test('schema preview and settings helpers do not expose dataset path without a valid workspace', () => {
+  const previewPath = resolve(process.cwd(), 'src/services/previewService.js')
+  const previewSource = readFileSync(previewPath, 'utf-8')
+  const apiPath = resolve(process.cwd(), 'src/services/apiService.js')
+  const apiSource = readFileSync(apiPath, 'utf-8')
+
+  assert.equal(previewSource.includes('if (!appStore.activeWorkspaceId || !appStore.hasWorkspace || !tableName)'), true)
+  assert.equal(apiSource.includes('const hasWorkspace = !!appStore.hasWorkspace'), true)
+  assert.equal(apiSource.includes('data_path: hasWorkspace ? (appStore.dataFilePath || null) : null'), true)
+})

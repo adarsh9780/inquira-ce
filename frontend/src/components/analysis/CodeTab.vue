@@ -135,6 +135,12 @@ const isMounted = ref(false)
 let editor = null
 let isUpdatingFromStore = false
 
+const hasSelectedData = computed(() => {
+  const selectedPath = String(appStore.dataFilePath || '').trim()
+  const selectedTable = String(appStore.ingestedTableName || '').trim()
+  return Boolean(selectedPath || selectedTable)
+})
+
 function applyExecutionArtifactsToStore(viewModel) {
   appStore.setDataframes(viewModel.dataframes)
   if (viewModel.dataframes.length > 0) {
@@ -145,8 +151,6 @@ function applyExecutionArtifactsToStore(viewModel) {
   if (viewModel.figures.length > 0) {
     appStore.setPlotlyFigure(viewModel.figures[0].data)
   }
-
-  appStore.setScalars(viewModel.scalars)
 }
 
 async function fetchDatabasePaths() {
@@ -244,6 +248,10 @@ function replaceTableNameInCode(src, newName) {
 }
 
 async function syncTableNameInCode(silent = false) {
+  if (!hasSelectedData.value) {
+    if (!silent) toast.info('Select a dataset first')
+    return
+  }
   await fetchSettings()
   const backendTable = settingsInfo.value?.table_name || settingsInfo.value?.data_table_name || settingsInfo.value?.table || null
   const tableName = backendTable || getTableName(appStore.dataFilePath || '')
@@ -325,7 +333,7 @@ async function executeSnippet(code, successLine) {
 
   if (normalized?.error) {
     appStore.setTerminalOutput(viewModel.output)
-    appStore.setActiveTab('terminal')
+    appStore.setActiveTab('output')
     return
   }
 
@@ -348,7 +356,11 @@ async function executeSnippet(code, successLine) {
     dataframeNames: orderedViewModel.dataframes.map((df) => String(df?.name || '')),
     figureNames: orderedViewModel.figures.map((fig) => String(fig?.name || '')),
   })
-  if (targetTab) appStore.setActiveTab(targetTab)
+  if (targetTab) {
+    appStore.setActiveTab(targetTab)
+  } else if (outputStdout || outputStderr) {
+    appStore.setActiveTab('output')
+  }
   appStore.setTerminalOutput(viewModel.output)
 }
 
@@ -547,11 +559,12 @@ onMounted(async () => {
   await nextTick()
   await fetchSettings()
   await fetchDatabasePaths()
-  await syncTableNameInCode(true)
-
-  const currentContent = appStore.pythonFileContent.trim()
-  if (!currentContent || currentContent === '# Python code for data analysis') {
-    appStore.setPythonFileContent(defaultCodeTemplate.value)
+  if (hasSelectedData.value) {
+    await syncTableNameInCode(true)
+    const currentContent = appStore.pythonFileContent.trim()
+    if (!currentContent || currentContent === '# Python code for data analysis') {
+      appStore.setPythonFileContent(defaultCodeTemplate.value)
+    }
   }
 
   await initializeEditor()
@@ -581,6 +594,7 @@ watch(() => appStore.pythonFileContent, () => {
 })
 
 watch(() => defaultCodeTemplate.value, (newTemplate) => {
+  if (!hasSelectedData.value) return
   const currentContent = appStore.pythonFileContent.trim()
   if (isDefaultEditorContent(currentContent) && newTemplate !== currentContent) {
     appStore.setPythonFileContent(newTemplate)
@@ -588,6 +602,8 @@ watch(() => defaultCodeTemplate.value, (newTemplate) => {
 })
 
 watch(() => appStore.dataFilePath, (newPath, oldPath) => {
+  const hasSelectedPath = String(newPath || '').trim() !== ''
+  if (!hasSelectedPath) return
   if (newPath !== oldPath) {
     const currentContent = appStore.pythonFileContent.trim()
     if (isDefaultEditorContent(currentContent)) {
@@ -597,6 +613,7 @@ watch(() => appStore.dataFilePath, (newPath, oldPath) => {
 })
 
 watch(() => databasePaths.value, (newPaths) => {
+  if (!hasSelectedData.value) return
   if (newPaths?.database_path) {
     const currentContent = appStore.pythonFileContent.trim()
     if (isDefaultEditorContent(currentContent)) {

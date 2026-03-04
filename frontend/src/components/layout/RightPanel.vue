@@ -21,7 +21,7 @@
         @mousedown="startResizeX"
       ></div>
 
-      <!-- Right Pane (Table / Figure / VarEx) -->
+      <!-- Right Pane (Table / Figure / Output) -->
       <div 
         class="flex flex-col h-full"
         :style="{ width: (100 - appStore.leftPaneWidth) + '%' }"

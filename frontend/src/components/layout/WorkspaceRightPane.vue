@@ -34,20 +34,20 @@
             <span class="sr-only">Chart</span>
           </button>
           <button
-            @click="appStore.setDataPane('varex')"
+            @click="appStore.setDataPane('output')"
             class="rounded-md p-2 transition-colors flex items-center justify-center"
-            :class="appStore.dataPane === 'varex' ? 'bg-white shadow-sm' : ''"
-            :style="appStore.dataPane === 'varex' ? 'color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
-            title="Var Ex"
-            aria-label="Var Ex"
+            :class="appStore.dataPane === 'output' ? 'bg-white shadow-sm' : ''"
+            :style="appStore.dataPane === 'output' ? 'color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
+            title="Output"
+            aria-label="Output"
           >
-            <CircleStackIcon class="w-4 h-4" />
-            <span class="sr-only">Var Ex</span>
+            <CommandLineIcon class="w-4 h-4" />
+            <span class="sr-only">Output</span>
           </button>
         </div>
       </div>
       
-      <!-- Teleport Target for Table/Figure/VarEx Toolbar -->
+      <!-- Teleport Target for Table/Figure/Output Toolbar -->
       <div id="workspace-right-pane-toolbar" class="flex-1 min-w-0 flex items-center justify-end"></div>
     </div>
 
@@ -58,8 +58,8 @@
       <div v-show="appStore.dataPane === 'figure'" class="h-full">
         <FigureTab />
       </div>
-      <div v-show="appStore.dataPane === 'varex'" class="h-full">
-        <VariableExplorerTab />
+      <div v-show="appStore.dataPane === 'output'" class="h-full">
+        <OutputTab />
       </div>
     </div>
   </div>
@@ -70,12 +70,12 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import TableTab from '../analysis/TableTab.vue'
 import FigureTab from '../analysis/FigureTab.vue'
-import VariableExplorerTab from '../analysis/VariableExplorerTab.vue'
+import OutputTab from '../analysis/OutputTab.vue'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import {
   TableCellsIcon,
   ChartBarIcon,
-  CircleStackIcon
+  CommandLineIcon
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
@@ -87,7 +87,7 @@ const COMPACT_SWITCHER_THRESHOLD_PX = 660
 const dataPaneOptions = [
   { value: 'table', label: 'Table' },
   { value: 'figure', label: 'Chart' },
-  { value: 'varex', label: 'Var Ex' }
+  { value: 'output', label: 'Output' }
 ]
 
 const selectedDataPane = computed({
