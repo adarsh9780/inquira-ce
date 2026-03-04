@@ -2,17 +2,17 @@
   <div class="flex flex-col w-full">
     <!-- Header -->
     <div 
-      class="flex items-center justify-between px-3 py-2 group cursor-pointer transition-colors"
+      class="flex items-center justify-between px-3 py-1.5 group cursor-pointer transition-colors"
       :class="[
-        isCollapsed ? 'justify-center hover:bg-zinc-100/50 rounded-lg mx-2 mb-1' : 'hover:bg-zinc-100/50',
+        isCollapsed ? 'justify-center hover:bg-zinc-100/50 rounded-lg mx-2 mb-1' : 'hover:bg-zinc-100/50 rounded-md',
         !appStore.hasWorkspace ? 'opacity-50 cursor-not-allowed' : ''
       ]"
       @click="handleHeaderClick"
       title="Datasets"
     >
       <div class="flex items-center gap-2">
-        <CircleStackIcon class="w-4 h-4 transition-transform" :class="!isCollapsed && 'scale-110'" style="color: var(--color-text-muted);" />
-        <span v-if="!isCollapsed" class="section-label">Datasets</span>
+        <FolderIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
+        <span v-if="!isCollapsed" class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Datasets</span>
       </div>
       <button 
         v-if="!isCollapsed && appStore.hasWorkspace"
@@ -26,7 +26,7 @@
     </div>
 
     <!-- List -->
-    <div v-show="!isCollapsed && appStore.hasWorkspace" class="flex flex-col mt-0.5 space-y-0.5 px-2 pb-2">
+    <div v-show="!isCollapsed && appStore.hasWorkspace" class="flex flex-col mt-0.5 space-y-0.5 pl-6 pr-2 pb-2">
       <div v-if="loading" class="px-2 py-2 text-[11px] text-center flex items-center justify-center gap-2" style="color: var(--color-text-muted);">
         <div class="animate-spin w-3 h-3 border-2 rounded-full" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);"></div>
         <span>Loading datasets...</span>
@@ -39,23 +39,15 @@
       <div 
         v-for="ds in datasets" 
         :key="ds.table_name"
-        class="group/item relative flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors border"
-        :class="ds.file_path === currentDataPath ? 'bg-zinc-100/80 border-zinc-200' : 'hover:bg-zinc-100/50 border-transparent'"
+        class="group/item relative flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs"
+        :class="isSelectedDataset(ds) ? 'bg-green-50/50 text-green-700' : 'text-zinc-500 hover:bg-zinc-100/60 hover:text-zinc-700'"
         @click="selectDataset(ds)"
       >
-        <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5">
-          <CheckCircleIcon 
-            v-if="ds.file_path === currentDataPath" 
-            class="w-3.5 h-3.5 shrink-0 mt-0.5" 
-            style="color: var(--color-success);"
-          />
-          <div v-else class="w-3.5 h-3.5 shrink-0 mt-0.5"></div>
-          <div class="flex-1 min-w-0">
-             <p class="truncate text-xs" :style="ds.file_path === currentDataPath ? 'font-weight:600;color:var(--color-text-main)' : 'color:var(--color-text-muted)'">
-              {{ ds.table_name }}
-            </p>
-            <p v-if="ds.file_path !== currentDataPath" class="text-[10px] truncate" style="color: var(--color-text-muted);">{{ formatPath(ds.file_path) }}</p>
-          </div>
+        <CircleStackIcon class="w-3.5 h-3.5 shrink-0" :class="isSelectedDataset(ds) ? 'text-green-600' : 'text-zinc-400'" />
+        <div class="min-w-0">
+          <p class="truncate" :class="isSelectedDataset(ds) ? 'font-semibold' : 'font-medium'">
+            {{ ds.table_name }}
+          </p>
         </div>
       </div>
     </div>
@@ -63,16 +55,16 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../../stores/appStore'
 import { apiService } from '../../../services/apiService'
 import { previewService } from '../../../services/previewService'
 import { inferTableNameFromDataPath } from '../../../utils/chatBootstrap'
 import { mergeDatasetSources } from '../../../utils/datasetCatalogMerge'
 import { 
+  FolderIcon,
   CircleStackIcon, 
   PlusIcon,
-  CheckCircleIcon
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -87,11 +79,22 @@ const datasets = ref([])
 
 const currentDataPath = computed(() => appStore.dataFilePath)
 
-function formatPath(path) {
-  if (!path) return ''
-  const parts = path.split('/')
-  const filename = parts[parts.length - 1]
-  return filename.replace(/\.[^.]+$/, '')
+function normalizePath(path) {
+  return String(path || '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/\/{2,}/g, '/')
+    .toLowerCase()
+}
+
+function isSelectedDataset(ds) {
+  const datasetPath = normalizePath(ds?.file_path)
+  const activePath = normalizePath(currentDataPath.value)
+  if (datasetPath && activePath && datasetPath === activePath) return true
+
+  const datasetTable = String(ds?.table_name || '').trim().toLowerCase()
+  const activeTable = String(appStore.ingestedTableName || '').trim().toLowerCase()
+  return Boolean(datasetTable && activeTable && datasetTable === activeTable)
 }
 
 async function loadDatasets() {
@@ -134,7 +137,7 @@ function handleHeaderClick() {
 }
 
 async function selectDataset(ds) {
-  if (ds.file_path === currentDataPath.value) {
+  if (isSelectedDataset(ds)) {
     emit('select')
     return
   }
@@ -177,6 +180,11 @@ function openSettings() {
   emit('open-settings', 'data')
 }
 
+function handleDatasetSwitched() {
+  if (!appStore.hasWorkspace || props.isCollapsed) return
+  void loadDatasets()
+}
+
 // Automatically load datasets when workspace changes
 watch(
   () => appStore.hasWorkspace,
@@ -192,6 +200,17 @@ watch(
 )
 
 watch(
+  () => appStore.activeWorkspaceId,
+  async () => {
+    if (!appStore.hasWorkspace || props.isCollapsed) {
+      datasets.value = []
+      return
+    }
+    await loadDatasets()
+  }
+)
+
+watch(
   () => props.isCollapsed,
   (collapsed) => {
     if (!collapsed && appStore.hasWorkspace) {
@@ -200,9 +219,22 @@ watch(
   }
 )
 
+watch(
+  () => appStore.dataFilePath,
+  () => {
+    if (!appStore.hasWorkspace || props.isCollapsed) return
+    void loadDatasets()
+  }
+)
+
 onMounted(() => {
+  window.addEventListener('dataset-switched', handleDatasetSwitched)
   if (!props.isCollapsed && appStore.hasWorkspace) {
     loadDatasets()
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('dataset-switched', handleDatasetSwitched)
 })
 </script>

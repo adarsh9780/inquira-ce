@@ -32,9 +32,9 @@
           <!-- Delete Figure -->
           <button
             @click="deleteSelectedFigure"
-            :disabled="!selectedArtifactId || isDeletingArtifact"
+            :disabled="!canDeleteSelectedFigure || isDeletingArtifact"
             class="inline-flex items-center px-3 py-1.5 border border-red-200 text-sm leading-4 font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-            :class="(!selectedArtifactId || isDeletingArtifact) ? 'opacity-50 cursor-not-allowed' : ''"
+            :class="(!canDeleteSelectedFigure || isDeletingArtifact) ? 'opacity-50 cursor-not-allowed' : ''"
           >
             <TrashIcon class="h-4 w-4 mr-1" />
             {{ isDeletingArtifact ? 'Deleting...' : 'Delete' }}
@@ -142,6 +142,7 @@ import {
 const appStore = useAppStore()
 
 const plotContainer = ref(null)
+const MEMORY_FIGURE_PREFIX = 'memory:'
 let ro = null
 const isDownloading = ref(false)
 const isLoadingArtifacts = ref(false)
@@ -156,14 +157,46 @@ let listAbortController = null
 let figureAbortController = null
 const DEFAULT_PLOTLY_THEME_MODE = PLOTLY_THEME_MODE.SOFT
 
+function getMemoryFigureId(name, index = 0) {
+  const normalizedName = String(name || '').trim() || `figure_${index + 1}`
+  return `${MEMORY_FIGURE_PREFIX}${normalizedName}`
+}
+
+function isMemoryFigureId(artifactId) {
+  return String(artifactId || '').startsWith(MEMORY_FIGURE_PREFIX)
+}
+
+const inMemoryFigureArtifacts = computed(() => {
+  if (!Array.isArray(appStore.figures)) return []
+  return appStore.figures
+    .map((fig, index) => {
+      const artifactId = String(fig?.artifact_id || fig?.data?.artifact_id || '').trim()
+      if (artifactId) return null
+      const normalizedFigure = normalizePlotlyFigure(fig?.data ?? fig)
+      if (!normalizedFigure) return null
+      const logicalName = String(fig?.logical_name || fig?.name || '').trim() || `Figure ${index + 1}`
+      return {
+        artifact_id: getMemoryFigureId(logicalName, index),
+        logical_name: logicalName,
+        source: 'memory',
+        memory_figure: normalizedFigure,
+      }
+    })
+    .filter(Boolean)
+})
+
 const orderedFigures = computed(() => {
-  if (!Array.isArray(workspaceFigureArtifacts.value)) return []
-  return workspaceFigureArtifacts.value
+  const persisted = Array.isArray(workspaceFigureArtifacts.value)
+    ? workspaceFigureArtifacts.value.map((fig) => ({ ...fig, source: 'artifact' }))
+    : []
+  return [...persisted, ...inMemoryFigureArtifacts.value]
 })
 
 const figureDropdownOptions = computed(() => orderedFigures.value.map((fig, index) => ({
   value: fig.artifact_id,
-  label: fig.logical_name || `Figure ${index + 1}`,
+  label: fig.source === 'memory'
+    ? `${fig.logical_name || `Figure ${index + 1}`} (memory)`
+    : (fig.logical_name || `Figure ${index + 1}`),
   key: fig.artifact_id || `${index}-figure`
 })))
 
@@ -171,6 +204,8 @@ const selectedFigureMeta = computed(() => {
   if (!selectedArtifactId.value) return null
   return orderedFigures.value.find((fig) => fig.artifact_id === selectedArtifactId.value) || null
 })
+
+const canDeleteSelectedFigure = computed(() => selectedFigureMeta.value?.source === 'artifact')
 
 const selectedFigure = computed(() => normalizePlotlyFigure(selectedFigurePayload.value))
 
@@ -220,17 +255,33 @@ watch(() => appStore.activeWorkspaceId, (workspaceId) => {
   selectedFigurePayload.value = null
   workspaceFigureArtifacts.value = []
   artifactListError.value = ''
-  appStore.setFigureCount(0)
   if (workspaceId && appStore.hasWorkspace) {
     void loadWorkspaceFigureArtifacts(workspaceId)
   }
 }, { immediate: true })
 
+watch(orderedFigures, (figures) => {
+  appStore.setFigureCount(Array.isArray(figures) ? figures.length : 0)
+  if (selectedArtifactId.value && !orderedFigures.value.some((fig) => fig.artifact_id === selectedArtifactId.value)) {
+    selectedArtifactId.value = orderedFigures.value[0]?.artifact_id || null
+  }
+}, { immediate: true })
+
 watch(
-  () => (Array.isArray(appStore.figures) ? appStore.figures.map((fig) => String(fig?.artifact_id || fig?.name || '')).join('|') : ''),
+  () => (
+    Array.isArray(appStore.figures)
+      ? appStore.figures
+        .map((fig) => String(fig?.artifact_id || fig?.data?.artifact_id || fig?.name || ''))
+        .join('|')
+      : ''
+  ),
   () => {
     if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) return
-    void loadWorkspaceFigureArtifacts(appStore.activeWorkspaceId)
+    const latestFigureHint = resolveLatestFigureHint()
+    void loadWorkspaceFigureArtifacts(appStore.activeWorkspaceId, {
+      preferredArtifactId: latestFigureHint.artifactId,
+      preferredLogicalName: latestFigureHint.logicalName,
+    })
   }
 )
 
@@ -241,7 +292,11 @@ watch(selectedArtifactId, (artifactId) => {
 // Re-render when the Figure pane becomes visible after being hidden by v-show
 watch(() => appStore.dataPane, (pane) => {
   if (pane === 'figure' && appStore.activeWorkspaceId && appStore.hasWorkspace) {
-    void loadWorkspaceFigureArtifacts(appStore.activeWorkspaceId)
+    const latestFigureHint = resolveLatestFigureHint()
+    void loadWorkspaceFigureArtifacts(appStore.activeWorkspaceId, {
+      preferredArtifactId: latestFigureHint.artifactId,
+      preferredLogicalName: latestFigureHint.logicalName,
+    })
   }
   if (pane === 'figure' && selectedFigure.value) {
     nextTick(() => {
@@ -250,7 +305,41 @@ watch(() => appStore.dataPane, (pane) => {
   }
 })
 
-async function loadWorkspaceFigureArtifacts(workspaceId) {
+function resolveLatestFigureHint() {
+  const latest = Array.isArray(appStore.figures) ? appStore.figures[0] : null
+  if (!latest || typeof latest !== 'object') {
+    return { artifactId: '', logicalName: '' }
+  }
+  return {
+    artifactId: String(latest?.artifact_id || latest?.data?.artifact_id || '').trim()
+      || getMemoryFigureId(latest?.logical_name || latest?.name || latest?.data?.name || ''),
+    logicalName: String(latest?.logical_name || latest?.name || latest?.data?.name || '').trim(),
+  }
+}
+
+function pickPreferredArtifactId(artifacts, preferredArtifactId, preferredLogicalName) {
+  if (!Array.isArray(artifacts) || artifacts.length === 0) return null
+
+  const normalizedPreferredId = String(preferredArtifactId || '').trim()
+  if (normalizedPreferredId) {
+    const direct = artifacts.find((item) => item.artifact_id === normalizedPreferredId)
+    if (direct?.artifact_id) return direct.artifact_id
+  }
+
+  const normalizedPreferredLogicalName = String(preferredLogicalName || '').trim().toLowerCase()
+  if (normalizedPreferredLogicalName) {
+    const logicalMatch = artifacts.find((item) => {
+      const logicalName = String(item?.logical_name || '').trim().toLowerCase()
+      const artifactId = String(item?.artifact_id || '').trim().toLowerCase()
+      return logicalName === normalizedPreferredLogicalName || artifactId === normalizedPreferredLogicalName
+    })
+    if (logicalMatch?.artifact_id) return logicalMatch.artifact_id
+  }
+
+  return null
+}
+
+async function loadWorkspaceFigureArtifacts(workspaceId, options = {}) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId || !appStore.hasWorkspace) {
     workspaceFigureArtifacts.value = []
@@ -273,16 +362,28 @@ async function loadWorkspaceFigureArtifacts(workspaceId) {
     workspaceFigureArtifacts.value = artifacts
     appStore.setFigureCount(artifacts.length)
 
-    if (!artifacts.length) {
+    const candidates = orderedFigures.value
+    if (!candidates.length) {
       selectedArtifactId.value = null
       selectedFigurePayload.value = null
       appStore.setPlotlyFigure(null)
       return
     }
-    const hasExistingSelection = artifacts.some((item) => item.artifact_id === selectedArtifactId.value)
-    if (!hasExistingSelection) {
-      selectedArtifactId.value = artifacts[0].artifact_id
-    } else if (!selectedFigurePayload.value && selectedArtifactId.value) {
+
+    const preferredArtifactId = pickPreferredArtifactId(
+      candidates,
+      options?.preferredArtifactId,
+      options?.preferredLogicalName,
+    )
+
+    const hasExistingSelection = candidates.some((item) => item.artifact_id === selectedArtifactId.value)
+    const nextSelection = preferredArtifactId
+      || (hasExistingSelection ? selectedArtifactId.value : null)
+      || candidates[0].artifact_id
+
+    if (nextSelection !== selectedArtifactId.value) {
+      selectedArtifactId.value = nextSelection
+    } else if (selectedArtifactId.value && (isMemoryFigureId(selectedArtifactId.value) || !selectedFigurePayload.value)) {
       await loadSelectedFigurePayload(selectedArtifactId.value)
     }
   } catch (error) {
@@ -290,9 +391,13 @@ async function loadWorkspaceFigureArtifacts(workspaceId) {
     console.warn('Failed to load workspace figure artifacts:', error)
     artifactListError.value = error?.message || 'Failed to load charts.'
     workspaceFigureArtifacts.value = []
-    selectedArtifactId.value = null
-    selectedFigurePayload.value = null
-    appStore.setFigureCount(0)
+    const fallbackSelection = orderedFigures.value[0]?.artifact_id || null
+    selectedArtifactId.value = fallbackSelection
+    if (!fallbackSelection) {
+      selectedFigurePayload.value = null
+      appStore.setPlotlyFigure(null)
+      appStore.setFigureCount(0)
+    }
   } finally {
     isLoadingArtifacts.value = false
   }
@@ -310,6 +415,18 @@ async function loadSelectedFigurePayload(artifactId) {
   figureAbortController = new AbortController()
   isLoadingFigure.value = true
   try {
+    if (isMemoryFigureId(normalizedArtifactId)) {
+      const memoryFigure = orderedFigures.value.find((fig) => fig.artifact_id === normalizedArtifactId && fig.source === 'memory')
+      const figurePayload = normalizePlotlyFigure(memoryFigure?.memory_figure)
+      if (!figurePayload) {
+        throw new Error('Selected chart payload is unavailable.')
+      }
+      if (selectedArtifactId.value !== normalizedArtifactId) return
+      selectedFigurePayload.value = figurePayload
+      appStore.setPlotlyFigure(figurePayload)
+      return
+    }
+
     const metadata = await apiService.v1GetWorkspaceArtifactMetadata(
       normalizedWorkspaceId,
       normalizedArtifactId,
@@ -565,6 +682,7 @@ async function deleteSelectedFigure() {
   const workspaceId = String(appStore.activeWorkspaceId || '').trim()
   const artifactId = String(selectedArtifactId.value || '').trim()
   if (!workspaceId || !artifactId || isDeletingArtifact.value) return
+  if (isMemoryFigureId(artifactId)) return
 
   const logicalName = String(selectedFigureMeta.value?.logical_name || artifactId)
   const confirmed = window.confirm(`Delete chart "${logicalName}"? This cannot be undone.`)

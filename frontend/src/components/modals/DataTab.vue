@@ -277,6 +277,32 @@ const messageTypeClass = computed(() => {
     : 'bg-red-50 border border-red-200 text-red-800'
 })
 
+function applyDatasetSelection({ dataPath, tableName, columns = [] }) {
+  const selectedPath = String(dataPath || '').trim()
+  const selectedTableName = String(tableName || '').trim()
+
+  appStore.setDataFilePath(selectedPath)
+  appStore.setIngestedColumns(Array.isArray(columns) ? columns : [])
+  appStore.setIngestedTableName(selectedTableName)
+  appStore.setSchemaFileId(selectedPath || selectedTableName)
+
+  // Reset run artifacts so UI never shows stale outputs from a previous dataset.
+  appStore.setGeneratedCode('')
+  appStore.setPythonFileContent('')
+  appStore.setResultData(null)
+  appStore.setPlotlyFigure(null)
+  appStore.setDataframes([])
+  appStore.setFigures([])
+  appStore.setTerminalOutput('')
+
+  window.dispatchEvent(new CustomEvent('dataset-switched', {
+    detail: {
+      tableName: selectedTableName,
+      dataPath: selectedPath,
+    },
+  }))
+}
+
 // Timer functions
 function startTimer() {
   startTime.value = Date.now()
@@ -368,11 +394,13 @@ async function processSelectedPath(filePath) {
   isPickingFile.value = true
   try {
     const result = await apiService.uploadDataPath(filePath)
-    appStore.setDataFilePath(filePath)
     ingestedTableName.value = result.table_name || filePath.split('/').pop().split('.')[0]
     ingestedColumns.value = result.columns || []
-    appStore.setIngestedColumns(ingestedColumns.value)
-    appStore.setIngestedTableName(ingestedTableName.value)
+    applyDatasetSelection({
+      dataPath: result.file_path || filePath,
+      tableName: ingestedTableName.value,
+      columns: ingestedColumns.value,
+    })
     showMessage(`Loaded "${filePath.split('/').pop()}" → table "${ingestedTableName.value}" (${result.row_count || '?'} rows, ${ingestedColumns.value.length} columns)`, 'success')
   } catch (error) {
     console.error('File path loading failed:', error)
@@ -388,11 +416,13 @@ async function processSelectedFileUpload(file) {
   isPickingFile.value = true
   try {
     const result = await apiService.uploadFile(file)
-    appStore.setDataFilePath(result.file_path || file.name)
     ingestedTableName.value = result.table_name || file.name.split('.')[0]
     ingestedColumns.value = result.columns || []
-    appStore.setIngestedColumns(ingestedColumns.value)
-    appStore.setIngestedTableName(ingestedTableName.value)
+    applyDatasetSelection({
+      dataPath: result.file_path || file.name,
+      tableName: ingestedTableName.value,
+      columns: ingestedColumns.value,
+    })
     showMessage(`Loaded "${file.name}" → table "${ingestedTableName.value}" (${result.row_count || '?'} rows, ${ingestedColumns.value.length} columns)`, 'success')
   } catch (error) {
     console.error('File upload failed:', error)

@@ -2,17 +2,17 @@
   <div class="flex flex-col w-full h-full min-h-[0]">
     <!-- Header -->
     <div 
-      class="flex items-center justify-between px-3 py-2 group cursor-pointer transition-colors shrink-0"
+      class="flex items-center justify-between px-3 py-1.5 group cursor-pointer transition-colors shrink-0"
       :class="[
-        isCollapsed ? 'justify-center hover:bg-zinc-100/50 rounded-lg mx-2 mb-1' : 'hover:bg-zinc-100/50',
+        isCollapsed ? 'justify-center hover:bg-zinc-100/50 rounded-lg mx-2 mb-1' : 'hover:bg-zinc-100/50 rounded-md',
         !appStore.hasWorkspace ? 'opacity-50 cursor-not-allowed' : ''
       ]"
       @click="handleHeaderClick"
       title="Conversations"
     >
       <div class="flex items-center gap-2">
-        <ChatBubbleLeftRightIcon class="w-4 h-4 transition-transform" :class="!isCollapsed && 'scale-110'" style="color: var(--color-text-muted);" />
-        <span v-if="!isCollapsed" class="section-label">Conversations</span>
+        <FolderIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
+        <span v-if="!isCollapsed" class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Conversations</span>
       </div>
       <button 
         v-if="!isCollapsed && appStore.hasWorkspace"
@@ -26,7 +26,7 @@
     </div>
 
     <!-- List -->
-    <div v-show="!isCollapsed && appStore.hasWorkspace" class="flex flex-col mt-0.5 space-y-0.5 px-2 pb-2 overflow-y-auto flex-1">
+    <div v-show="!isCollapsed && appStore.hasWorkspace" class="flex flex-col mt-0.5 space-y-0.5 pl-6 pr-2 pb-2 overflow-y-auto flex-1">
       <div v-if="appStore.conversations.length === 0" class="px-2 py-2 text-xs text-center" style="color: var(--color-text-muted);">
         No conversations yet.
       </div>
@@ -34,17 +34,12 @@
       <div 
         v-for="conv in appStore.conversations" 
         :key="conv.id"
-        class="group/item relative flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors border"
-        :class="conv.id === appStore.activeConversationId ? 'bg-zinc-100/80 border-zinc-200' : 'border-transparent hover:bg-zinc-100/50'"
+        class="group/item relative flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs"
+        :class="conv.id === appStore.activeConversationId ? 'bg-green-50/50 text-green-700' : 'text-zinc-500 hover:bg-zinc-100/60 hover:text-zinc-700'"
         @click="selectConversation(conv.id)"
       >
         <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5" @dblclick="startEditing(conv)">
-          <CheckCircleIcon 
-            v-if="conv.id === appStore.activeConversationId" 
-            class="w-3.5 h-3.5 shrink-0 mt-0.5" 
-            style="color: var(--color-success);"
-          />
-          <div v-else class="w-3.5 h-3.5 shrink-0 mt-0.5"></div>
+          <ChatBubbleLeftRightIcon class="w-3.5 h-3.5 shrink-0 mt-0.5" :class="conv.id === appStore.activeConversationId ? 'text-green-600' : 'text-zinc-400'" />
           <div class="flex-1 min-w-0">
              <div v-if="editingId === conv.id" class="flex items-center gap-1 w-full relative z-10">
                <input
@@ -59,13 +54,13 @@
              </div>
              <template v-else>
                <p 
-                  class="truncate text-xs" 
-                  :style="conv.id === appStore.activeConversationId ? 'font-weight: 600; color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
+                  class="truncate"
+                  :class="conv.id === appStore.activeConversationId ? 'font-semibold' : 'font-medium'"
                   :title="conv.title || 'Conversation'"
                 >
                   {{ conv.title || 'Conversation' }}
                 </p>
-                <p class="text-[9px] truncate" style="color: var(--color-text-muted);">{{ formatTimestamp(conv.updated_at || conv.created_at) }}</p>
+                <p class="text-[9px] truncate" :class="conv.id === appStore.activeConversationId ? 'text-green-600/70' : 'text-zinc-400'">{{ formatTimestamp(conv.updated_at || conv.created_at) }}</p>
              </template>
           </div>
         </div>
@@ -100,9 +95,9 @@ import { formatTimestamp } from '../../../utils/dateUtils'
 import { toast } from '../../../composables/useToast'
 import { extractApiErrorMessage } from '../../../utils/apiError'
 import { 
+  FolderIcon,
   ChatBubbleLeftRightIcon, 
   PlusIcon,
-  CheckCircleIcon,
   TrashIcon,
   PencilIcon
 } from '@heroicons/vue/24/outline'

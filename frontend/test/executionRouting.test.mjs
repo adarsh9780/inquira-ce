@@ -128,7 +128,7 @@ test('decideExecutionTabWithSelection routes identifier selections to table/figu
   )
 })
 
-test('decideExecutionTabWithSelection keeps tab for non-identifier selections', () => {
+test('decideExecutionTabWithSelection falls back to table/figure when artifacts exist without explicit result type', () => {
   assert.equal(
     decideExecutionTabWithSelection({
       resultType: 'scalar',
@@ -139,6 +139,19 @@ test('decideExecutionTabWithSelection keeps tab for non-identifier selections', 
       dataframeNames: ['top_batsmen'],
       figureNames: [],
     }),
-    null,
+    'table',
+  )
+
+  assert.equal(
+    decideExecutionTabWithSelection({
+      resultType: null,
+      hasError: false,
+      hasDataframes: false,
+      hasFigures: true,
+      selectedCode: 'fig.update_layout(title=\"x\")',
+      dataframeNames: [],
+      figureNames: ['fig'],
+    }),
+    'figure',
   )
 })

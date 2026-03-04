@@ -559,13 +559,6 @@ onMounted(async () => {
   await nextTick()
   await fetchSettings()
   await fetchDatabasePaths()
-  if (hasSelectedData.value) {
-    await syncTableNameInCode(true)
-    const currentContent = appStore.pythonFileContent.trim()
-    if (!currentContent || currentContent === '# Python code for data analysis') {
-      appStore.setPythonFileContent(defaultCodeTemplate.value)
-    }
-  }
 
   await initializeEditor()
 })
@@ -590,35 +583,6 @@ watch(() => appStore.isLoading, (loading) => {
 watch(() => appStore.pythonFileContent, () => {
   if (!isUpdatingFromStore && editor) {
     updateEditorContent()
-  }
-})
-
-watch(() => defaultCodeTemplate.value, (newTemplate) => {
-  if (!hasSelectedData.value) return
-  const currentContent = appStore.pythonFileContent.trim()
-  if (isDefaultEditorContent(currentContent) && newTemplate !== currentContent) {
-    appStore.setPythonFileContent(newTemplate)
-  }
-})
-
-watch(() => appStore.dataFilePath, (newPath, oldPath) => {
-  const hasSelectedPath = String(newPath || '').trim() !== ''
-  if (!hasSelectedPath) return
-  if (newPath !== oldPath) {
-    const currentContent = appStore.pythonFileContent.trim()
-    if (isDefaultEditorContent(currentContent)) {
-      appStore.setPythonFileContent(defaultCodeTemplate.value)
-    }
-  }
-})
-
-watch(() => databasePaths.value, (newPaths) => {
-  if (!hasSelectedData.value) return
-  if (newPaths?.database_path) {
-    const currentContent = appStore.pythonFileContent.trim()
-    if (isDefaultEditorContent(currentContent)) {
-      appStore.setPythonFileContent(defaultCodeTemplate.value)
-    }
   }
 })
 

@@ -90,6 +90,11 @@ export function decideExecutionTab({ resultType, resultKind, hasError, hasDatafr
   const normalized = String(resultType || '').toLowerCase()
   if (normalized === 'dataframe' && hasDataframes) return 'table'
   if (normalized === 'figure' && hasFigures) return 'figure'
+  // Fallback for assignment-style runs where backend result_type/result_kind is scalar/null
+  // but variable artifacts were still produced.
+  if (hasDataframes && !hasFigures) return 'table'
+  if (hasFigures && !hasDataframes) return 'figure'
+  if (hasDataframes && hasFigures) return 'table'
   return null
 }
 

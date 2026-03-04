@@ -26,24 +26,51 @@
     <!-- Add padding right to avoid scrollbar overlapping content-->
     <div class="flex-1 overflow-y-auto overflow-x-hidden flex flex-col py-3 custom-scrollbar">
       
-      <!-- File Explorer Sections -->
+      <!-- Workspace root + explorer tree -->
       <div class="flex flex-col space-y-2 mt-2">
         <SidebarWorkspaces 
           :is-collapsed="appStore.isSidebarCollapsed"
           @header-click="handleExplorerHeaderClick"
           @select="handleWorkspaceSelect"
         />
-        <SidebarDatasets 
-          :is-collapsed="appStore.isSidebarCollapsed"
-          @header-click="handleExplorerHeaderClick"
-          @select="handleDatasetSelect"
-          @open-settings="openSettings"
-        />
-        <SidebarConversations 
-          :is-collapsed="appStore.isSidebarCollapsed"
-          @header-click="handleExplorerHeaderClick"
-          @select="handleConversationSelect"
-        />
+
+        <div
+          v-if="!appStore.isSidebarCollapsed && appStore.hasWorkspace"
+          class="mx-2 rounded-lg border"
+          style="border-color: color-mix(in srgb, var(--color-border) 80%, transparent); background-color: color-mix(in srgb, var(--color-surface) 55%, var(--color-base));"
+        >
+          <div class="flex items-center gap-2 px-3 py-2 border-b" style="border-color: color-mix(in srgb, var(--color-border) 80%, transparent);">
+            <FolderOpenIcon class="w-4 h-4" style="color: var(--color-text-muted);" />
+            <span class="text-xs font-semibold truncate" style="color: var(--color-text-main);">{{ activeWorkspaceName }}</span>
+          </div>
+          <div class="py-1">
+            <SidebarDatasets 
+              :is-collapsed="appStore.isSidebarCollapsed"
+              @header-click="handleExplorerHeaderClick"
+              @select="handleDatasetSelect"
+              @open-settings="openSettings"
+            />
+            <SidebarConversations 
+              :is-collapsed="appStore.isSidebarCollapsed"
+              @header-click="handleExplorerHeaderClick"
+              @select="handleConversationSelect"
+            />
+          </div>
+        </div>
+
+        <template v-else>
+          <SidebarDatasets 
+            :is-collapsed="appStore.isSidebarCollapsed"
+            @header-click="handleExplorerHeaderClick"
+            @select="handleDatasetSelect"
+            @open-settings="openSettings"
+          />
+          <SidebarConversations 
+            :is-collapsed="appStore.isSidebarCollapsed"
+            @header-click="handleExplorerHeaderClick"
+            @select="handleConversationSelect"
+          />
+        </template>
       </div>
 
     </div>
@@ -162,7 +189,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { useAuthStore } from '../../stores/authStore'
 import { settingsWebSocket } from '../../services/websocketService'
@@ -175,6 +202,7 @@ import logo from '../../assets/favicon.svg'
 
 import {
   DocumentTextIcon,
+  FolderOpenIcon,
   CogIcon,
   ArrowRightOnRectangleIcon,
   ChevronUpIcon
@@ -191,6 +219,13 @@ const isUserMenuOpen = ref(false)
 const isLogoutConfirmOpen = ref(false)
 const isWebSocketConnected = ref(false)
 
+const activeWorkspaceName = computed(() => {
+  const activeId = String(appStore.activeWorkspaceId || '').trim()
+  if (!activeId) return 'Workspace'
+  const active = appStore.workspaces.find((ws) => ws.id === activeId)
+  return active?.name || 'Workspace'
+})
+
 function handleTabClick(tabId) {
   appStore.setActiveTab(tabId)
 }
@@ -200,8 +235,9 @@ function toggleSidebar() {
 }
 
 function handleExplorerHeaderClick() {
-  // Toggle off if expanded, expand if collapsed
-  appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+  if (appStore.isSidebarCollapsed) {
+    appStore.setSidebarCollapsed(false)
+  }
 }
 
 function handleWorkspaceSelect() {

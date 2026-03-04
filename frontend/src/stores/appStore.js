@@ -976,9 +976,13 @@ export const useAppStore = defineStore('app', () => {
       .map((fig, idx) => {
         const normalizedFigure = normalizePlotlyFigure(fig?.data ?? fig)
         if (!normalizedFigure) return null
+        const artifactId = String(fig?.artifact_id || normalizedFigure?.artifact_id || '').trim()
+        const logicalName = String(fig?.logical_name || normalizedFigure?.logical_name || fig?.name || '').trim()
         return {
           ...(fig || {}),
           name: String(fig?.name || `figure_${idx + 1}`),
+          artifact_id: artifactId || undefined,
+          logical_name: logicalName || undefined,
           data: normalizedFigure,
         }
       })

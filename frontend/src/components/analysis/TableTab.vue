@@ -16,7 +16,7 @@
 
         <div class="flex items-center space-x-2">
           <!-- Table selector dropdown — always shown when artifacts are available -->
-          <div v-if="allArtifacts.length > 0" class="flex items-center space-x-2">
+          <div v-if="displayArtifacts.length > 0" class="flex items-center space-x-2">
             <HeaderDropdown
               id="dataframe-select"
               v-model="selectedArtifactId"
@@ -31,9 +31,9 @@
           <!-- Delete selected table -->
           <button
             @click="deleteSelectedArtifact"
-            :disabled="!selectedArtifactId || isDeletingArtifact"
+            :disabled="!canDeleteSelectedArtifact || isDeletingArtifact"
             class="inline-flex items-center px-3 py-1.5 border border-red-200 text-sm leading-4 font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-            :class="(!selectedArtifactId || isDeletingArtifact) ? 'opacity-50 cursor-not-allowed' : ''"
+            :class="(!canDeleteSelectedArtifact || isDeletingArtifact) ? 'opacity-50 cursor-not-allowed' : ''"
           >
             <TrashIcon class="h-4 w-4 mr-1" />
             {{ isDeletingArtifact ? 'Deleting...' : 'Delete' }}
@@ -94,14 +94,14 @@
 
       <!-- Empty state: user hasn't selected a table yet but artifacts exist -->
       <div
-        v-else-if="!selectedArtifactId && allArtifacts.length > 0"
+        v-else-if="!selectedArtifactId && displayArtifacts.length > 0"
         class="absolute inset-0 flex items-center justify-center"
         style="background-color: var(--color-base);"
       >
         <div class="text-center">
           <TableCellsIcon class="h-12 w-12 mx-auto mb-3" style="color: var(--color-border);" />
           <p class="text-sm font-medium" style="color: var(--color-text-muted);">
-            {{ allArtifacts.length }} table{{ allArtifacts.length === 1 ? '' : 's' }} available
+            {{ displayArtifacts.length }} table{{ displayArtifacts.length === 1 ? '' : 's' }} available
           </p>
           <p class="text-xs mt-1" style="color: var(--color-text-muted);">Select a table from the dropdown above</p>
         </div>
@@ -194,6 +194,7 @@ import {
 const appStore = useAppStore()
 
 const pageSize = 100
+const MEMORY_ARTIFACT_PREFIX = 'memory:'
 const isDownloading = ref(false)
 const isDeletingArtifact = ref(false)
 const isPageLoading = ref(false)
@@ -238,6 +239,71 @@ onUnmounted(() => {
 
 const allArtifacts = computed(() => (Array.isArray(workspaceArtifacts.value) ? workspaceArtifacts.value : []))
 
+function getMemoryArtifactId(name, index = 0) {
+  const normalizedName = String(name || '').trim() || `dataframe_${index + 1}`
+  return `${MEMORY_ARTIFACT_PREFIX}${normalizedName}`
+}
+
+function isMemoryArtifactId(artifactId) {
+  return String(artifactId || '').startsWith(MEMORY_ARTIFACT_PREFIX)
+}
+
+function normalizeRowsFromDataframeValue(value) {
+  if (Array.isArray(value)) {
+    return value
+      .filter((row) => row && typeof row === 'object' && !Array.isArray(row))
+      .map((row) => ({ ...row }))
+  }
+  if (!value || typeof value !== 'object') return []
+
+  const rawRows = Array.isArray(value.data) ? value.data : []
+  if (!rawRows.length) return []
+  if (typeof rawRows[0] === 'object' && !Array.isArray(rawRows[0])) {
+    return rawRows.map((row) => ({ ...row }))
+  }
+
+  const columns = Array.isArray(value.columns) ? value.columns.map((col) => String(col)) : []
+  if (!columns.length) return []
+  return rawRows.map((row) => {
+    if (!Array.isArray(row)) return {}
+    const mapped = {}
+    columns.forEach((col, idx) => {
+      mapped[col] = row[idx]
+    })
+    return mapped
+  })
+}
+
+const memoryArtifacts = computed(() => {
+  if (!Array.isArray(appStore.dataframes)) return []
+  return appStore.dataframes
+    .map((df, index) => {
+      const artifactId = String(df?.data?.artifact_id || '').trim()
+      if (artifactId) return null
+
+      const rows = normalizeRowsFromDataframeValue(df?.data)
+      if (!rows.length) return null
+
+      const logicalName = String(df?.name || '').trim() || `dataframe_${index + 1}`
+      return {
+        artifact_id: getMemoryArtifactId(logicalName, index),
+        logical_name: logicalName,
+        row_count: Number(df?.data?.row_count || rows.length || 0),
+        source: 'memory',
+        memory_rows: rows,
+      }
+    })
+    .filter(Boolean)
+})
+
+const displayArtifacts = computed(() => {
+  const persistedArtifacts = allArtifacts.value.map((artifact) => ({
+    ...artifact,
+    source: 'artifact',
+  }))
+  return [...persistedArtifacts, ...memoryArtifacts.value]
+})
+
 const activeWorkspaceHasKnownSavedTables = computed(() => {
   const workspaceId = String(appStore.activeWorkspaceId || '').trim()
   if (!workspaceId) return false
@@ -249,19 +315,42 @@ const showArtifactListLoadingState = computed(() => {
   return activeWorkspaceHasKnownSavedTables.value
 })
 
-const tableDropdownOptions = computed(() => allArtifacts.value.map((artifact) => ({
-  value: artifact.artifact_id,
-  label: artifact.logical_name || artifact.artifact_id,
-  key: artifact.artifact_id
-})))
+const tableDropdownOptions = computed(() => displayArtifacts.value.map((artifact) => {
+  const isMemory = artifact.source === 'memory'
+  const label = artifact.logical_name || artifact.artifact_id
+  return {
+    value: artifact.artifact_id,
+    label: isMemory ? `${label} (memory)` : label,
+    key: artifact.artifact_id,
+  }
+}))
 
 // Expose dataframe count to the store so StatusBar can read it
 watch(allArtifacts, (list) => {
+  if (selectedArtifactId.value && !list.some((item) => item.artifact_id === selectedArtifactId.value)) {
+    if (isMemoryArtifactId(selectedArtifactId.value)) return
+    selectedArtifactId.value = null
+  }
+}, { immediate: true })
+
+watch(displayArtifacts, (list) => {
   appStore.setDataframeCount(list.length)
   if (selectedArtifactId.value && !list.some((item) => item.artifact_id === selectedArtifactId.value)) {
     selectedArtifactId.value = null
   }
 }, { immediate: true })
+
+function resolveLatestMemoryArtifactId() {
+  const latestFrame = appStore.dataframes?.[0]
+  if (!latestFrame || typeof latestFrame !== 'object') return ''
+  const latestPersistedArtifactId = String(latestFrame?.data?.artifact_id || '').trim()
+  if (latestPersistedArtifactId) return ''
+  const latestName = String(latestFrame?.name || '').trim()
+  if (!latestName) return ''
+  const memoryArtifactId = getMemoryArtifactId(latestName)
+  const exists = memoryArtifacts.value.some((entry) => entry.artifact_id === memoryArtifactId)
+  return exists ? memoryArtifactId : ''
+}
 
 watch(
   () => (Array.isArray(appStore.dataframes) ? appStore.dataframes.map((df) => String(df?.data?.artifact_id || '')).filter(Boolean).join('|') : ''),
@@ -269,10 +358,30 @@ watch(
     const latestArtifactId = String(appStore.dataframes?.[0]?.data?.artifact_id || '').trim()
     if (latestArtifactId && latestArtifactId !== selectedArtifactId.value) {
       selectedArtifactId.value = latestArtifactId
+    } else {
+      const latestMemoryId = resolveLatestMemoryArtifactId()
+      if (latestMemoryId && latestMemoryId !== selectedArtifactId.value) {
+        selectedArtifactId.value = latestMemoryId
+      }
     }
     if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) return
     void loadWorkspaceArtifacts(appStore.activeWorkspaceId)
   }
+)
+
+watch(
+  () => (
+    Array.isArray(appStore.dataframes)
+      ? appStore.dataframes.map((df, index) => `${index}:${String(df?.name || '')}:${String(df?.data?.artifact_id || '')}`).join('|')
+      : ''
+  ),
+  () => {
+    if (String(appStore.dataframes?.[0]?.data?.artifact_id || '').trim()) return
+    const latestMemoryId = resolveLatestMemoryArtifactId()
+    if (latestMemoryId && latestMemoryId !== selectedArtifactId.value) {
+      selectedArtifactId.value = latestMemoryId
+    }
+  },
 )
 
 function createAbortError(message = 'Request aborted') {
@@ -406,7 +515,7 @@ async function recoverFromMissingArtifact(artifactId) {
       tableError.value = ''
       return
     }
-    const fallbackId = allArtifacts.value[0]?.artifact_id || null
+    const fallbackId = displayArtifacts.value[0]?.artifact_id || null
     selectedArtifactId.value = fallbackId
     if (!fallbackId) {
       tableError.value = 'Selected table no longer exists. Run code to create a new table.'
@@ -437,6 +546,13 @@ watch(selectedArtifactId, async (newId) => {
     appStore.clearTableViewport()
     return
   }
+  if (isMemoryArtifactId(newId)) {
+    const memoryArtifact = displayArtifacts.value.find((entry) => entry.artifact_id === newId && entry.source === 'memory')
+    if (memoryArtifact) {
+      loadInMemoryArtifact(memoryArtifact)
+      return
+    }
+  }
   const rememberedPage = appStore.getTablePageOffset(appStore.activeWorkspaceId, newId)
   if (Number.isInteger(rememberedPage) && rememberedPage > 0) {
     pendingRestorePageByArtifact.set(newId, rememberedPage)
@@ -457,7 +573,12 @@ watch(selectedArtifactId, async (newId) => {
 // ---------------------------------------------------------------------------
 const selectedArtifactMeta = computed(() => {
   if (!selectedArtifactId.value) return null
-  return allArtifacts.value.find(a => a.artifact_id === selectedArtifactId.value) ?? null
+  return displayArtifacts.value.find(a => a.artifact_id === selectedArtifactId.value) ?? null
+})
+
+const canDeleteSelectedArtifact = computed(() => {
+  if (!selectedArtifactMeta.value) return false
+  return selectedArtifactMeta.value.source === 'artifact'
 })
 
 const useInfiniteModel = computed(() => {
@@ -548,6 +669,19 @@ function resetTableState() {
   if (isGridAlive()) {
     gridApi.setGridOption?.('datasource', null)
   }
+}
+
+function loadInMemoryArtifact(artifact) {
+  const rows = Array.isArray(artifact?.memory_rows) ? artifact.memory_rows : []
+  useClientFallback.value = true
+  tableError.value = ''
+  clientRows.value = rows
+  serverRows.value = []
+  serverColumns.value = rows[0] ? Object.keys(rows[0]) : []
+  rowCountValue.value = Number(artifact?.row_count || rows.length || 0)
+  windowStart.value = rows.length > 0 ? 1 : 0
+  windowEnd.value = rows.length > 0 ? Math.min(pageSize, rowCountValue.value || rows.length) : 0
+  appStore.setTableViewport(windowStart.value, windowEnd.value, rowCountValue.value)
 }
 
 function onGridReady(params) {
@@ -873,6 +1007,7 @@ async function deleteSelectedArtifact() {
   const workspaceId = String(appStore.activeWorkspaceId || '').trim()
   const artifactId = String(selectedArtifactId.value || '').trim()
   if (!workspaceId || !artifactId || isDeletingArtifact.value) return
+  if (isMemoryArtifactId(artifactId)) return
 
   const artifactLabel = String(selectedArtifactMeta.value?.logical_name || artifactId)
   const confirmed = window.confirm(`Delete table "${artifactLabel}"? This cannot be undone.`)

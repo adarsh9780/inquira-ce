@@ -89,11 +89,19 @@ export function buildExecutionViewModel(response, options = {}) {
   }
 
   const figureEntries = parsedFigures.entries
-    .map(({ name, value }) => ({
-      name,
-      data: normalizePlotlyFigure(value),
-    }))
-    .filter((entry) => Boolean(entry.data))
+    .map(({ name, value }) => {
+      const normalizedFigure = normalizePlotlyFigure(value)
+      if (!normalizedFigure) return null
+      const artifactId = String(value?.artifact_id || normalizedFigure?.artifact_id || '').trim()
+      const logicalName = String(value?.logical_name || value?.name || '').trim()
+      return {
+        name,
+        artifact_id: artifactId || undefined,
+        logical_name: logicalName || undefined,
+        data: normalizedFigure,
+      }
+    })
+    .filter(Boolean)
 
   return {
     output: outputParts.join('\n\n'),
