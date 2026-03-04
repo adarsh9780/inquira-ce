@@ -12,7 +12,11 @@
     >
       <div class="flex items-center gap-2">
         <FolderIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
-        <span v-if="!isCollapsed" class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Conversations</span>
+        <span
+          class="text-[11px] uppercase tracking-[0.08em] font-semibold overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-out"
+          :class="isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[120px] opacity-100'"
+          style="color: var(--color-text-muted);"
+        >Conversations</span>
       </div>
       <button 
         v-if="!isCollapsed && appStore.hasWorkspace"
@@ -26,64 +30,66 @@
     </div>
 
     <!-- List -->
-    <div v-show="!isCollapsed && appStore.hasWorkspace" class="flex flex-col mt-0.5 space-y-0.5 pl-6 pr-2 pb-2 overflow-y-auto flex-1">
-      <div v-if="appStore.conversations.length === 0" class="px-2 py-2 text-xs text-center" style="color: var(--color-text-muted);">
-        No conversations yet.
-      </div>
-      
-      <div 
-        v-for="conv in appStore.conversations" 
-        :key="conv.id"
-        class="group/item relative flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs"
-        :class="conv.id === appStore.activeConversationId ? 'bg-green-50/50 text-green-700' : 'text-zinc-500 hover:bg-zinc-100/60 hover:text-zinc-700'"
-        @click="selectConversation(conv.id)"
-      >
-        <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5" @dblclick="startEditing(conv)">
-          <ChatBubbleLeftRightIcon class="w-3.5 h-3.5 shrink-0 mt-0.5" :class="conv.id === appStore.activeConversationId ? 'text-green-600' : 'text-zinc-400'" />
-          <div class="flex-1 min-w-0">
-             <div v-if="editingId === conv.id" class="flex items-center gap-1 w-full relative z-10">
-               <input
-                 :ref="(el) => { if (el) editInputs[conv.id] = el }"
-                 v-model="editingTitleValue"
-                 class="input-base py-0.5 px-1 text-xs font-semibold"
-                 @keydown.enter.prevent="saveTitle(conv.id)"
-                 @keydown.esc.prevent="cancelEditing"
-                 @blur="saveTitle(conv.id)"
-                 @click.stop
-               />
-             </div>
-             <template v-else>
-               <p 
-                  class="truncate"
-                  :class="conv.id === appStore.activeConversationId ? 'font-semibold' : 'font-medium'"
-                  :title="conv.title || 'Conversation'"
-                >
-                  {{ conv.title || 'Conversation' }}
-                </p>
-                <p class="text-[9px] truncate" :class="conv.id === appStore.activeConversationId ? 'text-green-600/70' : 'text-zinc-400'">{{ formatTimestamp(conv.updated_at || conv.created_at) }}</p>
-             </template>
+    <Transition name="sidebar-list">
+      <div v-show="!isCollapsed && appStore.hasWorkspace" class="flex flex-col mt-0.5 space-y-0.5 pl-6 pr-2 pb-2 overflow-y-auto flex-1">
+        <div v-if="appStore.conversations.length === 0" class="px-2 py-2 text-xs text-center" style="color: var(--color-text-muted);">
+          No conversations yet.
+        </div>
+        
+        <div 
+          v-for="conv in appStore.conversations" 
+          :key="conv.id"
+          class="group/item relative flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs"
+          :class="conv.id === appStore.activeConversationId ? 'bg-green-50/50 text-green-700' : 'text-zinc-500 hover:bg-zinc-100/60 hover:text-zinc-700'"
+          @click="selectConversation(conv.id)"
+        >
+          <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5" @dblclick="startEditing(conv)">
+            <ChatBubbleLeftRightIcon class="w-3.5 h-3.5 shrink-0 mt-0.5" :class="conv.id === appStore.activeConversationId ? 'text-green-600' : 'text-zinc-400'" />
+            <div class="flex-1 min-w-0">
+              <div v-if="editingId === conv.id" class="flex items-center gap-1 w-full relative z-10">
+                <input
+                  :ref="(el) => { if (el) editInputs[conv.id] = el }"
+                  v-model="editingTitleValue"
+                  class="input-base py-0.5 px-1 text-xs font-semibold"
+                  @keydown.enter.prevent="saveTitle(conv.id)"
+                  @keydown.esc.prevent="cancelEditing"
+                  @blur="saveTitle(conv.id)"
+                  @click.stop
+                />
+              </div>
+              <template v-else>
+                <p 
+                    class="truncate"
+                    :class="conv.id === appStore.activeConversationId ? 'font-semibold' : 'font-medium'"
+                    :title="conv.title || 'Conversation'"
+                  >
+                    {{ conv.title || 'Conversation' }}
+                  </p>
+                  <p class="text-[9px] truncate" :class="conv.id === appStore.activeConversationId ? 'text-green-600/70' : 'text-zinc-400'">{{ formatTimestamp(conv.updated_at || conv.created_at) }}</p>
+              </template>
+            </div>
+          </div>
+
+          <div v-if="editingId !== conv.id" class="flex-shrink-0 flex items-center opacity-0 group-hover/item:opacity-100 transition-opacity">
+            <button
+              @click.stop="startEditing(conv)"
+              class="btn-icon p-1 hover:text-blue-600"
+              title="Rename Conversation"
+            >
+               <PencilIcon class="w-3 h-3" />
+            </button>
+            <button
+              v-if="conv.id !== appStore.activeConversationId"
+              @click.stop="deleteConv(conv.id)"
+              class="btn-icon p-1 hover:text-red-500"
+              title="Delete Conversation"
+            >
+               <TrashIcon class="w-3 h-3" />
+            </button>
           </div>
         </div>
-
-        <div v-if="editingId !== conv.id" class="flex-shrink-0 flex items-center opacity-0 group-hover/item:opacity-100 transition-opacity">
-          <button
-            @click.stop="startEditing(conv)"
-            class="btn-icon p-1 hover:text-blue-600"
-            title="Rename Conversation"
-          >
-             <PencilIcon class="w-3 h-3" />
-          </button>
-          <button
-            v-if="conv.id !== appStore.activeConversationId"
-            @click.stop="deleteConv(conv.id)"
-            class="btn-icon p-1 hover:text-red-500"
-            title="Delete Conversation"
-          >
-             <TrashIcon class="w-3 h-3" />
-          </button>
-        </div>
       </div>
-    </div>
+    </Transition>
   </div>
 </template>
 
@@ -240,3 +246,15 @@ onMounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.sidebar-list-enter-active,
+.sidebar-list-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.sidebar-list-enter-from,
+.sidebar-list-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+</style>

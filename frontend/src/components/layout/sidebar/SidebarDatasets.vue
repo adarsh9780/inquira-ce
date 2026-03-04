@@ -12,7 +12,11 @@
     >
       <div class="flex items-center gap-2">
         <FolderIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
-        <span v-if="!isCollapsed" class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Datasets</span>
+        <span
+          class="text-[11px] uppercase tracking-[0.08em] font-semibold overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-out"
+          :class="isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[120px] opacity-100'"
+          style="color: var(--color-text-muted);"
+        >Datasets</span>
       </div>
       <button 
         v-if="!isCollapsed && appStore.hasWorkspace"
@@ -26,31 +30,33 @@
     </div>
 
     <!-- List -->
-    <div v-show="!isCollapsed && appStore.hasWorkspace" class="flex flex-col mt-0.5 space-y-0.5 pl-6 pr-2 pb-2">
-      <div v-if="loading" class="px-2 py-2 text-[11px] text-center flex items-center justify-center gap-2" style="color: var(--color-text-muted);">
-        <div class="animate-spin w-3 h-3 border-2 rounded-full" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);"></div>
-        <span>Loading datasets...</span>
-      </div>
+    <Transition name="sidebar-list">
+      <div v-show="!isCollapsed && appStore.hasWorkspace" class="flex flex-col mt-0.5 space-y-0.5 pl-6 pr-2 pb-2">
+        <div v-if="loading" class="px-2 py-2 text-[11px] text-center flex items-center justify-center gap-2" style="color: var(--color-text-muted);">
+          <div class="animate-spin w-3 h-3 border-2 rounded-full" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);"></div>
+          <span>Loading datasets...</span>
+        </div>
 
-      <div v-else-if="datasets.length === 0" class="px-2 py-2 text-xs text-center" style="color: var(--color-text-muted);">
-        No datasets yet. Add in Settings.
-      </div>
-      
-      <div 
-        v-for="ds in datasets" 
-        :key="ds.table_name"
-        class="group/item relative flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs"
-        :class="isSelectedDataset(ds) ? 'bg-green-50/50 text-green-700' : 'text-zinc-500 hover:bg-zinc-100/60 hover:text-zinc-700'"
-        @click="selectDataset(ds)"
-      >
-        <CircleStackIcon class="w-3.5 h-3.5 shrink-0" :class="isSelectedDataset(ds) ? 'text-green-600' : 'text-zinc-400'" />
-        <div class="min-w-0">
-          <p class="truncate" :class="isSelectedDataset(ds) ? 'font-semibold' : 'font-medium'">
-            {{ ds.table_name }}
-          </p>
+        <div v-else-if="datasets.length === 0" class="px-2 py-2 text-xs text-center" style="color: var(--color-text-muted);">
+          No datasets yet. Add in Settings.
+        </div>
+        
+        <div 
+          v-for="ds in datasets" 
+          :key="ds.table_name"
+          class="group/item relative flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs"
+          :class="isSelectedDataset(ds) ? 'bg-green-50/50 text-green-700' : 'text-zinc-500 hover:bg-zinc-100/60 hover:text-zinc-700'"
+          @click="selectDataset(ds)"
+        >
+          <CircleStackIcon class="w-3.5 h-3.5 shrink-0" :class="isSelectedDataset(ds) ? 'text-green-600' : 'text-zinc-400'" />
+          <div class="min-w-0">
+            <p class="truncate" :class="isSelectedDataset(ds) ? 'font-semibold' : 'font-medium'">
+              {{ ds.table_name }}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </Transition>
   </div>
 </template>
 
@@ -238,3 +244,15 @@ onUnmounted(() => {
   window.removeEventListener('dataset-switched', handleDatasetSwitched)
 })
 </script>
+
+<style scoped>
+.sidebar-list-enter-active,
+.sidebar-list-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.sidebar-list-enter-from,
+.sidebar-list-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+</style>

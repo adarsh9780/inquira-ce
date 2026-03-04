@@ -9,7 +9,10 @@
     >
       <div class="flex items-center gap-2">
         <BuildingOffice2Icon class="w-4 h-4 transition-transform" :class="!isCollapsed && 'scale-110'" style="color: var(--color-text-muted);"/>
-        <span v-if="!isCollapsed" class="section-label">Workspaces</span>
+        <span
+          class="section-label overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-out"
+          :class="isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[120px] opacity-100'"
+        >Workspaces</span>
       </div>
       <button 
         v-if="!isCollapsed"
@@ -23,45 +26,47 @@
     </div>
 
     <!-- List -->
-    <div v-show="!isCollapsed" class="flex flex-col mt-0.5 space-y-0.5 px-2 pb-2">
-      <div v-if="appStore.workspaceDeletionJobs.length > 0" class="px-2 py-1.5 bg-amber-50 text-amber-800 text-[11px] flex items-center gap-1.5 rounded">
-        <svg class="animate-spin h-3 w-3 text-amber-700 shrink-0" viewBox="0 0 24 24" fill="none">
-          <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-          <path class="opacity-90" d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="4" />
-        </svg>
-        <span class="truncate">Deleting workspace...</span>
-      </div>
+    <Transition name="sidebar-list">
+      <div v-show="!isCollapsed" class="flex flex-col mt-0.5 space-y-0.5 px-2 pb-2">
+        <div v-if="appStore.workspaceDeletionJobs.length > 0" class="px-2 py-1.5 bg-amber-50 text-amber-800 text-[11px] flex items-center gap-1.5 rounded">
+          <svg class="animate-spin h-3 w-3 text-amber-700 shrink-0" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-90" d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="4" />
+          </svg>
+          <span class="truncate">Deleting workspace...</span>
+        </div>
 
-      <div v-if="appStore.workspaces.length === 0" class="px-2 py-2 text-xs text-center" style="color: var(--color-text-muted);">
-        No workspaces yet
-      </div>
-      
-      <div 
-        v-for="ws in visibleWorkspaces" 
-        :key="ws.id"
-        class="group/item relative flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors border"
-        :class="[
-          'hover:bg-zinc-100/50 border-transparent',
-          isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : ''
-        ]"
-        @click="!isWorkspaceDeleting(ws.id) && selectWorkspace(ws.id)"
-      >
-        <div class="flex items-center gap-2 min-w-0 pr-2">
-          <span class="truncate text-xs" style="color: var(--color-text-muted);">
-            {{ ws.name }}
-          </span>
+        <div v-if="appStore.workspaces.length === 0" class="px-2 py-2 text-xs text-center" style="color: var(--color-text-muted);">
+          No workspaces yet
         </div>
         
-        <button
-          v-if="!isWorkspaceDeleting(ws.id)"
-          @click.stop="confirmDeleteWorkspace(ws.id)"
-          class="btn-icon p-1 text-zinc-400 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0"
-          title="Delete Workspace"
+        <div 
+          v-for="ws in visibleWorkspaces" 
+          :key="ws.id"
+          class="group/item relative flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors border"
+          :class="[
+            'hover:bg-zinc-100/50 border-transparent',
+            isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : ''
+          ]"
+          @click="!isWorkspaceDeleting(ws.id) && selectWorkspace(ws.id)"
         >
-           <TrashIcon class="w-3.5 h-3.5" />
-        </button>
+          <div class="flex items-center gap-2 min-w-0 pr-2">
+            <span class="truncate text-xs" style="color: var(--color-text-muted);">
+              {{ ws.name }}
+            </span>
+          </div>
+          
+          <button
+            v-if="!isWorkspaceDeleting(ws.id)"
+            @click.stop="confirmDeleteWorkspace(ws.id)"
+            class="btn-icon p-1 text-zinc-400 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0"
+            title="Delete Workspace"
+          >
+             <TrashIcon class="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
-    </div>
+    </Transition>
 
     <!-- Modals -->
     <WorkspaceCreateModal
@@ -203,3 +208,15 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.sidebar-list-enter-active,
+.sidebar-list-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.sidebar-list-enter-from,
+.sidebar-list-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+</style>

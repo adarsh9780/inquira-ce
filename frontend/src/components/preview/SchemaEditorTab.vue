@@ -133,14 +133,17 @@
         </div>
 
         <div class="pb-2">
-          <label class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Data Description</label>
+          <label class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">LLM Context Hint (Recommended)</label>
+          <p class="mb-1 text-xs" style="color: var(--color-text-muted);">
+            Briefly describe business meaning, domain terms, and how this dataset should be interpreted. This helps the LLM generate better analysis.
+          </p>
           <textarea
             v-model="schemaContext"
             @input="schemaEdited = true"
             rows="3"
             class="w-full resize-y rounded-md border px-2 py-2 text-sm leading-5 outline-none"
             style="border-color: color-mix(in srgb, var(--color-border) 45%, transparent); color: var(--color-text-main); background-color: color-mix(in srgb, var(--color-surface) 72%, var(--color-base));"
-            placeholder="Describe your dataset context..."
+            placeholder="Example: Daily transaction-level sales data for retail stores. Revenue is in USD. 'channel' means online vs in-store."
           ></textarea>
         </div>
 
@@ -606,6 +609,48 @@ function clearCache() {
   }
 }
 
+async function persistExportJsonFile(defaultFileName, payloadBytes) {
+  if (window.__TAURI_INTERNALS__) {
+    const { save } = await import('@tauri-apps/plugin-dialog')
+    const savePath = await save({
+      defaultPath: defaultFileName,
+      filters: [{ name: 'JSON File', extensions: ['json'] }]
+    })
+    if (!savePath) return false
+    const { writeFile } = await import('@tauri-apps/plugin-fs')
+    await writeFile(savePath, payloadBytes)
+    return true
+  }
+
+  if (typeof window.showSaveFilePicker === 'function') {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: defaultFileName,
+        types: [{ description: 'JSON File', accept: { 'application/json': ['.json'] } }]
+      })
+      const writable = await handle.createWritable()
+      await writable.write(payloadBytes)
+      await writable.close()
+      return true
+    } catch (error) {
+      if (error?.name === 'AbortError') return false
+      throw error
+    }
+  }
+
+  const blob = new Blob([payloadBytes], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.setAttribute('href', url)
+  link.setAttribute('download', defaultFileName)
+  link.style.visibility = 'hidden'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+  return true
+}
+
 async function exportSchema() {
   try {
     if (!schema.value || schema.value.length === 0) {
@@ -617,16 +662,14 @@ async function exportSchema() {
       context: schemaContext.value || '',
       columns: schema.value,
     }
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${selectedDatasetTable.value || 'schema'}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    toast.success('Schema exported', `${selectedDatasetTable.value || 'schema'}.json downloaded.`)
+    const filename = `${selectedDatasetTable.value || 'schema'}.json`
+    const bytes = new TextEncoder().encode(JSON.stringify(payload, null, 2))
+    const exported = await persistExportJsonFile(filename, bytes)
+    if (!exported) {
+      toast.info('Export canceled')
+      return
+    }
+    toast.success('Schema exported', `${filename} saved.`)
   } catch (_e) {
     toast.error('Export failed', 'Unable to export schema file.')
   }

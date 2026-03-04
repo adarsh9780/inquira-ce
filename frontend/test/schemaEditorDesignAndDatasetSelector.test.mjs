@@ -10,6 +10,8 @@ test('schema editor follows shared UI language and supports dataset dropdown + m
   assert.equal(source.includes('<HeaderDropdown'), true)
   assert.equal(source.includes('v-model="selectedDatasetTable"'), true)
   assert.equal(source.includes('placeholder="Select dataset"'), true)
+  assert.equal(source.includes('LLM Context Hint (Recommended)'), true)
+  assert.equal(source.includes('This helps the LLM generate better analysis.'), true)
   assert.equal(source.includes('rows="2"'), true)
   assert.equal(source.includes('Enter one or more lines to describe this column'), true)
   assert.equal(source.includes('<input type="text"'), false)

@@ -3,9 +3,9 @@
     
     <!-- Top Workspace Area (Chat/Code & Data Panes) -->
     <div 
-      v-show="appStore.activeTab === 'workspace'" 
-      class="flex w-full overflow-hidden"
-      :style="{ height: appStore.isTerminalOpen ? (100 - appStore.terminalHeight) + '%' : '100%' }"
+      v-show="isWorkspaceActive"
+      class="flex w-full overflow-hidden transition-[height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+      :style="{ height: workspaceVisualHeight + '%' }"
     >
       <!-- Left Pane (Chat / Code) -->
       <div 
@@ -32,16 +32,18 @@
 
     <!-- Horizontal Resizer Handle (Workspace/Terminal panes) -->
     <div
-      v-show="appStore.activeTab === 'workspace' && appStore.isTerminalOpen"
-      class="h-[3px] w-full hover:h-1 bg-transparent hover:bg-zinc-300 cursor-row-resize z-20 transition-all duration-150 relative -my-[1px] hover:shadow-[0_0_6px_rgba(0,0,0,0.15)]"
-      @mousedown="startResizeY"
+      v-if="isWorkspaceActive"
+      class="w-full bg-transparent z-20 relative -my-[1px] transition-[height,opacity,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+      :class="appStore.isTerminalOpen ? 'h-[3px] hover:h-1 cursor-row-resize opacity-100 hover:bg-zinc-300 hover:shadow-[0_0_6px_rgba(0,0,0,0.15)]' : 'h-0 opacity-0 pointer-events-none'"
+      @mousedown="appStore.isTerminalOpen && startResizeY($event)"
     ></div>
 
     <!-- Bottom Pane (Terminal View) -->
     <div
-      v-show="appStore.isTerminalOpen && appStore.activeTab === 'workspace'"
-      class="w-full flex flex-col border-t z-10 overflow-hidden"
-      :style="{ height: appStore.terminalHeight + '%', borderColor: 'var(--color-border)', backgroundColor: 'var(--color-base)' }"
+      v-if="isWorkspaceActive"
+      class="w-full flex flex-col border-t z-10 overflow-hidden transition-[height,opacity,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+      :class="appStore.isTerminalOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'"
+      :style="{ height: terminalVisualHeight + '%', borderColor: appStore.isTerminalOpen ? 'var(--color-border)' : 'transparent', backgroundColor: 'var(--color-base)' }"
     >
       <div class="flex justify-between items-center px-4 py-1.5 border-b" style="background-color: var(--color-base); border-color: var(--color-border);">
         <div class="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5" style="color: var(--color-text-muted);">
@@ -86,7 +88,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import WorkspaceLeftPane from './WorkspaceLeftPane.vue'
 import WorkspaceRightPane from './WorkspaceRightPane.vue'
@@ -95,6 +97,12 @@ import SchemaEditorTab from '../preview/SchemaEditorTab.vue'
 import { CommandLineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
+const isWorkspaceActive = computed(() => appStore.activeTab === 'workspace')
+const terminalVisualHeight = computed(() => {
+  if (!isWorkspaceActive.value) return 0
+  return appStore.isTerminalOpen ? appStore.terminalHeight : 0
+})
+const workspaceVisualHeight = computed(() => 100 - terminalVisualHeight.value)
 
 // Resizing Logic
 const panelRef = ref(null)
