@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import desc, select
+from sqlalchemy import delete, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import WorkspaceDataset
@@ -46,3 +46,10 @@ class DatasetRepository:
             .order_by(desc(WorkspaceDataset.updated_at))
         )
         return list(result.scalars().all())
+
+    @staticmethod
+    async def delete_for_workspace(session: AsyncSession, workspace_id: str) -> None:
+        """Delete dataset metadata rows for one workspace."""
+        await session.execute(
+            delete(WorkspaceDataset).where(WorkspaceDataset.workspace_id == workspace_id)
+        )

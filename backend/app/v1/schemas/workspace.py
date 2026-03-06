@@ -11,6 +11,12 @@ class WorkspaceCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
 
 
+class WorkspaceRenameRequest(BaseModel):
+    """Workspace rename payload."""
+
+    name: str = Field(min_length=1, max_length=120)
+
+
 class WorkspaceResponse(BaseModel):
     """Workspace response payload."""
 
@@ -43,3 +49,11 @@ class WorkspaceDeletionJobListResponse(BaseModel):
     """List active deletion jobs response."""
 
     jobs: list[WorkspaceDeletionJobResponse]
+
+
+class WorkspaceDatabaseClearResponse(BaseModel):
+    """Workspace database clear payload."""
+
+    workspace_id: str
+    cleared: bool
+    detail: str

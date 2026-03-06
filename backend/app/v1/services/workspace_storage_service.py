@@ -28,6 +28,11 @@ class WorkspaceStorageService:
     @staticmethod
     def build_duckdb_path(username: str, workspace_id: str) -> Path:
         """Return workspace DuckDB path."""
+        return WorkspaceStorageService.build_workspace_dir(username, workspace_id) / "workspace.db"
+
+    @staticmethod
+    def build_legacy_duckdb_path(username: str, workspace_id: str) -> Path:
+        """Return legacy workspace DuckDB path (pre-`workspace.db` migration)."""
         return WorkspaceStorageService.build_workspace_dir(username, workspace_id) / "workspace.duckdb"
 
     @staticmethod
@@ -55,6 +60,7 @@ class WorkspaceStorageService:
         """Create workspace directories and return workspace root path."""
         workspace_dir = WorkspaceStorageService.build_workspace_dir(username, workspace_id)
         duckdb_path = WorkspaceStorageService.build_duckdb_path(username, workspace_id)
+        legacy_duckdb_path = WorkspaceStorageService.build_legacy_duckdb_path(username, workspace_id)
 
         def _create() -> None:
             import duckdb
@@ -81,7 +87,7 @@ class WorkspaceStorageService:
 
             # Bootstrap an empty but valid workspace DuckDB file so kernel read-only
             # connections do not fail for fresh workspaces with no datasets yet.
-            if not duckdb_path.exists():
+            if not duckdb_path.exists() and not legacy_duckdb_path.exists():
                 con = duckdb.connect(str(duckdb_path))
                 con.close()
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import warnings
 from pathlib import Path
 from typing import Literal
 
@@ -64,7 +65,13 @@ def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
             ]
         )
         chain = prompt | model.with_structured_output(RouteDecision)
-        decision = chain.invoke({"messages": messages})
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=r"^Pydantic serializer warnings:",
+                category=UserWarning,
+            )
+            decision = chain.invoke({"messages": messages})
         route = str(getattr(decision, "route", "")).strip().lower()
         if route in {"analysis", "general_chat", "unsafe"}:
             return route

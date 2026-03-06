@@ -462,6 +462,28 @@ async def _require_workspace_access(
     return workspace
 
 
+def _workspace_db_missing_detail(duckdb_path: str) -> str:
+    return (
+        "Workspace database is missing.\n"
+        f"Expected path: {duckdb_path}\n"
+        "Please re-create the workspace data by selecting the original dataset again."
+    )
+
+
+def _is_managed_workspace_path(duckdb_path: str) -> bool:
+    parts = {part.lower() for part in Path(str(duckdb_path or "")).expanduser().parts}
+    return ".inquira" in parts and "workspaces" in parts
+
+
+def _ensure_workspace_db_exists_or_raise(duckdb_path: str) -> None:
+    resolved = Path(str(duckdb_path or "")).expanduser()
+    if resolved.exists():
+        return
+    if not _is_managed_workspace_path(str(resolved)):
+        return
+    raise HTTPException(status_code=409, detail=_workspace_db_missing_detail(str(resolved)))
+
+
 @router.get("/workspaces/{workspace_id}/paths", response_model=WorkspacePathsResponse)
 async def get_workspace_paths(
     workspace_id: str,
@@ -487,6 +509,7 @@ async def execute_workspace_code(
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
     if _INSTALL_BLOCK_RE.search(payload.code or ""):
         raise HTTPException(
             status_code=400,
@@ -863,6 +886,7 @@ async def bootstrap_workspace_runtime_endpoint(
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
     websocket_user_id = _resolve_websocket_user_id(current_user.id)
 
     async def _progress(stage: str, message: str) -> None:
@@ -954,6 +978,7 @@ async def restart_workspace_kernel_runtime(
 
 async def _restart_workspace_kernel(workspace_id: str, workspace: Any) -> KernelResetResponse:
     """Shared reset/restart flow: reset session then warm-start kernel."""
+    _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
     await reset_workspace_kernel(workspace_id)
     try:
         ready = await bootstrap_workspace_runtime(

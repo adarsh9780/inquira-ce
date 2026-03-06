@@ -382,23 +382,24 @@ async function handleSubmit() {
 
     let errorTitle = 'Analysis Failed'
     let errorMessage = 'Failed to generate code. Please try again.'
+    const status = Number(error?.response?.status ?? error?.status ?? 0)
 
     if (error.name === 'AbortError' || signal.aborted) {
       errorTitle = 'Request Cancelled'
       errorMessage = 'Your query was cancelled due to timeout.'
-    } else if (error.response?.status === 400) {
+    } else if (status === 400) {
       errorTitle = 'Invalid Request'
       errorMessage = extractApiErrorMessage(error, 'The request is invalid. Please review your dataset and schema setup.')
-    } else if (error.response?.status === 401) {
+    } else if (status === 401) {
       errorTitle = 'Authentication Error'
       errorMessage = 'Please check your API key and try again.'
-    } else if (error.response?.status === 403) {
+    } else if (status === 403) {
       errorTitle = 'Access Denied'
       errorMessage = 'You do not have permission to perform this action.'
-    } else if (error.response?.status === 429) {
+    } else if (status === 429) {
       errorTitle = 'Rate Limit Exceeded'
       errorMessage = 'Too many requests. Please wait a moment and try again.'
-    } else if (error.response?.status >= 500) {
+    } else if (status >= 500) {
       errorTitle = 'Server Error'
       errorMessage = 'The server encountered an error. Please try again later.'
     } else if (error.code === 'NETWORK_ERROR' || !navigator.onLine) {

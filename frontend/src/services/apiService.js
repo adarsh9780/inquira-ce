@@ -543,6 +543,14 @@ export const apiService = {
     return v1Api.workspaces.activate(workspaceId)
   },
 
+  async v1RenameWorkspace(workspaceId, name) {
+    return v1Api.workspaces.rename(workspaceId, name)
+  },
+
+  async v1ClearWorkspaceDatabase(workspaceId) {
+    return v1Api.workspaces.clearDatabase(workspaceId)
+  },
+
   async v1DeleteWorkspace(workspaceId) {
     return v1Api.workspaces.remove(workspaceId)
   },

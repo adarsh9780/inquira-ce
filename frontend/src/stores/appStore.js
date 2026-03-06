@@ -933,6 +933,37 @@ export const useAppStore = defineStore('app', () => {
     saveLocalConfig()
   }
 
+  async function renameWorkspace(workspaceId, name) {
+    const updated = await apiService.v1RenameWorkspace(workspaceId, name)
+    const idx = workspaces.value.findIndex((ws) => ws.id === workspaceId)
+    if (idx >= 0) {
+      workspaces.value[idx] = { ...workspaces.value[idx], ...updated }
+    }
+    saveLocalConfig()
+    return updated
+  }
+
+  async function clearWorkspaceDatabase(workspaceId) {
+    const result = await apiService.v1ClearWorkspaceDatabase(workspaceId)
+    if (activeWorkspaceId.value === workspaceId) {
+      dataFilePath.value = ''
+      ingestedTableName.value = ''
+      ingestedColumns.value = []
+      schemaFileId.value = ''
+      isSchemaFileUploaded.value = false
+      generatedCode.value = ''
+      pythonFileContent.value = ''
+      resultData.value = null
+      plotlyFigure.value = null
+      dataPaneError.value = ''
+      setDataframes([])
+      setFigures([])
+      tablePageOffsets.value = {}
+      saveLocalConfig()
+    }
+    return result
+  }
+
   async function fetchConversations() {
     if (!activeWorkspaceId.value) return
     const response = await apiService.v1ListConversations(activeWorkspaceId.value, 50)
@@ -1609,6 +1640,8 @@ export const useAppStore = defineStore('app', () => {
     createWorkspace,
     deleteWorkspaceAsync,
     activateWorkspace,
+    renameWorkspace,
+    clearWorkspaceDatabase,
     fetchConversations,
     createConversation,
     fetchConversationTurns,

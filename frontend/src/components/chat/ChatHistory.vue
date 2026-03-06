@@ -584,11 +584,11 @@ function isNearBottom() {
 }
 
 function scrollToBottom() {
-  if (!end.value) return
-
   nextTick(() => {
+    const endEl = end.value
+    if (!endEl) return
     const behavior = appStore.isLoading ? 'auto' : 'smooth'
-    end.value.scrollIntoView({ behavior, block: 'end' })
+    endEl.scrollIntoView({ behavior, block: 'end' })
   })
 }
 

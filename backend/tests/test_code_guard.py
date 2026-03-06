@@ -26,12 +26,48 @@ def test_code_guard_blocks_empty_code():
 
 def test_code_guard_node_preserves_valid_code():
     agent = InquiraAgent()
-    code = "import duckdb\ncon = duckdb.connect()"
+    code = "df = conn.sql('SELECT 1 AS value').fetchdf()"
     state = State(messages=[], code=code, table_name="events")
 
     result = agent.code_guard(state, {})
     assert result["guard_status"] == "ok"
     assert result["code"] == code
+
+
+def test_code_guard_blocks_new_duckdb_connections():
+    code = """
+import duckdb
+db = duckdb.connect("local.duckdb")
+db.sql("SELECT 1").fetchall()
+"""
+    result = guard_code(code, table_name="events")
+    assert result.blocked is True
+    assert result.should_retry is True
+    assert "Do not create a new DuckDB connection" in (result.reason or "")
+
+
+def test_code_guard_blocks_new_duckdb_connections_with_alias_import():
+    code = """
+import duckdb as ddb
+db = ddb.connect("local.duckdb")
+db.sql("SELECT 1").fetchall()
+"""
+    result = guard_code(code, table_name="events")
+    assert result.blocked is True
+    assert result.should_retry is True
+    assert "Do not create a new DuckDB connection" in (result.reason or "")
+
+
+def test_code_guard_blocks_new_duckdb_connections_with_from_import():
+    code = """
+from duckdb import connect
+db = connect("local.duckdb")
+db.sql("SELECT 1").fetchall()
+"""
+    result = guard_code(code, table_name="events")
+    assert result.blocked is True
+    assert result.should_retry is True
+    assert "Do not create a new DuckDB connection" in (result.reason or "")
 
 
 def test_code_guard_blocks_plotly_with_narwhals_wrapper():

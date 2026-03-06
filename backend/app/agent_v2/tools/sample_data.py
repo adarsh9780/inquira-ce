@@ -32,9 +32,13 @@ def sample_data(*, data_path: str | None, table_name: str | None, limit: int = 5
         return output
 
     query = f'SELECT * FROM "{table_name}" LIMIT {safe_limit}'
-    con = duckdb.connect(data_path, read_only=True)
     try:
-        df = con.execute(query).fetchdf()
+        con = duckdb.connect(data_path, read_only=True)
+        try:
+            df = con.execute(query).fetchdf()
+        finally:
+            con.close()
+
         output = {
             "rows": df.head(safe_limit).to_dict(orient="records"),
             "columns": [str(c) for c in list(df.columns)],
@@ -56,5 +60,3 @@ def sample_data(*, data_path: str | None, table_name: str | None, limit: int = 5
             },
         )
         return {"rows": [], "columns": [], "row_count": 0, "error": str(exc)}
-    finally:
-        con.close()

@@ -600,6 +600,31 @@ class ChatService:
         return merged
 
     @staticmethod
+    def _workspace_db_missing_detail(duckdb_path: str) -> str:
+        return (
+            "Workspace database is missing.\n"
+            f"Expected path: {duckdb_path}\n"
+            "Please re-create the workspace data by selecting the original dataset again."
+        )
+
+    @staticmethod
+    def _should_enforce_workspace_db_presence(duckdb_path: str) -> bool:
+        parts = {part.lower() for part in Path(str(duckdb_path or "")).expanduser().parts}
+        return ".inquira" in parts and "workspaces" in parts
+
+    @staticmethod
+    def _ensure_workspace_db_exists(duckdb_path: str) -> None:
+        resolved = Path(str(duckdb_path or "")).expanduser()
+        if resolved.exists():
+            return
+        if not ChatService._should_enforce_workspace_db_presence(str(resolved)):
+            return
+        raise HTTPException(
+            status_code=409,
+            detail=ChatService._workspace_db_missing_detail(str(resolved)),
+        )
+
+    @staticmethod
     async def _preflight_check(
         session: AsyncSession,
         user,
@@ -613,6 +638,8 @@ class ChatService:
         workspace = await WorkspaceRepository.get_by_id(session, workspace_id, user.id)
         if workspace is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
+        workspace_duckdb_path = str(workspace.duckdb_path)
+        ChatService._ensure_workspace_db_exists(workspace_duckdb_path)
 
         conversation = None
         if conversation_id:
@@ -634,7 +661,6 @@ class ChatService:
 
         schema: dict[str, Any] | None = None
         table_name: str | None = None
-        workspace_duckdb_path = str(workspace.duckdb_path)
 
         def _normalize_table_name(raw: str) -> str:
             return "".join(c if c.isalnum() or c == "_" else "_" for c in raw.strip()).lower()

@@ -808,9 +808,16 @@ class WorkspaceKernelManager:
 
     def _ensure_workspace_duckdb_file(self, workspace_duckdb_path: str) -> None:
         workspace_db = Path(workspace_duckdb_path)
-        workspace_db.parent.mkdir(parents=True, exist_ok=True)
         if workspace_db.exists():
             return
+        parts = {part.lower() for part in workspace_db.expanduser().parts}
+        if ".inquira" in parts and "workspaces" in parts:
+            raise RuntimeError(
+                "Workspace database is missing. "
+                f"Expected path: {workspace_db}. "
+                "Re-create data by selecting the original dataset again."
+            )
+        workspace_db.parent.mkdir(parents=True, exist_ok=True)
         con = duckdb.connect(str(workspace_db))
         con.close()
 

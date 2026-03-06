@@ -52,8 +52,12 @@ def _stringify_content(content: Any) -> str:
     if isinstance(content, dict):
         if content.get("type") == "text":
             return str(content.get("text") or "")
-        return json.dumps(content, ensure_ascii=True)
+        return json.dumps(content, ensure_ascii=True, default=str)
     return str(content)
+
+
+def _safe_json_dumps(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=True, default=str)
 
 
 def _latest_user_text(messages: list[AnyMessage]) -> str:
@@ -201,7 +205,13 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
             ("system", _ANALYSIS_PROMPT),
             (
                 "system",
-                "Table: {table_name}\nSchema: {schema_json}\nSample rows: {sample_json}\nContext: {context}",
+                (
+                    "Workspace database path: {workspace_db_path}\n"
+                    "Table: {table_name}\n"
+                    "Schema: {schema_json}\n"
+                    "Sample rows: {sample_json}\n"
+                    "Context: {context}"
+                ),
             ),
             MessagesPlaceholder("messages"),
         ]
@@ -230,8 +240,9 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
             {
                 "messages": call_messages,
                 "table_name": table_name or "data_table",
-                "schema_json": json.dumps(schema_info, ensure_ascii=True),
-                "sample_json": json.dumps(sample, ensure_ascii=True),
+                "workspace_db_path": data_path or "",
+                "schema_json": _safe_json_dumps(schema_info),
+                "sample_json": _safe_json_dumps(sample),
                 "context": str(state.get("context") or ""),
             },
         )

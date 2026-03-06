@@ -8,9 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db.session import get_appdata_db_session
 from ..schemas.workspace import (
     WorkspaceCreateRequest,
+    WorkspaceDatabaseClearResponse,
     WorkspaceDeletionJobListResponse,
     WorkspaceDeletionJobResponse,
     WorkspaceListResponse,
+    WorkspaceRenameRequest,
     WorkspaceResponse,
 )
 from ..services.workspace_deletion_service import WorkspaceDeletionService
@@ -84,6 +86,44 @@ async def activate_workspace(
         duckdb_path=ws.duckdb_path,
         created_at=ws.created_at,
         updated_at=ws.updated_at,
+    )
+
+
+@router.patch("/{workspace_id}", response_model=WorkspaceResponse)
+async def rename_workspace(
+    workspace_id: str,
+    payload: WorkspaceRenameRequest,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Rename a workspace owned by the authenticated user."""
+    ws = await WorkspaceService.rename_workspace(session, current_user, workspace_id, payload.name)
+    return WorkspaceResponse(
+        id=ws.id,
+        name=ws.name,
+        is_active=bool(ws.is_active),
+        duckdb_path=ws.duckdb_path,
+        created_at=ws.created_at,
+        updated_at=ws.updated_at,
+    )
+
+
+@router.post("/{workspace_id}/database/clear", response_model=WorkspaceDatabaseClearResponse)
+async def clear_workspace_database(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Clear workspace DB/scratchpad content and reset dataset catalog metadata."""
+    cleared, detail = await WorkspaceService.clear_workspace_database(
+        session=session,
+        user=current_user,
+        workspace_id=workspace_id,
+    )
+    return WorkspaceDatabaseClearResponse(
+        workspace_id=workspace_id,
+        cleared=bool(cleared),
+        detail=detail,
     )
 
 

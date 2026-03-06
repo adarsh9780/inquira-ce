@@ -16,7 +16,7 @@ async def test_hard_delete_workspace_removes_entire_workspace_directory(monkeypa
 
     workspace_dir = WorkspaceStorageService.build_workspace_dir("alice", "ws-1")
     workspace_dir.mkdir(parents=True, exist_ok=True)
-    (workspace_dir / "workspace.duckdb").write_text("db", encoding="utf-8")
+    (workspace_dir / "workspace.db").write_text("db", encoding="utf-8")
     (workspace_dir / "agent_memory.db").write_text("mem", encoding="utf-8")
     (workspace_dir / "meta").mkdir(parents=True, exist_ok=True)
     (workspace_dir / "meta" / "table_schema.json").write_text("{}", encoding="utf-8")
@@ -56,7 +56,7 @@ async def test_ensure_workspace_dirs_bootstraps_valid_workspace_duckdb(monkeypat
     )
 
     workspace_dir = await WorkspaceStorageService.ensure_workspace_dirs("test", "ws-3")
-    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path = workspace_dir / "workspace.db"
 
     assert duckdb_path.exists() is True
 

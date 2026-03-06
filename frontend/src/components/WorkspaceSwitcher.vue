@@ -36,6 +36,7 @@
             isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : ''
           ]"
           @click="!isWorkspaceDeleting(ws.id) && activateWorkspace(ws.id)"
+          @contextmenu.prevent="!isWorkspaceDeleting(ws.id) && openWorkspaceContextMenu($event, ws.id)"
         >
           <span class="truncate" :class="isWorkspaceDeleting(ws.id) ? 'text-gray-400' : ''">{{ ws.name }}</span>
           <button
@@ -50,12 +51,46 @@
     </div>
   </div>
 
+  <div
+    v-if="isWorkspaceContextMenuOpen"
+    ref="contextMenuRef"
+    class="fixed z-[80] w-56 rounded-lg border border-gray-200 bg-white shadow-xl py-1"
+    :style="{ left: `${workspaceContextMenuX}px`, top: `${workspaceContextMenuY}px` }"
+  >
+    <button
+      class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+      @click="openRenameDialogFromContext"
+    >
+      Rename Workspace
+    </button>
+    <button
+      class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+      @click="confirmClearWorkspaceFromContext"
+    >
+      Clear Workspace Database
+    </button>
+    <button
+      class="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+      @click="confirmDeleteWorkspaceFromContext"
+    >
+      Delete Workspace
+    </button>
+  </div>
+
   <WorkspaceCreateModal
     :is-open="isCreateDialogOpen"
     :is-submitting="isCreatingWorkspace"
     :plan="authStore.planLabel"
     @close="closeCreateDialog"
     @submit="createWorkspace"
+  />
+
+  <WorkspaceRenameModal
+    :is-open="isRenameDialogOpen"
+    :is-submitting="isRenamingWorkspace"
+    :initial-name="pendingRenameWorkspaceName"
+    @close="closeRenameDialog"
+    @submit="renameWorkspace"
   />
 
   <ConfirmationModal
@@ -67,6 +102,16 @@
     @close="closeDeleteDialog"
     @confirm="deleteWorkspace"
   />
+
+  <ConfirmationModal
+    :is-open="isClearDbDialogOpen"
+    title="Clear Workspace Database"
+    :message="clearDbDialogMessage"
+    confirm-text="Clear Database"
+    cancel-text="Cancel"
+    @close="closeClearDbDialog"
+    @confirm="clearWorkspaceDatabase"
+  />
 </template>
 
 <script setup>
@@ -76,6 +121,7 @@ import { useAuthStore } from '../stores/authStore'
 import { toast } from '../composables/useToast'
 import { extractApiErrorMessage } from '../utils/apiError'
 import WorkspaceCreateModal from './modals/WorkspaceCreateModal.vue'
+import WorkspaceRenameModal from './modals/WorkspaceRenameModal.vue'
 import ConfirmationModal from './modals/ConfirmationModal.vue'
 
 const appStore = useAppStore()
@@ -86,6 +132,17 @@ const isCreateDialogOpen = ref(false)
 const isCreatingWorkspace = ref(false)
 const isDeleteDialogOpen = ref(false)
 const pendingDeleteWorkspaceId = ref('')
+const isClearDbDialogOpen = ref(false)
+const pendingClearDbWorkspaceId = ref('')
+const isRenameDialogOpen = ref(false)
+const isRenamingWorkspace = ref(false)
+const pendingRenameWorkspaceId = ref('')
+const pendingRenameWorkspaceName = ref('')
+const isWorkspaceContextMenuOpen = ref(false)
+const workspaceContextMenuX = ref(0)
+const workspaceContextMenuY = ref(0)
+const contextWorkspaceId = ref('')
+const contextMenuRef = ref(null)
 
 const activeWorkspaceName = computed(() => {
   const active = appStore.workspaces.find((w) => w.id === appStore.activeWorkspaceId)
@@ -110,6 +167,7 @@ async function activateWorkspace(workspaceId) {
 }
 
 function openCreateDialog() {
+  closeWorkspaceContextMenu()
   isOpen.value = false
   isCreateDialogOpen.value = true
 }
@@ -139,6 +197,7 @@ function isWorkspaceDeleting(workspaceId) {
 }
 
 function confirmDeleteWorkspace(workspaceId) {
+  closeWorkspaceContextMenu()
   pendingDeleteWorkspaceId.value = workspaceId
   isDeleteDialogOpen.value = true
 }
@@ -166,9 +225,98 @@ async function deleteWorkspace() {
   }
 }
 
+function openWorkspaceContextMenu(event, workspaceId) {
+  const targetId = String(workspaceId || '')
+  if (!targetId) return
+  contextWorkspaceId.value = targetId
+  workspaceContextMenuX.value = Number(event?.clientX || 0)
+  workspaceContextMenuY.value = Number(event?.clientY || 0)
+  isWorkspaceContextMenuOpen.value = true
+}
+
+function closeWorkspaceContextMenu() {
+  isWorkspaceContextMenuOpen.value = false
+  contextWorkspaceId.value = ''
+}
+
+function openRenameDialogFromContext() {
+  const workspaceId = contextWorkspaceId.value
+  const ws = appStore.workspaces.find((item) => item.id === workspaceId)
+  closeWorkspaceContextMenu()
+  if (!workspaceId || !ws) return
+  pendingRenameWorkspaceId.value = workspaceId
+  pendingRenameWorkspaceName.value = ws.name || ''
+  isRenameDialogOpen.value = true
+}
+
+function closeRenameDialog() {
+  if (isRenamingWorkspace.value) return
+  isRenameDialogOpen.value = false
+  pendingRenameWorkspaceId.value = ''
+  pendingRenameWorkspaceName.value = ''
+}
+
+async function renameWorkspace(name) {
+  const workspaceId = pendingRenameWorkspaceId.value
+  if (!workspaceId || !name) return
+  isRenamingWorkspace.value = true
+  try {
+    await appStore.renameWorkspace(workspaceId, name)
+    toast.success('Workspace Updated', 'Workspace name updated successfully.')
+    closeRenameDialog()
+  } catch (error) {
+    toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to rename workspace'))
+  } finally {
+    isRenamingWorkspace.value = false
+  }
+}
+
+function confirmClearWorkspaceFromContext() {
+  const workspaceId = contextWorkspaceId.value
+  closeWorkspaceContextMenu()
+  if (!workspaceId) return
+  pendingClearDbWorkspaceId.value = workspaceId
+  isClearDbDialogOpen.value = true
+}
+
+function closeClearDbDialog() {
+  isClearDbDialogOpen.value = false
+  pendingClearDbWorkspaceId.value = ''
+}
+
+const clearDbDialogMessage = computed(() => {
+  const target = appStore.workspaces.find((ws) => ws.id === pendingClearDbWorkspaceId.value)
+  const name = target?.name || 'this workspace'
+  return `Clear ${name} database and scratchpad artifacts? You will need to re-select the original dataset to rebuild workspace data.`
+})
+
+async function clearWorkspaceDatabase() {
+  const workspaceId = pendingClearDbWorkspaceId.value
+  if (!workspaceId) return
+  try {
+    const result = await appStore.clearWorkspaceDatabase(workspaceId)
+    toast.success('Workspace Database Cleared', result?.detail || 'Workspace database cleared.')
+    closeClearDbDialog()
+  } catch (error) {
+    toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to clear workspace database'))
+  }
+}
+
+function confirmDeleteWorkspaceFromContext() {
+  const workspaceId = contextWorkspaceId.value
+  closeWorkspaceContextMenu()
+  if (!workspaceId) return
+  confirmDeleteWorkspace(workspaceId)
+}
+
 function handleClickOutside(event) {
-  if (containerRef.value && !containerRef.value.contains(event.target)) {
+  const clickedOutsideDropdown = containerRef.value && !containerRef.value.contains(event.target)
+  const clickedOutsideContextMenu = contextMenuRef.value && !contextMenuRef.value.contains(event.target)
+  if (clickedOutsideDropdown) {
     isOpen.value = false
+  }
+  if (clickedOutsideContextMenu) {
+    closeWorkspaceContextMenu()
   }
 }
 

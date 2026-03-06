@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import ast
 import re
 
 
@@ -9,6 +10,45 @@ class CodeGuardResult:
     blocked: bool
     should_retry: bool = False
     reason: str | None = None
+
+
+def _contains_duckdb_connect(raw: str) -> bool:
+    if re.search(r"\bduckdb\.connect\s*\(", raw):
+        return True
+
+    try:
+        tree = ast.parse(raw)
+    except SyntaxError:
+        return False
+
+    duckdb_aliases: set[str] = {"duckdb"}
+    connect_aliases: set[str] = set()
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "duckdb":
+                    duckdb_aliases.add(alias.asname or "duckdb")
+        elif isinstance(node, ast.ImportFrom) and node.module == "duckdb":
+            for alias in node.names:
+                if alias.name in {"connect", "*"}:
+                    connect_aliases.add(alias.asname or "connect")
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        fn = node.func
+        if (
+            isinstance(fn, ast.Attribute)
+            and fn.attr == "connect"
+            and isinstance(fn.value, ast.Name)
+            and fn.value.id in duckdb_aliases
+        ):
+            return True
+        if isinstance(fn, ast.Name) and fn.id in connect_aliases:
+            return True
+
+    return False
 
 
 def guard_code(
@@ -33,6 +73,18 @@ def guard_code(
             reason=(
                 "Legacy `await query(...)` bridge detected. "
                 "Use `conn.sql(...).fetchdf()` with a backend DuckDB connection."
+            ),
+        )
+
+    if _contains_duckdb_connect(raw):
+        return CodeGuardResult(
+            code=raw,
+            changed=False,
+            blocked=True,
+            should_retry=True,
+            reason=(
+                "Do not create a new DuckDB connection in generated code. "
+                "Use the pre-provisioned read-only workspace connection `conn`."
             ),
         )
 
