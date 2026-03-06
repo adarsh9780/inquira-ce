@@ -460,7 +460,9 @@ export const useAppStore = defineStore('app', () => {
     return {
       planText: '',
       planNode: '',
-      events: []
+      events: [],
+      toolCalls: [],
+      intervention: null
     }
   }
 
@@ -483,6 +485,12 @@ export const useAppStore = defineStore('app', () => {
     if (typeof message.streamTrace.planNode !== 'string') {
       message.streamTrace.planNode = ''
     }
+    if (!Array.isArray(message.streamTrace.toolCalls)) {
+      message.streamTrace.toolCalls = []
+    }
+    if (message.streamTrace.intervention !== null && typeof message.streamTrace.intervention !== 'object') {
+      message.streamTrace.intervention = null
+    }
     return message.streamTrace
   }
 
@@ -492,7 +500,11 @@ export const useAppStore = defineStore('app', () => {
       ? {
           planText: String(options.streamTrace.planText || ''),
           planNode: String(options.streamTrace.planNode || ''),
-          events: Array.isArray(options.streamTrace.events) ? options.streamTrace.events : []
+          events: Array.isArray(options.streamTrace.events) ? options.streamTrace.events : [],
+          toolCalls: Array.isArray(options.streamTrace.toolCalls) ? options.streamTrace.toolCalls : [],
+          intervention: options.streamTrace.intervention && typeof options.streamTrace.intervention === 'object'
+            ? options.streamTrace.intervention
+            : null
         }
       : createEmptyStreamTrace()
 
@@ -549,6 +561,113 @@ export const useAppStore = defineStore('app', () => {
       output: String(event.output || ''),
       timestamp: new Date().toISOString()
     })
+  }
+
+  function appendLastMessageToolCall(event) {
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage || !event || typeof event !== 'object') return
+    const trace = ensureMessageStreamTrace(lastMessage)
+    if (!trace) return
+    const callId = String(event.call_id || '')
+    if (!callId) return
+    const existing = trace.toolCalls.find((item) => String(item.call_id || '') === callId)
+    if (existing) {
+      existing.tool = String(event.tool || existing.tool || '')
+      existing.args = event.args && typeof event.args === 'object' ? event.args : existing.args || {}
+      if (!Array.isArray(existing.lines)) existing.lines = []
+      existing.status = String(existing.status || 'running')
+      return
+    }
+    trace.toolCalls.push({
+      call_id: callId,
+      tool: String(event.tool || ''),
+      args: event.args && typeof event.args === 'object' ? event.args : {},
+      lines: [],
+      output: null,
+      status: 'running',
+      duration_ms: null,
+      started_at: new Date().toISOString(),
+    })
+  }
+
+  function appendLastMessageToolProgress(event) {
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage || !event || typeof event !== 'object') return
+    const trace = ensureMessageStreamTrace(lastMessage)
+    if (!trace) return
+    const callId = String(event.call_id || '')
+    if (!callId) return
+    const tool = trace.toolCalls.find((item) => String(item.call_id || '') === callId)
+    if (!tool) return
+    if (!Array.isArray(tool.lines)) tool.lines = []
+    tool.lines.push(String(event.line || ''))
+    if (tool.lines.length > 500) {
+      tool.lines.splice(0, tool.lines.length - 500)
+    }
+  }
+
+  function appendLastMessageToolResult(event) {
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage || !event || typeof event !== 'object') return
+    const trace = ensureMessageStreamTrace(lastMessage)
+    if (!trace) return
+    const callId = String(event.call_id || '')
+    if (!callId) return
+    const tool = trace.toolCalls.find((item) => String(item.call_id || '') === callId)
+    if (!tool) {
+      trace.toolCalls.push({
+        call_id: callId,
+        tool: '',
+        args: {},
+        lines: [],
+        output: event.output ?? null,
+        status: String(event.status || 'success'),
+        duration_ms: Number.isFinite(Number(event.duration_ms)) ? Number(event.duration_ms) : null,
+        started_at: new Date().toISOString(),
+      })
+      return
+    }
+    tool.output = event.output ?? null
+    tool.status = String(event.status || tool.status || 'success')
+    tool.duration_ms = Number.isFinite(Number(event.duration_ms)) ? Number(event.duration_ms) : null
+    tool.completed_at = new Date().toISOString()
+  }
+
+  function setLastMessageInterventionRequest(event) {
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage || !event || typeof event !== 'object') return
+    const trace = ensureMessageStreamTrace(lastMessage)
+    if (!trace) return
+    trace.intervention = {
+      id: String(event.id || ''),
+      prompt: String(event.prompt || ''),
+      options: Array.isArray(event.options) ? event.options.map((item) => String(item || '')) : [],
+      multi_select: Boolean(event.multi_select),
+      timeout_sec: Number.isFinite(Number(event.timeout_sec)) ? Number(event.timeout_sec) : null,
+      selected: [],
+      status: 'pending',
+      requested_at: new Date().toISOString(),
+    }
+  }
+
+  function setLastMessageInterventionResponse(event) {
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage || !event || typeof event !== 'object') return
+    const trace = ensureMessageStreamTrace(lastMessage)
+    if (!trace || !trace.intervention) return
+    if (String(event.id || '') !== String(trace.intervention.id || '')) return
+    trace.intervention.selected = Array.isArray(event.selected) ? event.selected.map((item) => String(item || '')) : []
+    trace.intervention.status = 'submitted'
+    trace.intervention.responded_at = new Date().toISOString()
+  }
+
+  function markLastMessageInterventionError(interventionId) {
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage) return
+    const trace = ensureMessageStreamTrace(lastMessage)
+    if (!trace || !trace.intervention) return
+    if (String(trace.intervention.id || '') !== String(interventionId || '')) return
+    trace.intervention.status = 'error'
   }
 
   function setLastMessageCodeSnapshot(code) {
@@ -1471,6 +1590,12 @@ export const useAppStore = defineStore('app', () => {
     appendLastMessageExplanationChunk,
     appendLastMessagePlanChunk,
     appendLastMessageTraceEvent,
+    appendLastMessageToolCall,
+    appendLastMessageToolProgress,
+    appendLastMessageToolResult,
+    setLastMessageInterventionRequest,
+    setLastMessageInterventionResponse,
+    markLastMessageInterventionError,
     setLastMessageCodeSnapshot,
     setWorkspaces,
     setWorkspaceDeletionJobs,

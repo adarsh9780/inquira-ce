@@ -6,8 +6,14 @@ import json
 import traceback
 
 from ..db.session import get_appdata_db_session
-from ..schemas.chat import AnalyzeRequest, AnalyzeResponse
+from ..schemas.chat import (
+    AnalyzeRequest,
+    AnalyzeResponse,
+    InterventionResponseAck,
+    InterventionResponseRequest,
+)
 from ..services.chat_service import ChatService
+from ..services.agent_intervention_service import get_agent_intervention_service
 from .deps import ensure_appdata_principal, get_current_user, get_langgraph_manager
 from ...core.logger import logprint
 
@@ -93,4 +99,25 @@ async def stream_analyze(
         event_generator(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
+
+
+@router.post(
+    "/interventions/{intervention_id}/response",
+    response_model=InterventionResponseAck,
+)
+async def respond_to_intervention(
+    intervention_id: str,
+    payload: InterventionResponseRequest,
+    current_user=Depends(get_current_user),
+):
+    """Submit a user response for a pending intervention request."""
+    accepted = await get_agent_intervention_service().submit_response(
+        intervention_id=intervention_id,
+        user_id=str(current_user.id),
+        selected=payload.selected,
+    )
+    return InterventionResponseAck(
+        intervention_id=str(intervention_id),
+        accepted=bool(accepted),
     )

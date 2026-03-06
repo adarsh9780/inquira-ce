@@ -636,6 +636,12 @@ export const apiService = {
     return v1Api.chat.analyze(payload)
   },
 
+  async v1RespondChatIntervention(interventionId, selected = []) {
+    return v1Api.chat.respondIntervention(interventionId, {
+      selected: Array.isArray(selected) ? selected : [],
+    })
+  },
+
   async v1InstallRunnerPackage(payload) {
     return v1Api.runtime.installRunnerPackage(payload)
   },

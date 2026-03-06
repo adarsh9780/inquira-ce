@@ -30,3 +30,16 @@ class AnalyzeResponse(BaseModel):
     execution: dict | None = None
     artifacts: list[dict] = Field(default_factory=list)
     final_script_artifact_id: str | None = None
+
+
+class InterventionResponseRequest(BaseModel):
+    """User decision payload for a pending agent intervention."""
+
+    selected: list[str] = Field(default_factory=list)
+
+
+class InterventionResponseAck(BaseModel):
+    """Ack payload for intervention response submissions."""
+
+    intervention_id: str
+    accepted: bool

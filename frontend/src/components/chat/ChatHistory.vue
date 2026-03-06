@@ -86,6 +86,22 @@
             </div>
           </div>
 
+          <div v-if="toolActivityRows(message).length" class="space-y-3 mt-3">
+            <ToolActivityCard
+              v-for="activity in toolActivityRows(message)"
+              :key="activity.call_id || activity.started_at"
+              :activity="activity"
+            />
+          </div>
+
+          <AgentIntervention
+            v-if="pendingIntervention(message)"
+            class="mt-3"
+            :intervention="pendingIntervention(message)"
+            :busy="isMessageInterventionBusy(message)"
+            @respond="(payload) => submitInterventionResponse(message, payload)"
+          />
+
           <div
             v-if="message.explanation"
             class="mt-4 mb-3 flex items-center gap-3"
@@ -164,11 +180,14 @@
 <script setup>
 import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
+import apiService from '../../services/apiService'
 import {
   DocumentDuplicateIcon,
   ChevronRightIcon,
   ChevronDownIcon
 } from '@heroicons/vue/24/outline'
+import ToolActivityCard from './ToolActivityCard.vue'
+import AgentIntervention from './AgentIntervention.vue'
 import MarkdownIt from 'markdown-it'
 import markdownItKatex from 'markdown-it-katex'
 import DOMPurify from 'dompurify'
@@ -192,6 +211,7 @@ const appStore = useAppStore()
 const chatContainer = ref(null)
 const end = ref(null)
 const ephemeralExpandedRows = ref(new Set())
+const pendingInterventionIds = ref(new Set())
 const suppressMutationAutoScroll = ref(false)
 const SHOW_EPHEMERAL_TRACE = false
 let shouldAutoScroll = true
@@ -373,6 +393,21 @@ function streamTraceEvents(message) {
   return Array.isArray(events) ? events : []
 }
 
+function streamToolCalls(message) {
+  const calls = message?.streamTrace?.toolCalls
+  return Array.isArray(calls) ? calls : []
+}
+
+function toolActivityRows(message) {
+  return streamToolCalls(message)
+}
+
+function pendingIntervention(message) {
+  const intervention = message?.streamTrace?.intervention
+  if (!intervention || typeof intervention !== 'object') return null
+  return intervention
+}
+
 function normalizeNodeName(nodeName) {
   return String(nodeName || '')
     .trim()
@@ -453,6 +488,8 @@ function hasAssistantContent(message) {
   return Boolean(
     message?.explanation ||
     shouldRenderCodeSnapshot(message) ||
+    toolActivityRows(message).length > 0 ||
+    pendingIntervention(message) ||
     (SHOW_EPHEMERAL_TRACE && hasStreamTrace(message)) ||
     (Array.isArray(message?.toolEvents) && message.toolEvents.length > 0)
   )
@@ -498,6 +535,43 @@ async function loadMoreTurns() {
     await appStore.fetchConversationTurns({ reset: false })
   } catch (error) {
     console.error('Failed to load more turns:', error)
+  }
+}
+
+function isInterventionBusy(interventionId) {
+  return pendingInterventionIds.value.has(String(interventionId || ''))
+}
+
+function isMessageInterventionBusy(message) {
+  const interventionId = String(message?.streamTrace?.intervention?.id || '')
+  if (!interventionId) return false
+  return isInterventionBusy(interventionId)
+}
+
+async function submitInterventionResponse(message, payload) {
+  const interventionId = String(payload?.id || '')
+  if (!interventionId || isInterventionBusy(interventionId)) return
+  pendingInterventionIds.value.add(interventionId)
+  try {
+    const selected = Array.isArray(payload?.selected) ? payload.selected.map((item) => String(item || '')) : []
+    const response = await apiService.v1RespondChatIntervention(interventionId, selected)
+    const accepted = Boolean(response?.accepted)
+    if (!accepted) {
+      throw new Error('Intervention response was rejected.')
+    }
+    if (message?.streamTrace?.intervention && String(message.streamTrace.intervention.id || '') === interventionId) {
+      message.streamTrace.intervention.selected = selected
+      message.streamTrace.intervention.status = 'submitted'
+      message.streamTrace.intervention.responded_at = new Date().toISOString()
+    }
+  } catch (error) {
+    console.error('Failed to submit intervention response:', error)
+    if (message?.streamTrace?.intervention && String(message.streamTrace.intervention.id || '') === interventionId) {
+      message.streamTrace.intervention.status = 'error'
+    }
+    toast.error('Intervention failed', 'Unable to send your response. Please try again.')
+  } finally {
+    pendingInterventionIds.value.delete(interventionId)
   }
 }
 
@@ -564,6 +638,7 @@ watch(() => appStore.activeConversationId, () => {
 watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) {
     ephemeralExpandedRows.value.clear()
+    pendingInterventionIds.value.clear()
   }
   if (shouldAutoScroll) {
     nextTick(() => scrollToBottom())

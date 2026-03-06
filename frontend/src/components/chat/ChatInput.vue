@@ -114,7 +114,10 @@ const FINAL_STREAM_NODES = new Set([
   'explain_code',
   'noncode_generator',
   'general_purpose',
-  'unsafe_rejector'
+  'unsafe_rejector',
+  'finalize',
+  'chat',
+  'reject'
 ])
 
 function handleModelChange(model) {
@@ -265,6 +268,26 @@ async function handleSubmit() {
               message: evt.data.message || '',
               output: evt.data?.output || ''
             })
+            return
+          }
+          if (evt.event === 'tool_call' && evt.data?.call_id) {
+            appStore.appendLastMessageToolCall(evt.data)
+            return
+          }
+          if (evt.event === 'tool_progress' && evt.data?.call_id) {
+            appStore.appendLastMessageToolProgress(evt.data)
+            return
+          }
+          if (evt.event === 'tool_result' && evt.data?.call_id) {
+            appStore.appendLastMessageToolResult(evt.data)
+            return
+          }
+          if (evt.event === 'intervention_request' && evt.data?.id) {
+            appStore.setLastMessageInterventionRequest(evt.data)
+            return
+          }
+          if (evt.event === 'intervention_response' && evt.data?.id) {
+            appStore.setLastMessageInterventionResponse(evt.data)
           }
         }
       }

@@ -44,7 +44,9 @@ export const v1Api = {
   },
   chat: {
     analyze: (payload) => axios.post('/api/v1/chat/analyze', payload),
-    stream: '/api/v1/chat/stream'
+    stream: '/api/v1/chat/stream',
+    respondIntervention: (interventionId, payload) =>
+      axios.post(`/api/v1/chat/interventions/${interventionId}/response`, payload)
   },
   runtime: {
     installRunnerPackage: (payload) =>

@@ -12,14 +12,15 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any
+from typing import Callable
 from typing import cast
 
 import duckdb
 from fastapi import HTTPException
-from langchain_core.messages import HumanMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...agent.graph import InputSchema, set_stream_token_emitter, reset_stream_token_emitter
+from ...agent.events import reset_agent_event_emitter, set_agent_event_emitter
+from ...agent.registry import get_agent_bindings
 from ...services.code_executor import execute_code, get_workspace_run_exports
 from ..repositories.conversation_repository import ConversationRepository
 from ..repositories.dataset_repository import DatasetRepository
@@ -28,6 +29,32 @@ from .conversation_service import ConversationService
 from .secret_storage_service import SecretStorageService
 from .workspace_storage_service import WorkspaceStorageService
 from ...core.logger import logprint
+
+LegacySetStreamEmitter = Callable[[Callable[[str, str], None] | None], Any]
+LegacyResetStreamEmitter = Callable[[Any], None]
+set_legacy_stream_token_emitter: LegacySetStreamEmitter | None
+reset_legacy_stream_token_emitter: LegacyResetStreamEmitter | None
+
+try:
+    from ...agent.graph import (
+        reset_stream_token_emitter as reset_legacy_stream_token_emitter,
+    )
+    from ...agent.graph import (
+        set_stream_token_emitter as set_legacy_stream_token_emitter,
+    )
+except Exception:  # pragma: no cover - legacy fallback only
+    set_legacy_stream_token_emitter = None
+    reset_legacy_stream_token_emitter = None
+
+
+class _AttrAccessDict(dict[str, Any]):
+    """Dict with attribute access for compatibility with legacy graph mocks."""
+
+    def __getattr__(self, name: str) -> Any:
+        try:
+            return self[name]
+        except KeyError as exc:
+            raise AttributeError(name) from exc
 
 
 class ChatService:
@@ -109,6 +136,12 @@ class ChatService:
         if content is None and isinstance(last_message, dict):
             content = last_message.get("content")
         return str(content or "").strip()
+
+    @staticmethod
+    def _coerce_input_state_for_graph(input_state: Any) -> Any:
+        if isinstance(input_state, dict) and not isinstance(input_state, _AttrAccessDict):
+            return _AttrAccessDict(input_state)
+        return input_state
 
     @staticmethod
     def _build_node_stream_payload(
@@ -699,18 +732,24 @@ class ChatService:
             active_schema_override=active_schema_override,
         )
 
+        bindings = get_agent_bindings()
         memory_path = WorkspaceStorageService.build_agent_memory_path(user.username, workspace_id)
         graph = await langgraph_manager.get_graph(workspace_id, memory_path)
 
-        input_state = InputSchema(
-            messages=[HumanMessage(content=question)],
-            active_schema=schema,
-            previous_code=current_code,
+        input_state = bindings.build_input_state(
+            question=question,
+            schema=schema,
             current_code=current_code,
             table_name=table_name,
             data_path=data_path,
             context=context or "",
+            workspace_id=workspace_id,
+            user_id=str(user.id),
+            scratchpad_path=str(
+                WorkspaceStorageService.build_scratchpad_db_path(user.username, workspace_id)
+            ),
         )
+        input_state = ChatService._coerce_input_state_for_graph(input_state)
         thread_id = f"{user.id}:{workspace_id}:{conversation_id}"
         config = {
             "configurable": {
@@ -800,10 +839,28 @@ class ChatService:
             metadata = metadata.model_dump()
         elif hasattr(metadata, "dict"):
             metadata = metadata.dict()
+        if not isinstance(metadata, dict):
+            metadata = {}
 
-        code = result.get("current_code", "") or result.get("code", "") or ""
+        route = str(result.get("route") or "").strip().lower()
+        if route == "unsafe":
+            metadata.setdefault("is_safe", False)
+            metadata.setdefault("is_relevant", False)
+        elif route == "general_chat":
+            metadata.setdefault("is_safe", True)
+            metadata.setdefault("is_relevant", False)
+        elif route:
+            metadata.setdefault("is_safe", True)
+            metadata.setdefault("is_relevant", True)
+
+        code = (
+            result.get("final_code")
+            or result.get("current_code", "")
+            or result.get("code", "")
+            or ""
+        )
         code_guard_feedback = result.get("code_guard_feedback", "") or ""
-        final_explanation = str(result.get("final_explanation") or "").strip()
+        final_explanation = str(result.get("final_explanation") or result.get("answer") or "").strip()
         explanation = final_explanation if code else ""
 
         if not code and code_guard_feedback:
@@ -877,12 +934,15 @@ class ChatService:
         """Async generator that yields incremental analysis events (SSE-compatible)."""
         event_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
         active_emitter_token = None
+        active_legacy_emitter_token = None
+        active_agent_event_token = None
+        bindings = get_agent_bindings()
 
         def queue_event(event: str, data: dict[str, Any]) -> None:
             event_queue.put_nowait({"event": event, "data": data})
 
         async def run_pipeline() -> None:
-            nonlocal active_emitter_token
+            nonlocal active_emitter_token, active_legacy_emitter_token, active_agent_event_token, bindings
             try:
                 conversation, resolved_conversation_id, schema, table_name, data_path = (
                     await ChatService._preflight_check(
@@ -901,15 +961,20 @@ class ChatService:
                 memory_path = WorkspaceStorageService.build_agent_memory_path(user.username, workspace_id)
                 graph = await langgraph_manager.get_graph(workspace_id, memory_path)
 
-                input_state = InputSchema(
-                    messages=[HumanMessage(content=question)],
-                    active_schema=schema,
-                    previous_code=current_code,
+                input_state = bindings.build_input_state(
+                    question=question,
+                    schema=schema,
                     current_code=current_code,
                     table_name=table_name,
                     data_path=data_path,
                     context=context or "",
+                    workspace_id=workspace_id,
+                    user_id=str(user.id),
+                    scratchpad_path=str(
+                        WorkspaceStorageService.build_scratchpad_db_path(user.username, workspace_id)
+                    ),
                 )
+                input_state = ChatService._coerce_input_state_for_graph(input_state)
                 thread_id = f"{user.id}:{workspace_id}:{resolved_conversation_id}"
                 config = {
                     "configurable": {
@@ -926,7 +991,13 @@ class ChatService:
                 def emit_token(node_name: str, text: str) -> None:
                     queue_event("token", {"node": node_name, "text": text})
 
-                active_emitter_token = set_stream_token_emitter(emit_token)
+                if callable(bindings.set_stream_token_emitter):
+                    active_emitter_token = bindings.set_stream_token_emitter(emit_token)
+                if callable(set_legacy_stream_token_emitter):
+                    active_legacy_emitter_token = set_legacy_stream_token_emitter(emit_token)
+                active_agent_event_token = set_agent_event_emitter(
+                    lambda event, data: queue_event(event, data)
+                )
 
                 aggregated: dict[str, Any] = {}
                 async for step in graph.astream(input_state, config=config):
@@ -1050,8 +1121,15 @@ class ChatService:
             except Exception as exc:
                 queue_event("error", {"detail": str(exc), "status_code": 500})
             finally:
-                if active_emitter_token is not None:
-                    reset_stream_token_emitter(active_emitter_token)
+                if active_emitter_token is not None and callable(bindings.reset_stream_token_emitter):
+                    bindings.reset_stream_token_emitter(active_emitter_token)
+                if (
+                    active_legacy_emitter_token is not None
+                    and callable(reset_legacy_stream_token_emitter)
+                ):
+                    reset_legacy_stream_token_emitter(active_legacy_emitter_token)
+                if active_agent_event_token is not None:
+                    reset_agent_event_emitter(active_agent_event_token)
 
         runner = asyncio.create_task(run_pipeline())
         try:

@@ -12,7 +12,7 @@ from typing import Any
 
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from ...agent.graph import build_graph
+from ...agent.registry import get_agent_bindings
 
 
 class WorkspaceLangGraphManager:
@@ -26,25 +26,29 @@ class WorkspaceLangGraphManager:
     async def get_graph(self, workspace_id: str, agent_memory_path: Path):
         """Return compiled graph for workspace, creating it if missing."""
         async with self._lock:
-            if workspace_id in self._graphs:
-                return self._graphs[workspace_id]
+            bindings = get_agent_bindings()
+            cache_key = f"{workspace_id}:{bindings.version}"
+            if cache_key in self._graphs:
+                return self._graphs[cache_key]
 
             agent_memory_path.parent.mkdir(parents=True, exist_ok=True)
             checkpointer_cm = AsyncSqliteSaver.from_conn_string(str(agent_memory_path))
             checkpointer = await checkpointer_cm.__aenter__()
-            graph = build_graph(checkpointer=checkpointer)
+            graph = bindings.build_graph(checkpointer=checkpointer)
 
-            self._checkpointers[workspace_id] = checkpointer_cm
-            self._graphs[workspace_id] = graph
+            self._checkpointers[cache_key] = checkpointer_cm
+            self._graphs[cache_key] = graph
             return graph
 
     async def close_workspace(self, workspace_id: str) -> None:
         """Close and evict one workspace graph/checkpointer."""
         async with self._lock:
-            cm = self._checkpointers.pop(workspace_id, None)
-            self._graphs.pop(workspace_id, None)
-            if cm is not None:
-                await cm.__aexit__(None, None, None)
+            keys = [k for k in self._checkpointers.keys() if str(k).startswith(f"{workspace_id}:")]
+            for key in keys:
+                cm = self._checkpointers.pop(key, None)
+                self._graphs.pop(key, None)
+                if cm is not None:
+                    await cm.__aexit__(None, None, None)
 
     async def shutdown(self) -> None:
         """Close all open checkpointers."""

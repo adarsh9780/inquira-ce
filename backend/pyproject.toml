@@ -53,6 +53,7 @@ app = [
     "frontend/dist/**/*",
     "logo/*",
     "prompts/*",
+    "agent_v2/prompts/*",
     "sql/*",
     "legal/*",
 ]

@@ -91,6 +91,24 @@ schema = 2048
 # Code-generation/chat execution cap.
 code_generation = 4096
 
+[agent]
+version = "agent_v2"
+max-tool-calls = 5
+max-code-executions = 3
+turn-timeout = 120
+
+[agent.bash]
+allowed-commands = ["rg", "grep", "wc", "head", "tail", "ls", "cat", "find"]
+sandbox = "."
+max-output-chars = 2000
+
+[agent.memory]
+max-recent-messages = 10
+max-summary-tokens = 500
+
+[agent.intervention]
+timeout-seconds = 60
+
 [ui]
 # Global Plotly chart styling behavior in the UI.
 # Supported values:
