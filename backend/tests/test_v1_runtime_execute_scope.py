@@ -82,6 +82,65 @@ async def test_execute_workspace_code_passes_workspace_context(monkeypatch, tmp_
 
 
 @pytest.mark.asyncio
+async def test_execute_workspace_code_wraps_arbitrary_dataframe_variable_name(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws1-any-var"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    captured = {}
+
+    async def fake_execute_code_with_workspace(
+        code,
+        timeout,
+        working_dir=None,
+        workspace_id=None,
+        workspace_duckdb_path=None,
+    ):
+        captured["code"] = code
+        _ = (timeout, working_dir, workspace_id, workspace_duckdb_path)
+        return {
+            "success": True,
+            "stdout": "",
+            "stderr": "",
+            "error": None,
+            "result": None,
+            "result_type": None,
+            "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
+        }
+
+    async def fake_get_workspace_run_exports(workspace_id: str, run_id: str):
+        _ = (workspace_id, run_id)
+        return []
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "execute_code", fake_execute_code_with_workspace)
+    monkeypatch.setattr(runtime_api, "get_workspace_run_exports", fake_get_workspace_run_exports)
+
+    payload = runtime_api.ExecuteRequest(
+        code="sample_data = conn.sql('select 1').df()\nprint(sample_data)",
+        timeout=30,
+    )
+    response = await runtime_api.execute_workspace_code(
+        workspace_id="ws-1",
+        payload=payload,
+        session=object(),
+        current_user=SimpleNamespace(id="user-1"),
+    )
+
+    assert response.success is True
+    assert "_inq_fallback_names" in captured["code"]
+    assert '"sample_data"' in captured["code"]
+    assert isinstance(response.run_id, str)
+
+
+@pytest.mark.asyncio
 async def test_execute_workspace_code_returns_upstream_result(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws2"
     workspace_dir.mkdir(parents=True, exist_ok=True)

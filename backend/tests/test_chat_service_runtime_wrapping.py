@@ -1,4 +1,5 @@
 from app.v1.services.chat_service import ChatService
+from app.services.output_capture import infer_capture_candidate_names
 
 
 def test_build_run_wrapped_code_uses_real_newlines():
@@ -53,3 +54,24 @@ def test_auto_capture_code_reports_export_errors_instead_of_swallowing_them():
     assert "_inq_record_error(" in code
     assert "[auto-capture] failed to export" in code
     assert "except Exception:\n        pass" not in code
+
+
+def test_infer_capture_candidate_names_supports_arbitrary_variable_names():
+    names = infer_capture_candidate_names(
+        "sample_data = conn.sql('select * from t').df()\n"
+        "top_players_df = sample_data.head(10)\n"
+        "print(top_players_df)\n"
+    )
+    assert names == ["sample_data", "top_players_df"]
+
+
+def test_build_run_wrapped_code_embeds_inferred_fallback_candidate_names():
+    wrapped = ChatService._build_run_wrapped_code(
+        "sample_data = conn.sql('select * from t').df()\nprint(sample_data)",
+        "run-2",
+        [],
+    )
+    assert "_inq_fallback_names" in wrapped
+    assert '"sample_data"' in wrapped
+    assert "_inq_aliases = ('result', 'final_df', 'df', 'fig', 'figure')" in wrapped
+    assert "_inq_kind == 'scalar' and _inq_name in _inq_aliases" in wrapped
