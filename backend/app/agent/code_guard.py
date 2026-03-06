@@ -112,6 +112,18 @@ def guard_code(
             ),
         )
 
+    if re.search(r"\.to_dict\s*\(\s*(?:orient\s*=\s*)?['\"]records['\"]\s*\)", raw):
+        return CodeGuardResult(
+            code=raw,
+            changed=False,
+            blocked=True,
+            should_retry=True,
+            reason=(
+                "Do not convert dataframe outputs to list/dict JSON (for example, `df.to_dict(orient='records')`). "
+                "Keep dataframe variables as dataframe objects and reference them in `output_contract`."
+            ),
+        )
+
     # Plotly Express does not accept Narwhals wrapper DataFrames directly.
     # Catch the common failure pattern and request regeneration.
     narwhals_vars = set(

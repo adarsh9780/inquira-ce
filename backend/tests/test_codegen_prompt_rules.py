@@ -16,6 +16,8 @@ def test_codegen_prompt_requires_descriptive_variable_names_with_stable_final_ou
     assert "Reuse a final output name intentionally only when it represents the same business meaning; use a new final name when meaning changes." in source
     assert "`output_contract` is a list of objects like" in source
     assert "monthly_revenue_summary_df" in source
+    assert "Do NOT serialize dataframe outputs via `.to_dict(...)`, `.to_json(...)`" in source
+    assert "Keep final dataframe outputs as real dataframe objects" in source
 
 
 def test_codegen_prompt_includes_plotly_industry_style_standards():

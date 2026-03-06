@@ -206,6 +206,37 @@ async def test_execute_on_session_uses_fallback_probe_when_primary_has_no_result
 
 
 @pytest.mark.asyncio
+async def test_execute_on_session_prefers_identifier_probe_for_selected_variable():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-1", "/tmp/a.duckdb")
+    calls = {"count": 0}
+
+    async def fake_execute_request(current_session, code):
+        _ = current_session
+        calls["count"] += 1
+        parsed = ParsedExecutionOutput()
+        if calls["count"] == 1:
+            assert code == "top_batsmen_df"
+            return parsed
+        if calls["count"] == 2:
+            assert "_inquira_identifier = 'top_batsmen_df'" in code
+            parsed.result = {"columns": ["a"], "data": [{"a": 1}]}
+            parsed.result_type = "DataFrame"
+            return parsed
+        raise AssertionError("Generic fallback probe should not run when identifier probe succeeds")
+
+    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
+
+    payload = await manager._execute_on_session(session, "top_batsmen_df")
+
+    assert calls["count"] == 2
+    assert payload["result_type"] == "DataFrame"
+    assert payload["result_kind"] == "dataframe"
+    assert payload["result_name"] == "top_batsmen_df"
+    assert payload["result"] == {"columns": ["a"], "data": [{"a": 1}]}
+
+
+@pytest.mark.asyncio
 async def test_execute_on_session_probes_scalar_result_without_overriding_scalar_payload():
     manager = WorkspaceKernelManager(idle_minutes=30)
     session = _session("ws-1", "/tmp/a.duckdb")
@@ -316,6 +347,8 @@ async def test_execute_on_session_sets_result_name_for_identifier_dataframe_sele
     payload = await manager._execute_on_session(session, "top_batsmen")
 
     assert payload["result_kind"] in {"scalar", "none"}
+    if payload["result_kind"] == "scalar":
+        assert payload["result_name"] == "top_batsmen"
 
 
 @pytest.mark.asyncio
@@ -538,3 +571,6 @@ async def test_bootstrap_workspace_exports_figure_payload_in_run_envelope(tmp_pa
     assert "payload={'figure': fig_payload, 'title': title, 'insight': insight}" in bootstrap_code
     assert "kind = 'scalar' AND logical_name = ?" in bootstrap_code
     assert "_old_scalar is not None" in bootstrap_code
+    assert "_pd_display.set_option('display.max_rows', 1000)" in bootstrap_code
+    assert "_pd_display.set_option('display.max_columns', 20)" in bootstrap_code
+    assert "_pd_display.set_option('display.large_repr', 'truncate')" in bootstrap_code

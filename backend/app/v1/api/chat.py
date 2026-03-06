@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any
 import json
+import math
 import traceback
 
 from ..db.session import get_appdata_db_session
@@ -24,8 +25,22 @@ router = APIRouter(
 )
 
 
+def _normalize_sse_payload(payload: Any) -> Any:
+    if isinstance(payload, float):
+        if math.isfinite(payload):
+            return payload
+        return None
+    if isinstance(payload, dict):
+        return {str(key): _normalize_sse_payload(value) for key, value in payload.items()}
+    if isinstance(payload, (list, tuple)):
+        return [_normalize_sse_payload(item) for item in payload]
+    return payload
+
+
 def _to_sse(event: str, payload: dict[str, Any]) -> str:
-    return f"event: {event}\ndata: {json.dumps(payload, default=str)}\n\n"
+    normalized_payload = _normalize_sse_payload(payload)
+    serialized_payload = json.dumps(normalized_payload, default=str, allow_nan=False)
+    return f"event: {event}\ndata: {serialized_payload}\n\n"
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)

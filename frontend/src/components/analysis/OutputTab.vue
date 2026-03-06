@@ -90,6 +90,63 @@
                 <p>Columns: {{ formatCount(event.columnCount) }}</p>
                 <p v-if="event.artifactId">Artifact: {{ event.artifactId }}</p>
               </div>
+              <div
+                v-if="event.preview.hasRows && event.preview.columns.length > 0"
+                class="mt-2 overflow-hidden rounded-lg border"
+                style="border-color: color-mix(in srgb, var(--color-border) 80%, transparent); background-color: color-mix(in srgb, var(--color-base) 90%, var(--color-surface));"
+              >
+                <div class="max-h-72 overflow-auto">
+                  <table class="w-max min-w-full border-separate border-spacing-0 text-[11px] font-mono leading-5" style="color: var(--color-text-main);">
+                    <thead class="sticky top-0 z-10" style="background-color: color-mix(in srgb, var(--color-surface) 92%, var(--color-base));">
+                      <tr>
+                        <th class="sticky left-0 z-20 border-b border-r px-2 py-1 text-right font-semibold" style="border-color: color-mix(in srgb, var(--color-border) 70%, transparent); background-color: color-mix(in srgb, var(--color-surface) 94%, var(--color-base));">#</th>
+                        <th
+                          v-for="column in event.preview.columns"
+                          :key="column.key"
+                          class="border-b border-r px-2 py-1 text-left font-semibold"
+                          style="border-color: color-mix(in srgb, var(--color-border) 70%, transparent);"
+                        >
+                          {{ column.label }}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="row in event.preview.rows" :key="row.key">
+                        <th
+                          class="sticky left-0 z-10 border-b border-r px-2 py-1 text-right font-medium"
+                          :style="row.isEllipsis ? 'font-style: italic;' : ''"
+                          style="border-color: color-mix(in srgb, var(--color-border) 70%, transparent); background-color: color-mix(in srgb, var(--color-surface) 94%, var(--color-base));"
+                        >
+                          {{ row.indexLabel }}
+                        </th>
+                        <td
+                          v-for="cell in row.cells"
+                          :key="cell.key"
+                          class="max-w-[14rem] border-b border-r px-2 py-1 align-top"
+                          :style="cell.isEllipsis ? 'text-align: center; font-style: italic;' : ''"
+                          style="border-color: color-mix(in srgb, var(--color-border) 70%, transparent);"
+                        >
+                          {{ cell.text }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p
+                  class="border-t px-3 py-1.5 text-[11px]"
+                  style="border-color: color-mix(in srgb, var(--color-border) 70%, transparent); color: var(--color-text-muted);"
+                >
+                  Showing {{ formatCount(event.preview.visibleRowCount) }} of {{ formatCount(event.rowCount) }} rows and
+                  {{ formatCount(event.preview.visibleColumnCount) }} of {{ formatCount(event.columnCount) }} columns.
+                </p>
+              </div>
+              <p
+                v-else
+                class="mt-2 rounded-md border px-3 py-2 text-[11px]"
+                style="border-color: color-mix(in srgb, var(--color-border) 80%, transparent); color: var(--color-text-muted); background-color: color-mix(in srgb, var(--color-base) 90%, var(--color-surface));"
+              >
+                No row preview captured for this dataframe yet.
+              </p>
               <button
                 class="mt-2 inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
                 style="border-color: var(--color-border); color: var(--color-text-main);"
@@ -135,6 +192,10 @@ const isMounted = ref(false)
 const activeFilter = ref('all')
 const expandedEventIds = ref([])
 const lastAutoOpenedRunId = ref('')
+const PREVIEW_HEAD_ROWS = 8
+const PREVIEW_TAIL_ROWS = 8
+const PREVIEW_HEAD_COLUMNS = 5
+const PREVIEW_TAIL_COLUMNS = 4
 
 const filterOptions = [
   { value: 'all', label: 'All' },
@@ -192,9 +253,10 @@ const analysisLogEvents = computed(() => {
 const tableEvents = computed(() => {
   const entries = Array.isArray(appStore.dataframes) ? appStore.dataframes : []
   return entries.map((item, index) => {
+    const preview = buildDataframePreview(item?.data)
+    const rowCount = Number(preview.rowCount || 0)
+    const columnCount = Number(preview.columnCount || 0)
     const payload = item?.data && typeof item.data === 'object' ? item.data : {}
-    const rowCount = Number(payload?.row_count || 0)
-    const columnCount = Array.isArray(payload?.columns) ? payload.columns.length : 0
     const artifactId = String(payload?.artifact_id || item?.artifact_id || '').trim()
     const tableName = String(item?.name || item?.logical_name || artifactId || `table_${index + 1}`)
     return {
@@ -206,6 +268,7 @@ const tableEvents = computed(() => {
       rowCount,
       columnCount,
       artifactId,
+      preview,
       status: 'success',
       createdAt: String(item?.createdAt || item?.created_at || payload?.created_at || ''),
       sequence: 50000 - index,
@@ -305,6 +368,154 @@ function formatCount(value) {
   const n = Number(value || 0)
   if (!Number.isFinite(n) || n <= 0) return '0'
   return n.toLocaleString()
+}
+
+function normalizeRowsFromDataframeValue(value) {
+  if (Array.isArray(value)) {
+    return value
+      .filter((row) => row && typeof row === 'object' && !Array.isArray(row))
+      .map((row) => ({ ...row }))
+  }
+  if (!value || typeof value !== 'object') return []
+
+  const rawRows = Array.isArray(value.data) ? value.data : []
+  if (!rawRows.length) return []
+  if (typeof rawRows[0] === 'object' && !Array.isArray(rawRows[0])) {
+    return rawRows.map((row) => ({ ...row }))
+  }
+
+  const columns = Array.isArray(value.columns) ? value.columns.map((col) => String(col)) : []
+  if (!columns.length) return []
+
+  return rawRows.map((row) => {
+    if (!Array.isArray(row)) return {}
+    const mapped = {}
+    columns.forEach((col, idx) => {
+      mapped[col] = row[idx]
+    })
+    return mapped
+  })
+}
+
+function formatPreviewCell(value) {
+  if (value === undefined) return ''
+  if (value === null) return 'null'
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value)
+  }
+  try {
+    return JSON.stringify(value)
+  } catch (_error) {
+    return String(value)
+  }
+}
+
+function makeVisibleColumns(columns) {
+  const normalized = columns.map((column, idx) => ({
+    key: `column:${idx}`,
+    sourceKey: column,
+    label: column,
+    isEllipsis: false,
+  }))
+  const maxColumns = PREVIEW_HEAD_COLUMNS + PREVIEW_TAIL_COLUMNS
+  if (normalized.length <= maxColumns) return normalized
+  const head = normalized.slice(0, PREVIEW_HEAD_COLUMNS)
+  const tail = normalized.slice(-PREVIEW_TAIL_COLUMNS)
+  return [
+    ...head,
+    {
+      key: 'column:ellipsis',
+      sourceKey: '',
+      label: '...',
+      isEllipsis: true,
+    },
+    ...tail,
+  ]
+}
+
+function rowToPreviewCells(row, visibleColumns, rowIndex) {
+  const safeRow = row && typeof row === 'object' ? row : {}
+  return visibleColumns.map((column, columnIndex) => {
+    if (column.isEllipsis) {
+      return {
+        key: `cell:${rowIndex}:${columnIndex}:ellipsis`,
+        text: '...',
+        isEllipsis: true,
+      }
+    }
+    return {
+      key: `cell:${rowIndex}:${columnIndex}`,
+      text: formatPreviewCell(safeRow[column.sourceKey]),
+      isEllipsis: false,
+    }
+  })
+}
+
+function buildDataframePreview(value) {
+  const rows = normalizeRowsFromDataframeValue(value)
+  const columnsFromPayload = Array.isArray(value?.columns) ? value.columns.map((column) => String(column)) : []
+  const columns = columnsFromPayload.length > 0
+    ? columnsFromPayload
+    : (rows[0] ? Object.keys(rows[0]).map((column) => String(column)) : [])
+
+  const rowCountRaw = Number(value?.row_count)
+  const rowCount = Number.isFinite(rowCountRaw) && rowCountRaw > 0 ? rowCountRaw : rows.length
+  const columnCount = columns.length
+  const visibleColumns = makeVisibleColumns(columns)
+  const indexValues = Array.isArray(value?.index) ? value.index : []
+  const maxRows = PREVIEW_HEAD_ROWS + PREVIEW_TAIL_ROWS
+  const visibleRows = []
+
+  if (rows.length <= maxRows) {
+    rows.forEach((row, idx) => {
+      visibleRows.push({
+        key: `row:${idx}`,
+        indexLabel: formatPreviewCell(indexValues[idx] ?? idx),
+        cells: rowToPreviewCells(row, visibleColumns, idx),
+        isEllipsis: false,
+      })
+    })
+  } else {
+    rows.slice(0, PREVIEW_HEAD_ROWS).forEach((row, idx) => {
+      visibleRows.push({
+        key: `row:${idx}`,
+        indexLabel: formatPreviewCell(indexValues[idx] ?? idx),
+        cells: rowToPreviewCells(row, visibleColumns, idx),
+        isEllipsis: false,
+      })
+    })
+    visibleRows.push({
+      key: 'row:ellipsis',
+      indexLabel: '...',
+      cells: visibleColumns.map((column, index) => ({
+        key: `cell:ellipsis:${index}:${column.key}`,
+        text: '...',
+        isEllipsis: true,
+      })),
+      isEllipsis: true,
+    })
+    const tailStart = rows.length - PREVIEW_TAIL_ROWS
+    rows.slice(tailStart).forEach((row, offset) => {
+      const idx = tailStart + offset
+      visibleRows.push({
+        key: `row:${idx}`,
+        indexLabel: formatPreviewCell(indexValues[idx] ?? idx),
+        cells: rowToPreviewCells(row, visibleColumns, idx),
+        isEllipsis: false,
+      })
+    })
+  }
+
+  return {
+    rows: visibleRows,
+    columns: visibleColumns,
+    rowCount,
+    columnCount,
+    hasRows: rows.length > 0,
+    visibleRowCount: visibleRows.filter((row) => !row.isEllipsis).length,
+    visibleColumnCount: visibleColumns.filter((column) => !column.isEllipsis).length,
+  }
 }
 
 function openTableInspector(event) {
