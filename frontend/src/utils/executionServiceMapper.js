@@ -10,6 +10,8 @@ export function mapExecutionServiceResponse(response) {
     resultType: response?.result_type || null,
     resultKind: response?.result_kind || null,
     resultName: response?.result_name || null,
+    runId: response?.run_id || null,
+    artifacts: Array.isArray(response?.artifacts) ? response.artifacts : [],
     variables: response?.variables || { dataframes: {}, figures: {}, scalars: {} },
   }
 }

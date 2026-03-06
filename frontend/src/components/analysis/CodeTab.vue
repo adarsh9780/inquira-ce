@@ -345,6 +345,8 @@ async function executeSnippet(code, successLine, options = {}) {
     result_type: pyResponse.resultType,
     result_kind: pyResponse.resultKind,
     result_name: pyResponse.resultName,
+    run_id: pyResponse.runId,
+    artifacts: pyResponse.artifacts,
     variables: pyResponse.variables,
   })
 
@@ -366,7 +368,7 @@ async function executeSnippet(code, successLine, options = {}) {
     kind: 'output',
     source: 'analysis',
     label: 'Run output',
-    runId,
+    runId: String(normalized?.run_id || runId || ''),
     status,
     stdout: outputStdout,
     stderr: outputStderr,

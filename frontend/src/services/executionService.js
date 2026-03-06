@@ -34,6 +34,8 @@ class ExecutionService {
                 error: err?.response?.data?.detail || err.message || 'Execution failed',
                 result: null,
                 resultType: null,
+                runId: null,
+                artifacts: [],
                 variables: { dataframes: {}, figures: {}, scalars: {} },
             }
         }

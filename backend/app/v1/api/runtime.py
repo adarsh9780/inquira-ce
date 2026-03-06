@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shlex
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -23,11 +24,13 @@ from ...services.code_executor import (
     get_workspace_artifact_metadata_via_kernel,
     get_workspace_dataframe_rows,
     get_workspace_kernel_status,
+    get_workspace_run_exports,
     interrupt_workspace_kernel,
     list_workspace_artifacts_via_kernel,
     reset_workspace_kernel,
 )
 from ...services.artifact_scratchpad import get_artifact_scratchpad_store
+from ...services.output_capture import build_run_wrapped_code
 from ..db.session import get_appdata_db_session
 from ..repositories.preferences_repository import PreferencesRepository
 from ..repositories.dataset_repository import DatasetRepository
@@ -61,6 +64,7 @@ class ExecuteRequest(BaseModel):
 
 class ExecuteResponse(BaseModel):
     success: bool
+    run_id: str | None = None
     stdout: str = ""
     stderr: str = ""
     has_stdout: bool = False
@@ -73,6 +77,7 @@ class ExecuteResponse(BaseModel):
     variables: dict[str, dict[str, Any]] = Field(
         default_factory=_default_variable_bundle
     )
+    artifacts: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class DataframeArtifactRowsResponse(BaseModel):
@@ -484,6 +489,54 @@ def _ensure_workspace_db_exists_or_raise(duckdb_path: str) -> None:
     raise HTTPException(status_code=409, detail=_workspace_db_missing_detail(str(resolved)))
 
 
+def _build_inline_artifact_fallback(
+    *,
+    run_id: str,
+    execution_result: dict[str, Any],
+) -> list[dict[str, Any]]:
+    result = execution_result.get("result")
+    result_type = str(execution_result.get("result_type") or "").lower()
+    if result_type != "dataframe":
+        return []
+    if not isinstance(result, dict):
+        return []
+    columns = result.get("columns")
+    rows = result.get("data")
+    if not isinstance(columns, list) or not isinstance(rows, list):
+        return []
+
+    column_names = [str(col) for col in columns]
+    preview_rows: list[dict[str, Any]] = []
+    for row in rows[:25]:
+        if isinstance(row, dict):
+            preview_rows.append({str(key): value for key, value in row.items()})
+            continue
+        if isinstance(row, list):
+            mapped = {
+                str(column_names[idx]): row[idx]
+                for idx in range(min(len(column_names), len(row)))
+            }
+            preview_rows.append(mapped)
+
+    return [
+        {
+            "artifact_id": None,
+            "run_id": run_id,
+            "kind": "dataframe",
+            "pointer": None,
+            "logical_name": "result",
+            "row_count": len(rows),
+            "schema": [{"name": str(col), "dtype": ""} for col in column_names],
+            "preview_rows": preview_rows,
+            "created_at": "",
+            "expires_at": "",
+            "status": "ready",
+            "error": None,
+            "table_name": None,
+        }
+    ]
+
+
 @router.get("/workspaces/{workspace_id}/paths", response_model=WorkspacePathsResponse)
 async def get_workspace_paths(
     workspace_id: str,
@@ -518,13 +571,34 @@ async def execute_workspace_code(
                 "Use Settings > Runner Packages to install pinned dependencies."
             ),
         )
+    run_id = str(uuid.uuid4())
+    wrapped_code = build_run_wrapped_code(payload.code, run_id, [])
     result = await execute_code(
-        code=payload.code,
+        code=wrapped_code,
         timeout=payload.timeout,
         working_dir=str(Path(workspace.duckdb_path).parent),
         workspace_id=workspace_id,
         workspace_duckdb_path=str(workspace.duckdb_path),
     )
+    artifacts = [
+        item for item in (result.get("artifacts") or []) if isinstance(item, dict)
+    ]
+    if not artifacts:
+        try:
+            exports = await get_workspace_run_exports(
+                workspace_id=workspace_id,
+                run_id=run_id,
+            )
+            artifacts = [item for item in exports if isinstance(item, dict)]
+        except Exception:
+            artifacts = []
+    if not artifacts:
+        artifacts = _build_inline_artifact_fallback(
+            run_id=run_id,
+            execution_result=result,
+        )
+    result["run_id"] = run_id
+    result["artifacts"] = artifacts
     return ExecuteResponse(**result)
 
 
