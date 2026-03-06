@@ -384,6 +384,34 @@ class ArtifactScratchpadStore:
             "limit": safe_limit,
         }
 
+    def get_workspace_artifact_usage(
+        self,
+        *,
+        workspace_duckdb_path: str,
+    ) -> dict[str, int]:
+        """Return lightweight scratchpad usage metrics for workspace warning UX."""
+        db_path = self.build_scratchpad_db_path(workspace_duckdb_path)
+        duckdb_bytes = int(db_path.stat().st_size) if db_path.exists() else 0
+        con = self._open_readonly(workspace_duckdb_path)
+        if con is None:
+            return {"duckdb_bytes": duckdb_bytes, "figure_count": 0}
+
+        now = datetime.now(UTC)
+        try:
+            row = con.execute(
+                """
+                SELECT COUNT(*)
+                FROM artifact_manifest
+                WHERE kind = 'figure' AND expires_at > ? AND status = 'ready'
+                """,
+                [now],
+            ).fetchone()
+        finally:
+            con.close()
+
+        figure_count = int((row or [0])[0] or 0)
+        return {"duckdb_bytes": duckdb_bytes, "figure_count": figure_count}
+
     def delete_artifact(
         self,
         *,

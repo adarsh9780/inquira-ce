@@ -585,6 +585,87 @@ async def test_workspace_artifact_delete_endpoint_returns_404_when_missing(monke
 
 
 @pytest.mark.asyncio
+async def test_workspace_artifact_usage_endpoint_returns_threshold_warnings(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws-usage"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    class _FakeStore:
+        def get_workspace_artifact_usage(self, *, workspace_duckdb_path: str):
+            assert workspace_duckdb_path == str(duckdb_path)
+            return {
+                "duckdb_bytes": (2 * 1024 * 1024 * 1024),
+                "figure_count": 24,
+            }
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _FakeStore())
+
+    response = await runtime_api.get_workspace_artifact_usage(
+        workspace_id="ws-usage",
+        session=object(),
+        current_user=SimpleNamespace(id="user-1"),
+    )
+
+    assert response.workspace_id == "ws-usage"
+    assert response.duckdb_bytes == (2 * 1024 * 1024 * 1024)
+    assert response.figure_count == 24
+    assert response.duckdb_warning_threshold_bytes == 1024 * 1024 * 1024
+    assert response.figure_warning_threshold_count == 20
+    assert response.duckdb_warning is True
+    assert response.figure_warning is True
+    assert response.warning is True
+
+
+@pytest.mark.asyncio
+async def test_workspace_artifact_usage_endpoint_uses_kernel_fallback_on_lock(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws-usage-lock"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    class _LockedStore:
+        def get_workspace_artifact_usage(self, *, workspace_duckdb_path: str):
+            _ = workspace_duckdb_path
+            raise runtime_api.duckdb.IOException("Conflicting lock is held")
+
+    async def fake_usage_via_kernel(workspace_id: str):
+        assert workspace_id == "ws-usage-lock"
+        return {
+            "duckdb_bytes": 512 * 1024 * 1024,
+            "figure_count": 7,
+        }
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _LockedStore())
+    monkeypatch.setattr(runtime_api, "get_workspace_artifact_usage_via_kernel", fake_usage_via_kernel)
+
+    response = await runtime_api.get_workspace_artifact_usage(
+        workspace_id="ws-usage-lock",
+        session=object(),
+        current_user=SimpleNamespace(id="user-1"),
+    )
+
+    assert response.workspace_id == "ws-usage-lock"
+    assert response.duckdb_bytes == 512 * 1024 * 1024
+    assert response.figure_count == 7
+    assert response.duckdb_warning is False
+    assert response.figure_warning is False
+    assert response.warning is False
+
+
+@pytest.mark.asyncio
 async def test_workspace_kernel_status_endpoint(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws3"
     workspace_dir.mkdir(parents=True, exist_ok=True)

@@ -265,6 +265,57 @@ def test_list_artifacts_for_workspace_no_kind_filter(tmp_path):
     assert "script" in kinds
 
 
+def test_get_workspace_artifact_usage_reports_duckdb_bytes_and_ready_figure_count(tmp_path):
+    workspace_db = tmp_path / "ws_usage" / "workspace.duckdb"
+    workspace_db.parent.mkdir(parents=True, exist_ok=True)
+    workspace_db.touch()
+
+    store = ArtifactScratchpadStore()
+    scratchpad_db = store.ensure_workspace(str(workspace_db))
+
+    con = duckdb.connect(str(scratchpad_db), read_only=False)
+    try:
+        con.execute(
+            """
+            INSERT INTO artifact_manifest (
+                artifact_id, run_id, workspace_id, logical_name, kind, table_name,
+                payload_json, schema_json, row_count, created_at, expires_at, status, error
+            ) VALUES (
+                'fig-ready', 'run-usage', 'ws-usage', 'chart_a', 'figure', NULL,
+                '{"figure": {"data": []}}', NULL, NULL, NOW(), NOW() + INTERVAL 1 DAY, 'ready', NULL
+            )
+            """
+        )
+        con.execute(
+            """
+            INSERT INTO artifact_manifest (
+                artifact_id, run_id, workspace_id, logical_name, kind, table_name,
+                payload_json, schema_json, row_count, created_at, expires_at, status, error
+            ) VALUES (
+                'fig-expired', 'run-usage', 'ws-usage', 'chart_old', 'figure', NULL,
+                '{"figure": {"data": []}}', NULL, NULL, NOW(), NOW() - INTERVAL 1 DAY, 'ready', NULL
+            )
+            """
+        )
+        con.execute(
+            """
+            INSERT INTO artifact_manifest (
+                artifact_id, run_id, workspace_id, logical_name, kind, table_name,
+                payload_json, schema_json, row_count, created_at, expires_at, status, error
+            ) VALUES (
+                'fig-failed', 'run-usage', 'ws-usage', 'chart_failed', 'figure', NULL,
+                '{"figure": {"data": []}}', NULL, NULL, NOW(), NOW() + INTERVAL 1 DAY, 'error', 'failed'
+            )
+            """
+        )
+    finally:
+        con.close()
+
+    usage = store.get_workspace_artifact_usage(workspace_duckdb_path=str(workspace_db))
+    assert usage["duckdb_bytes"] > 0
+    assert usage["figure_count"] == 1
+
+
 def test_list_artifacts_for_workspace_deduplicates_by_logical_name(tmp_path):
     """Regression: the UNIQUE(workspace_id, kind, logical_name) constraint must prevent duplicate rows.
 

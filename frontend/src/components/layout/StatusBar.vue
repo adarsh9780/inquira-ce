@@ -153,6 +153,14 @@
         <div v-if="appStore.activeWorkspaceId && tableViewportLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700">
           <span>{{ tableViewportLabel }}</span>
         </div>
+        <div
+          v-if="showArtifactUsageWarning"
+          class="flex items-center px-1.5 py-0.5 text-amber-600"
+          :title="artifactUsageWarningTitle"
+          aria-label="Artifact usage warning"
+        >
+          <ExclamationTriangleIcon class="w-3.5 h-3.5" />
+        </div>
       </template>
     </div>
 
@@ -210,7 +218,8 @@ import {
   ChevronUpIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  ChevronLeftIcon
+  ChevronLeftIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
 import { toast } from '../../composables/useToast'
 import SettingsModal from '../modals/SettingsModal.vue'
@@ -224,6 +233,9 @@ const kernelStatus = ref('missing')
 const isKernelStatusRequestInFlight = ref(false)
 const isKernelActionRunning = ref(false)
 let kernelStatusPoller = null
+let artifactUsagePoller = null
+let artifactUsageRefreshTimer = null
+let artifactUsageAbortController = null
 
 const accountMenuRef = ref(null)
 const isAccountMenuOpen = ref(false)
@@ -233,6 +245,16 @@ const isLogoutConfirmOpen = ref(false)
 const isWebSocketConnected = ref(false)
 const isWebSocketMonitoringActive = ref(false)
 let unsubscribeWebSocketConnection = null
+const isArtifactUsageRequestInFlight = ref(false)
+const artifactUsage = ref({
+  duckdbBytes: 0,
+  duckdbWarningThresholdBytes: 1024 * 1024 * 1024,
+  figureCount: 0,
+  figureWarningThresholdCount: 20,
+  duckdbWarning: false,
+  figureWarning: false,
+  warning: false,
+})
 
 const accountLabel = computed(() => {
   const username = String(authStore.username || '').trim()
@@ -339,6 +361,26 @@ const artifactCountClass = computed(() => {
   return 'bg-slate-100 text-slate-500'
 })
 
+const showArtifactUsageWarning = computed(() => {
+  return Boolean(appStore.activeWorkspaceId && appStore.hasWorkspace && artifactUsage.value.warning)
+})
+
+const artifactUsageWarningTitle = computed(() => {
+  const details = []
+  if (artifactUsage.value.duckdbWarning) {
+    details.push(
+      `DuckDB artifacts: ${formatBytes(artifactUsage.value.duckdbBytes)} (limit ${formatBytes(artifactUsage.value.duckdbWarningThresholdBytes)})`
+    )
+  }
+  if (artifactUsage.value.figureWarning) {
+    details.push(
+      `Charts saved: ${Number(artifactUsage.value.figureCount || 0)} (limit ${Number(artifactUsage.value.figureWarningThresholdCount || 20)})`
+    )
+  }
+  if (!details.length) return 'Scratchpad artifact usage is within safe limits.'
+  return `Scratchpad usage warning. ${details.join(' | ')}. Delete unused artifacts to avoid performance issues.`
+})
+
 function toggleSidebarFromStatusBar() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
 }
@@ -363,6 +405,88 @@ function setupWebSocketMonitoring() {
   unsubscribeWebSocketConnection = settingsWebSocket.onConnection((connected) => {
     updateWebSocketStatus(connected)
   })
+}
+
+function resetArtifactUsage() {
+  artifactUsage.value = {
+    duckdbBytes: 0,
+    duckdbWarningThresholdBytes: 1024 * 1024 * 1024,
+    figureCount: 0,
+    figureWarningThresholdCount: 20,
+    duckdbWarning: false,
+    figureWarning: false,
+    warning: false,
+  }
+}
+
+function formatBytes(bytes) {
+  const value = Math.max(0, Number(bytes || 0))
+  if (value < 1024) return `${value} B`
+  if (value < 1024 ** 2) return `${(value / 1024).toFixed(1)} KB`
+  if (value < 1024 ** 3) return `${(value / (1024 ** 2)).toFixed(1)} MB`
+  return `${(value / (1024 ** 3)).toFixed(2)} GB`
+}
+
+async function refreshArtifactUsage() {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (!workspaceId || !appStore.hasWorkspace) {
+    resetArtifactUsage()
+    return
+  }
+  if (isArtifactUsageRequestInFlight.value) return
+
+  isArtifactUsageRequestInFlight.value = true
+  artifactUsageAbortController?.abort()
+  artifactUsageAbortController = new AbortController()
+  try {
+    const payload = await apiService.v1GetWorkspaceArtifactUsage(workspaceId, {
+      signal: artifactUsageAbortController.signal,
+    })
+    artifactUsage.value = {
+      duckdbBytes: Math.max(0, Number(payload?.duckdb_bytes || 0)),
+      duckdbWarningThresholdBytes: Math.max(1, Number(payload?.duckdb_warning_threshold_bytes || 1024 * 1024 * 1024)),
+      figureCount: Math.max(0, Number(payload?.figure_count || 0)),
+      figureWarningThresholdCount: Math.max(1, Number(payload?.figure_warning_threshold_count || 20)),
+      duckdbWarning: Boolean(payload?.duckdb_warning),
+      figureWarning: Boolean(payload?.figure_warning),
+      warning: Boolean(payload?.warning),
+    }
+  } catch (error) {
+    if (error?.name === 'AbortError') return
+    resetArtifactUsage()
+  } finally {
+    isArtifactUsageRequestInFlight.value = false
+  }
+}
+
+function scheduleArtifactUsageRefresh(delayMs = 250) {
+  if (artifactUsageRefreshTimer) clearTimeout(artifactUsageRefreshTimer)
+  artifactUsageRefreshTimer = setTimeout(() => {
+    artifactUsageRefreshTimer = null
+    void refreshArtifactUsage()
+  }, Math.max(0, Number(delayMs || 0)))
+}
+
+function startArtifactUsagePolling() {
+  stopArtifactUsagePolling()
+  void refreshArtifactUsage()
+  artifactUsagePoller = setInterval(() => {
+    if (!document.hidden) void refreshArtifactUsage()
+  }, 15000)
+}
+
+function stopArtifactUsagePolling() {
+  if (artifactUsagePoller) {
+    clearInterval(artifactUsagePoller)
+    artifactUsagePoller = null
+  }
+  if (artifactUsageRefreshTimer) {
+    clearTimeout(artifactUsageRefreshTimer)
+    artifactUsageRefreshTimer = null
+  }
+  artifactUsageAbortController?.abort()
+  artifactUsageAbortController = null
+  isArtifactUsageRequestInFlight.value = false
 }
 
 function openSettings(tab = 'api') {
@@ -473,7 +597,10 @@ async function restartKernel() {
 
 // Named handler so we can remove the exact same reference on unmount
 function handleVisibilityChange() {
-  if (!document.hidden && appStore.activeWorkspaceId && appStore.hasWorkspace) refreshKernelStatus()
+  if (!document.hidden && appStore.activeWorkspaceId && appStore.hasWorkspace) {
+    refreshKernelStatus()
+    void refreshArtifactUsage()
+  }
 }
 
 function handleDocumentClick(event) {
@@ -502,7 +629,10 @@ function handleDocumentKeydown(event) {
 
 // Lifecycle and Watchers
 onMounted(() => {
-  if (appStore.activeWorkspaceId && appStore.hasWorkspace) startKernelStatusPolling()
+  if (appStore.activeWorkspaceId && appStore.hasWorkspace) {
+    startKernelStatusPolling()
+    startArtifactUsagePolling()
+  }
   setupWebSocketMonitoring()
   document.addEventListener('visibilitychange', handleVisibilityChange)
   document.addEventListener('click', handleDocumentClick)
@@ -511,6 +641,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopKernelStatusPolling()
+  stopArtifactUsagePolling()
+  resetArtifactUsage()
   if (typeof unsubscribeWebSocketConnection === 'function') {
     unsubscribeWebSocketConnection()
     unsubscribeWebSocketConnection = null
@@ -521,7 +653,21 @@ onUnmounted(() => {
 })
 
 watch([() => appStore.activeWorkspaceId, () => appStore.hasWorkspace], ([newId, hasWorkspace]) => {
-  if (newId && hasWorkspace) startKernelStatusPolling()
-  else stopKernelStatusPolling()
+  if (newId && hasWorkspace) {
+    startKernelStatusPolling()
+    startArtifactUsagePolling()
+  } else {
+    stopKernelStatusPolling()
+    stopArtifactUsagePolling()
+    resetArtifactUsage()
+  }
 })
+
+watch(
+  [() => appStore.dataframes, () => appStore.figures, () => appStore.dataframeCount, () => appStore.figureCount],
+  () => {
+    if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) return
+    scheduleArtifactUsageRefresh()
+  }
+)
 </script>

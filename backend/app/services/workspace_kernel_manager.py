@@ -363,6 +363,42 @@ class WorkspaceKernelManager:
             return []
         return [item for item in parsed.result if isinstance(item, dict)]
 
+    async def get_workspace_artifact_usage(
+        self,
+        *,
+        workspace_id: str,
+    ) -> dict[str, int]:
+        """Return workspace scratchpad usage via kernel-owned connection."""
+        async with self._sessions_lock:
+            session = self._sessions.get(workspace_id)
+        if session is None:
+            return {"duckdb_bytes": 0, "figure_count": 0}
+
+        try:
+            duckdb_bytes = int(Path(session.scratchpad_db_path).stat().st_size)
+        except OSError:
+            duckdb_bytes = 0
+
+        usage_code = (
+            "from datetime import datetime as _dt, timezone as _tz\n"
+            "_now = _dt.now(_tz.utc)\n"
+            "_figure_count = int(scratchpad_conn.execute(\n"
+            "    \"SELECT COUNT(*) FROM artifact_manifest WHERE kind = 'figure' AND expires_at > ? AND status = 'ready'\",\n"
+            "    [_now],\n"
+            ").fetchone()[0])\n"
+            "{'figure_count': _figure_count}\n"
+        )
+
+        async with session.lock:
+            session.last_used = datetime.now(UTC)
+            parsed = await self._execute_request(session, usage_code)
+
+        if parsed.error is not None or not isinstance(parsed.result, dict):
+            return {"duckdb_bytes": duckdb_bytes, "figure_count": 0}
+
+        figure_count = int(parsed.result.get("figure_count") or 0)
+        return {"duckdb_bytes": duckdb_bytes, "figure_count": max(0, figure_count)}
+
     async def get_workspace_artifact(
         self,
         *,

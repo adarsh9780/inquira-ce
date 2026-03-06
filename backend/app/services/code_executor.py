@@ -89,6 +89,14 @@ async def list_workspace_artifacts_via_kernel(
     )
 
 
+async def get_workspace_artifact_usage_via_kernel(
+    workspace_id: str,
+) -> dict[str, int]:
+    """Fetch workspace artifact usage using kernel-owned scratchpad connection."""
+    manager = await get_workspace_kernel_manager()
+    return await manager.get_workspace_artifact_usage(workspace_id=workspace_id)
+
+
 async def get_workspace_artifact_metadata_via_kernel(
     workspace_id: str,
     artifact_id: str,

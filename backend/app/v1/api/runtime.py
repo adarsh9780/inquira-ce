@@ -22,6 +22,7 @@ from ...services.code_executor import (
     delete_workspace_artifact_via_kernel,
     execute_code,
     get_workspace_artifact_metadata_via_kernel,
+    get_workspace_artifact_usage_via_kernel,
     get_workspace_dataframe_rows,
     get_workspace_kernel_status,
     get_workspace_run_exports,
@@ -120,6 +121,17 @@ class WorkspaceArtifactSummary(BaseModel):
 class WorkspaceArtifactListResponse(BaseModel):
     artifacts: list[WorkspaceArtifactSummary]
     total: int
+
+
+class WorkspaceArtifactUsageResponse(BaseModel):
+    workspace_id: str
+    duckdb_bytes: int
+    duckdb_warning_threshold_bytes: int
+    figure_count: int
+    figure_warning_threshold_count: int
+    duckdb_warning: bool
+    figure_warning: bool
+    warning: bool
 
 
 class ArtifactDeleteResponse(BaseModel):
@@ -239,6 +251,8 @@ _DEFAULT_TERMINAL_ALLOWLIST = {
     "pwd",
 }
 _BLOCKED_TERMINAL_SYNTAX_RE = re.compile(r"(&&|\|\||;|>|<|`|\$\(|\r|\n)")
+_ARTIFACT_DUCKDB_WARNING_THRESHOLD_BYTES = 1024 * 1024 * 1024
+_ARTIFACT_FIGURE_WARNING_THRESHOLD_COUNT = 20
 
 
 def _normalize_table_name(raw: str) -> str:
@@ -675,6 +689,43 @@ async def get_workspace_artifact_rows(
     if rows is None:
         raise HTTPException(status_code=404, detail="Artifact rows not found")
     return DataframeArtifactRowsResponse(**rows)
+
+
+@router.get(
+    "/workspaces/{workspace_id}/artifacts/usage",
+    response_model=WorkspaceArtifactUsageResponse,
+)
+async def get_workspace_artifact_usage(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Return scratchpad usage summary used by status-bar artifact pressure warning."""
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    store = get_artifact_scratchpad_store()
+    try:
+        usage = store.get_workspace_artifact_usage(
+            workspace_duckdb_path=str(workspace.duckdb_path),
+        )
+    except duckdb.IOException as exc:
+        if "Conflicting lock is held" not in str(exc):
+            raise HTTPException(status_code=503, detail=f"Artifact usage unavailable: {exc}") from exc
+        usage = await get_workspace_artifact_usage_via_kernel(workspace_id)
+
+    duckdb_bytes = max(0, int(usage.get("duckdb_bytes") or 0))
+    figure_count = max(0, int(usage.get("figure_count") or 0))
+    duckdb_warning = duckdb_bytes > _ARTIFACT_DUCKDB_WARNING_THRESHOLD_BYTES
+    figure_warning = figure_count > _ARTIFACT_FIGURE_WARNING_THRESHOLD_COUNT
+    return WorkspaceArtifactUsageResponse(
+        workspace_id=workspace_id,
+        duckdb_bytes=duckdb_bytes,
+        duckdb_warning_threshold_bytes=_ARTIFACT_DUCKDB_WARNING_THRESHOLD_BYTES,
+        figure_count=figure_count,
+        figure_warning_threshold_count=_ARTIFACT_FIGURE_WARNING_THRESHOLD_COUNT,
+        duckdb_warning=duckdb_warning,
+        figure_warning=figure_warning,
+        warning=duckdb_warning or figure_warning,
+    )
 
 
 @router.get(
