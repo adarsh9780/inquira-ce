@@ -48,3 +48,39 @@ test('buildExecutionViewModel reports parse errors for invalid json bucket items
   assert.equal(view.output.includes('⚠️ Failed to parse dataframe data.'), true)
 })
 
+test('buildExecutionViewModel prefers artifact-backed dataframe and figure entries', () => {
+  const view = buildExecutionViewModel({
+    output: '',
+    error: null,
+    variables: {
+      dataframes: {},
+      figures: {},
+      scalars: {},
+    },
+    artifacts: [
+      {
+        artifact_id: 'df-1',
+        kind: 'dataframe',
+        logical_name: 'summary_df',
+        row_count: 120,
+        schema: [{ name: 'a', dtype: 'INTEGER' }],
+        preview_rows: [[1], [2]],
+      },
+      {
+        artifact_id: 'fig-1',
+        kind: 'figure',
+        logical_name: 'trend_fig',
+        payload: { figure: { data: [{ x: [1], y: [2] }], layout: { title: { text: 'Trend' } } } },
+      },
+    ],
+  })
+
+  assert.equal(view.dataframes.length, 1)
+  assert.equal(view.dataframes[0].name, 'summary_df')
+  assert.equal(view.dataframes[0].data.artifact_id, 'df-1')
+  assert.deepEqual(view.dataframes[0].data.data, [{ a: 1 }, { a: 2 }])
+  assert.equal(view.figures.length, 1)
+  assert.equal(view.figures[0].artifact_id, 'fig-1')
+  assert.equal(view.counts.dataframes, 1)
+  assert.equal(view.counts.figures, 1)
+})

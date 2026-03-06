@@ -36,6 +36,8 @@ template: |
   - Valid kinds: `dataframe`, `figure`, `scalar` (aliases like `pandas`/`polars`/`pyarrow`/`arrow` and `plotly` are acceptable).
   - Include only final user-facing outputs; do not include transient helper variables.
   - Names listed in `output_contract` must match the exact final variable names from the generated code.
+  - Do NOT serialize dataframe outputs via `.to_dict(...)`, `.to_json(...)`, or list-of-dicts conversions for `output_contract`.
+  - Keep final dataframe outputs as real dataframe objects and list their variable names in `output_contract`.
 
   ## Code Generation Rules (ANTI-HALLUCINATION)
   - ALWAYS reuse the existing `conn` DuckDB connection when available.

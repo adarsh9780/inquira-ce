@@ -108,3 +108,28 @@ test('unpacks variable bundle when returned inside result', () => {
   assert.equal(Object.keys(normalized.variables.dataframes).length, 1)
   assert.equal(Object.keys(normalized.variables.figures).length, 1)
 })
+
+test('preserves run id and normalizes artifact previews from execute response', () => {
+  const normalized = normalizeExecutionResponse({
+    success: true,
+    stdout: '',
+    stderr: '',
+    run_id: 'run-123',
+    artifacts: [
+      {
+        artifact_id: 'art-1',
+        kind: 'dataframe',
+        logical_name: 'summary_df',
+        row_count: 200,
+        schema: [{ name: 'a', dtype: 'INTEGER' }],
+        preview_rows: [[1], [2]],
+      },
+    ],
+  })
+
+  assert.equal(normalized.run_id, 'run-123')
+  assert.equal(Array.isArray(normalized.artifacts), true)
+  assert.equal(normalized.artifacts.length, 1)
+  assert.equal(normalized.artifacts[0].artifact_id, 'art-1')
+  assert.deepEqual(normalized.artifacts[0].preview_rows, [{ a: 1 }, { a: 2 }])
+})

@@ -6,6 +6,7 @@ import { mapExecutionServiceResponse } from '../src/utils/executionServiceMapper
 test('mapExecutionServiceResponse preserves variables bundle from api response', () => {
   const mapped = mapExecutionServiceResponse({
     success: true,
+    run_id: 'run-abc',
     stdout: 'printed',
     stderr: '',
     has_stdout: true,
@@ -15,6 +16,13 @@ test('mapExecutionServiceResponse preserves variables bundle from api response',
     result_type: null,
     result_kind: 'dataframe',
     result_name: 'top_batsmen_df',
+    artifacts: [
+      {
+        artifact_id: 'a1',
+        kind: 'dataframe',
+        logical_name: 'top_batsmen_df',
+      },
+    ],
     variables: {
       dataframes: { top_batsmen_df: { artifact_id: 'a1', row_count: 10, data: [{ Batter: 'A' }] } },
       figures: { chart: { data: [], layout: {} } },
@@ -29,4 +37,6 @@ test('mapExecutionServiceResponse preserves variables bundle from api response',
   assert.equal(mapped.resultName, 'top_batsmen_df')
   assert.equal(mapped.hasStdout, true)
   assert.equal(mapped.hasStderr, false)
+  assert.equal(mapped.runId, 'run-abc')
+  assert.equal(mapped.artifacts[0].artifact_id, 'a1')
 })

@@ -8,5 +8,7 @@ Rules:
 - Use the provided table name.
 - Do not read external files.
 - Do not recreate sample data manually in Python lists/tuples; query the existing workspace table directly.
+- Do not convert dataframe outputs into dictionaries/lists/json for display (for example, avoid `df.to_dict(...)` or `df.to_json(...)`).
+- Keep dataframe results as dataframe variables so they can be captured and shown in the Table tab.
 - Keep code deterministic and concise.
 - Return plain markdown explanation for non-technical users.

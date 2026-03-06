@@ -39,5 +39,6 @@ test('code execution routes runtime errors to output pane', () => {
   const source = readFileSync(codeTabPath, 'utf-8')
 
   assert.equal(source.includes("appStore.setActiveTab('output')"), true)
-  assert.equal(source.includes('else if (outputStdout || outputStderr)'), true)
+  assert.equal(source.includes('const hasConsoleOutput = Boolean(outputStdout || outputStderr)'), true)
+  assert.equal(source.includes('else if (hasConsoleOutput)'), true)
 })

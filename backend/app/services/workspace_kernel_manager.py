@@ -69,6 +69,35 @@ _RUN_EXPORTS_PROBE_TEMPLATE = """
 _inquira_get_active_exports(run_id={run_id!r})
 """
 
+def _build_identifier_result_probe_code(identifier: str) -> str:
+    target = repr(str(identifier))
+    return (
+        "import json as _json\n"
+        "try:\n"
+        "    import pandas as _pd\n"
+        "except Exception:\n"
+        "    _pd = None\n"
+        "try:\n"
+        "    import plotly.graph_objects as _go\n"
+        "except Exception:\n"
+        "    _go = None\n"
+        f"_inquira_identifier = {target}\n"
+        "_inquira_target = globals().get(_inquira_identifier) if _inquira_identifier in globals() else None\n"
+        "if _inquira_target is None:\n"
+        "    _inquira_payload = None\n"
+        "elif _pd is not None and isinstance(_inquira_target, _pd.DataFrame):\n"
+        "    _preview = _inquira_target.head(1000)\n"
+        "    _inquira_payload = {\n"
+        "        'columns': [str(c) for c in list(_preview.columns)],\n"
+        "        'data': _json.loads(_preview.to_json(orient='records', date_format='iso')),\n"
+        "    }\n"
+        "elif _go is not None and isinstance(_inquira_target, _go.Figure):\n"
+        "    _inquira_payload = _inquira_target.to_plotly_json()\n"
+        "else:\n"
+        "    _inquira_payload = _inquira_target\n"
+        "_inquira_payload\n"
+    )
+
 _KERNEL_RESOURCE_CLEANUP_CODE = """
 try:
     if "scratchpad_conn" in globals() and scratchpad_conn is not None:
@@ -601,6 +630,14 @@ class WorkspaceKernelManager:
             "import json as _json\n"
             "import uuid as _uuid\n"
             "from datetime import datetime as _dt, timedelta as _td, timezone as _tz\n"
+            "try:\n"
+            "    import pandas as _pd_display\n"
+            "    _pd_display.set_option('display.max_rows', 1000)\n"
+            "    _pd_display.set_option('display.min_rows', 20)\n"
+            "    _pd_display.set_option('display.max_columns', 20)\n"
+            "    _pd_display.set_option('display.large_repr', 'truncate')\n"
+            "except Exception:\n"
+            "    pass\n"
             f"conn = duckdb.connect(r'''{duckdb_path}''', read_only=True)\n"
             f"scratchpad_conn = duckdb.connect(r'''{scratchpad_path}''', read_only=False)\n"
             "scratchpad_conn.execute(\"\"\"\n"
@@ -827,6 +864,7 @@ class WorkspaceKernelManager:
         code: str,
     ) -> dict[str, Any]:
         parsed = await self._execute_request(session, code)
+        identifier_ref = self._extract_identifier_reference(code)
 
         should_probe_fallback = (
             parsed.error is None
@@ -837,20 +875,43 @@ class WorkspaceKernelManager:
         )
 
         if should_probe_fallback:
-            probe = await self._execute_request(session, _FALLBACK_RESULT_PROBE_CODE)
-            if (
-                probe.result is not None
-                and probe.result_type in {"DataFrame", "Figure"}
-            ):
-                parsed.result = probe.result
-                parsed.result_type = probe.result_type
-            elif (
-                parsed.result is None
-                and probe.result is not None
-                and probe.result_type is not None
-            ):
-                parsed.result = probe.result
-                parsed.result_type = probe.result_type
+            preferred_probe_applied = False
+            if identifier_ref:
+                preferred_probe = await self._execute_request(
+                    session,
+                    _build_identifier_result_probe_code(identifier_ref),
+                )
+                if (
+                    preferred_probe.result is not None
+                    and preferred_probe.result_type in {"DataFrame", "Figure"}
+                ):
+                    parsed.result = preferred_probe.result
+                    parsed.result_type = preferred_probe.result_type
+                    preferred_probe_applied = True
+                elif (
+                    parsed.result is None
+                    and preferred_probe.result is not None
+                    and preferred_probe.result_type is not None
+                ):
+                    parsed.result = preferred_probe.result
+                    parsed.result_type = preferred_probe.result_type
+                    preferred_probe_applied = True
+
+            if not preferred_probe_applied:
+                probe = await self._execute_request(session, _FALLBACK_RESULT_PROBE_CODE)
+                if (
+                    probe.result is not None
+                    and probe.result_type in {"DataFrame", "Figure"}
+                ):
+                    parsed.result = probe.result
+                    parsed.result_type = probe.result_type
+                elif (
+                    parsed.result is None
+                    and probe.result is not None
+                    and probe.result_type is not None
+                ):
+                    parsed.result = probe.result
+                    parsed.result_type = probe.result_type
 
         variables: dict[str, dict[str, Any]] = {"dataframes": {}, "figures": {}, "scalars": {}}
         artifacts: list[dict[str, Any]] = []
@@ -1005,6 +1066,8 @@ class WorkspaceKernelManager:
                 return "scalar", identifier_ref
 
         kind = cls._normalize_result_kind(parsed.result_type)
+        if identifier_ref and kind in {"dataframe", "figure", "scalar"}:
+            return kind, identifier_ref
         if kind in {"dataframe", "figure", "scalar"}:
             return kind, None
         if parsed.result is not None:

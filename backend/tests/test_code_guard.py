@@ -94,3 +94,14 @@ df
     assert result.blocked is True
     assert result.should_retry is True
     assert "Source-file loaders are not allowed" in (result.reason or "")
+
+
+def test_code_guard_blocks_dataframe_to_dict_records_conversion():
+    code = """
+res = conn.sql("SELECT * FROM sales LIMIT 100").df()
+output = res.to_dict(orient='records')
+"""
+    result = guard_code(code, table_name="sales")
+    assert result.blocked is True
+    assert result.should_retry is True
+    assert "Do not convert dataframe outputs to list/dict JSON" in (result.reason or "")

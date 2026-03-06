@@ -328,6 +328,7 @@ function startRunEntry(scopeLabel) {
 
 async function executeSnippet(code, successLine, options = {}) {
   const preferOutputPane = options?.preferOutputPane === true
+  const preserveActiveTabOnNoOutput = options?.preserveActiveTabOnNoOutput === true
   const runEntryId = String(options?.runEntryId || '').trim()
   const runId = String(options?.runId || '').trim()
   const start = performance.now()
@@ -344,6 +345,8 @@ async function executeSnippet(code, successLine, options = {}) {
     result_type: pyResponse.resultType,
     result_kind: pyResponse.resultKind,
     result_name: pyResponse.resultName,
+    run_id: pyResponse.runId,
+    artifacts: pyResponse.artifacts,
     variables: pyResponse.variables,
   })
 
@@ -365,7 +368,7 @@ async function executeSnippet(code, successLine, options = {}) {
     kind: 'output',
     source: 'analysis',
     label: 'Run output',
-    runId,
+    runId: String(normalized?.run_id || runId || ''),
     status,
     stdout: outputStdout,
     stderr: outputStderr,
@@ -400,6 +403,8 @@ async function executeSnippet(code, successLine, options = {}) {
     dataframes: prioritizeByName(viewModel.dataframes, preferred.dataframeName),
     figures: prioritizeByName(viewModel.figures, preferred.figureName),
   }
+  const hasArtifacts = orderedViewModel.dataframes.length > 0 || orderedViewModel.figures.length > 0
+  const hasConsoleOutput = Boolean(outputStdout || outputStderr)
 
   applyExecutionArtifactsToStore(orderedViewModel)
   const targetTab = decideExecutionTabWithSelection({
@@ -417,12 +422,16 @@ async function executeSnippet(code, successLine, options = {}) {
     appStore.setActiveTab('output')
   } else if (targetTab) {
     appStore.setActiveTab(targetTab)
-  } else if (outputStdout || outputStderr) {
+  } else if (hasConsoleOutput) {
     appStore.setActiveTab('output')
+  } else if (preserveActiveTabOnNoOutput) {
+    // Selection-style no-op execution (e.g. assignment only): keep current pane.
   } else {
     appStore.setActiveTab('output')
   }
-  appStore.setTerminalOutput(viewModel.output)
+  if (!preserveActiveTabOnNoOutput || hasArtifacts || hasConsoleOutput) {
+    appStore.setTerminalOutput(viewModel.output)
+  }
   return {
     ok: true,
     execTime,
@@ -477,8 +486,6 @@ async function runSelectedCode() {
 
   isRunning.value = true
   appStore.setCodeRunning(true)
-  appStore.setActiveTab('output')
-  appStore.setTerminalOutput('Running selected code...')
   const runMeta = startRunEntry('Selection run')
 
   try {
@@ -486,7 +493,7 @@ async function runSelectedCode() {
       selectedCode,
       'Selected code executed successfully!',
       {
-        preferOutputPane: true,
+        preserveActiveTabOnNoOutput: true,
         runEntryId: runMeta.entryId,
         runId: runMeta.runId,
       },
