@@ -50,6 +50,12 @@ from ...services.terminal_executor import (
 )
 from ...services.websocket_manager import websocket_manager
 from ...core.logger import logprint
+from ..services.command_service import (
+    CommandExecutionError,
+    execute_workspace_command,
+    list_command_definitions,
+    parse_command_text,
+)
 
 router = APIRouter(tags=["V1 Runtime"], dependencies=[Depends(ensure_appdata_principal)])
 
@@ -198,6 +204,31 @@ class WorkspacePathsResponse(BaseModel):
     workspace_dir: str
     duckdb_path: str
     terminal_enabled: bool = False
+
+
+class WorkspaceColumnsResponse(BaseModel):
+    columns: list[dict[str, str]]
+
+
+class CommandCatalogResponse(BaseModel):
+    commands: list[dict[str, str]]
+
+
+class CommandExecuteRequest(BaseModel):
+    text: str | None = None
+    name: str | None = None
+    raw_args: str = ""
+    default_table: str | None = None
+    row_limit: int = Field(500, ge=1, le=2000)
+
+
+class CommandExecuteResponse(BaseModel):
+    command: str
+    name: str
+    output: str
+    result_type: str = "message"
+    result: dict[str, Any] | None = None
+    truncated: bool = False
 
 
 class DatasetSchemaResponse(BaseModel):
@@ -402,6 +433,30 @@ def _table_exists_in_workspace_db(duckdb_path: str, table_name: str) -> bool:
         con.close()
 
 
+def _read_workspace_columns(duckdb_path: str) -> list[dict[str, str]]:
+    con = duckdb.connect(duckdb_path)
+    try:
+        rows = con.execute(
+            """
+            SELECT table_name, column_name, data_type
+            FROM information_schema.columns
+            WHERE table_schema = 'main'
+            ORDER BY table_name, ordinal_position
+            """
+        ).fetchall()
+    finally:
+        con.close()
+
+    return [
+        {
+            "table_name": str(row[0]),
+            "column_name": str(row[1]),
+            "dtype": str(row[2] or ""),
+        }
+        for row in rows
+    ]
+
+
 def _read_table_columns_for_prompt(
     duckdb_path: str,
     table_name: str,
@@ -565,6 +620,88 @@ async def get_workspace_paths(
         workspace_dir=str(workspace_path),
         duckdb_path=str(workspace.duckdb_path),
         terminal_enabled=bool(runtime.terminal_enabled),
+    )
+
+
+@router.get("/workspaces/{workspace_id}/columns", response_model=WorkspaceColumnsResponse)
+async def get_workspace_columns(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
+    try:
+        columns = await asyncio.to_thread(_read_workspace_columns, str(workspace.duckdb_path))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to load workspace columns: {str(exc)}") from exc
+    return WorkspaceColumnsResponse(columns=columns)
+
+
+@router.get("/workspaces/{workspace_id}/commands", response_model=CommandCatalogResponse)
+async def list_workspace_commands(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    await _require_workspace_access(session, current_user.id, workspace_id)
+    return CommandCatalogResponse(commands=list_command_definitions())
+
+
+@router.post("/workspaces/{workspace_id}/commands/execute", response_model=CommandExecuteResponse)
+async def execute_workspace_slash_command(
+    workspace_id: str,
+    payload: CommandExecuteRequest,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
+
+    parsed_name = ""
+    raw_args = ""
+    args: list[str] = []
+    command_text = str(payload.text or "").strip()
+
+    if command_text:
+        try:
+            parsed_name, raw_args, args = parse_command_text(command_text)
+        except CommandExecutionError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    else:
+        parsed_name = str(payload.name or "").strip().lower()
+        raw_args = str(payload.raw_args or "").strip()
+        if not parsed_name:
+            raise HTTPException(status_code=400, detail="Provide either command text or command name.")
+        try:
+            args = shlex.split(raw_args) if raw_args else []
+        except ValueError:
+            args = raw_args.split()
+        command_text = f"/{parsed_name}" + (f" {raw_args}" if raw_args else "")
+
+    try:
+        result = await asyncio.to_thread(
+            execute_workspace_command,
+            duckdb_path=str(workspace.duckdb_path),
+            name=parsed_name,
+            args=args,
+            default_table=payload.default_table,
+            row_limit=payload.row_limit,
+        )
+    except CommandExecutionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except duckdb.Error as exc:
+        raise HTTPException(status_code=400, detail=f"Command execution failed: {str(exc)}") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Command execution failed: {str(exc)}") from exc
+
+    return CommandExecuteResponse(
+        command=command_text,
+        name=str(result.get("name") or parsed_name),
+        output=str(result.get("output") or ""),
+        result_type=str(result.get("result_type") or "message"),
+        result=result.get("result") if isinstance(result.get("result"), dict) else None,
+        truncated=bool(result.get("truncated")),
     )
 
 

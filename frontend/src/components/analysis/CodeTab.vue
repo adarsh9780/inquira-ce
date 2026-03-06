@@ -142,6 +142,107 @@ const hasSelectedData = computed(() => {
   return Boolean(selectedPath || selectedTable)
 })
 
+function isSimpleIdentifier(value) {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(value || '').trim())
+}
+
+function escapeQuotedString(value) {
+  return String(value || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+}
+
+function buildColumnReference(tableName, columnName) {
+  const table = String(tableName || '').trim()
+  const column = String(columnName || '').trim()
+  if (!table || !column) return ''
+  if (isSimpleIdentifier(column)) return `${table}.${column}`
+  return `${table}["${escapeQuotedString(column)}"]`
+}
+
+function buildColumnCompletionOptions(query = '') {
+  const loweredQuery = String(query || '').toLowerCase()
+  const options = []
+  const seen = new Set()
+  const addOption = ({ tableName, columnName, dtype = '' }) => {
+    const safeTable = String(tableName || '').trim()
+    const safeColumn = String(columnName || '').trim()
+    const safeDtype = String(dtype || '').trim()
+    if (!safeTable || !safeColumn) return
+
+    if (!seen.has(safeTable)) {
+      const tableLower = safeTable.toLowerCase()
+      if (!loweredQuery || tableLower.includes(loweredQuery) || `${tableLower}.`.startsWith(loweredQuery)) {
+        options.push({
+          label: safeTable,
+          type: 'keyword',
+          detail: 'table',
+        })
+      }
+      seen.add(safeTable)
+    }
+
+    const fullColumn = buildColumnReference(safeTable, safeColumn)
+    const dotColumn = `${safeTable}.${safeColumn}`
+    if (seen.has(fullColumn)) return
+    const searchPool = [fullColumn, dotColumn, safeTable, safeColumn].map((entry) => entry.toLowerCase())
+    if (!loweredQuery || searchPool.some((entry) => entry.includes(loweredQuery) || entry.startsWith(loweredQuery))) {
+      options.push({
+        label: fullColumn,
+        type: 'variable',
+        detail: safeDtype || (isSimpleIdentifier(safeColumn) ? 'column' : 'column (escaped)'),
+      })
+    }
+    seen.add(fullColumn)
+  }
+
+  const columns = Array.isArray(appStore.columnCatalog) ? appStore.columnCatalog : []
+
+  columns.forEach((item) => {
+    addOption({
+      tableName: item?.table_name,
+      columnName: item?.column_name,
+      dtype: item?.dtype,
+    })
+  })
+
+  const ingestedTable = String(appStore.ingestedTableName || '').trim()
+  const ingestedColumns = Array.isArray(appStore.ingestedColumns) ? appStore.ingestedColumns : []
+  ingestedColumns.forEach((item) => {
+    addOption({
+      tableName: ingestedTable,
+      columnName: item?.name || item?.column_name,
+      dtype: item?.dtype || item?.type,
+    })
+  })
+
+  return options.slice(0, 120)
+}
+
+function completionSource(context) {
+  const word = context.matchBefore(/[A-Za-z_][\w.\[\]"']*/)
+  if (!word) {
+    if (!context.explicit) return null
+    const options = buildColumnCompletionOptions('')
+    if (!options.length) return null
+    return {
+      from: context.pos,
+      options,
+      validFor: /^[A-Za-z_][\w.\[\]"']*$/,
+    }
+  }
+  if (word.from === word.to && !context.explicit) return null
+
+  const options = buildColumnCompletionOptions(word.text)
+  if (!options.length) return null
+
+  return {
+    from: word.from,
+    options,
+    validFor: /^[A-Za-z_][\w.\[\]"']*$/,
+  }
+}
+
 function applyExecutionArtifactsToStore(viewModel) {
   appStore.setDataframes(viewModel.dataframes)
   if (viewModel.dataframes.length > 0) {
@@ -577,7 +678,7 @@ async function initializeEditor() {
     basicSetup,
     indentUnit.of('    '),
     python(),
-    autocompletion(),
+    autocompletion({ override: [completionSource] }),
     Prec.highest(keymap.of(customKeymap)),
     EditorView.theme({
       '&': { fontSize: '14px', height: '100%', backgroundColor: '#FDFCF8' },
@@ -669,6 +770,7 @@ onMounted(async () => {
   await nextTick()
   await fetchSettings()
   await fetchDatabasePaths()
+  await appStore.fetchColumnCatalog({ force: true })
 
   await initializeEditor()
 })
@@ -700,6 +802,10 @@ watch(() => authStore.userId, async (newUserId, oldUserId) => {
   if (newUserId !== oldUserId && newUserId) {
     await fetchDatabasePaths()
   }
+})
+
+watch(() => appStore.activeWorkspaceId, async () => {
+  await appStore.fetchColumnCatalog({ force: true })
 })
 </script>
 

@@ -21,6 +21,8 @@ export const useAppStore = defineStore('app', () => {
   const isSchemaFileUploaded = ref(false)
   const ingestedTableName = ref('')
   const ingestedColumns = ref([])
+  const columnCatalog = ref([])
+  const profileData = ref(null)
 
   // LLM Configuration
   const selectedModel = ref('google/gemini-2.5-flash')
@@ -318,6 +320,8 @@ export const useAppStore = defineStore('app', () => {
     isSchemaFileUploaded.value = false
     ingestedTableName.value = ''
     ingestedColumns.value = []
+    columnCatalog.value = []
+    profileData.value = null
     schemaContext.value = ''
     allowSchemaSampleValues.value = false
     pythonFileContent.value = ''
@@ -397,6 +401,8 @@ export const useAppStore = defineStore('app', () => {
       isSchemaFileUploaded.value = false
       ingestedTableName.value = ''
       ingestedColumns.value = []
+      columnCatalog.value = []
+      profileData.value = null
     }
   }
 
@@ -423,6 +429,14 @@ export const useAppStore = defineStore('app', () => {
   function setIngestedColumns(columns) {
     ingestedColumns.value = Array.isArray(columns) ? columns : []
     saveLocalConfig()
+  }
+
+  function setColumnCatalog(columns) {
+    columnCatalog.value = Array.isArray(columns) ? columns : []
+  }
+
+  function setProfileData(data) {
+    profileData.value = data && typeof data === 'object' ? data : null
   }
 
   function setApiKey(key) {
@@ -764,7 +778,29 @@ export const useAppStore = defineStore('app', () => {
 
   function setActiveWorkspaceId(workspaceId) {
     activeWorkspaceId.value = workspaceId || ''
+    columnCatalog.value = []
+    profileData.value = null
     saveLocalConfig()
+  }
+
+  async function fetchColumnCatalog({ force = false } = {}) {
+    const workspaceId = String(activeWorkspaceId.value || '').trim()
+    if (!workspaceId) {
+      columnCatalog.value = []
+      return []
+    }
+    if (!force && Array.isArray(columnCatalog.value) && columnCatalog.value.length > 0) {
+      return columnCatalog.value
+    }
+    try {
+      const response = await apiService.getWorkspaceColumns(workspaceId)
+      const columns = Array.isArray(response?.columns) ? response.columns : []
+      columnCatalog.value = columns
+      return columns
+    } catch (_error) {
+      columnCatalog.value = []
+      return []
+    }
   }
 
   async function ensureWorkspaceKernelConnected(workspaceId = activeWorkspaceId.value) {
@@ -908,6 +944,8 @@ export const useAppStore = defineStore('app', () => {
       dataFilePath.value = ''
       ingestedTableName.value = ''
       ingestedColumns.value = []
+      columnCatalog.value = []
+      profileData.value = null
       schemaFileId.value = ''
       isSchemaFileUploaded.value = false
       setTerminalEnabled(false)
@@ -1062,6 +1100,8 @@ export const useAppStore = defineStore('app', () => {
       activeConversationId.value = ''
       chatHistory.value = []
       turnsNextCursor.value = null
+      columnCatalog.value = []
+      profileData.value = null
       saveLocalConfig()
     }
     pollWorkspaceDeletionJob(job.job_id)
@@ -1463,6 +1503,8 @@ export const useAppStore = defineStore('app', () => {
     isCodeRunning.value = false
     schemaFileId.value = ''
     isSchemaFileUploaded.value = false
+    columnCatalog.value = []
+    profileData.value = null
     historicalCodeBlocks.value = []
     saveLocalConfig()
   }
@@ -1539,6 +1581,8 @@ export const useAppStore = defineStore('app', () => {
     isSchemaFileUploaded,
     ingestedTableName,
     ingestedColumns,
+    columnCatalog,
+    profileData,
     selectedModel,
     availableModels,
     apiKey,
@@ -1610,6 +1654,8 @@ export const useAppStore = defineStore('app', () => {
     setIsSchemaFileUploaded,
     setIngestedTableName,
     setIngestedColumns,
+    setColumnCatalog,
+    setProfileData,
     setApiKey,
     setApiKeyConfigured,
     setSelectedModel,
@@ -1635,6 +1681,7 @@ export const useAppStore = defineStore('app', () => {
     setConversations,
     setActiveConversationId,
     fetchWorkspaces,
+    fetchColumnCatalog,
     fetchWorkspaceDeletionJobs,
     trackWorkspaceDeletionJob,
     createWorkspace,

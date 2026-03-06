@@ -1,20 +1,25 @@
 <template>
   <div class="space-y-2">
     <!-- Main Input Card (Cursor-style) -->
-    <div
-      class="relative flex flex-col rounded-2xl border transition-all duration-150"
-      style="
-        background-color: var(--color-base);
-        border-color: var(--color-border);
-        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-      "
-      :style="isFocused ? { borderColor: 'var(--color-border-hover)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-text-main) 5%, transparent)' } : {}"
-    >
+    <div class="relative">
+      <div
+        ref="inputCardRef"
+        class="relative flex flex-col rounded-2xl border transition-all duration-150"
+        style="
+          background-color: var(--color-base);
+          border-color: var(--color-border);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        "
+        :style="isFocused ? { borderColor: 'var(--color-border-hover)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-text-main) 5%, transparent)' } : {}"
+      >
       <!-- Textarea -->
       <textarea
+        ref="textareaRef"
         v-model="question"
-        @keydown.enter.prevent="handleSubmit"
-        @keydown.shift.enter="handleNewLine"
+        @keydown="handleKeydown"
+        @input="handleInputChange"
+        @click="handleCaretInteraction"
+        @keyup="handleCaretInteraction"
         @focus="isFocused = true"
         @blur="isFocused = false"
         placeholder="How can I help you today?"
@@ -64,6 +69,41 @@
         </div>
 
       </div>
+      </div>
+
+      <div
+        v-if="showCommandSuggestions"
+        class="absolute left-0 right-0 z-[70] overflow-hidden rounded-xl border shadow-lg"
+        :class="suggestionsOpenUp ? 'bottom-full mb-2' : 'top-full mt-1'"
+        style="background-color: var(--color-base); border-color: var(--color-border);"
+      >
+        <ul class="py-1">
+          <li v-for="(item, index) in commandSuggestions" :key="item.name">
+            <button
+              type="button"
+              class="flex w-full items-start justify-between gap-3 px-3 py-2 text-left text-sm transition-colors"
+              :class="index === selectedCommandIndex ? 'bg-black/[0.05]' : 'hover:bg-black/[0.03]'"
+              @mousedown.prevent="acceptCommandSuggestion(item)"
+            >
+              <span class="min-w-0">
+                <span class="block truncate font-medium" style="color: var(--color-text-main);">/{{ item.name }}</span>
+                <span class="block truncate text-xs" style="color: var(--color-text-muted);">{{ item.description }}</span>
+              </span>
+              <span class="shrink-0 rounded border px-1.5 py-0.5 text-[10px] uppercase" style="color: var(--color-text-muted); border-color: var(--color-border);">
+                {{ item.category }}
+              </span>
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      <ColumnSuggest
+        v-if="showColumnSuggestions"
+        :items="columnSuggestions"
+        :selected-index="selectedColumnIndex"
+        :open-up="suggestionsOpenUp"
+        @select="acceptColumnSuggestion"
+      />
     </div>
 
     <!-- Requirements Notice -->
@@ -83,14 +123,17 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import apiService from '../../services/apiService'
+import executionService from '../../services/executionService'
+import { executeCommand, getRegisteredCommands, isCommand } from '../../services/commandRegistry'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { buildBrowserDataPath, inferTableNameFromDataPath } from '../../utils/chatBootstrap'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import ModelSelector from '../ui/ModelSelector.vue'
+import ColumnSuggest from './ColumnSuggest.vue'
 import {
   PlusIcon,
   MicrophoneIcon,
@@ -102,6 +145,17 @@ const appStore = useAppStore()
 
 const question = ref('')
 const isFocused = ref(false)
+const textareaRef = ref(null)
+const inputCardRef = ref(null)
+const commandSuggestions = ref([])
+const selectedCommandIndex = ref(0)
+const columnSuggestions = ref([])
+const selectedColumnIndex = ref(0)
+const activeTokenRange = ref({ start: 0, end: 0, token: '' })
+const suggestionsOpenUp = ref(false)
+
+const showCommandSuggestions = computed(() => commandSuggestions.value.length > 0)
+const showColumnSuggestions = computed(() => columnSuggestions.value.length > 0)
 
 const canSend = computed(() =>
   appStore.canAnalyze &&
@@ -122,6 +176,274 @@ const FINAL_STREAM_NODES = new Set([
 
 function handleModelChange(model) {
   appStore.setSelectedModel(model)
+}
+
+function isSimpleIdentifier(value) {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(value || '').trim())
+}
+
+function escapeQuotedString(value) {
+  return String(value || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+}
+
+function buildColumnReference(tableName, columnName) {
+  const table = String(tableName || '').trim()
+  const column = String(columnName || '').trim()
+  if (!table || !column) return ''
+  if (isSimpleIdentifier(column)) {
+    return `${table}.${column}`
+  }
+  return `${table}["${escapeQuotedString(column)}"]`
+}
+
+function buildColumnSuggestion(item) {
+  const tableName = String(item?.table_name || '').trim()
+  const columnName = String(item?.column_name || '').trim()
+  if (!tableName || !columnName) return null
+
+  const displayText = buildColumnReference(tableName, columnName)
+  return {
+    ...item,
+    table_name: tableName,
+    column_name: columnName,
+    dtype: String(item?.dtype || ''),
+    displayText,
+    insertText: displayText,
+    dotText: `${tableName}.${columnName}`,
+    isSpecial: !isSimpleIdentifier(columnName),
+  }
+}
+
+function collectColumnCandidates() {
+  const merged = []
+  const seen = new Set()
+
+  const addCandidate = (tableName, columnName, dtype = '') => {
+    const table = String(tableName || '').trim()
+    const column = String(columnName || '').trim()
+    if (!table || !column) return
+    const key = `${table.toLowerCase()}::${column.toLowerCase()}`
+    if (seen.has(key)) return
+    seen.add(key)
+    const suggestion = buildColumnSuggestion({
+      table_name: table,
+      column_name: column,
+      dtype: String(dtype || ''),
+    })
+    if (suggestion) merged.push(suggestion)
+  }
+
+  const catalogItems = Array.isArray(appStore.columnCatalog) ? appStore.columnCatalog : []
+  catalogItems.forEach((item) => {
+    addCandidate(item?.table_name, item?.column_name, item?.dtype)
+  })
+
+  const activeTable = String(appStore.ingestedTableName || '').trim()
+  const ingestedItems = Array.isArray(appStore.ingestedColumns) ? appStore.ingestedColumns : []
+  ingestedItems.forEach((item) => {
+    addCandidate(
+      activeTable,
+      item?.name || item?.column_name,
+      item?.dtype || item?.type || ''
+    )
+  })
+
+  return merged
+}
+
+function clearSuggestions() {
+  commandSuggestions.value = []
+  selectedCommandIndex.value = 0
+  columnSuggestions.value = []
+  selectedColumnIndex.value = 0
+}
+
+function updateSuggestionPlacement() {
+  const target = inputCardRef.value || textareaRef.value
+  if (!target) {
+    suggestionsOpenUp.value = false
+    return
+  }
+  const rect = target.getBoundingClientRect()
+  const minDropdownHeight = 220
+  const spaceBelow = Math.max(0, window.innerHeight - rect.bottom)
+  suggestionsOpenUp.value = spaceBelow < minDropdownHeight
+}
+
+function currentCursorPosition() {
+  const target = textareaRef.value
+  if (!target) return question.value.length
+  return Number(target.selectionStart || 0)
+}
+
+function tokenRangeAtCursor(text, cursor) {
+  const safeText = String(text || '')
+  const safeCursor = Math.max(0, Math.min(Number(cursor || 0), safeText.length))
+  const prefix = safeText.slice(0, safeCursor)
+  const match = prefix.match(/([^\s]*)$/)
+  const token = String(match?.[1] || '')
+  return {
+    start: safeCursor - token.length,
+    end: safeCursor,
+    token,
+  }
+}
+
+function applyTokenReplacement(replacement, { appendSpace = false } = {}) {
+  const value = String(question.value || '')
+  const { start, end } = activeTokenRange.value
+  const safeStart = Math.max(0, Math.min(start, value.length))
+  const safeEnd = Math.max(safeStart, Math.min(end, value.length))
+  const suffix = appendSpace ? ' ' : ''
+  const updated = `${value.slice(0, safeStart)}${replacement}${suffix}${value.slice(safeEnd)}`
+  question.value = updated
+  const caret = safeStart + replacement.length + suffix.length
+  nextTick(() => {
+    if (textareaRef.value) {
+      textareaRef.value.focus()
+      textareaRef.value.selectionStart = caret
+      textareaRef.value.selectionEnd = caret
+    }
+    void updateAutocompleteSuggestions()
+  })
+}
+
+function acceptCommandSuggestion(item = null) {
+  const selected = item || commandSuggestions.value[selectedCommandIndex.value]
+  if (!selected) return
+  applyTokenReplacement(`/${selected.name}`, { appendSpace: true })
+  clearSuggestions()
+}
+
+function acceptColumnSuggestion(item = null) {
+  const selected = item || columnSuggestions.value[selectedColumnIndex.value]
+  if (!selected) return
+  applyTokenReplacement(String(selected.insertText || `${selected.table_name}.${selected.column_name}`))
+  clearSuggestions()
+}
+
+function navigateSuggestion(step) {
+  if (showCommandSuggestions.value) {
+    const size = commandSuggestions.value.length
+    if (!size) return
+    selectedCommandIndex.value = (selectedCommandIndex.value + step + size) % size
+    return
+  }
+  if (showColumnSuggestions.value) {
+    const size = columnSuggestions.value.length
+    if (!size) return
+    selectedColumnIndex.value = (selectedColumnIndex.value + step + size) % size
+  }
+}
+
+async function updateAutocompleteSuggestions() {
+  const value = String(question.value || '')
+  const range = tokenRangeAtCursor(value, currentCursorPosition())
+  activeTokenRange.value = range
+
+  const token = String(range.token || '').trim()
+  if (!token) {
+    clearSuggestions()
+    return
+  }
+
+  if (token.startsWith('/')) {
+    const prefixBeforeToken = value.slice(0, range.start)
+    if (prefixBeforeToken.trim().length > 0) {
+      clearSuggestions()
+      return
+    }
+
+    const prefix = token.slice(1).toLowerCase()
+    commandSuggestions.value = getRegisteredCommands()
+      .filter((item) => !prefix || item.name.startsWith(prefix))
+      .slice(0, 8)
+    selectedCommandIndex.value = 0
+    columnSuggestions.value = []
+    selectedColumnIndex.value = 0
+    updateSuggestionPlacement()
+    return
+  }
+
+  if (!Array.isArray(appStore.columnCatalog) || appStore.columnCatalog.length === 0) {
+    await appStore.fetchColumnCatalog()
+  }
+
+  const normalizedToken = token.toLowerCase()
+  columnSuggestions.value = collectColumnCandidates()
+    .filter((item) => {
+      const searchPool = [
+        String(item.displayText || ''),
+        String(item.dotText || ''),
+        String(item.column_name || ''),
+        String(item.table_name || ''),
+      ].map((entry) => entry.toLowerCase())
+      return (
+        searchPool.some((entry) => entry.startsWith(normalizedToken)) ||
+        searchPool.some((entry) => entry.includes(normalizedToken))
+      )
+    })
+    .slice(0, 8)
+  selectedColumnIndex.value = 0
+  commandSuggestions.value = []
+  updateSuggestionPlacement()
+}
+
+function handleInputChange() {
+  void updateAutocompleteSuggestions()
+}
+
+function handleCaretInteraction() {
+  void updateAutocompleteSuggestions()
+}
+
+function handleKeydown(event) {
+  if (!event) return
+
+  if ((showCommandSuggestions.value || showColumnSuggestions.value) && event.key === 'ArrowDown') {
+    event.preventDefault()
+    navigateSuggestion(1)
+    return
+  }
+  if ((showCommandSuggestions.value || showColumnSuggestions.value) && event.key === 'ArrowUp') {
+    event.preventDefault()
+    navigateSuggestion(-1)
+    return
+  }
+  if ((showCommandSuggestions.value || showColumnSuggestions.value) && event.key === 'Tab') {
+    event.preventDefault()
+    if (showCommandSuggestions.value) {
+      acceptCommandSuggestion()
+    } else {
+      acceptColumnSuggestion()
+    }
+    return
+  }
+  if ((showCommandSuggestions.value || showColumnSuggestions.value) && event.key === 'Escape') {
+    event.preventDefault()
+    clearSuggestions()
+    return
+  }
+  if ((showCommandSuggestions.value || showColumnSuggestions.value) && event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault()
+    if (showCommandSuggestions.value) {
+      acceptCommandSuggestion()
+    } else {
+      acceptColumnSuggestion()
+    }
+    return
+  }
+
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    if (event.shiftKey) {
+      handleNewLine(event)
+      return
+    }
+    handleSubmit()
+  }
 }
 
 function isBrowserVirtualPath(path) {
@@ -186,11 +508,97 @@ function buildActiveSchemaPayload() {
   }
 }
 
+function applyCommandResultToStore(commandResult) {
+  const payload = commandResult?.result && typeof commandResult.result === 'object'
+    ? commandResult.result
+    : null
+  const columns = Array.isArray(payload?.columns) ? payload.columns.map((col) => String(col)) : []
+  const rows = Array.isArray(payload?.data) ? payload.data : []
+  const hasTablePayload = columns.length > 0
+
+  if (hasTablePayload) {
+    const tableResult = {
+      columns,
+      data: rows,
+      row_count: Number.isFinite(Number(payload?.row_count)) ? Number(payload.row_count) : rows.length,
+      result_type: String(payload?.result_type || commandResult?.result_type || 'table'),
+    }
+    appStore.setDataframes([
+      {
+        name: String(commandResult?.name || 'command_result'),
+        data: tableResult,
+      },
+    ])
+    appStore.setResultData(tableResult)
+    appStore.setFigures([])
+    appStore.setPlotlyFigure(null)
+    appStore.setDataPane('table')
+    appStore.setActiveTab('table')
+  } else {
+    appStore.setDataframes([])
+    appStore.setResultData(null)
+    appStore.setFigures([])
+    appStore.setPlotlyFigure(null)
+    appStore.setDataPane('output')
+    appStore.setActiveTab('output')
+  }
+
+  const output = String(commandResult?.output || `/${commandResult?.name || 'command'} executed.`)
+  appStore.setTerminalOutput(output)
+  appStore.appendTerminalEntry({
+    kind: 'output',
+    source: 'analysis',
+    label: `/${String(commandResult?.name || 'command')}`,
+    status: 'success',
+    stdout: output,
+    stderr: '',
+    exitCode: 0,
+  })
+}
+
+async function handleSlashCommand(questionText) {
+  appStore.setLoading(true)
+  try {
+    const workspaceId = appStore.activeWorkspaceId
+    if (!workspaceId) {
+      throw new Error('Create/select a workspace before analysis.')
+    }
+
+    await ensureWorkspaceDatasetReady(workspaceId)
+    const result = await executeCommand(questionText, { appStore, apiService, executionService })
+    applyCommandResultToStore(result)
+  } catch (error) {
+    const message = extractApiErrorMessage(error, 'Failed to run command.')
+    toast.error('Command Failed', message)
+    appStore.setTerminalOutput(`Error: ${message}`)
+    appStore.appendTerminalEntry({
+      kind: 'output',
+      source: 'analysis',
+      label: 'Command error',
+      status: 'error',
+      stdout: '',
+      stderr: message,
+      exitCode: 1,
+    })
+    appStore.setDataPane('output')
+    appStore.setActiveTab('output')
+  } finally {
+    appStore.setLoading(false)
+  }
+}
+
 async function handleSubmit() {
   if (!canSend.value) return
 
   const questionText = question.value.trim()
+  if (!questionText) return
   question.value = ''
+  clearSuggestions()
+
+  if (isCommand(questionText)) {
+    await handleSlashCommand(questionText)
+    return
+  }
 
   appStore.addChatMessage(questionText, '')
   appStore.setLoading(true)
@@ -428,4 +836,30 @@ function handleNewLine(event) {
     textarea.selectionStart = textarea.selectionEnd = start + 1
   }, 0)
 }
+
+onMounted(() => {
+  if (appStore.activeWorkspaceId) {
+    void appStore.fetchColumnCatalog({ force: true })
+  }
+  window.addEventListener('resize', updateSuggestionPlacement)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateSuggestionPlacement)
+})
+
+watch(() => appStore.activeWorkspaceId, () => {
+  clearSuggestions()
+  if (appStore.activeWorkspaceId) {
+    void appStore.fetchColumnCatalog({ force: true })
+  }
+})
+
+watch(() => appStore.ingestedTableName, () => {
+  void updateAutocompleteSuggestions()
+})
+
+watch(() => appStore.ingestedColumns, () => {
+  void updateAutocompleteSuggestions()
+}, { deep: true })
 </script>

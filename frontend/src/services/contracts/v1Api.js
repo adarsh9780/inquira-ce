@@ -53,6 +53,12 @@ export const v1Api = {
   runtime: {
     installRunnerPackage: (payload) =>
       axios.post('/api/v1/runtime/runner/packages/install', payload),
+    workspaceColumns: (workspaceId) =>
+      axios.get(`/api/v1/workspaces/${workspaceId}/columns`),
+    listWorkspaceCommands: (workspaceId) =>
+      axios.get(`/api/v1/workspaces/${workspaceId}/commands`),
+    executeWorkspaceCommand: (workspaceId, payload) =>
+      axios.post(`/api/v1/workspaces/${workspaceId}/commands/execute`, payload),
     bootstrapWorkspaceRuntime: (workspaceId) =>
       axios.post(`/api/v1/workspaces/${workspaceId}/runtime/bootstrap`),
     kernelStatus: (workspaceId) =>

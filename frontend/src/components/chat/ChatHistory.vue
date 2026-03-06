@@ -27,7 +27,11 @@
       <!-- User Message -->
       <div class="w-full mb-2">
         <div class="px-4 py-3 rounded-2xl rounded-tl-sm" style="background-color: #EDE9DE;">
-          <p class="text-sm whitespace-pre-wrap" style="color: var(--color-text-main);">{{ message.question }}</p>
+          <p
+            class="chat-question-text text-sm whitespace-pre-wrap"
+            style="color: var(--color-text-main);"
+            v-html="renderQuestionWithHighlights(message.question)"
+          ></p>
         </div>
         <div class="flex items-center justify-between mt-1 px-1">
           <p class="text-xs" style="color: var(--color-text-muted);">{{ formatTimestamp(message.timestamp) }}</p>
@@ -220,6 +224,40 @@ let mutationObserver = null
 const lastMessageId = computed(() => appStore.chatHistory.at(-1)?.id)
 
 const SCROLL_THRESHOLD_PX = 100
+const QUESTION_REFERENCE_RE = /\b[A-Za-z_][A-Za-z0-9_]*\["(?:[^"\\]|\\.)+"\]|\b[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*/g
+
+function escapeHtml(rawValue) {
+  return String(rawValue || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function renderQuestionWithHighlights(question) {
+  const text = String(question || '')
+  if (!text) return ''
+  const matcher = new RegExp(QUESTION_REFERENCE_RE.source, 'g')
+  const matches = Array.from(text.matchAll(matcher))
+  if (matches.length === 0) {
+    return escapeHtml(text)
+  }
+
+  const parts = []
+  let cursor = 0
+  matches.forEach((match) => {
+    const token = String(match?.[0] || '')
+    const start = Number(match?.index || 0)
+    const end = start + token.length
+    if (!token || start < cursor) return
+    parts.push(escapeHtml(text.slice(cursor, start)))
+    parts.push(`<span class="chat-ref-highlight">${escapeHtml(token)}</span>`)
+    cursor = end
+  })
+  parts.push(escapeHtml(text.slice(cursor)))
+  return parts.join('')
+}
 
 // Markdown parser
 const md = new MarkdownIt({
@@ -647,6 +685,14 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
 </script>
 
 <style scoped>
+:deep(.chat-ref-highlight) {
+  color: #0369a1;
+  font-style: italic;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 :deep(.chat-markdown-content) {
   font-size: 15px;
   line-height: 1.78;

@@ -310,6 +310,16 @@ export const apiService = {
     }
   },
 
+  async getWorkspaceColumns(workspaceId = null) {
+    const { useAppStore } = await import('../stores/appStore')
+    const appStore = useAppStore()
+    const targetWorkspaceId = String(workspaceId || appStore.activeWorkspaceId || '').trim()
+    if (!targetWorkspaceId) {
+      return { columns: [] }
+    }
+    return this.v1GetWorkspaceColumns(targetWorkspaceId)
+  },
+
   // Code execution (server-side)
   async executeCode(code, timeout = 60, workspaceId = null) {
     const { useAppStore } = await import('../stores/appStore')
@@ -652,6 +662,18 @@ export const apiService = {
 
   async v1InstallRunnerPackage(payload) {
     return v1Api.runtime.installRunnerPackage(payload)
+  },
+
+  async v1GetWorkspaceColumns(workspaceId) {
+    return v1Api.runtime.workspaceColumns(workspaceId)
+  },
+
+  async v1ListWorkspaceCommands(workspaceId) {
+    return v1Api.runtime.listWorkspaceCommands(workspaceId)
+  },
+
+  async v1ExecuteWorkspaceCommand(workspaceId, payload) {
+    return v1Api.runtime.executeWorkspaceCommand(workspaceId, payload)
   },
 
   async v1BootstrapWorkspaceRuntime(workspaceId) {
