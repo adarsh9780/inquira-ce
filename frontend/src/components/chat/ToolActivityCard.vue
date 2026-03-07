@@ -26,6 +26,7 @@
           }"
         >
           {{ summaryText }}
+          <span v-if="durationLabel" class="tool-activity-duration">{{ durationLabel }}</span>
         </span>
       </button>
       <p
@@ -35,6 +36,7 @@
           'tool-activity-summary-running': toolStatus === 'running',
           'tool-activity-summary-error': toolStatus === 'error'
         }"
+        style="display: inline;"
       >
         {{ summaryText }}
       </p>
@@ -50,15 +52,16 @@
         <pre class="tool-activity-pre">{{ formattedArgs }}</pre>
       </div>
 
-      <div v-if="hasLines" class="tool-activity-section">
-        <p class="tool-activity-label">Execution logs</p>
+      <div v-if="showTerminal" class="tool-activity-section">
         <TerminalRenderer
-          v-if="showTerminal"
           :command="terminalCommand"
           :lines="toolLines"
+          :status="toolStatus"
         />
+      </div>
+      <div v-else-if="hasLines" class="tool-activity-section">
+        <p class="tool-activity-label">Execution logs</p>
         <pre
-          v-else
           class="tool-activity-pre tool-activity-log"
         >{{ formattedLines }}</pre>
       </div>
@@ -99,7 +102,21 @@ const toolLines = computed(() => {
 })
 const hasArgs = computed(() => Object.keys(toolArgs.value).length > 0)
 const hasLines = computed(() => toolLines.value.length > 0)
-const hasDetails = computed(() => hasArgs.value || hasLines.value)
+const hasDetails = computed(() => hasArgs.value || hasLines.value || showTerminal.value)
+const durationMs = computed(() => {
+  const ms = Number(props.activity?.duration_ms)
+  return Number.isFinite(ms) ? ms : null
+})
+const durationLabel = computed(() => {
+  if (durationMs.value === null) return ''
+  const seconds = Math.round(durationMs.value / 1000)
+  if (seconds < 1) return ''
+  if (seconds < 60) return `for ${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const remaining = seconds % 60
+  if (remaining === 0) return `for ${minutes}m`
+  return `for ${minutes}m ${remaining}s`
+})
 const terminalCommand = computed(() => String(toolArgs.value.command || toolName.value))
 const showTerminal = computed(() => ['bash', 'pip_install'].includes(normalizedToolName.value))
 const formattedLines = computed(() => toolLines.value.join('\n'))
@@ -205,9 +222,11 @@ const summaryText = computed(() => {
   }
 
   if (normalized === 'bash') {
+    const isComplete = toolStatus.value !== 'running'
     const command = firstText(args.command)
-    if (command) return `Running "${command}" using ${tool} tool`
-    return `Running shell command using ${tool} tool`
+    const verb = isComplete ? 'Ran' : 'Running'
+    if (command) return `${verb} command`
+    return `${verb} shell command`
   }
 
   if (normalized === 'execute_python') {
@@ -299,6 +318,12 @@ const errorSummary = computed(() => {
 
 .tool-activity-summary-error {
   color: #b91c1c;
+}
+
+.tool-activity-duration {
+  color: #a1a1aa;
+  font-weight: 400;
+  margin-left: 2px;
 }
 
 .tool-activity-error {

@@ -12,7 +12,7 @@ test('markdown code fences render editor-like block with copy icon and delegated
   assert.equal(source.includes("import 'prismjs/components/prism-sql'"), true)
   assert.equal(source.includes('class="chat-code-copy"'), true)
   assert.equal(source.includes('aria-label="Copy code"'), true)
-  assert.equal(source.includes("chatContainer.value.addEventListener('click', handleChatContainerClick)"), true)
+  assert.equal(source.includes("container.addEventListener('click', handleChatContainerClick)"), true)
   assert.equal(source.includes('void copyCodeFromBlock(copyButton)'), true)
   assert.equal(source.includes('const prismLanguage = resolvePrismLanguage(requestedLanguage)'), true)
   assert.equal(source.includes('Prism.highlight(rawCode, grammar, prismLanguage)'), true)
