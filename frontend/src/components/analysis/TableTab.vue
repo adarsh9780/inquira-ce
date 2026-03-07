@@ -393,7 +393,12 @@ watch(
   () => {
     const latestArtifactId = String(appStore.dataframes?.[0]?.data?.artifact_id || '').trim()
     if (latestArtifactId && latestArtifactId !== selectedArtifactId.value) {
-      selectedArtifactId.value = latestArtifactId
+      const existsInArtifactList = allArtifacts.value.some(
+        (item) => String(item?.artifact_id || '').trim() === latestArtifactId,
+      )
+      if (existsInArtifactList) {
+        selectedArtifactId.value = latestArtifactId
+      }
     } else {
       const latestMemoryId = resolveLatestMemoryArtifactId()
       if (latestMemoryId && latestMemoryId !== selectedArtifactId.value) {
@@ -613,6 +618,15 @@ watch(selectedArtifactId, async (newId) => {
       loadInMemoryArtifact(memoryArtifact)
       return
     }
+  }
+  const isKnownPersistedArtifact = allArtifacts.value.some(
+    (entry) => String(entry?.artifact_id || '').trim() === String(newId || '').trim(),
+  )
+  if (!isKnownPersistedArtifact) {
+    if (appStore.activeWorkspaceId && appStore.hasWorkspace) {
+      void loadWorkspaceArtifacts(appStore.activeWorkspaceId)
+    }
+    return
   }
   const rememberedPage = appStore.getTablePageOffset(appStore.activeWorkspaceId, newId)
   if (Number.isInteger(rememberedPage) && rememberedPage > 0) {

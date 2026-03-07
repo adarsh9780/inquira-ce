@@ -10,5 +10,7 @@ test('table tab auto-selects latest dataframe artifact after new run', () => {
   )
 
   assert.equal(source.includes("const latestArtifactId = String(appStore.dataframes?.[0]?.data?.artifact_id || '').trim()"), true)
+  assert.equal(source.includes('const existsInArtifactList = allArtifacts.value.some('), true)
+  assert.equal(source.includes('if (existsInArtifactList) {'), true)
   assert.equal(source.includes('selectedArtifactId.value = latestArtifactId'), true)
 })
