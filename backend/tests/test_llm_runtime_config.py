@@ -35,7 +35,9 @@ def test_llm_runtime_config_reads_base_url_and_models_from_toml(monkeypatch, tmp
     assert cfg.default_max_tokens == 2048
     assert cfg.schema_max_tokens == 1024
     assert cfg.code_generation_max_tokens == 3072
-    assert cfg.supported_models == ("openai/gpt-4o-mini", "openai/gpt-4.1-nano")
+    assert set(("openai/gpt-4o-mini", "openai/gpt-4.1-nano")).issubset(
+        set(cfg.supported_models)
+    )
 
 
 def test_llm_runtime_config_env_overrides_toml(monkeypatch, tmp_path):
@@ -77,16 +79,20 @@ def test_llm_runtime_config_env_overrides_toml(monkeypatch, tmp_path):
     assert cfg.default_max_tokens == 1024
     assert cfg.schema_max_tokens == 1536
     assert cfg.code_generation_max_tokens == 8192
-    assert cfg.supported_models == (
-        "openai/gpt-4o-mini",
-        "google/gemini-2.5-flash",
-        "google/gemini-3-flash-preview",
-        "google/gemini-2.5-flash-lite",
-    )
+    assert set(
+        (
+            "openai/gpt-4o-mini",
+            "google/gemini-2.5-flash",
+            "google/gemini-3-flash-preview",
+            "google/gemini-2.5-flash-lite",
+        )
+    ).issubset(set(cfg.supported_models))
 
 
 def test_normalize_model_id_supports_short_aliases():
-    assert normalize_model_id("gemini-3-flash-preview") == "google/gemini-3-flash-preview"
+    assert (
+        normalize_model_id("gemini-3-flash-preview") == "google/gemini-3-flash-preview"
+    )
     assert normalize_model_id("gemini-2.5-flash") == "google/gemini-2.5-flash"
     assert normalize_model_id("gemini-2.5-flash-lite") == "google/gemini-2.5-flash-lite"
     assert normalize_model_id("openrouter/free") == "openrouter/free"
@@ -117,7 +123,9 @@ def test_llm_runtime_config_rejects_shorthand_model_ids_in_toml(monkeypatch, tmp
         assert "must use the full model ID" in str(exc)
 
 
-def test_llm_runtime_config_rejects_non_positive_default_max_tokens(monkeypatch, tmp_path):
+def test_llm_runtime_config_rejects_non_positive_default_max_tokens(
+    monkeypatch, tmp_path
+):
     cfg_path = tmp_path / "inquira.toml"
     cfg_path.write_text(
         "\n".join(
@@ -141,7 +149,9 @@ def test_llm_runtime_config_rejects_non_positive_default_max_tokens(monkeypatch,
         load_llm_runtime_config()
 
 
-def test_llm_runtime_config_rejects_non_positive_schema_or_code_limits(monkeypatch, tmp_path):
+def test_llm_runtime_config_rejects_non_positive_schema_or_code_limits(
+    monkeypatch, tmp_path
+):
     cfg_path = tmp_path / "inquira.toml"
     cfg_path.write_text(
         "\n".join(

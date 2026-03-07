@@ -22,12 +22,7 @@ class LlmRuntimeConfig:
     default_max_tokens: int = 4096
     schema_max_tokens: int = 2048
     code_generation_max_tokens: int = 4096
-    supported_models: tuple[str, ...] = (
-        "google/gemini-3-flash-preview",
-        "google/gemini-2.5-flash",
-        "google/gemini-2.5-flash-lite",
-        "openrouter/free",
-    )
+    supported_models: tuple[str, ...] = tuple()
 
 
 _MODEL_ALIASES: dict[str, str] = {
@@ -65,7 +60,9 @@ def _validate_and_normalize_model_list(raw_models: Any, field_name: str) -> list
     elif isinstance(raw_models, list):
         values = [str(item).strip() for item in raw_models]
     else:
-        raise ValueError(f"{field_name} must be a list of model IDs or comma-separated string.")
+        raise ValueError(
+            f"{field_name} must be a list of model IDs or comma-separated string."
+        )
 
     normalized_unique: list[str] = []
     for item in values:
@@ -168,11 +165,26 @@ def load_llm_runtime_config() -> LlmRuntimeConfig:
     if code_generation_max_tokens_raw is None:
         code_generation_max_tokens_raw = 4096
 
-    default_max_tokens = _parse_positive_int(default_max_tokens_raw, "[llm.limits].default")
-    schema_max_tokens = _parse_positive_int(schema_max_tokens_raw, "[llm.limits].schema")
+    default_max_tokens = _parse_positive_int(
+        default_max_tokens_raw, "[llm.limits].default"
+    )
+    schema_max_tokens = _parse_positive_int(
+        schema_max_tokens_raw, "[llm.limits].schema"
+    )
     code_generation_max_tokens = _parse_positive_int(
         code_generation_max_tokens_raw, "[llm.limits].code_generation"
     )
+    # Gather all configured models from our loaded catalogs
+    from .llm_provider_catalog import all_provider_model_catalogs
+
+    catalogs = all_provider_model_catalogs()
+    for cat in catalogs.values():
+        for lst in ("main_models", "lite_models"):
+            for m in cat.get(lst, []):
+                norm_m = normalize_model_id(m)
+                if norm_m and norm_m not in supported_models:
+                    supported_models.append(norm_m)
+
     normalized_default_model = normalize_model_id(default_model)
     normalized_lite_model = normalize_model_id(lite_model)
     if normalized_default_model and normalized_default_model not in supported_models:
