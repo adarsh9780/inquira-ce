@@ -47,9 +47,25 @@ function normalizePreviewRows(rows, columns) {
     .filter(Boolean)
 }
 
+function parseArtifactTimestampMs(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return 0
+  const parsed = Date.parse(raw)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function sortArtifactsNewestFirst(artifacts) {
+  if (!Array.isArray(artifacts)) return []
+  return [...artifacts].sort((left, right) => {
+    const delta = parseArtifactTimestampMs(right?.created_at) - parseArtifactTimestampMs(left?.created_at)
+    if (delta !== 0) return delta
+    return String(right?.artifact_id || '').localeCompare(String(left?.artifact_id || ''))
+  })
+}
+
 function buildArtifactDataframes(artifacts) {
   if (!Array.isArray(artifacts)) return []
-  return artifacts
+  return sortArtifactsNewestFirst(artifacts)
     .filter((item) => String(item?.kind || '').toLowerCase() === 'dataframe')
     .map((item, index) => {
       const schema = Array.isArray(item?.schema) ? item.schema : []
@@ -74,7 +90,7 @@ function buildArtifactDataframes(artifacts) {
 
 function buildArtifactFigures(artifacts) {
   if (!Array.isArray(artifacts)) return []
-  return artifacts
+  return sortArtifactsNewestFirst(artifacts)
     .filter((item) => String(item?.kind || '').toLowerCase() === 'figure')
     .map((item, index) => {
       const payload = item?.payload?.figure ?? item?.payload
@@ -94,7 +110,7 @@ function buildArtifactFigures(artifacts) {
 
 function buildArtifactScalars(artifacts) {
   if (!Array.isArray(artifacts)) return []
-  return artifacts
+  return sortArtifactsNewestFirst(artifacts)
     .filter((item) => String(item?.kind || '').toLowerCase() === 'scalar')
     .map((item, index) => {
       const logicalName = String(item?.logical_name || '').trim()

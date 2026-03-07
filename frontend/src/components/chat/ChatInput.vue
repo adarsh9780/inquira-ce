@@ -174,6 +174,22 @@ const FINAL_STREAM_NODES = new Set([
   'reject'
 ])
 
+function parseArtifactTimestampMs(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return 0
+  const parsed = Date.parse(raw)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function sortArtifactsNewestFirst(items) {
+  if (!Array.isArray(items)) return []
+  return [...items].sort((left, right) => {
+    const delta = parseArtifactTimestampMs(right?.created_at) - parseArtifactTimestampMs(left?.created_at)
+    if (delta !== 0) return delta
+    return String(right?.artifact_id || '').localeCompare(String(left?.artifact_id || ''))
+  })
+}
+
 function handleModelChange(model) {
   appStore.setSelectedModel(model)
 }
@@ -721,6 +737,7 @@ async function handleSubmit() {
       appStore.setPythonFileContent(finalCode)
     }
 
+    const previousDataPane = String(appStore.dataPane || '').trim().toLowerCase()
     if (finalCode && finalCode.trim()) {
       const executionStderr = response?.execution?.stderr || ''
       const executionStdout = response?.execution?.stdout || ''
@@ -738,7 +755,7 @@ async function handleSubmit() {
       }
     }
 
-    const artifactItems = Array.isArray(response?.artifacts) ? response.artifacts : []
+    const artifactItems = sortArtifactsNewestFirst(Array.isArray(response?.artifacts) ? response.artifacts : [])
     if (artifactItems.length > 0) {
       const dataframeArtifacts = artifactItems
         .filter((item) => String(item?.kind || '') === 'dataframe')
@@ -748,7 +765,8 @@ async function handleSubmit() {
             artifact_id: item?.artifact_id,
             row_count: Number(item?.row_count || 0),
             columns: Array.isArray(item?.schema) ? item.schema.map((col) => String(col?.name || '')) : [],
-            data: Array.isArray(item?.preview_rows) ? item.preview_rows : []
+            data: Array.isArray(item?.preview_rows) ? item.preview_rows : [],
+            created_at: String(item?.created_at || ''),
           }
         }))
       const figureArtifacts = artifactItems
@@ -759,6 +777,7 @@ async function handleSubmit() {
           return {
             name: String(item?.logical_name || 'figure'),
             artifact_id: item?.artifact_id || null,
+            created_at: String(item?.created_at || ''),
             data: figure,
           }
         })
@@ -766,7 +785,13 @@ async function handleSubmit() {
 
       appStore.setDataframes(dataframeArtifacts)
       appStore.setFigures(figureArtifacts)
-      if (dataframeArtifacts.length > 0) {
+      if (previousDataPane === 'table' && dataframeArtifacts.length > 0) {
+        appStore.setResultData(dataframeArtifacts[0].data)
+        appStore.setDataPane('table')
+      } else if (previousDataPane === 'figure' && figureArtifacts.length > 0) {
+        appStore.setPlotlyFigure(figureArtifacts[0].data)
+        appStore.setDataPane('figure')
+      } else if (dataframeArtifacts.length > 0) {
         appStore.setResultData(dataframeArtifacts[0].data)
         appStore.setDataPane('table')
       } else if (figureArtifacts.length > 0) {
