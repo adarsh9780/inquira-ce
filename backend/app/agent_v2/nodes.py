@@ -167,6 +167,21 @@ def _invoke_structured_chain(chain: Any, payload: dict[str, Any]) -> Any:
         return chain.invoke(payload)
 
 
+def _is_non_retriable_execution_error(message: str) -> bool:
+    text = str(message or "").strip().lower()
+    if not text:
+        return False
+    non_retriable_markers = (
+        "workspace database is missing",
+        "missing workspace data path",
+        "missing data path",
+        "requires workspace_id",
+        "requires workspace_duckdb_path",
+        "api key not configured",
+    )
+    return any(marker in text for marker in non_retriable_markers)
+
+
 async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
     messages = list(state.get("messages") or [])
     table_name = str(state.get("table_name") or "")
@@ -223,6 +238,8 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
     best_output = AnalysisOutput(code="", explanation="", output_contract=[])
     max_attempts = max(1, int(runtime.max_code_executions))
     candidate_code = ""
+    execution_feedback = ""
+    last_executed_code = ""
     for _attempt in range(max_attempts):
         call_messages = list(messages)
         if retry_feedback:
@@ -255,21 +272,33 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
         guard = guard_code(candidate_code, table_name=table_name or None)
         if not guard.blocked:
             candidate_code = guard.code
-            retry_feedback = ""
-            break
-        retry_feedback = str(guard.reason or "Generated code failed validation.")
-        candidate_code = ""
+        else:
+            retry_feedback = str(guard.reason or "Generated code failed validation.")
+            candidate_code = ""
+            continue
 
-    execution_feedback = ""
-    if candidate_code:
         execution = await execute_python(
             workspace_id=workspace_id,
             data_path=data_path or None,
             code=candidate_code,
             timeout=min(90, max(10, int(runtime.turn_timeout))),
         )
-        if not bool(execution.get("success")):
-            execution_feedback = str(execution.get("error") or execution.get("stderr") or "").strip()
+        last_executed_code = candidate_code
+        if bool(execution.get("success")):
+            execution_feedback = ""
+            retry_feedback = ""
+            break
+
+        execution_feedback = str(execution.get("error") or execution.get("stderr") or "").strip()
+        if _is_non_retriable_execution_error(execution_feedback):
+            break
+        retry_feedback = (
+            "Execution failed. Regenerate code that fixes this runtime error.\n"
+            f"Runtime error: {execution_feedback[:1200]}"
+        )
+        candidate_code = ""
+    if not candidate_code and execution_feedback:
+        candidate_code = last_executed_code
 
     explanation = str(best_output.explanation or "").strip()
     if execution_feedback:
