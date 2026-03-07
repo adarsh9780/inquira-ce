@@ -151,8 +151,9 @@
           <table class="min-w-full table-fixed">
             <thead style="background-color: color-mix(in srgb, var(--color-surface) 78%, var(--color-base));">
               <tr>
-                <th class="w-[28%] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Column</th>
-                <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Description</th>
+                <th class="w-[24%] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Column</th>
+                <th class="w-[50%] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Description</th>
+                <th class="w-[26%] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Aliases</th>
               </tr>
             </thead>
             <tbody>
@@ -175,10 +176,23 @@
                     placeholder="Enter one or more lines to describe this column..."
                   ></textarea>
                 </td>
+                <td class="px-3 py-2">
+                  <input
+                    type="text"
+                    class="w-full rounded-md px-2 py-1.5 text-sm leading-5 outline-none"
+                    style="border: none; color: var(--color-text-main); background-color: transparent;"
+                    :value="formatAliasesForInput(col.aliases)"
+                    @input="e => updateSchemaAliases(i, e.target.value)"
+                    placeholder="Comma-separated aliases..."
+                  />
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
+        <p class="text-[11px]" style="color: var(--color-text-muted);">
+          Aliases are search hints for schema lookup. Enter comma-separated values per column.
+        </p>
       </div>
     </div>
   </div>
@@ -264,6 +278,34 @@ function normalizeDatasetEntries(items) {
     .filter(Boolean)
 }
 
+function normalizeAliasList(value) {
+  const source = Array.isArray(value)
+    ? value
+    : (typeof value === 'string' ? value.split(',') : [])
+  const seen = new Set()
+  const normalized = []
+  source.forEach((item) => {
+    const alias = String(item || '').trim()
+    if (!alias) return
+    const aliasKey = alias.toLowerCase()
+    if (seen.has(aliasKey)) return
+    seen.add(aliasKey)
+    normalized.push(alias)
+  })
+  return normalized
+}
+
+function formatAliasesForInput(value) {
+  return normalizeAliasList(value).join(', ')
+}
+
+function normalizeSchemaColumns(columns) {
+  return (Array.isArray(columns) ? columns : []).map((col) => ({
+    ...col,
+    aliases: normalizeAliasList(col?.aliases),
+  }))
+}
+
 function getSelectedDatasetEntry() {
   const tableName = String(selectedDatasetTable.value || '').trim()
   if (!tableName) return null
@@ -329,7 +371,7 @@ async function fetchSchemaData(forceRefresh = false) {
       selected.tableName
     )
     if (existingSchema && existingSchema.columns) {
-      schema.value = existingSchema.columns
+      schema.value = normalizeSchemaColumns(existingSchema.columns)
       schemaContext.value = existingSchema.context || ''
       schemaEdited.value = false
       return true
@@ -361,7 +403,7 @@ async function fetchSchemaDataForPath(dataPath, tableNameOverride = null) {
       tableName
     )
     if (existingSchema && existingSchema.columns) {
-      schema.value = existingSchema.columns
+      schema.value = normalizeSchemaColumns(existingSchema.columns)
       schemaContext.value = existingSchema.context || ''
       schemaEdited.value = false
       if (schemaNeedsDescriptions.value && appStore.apiKeyConfigured) {
@@ -409,6 +451,13 @@ function updateSchemaDescription(index, newDescription) {
   }
 }
 
+function updateSchemaAliases(index, aliasText) {
+  if (schema.value[index]) {
+    schema.value[index].aliases = normalizeAliasList(aliasText)
+    schemaEdited.value = true
+  }
+}
+
 async function saveSchema() {
   const workspaceId = String(appStore.activeWorkspaceId || '').trim()
   const tableName = String(selectedDatasetTable.value || appStore.ingestedTableName || '').trim()
@@ -418,10 +467,10 @@ async function saveSchema() {
     if (workspaceId && tableName) {
       await apiService.v1SaveDatasetSchema(workspaceId, tableName, {
         context: schemaContext.value || '',
-        columns: schema.value,
+        columns: normalizeSchemaColumns(schema.value),
       })
     } else if (dataPath) {
-      await apiService.saveSchema(dataPath, schemaContext.value || null, schema.value)
+      await apiService.saveSchema(dataPath, schemaContext.value || null, normalizeSchemaColumns(schema.value))
     } else {
       schemaError.value = 'Please select a dataset first.'
       toast.info('Select a dataset first')
@@ -507,7 +556,7 @@ async function regenerateSchemaForPath(dataPath, tableName = null, options = {})
       regenerationStatus.value = 'Finalizing...'
       regenerationProgress.value = 95
       previewService.clearSchemaCache()
-      schema.value = generatedSchema.columns
+      schema.value = normalizeSchemaColumns(generatedSchema.columns)
       schemaContext.value = generatedSchema.context || ''
       schemaEdited.value = false
       regenerationProgress.value = 100
@@ -660,7 +709,7 @@ async function exportSchema() {
     const payload = {
       table_name: selectedDatasetTable.value || '',
       context: schemaContext.value || '',
-      columns: schema.value,
+      columns: normalizeSchemaColumns(schema.value),
     }
     const filename = `${selectedDatasetTable.value || 'schema'}.json`
     const bytes = new TextEncoder().encode(JSON.stringify(payload, null, 2))
