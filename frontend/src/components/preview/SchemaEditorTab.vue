@@ -170,21 +170,21 @@
                   <textarea
                     rows="2"
                     class="w-full resize-y rounded-md px-2 py-1.5 text-sm leading-5 outline-none"
-                    style="border: none; color: var(--color-text-main); background-color: transparent;"
+                    style="border: none; color: var(--color-text-main); background-color: transparent; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;"
                     :value="col.description"
                     @input="e => updateSchemaDescription(i, e.target.value)"
                     placeholder="Enter one or more lines to describe this column..."
                   ></textarea>
                 </td>
                 <td class="px-3 py-2">
-                  <input
-                    type="text"
+                  <textarea
+                    rows="2"
                     class="w-full rounded-md px-2 py-1.5 text-sm leading-5 outline-none"
-                    style="border: none; color: var(--color-text-main); background-color: transparent;"
+                    style="border: none; color: var(--color-text-main); background-color: transparent; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;"
                     :value="formatAliasesForInput(col.aliases)"
                     @input="e => updateSchemaAliases(i, e.target.value)"
                     placeholder="Comma-separated aliases..."
-                  />
+                  ></textarea>
                 </td>
               </tr>
             </tbody>
