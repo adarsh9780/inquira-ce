@@ -11,7 +11,12 @@ test('apiService deduplicates in-flight artifact row requests and supports per-c
   const source = fs.readFileSync(filePath, 'utf8')
 
   assert.equal(source.includes('const artifactRowsInFlight = new Map()'), true)
-  assert.equal(source.includes('const requestKey = `${workspaceId}:${artifactId}:${Number(offset || 0)}:${Number(limit || 0)}`'), true)
+  assert.equal(source.includes('const sortModelPayload = JSON.stringify(normalizedSortModel)'), true)
+  assert.equal(source.includes('const filterModelPayload = JSON.stringify(normalizedFilterModel)'), true)
+  assert.equal(source.includes('const requestKey = ['), true)
+  assert.equal(source.includes('sortModelPayload,'), true)
+  assert.equal(source.includes('filterModelPayload,'), true)
+  assert.equal(source.includes('normalizedSearchText,'), true)
   assert.equal(source.includes('artifactRowsInFlight.get(requestKey)'), true)
   assert.equal(source.includes('artifactRowsInFlight.set(requestKey, inFlight)'), true)
   assert.equal(source.includes('artifactRowsInFlight.delete(requestKey)'), true)

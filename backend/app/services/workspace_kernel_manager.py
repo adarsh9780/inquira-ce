@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 import re
 import time
 from dataclasses import dataclass, field
@@ -19,6 +20,7 @@ from app.services.jupyter_message_parser import (
     ParsedExecutionOutput,
     update_from_iopub_message,
 )
+from app.services.artifact_scratchpad import ArtifactScratchpadStore
 from app.services.runner_env import ensure_runner_kernel_dependencies, resolve_runner_python
 
 _FALLBACK_RESULT_PROBE_CODE = """
@@ -267,6 +269,9 @@ class WorkspaceKernelManager:
         artifact_id: str,
         offset: int,
         limit: int,
+        sort_model: list[dict[str, Any]] | None = None,
+        filter_model: dict[str, Any] | None = None,
+        search_text: str | None = None,
     ) -> dict[str, Any] | None:
         async with self._sessions_lock:
             session = self._sessions.get(workspace_id)
@@ -275,32 +280,83 @@ class WorkspaceKernelManager:
 
         safe_limit = max(1, min(1000, int(limit)))
         safe_offset = max(0, int(offset))
-        escaped_artifact_id = str(artifact_id).replace("'", "''")
-        page_code = (
+        artifact_token = str(artifact_id).strip()
+        probe_code = (
             "import json as _json\n"
-            f"_art = scratchpad_conn.execute(\"SELECT logical_name, table_name FROM artifact_manifest WHERE artifact_id = '{escaped_artifact_id}' AND kind = 'dataframe' LIMIT 1\").fetchone()\n"
+            f"_artifact_id = {json.dumps(artifact_token, ensure_ascii=True)}\n"
+            "_art = scratchpad_conn.execute(\n"
+            "    \"SELECT logical_name, table_name FROM artifact_manifest \"\n"
+            "    \"WHERE artifact_id = ? AND kind = 'dataframe' LIMIT 1\",\n"
+            "    [_artifact_id],\n"
+            ").fetchone()\n"
             "if _art is None:\n"
-            "    _page = None\n"
+            "    _meta = None\n"
             "else:\n"
             "    _name, _table_name = _art\n"
             "    _escaped = str(_table_name).replace('\"', '\"\"')\n"
-            f"    _rows_df = scratchpad_conn.execute(f'SELECT * FROM \"{{_escaped}}\" LIMIT {safe_limit} OFFSET {safe_offset}').fetchdf()\n"
-            "    _count = int(scratchpad_conn.execute(f'SELECT COUNT(*) FROM \"{_escaped}\"').fetchone()[0])\n"
-            "    _page = {\n"
-            f"      'artifact_id': '{escaped_artifact_id}',\n"
-            "      'name': str(_name),\n"
-            "      'row_count': _count,\n"
-            "      'columns': [str(c) for c in list(_rows_df.columns)],\n"
-            "      'rows': _json.loads(_rows_df.to_json(orient='records', date_format='iso')),\n"
-            f"      'offset': {safe_offset},\n"
-            f"      'limit': {safe_limit},\n"
+            "    _cols = [str(_row[1]) for _row in scratchpad_conn.execute(f'PRAGMA table_info(\"{_escaped}\")').fetchall()]\n"
+            "    _meta = {\n"
+            "        'name': str(_name),\n"
+            "        'table_name': str(_table_name),\n"
+            "        'columns': _cols,\n"
             "    }\n"
-            "_page\n"
+            "_meta\n"
         )
 
         async with session.lock:
             session.last_used = datetime.now(UTC)
-            parsed = await self._execute_request(session, page_code)
+            parsed_meta = await self._execute_request(session, probe_code)
+
+        if parsed_meta.error is not None or parsed_meta.result is None:
+            return None
+        if not isinstance(parsed_meta.result, dict):
+            return None
+
+        table_name = str(parsed_meta.result.get("table_name") or "").strip()
+        display_name = str(parsed_meta.result.get("name") or "dataframe")
+        column_names = parsed_meta.result.get("columns")
+        if not table_name or not isinstance(column_names, list):
+            return None
+        safe_column_names = [str(column) for column in column_names]
+
+        where_sql, where_params = ArtifactScratchpadStore.build_dataframe_where_clause(
+            column_names=safe_column_names,
+            filter_model=filter_model if isinstance(filter_model, dict) else {},
+            search_text=search_text,
+        )
+        order_sql = ArtifactScratchpadStore.build_dataframe_order_clause(
+            column_names=safe_column_names,
+            sort_model=sort_model if isinstance(sort_model, list) else [],
+        )
+
+        escaped_table = table_name.replace('"', '""')
+        page_sql = f'SELECT * FROM "{escaped_table}" {where_sql} {order_sql} LIMIT {safe_limit} OFFSET {safe_offset}'
+        count_sql = f'SELECT COUNT(*) FROM "{escaped_table}" {where_sql}'
+
+        rows_code = (
+            "import json as _json\n"
+            f"_artifact_id = {json.dumps(artifact_token, ensure_ascii=True)}\n"
+            f"_display_name = {json.dumps(display_name, ensure_ascii=True)}\n"
+            f"_query_params = {repr(where_params)}\n"
+            f"_page_sql = {json.dumps(page_sql, ensure_ascii=True)}\n"
+            f"_count_sql = {json.dumps(count_sql, ensure_ascii=True)}\n"
+            "_rows_df = scratchpad_conn.execute(_page_sql, _query_params).fetchdf()\n"
+            "_count = int(scratchpad_conn.execute(_count_sql, _query_params).fetchone()[0])\n"
+            "_result = {\n"
+            "    'artifact_id': _artifact_id,\n"
+            "    'name': _display_name,\n"
+            "    'row_count': _count,\n"
+            "    'columns': [str(_col) for _col in list(_rows_df.columns)],\n"
+            "    'rows': _json.loads(_rows_df.to_json(orient='records', date_format='iso')),\n"
+            f"    'offset': {safe_offset},\n"
+            f"    'limit': {safe_limit},\n"
+            "}\n"
+            "_result\n"
+        )
+
+        async with session.lock:
+            session.last_used = datetime.now(UTC)
+            parsed = await self._execute_request(session, rows_code)
 
         if parsed.error is not None or parsed.result is None:
             return None

@@ -70,6 +70,61 @@ def test_get_dataframe_rows_reads_manifest_table(tmp_path):
     assert rows["rows"] == [{"a": 2}, {"a": 3}]
 
 
+def test_get_dataframe_rows_applies_sort_filter_and_global_search(tmp_path):
+    workspace_db = tmp_path / "ws2-search-sort" / "workspace.duckdb"
+    workspace_db.parent.mkdir(parents=True, exist_ok=True)
+    workspace_db.touch()
+
+    store = ArtifactScratchpadStore()
+    scratchpad_db = store.ensure_workspace(str(workspace_db))
+
+    con = duckdb.connect(str(scratchpad_db), read_only=False)
+    try:
+        con.execute("CREATE TABLE art_run_search (name VARCHAR, city VARCHAR, amount INTEGER)")
+        con.execute(
+            """
+            INSERT INTO art_run_search VALUES
+            ('Alice', 'New York', 50),
+            ('Bob', 'Boston', 75),
+            ('Carol', 'New Delhi', 65),
+            ('Dan', 'Austin', 90)
+            """
+        )
+        con.execute(
+            """
+            INSERT INTO artifact_manifest (
+                artifact_id, run_id, workspace_id, logical_name, kind, table_name,
+                payload_json, schema_json, row_count, created_at, expires_at, status, error
+            ) VALUES (
+                'a2', 'run-2', 'ws-2', 'summary', 'dataframe', 'art_run_search',
+                NULL, NULL, 4, NOW(), NOW() + INTERVAL 1 DAY, 'ready', NULL
+            )
+            """
+        )
+    finally:
+        con.close()
+
+    rows = store.get_dataframe_rows(
+        workspace_duckdb_path=str(workspace_db),
+        artifact_id="a2",
+        offset=0,
+        limit=10,
+        sort_model=[{"colId": "amount", "sort": "desc"}],
+        filter_model={
+            "name": {
+                "filterType": "text",
+                "type": "contains",
+                "filter": "a",
+            }
+        },
+        search_text="new",
+    )
+
+    assert rows is not None
+    assert rows["row_count"] == 2
+    assert [item["name"] for item in rows["rows"]] == ["Carol", "Alice"]
+
+
 def test_delete_artifact_removes_manifest_row_and_dataframe_table(tmp_path):
     workspace_db = tmp_path / "ws-del" / "workspace.duckdb"
     workspace_db.parent.mkdir(parents=True, exist_ok=True)

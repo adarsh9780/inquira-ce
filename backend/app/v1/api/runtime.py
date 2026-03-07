@@ -66,6 +66,41 @@ def _default_variable_bundle() -> dict[str, dict[str, Any]]:
     return {"dataframes": {}, "figures": {}, "scalars": {}}
 
 
+def _parse_grid_query_model(
+    *,
+    raw_value: Any,
+    field_name: str,
+    expected_kind: type,
+) -> list[Any] | dict[str, Any]:
+    if expected_kind is list and isinstance(raw_value, list):
+        return raw_value
+    if expected_kind is dict and isinstance(raw_value, dict):
+        return raw_value
+    if raw_value is not None and not isinstance(raw_value, str):
+        return [] if expected_kind is list else {}
+    if raw_value is None:
+        return [] if expected_kind is list else {}
+    text = str(raw_value).strip()
+    if not text:
+        return [] if expected_kind is list else {}
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid {field_name} JSON payload.") from exc
+    if expected_kind is list and not isinstance(parsed, list):
+        raise HTTPException(status_code=422, detail=f"{field_name} must be a JSON array.")
+    if expected_kind is dict and not isinstance(parsed, dict):
+        raise HTTPException(status_code=422, detail=f"{field_name} must be a JSON object.")
+    return parsed
+
+
+def _normalize_search_query(raw_value: Any) -> str | None:
+    if raw_value is None or not isinstance(raw_value, str):
+        return None
+    text = raw_value.strip()
+    return text or None
+
+
 class ExecuteRequest(BaseModel):
     code: str = Field(..., description="Python code to execute")
     timeout: int = Field(60, ge=1, le=300, description="Max execution time in seconds")
@@ -962,11 +997,25 @@ async def get_workspace_dataframe_artifact_rows(
     artifact_id: str,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=1000, ge=1, le=1000),
+    sort_model: str | None = Query(default=None, description="AG Grid sort model JSON"),
+    filter_model: str | None = Query(default=None, description="AG Grid filter model JSON"),
+    search: str | None = Query(default=None, description="Global text search applied across columns"),
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     store = get_artifact_scratchpad_store()
+    parsed_sort_model = _parse_grid_query_model(
+        raw_value=sort_model,
+        field_name="sort_model",
+        expected_kind=list,
+    )
+    parsed_filter_model = _parse_grid_query_model(
+        raw_value=filter_model,
+        field_name="filter_model",
+        expected_kind=dict,
+    )
+    search_text = _normalize_search_query(search)
     rows: dict[str, Any] | None = None
     try:
         rows = store.get_dataframe_rows(
@@ -974,6 +1023,9 @@ async def get_workspace_dataframe_artifact_rows(
             artifact_id=artifact_id,
             offset=offset,
             limit=limit,
+            sort_model=parsed_sort_model,
+            filter_model=parsed_filter_model,
+            search_text=search_text,
         )
     except duckdb.IOException as exc:
         message = str(exc)
@@ -985,6 +1037,9 @@ async def get_workspace_dataframe_artifact_rows(
             artifact_id=artifact_id,
             offset=offset,
             limit=limit,
+            sort_model=parsed_sort_model,
+            filter_model=parsed_filter_model,
+            search_text=search_text,
         )
     if rows is None:
         raise HTTPException(status_code=404, detail="Dataframe artifact not found")
@@ -1000,11 +1055,25 @@ async def get_workspace_artifact_rows(
     artifact_id: str,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=1000, ge=1, le=1000),
+    sort_model: str | None = Query(default=None, description="AG Grid sort model JSON"),
+    filter_model: str | None = Query(default=None, description="AG Grid filter model JSON"),
+    search: str | None = Query(default=None, description="Global text search applied across columns"),
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     store = get_artifact_scratchpad_store()
+    parsed_sort_model = _parse_grid_query_model(
+        raw_value=sort_model,
+        field_name="sort_model",
+        expected_kind=list,
+    )
+    parsed_filter_model = _parse_grid_query_model(
+        raw_value=filter_model,
+        field_name="filter_model",
+        expected_kind=dict,
+    )
+    search_text = _normalize_search_query(search)
     rows: dict[str, Any] | None = None
     try:
         rows = store.get_dataframe_rows(
@@ -1012,6 +1081,9 @@ async def get_workspace_artifact_rows(
             artifact_id=artifact_id,
             offset=offset,
             limit=limit,
+            sort_model=parsed_sort_model,
+            filter_model=parsed_filter_model,
+            search_text=search_text,
         )
     except duckdb.IOException as exc:
         message = str(exc)
@@ -1022,6 +1094,9 @@ async def get_workspace_artifact_rows(
             artifact_id=artifact_id,
             offset=offset,
             limit=limit,
+            sort_model=parsed_sort_model,
+            filter_model=parsed_filter_model,
+            search_text=search_text,
         )
     if rows is None:
         raise HTTPException(status_code=404, detail="Artifact rows not found")

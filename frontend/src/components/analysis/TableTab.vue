@@ -30,6 +30,16 @@
             />
           </div>
 
+          <input
+            v-model="tableSearch"
+            type="text"
+            placeholder="Search rows"
+            class="h-8 w-48 rounded-md border px-2 text-sm"
+            style="border-color: var(--color-border); background-color: var(--color-surface, #fff); color: var(--color-text);"
+            :disabled="!selectedArtifactId"
+            aria-label="Search rows"
+          />
+
           <!-- Delete selected table -->
           <button
             @click="deleteSelectedArtifact"
@@ -84,6 +94,7 @@
         class="ag-theme-quartz absolute inset-0"
         :columnDefs="columnDefs"
         :rowData="clientRows"
+        :quickFilterText="tableSearch"
         :defaultColDef="defaultColDef"
         :enableClipboard="true"
         :pagination="true"
@@ -218,6 +229,7 @@ const rowCountValue = ref(0)
 const windowStart = ref(0)
 const windowEnd = ref(0)
 const useClientFallback = ref(false)
+const tableSearch = ref('')
 const tableError = ref('')
 const artifactListError = ref('')
 const pendingControllers = new Set()
@@ -228,6 +240,7 @@ let serializedRequestQueue = Promise.resolve()
 let selectedArtifactLoadToken = 0
 let currentDatasourceToken = 0
 let isRecoveringMissingArtifact = false
+let tableSearchDebounceTimer = null
 const pendingRestorePageByArtifact = new Map()
 
 onMounted(() => {
@@ -237,6 +250,10 @@ onMounted(() => {
 onUnmounted(() => {
   cancelPendingRequests()
   listAbortController?.abort()
+  if (tableSearchDebounceTimer) {
+    clearTimeout(tableSearchDebounceTimer)
+    tableSearchDebounceTimer = null
+  }
   gridApi = null
 })
 
@@ -564,6 +581,7 @@ async function recoverFromMissingArtifact(artifactId) {
 
 watch(() => appStore.activeWorkspaceId, (id) => {
   kernelReadyWorkspaceId = ''
+  tableSearch.value = ''
   pendingRestorePageByArtifact.clear()
   selectedArtifactLoadToken += 1
   selectedArtifactId.value = null
@@ -575,6 +593,10 @@ watch(() => appStore.activeWorkspaceId, (id) => {
 // React to user selecting an artifact in the dropdown
 // ---------------------------------------------------------------------------
 watch(selectedArtifactId, async (newId) => {
+  if (tableSearchDebounceTimer) {
+    clearTimeout(tableSearchDebounceTimer)
+    tableSearchDebounceTimer = null
+  }
   const loadToken = ++selectedArtifactLoadToken
   const normalizedWorkspaceId = String(appStore.activeWorkspaceId || '').trim()
   if (normalizedWorkspaceId) {
@@ -605,6 +627,23 @@ watch(selectedArtifactId, async (newId) => {
     if (isAbortError(error)) return
     tableError.value = error?.message || 'Failed to load selected table.'
   }
+})
+
+watch(tableSearch, () => {
+  const artifactId = String(selectedArtifactId.value || '').trim()
+  if (!artifactId) return
+  if (tableSearchDebounceTimer) {
+    clearTimeout(tableSearchDebounceTimer)
+  }
+  tableSearchDebounceTimer = setTimeout(() => {
+    tableSearchDebounceTimer = null
+    pendingRestorePageByArtifact.delete(artifactId)
+    appStore.setTablePageOffset(appStore.activeWorkspaceId, artifactId, 0)
+    if (!useInfiniteModel.value || !isGridAlive()) return
+    void attachInfiniteDatasource(artifactId).then(() => {
+      gridApi?.paginationGoToPage?.(0)
+    })
+  }, 200)
 })
 
 // ---------------------------------------------------------------------------
@@ -769,6 +808,7 @@ function onPaginationChanged() {
 
 function restoreArtifactPage(artifactId) {
   if (!artifactId || !isGridAlive()) return
+  if (String(tableSearch.value || '').trim()) return
   const rememberedPage = pendingRestorePageByArtifact.get(artifactId)
     ?? appStore.getTablePageOffset(appStore.activeWorkspaceId, artifactId)
   if (!Number.isInteger(rememberedPage) || rememberedPage <= 0) return
@@ -829,7 +869,10 @@ async function loadInitialServerPage(artifactId) {
       artifactId,
       0,
       pageSize,
-      { signal: controller.signal },
+      {
+        signal: controller.signal,
+        searchText: String(tableSearch.value || '').trim(),
+      },
     )
     const rows = Array.isArray(payload?.rows) ? payload.rows : []
     serverRows.value = rows
@@ -885,12 +928,23 @@ async function attachInfiniteDatasource(artifactId) {
           const startRow = Number(params.startRow || 0)
           const endRow = Number(params.endRow || (startRow + pageSize))
           const requestLimit = Math.max(1, Math.min(pageSize, endRow - startRow))
+          const sortModel = Array.isArray(params?.sortModel) ? params.sortModel : []
+          const filterModel = (
+            params?.filterModel &&
+            typeof params.filterModel === 'object' &&
+            !Array.isArray(params.filterModel)
+          ) ? params.filterModel : {}
           return apiService.getDataframeArtifactRows(
             workspaceId,
             aid,
             startRow,
             requestLimit,
-            { signal: controller.signal },
+            {
+              signal: controller.signal,
+              sortModel,
+              filterModel,
+              searchText: String(tableSearch.value || '').trim(),
+            },
           )
         })
         if (!isGridAlive() || datasourceTag !== currentDatasourceToken) return

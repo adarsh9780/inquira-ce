@@ -66,6 +66,9 @@ async def get_workspace_dataframe_rows(
     artifact_id: str,
     offset: int = 0,
     limit: int = 1000,
+    sort_model: list[dict[str, Any]] | None = None,
+    filter_model: dict[str, Any] | None = None,
+    search_text: str | None = None,
 ) -> dict[str, Any] | None:
     """Fetch a paginated slice of a stored dataframe artifact."""
     manager = await get_workspace_kernel_manager()
@@ -74,6 +77,9 @@ async def get_workspace_dataframe_rows(
         artifact_id=artifact_id,
         offset=offset,
         limit=limit,
+        sort_model=sort_model,
+        filter_model=filter_model,
+        search_text=search_text,
     )
 
 

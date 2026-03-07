@@ -359,10 +359,23 @@ async def test_get_dataframe_rows_reads_paginated_chunk(tmp_path):
     session = _session("ws-2", str(workspace_db))
     manager._sessions["ws-2"] = session
 
+    calls = {"count": 0}
+
     async def fake_execute_request(current_session, code):
         _ = current_session
-        assert "artifact_manifest" in code
+        calls["count"] += 1
         parsed = ParsedExecutionOutput()
+        if calls["count"] == 1:
+            assert "artifact_manifest" in code
+            assert "table_name" in code
+            parsed.result = {
+                "name": "summary",
+                "table_name": "art_table",
+                "columns": ["a"],
+            }
+            parsed.result_type = "scalar"
+            return parsed
+        assert "SELECT * FROM" in code
         parsed.result = {
             "artifact_id": "artifact-1",
             "name": "summary",

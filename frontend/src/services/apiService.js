@@ -347,13 +347,44 @@ export const apiService = {
   },
 
   async getDataframeArtifactRows(workspaceId, artifactId, offset = 0, limit = 1000, options = {}) {
-    const requestKey = `${workspaceId}:${artifactId}:${Number(offset || 0)}:${Number(limit || 0)}`
+    const normalizedSortModel = Array.isArray(options?.sortModel) ? options.sortModel : []
+    const normalizedFilterModel = (
+      options?.filterModel &&
+      typeof options.filterModel === 'object' &&
+      !Array.isArray(options.filterModel)
+    ) ? options.filterModel : {}
+    const normalizedSearchText = String(options?.searchText || '').trim()
+    const sortModelPayload = JSON.stringify(normalizedSortModel)
+    const filterModelPayload = JSON.stringify(normalizedFilterModel)
+
+    const requestKey = [
+      workspaceId,
+      artifactId,
+      Number(offset || 0),
+      Number(limit || 0),
+      sortModelPayload,
+      filterModelPayload,
+      normalizedSearchText,
+    ].join(':')
     let inFlight = artifactRowsInFlight.get(requestKey)
 
     if (!inFlight) {
       inFlight = (async () => {
+        const queryParams = new URLSearchParams({
+          offset: String(offset),
+          limit: String(limit),
+        })
+        if (sortModelPayload !== '[]') {
+          queryParams.set('sort_model', sortModelPayload)
+        }
+        if (filterModelPayload !== '{}') {
+          queryParams.set('filter_model', filterModelPayload)
+        }
+        if (normalizedSearchText) {
+          queryParams.set('search', normalizedSearchText)
+        }
         const response = await fetch(
-          `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/${artifactId}/rows?offset=${offset}&limit=${limit}`,
+          `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/${artifactId}/rows?${queryParams.toString()}`,
           {
             method: 'GET',
             credentials: 'include',

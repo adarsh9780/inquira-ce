@@ -287,11 +287,17 @@ async def test_workspace_dataframe_artifact_rows_endpoint(monkeypatch, tmp_path)
             artifact_id: str,
             offset: int,
             limit: int,
+            sort_model=None,
+            filter_model=None,
+            search_text=None,
         ):
             assert workspace_duckdb_path == str(duckdb_path)
             assert artifact_id == "art-1"
             assert offset == 0
             assert limit == 1000
+            assert sort_model == []
+            assert filter_model == {}
+            assert search_text is None
             return {
                 "artifact_id": "art-1",
                 "name": "summary",
@@ -339,8 +345,11 @@ async def test_workspace_dataframe_artifact_rows_endpoint_falls_back_on_duckdb_l
             artifact_id: str,
             offset: int,
             limit: int,
+            sort_model=None,
+            filter_model=None,
+            search_text=None,
         ):
-            _ = (workspace_duckdb_path, artifact_id, offset, limit)
+            _ = (workspace_duckdb_path, artifact_id, offset, limit, sort_model, filter_model, search_text)
             raise runtime_api.duckdb.IOException("Conflicting lock is held")
 
     async def fake_get_rows(
@@ -348,11 +357,17 @@ async def test_workspace_dataframe_artifact_rows_endpoint_falls_back_on_duckdb_l
         artifact_id: str,
         offset: int,
         limit: int,
+        sort_model=None,
+        filter_model=None,
+        search_text=None,
     ):
         assert workspace_id == "ws-5"
         assert artifact_id == "art-1"
         assert offset == 0
         assert limit == 1000
+        assert sort_model == []
+        assert filter_model == {}
+        assert search_text is None
         return {
             "artifact_id": "art-1",
             "name": "summary",
@@ -379,6 +394,74 @@ async def test_workspace_dataframe_artifact_rows_endpoint_falls_back_on_duckdb_l
     assert response.artifact_id == "art-1"
     assert response.row_count == 2000
     assert response.rows == [{"a": 1}]
+
+
+@pytest.mark.asyncio
+async def test_workspace_dataframe_artifact_rows_endpoint_forwards_sort_filter_and_search(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws5-grid-models"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    captured = {}
+
+    class _FakeStore:
+        def get_dataframe_rows(
+            self,
+            *,
+            workspace_duckdb_path: str,
+            artifact_id: str,
+            offset: int,
+            limit: int,
+            sort_model=None,
+            filter_model=None,
+            search_text=None,
+        ):
+            captured["workspace_duckdb_path"] = workspace_duckdb_path
+            captured["artifact_id"] = artifact_id
+            captured["offset"] = offset
+            captured["limit"] = limit
+            captured["sort_model"] = sort_model
+            captured["filter_model"] = filter_model
+            captured["search_text"] = search_text
+            return {
+                "artifact_id": artifact_id,
+                "name": "summary",
+                "row_count": 1,
+                "columns": ["city"],
+                "rows": [{"city": "New York"}],
+                "offset": offset,
+                "limit": limit,
+            }
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _FakeStore())
+
+    response = await runtime_api.get_workspace_dataframe_artifact_rows(
+        workspace_id="ws-5",
+        artifact_id="art-1",
+        offset=0,
+        limit=100,
+        sort_model='[{"colId":"amount","sort":"desc"}]',
+        filter_model='{"city":{"filterType":"text","type":"contains","filter":"new"}}',
+        search="new",
+        session=object(),
+        current_user=SimpleNamespace(id="user-1"),
+    )
+
+    assert response.artifact_id == "art-1"
+    assert captured["workspace_duckdb_path"] == str(duckdb_path)
+    assert captured["artifact_id"] == "art-1"
+    assert captured["offset"] == 0
+    assert captured["limit"] == 100
+    assert captured["sort_model"] == [{"colId": "amount", "sort": "desc"}]
+    assert captured["filter_model"] == {"city": {"filterType": "text", "type": "contains", "filter": "new"}}
+    assert captured["search_text"] == "new"
 
 
 @pytest.mark.asyncio
