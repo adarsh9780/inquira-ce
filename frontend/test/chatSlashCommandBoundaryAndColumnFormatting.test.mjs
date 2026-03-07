@@ -15,7 +15,7 @@ test('chat slash command suggestions are constrained to beginning of input', () 
   assert.equal(source.includes(":class=\"suggestionsOpenUp ? 'bottom-full mb-2' : 'top-full mt-1'\""), true)
 })
 
-test('chat column autocomplete supports escaped bracket notation for special column names', () => {
+test('chat column autocomplete uses DuckDB quoted identifiers for special column names', () => {
   const componentPath = resolve(process.cwd(), 'src/components/chat/ChatInput.vue')
   const source = readFileSync(componentPath, 'utf-8')
 
@@ -23,7 +23,7 @@ test('chat column autocomplete supports escaped bracket notation for special col
   assert.equal(source.includes('function collectColumnCandidates()'), true)
   assert.equal(source.includes('appStore.ingestedColumns'), true)
   assert.equal(source.includes('appStore.ingestedTableName'), true)
-  assert.equal(source.includes('return `${table}["${escapeQuotedString(column)}"]`'), true)
+  assert.equal(source.includes('return `${table}.${quoteSqlIdentifier(column)}`'), true)
   assert.equal(source.includes('isSpecial: !isSimpleIdentifier(columnName)'), true)
   assert.equal(source.includes('selected.insertText'), true)
 })
@@ -37,11 +37,11 @@ test('column suggestion UI highlights escaped/special column references', () => 
   assert.equal(source.includes(":class=\"openUp ? 'bottom-full mb-2' : 'top-full mt-1'\""), true)
 })
 
-test('code tab completion source formats special columns with escaped bracket notation', () => {
+test('code tab completion source formats special columns with quoted identifiers', () => {
   const codeTabPath = resolve(process.cwd(), 'src/components/analysis/CodeTab.vue')
   const source = readFileSync(codeTabPath, 'utf-8')
 
   assert.equal(source.includes('function buildColumnReference(tableName, columnName)'), true)
-  assert.equal(source.includes('return `${table}["${escapeQuotedString(column)}"]`'), true)
-  assert.equal(source.includes("column (escaped)"), true)
+  assert.equal(source.includes('return `${table}.${quoteSqlIdentifier(column)}`'), true)
+  assert.equal(source.includes("column (quoted)"), true)
 })

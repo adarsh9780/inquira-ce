@@ -242,7 +242,7 @@ const lastMessageId = computed(() => appStore.chatHistory.at(-1)?.id)
 
 const SCROLL_THRESHOLD_PX = 100
 const SHOW_SCROLL_BUTTON_THRESHOLD_PX = 220
-const QUESTION_REFERENCE_RE = /\b[A-Za-z_][A-Za-z0-9_]*\["(?:[^"\\]|\\.)+"\]|\b[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*/g
+const QUESTION_REFERENCE_RE = /\b[A-Za-z_][A-Za-z0-9_]*\."(?:[^"]|"")+"|\b[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*/g
 
 function escapeHtml(rawValue) {
   return String(rawValue || '')

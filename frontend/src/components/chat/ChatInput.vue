@@ -198,10 +198,8 @@ function isSimpleIdentifier(value) {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(value || '').trim())
 }
 
-function escapeQuotedString(value) {
-  return String(value || '')
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
+function quoteSqlIdentifier(value) {
+  return `"${String(value || '').replace(/"/g, '""')}"`
 }
 
 function buildColumnReference(tableName, columnName) {
@@ -211,7 +209,7 @@ function buildColumnReference(tableName, columnName) {
   if (isSimpleIdentifier(column)) {
     return `${table}.${column}`
   }
-  return `${table}["${escapeQuotedString(column)}"]`
+  return `${table}.${quoteSqlIdentifier(column)}`
 }
 
 function buildColumnSuggestion(item) {

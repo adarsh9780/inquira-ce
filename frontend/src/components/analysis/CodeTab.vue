@@ -146,10 +146,8 @@ function isSimpleIdentifier(value) {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(value || '').trim())
 }
 
-function escapeQuotedString(value) {
-  return String(value || '')
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
+function quoteSqlIdentifier(value) {
+  return `"${String(value || '').replace(/"/g, '""')}"`
 }
 
 function buildColumnReference(tableName, columnName) {
@@ -157,7 +155,7 @@ function buildColumnReference(tableName, columnName) {
   const column = String(columnName || '').trim()
   if (!table || !column) return ''
   if (isSimpleIdentifier(column)) return `${table}.${column}`
-  return `${table}["${escapeQuotedString(column)}"]`
+  return `${table}.${quoteSqlIdentifier(column)}`
 }
 
 function buildColumnCompletionOptions(query = '') {
@@ -190,7 +188,7 @@ function buildColumnCompletionOptions(query = '') {
       options.push({
         label: fullColumn,
         type: 'variable',
-        detail: safeDtype || (isSimpleIdentifier(safeColumn) ? 'column' : 'column (escaped)'),
+        detail: safeDtype || (isSimpleIdentifier(safeColumn) ? 'column' : 'column (quoted)'),
       })
     }
     seen.add(fullColumn)

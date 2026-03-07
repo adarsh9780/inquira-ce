@@ -179,6 +179,14 @@ def _resolve_table(catalog: _Catalog, token: str | None, default_table: str | No
 
 def _resolve_column(catalog: _Catalog, table_name: str, column_token: str) -> str:
     candidate = str(column_token or "").strip()
+    if len(candidate) >= 2 and candidate[0] == candidate[-1] and candidate[0] in {'"', "'"}:
+        quote = candidate[0]
+        candidate = candidate[1:-1]
+        if quote == '"':
+            candidate = candidate.replace('""', '"')
+        else:
+            candidate = candidate.replace("''", "'")
+    candidate = candidate.strip()
     if not candidate:
         raise CommandExecutionError("Column name is required.")
 
@@ -201,6 +209,12 @@ def _resolve_table_column_ref(
 
     if "." in token:
         table_part, column_part = token.split(".", 1)
+        table_name = _resolve_table(catalog, table_part, default_table)
+        column_name = _resolve_column(catalog, table_name, column_part)
+        return table_name, column_name
+
+    if token.endswith("]") and "[" in token:
+        table_part, column_part = token[:-1].split("[", 1)
         table_name = _resolve_table(catalog, table_part, default_table)
         column_name = _resolve_column(catalog, table_name, column_part)
         return table_name, column_name
