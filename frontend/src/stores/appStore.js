@@ -64,6 +64,8 @@ export const useAppStore = defineStore('app', () => {
   const tableWindowStart = ref(0)
   const tableWindowEnd = ref(0)
   const tablePageOffsets = ref({})
+  const selectedTableArtifactsByWorkspace = ref({})
+  const selectedFigureArtifactsByWorkspace = ref({})
   const dataPaneError = ref('')
   const figureCount = ref(0)
   const terminalOutput = ref('')
@@ -141,7 +143,9 @@ export const useAppStore = defineStore('app', () => {
         table_row_count: Number(tableRowCount.value || 0),
         table_window_start: Number(tableWindowStart.value || 0),
         table_window_end: Number(tableWindowEnd.value || 0),
-        table_page_offsets: tablePageOffsets.value || {}
+        table_page_offsets: tablePageOffsets.value || {},
+        table_selected_artifacts: selectedTableArtifactsByWorkspace.value || {},
+        figure_selected_artifacts: selectedFigureArtifactsByWorkspace.value || {},
       },
       session: {
         active_workspace_id: activeWorkspaceId.value || '',
@@ -216,6 +220,12 @@ export const useAppStore = defineStore('app', () => {
     }
     if (ui.table_page_offsets && typeof ui.table_page_offsets === 'object') {
       tablePageOffsets.value = { ...ui.table_page_offsets }
+    }
+    if (ui.table_selected_artifacts && typeof ui.table_selected_artifacts === 'object') {
+      selectedTableArtifactsByWorkspace.value = { ...ui.table_selected_artifacts }
+    }
+    if (ui.figure_selected_artifacts && typeof ui.figure_selected_artifacts === 'object') {
+      selectedFigureArtifactsByWorkspace.value = { ...ui.figure_selected_artifacts }
     }
 
     if (typeof sessionState.active_workspace_id === 'string') {
@@ -347,6 +357,8 @@ export const useAppStore = defineStore('app', () => {
     tableWindowStart.value = 0
     tableWindowEnd.value = 0
     tablePageOffsets.value = {}
+    selectedTableArtifactsByWorkspace.value = {}
+    selectedFigureArtifactsByWorkspace.value = {}
     dataPaneError.value = ''
     terminalOutput.value = ''
     terminalEntries.value = []
@@ -997,6 +1009,8 @@ export const useAppStore = defineStore('app', () => {
       setDataframes([])
       setFigures([])
       tablePageOffsets.value = {}
+      setSelectedTableArtifact(workspaceId, '')
+      setSelectedFigureArtifact(workspaceId, '')
       saveLocalConfig()
     }
     return result
@@ -1095,6 +1109,8 @@ export const useAppStore = defineStore('app', () => {
   async function deleteWorkspaceAsync(workspaceId) {
     const job = await apiService.v1DeleteWorkspace(workspaceId)
     upsertWorkspaceDeletionJob(job)
+    setSelectedTableArtifact(workspaceId, '')
+    setSelectedFigureArtifact(workspaceId, '')
     if (activeWorkspaceId.value === workspaceId) {
       activeWorkspaceId.value = ''
       activeConversationId.value = ''
@@ -1219,6 +1235,10 @@ export const useAppStore = defineStore('app', () => {
     return `${String(workspaceId || '').trim()}::${String(artifactId || '').trim()}`
   }
 
+  function workspaceSelectionKey(workspaceId) {
+    return String(workspaceId || '').trim()
+  }
+
   function setTablePageOffset(workspaceId, artifactId, page) {
     const key = tableOffsetKey(workspaceId, artifactId)
     if (!key || key === '::') return
@@ -1234,6 +1254,56 @@ export const useAppStore = defineStore('app', () => {
     const key = tableOffsetKey(workspaceId, artifactId)
     if (!key || key === '::') return 0
     return Math.max(0, Number(tablePageOffsets.value?.[key] || 0))
+  }
+
+  function setSelectedTableArtifact(workspaceId, artifactId) {
+    const key = workspaceSelectionKey(workspaceId)
+    if (!key) return
+    const normalizedArtifactId = String(artifactId || '').trim()
+    if (normalizedArtifactId) {
+      selectedTableArtifactsByWorkspace.value = {
+        ...selectedTableArtifactsByWorkspace.value,
+        [key]: normalizedArtifactId
+      }
+    } else if (Object.prototype.hasOwnProperty.call(selectedTableArtifactsByWorkspace.value, key)) {
+      const next = { ...selectedTableArtifactsByWorkspace.value }
+      delete next[key]
+      selectedTableArtifactsByWorkspace.value = next
+    } else {
+      return
+    }
+    scheduleLocalSnapshotSave()
+  }
+
+  function getSelectedTableArtifact(workspaceId) {
+    const key = workspaceSelectionKey(workspaceId)
+    if (!key) return ''
+    return String(selectedTableArtifactsByWorkspace.value?.[key] || '').trim()
+  }
+
+  function setSelectedFigureArtifact(workspaceId, artifactId) {
+    const key = workspaceSelectionKey(workspaceId)
+    if (!key) return
+    const normalizedArtifactId = String(artifactId || '').trim()
+    if (normalizedArtifactId) {
+      selectedFigureArtifactsByWorkspace.value = {
+        ...selectedFigureArtifactsByWorkspace.value,
+        [key]: normalizedArtifactId
+      }
+    } else if (Object.prototype.hasOwnProperty.call(selectedFigureArtifactsByWorkspace.value, key)) {
+      const next = { ...selectedFigureArtifactsByWorkspace.value }
+      delete next[key]
+      selectedFigureArtifactsByWorkspace.value = next
+    } else {
+      return
+    }
+    scheduleLocalSnapshotSave()
+  }
+
+  function getSelectedFigureArtifact(workspaceId) {
+    const key = workspaceSelectionKey(workspaceId)
+    if (!key) return ''
+    return String(selectedFigureArtifactsByWorkspace.value?.[key] || '').trim()
   }
 
   function setTerminalOutput(output) {
@@ -1493,6 +1563,8 @@ export const useAppStore = defineStore('app', () => {
     tableWindowStart.value = 0
     tableWindowEnd.value = 0
     tablePageOffsets.value = {}
+    selectedTableArtifactsByWorkspace.value = {}
+    selectedFigureArtifactsByWorkspace.value = {}
     activeTab.value = 'workspace'
     workspacePane.value = 'code'
     dataPane.value = 'table'
@@ -1610,6 +1682,8 @@ export const useAppStore = defineStore('app', () => {
     tableWindowStart,
     tableWindowEnd,
     tablePageOffsets,
+    selectedTableArtifactsByWorkspace,
+    selectedFigureArtifactsByWorkspace,
     dataPaneError,
     figureCount,
     terminalOutput,
@@ -1705,6 +1779,10 @@ export const useAppStore = defineStore('app', () => {
     clearTableViewport,
     setTablePageOffset,
     getTablePageOffset,
+    setSelectedTableArtifact,
+    getSelectedTableArtifact,
+    setSelectedFigureArtifact,
+    getSelectedFigureArtifact,
     setFigureCount,
     setDataPaneError,
     clearDataPaneError,

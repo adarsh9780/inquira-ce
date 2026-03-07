@@ -288,6 +288,10 @@ watch(
 )
 
 watch(selectedArtifactId, (artifactId) => {
+  const normalizedWorkspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (normalizedWorkspaceId) {
+    appStore.setSelectedFigureArtifact(normalizedWorkspaceId, String(artifactId || '').trim())
+  }
   void loadSelectedFigurePayload(artifactId)
 })
 
@@ -341,6 +345,12 @@ function pickPreferredArtifactId(artifacts, preferredArtifactId, preferredLogica
   return null
 }
 
+function resolveRememberedFigureArtifactId(workspaceId, candidates) {
+  const rememberedArtifactId = String(appStore.getSelectedFigureArtifact(workspaceId) || '').trim()
+  if (!rememberedArtifactId) return null
+  return candidates.some((item) => item.artifact_id === rememberedArtifactId) ? rememberedArtifactId : null
+}
+
 async function loadWorkspaceFigureArtifacts(workspaceId, options = {}) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId || !appStore.hasWorkspace) {
@@ -377,9 +387,14 @@ async function loadWorkspaceFigureArtifacts(workspaceId, options = {}) {
       options?.preferredArtifactId,
       options?.preferredLogicalName,
     )
+    const rememberedArtifactId = resolveRememberedFigureArtifactId(
+      normalizedWorkspaceId,
+      candidates,
+    )
 
     const hasExistingSelection = candidates.some((item) => item.artifact_id === selectedArtifactId.value)
     const nextSelection = preferredArtifactId
+      || rememberedArtifactId
       || (hasExistingSelection ? selectedArtifactId.value : null)
       || candidates[0].artifact_id
 

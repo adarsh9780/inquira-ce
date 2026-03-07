@@ -354,6 +354,22 @@ function resolveLatestMemoryArtifactId() {
   return exists ? memoryArtifactId : ''
 }
 
+function resolvePreferredTableSelectionId(workspaceId, availableArtifactIds) {
+  const rememberedArtifactId = String(appStore.getSelectedTableArtifact(workspaceId) || '').trim()
+  if (rememberedArtifactId && availableArtifactIds.has(rememberedArtifactId)) {
+    return rememberedArtifactId
+  }
+  const latestArtifactId = String(appStore.dataframes?.[0]?.data?.artifact_id || '').trim()
+  if (latestArtifactId && availableArtifactIds.has(latestArtifactId)) {
+    return latestArtifactId
+  }
+  const latestMemoryId = resolveLatestMemoryArtifactId()
+  if (latestMemoryId && availableArtifactIds.has(latestMemoryId)) {
+    return latestMemoryId
+  }
+  return ''
+}
+
 watch(
   () => (Array.isArray(appStore.dataframes) ? appStore.dataframes.map((df) => String(df?.data?.artifact_id || '')).filter(Boolean).join('|') : ''),
   () => {
@@ -470,6 +486,7 @@ async function loadWorkspaceArtifacts(workspaceId) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId || !appStore.hasWorkspace) {
     workspaceArtifacts.value = []
+    selectedArtifactId.value = null
     return
   }
   listAbortController?.abort()
@@ -491,6 +508,21 @@ async function loadWorkspaceArtifacts(workspaceId) {
     workspaceKnownSavedTables.value = {
       ...workspaceKnownSavedTables.value,
       [normalizedWorkspaceId]: artifacts.length > 0
+    }
+    const availableArtifactIds = new Set(
+      displayArtifacts.value
+        .map((item) => String(item?.artifact_id || '').trim())
+        .filter(Boolean),
+    )
+    const currentSelection = String(selectedArtifactId.value || '').trim()
+    const hasCurrentSelection = Boolean(currentSelection && availableArtifactIds.has(currentSelection))
+    if (!hasCurrentSelection) {
+      const preferredSelection = resolvePreferredTableSelectionId(
+        normalizedWorkspaceId,
+        availableArtifactIds,
+      )
+      const fallbackSelection = preferredSelection || displayArtifacts.value[0]?.artifact_id || null
+      selectedArtifactId.value = fallbackSelection
     }
   } catch (error) {
     if (isAbortError(error)) return
@@ -543,6 +575,10 @@ watch(() => appStore.activeWorkspaceId, (id) => {
 // ---------------------------------------------------------------------------
 watch(selectedArtifactId, async (newId) => {
   const loadToken = ++selectedArtifactLoadToken
+  const normalizedWorkspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (normalizedWorkspaceId) {
+    appStore.setSelectedTableArtifact(normalizedWorkspaceId, String(newId || '').trim())
+  }
   resetTableState()
   if (!newId) {
     appStore.clearTableViewport()
