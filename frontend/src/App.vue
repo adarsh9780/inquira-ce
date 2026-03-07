@@ -66,6 +66,7 @@ import { useAppStore } from './stores/appStore'
 import { useAuthStore } from './stores/authStore'
 import { settingsWebSocket } from './services/websocketService'
 import { previewService } from './services/previewService'
+import { walkthroughService } from './services/walkthroughService'
 import { toast } from './composables/useToast'
 import AuthModal from './components/modals/AuthModal.vue'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
@@ -161,6 +162,7 @@ async function handleAuthenticated(userData) {
       }
     }
     console.debug('Loaded v1 workspace state for authenticated user')
+    walkthroughService.startIfFirstTime()
   } catch (error) {
     console.error('Failed to load v1 workspace state:', error)
   }
