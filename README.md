@@ -24,14 +24,26 @@ Hosted docs site (GitHub Pages): [https://adarsh9780.github.io/inquira-ce/](http
 - Turn natural language requests into reproducible Python/data operations.
 - Package the app as a desktop experience with backend + frontend + Tauri shell.
 
-## What's New (Since v0.5.7a5)
+## What's New (Since v0.5.7a6)
 
-- Real-time chat token streaming with smoother incremental response rendering.
-- Redesigned workspace layout with a unified collapsible sidebar and dual resizable panes.
-- Stronger built-in terminal workflow with persistent sessions and improved output visibility.
-- Better runtime reliability around DuckDB locks, kernel lifecycle, and artifact rendering.
-- Clearer agent answer structure for analysis plans and explain-code responses.
-- Desktop icon sizing normalized for consistent Dock appearance.
+- Built-in multi-provider LLM support (Ollama, OpenAI, Anthropic) using `inquira.toml`.
+- Replaced Variable Explorer with a Timeline Output Inspector that streams stdout/stderr via SSE.
+- Added backend-driven EDA slash commands and hybrid alias-aware schema retrieval.
+- Arrow-key message recall, VS Code-aligned keyboard shortcuts, and redesigned chat history styling.
+- Improved stability around DuckDB locks, backend auto-healing, and API key management.
+
+## Upcoming Changes
+
+*   **Supabase Auth**: Migrate to Supabase for robust authentication and align the auth page styling with the main UI.
+*   **Proxy Infrastructure**: Launch `inquira-infra` as a private gateway using a LiteLLM proxy for secure key management and token analytics.
+*   **Workspace Layout**: Allow independent toggling of the left and right panels, while retaining their dual-view capability.
+*   **Secure Execution**: Sandbox code execution at the OS or Tauri app level.
+*   **State Persistence**: Store generated workflows persistently by mapping one workspace to one Python script.
+*   **Multi-Table Querying**: Drop the single-dataset constraint so agents can seamlessly query across multiple data sources in a single workspace.
+*   **Performance Optimization**: Stream large images as base64 instead of interactive payloads when size crosses a threshold.
+*   **Artifact Caching**: Smooth out table navigation (e.g., jumping between df1 and df2) by caching offsets and limits across artifact switches.
+*   **Data Sources**: Add native support for loading DuckDB database files.
+*   **Grid Options**: Restore active functionality for AG Grid sorting and filtering.
 
 ## Quick Start
 
