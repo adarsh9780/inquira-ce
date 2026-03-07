@@ -41,6 +41,7 @@ export const useAppStore = defineStore('app', () => {
 
   // Chat
   const chatHistory = ref([])
+  const questionHistory = ref([])
   const currentQuestion = ref('')
   const currentExplanation = ref('')
   const workspaces = ref([])
@@ -119,6 +120,7 @@ export const useAppStore = defineStore('app', () => {
   const MAX_TERMINAL_ENTRIES = 50
   const MAX_TERMINAL_STREAM_CHARS = 200000
   const MAX_TERMINAL_TOTAL_CHARS = 2000000
+  const MAX_QUESTION_HISTORY = 30
 
   function resolveSnapshotUserId(explicitUserId = null) {
     const candidate = String(explicitUserId ?? authStore.userId ?? '').trim()
@@ -152,6 +154,7 @@ export const useAppStore = defineStore('app', () => {
         active_dataset_path: dataFilePath.value || '',
         active_table_name: ingestedTableName.value || '',
         active_conversation_id: activeConversationId.value || '',
+        question_history: Array.isArray(questionHistory.value) ? questionHistory.value : [],
         schema_file_id: schemaFileId.value || '',
         schema_uploaded: !!isSchemaFileUploaded.value,
       },
@@ -239,6 +242,12 @@ export const useAppStore = defineStore('app', () => {
     }
     if (typeof sessionState.active_conversation_id === 'string') {
       activeConversationId.value = sessionState.active_conversation_id
+    }
+    if (Array.isArray(sessionState.question_history)) {
+      questionHistory.value = sessionState.question_history
+        .map((item) => String(item || '').trim())
+        .filter((item) => item.length > 0)
+        .slice(-MAX_QUESTION_HISTORY)
     }
     if (typeof sessionState.schema_file_id === 'string') {
       schemaFileId.value = sessionState.schema_file_id
@@ -337,6 +346,7 @@ export const useAppStore = defineStore('app', () => {
     pythonFileContent.value = ''
 
     chatHistory.value = []
+    questionHistory.value = []
     currentQuestion.value = ''
     currentExplanation.value = ''
     workspaces.value = []
@@ -547,6 +557,18 @@ export const useAppStore = defineStore('app', () => {
     })
     currentQuestion.value = question
     currentExplanation.value = explanation
+  }
+
+  function addQuestionHistoryEntry(question) {
+    const normalized = String(question || '').trim()
+    if (!normalized) return
+
+    const existing = Array.isArray(questionHistory.value) ? questionHistory.value : []
+    if (existing[existing.length - 1] === normalized) return
+
+    const next = [...existing, normalized]
+    questionHistory.value = next.slice(-MAX_QUESTION_HISTORY)
+    saveLocalConfig()
   }
 
   function updateLastMessageExplanation(explanation) {
@@ -1664,6 +1686,7 @@ export const useAppStore = defineStore('app', () => {
     plotlyThemeMode,
     pythonFileContent,
     chatHistory,
+    questionHistory,
     currentQuestion,
     currentExplanation,
     workspaces,
@@ -1737,6 +1760,7 @@ export const useAppStore = defineStore('app', () => {
     setAllowSchemaSampleValues,
     setPythonFileContent,
     addChatMessage,
+    addQuestionHistoryEntry,
     updateLastMessageExplanation,
     appendLastMessageExplanationChunk,
     appendLastMessagePlanChunk,

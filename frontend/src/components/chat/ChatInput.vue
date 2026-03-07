@@ -151,6 +151,8 @@ const commandSuggestions = ref([])
 const selectedCommandIndex = ref(0)
 const columnSuggestions = ref([])
 const selectedColumnIndex = ref(0)
+const questionHistoryIndex = ref(-1)
+const questionHistoryDraft = ref('')
 const activeTokenRange = ref({ start: 0, end: 0, token: '' })
 const suggestionsOpenUp = ref(false)
 
@@ -406,6 +408,10 @@ async function updateAutocompleteSuggestions() {
 }
 
 function handleInputChange() {
+  if (questionHistoryIndex.value !== -1) {
+    questionHistoryIndex.value = -1
+    questionHistoryDraft.value = ''
+  }
   void updateAutocompleteSuggestions()
 }
 
@@ -420,6 +426,64 @@ function handleCaretInteraction(event = null) {
     return
   }
   void updateAutocompleteSuggestions()
+}
+
+function setQuestionFromHistory(value) {
+  question.value = String(value || '')
+  clearSuggestions()
+  nextTick(() => {
+    if (textareaRef.value) {
+      const caret = question.value.length
+      textareaRef.value.focus()
+      textareaRef.value.selectionStart = caret
+      textareaRef.value.selectionEnd = caret
+    }
+  })
+}
+
+function isHistoryNavigationAllowed(event, step) {
+  if (!event) return false
+  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return false
+  if (showCommandSuggestions.value || showColumnSuggestions.value) return false
+  const textarea = textareaRef.value
+  if (!textarea) return false
+  if (textarea.selectionStart !== textarea.selectionEnd) return false
+  const caret = Number(textarea.selectionStart || 0)
+  if (step < 0) return caret === 0
+  if (step > 0) return caret === String(question.value || '').length && questionHistoryIndex.value !== -1
+  return false
+}
+
+function navigateQuestionHistory(step) {
+  const history = Array.isArray(appStore.questionHistory) ? appStore.questionHistory : []
+  if (history.length === 0) return false
+
+  if (step < 0) {
+    if (questionHistoryIndex.value === -1) {
+      questionHistoryDraft.value = question.value
+      questionHistoryIndex.value = history.length - 1
+    } else if (questionHistoryIndex.value > 0) {
+      questionHistoryIndex.value -= 1
+    }
+    setQuestionFromHistory(history[questionHistoryIndex.value] || '')
+    return true
+  }
+
+  if (step > 0) {
+    if (questionHistoryIndex.value === -1) return false
+    if (questionHistoryIndex.value < history.length - 1) {
+      questionHistoryIndex.value += 1
+      setQuestionFromHistory(history[questionHistoryIndex.value] || '')
+      return true
+    }
+    const draft = questionHistoryDraft.value
+    questionHistoryIndex.value = -1
+    questionHistoryDraft.value = ''
+    setQuestionFromHistory(draft)
+    return true
+  }
+
+  return false
 }
 
 function handleKeydown(event) {
@@ -457,6 +521,20 @@ function handleKeydown(event) {
       acceptColumnSuggestion()
     }
     return
+  }
+  if (event.key === 'ArrowUp' && isHistoryNavigationAllowed(event, -1)) {
+    const didNavigateHistory = navigateQuestionHistory(-1)
+    if (didNavigateHistory) {
+      event.preventDefault()
+      return
+    }
+  }
+  if (event.key === 'ArrowDown' && isHistoryNavigationAllowed(event, 1)) {
+    const didNavigateHistory = navigateQuestionHistory(1)
+    if (didNavigateHistory) {
+      event.preventDefault()
+      return
+    }
   }
 
   if (event.key === 'Enter') {
@@ -631,6 +709,9 @@ async function handleSubmit() {
 
   const questionText = question.value.trim()
   if (!questionText) return
+  appStore.addQuestionHistoryEntry(questionText)
+  questionHistoryIndex.value = -1
+  questionHistoryDraft.value = ''
   question.value = ''
   clearSuggestions()
 
