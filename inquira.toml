@@ -91,14 +91,12 @@ models = [
 main-models = [
     "google/gemini-3-flash-preview",
     "google/gemini-2.5-flash",
-    "openai/gpt-4o-mini",
-    "anthropic/claude-3.5-sonnet",
     "openrouter/free",
 ]
 lite-models = [
-    "google/gemini-2.5-flash-lite",
-    "openai/gpt-4.1-nano",
+    "google/gemma-3-27b-it",
     "google/gemma-2-9b-it",
+    "google/gemma-3-27b-it:free"
 ]
 
 [llm.providers.openai]
@@ -123,16 +121,10 @@ lite-models = [
 
 [llm.providers.ollama]
 main-models = [
-    "llama3.2",
-    "qwen2.5-coder:7b",
-    "mistral",
-    "deepseek-r1:8b",
+    "gemma3:1b"
 ]
 lite-models = [
-    "llama3.2:3b",
-    "qwen2.5:3b",
-    "gemma2:2b",
-    "gemma2:9b",
+    "gemma3:1b"
 ]
 
 [llm.limits]

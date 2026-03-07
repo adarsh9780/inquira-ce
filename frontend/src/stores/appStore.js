@@ -292,7 +292,7 @@ export const useAppStore = defineStore('app', () => {
       const activeUserId = resolveSnapshotUserId()
       if (!authStore.isAuthenticated || !activeUserId || activeUserId !== targetUserId) return
       try {
-        await apiService.v1UpdatePreferences({
+        const response = await apiService.v1UpdatePreferences({
           llm_provider: llmProvider.value,
           selected_model: selectedModel.value,
           selected_lite_model: selectedLiteModel.value,
@@ -306,6 +306,7 @@ export const useAppStore = defineStore('app', () => {
           active_dataset_path: dataFilePath.value || '',
           active_table_name: ingestedTableName.value || ''
         })
+        applyPreferencesResponse(response)
       } catch (_error) {
         // Best-effort sync. Keep UI responsive even if backend is unavailable.
       }
@@ -577,14 +578,14 @@ export const useAppStore = defineStore('app', () => {
     const codeSnapshot = String(options?.codeSnapshot || '')
     const streamTrace = options?.streamTrace && typeof options.streamTrace === 'object'
       ? {
-          planText: String(options.streamTrace.planText || ''),
-          planNode: String(options.streamTrace.planNode || ''),
-          events: Array.isArray(options.streamTrace.events) ? options.streamTrace.events : [],
-          toolCalls: Array.isArray(options.streamTrace.toolCalls) ? options.streamTrace.toolCalls : [],
-          intervention: options.streamTrace.intervention && typeof options.streamTrace.intervention === 'object'
-            ? options.streamTrace.intervention
-            : null
-        }
+        planText: String(options.streamTrace.planText || ''),
+        planNode: String(options.streamTrace.planNode || ''),
+        events: Array.isArray(options.streamTrace.events) ? options.streamTrace.events : [],
+        toolCalls: Array.isArray(options.streamTrace.toolCalls) ? options.streamTrace.toolCalls : [],
+        intervention: options.streamTrace.intervention && typeof options.streamTrace.intervention === 'object'
+          ? options.streamTrace.intervention
+          : null
+      }
       : createEmptyStreamTrace()
 
     // Add to local state
@@ -1653,89 +1654,93 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  function applyPreferencesResponse(prefs) {
+    if (typeof prefs?.llm_provider === 'string' && prefs.llm_provider.trim()) {
+      llmProvider.value = prefs.llm_provider.trim().toLowerCase()
+    }
+    if (Array.isArray(prefs?.available_providers) && prefs.available_providers.length) {
+      availableProviders.value = prefs.available_providers
+    }
+    if (Array.isArray(prefs?.provider_available_main_models) && prefs.provider_available_main_models.length) {
+      providerMainModels.value = prefs.provider_available_main_models
+    }
+    if (Array.isArray(prefs?.provider_available_lite_models) && prefs.provider_available_lite_models.length) {
+      providerLiteModels.value = prefs.provider_available_lite_models
+    }
+    if (prefs?.provider_model_catalogs && typeof prefs.provider_model_catalogs === 'object') {
+      providerModelCatalogs.value = prefs.provider_model_catalogs
+    }
+    if (prefs?.api_key_present_by_provider && typeof prefs.api_key_present_by_provider === 'object') {
+      apiKeyPresenceByProvider.value = prefs.api_key_present_by_provider
+    }
+    if (typeof prefs?.selected_provider_requires_api_key === 'boolean') {
+      providerRequiresApiKey.value = prefs.selected_provider_requires_api_key
+    }
+    if (typeof prefs?.selected_provider_api_key_present === 'boolean') {
+      selectedProviderApiKeyPresent.value = prefs.selected_provider_api_key_present
+    }
+    if (Array.isArray(prefs?.available_models) && prefs.available_models.length) {
+      availableModels.value = prefs.available_models
+    }
+    if (Array.isArray(prefs?.enabled_models) && prefs.enabled_models.length) {
+      availableModels.value = prefs.enabled_models
+    }
+    if (prefs?.selected_model) selectedModel.value = prefs.selected_model
+    if (!availableModels.value.includes(selectedModel.value)) {
+      selectedModel.value = availableModels.value[0] || 'google/gemini-2.5-flash'
+    }
+    if (prefs?.selected_lite_model) {
+      selectedLiteModel.value = prefs.selected_lite_model
+    }
+    if (!providerLiteModels.value.includes(selectedLiteModel.value)) {
+      selectedLiteModel.value = providerLiteModels.value[0] || DEFAULT_LITE_MODEL
+    }
+    if (typeof prefs?.schema_context === 'string') schemaContext.value = prefs.schema_context
+    if (typeof prefs?.allow_schema_sample_values === 'boolean') {
+      allowSchemaSampleValues.value = prefs.allow_schema_sample_values
+    }
+    if (typeof prefs?.plotly_theme_mode === 'string') {
+      const normalizedPlotlyThemeMode = prefs.plotly_theme_mode.trim().toLowerCase()
+      plotlyThemeMode.value = normalizedPlotlyThemeMode === 'hard' ? 'hard' : 'soft'
+    }
+    if (
+      typeof prefs?.chat_overlay_width === 'number' &&
+      prefs.chat_overlay_width > 0.1 &&
+      prefs.chat_overlay_width < 0.9
+    ) {
+      chatOverlayWidth.value = prefs.chat_overlay_width
+    }
+    if (typeof prefs?.is_sidebar_collapsed === 'boolean') {
+      isSidebarCollapsed.value = prefs.is_sidebar_collapsed
+    }
+    if (typeof prefs?.hide_shortcuts_modal === 'boolean') {
+      hideShortcutsModal.value = prefs.hide_shortcuts_modal
+    }
+    if (typeof prefs?.api_key_present === 'boolean') {
+      apiKeyConfigured.value = prefs.api_key_present
+    }
+    if (prefs?.active_workspace_id) {
+      activeWorkspaceId.value = prefs.active_workspace_id
+    }
+    if (prefs?.active_dataset_path) {
+      dataFilePath.value = prefs.active_dataset_path
+    }
+    if (prefs?.active_table_name) {
+      ingestedTableName.value = prefs.active_table_name
+    }
+
+    // Preferences may point to deleted/stale workspace IDs.
+    if (activeWorkspaceId.value && !workspaces.value.some((ws) => ws.id === activeWorkspaceId.value)) {
+      const active = workspaces.value.find((ws) => ws.is_active) || workspaces.value[0]
+      activeWorkspaceId.value = active?.id || ''
+    }
+  }
+
   async function loadUserPreferences() {
     try {
       suppressPreferenceSync = true
       const prefs = await apiService.v1GetPreferences()
-      if (typeof prefs?.llm_provider === 'string' && prefs.llm_provider.trim()) {
-        llmProvider.value = prefs.llm_provider.trim().toLowerCase()
-      }
-      if (Array.isArray(prefs?.available_providers) && prefs.available_providers.length) {
-        availableProviders.value = prefs.available_providers
-      }
-      if (Array.isArray(prefs?.provider_available_main_models) && prefs.provider_available_main_models.length) {
-        providerMainModels.value = prefs.provider_available_main_models
-      }
-      if (Array.isArray(prefs?.provider_available_lite_models) && prefs.provider_available_lite_models.length) {
-        providerLiteModels.value = prefs.provider_available_lite_models
-      }
-      if (prefs?.provider_model_catalogs && typeof prefs.provider_model_catalogs === 'object') {
-        providerModelCatalogs.value = prefs.provider_model_catalogs
-      }
-      if (prefs?.api_key_present_by_provider && typeof prefs.api_key_present_by_provider === 'object') {
-        apiKeyPresenceByProvider.value = prefs.api_key_present_by_provider
-      }
-      if (typeof prefs?.selected_provider_requires_api_key === 'boolean') {
-        providerRequiresApiKey.value = prefs.selected_provider_requires_api_key
-      }
-      if (typeof prefs?.selected_provider_api_key_present === 'boolean') {
-        selectedProviderApiKeyPresent.value = prefs.selected_provider_api_key_present
-      }
-      if (Array.isArray(prefs?.available_models) && prefs.available_models.length) {
-        availableModels.value = prefs.available_models
-      }
-      if (Array.isArray(prefs?.enabled_models) && prefs.enabled_models.length) {
-        availableModels.value = prefs.enabled_models
-      }
-      if (prefs?.selected_model) selectedModel.value = prefs.selected_model
-      if (!availableModels.value.includes(selectedModel.value)) {
-        selectedModel.value = availableModels.value[0] || 'google/gemini-2.5-flash'
-      }
-      if (prefs?.selected_lite_model) {
-        selectedLiteModel.value = prefs.selected_lite_model
-      }
-      if (!providerLiteModels.value.includes(selectedLiteModel.value)) {
-        selectedLiteModel.value = providerLiteModels.value[0] || DEFAULT_LITE_MODEL
-      }
-      if (typeof prefs?.schema_context === 'string') schemaContext.value = prefs.schema_context
-      if (typeof prefs?.allow_schema_sample_values === 'boolean') {
-        allowSchemaSampleValues.value = prefs.allow_schema_sample_values
-      }
-      if (typeof prefs?.plotly_theme_mode === 'string') {
-        const normalizedPlotlyThemeMode = prefs.plotly_theme_mode.trim().toLowerCase()
-        plotlyThemeMode.value = normalizedPlotlyThemeMode === 'hard' ? 'hard' : 'soft'
-      }
-      if (
-        typeof prefs?.chat_overlay_width === 'number' &&
-        prefs.chat_overlay_width > 0.1 &&
-        prefs.chat_overlay_width < 0.9
-      ) {
-        chatOverlayWidth.value = prefs.chat_overlay_width
-      }
-      if (typeof prefs?.is_sidebar_collapsed === 'boolean') {
-        isSidebarCollapsed.value = prefs.is_sidebar_collapsed
-      }
-      if (typeof prefs?.hide_shortcuts_modal === 'boolean') {
-        hideShortcutsModal.value = prefs.hide_shortcuts_modal
-      }
-      if (typeof prefs?.api_key_present === 'boolean') {
-        apiKeyConfigured.value = prefs.api_key_present
-      }
-      if (prefs?.active_workspace_id) {
-        activeWorkspaceId.value = prefs.active_workspace_id
-      }
-      if (prefs?.active_dataset_path) {
-        dataFilePath.value = prefs.active_dataset_path
-      }
-      if (prefs?.active_table_name) {
-        ingestedTableName.value = prefs.active_table_name
-      }
-
-      // Preferences may point to deleted/stale workspace IDs.
-      if (activeWorkspaceId.value && !workspaces.value.some((ws) => ws.id === activeWorkspaceId.value)) {
-        const active = workspaces.value.find((ws) => ws.is_active) || workspaces.value[0]
-        activeWorkspaceId.value = active?.id || ''
-      }
+      applyPreferencesResponse(prefs)
     } catch (_error) {
       // Continue with defaults if preference fetch fails.
     } finally {

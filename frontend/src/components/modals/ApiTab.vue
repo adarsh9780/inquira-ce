@@ -363,13 +363,18 @@ async function saveApiSettings() {
   clearMessage()
 
   try {
-    await apiService.v1UpdatePreferences({
+    const response = await apiService.v1UpdatePreferences({
       llm_provider: appStore.llmProvider,
       selected_model: appStore.selectedModel,
       selected_lite_model: appStore.selectedLiteModel,
       enabled_models: appStore.availableModels,
       allow_schema_sample_values: appStore.allowSchemaSampleValues,
     })
+    
+    // Sync store state with backend response (especially providerRequiresApiKey)
+    if (typeof appStore.applyPreferencesResponse === 'function') {
+      appStore.applyPreferencesResponse(response)
+    }
 
     if (requiresApiKey.value) {
       if (!apiKey) {
