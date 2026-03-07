@@ -30,6 +30,7 @@ _MODEL_CATALOG: dict[str, dict[str, Any]] = {
         "lite_models": [
             "google/gemini-2.5-flash-lite",
             "openai/gpt-4.1-nano",
+            "google/gemma-2-9b-it",
         ],
         "default_main_model": "google/gemini-2.5-flash",
         "default_lite_model": "google/gemini-2.5-flash-lite",
@@ -68,6 +69,8 @@ _MODEL_CATALOG: dict[str, dict[str, Any]] = {
         "lite_models": [
             "llama3.2:3b",
             "qwen2.5:3b",
+            "gemma2:2b",
+            "gemma2:9b",
         ],
         "default_main_model": "llama3.2",
         "default_lite_model": "llama3.2:3b",
@@ -87,7 +90,9 @@ def provider_requires_api_key(provider: str) -> bool:
 
 
 def provider_default_base_url(provider: str) -> str:
-    return _DEFAULT_BASE_URLS.get(normalize_llm_provider(provider), _DEFAULT_BASE_URLS["openrouter"])
+    return _DEFAULT_BASE_URLS.get(
+        normalize_llm_provider(provider), _DEFAULT_BASE_URLS["openrouter"]
+    )
 
 
 def provider_model_catalog(provider: str) -> dict[str, Any]:
@@ -102,4 +107,7 @@ def provider_model_catalog(provider: str) -> dict[str, Any]:
 
 
 def all_provider_model_catalogs() -> dict[str, dict[str, Any]]:
-    return {provider: provider_model_catalog(provider) for provider in SUPPORTED_LLM_PROVIDERS}
+    return {
+        provider: provider_model_catalog(provider)
+        for provider in SUPPORTED_LLM_PROVIDERS
+    }

@@ -17,51 +17,39 @@
         <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
           Provider
         </label>
-        <select
-          :value="appStore.llmProvider"
-          @change="handleProviderChange"
-          class="input-base max-w-md"
-        >
-          <option v-for="provider in appStore.availableProviders" :key="provider" :value="provider">
-            {{ provider }}
-          </option>
-        </select>
+        <HeaderDropdown
+          :model-value="appStore.llmProvider"
+          @update:model-value="handleProviderChange"
+          :options="providerOptions"
+          placeholder="Select provider"
+          max-width-class="max-w-md w-full"
+        />
       </div>
 
       <div>
         <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
           Main Models (shown in Chat selector)
         </label>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-3xl rounded-md border p-3" style="border-color: var(--color-border);">
-          <label
-            v-for="model in appStore.providerMainModels"
-            :key="model"
-            class="inline-flex items-center gap-2 text-xs cursor-pointer"
-            style="color: var(--color-text-main);"
-          >
-            <input
-              type="checkbox"
-              :checked="appStore.availableModels.includes(model)"
-              @change="toggleEnabledModel(model, $event)"
-            />
-            <span>{{ model }}</span>
-          </label>
-        </div>
+        <MultiSelectDropdown
+          :model-value="appStore.availableModels"
+          @update:model-value="handleMainModelsChange"
+          :options="mainModelOptions"
+          placeholder="Select main models"
+          max-width-class="max-w-md w-full"
+        />
       </div>
 
       <div>
         <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
           Lite Model
         </label>
-        <select
-          :value="appStore.selectedLiteModel"
-          @change="handleLiteModelChange"
-          class="input-base max-w-md"
-        >
-          <option v-for="model in appStore.providerLiteModels" :key="model" :value="model">
-            {{ model }}
-          </option>
-        </select>
+        <HeaderDropdown
+          :model-value="appStore.selectedLiteModel"
+          @update:model-value="handleLiteModelChange"
+          :options="liteModelOptions"
+          placeholder="Select lite model"
+          max-width-class="max-w-md w-full"
+        />
       </div>
 
       <!-- API Key Input -->
@@ -220,6 +208,8 @@ import { ref, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { apiService } from '../../services/apiService'
 import { toast } from '../../composables/useToast'
+import HeaderDropdown from '../ui/HeaderDropdown.vue'
+import MultiSelectDropdown from '../ui/MultiSelectDropdown.vue'
 import {
   KeyIcon,
   EyeIcon,
@@ -240,6 +230,10 @@ const runnerPackageVersion = ref('')
 const runnerIndexUrl = ref('')
 const saveRunnerDefaults = ref(false)
 const runnerInstallDetails = ref('')
+
+const providerOptions = computed(() => appStore.availableProviders.map(p => ({ label: p, value: p })))
+const mainModelOptions = computed(() => appStore.providerMainModels.map(m => ({ label: m, value: m })))
+const liteModelOptions = computed(() => appStore.providerLiteModels.map(m => ({ label: m, value: m })))
 
 const messageTypeClass = computed(() => {
   return messageType.value === 'success'
@@ -280,7 +274,7 @@ function handleApiKeyChange(event) {
 }
 
 function handleProviderChange(event) {
-  const provider = String(event.target.value || '').trim().toLowerCase()
+  const provider = String(event?.target?.value ?? event ?? '').trim().toLowerCase()
   appStore.setLlmProvider(provider)
   appStore.setApiKey('')
   syncProviderCatalog(provider)
@@ -288,7 +282,7 @@ function handleProviderChange(event) {
 }
 
 function handleLiteModelChange(event) {
-  appStore.setSelectedLiteModel(event.target.value)
+  appStore.setSelectedLiteModel(event?.target?.value ?? event)
   clearMessage()
 }
 
@@ -297,6 +291,19 @@ function toggleEnabledModel(model, event) {
   const current = [...appStore.availableModels]
   const next = checked ? Array.from(new Set([...current, model])) : current.filter((item) => item !== model)
   if (!next.length) {
+    message.value = 'Please keep at least one main model enabled.'
+    messageType.value = 'error'
+    return
+  }
+  appStore.setEnabledModels(next)
+  if (!next.includes(appStore.selectedModel)) {
+    appStore.setSelectedModel(next[0])
+  }
+  clearMessage()
+}
+
+function handleMainModelsChange(next) {
+  if (!next || !next.length) {
     message.value = 'Please keep at least one main model enabled.'
     messageType.value = 'error'
     return
