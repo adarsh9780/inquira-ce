@@ -211,10 +211,10 @@ export const apiService = {
     return { detail: 'Context saved.' }
   },
 
-  async setApiKeySettings(apiKey) {
+  async setApiKeySettings(apiKey, provider = 'openrouter') {
     const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
-    await this.v1SetApiKey(apiKey || '')
+    await this.v1SetApiKey(apiKey || '', provider)
     appStore.setApiKeyConfigured(true)
     return { detail: 'API key saved securely.' }
   },
@@ -540,8 +540,8 @@ export const apiService = {
   },
 
   // test gemini api
-  async testGeminiApi(apiKey, model = '') {
-    const payload = { api_key: apiKey, model: model || undefined }
+  async testGeminiApi(apiKey, model = '', provider = 'openrouter') {
+    const payload = { api_key: apiKey, model: model || undefined, provider }
     try {
       // Prefer generated endpoint names from both old and current OpenAPI specs.
       const generatedCall =
@@ -616,12 +616,12 @@ export const apiService = {
     return v1Api.preferences.update(payload)
   },
 
-  async v1SetApiKey(apiKey) {
-    return v1Api.preferences.setApiKey(apiKey)
+  async v1SetApiKey(apiKey, provider = 'openrouter') {
+    return v1Api.preferences.setApiKey(apiKey, provider)
   },
 
-  async v1DeleteApiKey() {
-    return v1Api.preferences.deleteApiKey()
+  async v1DeleteApiKey(provider = 'openrouter') {
+    return v1Api.preferences.deleteApiKey(provider)
   },
 
   async v1GetWorkspacePaths(workspaceId) {

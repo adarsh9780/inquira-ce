@@ -8,7 +8,8 @@ test('app store requires active workspace and API key for chat analysis', () => 
   const source = readFileSync(storePath, 'utf-8')
 
   assert.equal(source.includes('const canAnalyze = computed(() => {'), true)
-  assert.equal(source.includes('if (!apiKeyConfigured.value) return false'), true)
+  assert.equal(source.includes('const hasProviderAccess = providerRequiresApiKey.value'), true)
+  assert.equal(source.includes('if (!hasProviderAccess) return false'), true)
   assert.equal(source.includes('return hasWorkspace.value'), true)
 })
 

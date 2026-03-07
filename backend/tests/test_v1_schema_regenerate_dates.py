@@ -25,7 +25,7 @@ async def test_regenerate_schema_handles_date_types(monkeypatch, tmp_path):
         )
 
     class FakeLLMService:
-        def __init__(self, api_key: str, model: str):
+        def __init__(self, api_key: str, model: str, provider: str | None = None):
             pass
 
         def ask(self, _prompt, _schema_type, max_tokens=None):
@@ -47,7 +47,7 @@ async def test_regenerate_schema_handles_date_types(monkeypatch, tmp_path):
     monkeypatch.setattr(
         runtime_api.SecretStorageService,
         "get_api_key",
-        lambda _user_id: "test-key",
+        lambda _user_id, provider="openrouter": "test-key",
     )
     
     # Simulate an extracted column sample from DuckDB that contains a native date object

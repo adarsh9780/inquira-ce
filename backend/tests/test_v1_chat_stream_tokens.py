@@ -39,7 +39,10 @@ async def test_v1_chat_stream_emits_token_events_before_final(monkeypatch):
 
     monkeypatch.setattr(ChatService, "_preflight_check", staticmethod(_fake_preflight))
     monkeypatch.setattr(ChatService, "_persist_turn", staticmethod(_fake_persist_turn))
-    monkeypatch.setattr("app.v1.services.chat_service.SecretStorageService.get_api_key", lambda _uid: "key")
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.SecretStorageService.get_api_key",
+        lambda _uid, provider="openrouter": "key",
+    )
 
     user = SimpleNamespace(id="user-1", username="alice")
     events = []

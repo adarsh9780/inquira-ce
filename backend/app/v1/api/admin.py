@@ -14,12 +14,14 @@ from ..db.session import appdata_engine, auth_engine
 from ..schemas.common import MessageResponse
 from .deps import get_current_user
 from ...services.llm_service import LLMService
+from ...services.llm_provider_catalog import normalize_llm_provider
 
 router = APIRouter(prefix="/admin", tags=["V1 Admin"])
 
 
 class GeminiTestRequest(BaseModel):
-    api_key: str = Field(description="OpenRouter API key to test")
+    api_key: str = Field(description="Provider API key to test")
+    provider: str | None = Field(default=None, description="LLM provider to test against.")
     model: str | None = Field(
         default=None, description="Optional model identifier to validate against."
     )
@@ -68,7 +70,11 @@ async def test_gemini_api_key(
         raise HTTPException(status_code=400, detail="Please provide a valid API key to test.")
 
     try:
-        llm_service = LLMService(api_key=api_key, model=model or "google/gemini-2.5-flash")
+        llm_service = LLMService(
+            api_key=api_key,
+            provider=normalize_llm_provider(payload.provider or "openrouter"),
+            model=model or "google/gemini-2.5-flash",
+        )
         llm_service.ask(
             "Hello, please respond with just the word 'OK' to confirm this API key is working.",
             str,

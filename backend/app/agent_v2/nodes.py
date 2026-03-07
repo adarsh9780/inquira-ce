@@ -18,6 +18,7 @@ from ..agent.code_guard import guard_code
 from ..agent.registry import load_agent_runtime_config
 from ..services.chat_model_factory import create_chat_model
 from ..services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
+from ..services.llm_provider_catalog import normalize_llm_provider, provider_requires_api_key
 from .router import decide_route
 from .streaming import emit_stream_token
 from .tools.bash_tool import run_bash
@@ -75,17 +76,25 @@ def _latest_user_text(messages: list[AnyMessage]) -> str:
 def _get_model(config: RunnableConfig, *, lite: bool) -> BaseChatModel:
     runtime = load_llm_runtime_config()
     configurable = config.get("configurable", {})
+    provider = normalize_llm_provider(str(configurable.get("provider") or runtime.provider))
+    base_url = str(configurable.get("base_url") or runtime.base_url).strip()
+    default_model = normalize_model_id(
+        str(configurable.get("default_model") or runtime.default_model).strip()
+    )
+    lite_model = normalize_model_id(
+        str(configurable.get("lite_model") or runtime.lite_model).strip()
+    )
     selected = normalize_model_id(str(configurable.get("model") or "").strip())
-    model_name = selected or (runtime.lite_model if lite else runtime.default_model)
+    model_name = selected or (lite_model if lite else default_model)
     api_key = str(configurable.get("api_key") or "").strip()
-    if runtime.requires_api_key and not api_key:
+    if provider_requires_api_key(provider) and not api_key:
         raise ValueError("API key not configured for agent v2.")
 
     return create_chat_model(
-        provider=runtime.provider,
+        provider=provider,
         model=model_name,
         api_key=api_key,
-        base_url=runtime.base_url,
+        base_url=base_url,
         temperature=0,
         max_tokens=runtime.code_generation_max_tokens,
     )

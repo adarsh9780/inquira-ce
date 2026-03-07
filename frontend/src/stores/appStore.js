@@ -13,6 +13,9 @@ export const useAppStore = defineStore('app', () => {
     'google/gemini-2.5-flash-lite',
     'openrouter/free'
   ]
+  const DEFAULT_PROVIDER = 'openrouter'
+  const DEFAULT_LITE_MODEL = 'google/gemini-2.5-flash-lite'
+  const DEFAULT_PROVIDER_LIST = ['openrouter', 'openai', 'anthropic', 'ollama']
 
   // Files
   const dataFilePath = ref('')
@@ -25,8 +28,17 @@ export const useAppStore = defineStore('app', () => {
   const profileData = ref(null)
 
   // LLM Configuration
+  const llmProvider = ref(DEFAULT_PROVIDER)
+  const availableProviders = ref([...DEFAULT_PROVIDER_LIST])
   const selectedModel = ref('google/gemini-2.5-flash')
+  const selectedLiteModel = ref(DEFAULT_LITE_MODEL)
   const availableModels = ref([...DEFAULT_MODELS])
+  const providerMainModels = ref([...DEFAULT_MODELS])
+  const providerLiteModels = ref([DEFAULT_LITE_MODEL])
+  const providerModelCatalogs = ref({})
+  const providerRequiresApiKey = ref(true)
+  const apiKeyPresenceByProvider = ref({})
+  const selectedProviderApiKeyPresent = ref(false)
   const apiKey = ref('')
   const apiKeyConfigured = ref(false)
 
@@ -107,7 +119,10 @@ export const useAppStore = defineStore('app', () => {
     return workspaces.value.some((ws) => ws.id === activeId)
   })
   const canAnalyze = computed(() => {
-    if (!apiKeyConfigured.value) return false
+    const hasProviderAccess = providerRequiresApiKey.value
+      ? selectedProviderApiKeyPresent.value
+      : true
+    if (!hasProviderAccess) return false
     return hasWorkspace.value
   })
 
@@ -278,7 +293,10 @@ export const useAppStore = defineStore('app', () => {
       if (!authStore.isAuthenticated || !activeUserId || activeUserId !== targetUserId) return
       try {
         await apiService.v1UpdatePreferences({
+          llm_provider: llmProvider.value,
           selected_model: selectedModel.value,
+          selected_lite_model: selectedLiteModel.value,
+          enabled_models: availableModels.value,
           schema_context: schemaContext.value,
           allow_schema_sample_values: allowSchemaSampleValues.value,
           chat_overlay_width: chatOverlayWidth.value,
@@ -331,8 +349,17 @@ export const useAppStore = defineStore('app', () => {
   function clearInMemoryUserState() {
     apiKey.value = ''
     apiKeyConfigured.value = false
+    llmProvider.value = DEFAULT_PROVIDER
+    availableProviders.value = [...DEFAULT_PROVIDER_LIST]
     selectedModel.value = 'google/gemini-2.5-flash'
+    selectedLiteModel.value = DEFAULT_LITE_MODEL
     availableModels.value = [...DEFAULT_MODELS]
+    providerMainModels.value = [...DEFAULT_MODELS]
+    providerLiteModels.value = [DEFAULT_LITE_MODEL]
+    providerModelCatalogs.value = {}
+    providerRequiresApiKey.value = true
+    apiKeyPresenceByProvider.value = {}
+    selectedProviderApiKeyPresent.value = false
     dataFilePath.value = ''
     schemaFilePath.value = ''
     schemaFileId.value = ''
@@ -463,6 +490,22 @@ export const useAppStore = defineStore('app', () => {
 
   function setApiKey(key) {
     apiKey.value = key
+  }
+
+  function setLlmProvider(provider) {
+    const value = String(provider || '').trim().toLowerCase()
+    llmProvider.value = value || DEFAULT_PROVIDER
+    saveLocalConfig()
+  }
+
+  function setSelectedLiteModel(model) {
+    selectedLiteModel.value = String(model || '').trim()
+    saveLocalConfig()
+  }
+
+  function setEnabledModels(models) {
+    availableModels.value = Array.isArray(models) ? models.map((m) => String(m || '').trim()).filter(Boolean) : []
+    saveLocalConfig()
   }
 
   function setApiKeyConfigured(configured) {
@@ -1614,12 +1657,45 @@ export const useAppStore = defineStore('app', () => {
     try {
       suppressPreferenceSync = true
       const prefs = await apiService.v1GetPreferences()
+      if (typeof prefs?.llm_provider === 'string' && prefs.llm_provider.trim()) {
+        llmProvider.value = prefs.llm_provider.trim().toLowerCase()
+      }
+      if (Array.isArray(prefs?.available_providers) && prefs.available_providers.length) {
+        availableProviders.value = prefs.available_providers
+      }
+      if (Array.isArray(prefs?.provider_available_main_models) && prefs.provider_available_main_models.length) {
+        providerMainModels.value = prefs.provider_available_main_models
+      }
+      if (Array.isArray(prefs?.provider_available_lite_models) && prefs.provider_available_lite_models.length) {
+        providerLiteModels.value = prefs.provider_available_lite_models
+      }
+      if (prefs?.provider_model_catalogs && typeof prefs.provider_model_catalogs === 'object') {
+        providerModelCatalogs.value = prefs.provider_model_catalogs
+      }
+      if (prefs?.api_key_present_by_provider && typeof prefs.api_key_present_by_provider === 'object') {
+        apiKeyPresenceByProvider.value = prefs.api_key_present_by_provider
+      }
+      if (typeof prefs?.selected_provider_requires_api_key === 'boolean') {
+        providerRequiresApiKey.value = prefs.selected_provider_requires_api_key
+      }
+      if (typeof prefs?.selected_provider_api_key_present === 'boolean') {
+        selectedProviderApiKeyPresent.value = prefs.selected_provider_api_key_present
+      }
       if (Array.isArray(prefs?.available_models) && prefs.available_models.length) {
         availableModels.value = prefs.available_models
+      }
+      if (Array.isArray(prefs?.enabled_models) && prefs.enabled_models.length) {
+        availableModels.value = prefs.enabled_models
       }
       if (prefs?.selected_model) selectedModel.value = prefs.selected_model
       if (!availableModels.value.includes(selectedModel.value)) {
         selectedModel.value = availableModels.value[0] || 'google/gemini-2.5-flash'
+      }
+      if (prefs?.selected_lite_model) {
+        selectedLiteModel.value = prefs.selected_lite_model
+      }
+      if (!providerLiteModels.value.includes(selectedLiteModel.value)) {
+        selectedLiteModel.value = providerLiteModels.value[0] || DEFAULT_LITE_MODEL
       }
       if (typeof prefs?.schema_context === 'string') schemaContext.value = prefs.schema_context
       if (typeof prefs?.allow_schema_sample_values === 'boolean') {
@@ -1677,8 +1753,17 @@ export const useAppStore = defineStore('app', () => {
     ingestedColumns,
     columnCatalog,
     profileData,
+    llmProvider,
+    availableProviders,
     selectedModel,
+    selectedLiteModel,
     availableModels,
+    providerMainModels,
+    providerLiteModels,
+    providerModelCatalogs,
+    providerRequiresApiKey,
+    apiKeyPresenceByProvider,
+    selectedProviderApiKeyPresent,
     apiKey,
     apiKeyConfigured,
     schemaContext,
@@ -1754,6 +1839,9 @@ export const useAppStore = defineStore('app', () => {
     setColumnCatalog,
     setProfileData,
     setApiKey,
+    setLlmProvider,
+    setSelectedLiteModel,
+    setEnabledModels,
     setApiKeyConfigured,
     setSelectedModel,
     setSchemaContext,

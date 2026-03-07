@@ -23,7 +23,7 @@ async def test_regenerate_schema_raises_500_on_llm_failure(monkeypatch, tmp_path
         )
 
     class FakeLLMService:
-        def __init__(self, api_key: str, model: str):
+        def __init__(self, api_key: str, model: str, provider: str | None = None):
             pass
 
         def ask(self, _prompt, _schema_type, max_tokens=None):
@@ -43,7 +43,7 @@ async def test_regenerate_schema_raises_500_on_llm_failure(monkeypatch, tmp_path
     monkeypatch.setattr(
         runtime_api.SecretStorageService,
         "get_api_key",
-        lambda _user_id: "test-key",
+        lambda _user_id, provider="openrouter": "test-key",
     )
     monkeypatch.setattr(
         runtime_api,
@@ -91,7 +91,7 @@ async def test_regenerate_schema_preserves_upstream_http_status(monkeypatch, tmp
         )
 
     class FakeLLMService:
-        def __init__(self, api_key: str, model: str):
+        def __init__(self, api_key: str, model: str, provider: str | None = None):
             _ = (api_key, model)
 
         def ask(self, _prompt, _schema_type, max_tokens=None):
@@ -112,7 +112,7 @@ async def test_regenerate_schema_preserves_upstream_http_status(monkeypatch, tmp
     monkeypatch.setattr(
         runtime_api.SecretStorageService,
         "get_api_key",
-        lambda _user_id: "test-key",
+        lambda _user_id, provider="openrouter": "test-key",
     )
     monkeypatch.setattr(
         runtime_api,

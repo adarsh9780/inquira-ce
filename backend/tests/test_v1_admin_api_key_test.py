@@ -9,7 +9,7 @@ async def test_test_gemini_api_key_uses_selected_model(monkeypatch):
     captured = {}
 
     class FakeLLMService:
-        def __init__(self, api_key: str, model: str):
+        def __init__(self, api_key: str, model: str, provider: str | None = None):
             captured["api_key"] = api_key
             captured["model"] = model
 

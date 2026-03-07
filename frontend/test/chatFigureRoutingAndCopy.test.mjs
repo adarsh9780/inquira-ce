@@ -11,7 +11,7 @@ test('chat input routes chart-like responses to figure data pane', () => {
   assert.equal(source.includes("appStore.setActiveTab('chart')"), false)
 })
 
-test('onboarding copy is consistent about OpenRouter API key setup', () => {
+test('onboarding copy avoids provider-specific hardcoding in API settings', () => {
   const chatInputPath = resolve(process.cwd(), 'src/components/chat/ChatInput.vue')
   const chatTabPath = resolve(process.cwd(), 'src/components/chat/ChatTab.vue')
   const apiTabPath = resolve(process.cwd(), 'src/components/modals/ApiTab.vue')
@@ -24,5 +24,6 @@ test('onboarding copy is consistent about OpenRouter API key setup', () => {
   assert.equal(chatTab.includes('Gemini API key'), false)
   assert.equal(chatInput.includes('OpenRouter API key'), true)
   assert.equal(chatTab.includes('OpenRouter API key'), true)
-  assert.equal(apiTab.includes('API Key (OpenRouter)'), true)
+  assert.equal(apiTab.includes('API Key (OpenRouter)'), false)
+  assert.equal(apiTab.includes('API Key ({{ appStore.llmProvider }})'), true)
 })

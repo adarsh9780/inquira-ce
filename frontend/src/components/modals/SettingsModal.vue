@@ -198,7 +198,10 @@ const isWebSocketConnected = ref(false)
 const currentFact = ref('')
 
 // Computed properties
-const hasApiKey = computed(() => appStore.apiKeyConfigured)
+const hasApiKey = computed(() => {
+  if (!appStore.providerRequiresApiKey) return true
+  return !!appStore.selectedProviderApiKeyPresent
+})
 
 
 function closeModal() {

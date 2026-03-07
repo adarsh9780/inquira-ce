@@ -335,7 +335,10 @@ async def test_chat_uses_keychain_api_key_when_payload_key_missing(monkeypatch):
     monkeypatch.setattr("app.v1.services.chat_service.ChatService._read_live_table_columns", lambda *_args, **_kwargs: [])
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
-    monkeypatch.setattr("app.v1.services.chat_service.SecretStorageService.get_api_key", lambda _uid: "key-from-keychain")
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.SecretStorageService.get_api_key",
+        lambda _uid, provider="openrouter": "key-from-keychain",
+    )
 
     session = SimpleNamespace()
 
@@ -369,6 +372,86 @@ async def test_chat_uses_keychain_api_key_when_payload_key_missing(monkeypatch):
     )
 
     assert captured["api_key"] == "key-from-keychain"
+
+
+@pytest.mark.asyncio
+async def test_chat_allows_ollama_without_api_key(monkeypatch):
+    captured = {}
+
+    async def fake_get_workspace(_session, _workspace_id, _user_id):
+        return SimpleNamespace(id="ws-1", duckdb_path="/tmp/ws.duckdb")
+
+    async def fake_create_conversation(*, session, principal_id, workspace_id, title):
+        return SimpleNamespace(id="conv-ollama", title=title)
+
+    async def fake_get_latest_dataset(_session, _workspace_id):
+        return None
+
+    async def fake_get_graph(_workspace_id, _memory_path):
+        class _Graph:
+            async def ainvoke(self, input_state, config=None):
+                captured["provider"] = config["configurable"].get("provider")
+                captured["api_key"] = config["configurable"].get("api_key")
+                return {"metadata": {"is_safe": True, "is_relevant": True}, "plan": "ok", "current_code": ""}
+
+        return _Graph()
+
+    async def fake_next_seq_no(_session, _conversation_id):
+        return 1
+
+    async def fake_create_turn(*, session, **kwargs):
+        return SimpleNamespace(id="turn-ollama")
+
+    monkeypatch.setattr("app.v1.services.chat_service.WorkspaceRepository.get_by_id", fake_get_workspace)
+    monkeypatch.setattr("app.v1.services.chat_service.ConversationService.create_conversation", fake_create_conversation)
+    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_latest_for_workspace", fake_get_latest_dataset)
+    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_for_workspace_table", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
+    monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
+    async def _fake_resolve_llm_preferences(_session, _user_id):
+        return {
+            "provider": "ollama",
+            "base_url": "http://localhost:11434/v1",
+            "requires_api_key": False,
+            "selected_lite_model": "llama3.2:3b",
+            "selected_main_model": "llama3.2",
+        }
+
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.ChatService._resolve_llm_preferences",
+        staticmethod(_fake_resolve_llm_preferences),
+    )
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.SecretStorageService.get_api_key",
+        lambda _uid, provider="openrouter": None,
+    )
+
+    session = SimpleNamespace()
+
+    async def _commit():
+        return None
+
+    session.commit = _commit
+    session.execute = lambda *_args, **_kwargs: None
+    langgraph_manager = SimpleNamespace(get_graph=fake_get_graph)
+    user = SimpleNamespace(id="u1", username="alice")
+
+    response, _conversation_id, _turn_id = await ChatService.analyze_and_persist_turn(
+        session=session,
+        langgraph_manager=langgraph_manager,
+        user=user,
+        workspace_id="ws-1",
+        conversation_id=None,
+        question="hello",
+        current_code="",
+        model="llama3.2",
+        context=None,
+        api_key=None,
+    )
+
+    assert response["is_safe"] is True
+    assert captured["provider"] == "ollama"
+    assert captured["api_key"] == ""
 
 
 @pytest.mark.asyncio

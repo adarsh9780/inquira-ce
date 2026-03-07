@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from .chat_model_factory import create_chat_model
+from .llm_provider_catalog import normalize_llm_provider, provider_default_base_url, provider_requires_api_key
 from .llm_runtime_config import load_llm_runtime_config, normalize_model_id
 
 
@@ -27,9 +28,16 @@ class CodeOutput(BaseModel):
 class LLMService:
     """Service for interacting with OpenAI-compatible LLM providers."""
 
-    def __init__(self, api_key: str = "", model: str = "google/gemini-2.5-flash"):
+    def __init__(
+        self,
+        api_key: str = "",
+        model: str = "google/gemini-2.5-flash",
+        provider: str | None = None,
+        base_url: str | None = None,
+    ):
         """Initialize LLM service with API key and OpenAI-compatible base URL."""
         runtime = load_llm_runtime_config()
+        resolved_provider = normalize_llm_provider(provider or runtime.provider)
         if api_key:
             self.api_key = api_key
         else:
@@ -38,12 +46,17 @@ class LLMService:
             # Load both so local dev can keep .env at repo root or backend root.
             load_dotenv(backend_env)
             load_dotenv(repo_root_env)
-            self.api_key = self._load_provider_api_key(runtime.provider)
+            self.api_key = self._load_provider_api_key(resolved_provider)
 
         self.model = normalize_model_id(model) or runtime.default_model
-        self.base_url = runtime.base_url
-        self.provider = runtime.provider
-        self.requires_api_key = runtime.requires_api_key
+        if base_url is not None and str(base_url).strip():
+            self.base_url = str(base_url).strip()
+        elif resolved_provider == "openrouter":
+            self.base_url = runtime.base_url
+        else:
+            self.base_url = provider_default_base_url(resolved_provider)
+        self.provider = resolved_provider
+        self.requires_api_key = provider_requires_api_key(resolved_provider)
         self.default_max_tokens = runtime.default_max_tokens
         self.client: Any | None
         self.chat_client: Any | None

@@ -27,8 +27,15 @@ from ...services.output_capture import (
     build_run_wrapped_code,
     normalize_output_contract,
 )
+from ...services.llm_provider_catalog import (
+    normalize_llm_provider,
+    provider_default_base_url,
+    provider_requires_api_key,
+)
+from ...services.llm_runtime_config import load_llm_runtime_config
 from ..repositories.conversation_repository import ConversationRepository
 from ..repositories.dataset_repository import DatasetRepository
+from ..repositories.preferences_repository import PreferencesRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .conversation_service import ConversationService
 from .secret_storage_service import SecretStorageService
@@ -114,6 +121,35 @@ class ChatService:
         if isinstance(input_state, dict) and not isinstance(input_state, _AttrAccessDict):
             return _AttrAccessDict(input_state)
         return input_state
+
+    @staticmethod
+    async def _resolve_llm_preferences(session: AsyncSession, user_id: str) -> dict[str, Any]:
+        runtime = load_llm_runtime_config()
+        try:
+            prefs = await PreferencesRepository.get_or_create(session, user_id)
+        except Exception:  # noqa: BLE001
+            provider = normalize_llm_provider(runtime.provider)
+            base_url = runtime.base_url if provider == "openrouter" else provider_default_base_url(provider)
+            return {
+                "provider": provider,
+                "base_url": base_url,
+                "requires_api_key": provider_requires_api_key(provider),
+                "selected_lite_model": runtime.lite_model,
+                "selected_main_model": runtime.default_model,
+            }
+
+        provider = normalize_llm_provider(getattr(prefs, "llm_provider", runtime.provider))
+        base_url = runtime.base_url if provider == "openrouter" else provider_default_base_url(provider)
+        selected_lite_model = str(
+            getattr(prefs, "selected_lite_model", runtime.lite_model) or runtime.lite_model
+        ).strip()
+        return {
+            "provider": provider,
+            "base_url": base_url,
+            "requires_api_key": provider_requires_api_key(provider),
+            "selected_lite_model": selected_lite_model,
+            "selected_main_model": str(getattr(prefs, "selected_model", runtime.default_model) or runtime.default_model).strip(),
+        }
 
     @staticmethod
     def _normalize_known_columns(raw: Any, max_items: int = 50) -> list[dict[str, str]]:
@@ -730,9 +766,16 @@ class ChatService:
                 "model": model,
             }
         }
-        resolved_api_key = (api_key or "").strip() or (SecretStorageService.get_api_key(user.id) or "")
+        llm_prefs = await ChatService._resolve_llm_preferences(session, str(user.id))
+        resolved_api_key = (api_key or "").strip() or (
+            SecretStorageService.get_api_key(user.id, provider=llm_prefs["provider"]) or ""
+        )
         config["configurable"]["api_key"] = resolved_api_key
-        if not resolved_api_key:
+        config["configurable"]["provider"] = llm_prefs["provider"]
+        config["configurable"]["base_url"] = llm_prefs["base_url"]
+        config["configurable"]["lite_model"] = llm_prefs["selected_lite_model"]
+        config["configurable"]["default_model"] = llm_prefs["selected_main_model"]
+        if llm_prefs["requires_api_key"] and not resolved_api_key:
             raise HTTPException(status_code=401, detail="API key not configured")
 
         result = await graph.ainvoke(input_state, config=config)
@@ -967,9 +1010,16 @@ class ChatService:
                         "model": model,
                     }
                 }
-                resolved_api_key = (api_key or "").strip() or (SecretStorageService.get_api_key(user.id) or "")
+                llm_prefs = await ChatService._resolve_llm_preferences(session, str(user.id))
+                resolved_api_key = (api_key or "").strip() or (
+                    SecretStorageService.get_api_key(user.id, provider=llm_prefs["provider"]) or ""
+                )
                 config["configurable"]["api_key"] = resolved_api_key
-                if not resolved_api_key:
+                config["configurable"]["provider"] = llm_prefs["provider"]
+                config["configurable"]["base_url"] = llm_prefs["base_url"]
+                config["configurable"]["lite_model"] = llm_prefs["selected_lite_model"]
+                config["configurable"]["default_model"] = llm_prefs["selected_main_model"]
+                if llm_prefs["requires_api_key"] and not resolved_api_key:
                     raise HTTPException(status_code=401, detail="API key not configured")
 
                 def emit_token(node_name: str, text: str) -> None:

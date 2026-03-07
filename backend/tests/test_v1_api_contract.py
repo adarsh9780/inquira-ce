@@ -39,5 +39,8 @@ def test_v1_preferences_response_exposes_available_models():
     components = schema.get("components", {}).get("schemas", {})
     prefs = components.get("PreferencesResponse", {})
     properties = prefs.get("properties", {})
+    assert "llm_provider" in properties
     assert "available_models" in properties
+    assert "selected_lite_model" in properties
+    assert "enabled_models" in properties
     assert "plotly_theme_mode" in properties

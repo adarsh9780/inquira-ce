@@ -43,6 +43,7 @@ from .deps import ensure_appdata_principal, get_current_user
 from ...core.prompt_library import get_prompt
 from ...services.llm_service import LLMService
 from ...services.llm_runtime_config import load_llm_runtime_config
+from ...services.llm_provider_catalog import normalize_llm_provider, provider_requires_api_key
 from ...services.execution_config import load_execution_runtime_config
 from ...services.runner_env import install_runner_package
 from ...services.terminal_executor import (
@@ -1668,14 +1669,15 @@ async def regenerate_workspace_dataset_schema(
     prefs = await PreferencesRepository.get_or_create(session, current_user.id)
     context = (payload.context if payload.context is not None else prefs.schema_context) or "General data analysis"
     model = (payload.model or prefs.selected_model or "google/gemini-2.5-flash").strip()
+    provider = normalize_llm_provider(getattr(prefs, "llm_provider", "openrouter"))
     allow_sample_values = bool(prefs.allow_schema_sample_values)
 
     try:
-        api_key = SecretStorageService.get_api_key(current_user.id)
+        api_key = SecretStorageService.get_api_key(current_user.id, provider=provider)
     except RuntimeError as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
 
-    if not api_key:
+    if provider_requires_api_key(provider) and not api_key:
         raise HTTPException(
             status_code=400,
             detail="API key not set. Please configure your API key in Settings.",
@@ -1711,7 +1713,7 @@ async def regenerate_workspace_dataset_schema(
     )
     prompt = get_prompt("schema_generation", context=context, columns_text=columns_text)
 
-    llm_service = LLMService(api_key=api_key, model=model)
+    llm_service = LLMService(api_key=api_key, provider=provider, model=model)
     runtime = load_llm_runtime_config()
     try:
         schema_response = await asyncio.to_thread(

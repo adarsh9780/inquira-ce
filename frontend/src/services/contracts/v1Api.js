@@ -31,8 +31,10 @@ export const v1Api = {
   preferences: {
     get: () => axios.get('/api/v1/preferences'),
     update: (payload) => axios.put('/api/v1/preferences', payload),
-    setApiKey: (apiKey) => axios.put('/api/v1/preferences/api-key', { api_key: apiKey }),
-    deleteApiKey: () => axios.delete('/api/v1/preferences/api-key')
+    setApiKey: (apiKey, provider = 'openrouter') =>
+      axios.put('/api/v1/preferences/api-key', { api_key: apiKey, provider }),
+    deleteApiKey: (provider = 'openrouter') =>
+      axios.delete('/api/v1/preferences/api-key', { params: { provider } })
   },
   conversations: {
     list: (workspaceId, limit = 50) =>

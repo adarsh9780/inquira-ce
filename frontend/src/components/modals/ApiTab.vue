@@ -13,12 +13,61 @@
     </div>
 
     <div class="space-y-6">
+      <div>
+        <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
+          Provider
+        </label>
+        <select
+          :value="appStore.llmProvider"
+          @change="handleProviderChange"
+          class="input-base max-w-md"
+        >
+          <option v-for="provider in appStore.availableProviders" :key="provider" :value="provider">
+            {{ provider }}
+          </option>
+        </select>
+      </div>
 
+      <div>
+        <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
+          Main Models (shown in Chat selector)
+        </label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-3xl rounded-md border p-3" style="border-color: var(--color-border);">
+          <label
+            v-for="model in appStore.providerMainModels"
+            :key="model"
+            class="inline-flex items-center gap-2 text-xs cursor-pointer"
+            style="color: var(--color-text-main);"
+          >
+            <input
+              type="checkbox"
+              :checked="appStore.availableModels.includes(model)"
+              @change="toggleEnabledModel(model, $event)"
+            />
+            <span>{{ model }}</span>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
+          Lite Model
+        </label>
+        <select
+          :value="appStore.selectedLiteModel"
+          @change="handleLiteModelChange"
+          class="input-base max-w-md"
+        >
+          <option v-for="model in appStore.providerLiteModels" :key="model" :value="model">
+            {{ model }}
+          </option>
+        </select>
+      </div>
 
       <!-- API Key Input -->
-      <div>
+      <div v-if="requiresApiKey">
         <label for="api-key-input" class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
-          API Key (OpenRouter)
+          API Key ({{ appStore.llmProvider }})
         </label>
         <div class="relative max-w-md">
           <input
@@ -26,7 +75,7 @@
             :type="showApiKey ? 'text' : 'password'"
             :value="appStore.apiKey"
             @input="handleApiKeyChange"
-            placeholder="Enter your OpenRouter API key"
+            :placeholder="`Enter your ${appStore.llmProvider} API key`"
             class="input-base pr-10"
           />
           <button
@@ -42,18 +91,18 @@
           <p class="text-xs" style="color: var(--color-text-muted);">
             Your API key is stored in your OS keychain.
             <a
-              href="https://openrouter.ai/keys"
+              :href="providerKeyUrl"
               target="_blank"
               rel="noopener"
               class="hover:underline ml-1"
               style="color: var(--color-accent);"
             >
-              Get an OpenRouter API key
+              Get a {{ appStore.llmProvider }} API key
             </a>
           </p>
           <button
             @click="testApiKey"
-            :disabled="isTestingApiKey || !appStore.apiKey.trim()"
+            :disabled="isTestingApiKey || !appStore.apiKey.trim() || !appStore.selectedModel"
             class="ml-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-secondary"
             title="Test your API key with the configured provider"
             type="button"
@@ -67,8 +116,12 @@
         </div>
       </div>
 
-      <p v-if="appStore.apiKeyConfigured" class="text-xs text-green-700">
-        A key is already configured in secure storage.
+      <p v-else class="text-xs text-green-700">
+        Ollama does not require an API key.
+      </p>
+
+      <p v-if="requiresApiKey && appStore.selectedProviderApiKeyPresent" class="text-xs text-green-700">
+        A key for {{ appStore.llmProvider }} is already configured in secure storage.
       </p>
 
       <div>
@@ -193,9 +246,65 @@ const messageTypeClass = computed(() => {
     ? 'bg-green-50 border border-green-200 text-green-800'
     : 'bg-red-50 border border-red-200 text-red-800'
 })
+const requiresApiKey = computed(() => !!appStore.providerRequiresApiKey)
+const providerKeyUrl = computed(() => {
+  if (appStore.llmProvider === 'openai') return 'https://platform.openai.com/api-keys'
+  if (appStore.llmProvider === 'anthropic') return 'https://console.anthropic.com/settings/keys'
+  return 'https://openrouter.ai/keys'
+})
+
+function syncProviderCatalog(provider) {
+  const catalog = appStore.providerModelCatalogs?.[provider] || {}
+  const mainModels = Array.isArray(catalog.main_models) ? catalog.main_models : []
+  const liteModels = Array.isArray(catalog.lite_models) ? catalog.lite_models : []
+  if (mainModels.length) {
+    appStore.providerMainModels = [...mainModels]
+    const enabled = appStore.availableModels.filter((item) => mainModels.includes(item))
+    appStore.setEnabledModels(enabled.length ? enabled : [...mainModels])
+  }
+  if (!appStore.availableModels.includes(appStore.selectedModel)) {
+    appStore.setSelectedModel(appStore.availableModels[0] || '')
+  }
+  if (liteModels.length) {
+    appStore.providerLiteModels = [...liteModels]
+    const fallbackLite = catalog.default_lite_model || liteModels[0] || ''
+    appStore.setSelectedLiteModel(
+      liteModels.includes(appStore.selectedLiteModel) ? appStore.selectedLiteModel : fallbackLite
+    )
+  }
+}
 
 function handleApiKeyChange(event) {
   appStore.setApiKey(event.target.value)
+  clearMessage()
+}
+
+function handleProviderChange(event) {
+  const provider = String(event.target.value || '').trim().toLowerCase()
+  appStore.setLlmProvider(provider)
+  appStore.setApiKey('')
+  syncProviderCatalog(provider)
+  clearMessage()
+}
+
+function handleLiteModelChange(event) {
+  appStore.setSelectedLiteModel(event.target.value)
+  clearMessage()
+}
+
+function toggleEnabledModel(model, event) {
+  const checked = !!event?.target?.checked
+  const current = [...appStore.availableModels]
+  const next = checked ? Array.from(new Set([...current, model])) : current.filter((item) => item !== model)
+  if (!next.length) {
+    message.value = 'Please keep at least one main model enabled.'
+    messageType.value = 'error'
+    return
+  }
+  appStore.setEnabledModels(next)
+  if (!next.includes(appStore.selectedModel)) {
+    appStore.setSelectedModel(next[0])
+  }
   clearMessage()
 }
 
@@ -221,7 +330,7 @@ async function testApiKey() {
   clearMessage()
 
   try {
-    const res = await apiService.testGeminiApi(key, appStore.selectedModel)
+    const res = await apiService.testGeminiApi(key, appStore.selectedModel, appStore.llmProvider)
     message.value = res?.detail || 'Successfully connected to model provider.'
     messageType.value = 'success'
   } catch (error) {
@@ -237,9 +346,8 @@ async function testApiKey() {
 async function saveApiSettings() {
   const apiKey = appStore.apiKey.trim()
 
-  // Validate API key
-  if (!apiKey) {
-    message.value = 'API key is required.'
+  if (!appStore.availableModels.length) {
+    message.value = 'Select at least one main model.'
     messageType.value = 'error'
     return
   }
@@ -248,16 +356,28 @@ async function saveApiSettings() {
   clearMessage()
 
   try {
-    // Test API key first
-    await testApiKey()
+    await apiService.v1UpdatePreferences({
+      llm_provider: appStore.llmProvider,
+      selected_model: appStore.selectedModel,
+      selected_lite_model: appStore.selectedLiteModel,
+      enabled_models: appStore.availableModels,
+      allow_schema_sample_values: appStore.allowSchemaSampleValues,
+    })
 
-    // If test was successful, persist securely for v1 runtime.
-    if (messageType.value === 'success') {
-      await apiService.setApiKeySettings(apiKey)
+    if (requiresApiKey.value) {
+      if (!apiKey) {
+        message.value = `API key is required for ${appStore.llmProvider}.`
+        messageType.value = 'error'
+        return
+      }
+      await testApiKey()
+      if (messageType.value !== 'success') return
+      await apiService.setApiKeySettings(apiKey, appStore.llmProvider)
       appStore.setApiKeyConfigured(true)
-      message.value = 'API key saved securely in OS keychain.'
-      messageType.value = 'success'
     }
+    await appStore.loadUserPreferences()
+    message.value = 'Provider and model settings saved.'
+    messageType.value = 'success'
   } catch (error) {
     console.error('❌ Failed to save API settings:', error)
     message.value = 'Failed to save API settings. Please try again.'

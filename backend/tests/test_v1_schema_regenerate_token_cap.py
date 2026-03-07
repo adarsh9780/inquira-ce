@@ -27,7 +27,7 @@ async def test_regenerate_schema_caps_llm_max_tokens(monkeypatch, tmp_path):
         )
 
     class FakeLLMService:
-        def __init__(self, api_key: str, model: str):
+        def __init__(self, api_key: str, model: str, provider: str | None = None):
             captured["api_key"] = api_key
             captured["model"] = model
 
@@ -56,7 +56,7 @@ async def test_regenerate_schema_caps_llm_max_tokens(monkeypatch, tmp_path):
     monkeypatch.setattr(
         runtime_api.SecretStorageService,
         "get_api_key",
-        lambda _user_id: "test-key",
+        lambda _user_id, provider="openrouter": "test-key",
     )
     monkeypatch.setattr(
         runtime_api,
@@ -122,7 +122,7 @@ async def test_regenerate_schema_falls_back_to_saved_schema_columns_when_table_u
         )
 
     class FakeLLMService:
-        def __init__(self, api_key: str, model: str):
+        def __init__(self, api_key: str, model: str, provider: str | None = None):
             self.api_key = api_key
             self.model = model
 
@@ -153,7 +153,7 @@ async def test_regenerate_schema_falls_back_to_saved_schema_columns_when_table_u
     monkeypatch.setattr(
         runtime_api.SecretStorageService,
         "get_api_key",
-        lambda _user_id: "test-key",
+        lambda _user_id, provider="openrouter": "test-key",
     )
     monkeypatch.setattr(
         runtime_api,
@@ -198,7 +198,7 @@ async def test_regenerate_schema_matches_descriptions_with_normalized_names(monk
         )
 
     class FakeLLMService:
-        def __init__(self, api_key: str, model: str):
+        def __init__(self, api_key: str, model: str, provider: str | None = None):
             _ = (api_key, model)
 
         def ask(self, _prompt, _schema_type, max_tokens=None):
@@ -229,7 +229,7 @@ async def test_regenerate_schema_matches_descriptions_with_normalized_names(monk
     monkeypatch.setattr(
         runtime_api.SecretStorageService,
         "get_api_key",
-        lambda _user_id: "test-key",
+        lambda _user_id, provider="openrouter": "test-key",
     )
     monkeypatch.setattr(
         runtime_api,

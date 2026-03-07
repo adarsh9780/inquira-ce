@@ -22,6 +22,11 @@ class UserPreferences(AppDataBase):
     selected_model: Mapped[str] = mapped_column(
         String(120), nullable=False, default="google/gemini-2.5-flash"
     )
+    llm_provider: Mapped[str] = mapped_column(String(32), nullable=False, default="openrouter")
+    selected_lite_model: Mapped[str] = mapped_column(
+        String(120), nullable=False, default="google/gemini-2.5-flash-lite"
+    )
+    enabled_main_models_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     schema_context: Mapped[str] = mapped_column(Text, nullable=False, default="")
     allow_schema_sample_values: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     chat_overlay_width: Mapped[float] = mapped_column(Float, nullable=False, default=0.25)

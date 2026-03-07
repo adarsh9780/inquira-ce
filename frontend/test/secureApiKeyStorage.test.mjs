@@ -9,7 +9,8 @@ test('api service persists API key via v1 preferences secure endpoint', () => {
   const source = readFileSync(servicePath, 'utf-8')
   const contract = readFileSync(contractPath, 'utf-8')
 
-  assert.equal(source.includes('v1SetApiKey(apiKey)'), true)
+  assert.equal(source.includes("v1SetApiKey(apiKey || '', provider)"), true)
+  assert.equal(contract.includes('setApiKey: (apiKey, provider = \'openrouter\')'), true)
   assert.equal(contract.includes('/api/v1/preferences/api-key'), true)
   assert.equal(source.includes('API key saved securely.'), true)
 })

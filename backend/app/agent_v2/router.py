@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from ..services.chat_model_factory import create_chat_model
 from ..services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
+from ..services.llm_provider_catalog import normalize_llm_provider, provider_requires_api_key
 
 _ROUTER_PROMPT = (
     Path(__file__).resolve().parent / "prompts" / "router_system.yaml"
@@ -44,7 +45,15 @@ def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
         return "unsafe"
 
     runtime = load_llm_runtime_config()
-    if runtime.provider == "ollama":
+    provider = normalize_llm_provider(str(configurable.get("provider") or runtime.provider))
+    base_url = str(configurable.get("base_url") or runtime.base_url).strip()
+    default_model = normalize_model_id(
+        str(configurable.get("default_model") or runtime.default_model).strip()
+    )
+    lite_model = normalize_model_id(
+        str(configurable.get("lite_model") or runtime.lite_model).strip()
+    )
+    if provider == "ollama":
         analysis_hints = re.compile(
             r"\b(chart|plot|graph|sql|query|average|sum|count|group by|dataset|table|column)\b",
             re.IGNORECASE,
@@ -52,17 +61,17 @@ def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
         return "analysis" if analysis_hints.search(user_text) else "general_chat"
 
     selected_model = normalize_model_id(str(configurable.get("model") or "").strip())
-    model_name = selected_model or runtime.lite_model or runtime.default_model
+    model_name = selected_model or lite_model or default_model
     api_key = str(configurable.get("api_key") or "").strip()
-    if runtime.requires_api_key and not api_key:
+    if provider_requires_api_key(provider) and not api_key:
         return "analysis"
 
     try:
         model = create_chat_model(
-            provider=runtime.provider,
+            provider=provider,
             model=model_name,
             api_key=api_key,
-            base_url=runtime.base_url,
+            base_url=base_url,
             temperature=0,
             max_tokens=256,
         )

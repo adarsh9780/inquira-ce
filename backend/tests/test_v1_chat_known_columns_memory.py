@@ -84,7 +84,10 @@ async def test_chat_service_shares_known_columns_across_workspace_conversations(
     monkeypatch.setattr(ChatService, "_preflight_check", staticmethod(_fake_preflight))
     monkeypatch.setattr(ChatService, "_persist_turn", staticmethod(_fake_persist_turn))
     monkeypatch.setattr("app.v1.services.chat_service.get_agent_bindings", lambda: SimpleNamespace(build_input_state=_fake_build_input_state))
-    monkeypatch.setattr("app.v1.services.chat_service.SecretStorageService.get_api_key", lambda _uid: "key")
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.SecretStorageService.get_api_key",
+        lambda _uid, provider="openrouter": "key",
+    )
 
     user = SimpleNamespace(id="user-1", username="alice")
     payload, conversation_id, turn_id = await ChatService.analyze_and_persist_turn(

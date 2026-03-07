@@ -31,7 +31,7 @@ async def test_regenerate_schema_persists_aliases(monkeypatch, tmp_path):
         )
 
     class FakeLLMService:
-        def __init__(self, api_key: str, model: str):
+        def __init__(self, api_key: str, model: str, provider: str | None = None):
             _ = (api_key, model)
 
         def ask(self, _prompt, _schema_type, max_tokens=None):
@@ -52,7 +52,11 @@ async def test_regenerate_schema_persists_aliases(monkeypatch, tmp_path):
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(runtime_api.DatasetRepository, "get_for_workspace_table", fake_get_dataset)
     monkeypatch.setattr(runtime_api.PreferencesRepository, "get_or_create", fake_get_prefs)
-    monkeypatch.setattr(runtime_api.SecretStorageService, "get_api_key", lambda _user_id: "test-key")
+    monkeypatch.setattr(
+        runtime_api.SecretStorageService,
+        "get_api_key",
+        lambda _user_id, provider="openrouter": "test-key",
+    )
     monkeypatch.setattr(
         runtime_api,
         "_read_table_columns_for_prompt",
@@ -100,7 +104,7 @@ async def test_regenerate_schema_missing_aliases_defaults_to_empty(monkeypatch, 
         )
 
     class FakeLLMService:
-        def __init__(self, api_key: str, model: str):
+        def __init__(self, api_key: str, model: str, provider: str | None = None):
             _ = (api_key, model)
 
         def ask(self, _prompt, _schema_type, max_tokens=None):
@@ -120,7 +124,11 @@ async def test_regenerate_schema_missing_aliases_defaults_to_empty(monkeypatch, 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(runtime_api.DatasetRepository, "get_for_workspace_table", fake_get_dataset)
     monkeypatch.setattr(runtime_api.PreferencesRepository, "get_or_create", fake_get_prefs)
-    monkeypatch.setattr(runtime_api.SecretStorageService, "get_api_key", lambda _user_id: "test-key")
+    monkeypatch.setattr(
+        runtime_api.SecretStorageService,
+        "get_api_key",
+        lambda _user_id, provider="openrouter": "test-key",
+    )
     monkeypatch.setattr(
         runtime_api,
         "_read_table_columns_for_prompt",

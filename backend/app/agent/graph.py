@@ -26,6 +26,7 @@ from .code_guard import guard_code
 from ..core.logger import logprint
 from ..services.chat_model_factory import create_chat_model
 from ..services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
+from ..services.llm_provider_catalog import normalize_llm_provider, provider_requires_api_key
 
 
 MAX_CODE_GUARD_RETRIES = 2
@@ -195,23 +196,32 @@ class InquiraAgent:
         api_key = str(configurable.get("api_key") or "").strip()
         selected_model = str(configurable.get("model") or "").strip()
         runtime = load_llm_runtime_config()
+        provider = normalize_llm_provider(str(configurable.get("provider") or runtime.provider))
+        base_url = str(configurable.get("base_url") or runtime.base_url).strip()
+        configured_default_model = str(configurable.get("default_model") or runtime.default_model).strip()
+        configured_lite_model = str(configurable.get("lite_model") or runtime.lite_model).strip()
 
         effective_model = self._resolve_runtime_model(
             requested_model=model_name,
             selected_model=selected_model,
-            default_model=runtime.default_model,
-            lite_model=runtime.lite_model,
+            default_model=configured_default_model,
+            lite_model=configured_lite_model,
         )
 
-        resolved_api_key = api_key or os.getenv("OPENROUTER_API_KEY", "").strip()
-        if runtime.requires_api_key and not resolved_api_key:
+        env_key_var = {
+            "openai": "OPENAI_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
+            "ollama": "OLLAMA_API_KEY",
+        }.get(provider, "OPENROUTER_API_KEY")
+        resolved_api_key = api_key or os.getenv(env_key_var, "").strip()
+        if provider_requires_api_key(provider) and not resolved_api_key:
             raise ValueError("API key not configured for LLM runtime")
 
         return create_chat_model(
-            provider=runtime.provider,
+            provider=provider,
             model=effective_model,
             api_key=resolved_api_key,
-            base_url=runtime.base_url,
+            base_url=base_url,
             temperature=0,
             max_tokens=runtime.code_generation_max_tokens,
         )
