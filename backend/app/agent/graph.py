@@ -4,8 +4,8 @@ import warnings
 from contextvars import ContextVar
 
 from pydantic import BaseModel, Field
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import AnyMessage, HumanMessage, AIMessage
+from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.graph import add_messages, StateGraph, START, END
 from langchain_core.prompts import (
     ChatPromptTemplate,
@@ -24,6 +24,7 @@ import json
 from pathlib import Path
 from .code_guard import guard_code
 from ..core.logger import logprint
+from ..services.chat_model_factory import create_chat_model
 from ..services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
 
 
@@ -186,7 +187,9 @@ class InquiraAgent:
             return lite_model
         return normalize_model_id(requested_model)
 
-    def _get_model(self, config: RunnableConfig, model_name: str = "gemini-2.5-flash"):
+    def _get_model(
+        self, config: RunnableConfig, model_name: str = "gemini-2.5-flash"
+    ) -> BaseChatModel:
         """Get model instance with API key from config"""
         configurable = config.get("configurable", {})
         api_key = str(configurable.get("api_key") or "").strip()
@@ -201,10 +204,11 @@ class InquiraAgent:
         )
 
         resolved_api_key = api_key or os.getenv("OPENROUTER_API_KEY", "").strip()
-        if not resolved_api_key:
+        if runtime.requires_api_key and not resolved_api_key:
             raise ValueError("API key not configured for LLM runtime")
 
-        return ChatOpenAI(
+        return create_chat_model(
+            provider=runtime.provider,
             model=effective_model,
             api_key=resolved_api_key,
             base_url=runtime.base_url,

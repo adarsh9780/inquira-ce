@@ -9,13 +9,14 @@ from pathlib import Path
 from typing import Any
 
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableConfig
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from ..agent.code_guard import guard_code
 from ..agent.registry import load_agent_runtime_config
+from ..services.chat_model_factory import create_chat_model
 from ..services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
 from .router import decide_route
 from .streaming import emit_stream_token
@@ -71,16 +72,17 @@ def _latest_user_text(messages: list[AnyMessage]) -> str:
     return ""
 
 
-def _get_model(config: RunnableConfig, *, lite: bool) -> ChatOpenAI:
+def _get_model(config: RunnableConfig, *, lite: bool) -> BaseChatModel:
     runtime = load_llm_runtime_config()
     configurable = config.get("configurable", {})
     selected = normalize_model_id(str(configurable.get("model") or "").strip())
     model_name = selected or (runtime.lite_model if lite else runtime.default_model)
     api_key = str(configurable.get("api_key") or "").strip()
-    if not api_key:
+    if runtime.requires_api_key and not api_key:
         raise ValueError("API key not configured for agent v2.")
 
-    return ChatOpenAI(
+    return create_chat_model(
+        provider=runtime.provider,
         model=model_name,
         api_key=api_key,
         base_url=runtime.base_url,

@@ -72,11 +72,14 @@ async def test_chat_service_passes_model_and_context_to_graph(monkeypatch):
 def test_agent_model_selection_uses_configurable_model(monkeypatch):
     called = {}
 
-    class FakeChatOpenAI:
-        def __init__(self, **kwargs):
-            called.update(kwargs)
+    class FakeModel:
+        pass
 
-    monkeypatch.setattr("app.agent.graph.ChatOpenAI", FakeChatOpenAI)
+    def _fake_create_chat_model(**kwargs):
+        called.update(kwargs)
+        return FakeModel()
+
+    monkeypatch.setattr("app.agent.graph.create_chat_model", _fake_create_chat_model)
     monkeypatch.setattr(
         "app.agent.graph.load_llm_runtime_config",
         lambda: LlmRuntimeConfig(
@@ -103,11 +106,14 @@ def test_agent_model_selection_uses_configurable_model(monkeypatch):
 def test_agent_model_selection_maps_legacy_lite_model_to_runtime_default(monkeypatch):
     called = {}
 
-    class FakeChatOpenAI:
-        def __init__(self, **kwargs):
-            called.update(kwargs)
+    class FakeModel:
+        pass
 
-    monkeypatch.setattr("app.agent.graph.ChatOpenAI", FakeChatOpenAI)
+    def _fake_create_chat_model(**kwargs):
+        called.update(kwargs)
+        return FakeModel()
+
+    monkeypatch.setattr("app.agent.graph.create_chat_model", _fake_create_chat_model)
     monkeypatch.setattr(
         "app.agent.graph.load_llm_runtime_config",
         lambda: LlmRuntimeConfig(

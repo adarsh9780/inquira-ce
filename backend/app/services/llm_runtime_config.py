@@ -12,8 +12,11 @@ from typing import Any
 
 @dataclass(frozen=True)
 class LlmRuntimeConfig:
+    # Known providers today: openrouter, openai, ollama, anthropic.
+    # Keep this open-ended so custom OpenAI-compatible providers still work.
     provider: str = "openrouter"
     base_url: str = "https://openrouter.ai/api/v1"
+    requires_api_key: bool = True
     default_model: str = "google/gemini-2.5-flash"
     lite_model: str = "google/gemini-2.5-flash-lite"
     default_max_tokens: int = 4096
@@ -180,6 +183,7 @@ def load_llm_runtime_config() -> LlmRuntimeConfig:
     return LlmRuntimeConfig(
         provider=provider.lower(),
         base_url=base_url,
+        requires_api_key=provider.strip().lower() != "ollama",
         default_model=normalized_default_model,
         lite_model=normalized_lite_model,
         default_max_tokens=default_max_tokens,

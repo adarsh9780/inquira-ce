@@ -4,10 +4,10 @@ from pathlib import Path
 from typing import Any, cast
 from dotenv import load_dotenv
 from fastapi import HTTPException
-from pydantic import BaseModel, Field, SecretStr
-from langchain_openai import ChatOpenAI
+from pydantic import BaseModel, Field
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
+from .chat_model_factory import create_chat_model
 from .llm_runtime_config import load_llm_runtime_config, normalize_model_id
 
 
@@ -38,19 +38,22 @@ class LLMService:
             # Load both so local dev can keep .env at repo root or backend root.
             load_dotenv(backend_env)
             load_dotenv(repo_root_env)
-            self.api_key = os.getenv("OPENROUTER_API_KEY", "")
+            self.api_key = self._load_provider_api_key(runtime.provider)
 
         self.model = normalize_model_id(model) or runtime.default_model
         self.base_url = runtime.base_url
+        self.provider = runtime.provider
+        self.requires_api_key = runtime.requires_api_key
         self.default_max_tokens = runtime.default_max_tokens
         self.client: Any | None
         self.chat_client: Any | None
 
         self.client = None
-        if self.api_key:
-            self.client = ChatOpenAI(
+        if self.api_key or not self.requires_api_key:
+            self.client = create_chat_model(
+                provider=self.provider,
                 model=self.model,
-                api_key=SecretStr(self.api_key),
+                api_key=self.api_key,
                 base_url=self.base_url,
                 temperature=0,
                 max_retries=0,  # Fail fast instead of hanging the UI with automatic retries
@@ -58,6 +61,17 @@ class LLMService:
             )
 
         self.chat_client = None
+
+    @staticmethod
+    def _load_provider_api_key(provider: str) -> str:
+        provider_name = str(provider or "").strip().lower()
+        if provider_name == "openai":
+            return os.getenv("OPENAI_API_KEY", "").strip()
+        if provider_name == "anthropic":
+            return os.getenv("ANTHROPIC_API_KEY", "").strip()
+        if provider_name == "ollama":
+            return os.getenv("OLLAMA_API_KEY", "").strip()
+        return os.getenv("OPENROUTER_API_KEY", "").strip()
 
     def create_chat_client(self, system_instruction: str = "", model: str = ""):
         if not self.client:
@@ -67,9 +81,10 @@ class LLMService:
 
         selected_model = normalize_model_id((model or self.model).strip() or self.model)
 
-        model_client = ChatOpenAI(
+        model_client = create_chat_model(
+            provider=self.provider,
             model=selected_model,
-            api_key=SecretStr(self.api_key),
+            api_key=self.api_key,
             base_url=self.base_url,
             temperature=0,
             max_retries=0,  # Fail fast

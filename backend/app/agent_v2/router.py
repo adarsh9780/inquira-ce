@@ -9,9 +9,9 @@ from typing import Literal
 
 from langchain_core.messages import AnyMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 
+from ..services.chat_model_factory import create_chat_model
 from ..services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
 
 _ROUTER_PROMPT = (
@@ -44,14 +44,22 @@ def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
         return "unsafe"
 
     runtime = load_llm_runtime_config()
+    if runtime.provider == "ollama":
+        analysis_hints = re.compile(
+            r"\b(chart|plot|graph|sql|query|average|sum|count|group by|dataset|table|column)\b",
+            re.IGNORECASE,
+        )
+        return "analysis" if analysis_hints.search(user_text) else "general_chat"
+
     selected_model = normalize_model_id(str(configurable.get("model") or "").strip())
     model_name = selected_model or runtime.lite_model or runtime.default_model
     api_key = str(configurable.get("api_key") or "").strip()
-    if not api_key:
+    if runtime.requires_api_key and not api_key:
         return "analysis"
 
     try:
-        model = ChatOpenAI(
+        model = create_chat_model(
+            provider=runtime.provider,
             model=model_name,
             api_key=api_key,
             base_url=runtime.base_url,

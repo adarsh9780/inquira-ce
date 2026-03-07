@@ -28,6 +28,7 @@ def test_llm_runtime_config_reads_base_url_and_models_from_toml(monkeypatch, tmp
     cfg = load_llm_runtime_config()
 
     assert cfg.provider == "openrouter"
+    assert cfg.requires_api_key is True
     assert cfg.base_url == "http://localhost:4000/v1"
     assert cfg.default_model == "openai/gpt-4o-mini"
     assert cfg.lite_model == "openai/gpt-4.1-nano"
@@ -70,6 +71,7 @@ def test_llm_runtime_config_env_overrides_toml(monkeypatch, tmp_path):
     cfg = load_llm_runtime_config()
 
     assert cfg.base_url == "http://127.0.0.1:4000/v1"
+    assert cfg.requires_api_key is True
     assert cfg.default_model == "google/gemini-3-flash-preview"
     assert cfg.lite_model == "google/gemini-2.5-flash-lite"
     assert cfg.default_max_tokens == 1024
@@ -186,3 +188,26 @@ def test_llm_runtime_config_rejects_shorthand_ids_in_models_list(monkeypatch, tm
 
     with pytest.raises(ValueError, match="must use the full model ID"):
         load_llm_runtime_config()
+
+
+def test_runtime_config_ollama_no_api_key(monkeypatch, tmp_path):
+    cfg_path = tmp_path / "inquira.toml"
+    cfg_path.write_text(
+        "\n".join(
+            [
+                "[llm]",
+                'provider = "ollama"',
+                'base-url = "http://localhost:11434/v1"',
+                'default-model = "llama3.2"',
+                'lite-model = "llama3.2"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("INQUIRA_TOML_PATH", str(cfg_path))
+    load_llm_runtime_config.cache_clear()
+    cfg = load_llm_runtime_config()
+
+    assert cfg.provider == "ollama"
+    assert cfg.requires_api_key is False
