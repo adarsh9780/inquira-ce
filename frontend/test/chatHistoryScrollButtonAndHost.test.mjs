@@ -8,7 +8,8 @@ test('chat history binds scroll logic to outer scroll host and forces initial bo
 
   assert.equal(source.includes('scrollHost.value = resolveScrollHost()'), true)
   assert.equal(source.includes("localContainer.parentElement?.closest?.('[data-chat-scroll-container]')"), true)
-  assert.equal(source.includes("window.setTimeout(() => scrollToBottom({ behavior: 'auto', force: true }), 32)"), true)
+  assert.equal(source.includes("window.setTimeout(() => scrollToBottom({ behavior: 'auto', force: true, hardAlign: true }), 32)"), true)
+  assert.equal(source.includes('const hardAlign = options?.hardAlign === true'), true)
 })
 
 test('chat history renders conditional scroll-to-bottom button when user scrolls up', () => {
@@ -19,5 +20,7 @@ test('chat history renders conditional scroll-to-bottom button when user scrolls
   assert.equal(source.includes('@click="handleScrollToBottomClick"'), true)
   assert.equal(source.includes('const showScrollToBottomButton = ref(false)'), true)
   assert.equal(source.includes('function handleScrollToBottomClick() {'), true)
-  assert.equal(source.includes("scrollToBottom({ behavior: 'smooth', force: true })"), true)
+  assert.equal(source.includes("scrollToBottom({ behavior: 'auto', force: true })"), true)
+  assert.equal(source.includes('if (container.scrollTop < previousTop && distanceFromBottom > 0) {'), true)
+  assert.equal(source.includes('shouldAutoScroll = false'), true)
 })

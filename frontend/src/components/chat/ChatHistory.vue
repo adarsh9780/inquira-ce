@@ -371,7 +371,7 @@ onMounted(() => {
   // Hydrated conversations mount with existing messages, so force initial bottom alignment.
   if (appStore.chatHistory.length > 0) {
     nextTick(() => scrollToBottom())
-    window.setTimeout(() => scrollToBottom({ behavior: 'auto', force: true }), 32)
+    window.setTimeout(() => scrollToBottom({ behavior: 'auto', force: true, hardAlign: true }), 32)
   }
 })
 
@@ -677,6 +677,7 @@ function updateScrollState(options = {}) {
 function scrollToBottom(options = {}) {
   const resolvedBehavior = String(options?.behavior || '').trim() || (appStore.isLoading ? 'auto' : 'smooth')
   const force = options?.force === true
+  const hardAlign = options?.hardAlign === true
   nextTick(() => {
     const container = getScrollContainer()
     const endEl = end.value
@@ -688,7 +689,7 @@ function scrollToBottom(options = {}) {
     }
     if (typeof container.scrollTo === 'function') {
       container.scrollTo({ top: container.scrollHeight, behavior })
-      if (force && behavior === 'auto') {
+      if (hardAlign && force && behavior === 'auto') {
         // Hydrated history needs one hard align pass after layout settles.
         window.requestAnimationFrame(() => {
           container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
