@@ -37,6 +37,15 @@ test('column suggestion UI highlights escaped/special column references', () => 
   assert.equal(source.includes(":class=\"openUp ? 'bottom-full mb-2' : 'top-full mt-1'\""), true)
 })
 
+test('chat caret keyup handler ignores suggestion navigation keys to preserve arrow selection', () => {
+  const componentPath = resolve(process.cwd(), 'src/components/chat/ChatInput.vue')
+  const source = readFileSync(componentPath, 'utf-8')
+
+  assert.equal(source.includes("const SUGGESTION_NAVIGATION_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Tab', 'Enter', 'Escape'])"), true)
+  assert.equal(source.includes('SUGGESTION_NAVIGATION_KEYS.has(String(event.key || \'\'))'), true)
+  assert.equal(source.includes('(showCommandSuggestions.value || showColumnSuggestions.value)'), true)
+})
+
 test('code tab completion source formats special columns with quoted identifiers', () => {
   const codeTabPath = resolve(process.cwd(), 'src/components/analysis/CodeTab.vue')
   const source = readFileSync(codeTabPath, 'utf-8')

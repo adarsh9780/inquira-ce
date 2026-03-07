@@ -409,7 +409,16 @@ function handleInputChange() {
   void updateAutocompleteSuggestions()
 }
 
-function handleCaretInteraction() {
+const SUGGESTION_NAVIGATION_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Tab', 'Enter', 'Escape'])
+
+function handleCaretInteraction(event = null) {
+  if (
+    event &&
+    SUGGESTION_NAVIGATION_KEYS.has(String(event.key || '')) &&
+    (showCommandSuggestions.value || showColumnSuggestions.value)
+  ) {
+    return
+  }
   void updateAutocompleteSuggestions()
 }
 
