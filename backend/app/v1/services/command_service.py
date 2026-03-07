@@ -224,6 +224,40 @@ def _resolve_table_column_ref(
     return table_name, column_name
 
 
+def _consume_column_ref_tokens(
+    catalog: _Catalog,
+    args: list[str],
+    *,
+    default_table: str | None = None,
+    start_index: int = 0,
+) -> tuple[str, str, int]:
+    if start_index >= len(args):
+        raise CommandExecutionError("Column reference is required (expected table.column).")
+
+    best_match: tuple[str, str, int] | None = None
+    for end_index in range(start_index + 1, len(args) + 1):
+        token = " ".join(str(part or "").strip() for part in args[start_index:end_index]).strip()
+        if not token:
+            continue
+        try:
+            table_name, column_name = _resolve_table_column_ref(
+                catalog,
+                token,
+                default_table=default_table,
+            )
+        except CommandExecutionError:
+            continue
+        best_match = (table_name, column_name, end_index)
+
+    if best_match is None:
+        unresolved = " ".join(str(part or "").strip() for part in args[start_index:]).strip()
+        raise CommandExecutionError(
+            f"Column reference is required (expected table.column). Could not resolve: {unresolved or '<empty>'}"
+        )
+
+    return best_match
+
+
 def _parse_positive_int(value: str | None, default: int, *, min_value: int = 1, max_value: int = MAX_ROW_LIMIT) -> int:
     raw = str(value or "").strip()
     if not raw:
@@ -385,7 +419,12 @@ def _run_single_column_aggregate(
     if not args:
         raise CommandExecutionError(f"/{name} requires a column reference (<table>.<col>).")
 
-    table, column = _resolve_table_column_ref(catalog, args[0], default_table=default_table)
+    table, column, next_arg_index = _consume_column_ref_tokens(
+        catalog,
+        args,
+        default_table=default_table,
+        start_index=0,
+    )
     qt = _quote_ident(table)
     qc = _quote_ident(column)
 
@@ -404,7 +443,12 @@ def _run_single_column_aggregate(
     elif name == "max":
         expr = f"MAX({qc})"
     elif name == "percentile":
-        percentile = _parse_positive_int(args[1] if len(args) > 1 else None, 50, min_value=1, max_value=100)
+        percentile = _parse_positive_int(
+            args[next_arg_index] if len(args) > next_arg_index else None,
+            50,
+            min_value=1,
+            max_value=100,
+        )
         quantile = percentile / 100.0
         expr = f"QUANTILE_CONT({qc}, {quantile})"
     else:
@@ -436,12 +480,22 @@ def _run_distribution(
     if name in {"value_counts", "unique", "histogram"}:
         if not args:
             raise CommandExecutionError(f"/{name} requires a column reference (<table>.<col>).")
-        table, column = _resolve_table_column_ref(catalog, args[0], default_table=default_table)
+        table, column, next_arg_index = _consume_column_ref_tokens(
+            catalog,
+            args,
+            default_table=default_table,
+            start_index=0,
+        )
         qt = _quote_ident(table)
         qc = _quote_ident(column)
 
         if name == "value_counts":
-            n = _parse_positive_int(args[1] if len(args) > 1 else None, 20, min_value=1, max_value=MAX_ROW_LIMIT)
+            n = _parse_positive_int(
+                args[next_arg_index] if len(args) > next_arg_index else None,
+                20,
+                min_value=1,
+                max_value=MAX_ROW_LIMIT,
+            )
             sql = (
                 f"SELECT {qc} AS value, COUNT(*) AS count "
                 f"FROM {qt} "
@@ -460,7 +514,12 @@ def _run_distribution(
                 "FROM stats LEFT JOIN samples ON TRUE"
             )
         else:
-            bins = _parse_positive_int(args[1] if len(args) > 1 else None, 10, min_value=2, max_value=100)
+            bins = _parse_positive_int(
+                args[next_arg_index] if len(args) > next_arg_index else None,
+                10,
+                min_value=2,
+                max_value=100,
+            )
             sql = (
                 "WITH ranked AS ("
                 f"SELECT NTILE({bins}) OVER (ORDER BY {qc}) AS bucket "
@@ -483,14 +542,23 @@ def _run_distribution(
         if len(args) < 2:
             raise CommandExecutionError(f"/{name} requires two columns. Usage: /{name} <table>.<c1> <c2>")
 
-        table, c1 = _resolve_table_column_ref(catalog, args[0], default_table=default_table)
-        second = str(args[1] or "").strip()
-        if "." in second:
-            table2, c2 = _resolve_table_column_ref(catalog, second, default_table=default_table)
-            if table2.lower() != table.lower():
-                raise CommandExecutionError("Both columns must belong to the same table.")
-        else:
-            c2 = _resolve_column(catalog, table, second)
+        table, c1, next_arg_index = _consume_column_ref_tokens(
+            catalog,
+            args,
+            default_table=default_table,
+            start_index=0,
+        )
+        if next_arg_index >= len(args):
+            raise CommandExecutionError(f"/{name} requires two columns. Usage: /{name} <table>.<c1> <c2>")
+
+        table2, c2, _ = _consume_column_ref_tokens(
+            catalog,
+            args,
+            default_table=table,
+            start_index=next_arg_index,
+        )
+        if table2.lower() != table.lower():
+            raise CommandExecutionError("Both columns must belong to the same table.")
 
         qt = _quote_ident(table)
         qc1 = _quote_ident(c1)
@@ -542,7 +610,7 @@ def _run_quality(
         if not args:
             raise CommandExecutionError("/nulls requires a table or table.column argument.")
 
-        target = str(args[0] or "").strip()
+        target = " ".join(str(part or "").strip() for part in args).strip()
         if "." in target:
             table, column = _resolve_table_column_ref(catalog, target, default_table=default_table)
             qt = _quote_ident(table)
@@ -563,7 +631,33 @@ def _run_quality(
                 truncated=truncated,
             )
 
-        table = _resolve_table(catalog, target, default_table)
+        try:
+            table = _resolve_table(catalog, target, default_table)
+        except CommandExecutionError:
+            table, column, _ = _consume_column_ref_tokens(
+                catalog,
+                args,
+                default_table=default_table,
+                start_index=0,
+            )
+            qt = _quote_ident(table)
+            qc = _quote_ident(column)
+            sql = (
+                f"SELECT COUNT(*) AS null_count, COUNT(*) FILTER (WHERE {qc} IS NOT NULL) AS non_null_count "
+                f"FROM {qt} WHERE {qc} IS NULL OR {qc} IS NOT NULL"
+            )
+            payload, truncated = _run_sql(con, sql, row_limit=5, result_type="scalar")
+            scalar_rows = payload.get("data") or []
+            null_count = scalar_rows[0].get("null_count") if scalar_rows else 0
+            payload["scalar"] = null_count
+            return _Result(
+                name=name,
+                output=f"/{name} for {table}.{column}: {null_count}",
+                result_type="scalar",
+                result=payload,
+                truncated=truncated,
+            )
+
         qt = _quote_ident(table)
         table_columns = list(catalog.columns.get(table, {}).values())
         rows: list[dict[str, Any]] = []
@@ -629,7 +723,12 @@ def _run_quality(
         if not args:
             raise CommandExecutionError("/outliers requires a column reference (<table>.<col>).")
 
-        table, column = _resolve_table_column_ref(catalog, args[0], default_table=default_table)
+        table, column, _ = _consume_column_ref_tokens(
+            catalog,
+            args,
+            default_table=default_table,
+            start_index=0,
+        )
         qt = _quote_ident(table)
         qc = _quote_ident(column)
         sql = (

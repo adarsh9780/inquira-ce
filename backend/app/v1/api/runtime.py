@@ -36,7 +36,9 @@ from ..db.session import get_appdata_db_session
 from ..repositories.preferences_repository import PreferencesRepository
 from ..repositories.dataset_repository import DatasetRepository
 from ..repositories.workspace_repository import WorkspaceRepository
+from ..repositories.conversation_repository import ConversationRepository
 from ..services.secret_storage_service import SecretStorageService
+from ..services.conversation_service import ConversationService
 from .deps import ensure_appdata_principal, get_current_user
 from ...core.prompt_library import get_prompt
 from ...services.llm_service import LLMService
@@ -219,6 +221,7 @@ class CommandExecuteRequest(BaseModel):
     name: str | None = None
     raw_args: str = ""
     default_table: str | None = None
+    conversation_id: str | None = None
     row_limit: int = Field(500, ge=1, le=2000)
 
 
@@ -229,6 +232,8 @@ class CommandExecuteResponse(BaseModel):
     result_type: str = "message"
     result: dict[str, Any] | None = None
     truncated: bool = False
+    conversation_id: str | None = None
+    turn_id: str | None = None
 
 
 class DatasetSchemaResponse(BaseModel):
@@ -536,6 +541,129 @@ async def _require_workspace_access(
     return workspace
 
 
+def _derive_command_conversation_title(command_text: str) -> str:
+    compact = " ".join(str(command_text or "").strip().split())
+    if not compact:
+        return "New Conversation"
+    if len(compact) <= 80:
+        return compact
+    return compact[:77].rstrip() + "..."
+
+
+async def _resolve_or_create_command_conversation(
+    *,
+    session: AsyncSession,
+    principal_id: str,
+    workspace_id: str,
+    conversation_id: str | None,
+    command_text: str,
+):
+    candidate = str(conversation_id or "").strip()
+    if candidate:
+        conversation = await ConversationRepository.get_conversation(session, candidate)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        if str(conversation.workspace_id) != str(workspace_id):
+            raise HTTPException(
+                status_code=400,
+                detail="Conversation does not belong to the selected workspace.",
+            )
+        return conversation
+
+    return await ConversationService.create_conversation(
+        session=session,
+        principal_id=principal_id,
+        workspace_id=workspace_id,
+        title=_derive_command_conversation_title(command_text),
+    )
+
+
+async def _persist_command_turn(
+    *,
+    session: AsyncSession,
+    conversation: Any,
+    command_text: str,
+    command_name: str,
+    command_output: str,
+    command_result_type: str,
+    command_result: dict[str, Any] | None,
+    truncated: bool,
+) -> str:
+    conversation_id = str(getattr(conversation, "id", "") or "").strip()
+    if not conversation_id:
+        raise HTTPException(status_code=500, detail="Conversation initialization failed")
+
+    seq_no = await ConversationRepository.next_seq_no(session, conversation_id)
+    if seq_no == 1 and (str(getattr(conversation, "title", "") or "").strip().lower() == "new conversation"):
+        conversation.title = _derive_command_conversation_title(command_text)
+
+    assistant_text = str(command_output or "").strip() or f"Executed /{command_name}."
+    metadata: dict[str, Any] = {
+        "source": "slash_command",
+        "command_name": str(command_name or ""),
+        "result_type": str(command_result_type or "message"),
+        "truncated": bool(truncated),
+    }
+    if isinstance(command_result, dict):
+        columns = command_result.get("columns")
+        row_count = command_result.get("row_count")
+        metadata["result"] = {
+            "columns": [str(col) for col in columns[:20]] if isinstance(columns, list) else [],
+            "row_count": int(row_count) if isinstance(row_count, int) else None,
+        }
+
+    turn = await ConversationRepository.create_turn(
+        session=session,
+        conversation_id=conversation_id,
+        seq_no=seq_no,
+        user_text=str(command_text or ""),
+        assistant_text=assistant_text,
+        tool_events=None,
+        metadata=metadata,
+        code_snapshot=None,
+    )
+    await session.commit()
+    return str(turn.id)
+
+
+async def _persist_failed_command_turn_best_effort(
+    *,
+    session: AsyncSession,
+    principal_id: str,
+    workspace_id: str,
+    conversation_id: str | None,
+    command_text: str,
+    command_name: str,
+    error_detail: str,
+) -> None:
+    try:
+        conversation = await _resolve_or_create_command_conversation(
+            session=session,
+            principal_id=principal_id,
+            workspace_id=workspace_id,
+            conversation_id=conversation_id,
+            command_text=command_text,
+        )
+        await _persist_command_turn(
+            session=session,
+            conversation=conversation,
+            command_text=command_text,
+            command_name=command_name,
+            command_output=f"Command failed: {error_detail}",
+            command_result_type="error",
+            command_result={"error": error_detail},
+            truncated=False,
+        )
+    except Exception as exc:
+        logprint(
+            "Failed to persist slash-command error turn",
+            level="WARNING",
+            workspace_id=workspace_id,
+            command=command_text,
+            error=str(exc),
+        )
+
+
 def _workspace_db_missing_detail(duckdb_path: str) -> str:
     return (
         "Workspace database is missing.\n"
@@ -689,11 +817,59 @@ async def execute_workspace_slash_command(
             row_limit=payload.row_limit,
         )
     except CommandExecutionError as exc:
+        await _persist_failed_command_turn_best_effort(
+            session=session,
+            principal_id=str(current_user.id),
+            workspace_id=workspace_id,
+            conversation_id=payload.conversation_id,
+            command_text=command_text,
+            command_name=parsed_name or "command",
+            error_detail=str(exc),
+        )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except duckdb.Error as exc:
+        detail = f"Command execution failed: {str(exc)}"
+        await _persist_failed_command_turn_best_effort(
+            session=session,
+            principal_id=str(current_user.id),
+            workspace_id=workspace_id,
+            conversation_id=payload.conversation_id,
+            command_text=command_text,
+            command_name=parsed_name or "command",
+            error_detail=detail,
+        )
         raise HTTPException(status_code=400, detail=f"Command execution failed: {str(exc)}") from exc
     except Exception as exc:
+        detail = f"Command execution failed: {str(exc)}"
+        await _persist_failed_command_turn_best_effort(
+            session=session,
+            principal_id=str(current_user.id),
+            workspace_id=workspace_id,
+            conversation_id=payload.conversation_id,
+            command_text=command_text,
+            command_name=parsed_name or "command",
+            error_detail=detail,
+        )
         raise HTTPException(status_code=500, detail=f"Command execution failed: {str(exc)}") from exc
+
+    conversation = await _resolve_or_create_command_conversation(
+        session=session,
+        principal_id=str(current_user.id),
+        workspace_id=workspace_id,
+        conversation_id=payload.conversation_id,
+        command_text=command_text,
+    )
+
+    turn_id = await _persist_command_turn(
+        session=session,
+        conversation=conversation,
+        command_text=command_text,
+        command_name=str(result.get("name") or parsed_name),
+        command_output=str(result.get("output") or ""),
+        command_result_type=str(result.get("result_type") or "message"),
+        command_result=result.get("result") if isinstance(result.get("result"), dict) else None,
+        truncated=bool(result.get("truncated")),
+    )
 
     return CommandExecuteResponse(
         command=command_text,
@@ -702,6 +878,8 @@ async def execute_workspace_slash_command(
         result_type=str(result.get("result_type") or "message"),
         result=result.get("result") if isinstance(result.get("result"), dict) else None,
         truncated=bool(result.get("truncated")),
+        conversation_id=str(getattr(conversation, "id", "") or ""),
+        turn_id=turn_id,
     )
 
 

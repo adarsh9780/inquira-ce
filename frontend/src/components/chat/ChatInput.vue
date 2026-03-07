@@ -572,17 +572,33 @@ function applyCommandResultToStore(commandResult) {
 
 async function handleSlashCommand(questionText) {
   appStore.setLoading(true)
+  let commandMessageCreated = false
   try {
     const workspaceId = appStore.activeWorkspaceId
     if (!workspaceId) {
       throw new Error('Create/select a workspace before analysis.')
     }
 
+    appStore.addChatMessage(questionText, 'Running command...')
+    commandMessageCreated = true
     await ensureWorkspaceDatasetReady(workspaceId)
     const result = await executeCommand(questionText, { appStore, apiService, executionService })
+    const persistedConversationId = String(result?.conversation_id || '').trim()
+    if (persistedConversationId && persistedConversationId !== String(appStore.activeConversationId || '').trim()) {
+      appStore.setActiveConversationId(persistedConversationId)
+    }
+    if (persistedConversationId) {
+      await appStore.fetchConversations()
+    }
+    appStore.updateLastMessageExplanation(
+      String(result?.output || `/${String(result?.name || 'command')} executed.`)
+    )
     applyCommandResultToStore(result)
   } catch (error) {
     const message = extractApiErrorMessage(error, 'Failed to run command.')
+    if (commandMessageCreated) {
+      appStore.updateLastMessageExplanation(`Command failed: ${message}`)
+    }
     toast.error('Command Failed', message)
     appStore.setTerminalOutput(`Error: ${message}`)
     appStore.appendTerminalEntry({

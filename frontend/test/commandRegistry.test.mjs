@@ -55,6 +55,7 @@ test('executeCommand dispatches to backend endpoint with workspace context', asy
     appStore: {
       activeWorkspaceId: 'ws-1',
       ingestedTableName: 'sales',
+      activeConversationId: 'conv-1',
     },
     apiService: mockApiService,
   })
@@ -62,6 +63,7 @@ test('executeCommand dispatches to backend endpoint with workspace context', asy
   assert.equal(captured.workspaceId, 'ws-1')
   assert.equal(captured.payload?.name, 'shape')
   assert.equal(captured.payload?.default_table, 'sales')
+  assert.equal(captured.payload?.conversation_id, 'conv-1')
   assert.equal(result?.name, 'shape')
   assert.equal(result?.result_type, 'table')
 })
@@ -74,5 +76,6 @@ test('chat input routes slash commands through the command handler path', () => 
   assert.equal(source.includes('if (isCommand(questionText)) {'), true)
   assert.equal(source.includes('await handleSlashCommand(questionText)'), true)
   assert.equal(source.includes('const result = await executeCommand(questionText'), true)
+  assert.equal(source.includes("appStore.addChatMessage(questionText, 'Running command...')"), true)
   assert.equal(source.includes('getRegisteredCommands()'), true)
 })

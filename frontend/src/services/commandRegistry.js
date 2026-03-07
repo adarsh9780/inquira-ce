@@ -95,6 +95,7 @@ export async function executeCommand(text, { appStore, apiService: api = null } 
     name: parsed.name,
     raw_args: parsed.rawArgs,
     default_table: String(appStore?.ingestedTableName || '').trim() || null,
+    conversation_id: String(appStore?.activeConversationId || '').trim() || null,
   })
 
   return {
