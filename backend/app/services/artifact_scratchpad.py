@@ -34,7 +34,10 @@ class ArtifactScratchpadStore:
 
     @staticmethod
     def build_scratchpad_db_path(workspace_duckdb_path: str) -> Path:
-        return ArtifactScratchpadStore.build_scratchpad_dir(workspace_duckdb_path) / "artifacts.duckdb"
+        return (
+            ArtifactScratchpadStore.build_scratchpad_dir(workspace_duckdb_path)
+            / "artifacts.duckdb"
+        )
 
     @staticmethod
     def _quoted(ident: str) -> str:
@@ -62,7 +65,9 @@ class ArtifactScratchpadStore:
         operator = str(model.get("operator") or "").upper()
         nested_conditions: list[dict[str, Any]] = []
         if isinstance(model.get("conditions"), list):
-            nested_conditions = [item for item in model["conditions"] if isinstance(item, dict)]
+            nested_conditions = [
+                item for item in model["conditions"] if isinstance(item, dict)
+            ]
         else:
             condition_one = model.get("condition1")
             condition_two = model.get("condition2")
@@ -101,9 +106,15 @@ class ArtifactScratchpadStore:
             return f"{quoted_column} IN ({placeholders})", list(raw_values)
 
         if filter_mode == "blank":
-            return f"({quoted_column} IS NULL OR CAST({quoted_column} AS VARCHAR) = '')", []
+            return (
+                f"({quoted_column} IS NULL OR CAST({quoted_column} AS VARCHAR) = '')",
+                [],
+            )
         if filter_mode == "notBlank":
-            return f"({quoted_column} IS NOT NULL AND CAST({quoted_column} AS VARCHAR) <> '')", []
+            return (
+                f"({quoted_column} IS NOT NULL AND CAST({quoted_column} AS VARCHAR) <> '')",
+                [],
+            )
 
         if filter_type == "text":
             haystack = f"LOWER(CAST({quoted_column} AS VARCHAR))"
@@ -111,7 +122,9 @@ class ArtifactScratchpadStore:
             if filter_mode == "contains":
                 return f"{haystack} LIKE ?", [f"%{value}%"]
             if filter_mode == "notContains":
-                return f"({quoted_column} IS NULL OR {haystack} NOT LIKE ?)", [f"%{value}%"]
+                return f"({quoted_column} IS NULL OR {haystack} NOT LIKE ?)", [
+                    f"%{value}%"
+                ]
             if filter_mode == "equals":
                 return f"{haystack} = ?", [value]
             if filter_mode == "notEqual":
@@ -129,7 +142,9 @@ class ArtifactScratchpadStore:
             if filter_mode == "equals" and number_value is not None:
                 return f"{numeric_expr} = ?", [number_value]
             if filter_mode == "notEqual" and number_value is not None:
-                return f"({numeric_expr} IS NULL OR {numeric_expr} <> ?)", [number_value]
+                return f"({numeric_expr} IS NULL OR {numeric_expr} <> ?)", [
+                    number_value
+                ]
             if filter_mode == "greaterThan" and number_value is not None:
                 return f"{numeric_expr} > ?", [number_value]
             if filter_mode == "greaterThanOrEqual" and number_value is not None:
@@ -138,7 +153,11 @@ class ArtifactScratchpadStore:
                 return f"{numeric_expr} < ?", [number_value]
             if filter_mode == "lessThanOrEqual" and number_value is not None:
                 return f"{numeric_expr} <= ?", [number_value]
-            if filter_mode == "inRange" and number_value is not None and number_to_value is not None:
+            if (
+                filter_mode == "inRange"
+                and number_value is not None
+                and number_to_value is not None
+            ):
                 low, high = sorted([number_value, number_to_value])
                 return f"{numeric_expr} BETWEEN ? AND ?", [low, high]
             return "", []
@@ -170,12 +189,18 @@ class ArtifactScratchpadStore:
             return "", []
 
         if filter_type == "boolean":
-            value = model.get("filter")
-            if isinstance(value, bool):
-                return (f"TRY_CAST({quoted_column} AS BOOLEAN) IS {'TRUE' if value else 'FALSE'}", [])
-            value_text = str(value).strip().lower()
+            bool_val = model.get("filter")
+            if isinstance(bool_val, bool):
+                return (
+                    f"TRY_CAST({quoted_column} AS BOOLEAN) IS {'TRUE' if bool_val else 'FALSE'}",
+                    [],
+                )
+            value_text = str(bool_val).strip().lower()
             if value_text in {"true", "false"}:
-                return (f"TRY_CAST({quoted_column} AS BOOLEAN) IS {value_text.upper()}", [])
+                return (
+                    f"TRY_CAST({quoted_column} AS BOOLEAN) IS {value_text.upper()}",
+                    [],
+                )
             return "", []
 
         return "", []
@@ -208,7 +233,10 @@ class ArtifactScratchpadStore:
 
         needle = str(search_text or "").strip().lower()
         if needle and quoted_columns:
-            search_clauses = [f"LOWER(CAST({expr} AS VARCHAR)) LIKE ?" for expr in quoted_columns.values()]
+            search_clauses = [
+                f"LOWER(CAST({expr} AS VARCHAR)) LIKE ?"
+                for expr in quoted_columns.values()
+            ]
             where_parts.append(f"({' OR '.join(search_clauses)})")
             where_params.extend([f"%{needle}%"] * len(search_clauses))
 
@@ -257,7 +285,9 @@ class ArtifactScratchpadStore:
         will raise ``duckdb.IOException`` — the caller / API layer should catch
         it and fall back to the kernel's in-process scratchpad connection.
         """
-        db_path = ArtifactScratchpadStore.build_scratchpad_db_path(workspace_duckdb_path)
+        db_path = ArtifactScratchpadStore.build_scratchpad_db_path(
+            workspace_duckdb_path
+        )
         if not db_path.exists():
             return None
         return duckdb.connect(str(db_path), read_only=True)
@@ -402,13 +432,23 @@ class ArtifactScratchpadStore:
                     created_at, expires_at, status, error
                 ) VALUES (?, ?, ?, ?, 'script', NULL, ?, NULL, NULL, ?, ?, 'ready', NULL)
                 """,
-                [artifact_id, run_id, workspace_id, logical_name, payload, now, expires_at],
+                [
+                    artifact_id,
+                    run_id,
+                    workspace_id,
+                    logical_name,
+                    payload,
+                    now,
+                    expires_at,
+                ],
             )
         finally:
             con.close()
         return artifact_id
 
-    def get_artifact(self, *, workspace_duckdb_path: str, artifact_id: str) -> dict[str, Any] | None:
+    def get_artifact(
+        self, *, workspace_duckdb_path: str, artifact_id: str
+    ) -> dict[str, Any] | None:
         con = self._open_readonly(workspace_duckdb_path)
         if con is None:
             return None
@@ -456,7 +496,9 @@ class ArtifactScratchpadStore:
             "pointer": f"duckdb://scratchpad/artifacts.duckdb#artifact={row[0]}",
         }
 
-    def list_artifacts_for_run(self, *, workspace_duckdb_path: str, run_id: str) -> list[dict[str, Any]]:
+    def list_artifacts_for_run(
+        self, *, workspace_duckdb_path: str, run_id: str
+    ) -> list[dict[str, Any]]:
         con = self._open_readonly(workspace_duckdb_path)
         if con is None:
             return []
@@ -474,7 +516,9 @@ class ArtifactScratchpadStore:
             con.close()
         artifacts: list[dict[str, Any]] = []
         for row in rows:
-            item = self.get_artifact(workspace_duckdb_path=workspace_duckdb_path, artifact_id=str(row[0]))
+            item = self.get_artifact(
+                workspace_duckdb_path=workspace_duckdb_path, artifact_id=str(row[0])
+            )
             if item is None:
                 continue
             artifacts.append(item)
@@ -554,7 +598,9 @@ class ArtifactScratchpadStore:
         filter_model: dict[str, Any] | None = None,
         search_text: str | None = None,
     ) -> dict[str, Any] | None:
-        meta = self.get_artifact(workspace_duckdb_path=workspace_duckdb_path, artifact_id=artifact_id)
+        meta = self.get_artifact(
+            workspace_duckdb_path=workspace_duckdb_path, artifact_id=artifact_id
+        )
         if meta is None or meta.get("kind") != "dataframe":
             return None
         table_name = str(meta.get("table_name") or "").strip()
@@ -659,7 +705,9 @@ class ArtifactScratchpadStore:
 
             kind = str(row[0] or "")
             table_name = str(row[1] or "").strip()
-            con.execute("DELETE FROM artifact_manifest WHERE artifact_id = ?", [artifact_id])
+            con.execute(
+                "DELETE FROM artifact_manifest WHERE artifact_id = ?", [artifact_id]
+            )
             if kind == "dataframe" and table_name:
                 escaped = table_name.replace('"', '""')
                 try:

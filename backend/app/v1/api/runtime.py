@@ -9,7 +9,7 @@ import re
 import shlex
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import duckdb
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -43,7 +43,10 @@ from .deps import ensure_appdata_principal, get_current_user
 from ...core.prompt_library import get_prompt
 from ...services.llm_service import LLMService
 from ...services.llm_runtime_config import load_llm_runtime_config
-from ...services.llm_provider_catalog import normalize_llm_provider, provider_requires_api_key
+from ...services.llm_provider_catalog import (
+    normalize_llm_provider,
+    provider_requires_api_key,
+)
 from ...services.execution_config import load_execution_runtime_config
 from ...services.runner_env import install_runner_package
 from ...services.terminal_executor import (
@@ -60,7 +63,9 @@ from ..services.command_service import (
     parse_command_text,
 )
 
-router = APIRouter(tags=["V1 Runtime"], dependencies=[Depends(ensure_appdata_principal)])
+router = APIRouter(
+    tags=["V1 Runtime"], dependencies=[Depends(ensure_appdata_principal)]
+)
 
 
 def _default_variable_bundle() -> dict[str, dict[str, Any]]:
@@ -87,12 +92,18 @@ def _parse_grid_query_model(
     try:
         parsed = json.loads(text)
     except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=422, detail=f"Invalid {field_name} JSON payload.") from exc
+        raise HTTPException(
+            status_code=422, detail=f"Invalid {field_name} JSON payload."
+        ) from exc
     if expected_kind is list and not isinstance(parsed, list):
-        raise HTTPException(status_code=422, detail=f"{field_name} must be a JSON array.")
+        raise HTTPException(
+            status_code=422, detail=f"{field_name} must be a JSON array."
+        )
     if expected_kind is dict and not isinstance(parsed, dict):
-        raise HTTPException(status_code=422, detail=f"{field_name} must be a JSON object.")
-    return parsed
+        raise HTTPException(
+            status_code=422, detail=f"{field_name} must be a JSON object."
+        )
+    return cast(list[Any] | dict[str, Any], parsed)
 
 
 def _normalize_search_query(raw_value: Any) -> str | None:
@@ -185,8 +196,12 @@ class ArtifactDeleteResponse(BaseModel):
 
 class TerminalExecuteRequest(BaseModel):
     command: str = Field(..., min_length=1, description="Shell command to run")
-    cwd: str | None = Field(default=None, description="Optional working directory override")
-    timeout: int = Field(120, ge=1, le=600, description="Max command execution time in seconds")
+    cwd: str | None = Field(
+        default=None, description="Optional working directory override"
+    )
+    timeout: int = Field(
+        120, ge=1, le=600, description="Max command execution time in seconds"
+    )
 
 
 class TerminalExecuteResponse(BaseModel):
@@ -207,9 +222,13 @@ class TerminalSessionResetResponse(BaseModel):
 
 class RunnerPackageInstallRequest(BaseModel):
     workspace_id: str
-    package: str = Field(..., min_length=1, description="Package name without version specifier")
+    package: str = Field(
+        ..., min_length=1, description="Package name without version specifier"
+    )
     version: str = Field(..., min_length=1, description="Exact package version")
-    index_url: str | None = Field(default=None, description="Optional package index URL")
+    index_url: str | None = Field(
+        default=None, description="Optional package index URL"
+    )
     save_as_default: bool = Field(
         default=False,
         description="Persist package/index settings to inquira.toml runner defaults",
@@ -374,25 +393,44 @@ def _validate_runner_install_request(
             detail="Invalid package version. Exact pinned versions only (e.g., 2.2.3).",
         )
     if any(token in package_name for token in ["<", ">", "=", "!", "~", " "]):
-        raise HTTPException(status_code=400, detail="Package name must not include a version specifier.")
+        raise HTTPException(
+            status_code=400, detail="Package name must not include a version specifier."
+        )
     if any(token in version for token in ["<", ">", "=", "!", "~", " "]):
-        raise HTTPException(status_code=400, detail="Version must be exact and must not include comparison operators.")
+        raise HTTPException(
+            status_code=400,
+            detail="Version must be exact and must not include comparison operators.",
+        )
 
-    if index_url and not (index_url.startswith("http://") or index_url.startswith("https://")):
-        raise HTTPException(status_code=400, detail="index_url must start with http:// or https://")
+    if index_url and not (
+        index_url.startswith("http://") or index_url.startswith("https://")
+    ):
+        raise HTTPException(
+            status_code=400, detail="index_url must start with http:// or https://"
+        )
 
-    allowlist = [p.strip().lower() for p in (config.runner_package_allowlist or []) if p.strip()]
-    denylist = [p.strip().lower() for p in (config.runner_package_denylist or []) if p.strip()]
+    allowlist = [
+        p.strip().lower() for p in (config.runner_package_allowlist or []) if p.strip()
+    ]
+    denylist = [
+        p.strip().lower() for p in (config.runner_package_denylist or []) if p.strip()
+    ]
     package_lower = package_name.lower()
 
     if allowlist and package_lower not in allowlist:
-        raise HTTPException(status_code=403, detail="Package is not allowed by runner package policy.")
+        raise HTTPException(
+            status_code=403, detail="Package is not allowed by runner package policy."
+        )
     if package_lower in denylist:
-        raise HTTPException(status_code=403, detail="Package is blocked by runner package policy.")
+        raise HTTPException(
+            status_code=403, detail="Package is blocked by runner package policy."
+        )
 
     max_packages = max(1, int(config.runner_install_max_packages_per_request or 1))
     if max_packages < 1:
-        raise HTTPException(status_code=400, detail="Runner install policy is misconfigured.")
+        raise HTTPException(
+            status_code=400, detail="Runner install policy is misconfigured."
+        )
 
     package_spec = f"{package_name}=={version}"
     return package_spec, index_url
@@ -408,7 +446,9 @@ def _runner_toml_path() -> Path:
 def _persist_runner_defaults(package_spec: str, index_url: str | None) -> None:
     path = _runner_toml_path()
     if not path.exists():
-        raise RuntimeError(f"Cannot persist runner defaults; config file not found: {path}")
+        raise RuntimeError(
+            f"Cannot persist runner defaults; config file not found: {path}"
+        )
 
     text = path.read_text(encoding="utf-8")
     lines = text.splitlines()
@@ -424,7 +464,7 @@ def _persist_runner_defaults(package_spec: str, index_url: str | None) -> None:
         if lines and lines[-1].strip():
             lines.append("")
         lines.append("[execution.runner]")
-        lines.append('packages = []')
+        lines.append("packages = []")
         section_start = len(lines) - 2
         section_end = len(lines)
     else:
@@ -649,10 +689,15 @@ async def _persist_command_turn(
 ) -> str:
     conversation_id = str(getattr(conversation, "id", "") or "").strip()
     if not conversation_id:
-        raise HTTPException(status_code=500, detail="Conversation initialization failed")
+        raise HTTPException(
+            status_code=500, detail="Conversation initialization failed"
+        )
 
     seq_no = await ConversationRepository.next_seq_no(session, conversation_id)
-    if seq_no == 1 and (str(getattr(conversation, "title", "") or "").strip().lower() == "new conversation"):
+    if seq_no == 1 and (
+        str(getattr(conversation, "title", "") or "").strip().lower()
+        == "new conversation"
+    ):
         conversation.title = _derive_command_conversation_title(command_text)
 
     assistant_text = str(command_output or "").strip() or f"Executed /{command_name}."
@@ -666,7 +711,9 @@ async def _persist_command_turn(
         columns = command_result.get("columns")
         row_count = command_result.get("row_count")
         metadata["result"] = {
-            "columns": [str(col) for col in columns[:20]] if isinstance(columns, list) else [],
+            "columns": [str(col) for col in columns[:20]]
+            if isinstance(columns, list)
+            else [],
             "row_count": int(row_count) if isinstance(row_count, int) else None,
         }
 
@@ -741,7 +788,9 @@ def _ensure_workspace_db_exists_or_raise(duckdb_path: str) -> None:
         return
     if not _is_managed_workspace_path(str(resolved)):
         return
-    raise HTTPException(status_code=409, detail=_workspace_db_missing_detail(str(resolved)))
+    raise HTTPException(
+        status_code=409, detail=_workspace_db_missing_detail(str(resolved))
+    )
 
 
 def _build_inline_artifact_fallback(
@@ -809,7 +858,9 @@ async def get_workspace_paths(
     )
 
 
-@router.get("/workspaces/{workspace_id}/columns", response_model=WorkspaceColumnsResponse)
+@router.get(
+    "/workspaces/{workspace_id}/columns", response_model=WorkspaceColumnsResponse
+)
 async def get_workspace_columns(
     workspace_id: str,
     session: AsyncSession = Depends(get_appdata_db_session),
@@ -818,13 +869,19 @@ async def get_workspace_columns(
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
     try:
-        columns = await asyncio.to_thread(_read_workspace_columns, str(workspace.duckdb_path))
+        columns = await asyncio.to_thread(
+            _read_workspace_columns, str(workspace.duckdb_path)
+        )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to load workspace columns: {str(exc)}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"Failed to load workspace columns: {str(exc)}"
+        ) from exc
     return WorkspaceColumnsResponse(columns=columns)
 
 
-@router.get("/workspaces/{workspace_id}/commands", response_model=CommandCatalogResponse)
+@router.get(
+    "/workspaces/{workspace_id}/commands", response_model=CommandCatalogResponse
+)
 async def list_workspace_commands(
     workspace_id: str,
     session: AsyncSession = Depends(get_appdata_db_session),
@@ -834,7 +891,9 @@ async def list_workspace_commands(
     return CommandCatalogResponse(commands=list_command_definitions())
 
 
-@router.post("/workspaces/{workspace_id}/commands/execute", response_model=CommandExecuteResponse)
+@router.post(
+    "/workspaces/{workspace_id}/commands/execute", response_model=CommandExecuteResponse
+)
 async def execute_workspace_slash_command(
     workspace_id: str,
     payload: CommandExecuteRequest,
@@ -858,7 +917,9 @@ async def execute_workspace_slash_command(
         parsed_name = str(payload.name or "").strip().lower()
         raw_args = str(payload.raw_args or "").strip()
         if not parsed_name:
-            raise HTTPException(status_code=400, detail="Provide either command text or command name.")
+            raise HTTPException(
+                status_code=400, detail="Provide either command text or command name."
+            )
         try:
             args = shlex.split(raw_args) if raw_args else []
         except ValueError:
@@ -896,7 +957,9 @@ async def execute_workspace_slash_command(
             command_name=parsed_name or "command",
             error_detail=detail,
         )
-        raise HTTPException(status_code=400, detail=f"Command execution failed: {str(exc)}") from exc
+        raise HTTPException(
+            status_code=400, detail=f"Command execution failed: {str(exc)}"
+        ) from exc
     except Exception as exc:
         detail = f"Command execution failed: {str(exc)}"
         await _persist_failed_command_turn_best_effort(
@@ -908,7 +971,9 @@ async def execute_workspace_slash_command(
             command_name=parsed_name or "command",
             error_detail=detail,
         )
-        raise HTTPException(status_code=500, detail=f"Command execution failed: {str(exc)}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"Command execution failed: {str(exc)}"
+        ) from exc
 
     conversation = await _resolve_or_create_command_conversation(
         session=session,
@@ -925,7 +990,9 @@ async def execute_workspace_slash_command(
         command_name=str(result.get("name") or parsed_name),
         command_output=str(result.get("output") or ""),
         command_result_type=str(result.get("result_type") or "message"),
-        command_result=result.get("result") if isinstance(result.get("result"), dict) else None,
+        command_result=result.get("result")
+        if isinstance(result.get("result"), dict)
+        else None,
         truncated=bool(result.get("truncated")),
     )
 
@@ -999,8 +1066,12 @@ async def get_workspace_dataframe_artifact_rows(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=1000, ge=1, le=1000),
     sort_model: str | None = Query(default=None, description="AG Grid sort model JSON"),
-    filter_model: str | None = Query(default=None, description="AG Grid filter model JSON"),
-    search: str | None = Query(default=None, description="Global text search applied across columns"),
+    filter_model: str | None = Query(
+        default=None, description="AG Grid filter model JSON"
+    ),
+    search: str | None = Query(
+        default=None, description="Global text search applied across columns"
+    ),
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
@@ -1024,22 +1095,24 @@ async def get_workspace_dataframe_artifact_rows(
             artifact_id=artifact_id,
             offset=offset,
             limit=limit,
-            sort_model=parsed_sort_model,
-            filter_model=parsed_filter_model,
+            sort_model=cast(list[dict[str, Any]], parsed_sort_model),
+            filter_model=cast(dict[str, Any], parsed_filter_model),
             search_text=search_text,
         )
     except duckdb.IOException as exc:
         message = str(exc)
         if "Conflicting lock is held" not in message:
-            raise HTTPException(status_code=503, detail=f"Artifact store unavailable: {message}") from exc
+            raise HTTPException(
+                status_code=503, detail=f"Artifact store unavailable: {message}"
+            ) from exc
         # Kernel path shares the in-process scratchpad connection, so use it as lock-safe fallback.
         rows = await get_workspace_dataframe_rows(
             workspace_id=workspace_id,
             artifact_id=artifact_id,
             offset=offset,
             limit=limit,
-            sort_model=parsed_sort_model,
-            filter_model=parsed_filter_model,
+            sort_model=cast(list[dict[str, Any]], parsed_sort_model),
+            filter_model=cast(dict[str, Any], parsed_filter_model),
             search_text=search_text,
         )
     if rows is None:
@@ -1057,8 +1130,12 @@ async def get_workspace_artifact_rows(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=1000, ge=1, le=1000),
     sort_model: str | None = Query(default=None, description="AG Grid sort model JSON"),
-    filter_model: str | None = Query(default=None, description="AG Grid filter model JSON"),
-    search: str | None = Query(default=None, description="Global text search applied across columns"),
+    filter_model: str | None = Query(
+        default=None, description="AG Grid filter model JSON"
+    ),
+    search: str | None = Query(
+        default=None, description="Global text search applied across columns"
+    ),
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
@@ -1082,21 +1159,23 @@ async def get_workspace_artifact_rows(
             artifact_id=artifact_id,
             offset=offset,
             limit=limit,
-            sort_model=parsed_sort_model,
-            filter_model=parsed_filter_model,
+            sort_model=cast(list[dict[str, Any]], parsed_sort_model),
+            filter_model=cast(dict[str, Any], parsed_filter_model),
             search_text=search_text,
         )
     except duckdb.IOException as exc:
         message = str(exc)
         if "Conflicting lock is held" not in message:
-            raise HTTPException(status_code=503, detail=f"Artifact store unavailable: {message}") from exc
+            raise HTTPException(
+                status_code=503, detail=f"Artifact store unavailable: {message}"
+            ) from exc
         rows = await get_workspace_dataframe_rows(
             workspace_id=workspace_id,
             artifact_id=artifact_id,
             offset=offset,
             limit=limit,
-            sort_model=parsed_sort_model,
-            filter_model=parsed_filter_model,
+            sort_model=cast(list[dict[str, Any]], parsed_sort_model),
+            filter_model=cast(dict[str, Any], parsed_filter_model),
             search_text=search_text,
         )
     if rows is None:
@@ -1122,7 +1201,9 @@ async def get_workspace_artifact_usage(
         )
     except duckdb.IOException as exc:
         if "Conflicting lock is held" not in str(exc):
-            raise HTTPException(status_code=503, detail=f"Artifact usage unavailable: {exc}") from exc
+            raise HTTPException(
+                status_code=503, detail=f"Artifact usage unavailable: {exc}"
+            ) from exc
         usage = await get_workspace_artifact_usage_via_kernel(workspace_id)
 
     duckdb_bytes = max(0, int(usage.get("duckdb_bytes") or 0))
@@ -1162,7 +1243,9 @@ async def get_workspace_artifact_metadata(
     except duckdb.IOException as exc:
         message = str(exc)
         if "Conflicting lock is held" not in message:
-            raise HTTPException(status_code=503, detail=f"Artifact store unavailable: {message}") from exc
+            raise HTTPException(
+                status_code=503, detail=f"Artifact store unavailable: {message}"
+            ) from exc
         # Lock-safe fallback: query through the kernel's in-process scratchpad connection.
         artifact = await get_workspace_artifact_metadata_via_kernel(
             workspace_id=workspace_id,
@@ -1194,7 +1277,9 @@ async def delete_workspace_artifact(
     except duckdb.IOException as exc:
         message = str(exc)
         if "Conflicting lock is held" not in message:
-            raise HTTPException(status_code=503, detail=f"Artifact store unavailable: {message}") from exc
+            raise HTTPException(
+                status_code=503, detail=f"Artifact store unavailable: {message}"
+            ) from exc
         deleted = await delete_workspace_artifact_via_kernel(
             workspace_id=workspace_id,
             artifact_id=artifact_id,
@@ -1210,7 +1295,10 @@ async def delete_workspace_artifact(
 )
 async def list_workspace_artifacts(
     workspace_id: str,
-    kind: str | None = Query(default=None, description="Filter by artifact kind, e.g. 'dataframe' or 'figure'"),
+    kind: str | None = Query(
+        default=None,
+        description="Filter by artifact kind, e.g. 'dataframe' or 'figure'",
+    ),
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
@@ -1224,7 +1312,9 @@ async def list_workspace_artifacts(
         )
     except duckdb.IOException as exc:
         if "Conflicting lock is held" not in str(exc):
-            raise HTTPException(status_code=503, detail=f"Artifact store unavailable: {exc}") from exc
+            raise HTTPException(
+                status_code=503, detail=f"Artifact store unavailable: {exc}"
+            ) from exc
         # Lock-safe fallback: query through the kernel's in-process scratchpad connection.
         items = await list_workspace_artifacts_via_kernel(workspace_id, kind=kind)
     summaries = [
@@ -1242,13 +1332,17 @@ async def list_workspace_artifacts(
     return WorkspaceArtifactListResponse(artifacts=summaries, total=len(summaries))
 
 
-@router.post("/runtime/runner/packages/install", response_model=RunnerPackageInstallResponse)
+@router.post(
+    "/runtime/runner/packages/install", response_model=RunnerPackageInstallResponse
+)
 async def install_runner_runtime_package(
     payload: RunnerPackageInstallRequest,
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
-    workspace = await _require_workspace_access(session, current_user.id, payload.workspace_id)
+    workspace = await _require_workspace_access(
+        session, current_user.id, payload.workspace_id
+    )
     runtime = load_execution_runtime_config()
     package_spec, index_url = _validate_runner_install_request(payload, runtime)
 
@@ -1354,9 +1448,18 @@ async def stream_workspace_terminal_command_sse(
             ):
                 event_type = str(event.get("type") or "")
                 if event_type == "output":
-                    yield _format_sse_event("output", {"line": str(event.get("line") or "")})
+                    yield _format_sse_event(
+                        "output", {"line": str(event.get("line") or "")}
+                    )
                 elif event_type == "error":
-                    yield _format_sse_event("error", {"detail": str(event.get("error") or "Terminal execution failed.")})
+                    yield _format_sse_event(
+                        "error",
+                        {
+                            "detail": str(
+                                event.get("error") or "Terminal execution failed."
+                            )
+                        },
+                    )
                     return
                 elif event_type == "final":
                     result = event.get("result") or {}
@@ -1443,7 +1546,10 @@ async def bootstrap_workspace_runtime_endpoint(
         )
 
     try:
-        await _progress("workspace_runtime_start", f"Preparing runtime for workspace {workspace_id}...")
+        await _progress(
+            "workspace_runtime_start",
+            f"Preparing runtime for workspace {workspace_id}...",
+        )
         ready = await bootstrap_workspace_runtime(
             workspace_id=workspace_id,
             workspace_duckdb_path=str(workspace.duckdb_path),
@@ -1514,7 +1620,9 @@ async def restart_workspace_kernel_runtime(
     return await _restart_workspace_kernel(workspace_id, workspace)
 
 
-async def _restart_workspace_kernel(workspace_id: str, workspace: Any) -> KernelResetResponse:
+async def _restart_workspace_kernel(
+    workspace_id: str, workspace: Any
+) -> KernelResetResponse:
     """Shared reset/restart flow: reset session then warm-start kernel."""
     _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
     await reset_workspace_kernel(workspace_id)
@@ -1548,7 +1656,9 @@ async def get_workspace_dataset_schema(
         workspace_id=workspace_id,
         table_name=normalized,
     )
-    if dataset is None and not _table_exists_in_workspace_db(workspace.duckdb_path, normalized):
+    if dataset is None and not _table_exists_in_workspace_db(
+        workspace.duckdb_path, normalized
+    ):
         raise HTTPException(status_code=404, detail="Dataset table not found")
 
     if dataset is not None and dataset.schema_path:
@@ -1663,11 +1773,15 @@ async def regenerate_workspace_dataset_schema(
         workspace_id=workspace_id,
         table_name=normalized,
     )
-    if dataset is None and not _table_exists_in_workspace_db(workspace.duckdb_path, normalized):
+    if dataset is None and not _table_exists_in_workspace_db(
+        workspace.duckdb_path, normalized
+    ):
         raise HTTPException(status_code=404, detail="Dataset table not found")
 
     prefs = await PreferencesRepository.get_or_create(session, current_user.id)
-    context = (payload.context if payload.context is not None else prefs.schema_context) or "General data analysis"
+    context = (
+        payload.context if payload.context is not None else prefs.schema_context
+    ) or "General data analysis"
     model = (payload.model or prefs.selected_model or "google/gemini-2.5-flash").strip()
     provider = normalize_llm_provider(getattr(prefs, "llm_provider", "openrouter"))
     allow_sample_values = bool(prefs.allow_schema_sample_values)
@@ -1694,11 +1808,7 @@ async def regenerate_workspace_dataset_schema(
     except Exception:
         columns = []
 
-    if (
-        not columns
-        and dataset is not None
-        and dataset.schema_path
-    ):
+    if not columns and dataset is not None and dataset.schema_path:
         columns = await asyncio.to_thread(
             _read_columns_from_schema_file,
             dataset.schema_path,
@@ -1706,14 +1816,19 @@ async def regenerate_workspace_dataset_schema(
         )
 
     if not columns:
-        raise HTTPException(status_code=400, detail="No columns found for this dataset table")
+        raise HTTPException(
+            status_code=400, detail="No columns found for this dataset table"
+        )
 
     columns_text = "\n".join(
-        [f"- {col['name']} ({col['dtype']}): {(col.get('samples') or [])[:3]}" for col in columns]
+        [
+            f"- {col['name']} ({col['dtype']}): {(col.get('samples') or [])[:3]}"
+            for col in columns
+        ]
     )
     prompt = get_prompt("schema_generation", context=context, columns_text=columns_text)
 
-    llm_service = LLMService(api_key=api_key, provider=provider, model=model)
+    llm_service = LLMService(api_key=api_key or "", provider=provider, model=model)
     runtime = load_llm_runtime_config()
     try:
         schema_response = await asyncio.to_thread(
@@ -1730,8 +1845,7 @@ async def regenerate_workspace_dataset_schema(
         ) from exc
     except Exception as exc:
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to generate schema via LLM: {str(exc)}"
+            status_code=500, detail=f"Failed to generate schema via LLM: {str(exc)}"
         ) from exc
 
     generated_items = (
@@ -1742,23 +1856,25 @@ async def regenerate_workspace_dataset_schema(
     generated_by_name: dict[str, dict[str, Any]] = {}
     generated_by_normalized_name: dict[str, dict[str, Any]] = {}
     for item in generated_items:
-        name = str(getattr(item, "name", "")).strip()
-        description = str(getattr(item, "description", "")).strip()
-        aliases = _normalize_alias_list(getattr(item, "aliases", []))
-        if not name:
+        g_name = str(getattr(item, "name", "")).strip()
+        g_description = str(getattr(item, "description", "")).strip()
+        g_aliases = _normalize_alias_list(getattr(item, "aliases", []))
+        if not g_name:
             continue
-        payload = {"description": description, "aliases": aliases}
-        generated_by_name[name] = payload
-        normalized_name = _normalize_schema_item_name(name)
+        g_payload = {"description": g_description, "aliases": g_aliases}
+        generated_by_name[g_name] = g_payload
+        normalized_name = _normalize_schema_item_name(g_name)
         if normalized_name and normalized_name not in generated_by_normalized_name:
-            generated_by_normalized_name[normalized_name] = payload
+            generated_by_normalized_name[normalized_name] = g_payload
 
     merged_columns = [
         {
             "name": col["name"],
             "dtype": col["dtype"],
             "description": (
-                str(generated_by_name.get(col["name"], {}).get("description", "")).strip()
+                str(
+                    generated_by_name.get(col["name"], {}).get("description", "")
+                ).strip()
                 or str(
                     generated_by_normalized_name.get(
                         _normalize_schema_item_name(col["name"]),
@@ -1769,7 +1885,9 @@ async def regenerate_workspace_dataset_schema(
             ),
             "samples": col.get("samples", []),
             "aliases": (
-                _normalize_alias_list(generated_by_name.get(col["name"], {}).get("aliases", []))
+                _normalize_alias_list(
+                    generated_by_name.get(col["name"], {}).get("aliases", [])
+                )
                 or _normalize_alias_list(
                     generated_by_normalized_name.get(
                         _normalize_schema_item_name(col["name"]),
@@ -1795,7 +1913,7 @@ async def regenerate_workspace_dataset_schema(
         "columns": merged_columns,
     }
     from datetime import date, datetime
-    
+
     class DateTimeEncoder(json.JSONEncoder):
         def default(self, obj):
             if isinstance(obj, (datetime, date)):
@@ -1854,7 +1972,9 @@ def _validate_terminal_cwd(cwd: str | None, workspace_dir: str) -> None:
         return
     base = Path(workspace_dir).resolve()
     requested = Path(cwd).expanduser()
-    resolved = requested.resolve() if requested.is_absolute() else (base / requested).resolve()
+    resolved = (
+        requested.resolve() if requested.is_absolute() else (base / requested).resolve()
+    )
     try:
         resolved.relative_to(base)
     except ValueError as exc:
@@ -1876,11 +1996,16 @@ def _enforce_terminal_command_policy(command: str, config: Any) -> None:
         )
 
     denylist = list(_DEFAULT_TERMINAL_DENYLIST)
-    denylist.extend([p for p in (config.terminal_command_denylist or []) if str(p).strip()])
+    denylist.extend(
+        [p for p in (config.terminal_command_denylist or []) if str(p).strip()]
+    )
     for pattern in denylist:
         try:
             if re.search(pattern, trimmed):
-                raise HTTPException(status_code=400, detail="Command blocked by terminal security policy.")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Command blocked by terminal security policy.",
+                )
         except re.error:
             continue
 

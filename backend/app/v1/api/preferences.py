@@ -14,6 +14,7 @@ from ..schemas.preferences import (
     ApiKeyUpdateRequest,
     PreferencesResponse,
     PreferencesUpdateRequest,
+    ProviderModelCatalog,
 )
 from ..services.secret_storage_service import SecretStorageService
 from ...services.llm_provider_catalog import (
@@ -58,12 +59,16 @@ def _load_enabled_models(raw_json: str, provider: str) -> list[str]:
 def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesResponse:
     provider = normalize_llm_provider(getattr(prefs, "llm_provider", "openrouter"))
     catalog = provider_model_catalog(provider)
-    enabled_models = _load_enabled_models(getattr(prefs, "enabled_main_models_json", "[]"), provider)
+    enabled_models = _load_enabled_models(
+        getattr(prefs, "enabled_main_models_json", "[]"), provider
+    )
     selected_model = str(getattr(prefs, "selected_model", "") or "").strip()
     if selected_model not in enabled_models:
         selected_model = catalog["default_main_model"]
         if selected_model not in enabled_models:
-            selected_model = enabled_models[0] if enabled_models else catalog["default_main_model"]
+            selected_model = (
+                enabled_models[0] if enabled_models else catalog["default_main_model"]
+            )
     selected_lite_model = str(getattr(prefs, "selected_lite_model", "") or "").strip()
     if selected_lite_model not in catalog["lite_models"]:
         selected_lite_model = catalog["default_lite_model"]
@@ -89,7 +94,10 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
         available_models=enabled_models,
         provider_available_main_models=list(catalog["main_models"]),
         provider_available_lite_models=list(catalog["lite_models"]),
-        provider_model_catalogs=all_provider_model_catalogs(),
+        provider_model_catalogs={
+            p: ProviderModelCatalog(**c)
+            for p, c in all_provider_model_catalogs().items()
+        },
         api_key_present_by_provider=api_key_presence,
         selected_provider_requires_api_key=requires_api_key,
         selected_provider_api_key_present=selected_key_present,
@@ -135,9 +143,13 @@ async def update_preferences(
                 continue
             seen.add(value)
             cleaned.append(value)
-        prefs.enabled_main_models_json = json.dumps(cleaned or list(catalog["main_models"]))
+        prefs.enabled_main_models_json = json.dumps(
+            cleaned or list(catalog["main_models"])
+        )
 
-    enabled_models = _load_enabled_models(getattr(prefs, "enabled_main_models_json", "[]"), provider)
+    enabled_models = _load_enabled_models(
+        getattr(prefs, "enabled_main_models_json", "[]"), provider
+    )
     if payload.selected_model is not None:
         selected_model = str(payload.selected_model or "").strip()
         if selected_model in enabled_models:
@@ -167,10 +179,17 @@ async def update_preferences(
 
     if str(getattr(prefs, "selected_model", "") or "").strip() not in enabled_models:
         prefs.selected_model = (
-            enabled_models[0] if enabled_models else provider_model_catalog(provider)["default_main_model"]
+            enabled_models[0]
+            if enabled_models
+            else provider_model_catalog(provider)["default_main_model"]
         )
-    if str(getattr(prefs, "selected_lite_model", "") or "").strip() not in catalog["lite_models"]:
-        prefs.selected_lite_model = provider_model_catalog(provider)["default_lite_model"]
+    if (
+        str(getattr(prefs, "selected_lite_model", "") or "").strip()
+        not in catalog["lite_models"]
+    ):
+        prefs.selected_lite_model = provider_model_catalog(provider)[
+            "default_lite_model"
+        ]
 
     await session.commit()
     key_presence = SecretStorageService.get_api_key_presence_map(
@@ -193,8 +212,12 @@ async def set_api_key(
     except RuntimeError as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail="Failed to persist API key in OS keychain.") from exc
-    return MessageResponse(message=f"API key for provider '{provider}' saved to OS keychain.")
+        raise HTTPException(
+            status_code=500, detail="Failed to persist API key in OS keychain."
+        ) from exc
+    return MessageResponse(
+        message=f"API key for provider '{provider}' saved to OS keychain."
+    )
 
 
 @router.delete("/api-key", response_model=MessageResponse)
@@ -204,9 +227,14 @@ async def delete_api_key(
     current_user=Depends(get_current_user),
 ):
     prefs = await PreferencesRepository.get_or_create(session, current_user.id)
-    selected_provider = normalize_llm_provider(provider or getattr(prefs, "llm_provider", "openrouter"))
+    default_provider = str(getattr(prefs, "llm_provider", "openrouter") or "openrouter")
+    selected_provider = normalize_llm_provider(str(provider or default_provider))
     try:
         SecretStorageService.delete_api_key(current_user.id, provider=selected_provider)
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail="Failed to remove API key from OS keychain.") from exc
-    return MessageResponse(message=f"API key for provider '{selected_provider}' removed from OS keychain.")
+        raise HTTPException(
+            status_code=500, detail="Failed to remove API key from OS keychain."
+        ) from exc
+    return MessageResponse(
+        message=f"API key for provider '{selected_provider}' removed from OS keychain."
+    )
