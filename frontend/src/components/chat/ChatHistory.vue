@@ -131,7 +131,7 @@
                 Open Code
               </button>
             </div>
-            <pre class="chat-code-scroll"><code>{{ message.codeSnapshot }}</code></pre>
+            <pre class="chat-code-scroll"><code class="language-python" v-html="renderCodeSnapshot(message.codeSnapshot)"></code></pre>
           </div>
 
           <details v-if="message.toolEvents && message.toolEvents.length" class="mt-3 rounded p-2" style="border: 1px solid var(--color-border);">
@@ -435,6 +435,19 @@ function renderMarkdown(text) {
       'rx',
       'd'
     ]
+  })
+}
+
+function renderCodeSnapshot(code) {
+  const rawCode = String(code || '')
+  if (!rawCode) return ''
+  const grammar = Prism.languages.python
+  const highlighted = grammar
+    ? Prism.highlight(rawCode, grammar, 'python')
+    : md.utils.escapeHtml(rawCode)
+  return DOMPurify.sanitize(highlighted, {
+    ALLOWED_TAGS: ['span'],
+    ALLOWED_ATTR: ['class']
   })
 }
 
