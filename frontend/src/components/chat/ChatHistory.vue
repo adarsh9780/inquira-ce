@@ -236,6 +236,7 @@ const SHOW_EPHEMERAL_TRACE = false
 const showScrollToBottomButton = ref(false)
 let shouldAutoScroll = true
 let mutationObserver = null
+let lastScrollTop = 0
 
 const lastMessageId = computed(() => appStore.chatHistory.at(-1)?.id)
 
@@ -351,6 +352,7 @@ onMounted(() => {
   // Listen for scroll events on the scrollable container
   const container = getScrollContainer()
   if (container) {
+    lastScrollTop = container.scrollTop
     container.addEventListener('scroll', handleScroll, { passive: true })
     container.addEventListener('click', handleChatContainerClick)
   }
@@ -646,17 +648,30 @@ function getScrollContainer() {
   return scrollHost.value || chatContainer.value
 }
 
-function updateScrollState() {
+function updateScrollState(options = {}) {
+  const fromUserScroll = options?.fromUserScroll === true
+  const previousTop = Number.isFinite(options?.previousTop) ? options.previousTop : lastScrollTop
   const container = getScrollContainer()
   if (!container) {
     shouldAutoScroll = true
     showScrollToBottomButton.value = false
+    lastScrollTop = 0
     return
   }
   const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
-  const isNearBottomNow = distanceFromBottom < SCROLL_THRESHOLD_PX
-  shouldAutoScroll = isNearBottomNow
+  const isNearBottomNow = distanceFromBottom <= SCROLL_THRESHOLD_PX
+  if (fromUserScroll) {
+    if (container.scrollTop < previousTop && distanceFromBottom > 0) {
+      // Any manual upward scroll should pause auto-follow immediately.
+      shouldAutoScroll = false
+    } else if (isNearBottomNow) {
+      shouldAutoScroll = true
+    }
+  } else {
+    shouldAutoScroll = isNearBottomNow
+  }
   showScrollToBottomButton.value = distanceFromBottom > SHOW_SCROLL_BUTTON_THRESHOLD_PX
+  lastScrollTop = container.scrollTop
 }
 
 function scrollToBottom(options = {}) {
@@ -665,32 +680,41 @@ function scrollToBottom(options = {}) {
   nextTick(() => {
     const container = getScrollContainer()
     const endEl = end.value
-    if (!endEl) return
     if (!container) return
     const behavior = resolvedBehavior
     if (force) {
       shouldAutoScroll = true
       showScrollToBottomButton.value = false
-      if (typeof container.scrollTo === 'function') {
-        container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
-      }
     }
+    if (typeof container.scrollTo === 'function') {
+      container.scrollTo({ top: container.scrollHeight, behavior })
+      if (force && behavior === 'auto') {
+        // Hydrated history needs one hard align pass after layout settles.
+        window.requestAnimationFrame(() => {
+          container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
+          updateScrollState()
+        })
+        return
+      }
+      window.requestAnimationFrame(() => {
+        updateScrollState()
+      })
+      return
+    }
+    if (!endEl) return
     endEl.scrollIntoView({ behavior, block: 'end' })
     window.requestAnimationFrame(() => {
-      if (force && typeof container.scrollTo === 'function') {
-        container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
-      }
       updateScrollState()
     })
   })
 }
 
 function handleScroll() {
-  updateScrollState()
+  updateScrollState({ fromUserScroll: true, previousTop: lastScrollTop })
 }
 
 function handleScrollToBottomClick() {
-  scrollToBottom({ behavior: 'smooth', force: true })
+  scrollToBottom({ behavior: 'auto', force: true })
 }
 
 async function copyCodeFromBlock(copyButton) {

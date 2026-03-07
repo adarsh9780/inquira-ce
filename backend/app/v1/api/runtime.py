@@ -417,7 +417,7 @@ def _normalize_schema_columns(raw: Any) -> list[dict[str, Any]]:
 
 
 def _table_exists_in_workspace_db(duckdb_path: str, table_name: str) -> bool:
-    con = duckdb.connect(duckdb_path)
+    con = duckdb.connect(duckdb_path, read_only=True)
     try:
         row = con.execute(
             """
@@ -434,7 +434,7 @@ def _table_exists_in_workspace_db(duckdb_path: str, table_name: str) -> bool:
 
 
 def _read_workspace_columns(duckdb_path: str) -> list[dict[str, str]]:
-    con = duckdb.connect(duckdb_path)
+    con = duckdb.connect(duckdb_path, read_only=True)
     try:
         rows = con.execute(
             """
@@ -462,7 +462,7 @@ def _read_table_columns_for_prompt(
     table_name: str,
     allow_sample_values: bool,
 ) -> list[dict[str, Any]]:
-    con = duckdb.connect(duckdb_path)
+    con = duckdb.connect(duckdb_path, read_only=True)
     try:
         rows = con.execute(f'DESCRIBE "{table_name}"').fetchall()
         columns: list[dict[str, Any]] = []
@@ -1290,7 +1290,7 @@ async def get_workspace_dataset_schema(
                 # Fall back to DuckDB introspection when saved schema metadata is unreadable.
                 pass
 
-    con = duckdb.connect(workspace.duckdb_path)
+    con = duckdb.connect(workspace.duckdb_path, read_only=True)
     try:
         rows = con.execute(f'DESCRIBE "{normalized}"').fetchall()
     except Exception as exc:

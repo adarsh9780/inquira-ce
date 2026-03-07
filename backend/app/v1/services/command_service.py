@@ -669,7 +669,7 @@ def execute_workspace_command(
             "truncated": result.truncated,
         }
 
-    con = duckdb.connect(str(duckdb_path))
+    con = duckdb.connect(str(duckdb_path), read_only=True)
     try:
         catalog = _build_catalog(con)
         if not catalog.tables:
