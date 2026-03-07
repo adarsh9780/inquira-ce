@@ -33,6 +33,7 @@
           <!-- Delete selected table -->
           <button
             @click="deleteSelectedArtifact"
+            type="button"
             :disabled="!canDeleteSelectedArtifact || isDeletingArtifact"
             class="inline-flex items-center px-3 py-1.5 border border-red-200 text-sm leading-4 font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
             :class="(!canDeleteSelectedArtifact || isDeletingArtifact) ? 'opacity-50 cursor-not-allowed' : ''"
@@ -1041,6 +1042,18 @@ async function retrySelectedArtifact() {
   }
 }
 
+async function resolveConfirmation(message) {
+  try {
+    const decision = window.confirm(message)
+    if (decision && typeof decision.then === 'function') {
+      return Boolean(await decision)
+    }
+    return Boolean(decision)
+  } catch (_error) {
+    return false
+  }
+}
+
 async function deleteSelectedArtifact() {
   const workspaceId = String(appStore.activeWorkspaceId || '').trim()
   const artifactId = String(selectedArtifactId.value || '').trim()
@@ -1048,7 +1061,7 @@ async function deleteSelectedArtifact() {
   if (isMemoryArtifactId(artifactId)) return
 
   const artifactLabel = String(selectedArtifactMeta.value?.logical_name || artifactId)
-  const confirmed = window.confirm(`Delete table "${artifactLabel}"? This cannot be undone.`)
+  const confirmed = await resolveConfirmation(`Delete table "${artifactLabel}"? This cannot be undone.`)
   if (!confirmed) return
 
   isDeletingArtifact.value = true
