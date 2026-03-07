@@ -1,10 +1,18 @@
-You will be provided a list of columns, their data types and some sample values along with
-a little context. Your task is to generate the schema information based on the provided information.
+You will be provided a list of columns, their data types and some sample values, along with
+domain context. Generate schema metadata for each column.
 
 Context: {{ context }}
 
 Columns:
 {{ columns_text }}
 
-Please generate a schema description for each column that explains what this column represents
-in the context of the provided domain knowledge.
+For every column, return:
+- `name`: exact column name
+- `description`: what this column represents in this domain
+- `aliases`: exactly 5 alternative phrases users may use for this column
+
+Alias rules:
+- Aliases must be unique across all columns in the same response.
+- Use realistic business/user language from context and samples.
+- Prefer concise noun phrases (1-4 words).
+- Do not repeat the exact column name as an alias unless unavoidable.

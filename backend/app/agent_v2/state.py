@@ -31,6 +31,7 @@ class AgentInput(TypedDict):
     active_schema: dict[str, Any]
     previous_code: str
     current_code: str
+    known_columns: list[dict[str, str]]
 
 
 class AgentOutput(TypedDict):
@@ -38,6 +39,7 @@ class AgentOutput(TypedDict):
     final_code: str | None
     final_explanation: str | None
     output_contract: list[dict[str, str]]
+    known_columns: list[dict[str, str]]
     route: str
     run_id: str
     metadata: dict[str, Any]
@@ -48,6 +50,7 @@ class AgentState(AgentInput, total=False):
     final_code: str | None
     final_explanation: str | None
     output_contract: list[dict[str, str]]
+    known_columns: list[dict[str, str]]
     metadata: dict[str, Any]
     tool_calls: int
     code_attempts: int
@@ -74,9 +77,26 @@ def build_input_state(
     workspace_id: str,
     user_id: str,
     scratchpad_path: str,
+    known_columns: list[dict[str, str]] | None = None,
     run_id: str | None = None,
     **_: Any,
 ) -> AgentInput:
+    normalized_known_columns: list[dict[str, str]] = []
+    for item in known_columns or []:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        normalized_known_columns.append(
+            {
+                "table_name": str(item.get("table_name") or "").strip(),
+                "name": name,
+                "dtype": str(item.get("dtype") or "").strip(),
+                "description": str(item.get("description") or "").strip(),
+            }
+        )
+
     return AgentInput(
         messages=[HumanMessage(content=question)],
         workspace_id=workspace_id,
@@ -90,4 +110,5 @@ def build_input_state(
         active_schema=dict(schema or {}),
         previous_code=str(current_code or ""),
         current_code=str(current_code or ""),
+        known_columns=normalized_known_columns,
     )

@@ -255,6 +255,7 @@ class RegenerateSchemaRequest(BaseModel):
 class SchemaDescriptionItem(BaseModel):
     name: str
     description: str
+    aliases: list[str] = Field(default_factory=list)
 
 
 class SchemaDescriptionList(BaseModel):
@@ -297,6 +298,25 @@ def _normalize_table_name(raw: str) -> str:
 
 def _normalize_schema_item_name(raw: str) -> str:
     return "".join(c for c in str(raw or "").strip().lower() if c.isalnum())
+
+
+def _normalize_alias_list(raw: Any, *, max_items: int = 5) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        alias = str(item or "").strip()
+        if not alias:
+            continue
+        dedupe = alias.lower()
+        if dedupe in seen:
+            continue
+        seen.add(dedupe)
+        normalized.append(alias)
+        if len(normalized) >= max_items:
+            break
+    return normalized
 
 
 def _validate_runner_install_request(
@@ -486,6 +506,7 @@ def _read_table_columns_for_prompt(
                     "dtype": col_dtype,
                     "samples": samples,
                     "description": "",
+                    "aliases": [],
                 }
             )
         return columns
@@ -525,6 +546,7 @@ def _read_columns_from_schema_file(
                     else []
                 ),
                 "description": str(col.get("description", "")),
+                "aliases": _normalize_alias_list(col.get("aliases", [])),
             }
         )
     return columns
@@ -1488,6 +1510,7 @@ async def get_workspace_dataset_schema(
             "dtype": row[1],
             "description": "",
             "samples": [],
+            "aliases": [],
         }
         for row in rows
     ]
@@ -1639,28 +1662,45 @@ async def regenerate_workspace_dataset_schema(
         if hasattr(schema_response, "schemas")
         else (schema_response if isinstance(schema_response, list) else [])
     )
-    generated_by_name: dict[str, str] = {}
-    generated_by_normalized_name: dict[str, str] = {}
+    generated_by_name: dict[str, dict[str, Any]] = {}
+    generated_by_normalized_name: dict[str, dict[str, Any]] = {}
     for item in generated_items:
         name = str(getattr(item, "name", "")).strip()
         description = str(getattr(item, "description", "")).strip()
+        aliases = _normalize_alias_list(getattr(item, "aliases", []))
         if not name:
             continue
-        generated_by_name[name] = description
+        payload = {"description": description, "aliases": aliases}
+        generated_by_name[name] = payload
         normalized_name = _normalize_schema_item_name(name)
         if normalized_name and normalized_name not in generated_by_normalized_name:
-            generated_by_normalized_name[normalized_name] = description
+            generated_by_normalized_name[normalized_name] = payload
 
     merged_columns = [
         {
             "name": col["name"],
             "dtype": col["dtype"],
             "description": (
-                generated_by_name.get(col["name"], "").strip()
-                or generated_by_normalized_name.get(_normalize_schema_item_name(col["name"]), "").strip()
+                str(generated_by_name.get(col["name"], {}).get("description", "")).strip()
+                or str(
+                    generated_by_normalized_name.get(
+                        _normalize_schema_item_name(col["name"]),
+                        {},
+                    ).get("description", "")
+                ).strip()
                 or str(col.get("description", "")).strip()
             ),
             "samples": col.get("samples", []),
+            "aliases": (
+                _normalize_alias_list(generated_by_name.get(col["name"], {}).get("aliases", []))
+                or _normalize_alias_list(
+                    generated_by_normalized_name.get(
+                        _normalize_schema_item_name(col["name"]),
+                        {},
+                    ).get("aliases", [])
+                )
+                or _normalize_alias_list(col.get("aliases", []))
+            ),
         }
         for col in columns
     ]

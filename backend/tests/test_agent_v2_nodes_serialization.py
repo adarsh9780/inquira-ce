@@ -23,14 +23,7 @@ async def test_react_loop_node_serializes_non_json_sample_values(monkeypatch):
 
     monkeypatch.setattr(
         "app.agent_v2.nodes.load_agent_runtime_config",
-        lambda: SimpleNamespace(max_code_executions=1, turn_timeout=120),
-    )
-    monkeypatch.setattr(
-        "app.agent_v2.nodes.inspect_schema",
-        lambda **_kwargs: {
-            "table_name": "deliveries",
-            "columns": [{"name": "ts", "dtype": "TIMESTAMP"}],
-        },
+        lambda: SimpleNamespace(max_code_executions=1, turn_timeout=120, max_tool_calls=3),
     )
     monkeypatch.setattr(
         "app.agent_v2.nodes.sample_data",
@@ -81,7 +74,9 @@ async def test_react_loop_node_serializes_non_json_sample_values(monkeypatch):
 
     assert result["final_code"] == "print('ok')"
     assert captured_payload.get("workspace_db_path") == "/tmp/ws.duckdb"
+    assert str(captured_payload.get("schema_summary") or "") == "No schema columns available."
     assert "2026-01-02" in str(captured_payload.get("sample_json") or "")
+    assert captured_payload.get("known_columns_json") == "[]"
 
 
 @pytest.mark.asyncio
@@ -105,9 +100,8 @@ async def test_react_loop_node_retries_after_runtime_error(monkeypatch):
 
     monkeypatch.setattr(
         "app.agent_v2.nodes.load_agent_runtime_config",
-        lambda: SimpleNamespace(max_code_executions=2, turn_timeout=120),
+        lambda: SimpleNamespace(max_code_executions=2, turn_timeout=120, max_tool_calls=3),
     )
-    monkeypatch.setattr("app.agent_v2.nodes.inspect_schema", lambda **_kwargs: {"columns": []})
     monkeypatch.setattr(
         "app.agent_v2.nodes.sample_data",
         lambda **_kwargs: {"rows": [], "columns": [], "row_count": 0},
@@ -164,3 +158,93 @@ async def test_react_loop_node_retries_after_runtime_error(monkeypatch):
         "Runtime error: AttributeError" in str(getattr(message, "content", ""))
         for message in retry_messages
     )
+
+
+@pytest.mark.asyncio
+async def test_react_loop_node_merges_search_schema_results_into_known_columns(monkeypatch):
+    payloads: list[dict] = []
+    outputs = iter(
+        [
+            AnalysisOutput(
+                code="",
+                explanation="Need schema details first",
+                output_contract=[],
+                search_schema_queries=["profitability"],
+            ),
+            AnalysisOutput(
+                code='result_df = conn.sql("select gross_margin from orders").fetchdf()',
+                explanation="Computed profitability output",
+                output_contract=[],
+                search_schema_queries=[],
+            ),
+        ]
+    )
+
+    monkeypatch.setattr(
+        "app.agent_v2.nodes.load_agent_runtime_config",
+        lambda: SimpleNamespace(max_code_executions=1, turn_timeout=120, max_tool_calls=3),
+    )
+    monkeypatch.setattr(
+        "app.agent_v2.nodes.sample_data",
+        lambda **_kwargs: {"rows": [], "columns": [], "row_count": 0},
+    )
+    monkeypatch.setattr(
+        "app.agent_v2.nodes.ChatPromptTemplate.from_messages",
+        lambda *_args, **_kwargs: _FakePrompt(),
+    )
+    monkeypatch.setattr("app.agent_v2.nodes._get_model", lambda *_args, **_kwargs: _FakeModel())
+    monkeypatch.setattr(
+        "app.agent_v2.nodes.guard_code",
+        lambda code, table_name=None: SimpleNamespace(blocked=False, code=code, reason=None),
+    )
+    monkeypatch.setattr("app.agent_v2.nodes.emit_stream_token", lambda *_args, **_kwargs: None)
+
+    def fake_invoke(_chain, payload):
+        payloads.append(payload)
+        return next(outputs)
+
+    monkeypatch.setattr("app.agent_v2.nodes._invoke_structured_chain", fake_invoke)
+    monkeypatch.setattr(
+        "app.agent_v2.nodes.search_schema",
+        lambda **_kwargs: {
+            "query": "profitability",
+            "match_count": 1,
+            "columns": [
+                {
+                    "table_name": "orders",
+                    "name": "gross_margin",
+                    "dtype": "DOUBLE",
+                    "description": "Profitability percentage",
+                }
+            ],
+        },
+    )
+
+    async def fake_execute_python(**_kwargs):
+        return {"success": True}
+
+    monkeypatch.setattr("app.agent_v2.nodes.execute_python", fake_execute_python)
+
+    result = await react_loop_node(
+        {
+            "messages": [HumanMessage(content="show profitability trend")],
+            "table_name": "orders",
+            "data_path": "/tmp/ws.duckdb",
+            "active_schema": {
+                "table_name": "orders",
+                "columns": [
+                    {"name": "gross_margin", "dtype": "DOUBLE", "description": "", "aliases": ["profitability"]}
+                ],
+            },
+            "workspace_id": "ws-1",
+            "user_id": "u-1",
+            "context": "",
+            "known_columns": [],
+        },
+        {"configurable": {"api_key": "key"}},
+    )
+
+    assert result["final_code"] == 'result_df = conn.sql("select gross_margin from orders").fetchdf()'
+    assert len(payloads) == 2
+    assert "gross_margin" in payloads[1]["known_columns_json"]
+    assert any(col["name"] == "gross_margin" for col in result["known_columns"])

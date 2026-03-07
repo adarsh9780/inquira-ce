@@ -201,11 +201,20 @@ const summaryText = computed(() => {
     return `Looking for ${columnText} using ${tool} tool`
   }
 
-  if (normalized === 'inspect_schema' || normalized === 'input_schema') {
-    const count = numericArg(args.column_count)
-    if (table && count !== null) return `Checking schema for ${table} (${count} columns) using ${tool} tool`
-    if (table) return `Checking schema for ${table} using ${tool} tool`
-    return `Checking schema using ${tool} tool`
+  if (normalized === 'search_schema') {
+    const query = firstText(args.query)
+    const output = props.activity?.output
+    let count = numericArg(args.match_count)
+    if (count === null && output && typeof output === 'object') {
+      count = numericArg(output.match_count)
+      if (count === null && Array.isArray(output.columns)) {
+        count = output.columns.length
+      }
+    }
+    if (query && count !== null) return `Searching schema for "${query}" (${count} matches)`
+    if (query) return `Searching schema for "${query}"`
+    if (count !== null) return `Searching schema (${count} matches)`
+    return 'Searching schema'
   }
 
   if (normalized === 'sample_data') {

@@ -66,6 +66,10 @@ class ChatService:
     """Runs analysis and persists chat turns."""
 
     @staticmethod
+    def _known_columns_thread_id(user_id: str, workspace_id: str) -> str:
+        return f"{user_id}:{workspace_id}:known_columns"
+
+    @staticmethod
     def _derive_conversation_title(question: str) -> str:
         """Build readable conversation title from first question text."""
         normalized = " ".join((question or "").strip().split())
@@ -110,6 +114,79 @@ class ChatService:
         if isinstance(input_state, dict) and not isinstance(input_state, _AttrAccessDict):
             return _AttrAccessDict(input_state)
         return input_state
+
+    @staticmethod
+    def _normalize_known_columns(raw: Any, max_items: int = 50) -> list[dict[str, str]]:
+        if not isinstance(raw, list):
+            return []
+        normalized: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            table_name = str(item.get("table_name") or "").strip()
+            name = str(item.get("name") or "").strip()
+            if not name:
+                continue
+            dedupe = f"{table_name.lower()}::{name.lower()}"
+            if dedupe in seen:
+                continue
+            seen.add(dedupe)
+            normalized.append(
+                {
+                    "table_name": table_name,
+                    "name": name,
+                    "dtype": str(item.get("dtype") or "").strip(),
+                    "description": str(item.get("description") or "").strip(),
+                }
+            )
+            if len(normalized) >= max_items:
+                break
+        return normalized
+
+    @staticmethod
+    async def _load_workspace_known_columns(
+        *,
+        graph: Any,
+        user_id: str,
+        workspace_id: str,
+    ) -> list[dict[str, str]]:
+        if not hasattr(graph, "aget_state"):
+            return []
+        cfg = {
+            "configurable": {
+                "thread_id": ChatService._known_columns_thread_id(user_id, workspace_id),
+            }
+        }
+        try:
+            state = await graph.aget_state(cfg)
+        except Exception:
+            return []
+        values = getattr(state, "values", None)
+        if not isinstance(values, dict):
+            return []
+        return ChatService._normalize_known_columns(values.get("known_columns"))
+
+    @staticmethod
+    async def _save_workspace_known_columns(
+        *,
+        graph: Any,
+        user_id: str,
+        workspace_id: str,
+        known_columns: Any,
+    ) -> None:
+        if not hasattr(graph, "aupdate_state"):
+            return
+        normalized = ChatService._normalize_known_columns(known_columns)
+        cfg = {
+            "configurable": {
+                "thread_id": ChatService._known_columns_thread_id(user_id, workspace_id),
+            }
+        }
+        try:
+            await graph.aupdate_state(cfg, {"known_columns": normalized})
+        except Exception:
+            return
 
     @staticmethod
     def _build_node_stream_payload(
@@ -401,6 +478,7 @@ class ChatService:
                     "dtype": str(live.get("dtype") or old.get("dtype") or old.get("type") or "VARCHAR"),
                     "description": str(old.get("description", "")),
                     "samples": old.get("samples", []) if isinstance(old.get("samples", []), list) else [],
+                    "aliases": old.get("aliases", []) if isinstance(old.get("aliases", []), list) else [],
                 }
             )
 
@@ -455,6 +533,8 @@ class ChatService:
                     candidate["description"] = override["description"]
                 if isinstance(override.get("samples"), list):
                     candidate["samples"] = override["samples"]
+                if isinstance(override.get("aliases"), list):
+                    candidate["aliases"] = override["aliases"]
             enriched_columns.append(candidate)
         merged["columns"] = enriched_columns
         return merged
@@ -621,6 +701,11 @@ class ChatService:
         bindings = get_agent_bindings()
         memory_path = WorkspaceStorageService.build_agent_memory_path(user.username, workspace_id)
         graph = await langgraph_manager.get_graph(workspace_id, memory_path)
+        known_columns = await ChatService._load_workspace_known_columns(
+            graph=graph,
+            user_id=str(user.id),
+            workspace_id=workspace_id,
+        )
 
         input_state = bindings.build_input_state(
             question=question,
@@ -634,6 +719,7 @@ class ChatService:
             scratchpad_path=str(
                 WorkspaceStorageService.build_scratchpad_db_path(user.username, workspace_id)
             ),
+            known_columns=known_columns,
         )
         input_state = ChatService._coerce_input_state_for_graph(input_state)
         thread_id = f"{user.id}:{workspace_id}:{conversation_id}"
@@ -650,6 +736,12 @@ class ChatService:
             raise HTTPException(status_code=401, detail="API key not configured")
 
         result = await graph.ainvoke(input_state, config=config)
+        await ChatService._save_workspace_known_columns(
+            graph=graph,
+            user_id=str(user.id),
+            workspace_id=workspace_id,
+            known_columns=result.get("known_columns"),
+        )
         response_payload = ChatService._build_response_payload(result)
         run_id = str(uuid.uuid4())
         response_payload["run_id"] = run_id
@@ -846,6 +938,11 @@ class ChatService:
 
                 memory_path = WorkspaceStorageService.build_agent_memory_path(user.username, workspace_id)
                 graph = await langgraph_manager.get_graph(workspace_id, memory_path)
+                known_columns = await ChatService._load_workspace_known_columns(
+                    graph=graph,
+                    user_id=str(user.id),
+                    workspace_id=workspace_id,
+                )
 
                 input_state = bindings.build_input_state(
                     question=question,
@@ -859,6 +956,7 @@ class ChatService:
                     scratchpad_path=str(
                         WorkspaceStorageService.build_scratchpad_db_path(user.username, workspace_id)
                     ),
+                    known_columns=known_columns,
                 )
                 input_state = ChatService._coerce_input_state_for_graph(input_state)
                 thread_id = f"{user.id}:{workspace_id}:{resolved_conversation_id}"
@@ -915,6 +1013,13 @@ class ChatService:
                         aggregated = final_state.values
                 except Exception:
                     pass
+
+                await ChatService._save_workspace_known_columns(
+                    graph=graph,
+                    user_id=str(user.id),
+                    workspace_id=workspace_id,
+                    known_columns=aggregated.get("known_columns"),
+                )
 
                 response_payload = ChatService._build_response_payload(aggregated)
                 run_id = str(uuid.uuid4())

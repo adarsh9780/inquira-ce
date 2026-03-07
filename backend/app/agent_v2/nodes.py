@@ -22,9 +22,9 @@ from .streaming import emit_stream_token
 from .tools.bash_tool import run_bash
 from .tools.execute_python import execute_python
 from .tools.finish_analysis import finish_analysis
-from .tools.inspect_schema import inspect_schema
 from .tools.pip_install import pip_install
 from .tools.sample_data import sample_data
+from .tools.search_schema import search_schema
 
 _ANALYSIS_PROMPT = (
     Path(__file__).resolve().parent / "prompts" / "react_system.yaml"
@@ -38,6 +38,7 @@ class AnalysisOutput(BaseModel):
     code: str | None = None
     explanation: str | None = None
     output_contract: list[dict[str, str]] = Field(default_factory=list)
+    search_schema_queries: list[str] = Field(default_factory=list)
 
 
 class ChatOutput(BaseModel):
@@ -119,6 +120,156 @@ def _sanitize_output_contract(contract: Any) -> list[dict[str, str]]:
     return accepted
 
 
+def _normalize_search_queries(raw: Any) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for entry in raw:
+        query = str(entry or "").strip()
+        if not query:
+            continue
+        dedupe = query.lower()
+        if dedupe in seen:
+            continue
+        seen.add(dedupe)
+        normalized.append(query)
+        if len(normalized) >= 3:
+            break
+    return normalized
+
+
+def _iter_schema_columns(schema: dict[str, Any], table_name: str | None) -> list[tuple[str, str]]:
+    if not isinstance(schema, dict):
+        return []
+    requested_table = str(table_name or "").strip().lower()
+    rows: list[tuple[str, str]] = []
+
+    scoped_table = str(schema.get("table_name") or "").strip()
+    scoped_columns = schema.get("columns")
+    if isinstance(scoped_columns, list):
+        if requested_table and scoped_table and scoped_table.lower() != requested_table:
+            return []
+        for col in scoped_columns:
+            if not isinstance(col, dict):
+                continue
+            name = str(col.get("name") or "").strip()
+            if not name:
+                continue
+            rows.append((scoped_table, name))
+        return rows
+
+    tables = schema.get("tables")
+    if not isinstance(tables, list):
+        return rows
+    for table in tables:
+        if not isinstance(table, dict):
+            continue
+        candidate_table = str(table.get("table_name") or "").strip()
+        if requested_table and candidate_table.lower() != requested_table:
+            continue
+        raw_columns = table.get("columns")
+        if not isinstance(raw_columns, list):
+            continue
+        for col in raw_columns:
+            if not isinstance(col, dict):
+                continue
+            name = str(col.get("name") or "").strip()
+            if not name:
+                continue
+            rows.append((candidate_table, name))
+    return rows
+
+
+def _build_schema_summary(schema: dict[str, Any], table_name: str | None) -> str:
+    grouped: dict[str, list[str]] = {}
+    for candidate_table, name in _iter_schema_columns(schema, table_name):
+        key = candidate_table or (str(table_name or "").strip() or "data_table")
+        grouped.setdefault(key, []).append(name)
+
+    if not grouped:
+        return "No schema columns available."
+
+    lines: list[str] = []
+    for table, columns in grouped.items():
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for col in columns:
+            if col.lower() in seen:
+                continue
+            seen.add(col.lower())
+            deduped.append(col)
+        lines.append(f"Table: {table} ({len(deduped)} columns): {', '.join(deduped)}")
+    return "\n".join(lines)
+
+
+def _normalize_known_columns(raw: Any, *, max_items: int = 50) -> list[dict[str, str]]:
+    if not isinstance(raw, list):
+        return []
+    normalized: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        table = str(item.get("table_name") or "").strip()
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        dedupe = f"{table.lower()}::{name.lower()}"
+        if dedupe in seen:
+            continue
+        seen.add(dedupe)
+        normalized.append(
+            {
+                "table_name": table,
+                "name": name,
+                "dtype": str(item.get("dtype") or "").strip(),
+                "description": str(item.get("description") or "").strip(),
+            }
+        )
+        if len(normalized) >= max_items:
+            break
+    return normalized
+
+
+def _merge_known_columns_lru(
+    current: list[dict[str, str]],
+    discovered: list[dict[str, Any]],
+    *,
+    max_items: int = 50,
+) -> list[dict[str, str]]:
+    ordered = _normalize_known_columns(current, max_items=max_items)
+    by_key = {
+        f"{item.get('table_name', '').lower()}::{item.get('name', '').lower()}": item
+        for item in ordered
+    }
+
+    for item in discovered:
+        if not isinstance(item, dict):
+            continue
+        table = str(item.get("table_name") or "").strip()
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        key = f"{table.lower()}::{name.lower()}"
+        normalized_item = {
+            "table_name": table,
+            "name": name,
+            "dtype": str(item.get("dtype") or "").strip(),
+            "description": str(item.get("description") or "").strip(),
+        }
+        if key in by_key:
+            ordered = [entry for entry in ordered if f"{entry.get('table_name', '').lower()}::{entry.get('name', '').lower()}" != key]
+        by_key[key] = normalized_item
+        ordered.append(normalized_item)
+        if len(ordered) > max_items:
+            dropped = ordered.pop(0)
+            drop_key = f"{dropped.get('table_name', '').lower()}::{dropped.get('name', '').lower()}"
+            by_key.pop(drop_key, None)
+
+    return ordered
+
+
 def route_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
     route = decide_route(state.get("messages") or [], config.get("configurable", {}))
     if route == "unsafe":
@@ -191,8 +342,9 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
     user_id = str(state.get("user_id") or "")
     user_text = _latest_user_text(messages)
     runtime = load_agent_runtime_config()
+    known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
 
-    schema_info = inspect_schema(schema=schema, table_name=table_name)
+    schema_summary = _build_schema_summary(schema=schema, table_name=table_name or None)
     sample = sample_data(data_path=data_path or None, table_name=table_name or None, limit=5)
 
     requested_packages = _extract_packages_from_prompt(user_text)
@@ -223,7 +375,8 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
                 (
                     "Workspace database path: {workspace_db_path}\n"
                     "Table: {table_name}\n"
-                    "Schema: {schema_json}\n"
+                    "Schema summary (column names only): {schema_summary}\n"
+                    "Known columns: {known_columns_json}\n"
                     "Sample rows: {sample_json}\n"
                     "Context: {context}"
                 ),
@@ -237,10 +390,15 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
     retry_feedback = ""
     best_output = AnalysisOutput(code="", explanation="", output_contract=[])
     max_attempts = max(1, int(runtime.max_code_executions))
+    max_schema_search_calls = max(1, int(runtime.max_tool_calls))
+    total_iterations = max_attempts + max_schema_search_calls
+    search_calls = 0
+    searched_schema_queries: set[str] = set()
+    execution_attempts = 0
     candidate_code = ""
     execution_feedback = ""
     last_executed_code = ""
-    for _attempt in range(max_attempts):
+    for _attempt in range(total_iterations):
         call_messages = list(messages)
         if retry_feedback:
             call_messages.append(
@@ -258,7 +416,8 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
                 "messages": call_messages,
                 "table_name": table_name or "data_table",
                 "workspace_db_path": data_path or "",
-                "schema_json": _safe_json_dumps(schema_info),
+                "schema_summary": schema_summary,
+                "known_columns_json": _safe_json_dumps(known_columns),
                 "sample_json": _safe_json_dumps(sample),
                 "context": str(state.get("context") or ""),
             },
@@ -268,7 +427,43 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
         else:
             best_output = AnalysisOutput.model_validate(output)
 
+        search_queries = _normalize_search_queries(best_output.search_schema_queries)
+        pending_search_queries = [
+            query
+            for query in search_queries
+            if query.lower() not in searched_schema_queries
+        ]
+        if pending_search_queries and search_calls < max_schema_search_calls:
+            for query in pending_search_queries:
+                if search_calls >= max_schema_search_calls:
+                    break
+                searched_schema_queries.add(query.lower())
+                search_calls += 1
+                search_result = search_schema(
+                    schema=schema,
+                    query=query,
+                    table_name=table_name or None,
+                    max_results=20,
+                )
+                discovered = search_result.get("columns") if isinstance(search_result, dict) else []
+                if isinstance(discovered, list):
+                    known_columns = _merge_known_columns_lru(
+                        known_columns,
+                        discovered,
+                        max_items=50,
+                    )
+            retry_feedback = (
+                "Additional schema details were retrieved with search_schema. "
+                "Use known columns to generate executable Python code."
+            )
+            candidate_code = ""
+            continue
+
         candidate_code = str(best_output.code or "").strip()
+        if not candidate_code:
+            retry_feedback = "No code was produced. Generate executable Python code."
+            continue
+
         guard = guard_code(candidate_code, table_name=table_name or None)
         if not guard.blocked:
             candidate_code = guard.code
@@ -277,6 +472,7 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
             candidate_code = ""
             continue
 
+        execution_attempts += 1
         execution = await execute_python(
             workspace_id=workspace_id,
             data_path=data_path or None,
@@ -291,6 +487,8 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
 
         execution_feedback = str(execution.get("error") or execution.get("stderr") or "").strip()
         if _is_non_retriable_execution_error(execution_feedback):
+            break
+        if execution_attempts >= max_attempts:
             break
         retry_feedback = (
             "Execution failed. Regenerate code that fixes this runtime error.\n"
@@ -325,6 +523,7 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
         "metadata": {"is_safe": True, "is_relevant": True},
         "messages": [AIMessage(content=explanation)],
         "last_error": retry_feedback or execution_feedback,
+        "known_columns": known_columns,
     }
 
 
@@ -350,6 +549,7 @@ def chat_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         "final_code": "",
         "final_explanation": text,
         "output_contract": [],
+        "known_columns": _normalize_known_columns(state.get("known_columns") or []),
         "metadata": {"is_safe": True, "is_relevant": False},
         "messages": [AIMessage(content=text)],
     }
@@ -367,6 +567,7 @@ def reject_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]
         "final_code": "",
         "final_explanation": text,
         "output_contract": [],
+        "known_columns": _normalize_known_columns(state.get("known_columns") or []),
         "metadata": {"is_safe": False, "is_relevant": False},
         "messages": [AIMessage(content=text)],
     }
@@ -402,6 +603,7 @@ def finalize_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, An
         "final_explanation": finish.get("final_explanation", explanation),
         "messages": [AIMessage(content=finish.get("final_explanation", explanation))],
         "output_contract": state.get("output_contract") or [],
+        "known_columns": _normalize_known_columns(state.get("known_columns") or []),
         "route": state.get("route") or "analysis",
         "metadata": state.get("metadata") or {"is_safe": True, "is_relevant": True},
         "run_id": state.get("run_id"),
