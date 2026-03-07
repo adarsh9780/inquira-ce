@@ -1,5 +1,5 @@
 <template>
-  <div ref="chatContainer" data-chat-scroll-container class="space-y-6" style="min-height: 200px;" role="log" aria-live="polite" aria-relevant="additions" :aria-busy="appStore.isLoading">
+  <div ref="chatContainer" class="space-y-6" style="min-height: 200px;" role="log" aria-live="polite" aria-relevant="additions" :aria-busy="appStore.isLoading">
     <div v-if="appStore.activeConversationId && appStore.turnsNextCursor" class="flex justify-center">
       <button
         type="button"
@@ -176,6 +176,20 @@
       </div>
     </div>
 
+    <div v-if="showScrollToBottomButton" class="sticky bottom-3 z-20 flex justify-end pr-2 pointer-events-none">
+      <button
+        type="button"
+        class="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors"
+        style="border-color: var(--color-border); background-color: var(--color-surface); color: var(--color-text-main);"
+        aria-label="Scroll to bottom"
+        title="Scroll to bottom"
+        @click="handleScrollToBottomClick"
+      >
+        <ChevronDownIcon class="h-3.5 w-3.5" aria-hidden="true" />
+        <span>Latest</span>
+      </button>
+    </div>
+
     <!-- Sentinel for auto-scroll -->
     <div ref="end" />
   </div>
@@ -213,17 +227,20 @@ DOMPurify.addHook('afterSanitizeAttributes', function(node) {
 
 const appStore = useAppStore()
 const chatContainer = ref(null)
+const scrollHost = ref(null)
 const end = ref(null)
 const ephemeralExpandedRows = ref(new Set())
 const pendingInterventionIds = ref(new Set())
 const suppressMutationAutoScroll = ref(false)
 const SHOW_EPHEMERAL_TRACE = false
+const showScrollToBottomButton = ref(false)
 let shouldAutoScroll = true
 let mutationObserver = null
 
 const lastMessageId = computed(() => appStore.chatHistory.at(-1)?.id)
 
 const SCROLL_THRESHOLD_PX = 100
+const SHOW_SCROLL_BUTTON_THRESHOLD_PX = 220
 const QUESTION_REFERENCE_RE = /\b[A-Za-z_][A-Za-z0-9_]*\["(?:[^"\\]|\\.)+"\]|\b[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*/g
 
 function escapeHtml(rawValue) {
@@ -327,12 +344,15 @@ const HIDDEN_EPHEMERAL_NODES = new Set([
 
 // Initialize shouldAutoScroll and setup listeners on mount
 onMounted(() => {
+  scrollHost.value = resolveScrollHost()
   shouldAutoScroll = true // Start with auto-scroll enabled
+  showScrollToBottomButton.value = false
 
   // Listen for scroll events on the scrollable container
-  if (chatContainer.value) {
-    chatContainer.value.addEventListener('scroll', handleScroll, { passive: true })
-    chatContainer.value.addEventListener('click', handleChatContainerClick)
+  const container = getScrollContainer()
+  if (container) {
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    container.addEventListener('click', handleChatContainerClick)
   }
 
   // Setup MutationObserver for dynamic content
@@ -349,14 +369,16 @@ onMounted(() => {
   // Hydrated conversations mount with existing messages, so force initial bottom alignment.
   if (appStore.chatHistory.length > 0) {
     nextTick(() => scrollToBottom())
+    window.setTimeout(() => scrollToBottom({ behavior: 'auto', force: true }), 32)
   }
 })
 
 // Clean up event listener and observer when component unmounts
 onUnmounted(() => {
-  if (chatContainer.value) {
-    chatContainer.value.removeEventListener('scroll', handleScroll)
-    chatContainer.value.removeEventListener('click', handleChatContainerClick)
+  const container = getScrollContainer()
+  if (container) {
+    container.removeEventListener('scroll', handleScroll)
+    container.removeEventListener('click', handleChatContainerClick)
   }
   if (mutationObserver) {
     mutationObserver.disconnect()
@@ -613,25 +635,62 @@ async function submitInterventionResponse(message, payload) {
   }
 }
 
-function isNearBottom() {
-  if (!chatContainer.value) return true
-
-  const container = chatContainer.value
-  const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
-  return distanceFromBottom < SCROLL_THRESHOLD_PX
+function resolveScrollHost() {
+  const localContainer = chatContainer.value
+  if (!localContainer) return null
+  const host = localContainer.parentElement?.closest?.('[data-chat-scroll-container]')
+  return host || localContainer
 }
 
-function scrollToBottom() {
+function getScrollContainer() {
+  return scrollHost.value || chatContainer.value
+}
+
+function updateScrollState() {
+  const container = getScrollContainer()
+  if (!container) {
+    shouldAutoScroll = true
+    showScrollToBottomButton.value = false
+    return
+  }
+  const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+  const isNearBottomNow = distanceFromBottom < SCROLL_THRESHOLD_PX
+  shouldAutoScroll = isNearBottomNow
+  showScrollToBottomButton.value = distanceFromBottom > SHOW_SCROLL_BUTTON_THRESHOLD_PX
+}
+
+function scrollToBottom(options = {}) {
+  const resolvedBehavior = String(options?.behavior || '').trim() || (appStore.isLoading ? 'auto' : 'smooth')
+  const force = options?.force === true
   nextTick(() => {
+    const container = getScrollContainer()
     const endEl = end.value
     if (!endEl) return
-    const behavior = appStore.isLoading ? 'auto' : 'smooth'
+    if (!container) return
+    const behavior = resolvedBehavior
+    if (force) {
+      shouldAutoScroll = true
+      showScrollToBottomButton.value = false
+      if (typeof container.scrollTo === 'function') {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
+      }
+    }
     endEl.scrollIntoView({ behavior, block: 'end' })
+    window.requestAnimationFrame(() => {
+      if (force && typeof container.scrollTo === 'function') {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
+      }
+      updateScrollState()
+    })
   })
 }
 
 function handleScroll() {
-  shouldAutoScroll = isNearBottom()
+  updateScrollState()
+}
+
+function handleScrollToBottomClick() {
+  scrollToBottom({ behavior: 'smooth', force: true })
 }
 
 async function copyCodeFromBlock(copyButton) {
