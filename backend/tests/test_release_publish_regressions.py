@@ -40,6 +40,7 @@ def test_backend_pyproject_avoids_vcs_direct_dependency_for_pypi():
 def test_tauri_bundle_resources_include_backend_project_files():
     data = json.loads(TAURI_CONF.read_text(encoding="utf-8"))
     resources = data.get("bundle", {}).get("resources", [])
+    tauri_dir = TAURI_CONF.parent
 
     assert "../backend" not in resources
     assert "../backend/app" not in resources
@@ -53,7 +54,7 @@ def test_tauri_bundle_resources_include_backend_project_files():
     assert "../backend/app/legal" in resources
     assert "../backend/app/logo" in resources
     assert "../backend/app/services" in resources
-    assert "../backend/app/tools" in resources
+    assert "../backend/app/tools" not in resources
     assert "../backend/app/v1" in resources
     assert "../backend/alembic" in resources
     assert "../backend/alembic.ini" in resources
@@ -63,3 +64,7 @@ def test_tauri_bundle_resources_include_backend_project_files():
     assert "../src-tauri/bundled-tools" in resources
     assert "../inquira.toml" in resources
     assert "../backend/app/static" not in resources
+
+    for resource in resources:
+        resolved = (tauri_dir / resource).resolve()
+        assert resolved.exists(), f"Missing tauri bundle resource path: {resource}"

@@ -37,7 +37,6 @@
       "../backend/app/legal",
       "../backend/app/logo",
       "../backend/app/services",
-      "../backend/app/tools",
       "../backend/app/v1",
       "../backend/alembic",
       "../backend/alembic.ini",
