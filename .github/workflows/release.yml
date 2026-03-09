@@ -79,38 +79,6 @@ jobs:
               `Timed out waiting for successful CI (ci.yml) run for commit ${sha} after ${maxAttempts} attempts.`
             );
 
-  build_wheel:
-    needs: [guard_release_prereqs]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
-        with:
-          uv-version: "0.6.3"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - name: Build frontend for wheel
-        run: |
-          npm ci
-          npm run build
-        working-directory: frontend
-      - name: Sync frontend dist into backend package data
-        run: |
-          rm -rf backend/app/frontend/dist
-          mkdir -p backend/app/frontend
-          cp -R src/inquira/frontend/dist backend/app/frontend/dist
-      - name: Build wheel
-        working-directory: backend
-        run: uv build --wheel
-      - name: Upload wheel artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-wheel
-          path: backend/dist/*.whl
-
   build_tauri:
     needs: [guard_release_prereqs]
     strategy:
@@ -246,69 +214,3 @@ jobs:
             src-tauri/target/release/bundle/**/*.app.tar.gz
             src-tauri/target/release/bundle/**/*.msi
             src-tauri/target/release/bundle/**/*.exe
-
-  publish_wheel_to_release:
-    needs: [build_wheel]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Load release metadata
-        id: release_meta
-        shell: bash
-        run: |
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          meta_path = Path(".github/release/metadata.json")
-          data = json.loads(meta_path.read_text(encoding="utf-8"))
-          ref_name = os.environ.get("GITHUB_REF_NAME", "").strip()
-          default_name = f"Inquira {ref_name}" if ref_name else "Inquira Release"
-          name = str(data.get("release_name", "")).strip() or default_name
-          body = str(data.get("release_body", "")).strip()
-          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as out:
-              out.write(f"release_name={name}\n")
-              out.write("release_body<<EOF\n")
-              out.write(body + "\n")
-              out.write("EOF\n")
-          PY
-      - name: Ensure GitHub release exists and metadata is up to date
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_NAME: ${{ steps.release_meta.outputs.release_name }}
-          RELEASE_BODY: ${{ steps.release_meta.outputs.release_body }}
-        run: |
-          if ! gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            gh release create "${GITHUB_REF_NAME}" --title "${RELEASE_NAME}" --notes "${RELEASE_BODY}" --prerelease
-          else
-            gh release edit "${GITHUB_REF_NAME}" --title "${RELEASE_NAME}" --notes "${RELEASE_BODY}" --prerelease
-          fi
-      - name: Download wheel artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: python-wheel
-          path: dist
-
-      - name: Attach wheel to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${GITHUB_REF_NAME}" dist/*.whl --clobber
-
-  publish_wheel_to_pypi:
-    needs: [build_wheel]
-    runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write
-    steps:
-      - name: Download wheel artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: python-wheel
-          path: dist
-
-      - name: Publish wheel to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: dist

@@ -49,12 +49,6 @@ Hosted docs site (GitHub Pages): [https://adarsh9780.github.io/inquira-ce/](http
 
 ### End Users
 
-Install via pip:
-```bash
-pip install inquira-ce
-inquira
-```
-
 Desktop binaries (`.dmg`, `.exe`) are available on:
 [https://github.com/adarsh9780/inquira-ce/releases/latest](https://github.com/adarsh9780/inquira-ce/releases/latest)
 

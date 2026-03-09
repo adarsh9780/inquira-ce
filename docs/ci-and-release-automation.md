@@ -20,9 +20,7 @@ It runs:
 
 It does:
 - Enforce release preconditions (tag on `master` and successful CI for same commit)
-- Build/publish backend wheel (GitHub Release + PyPI)
 - Build desktop artifacts (macOS/Windows)
-- Keep wheel and desktop publishing independent so one does not block the other
 
 ## Practical release behavior
 

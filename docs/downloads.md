@@ -4,19 +4,6 @@
 
 - [Latest release page](https://github.com/adarsh9780/inquira-ce/releases/latest)
 - [All releases](https://github.com/adarsh9780/inquira-ce/releases)
-- [PyPI package](https://pypi.org/project/inquira-ce/)
-
-## Direct install commands
-
-```bash
-pip install inquira-ce
-```
-
-Launch after install:
-
-```bash
-inquira
-```
 
 ## Latest release assets (auto-loaded)
 

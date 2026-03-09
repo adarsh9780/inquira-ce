@@ -54,10 +54,8 @@ What it does:
 
 1. Verifies tag commit is on `master`.
 2. Waits for `ci.yml` to complete and requires success for the same commit SHA.
-3. Builds frontend assets for wheel packaging, syncs them into `backend/app/frontend/dist`, and builds backend wheel (`backend/dist/*.whl`).
-4. Uploads wheel to GitHub Release and publishes wheel to PyPI (environment: `pypi`).
-5. Builds desktop artifacts via Tauri action (macOS + Windows matrix; Windows uses NSIS bundle).
-6. Desktop and wheel publishing are independent: one can fail while the other still publishes.
+3. Builds desktop artifacts via Tauri action (macOS + Windows matrix; Windows uses NSIS bundle).
+4. Publishes desktop artifacts to the GitHub prerelease for the tag.
 
 ## 7. Verify published release
 

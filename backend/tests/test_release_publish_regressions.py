@@ -8,15 +8,15 @@ TAURI_CONF = ROOT / "src-tauri" / "tauri.conf.json"
 BACKEND_PYPROJECT = ROOT / "backend" / "pyproject.toml"
 
 
-def test_publish_wheel_to_release_checks_out_repo_for_gh_cli_context():
+def test_release_workflow_does_not_publish_python_wheels_or_pypi_artifacts():
     text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
 
-    assert "publish_wheel_to_release:" in text
-    assert "- uses: actions/checkout@v4" in text
-    assert "Ensure GitHub release exists" in text
-    assert 'gh release view "${GITHUB_REF_NAME}"' in text
-    assert 'gh release create "${GITHUB_REF_NAME}"' in text
-    assert 'gh release upload "${GITHUB_REF_NAME}" dist/*.whl --clobber' in text
+    assert "build_tauri:" in text
+    assert "build_wheel:" not in text
+    assert "publish_wheel_to_release:" not in text
+    assert "publish_wheel_to_pypi:" not in text
+    assert "gh-action-pypi-publish" not in text
+    assert "dist/*.whl" not in text
 
 
 def test_tauri_before_build_command_is_shell_portable():
@@ -29,7 +29,7 @@ def test_tauri_before_build_command_is_shell_portable():
     assert "[ -d frontend ]" not in text
 
 
-def test_backend_pyproject_avoids_vcs_direct_dependency_for_pypi():
+def test_backend_pyproject_avoids_vcs_direct_dependency_for_runtime_stability():
     text = BACKEND_PYPROJECT.read_text(encoding="utf-8")
 
     assert "jupyter-client>=" in text

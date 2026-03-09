@@ -29,7 +29,7 @@ Version source of truth: root `VERSION` file.
 
 ## Distribution channels
 
-- Python package: `pip install inquira-ce`
+- Desktop installers distributed via GitHub Releases
 - Desktop binaries: GitHub Releases (`.dmg`, `.exe`)
 - Documentation site: GitHub Pages
 

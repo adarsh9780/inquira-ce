@@ -34,18 +34,19 @@ def test_mkdocs_config_includes_downloads_and_core_docs_nav():
     assert "js/mermaid-init.js" in text
 
 
-def test_downloads_doc_links_latest_release_and_pypi():
+def test_downloads_doc_links_release_and_api():
     text = DOWNLOADS_DOC.read_text(encoding="utf-8")
 
     assert "https://github.com/adarsh9780/inquira-ce/releases/latest" in text
-    assert "https://pypi.org/project/inquira-ce/" in text
+    assert "pypi.org/project/inquira-ce/" not in text
     assert "https://api.github.com/repos/adarsh9780/inquira-ce/releases/latest" in text
 
 
-def test_index_doc_mentions_distribution_channels():
+def test_index_doc_mentions_desktop_distribution_channel():
     text = INDEX_DOC.read_text(encoding="utf-8")
 
-    assert "pip install inquira-ce" in text
+    assert "pip install inquira-ce" not in text
+    assert "Python package" not in text
     assert "Desktop installers" in text
     assert "Open latest release" in text
 

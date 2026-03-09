@@ -4,16 +4,7 @@ This page focuses on the fastest supported install paths.
 
 ## End Users
 
-### Option A: pip install (recommended)
-
-```bash
-pip install inquira-ce
-inquira
-```
-
-Use this when you want a quick local setup and are comfortable with Python tooling.
-
-### Option B: Desktop binaries
+### Option A: Desktop binaries (recommended)
 
 Download platform-specific desktop builds (`.dmg`, `.exe`) from:
 
@@ -28,7 +19,6 @@ If something fails, check the latest release notes and known issues in the relea
 
 ## Upgrade path
 
-- pip users: `pip install --upgrade inquira-ce`
-- desktop users: install the latest binary from releases
+- install the latest desktop binary from releases
 
 Next: [Development](./development.md)
