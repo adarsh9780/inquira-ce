@@ -34,6 +34,29 @@ function getDefaultApiBase() {
 const resolvedEnvBase = (import.meta.env.VITE_API_BASE || '').trim()
 const apiBaseUrl = resolvedEnvBase || getDefaultApiBase()
 const artifactRowsInFlight = new Map()
+const artifactRowsCache = new Map()
+const ARTIFACT_ROWS_CACHE_LIMIT = 200
+
+function cloneArtifactRowsPayload(payload) {
+  return JSON.parse(JSON.stringify(payload ?? null))
+}
+
+function readArtifactRowsCache(requestKey) {
+  const cached = artifactRowsCache.get(requestKey)
+  if (!cached) return null
+  artifactRowsCache.delete(requestKey)
+  artifactRowsCache.set(requestKey, cached)
+  return cloneArtifactRowsPayload(cached)
+}
+
+function writeArtifactRowsCache(requestKey, payload) {
+  artifactRowsCache.set(requestKey, cloneArtifactRowsPayload(payload))
+  if (artifactRowsCache.size <= ARTIFACT_ROWS_CACHE_LIMIT) return
+  const oldestKey = artifactRowsCache.keys().next().value
+  if (oldestKey) {
+    artifactRowsCache.delete(oldestKey)
+  }
+}
 
 function createAbortError(message = 'Request aborted') {
   const error = new Error(message)
@@ -358,6 +381,10 @@ export const apiService = {
       filterModelPayload,
       normalizedSearchText,
     ].join(':')
+    const cached = readArtifactRowsCache(requestKey)
+    if (cached) {
+      return withAbortSignal(Promise.resolve(cached), options?.signal || null)
+    }
     let inFlight = artifactRowsInFlight.get(requestKey)
 
     if (!inFlight) {
@@ -386,7 +413,9 @@ export const apiService = {
           const detail = await response.json().catch(() => ({}))
           throw new Error(detail.detail || `Artifact row fetch failed (${response.status})`)
         }
-        return response.json()
+        const payload = await response.json()
+        writeArtifactRowsCache(requestKey, payload)
+        return cloneArtifactRowsPayload(payload)
       })().finally(() => {
         artifactRowsInFlight.delete(requestKey)
       })
