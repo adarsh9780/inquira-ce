@@ -66,12 +66,14 @@
 
       <div
         v-if="isGeneratingCode"
-        class="absolute inset-0 z-10 flex items-center justify-center bg-white bg-opacity-90"
+        class="pointer-events-none absolute right-3 top-3 z-10"
       >
-        <div class="text-center">
-          <div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
-          <p class="text-sm font-medium text-gray-900">Generating code...</p>
-          <p class="mt-1 text-xs text-gray-500">AI is creating Python code for your analysis</p>
+        <div
+          class="flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm"
+          style="background-color: color-mix(in srgb, var(--color-surface) 92%, white); border-color: var(--color-border); color: var(--color-text-main);"
+        >
+          <div class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
+          <span>Generating code...</span>
         </div>
       </div>
 
@@ -105,7 +107,7 @@ import {
 } from '../../utils/executionRouting'
 
 import { EditorView, basicSetup } from 'codemirror'
-import { EditorState, Prec } from '@codemirror/state'
+import { Compartment, EditorState, Prec } from '@codemirror/state'
 import { python } from '@codemirror/lang-python'
 import { autocompletion } from '@codemirror/autocomplete'
 import { keymap } from '@codemirror/view'
@@ -135,6 +137,7 @@ let lastRunBlockedToastAt = 0
 
 let editor = null
 let isUpdatingFromStore = false
+const editableCompartment = new Compartment()
 
 const hasSelectedData = computed(() => {
   const selectedPath = String(appStore.dataFilePath || '').trim()
@@ -669,11 +672,19 @@ function updateEditorContent() {
   }
 }
 
+function syncEditorEditability() {
+  if (!editor) return
+  editor.dispatch({
+    effects: editableCompartment.reconfigure(EditorView.editable.of(!isGeneratingCode.value))
+  })
+}
+
 async function initializeEditor() {
   if (!editorContainer.value) return
 
   const extensions = [
     basicSetup,
+    editableCompartment.of(EditorView.editable.of(!isGeneratingCode.value)),
     indentUnit.of('    '),
     python(),
     autocompletion({ override: [completionSource] }),
@@ -788,6 +799,7 @@ watch(() => appStore.generatedCode, (newCode) => {
 
 watch(() => appStore.isLoading, (loading) => {
   isGeneratingCode.value = loading
+  syncEditorEditability()
 })
 
 watch(() => appStore.pythonFileContent, () => {
