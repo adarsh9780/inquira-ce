@@ -66,9 +66,6 @@
         </div>
       </div>
 
-      <div class="flex-shrink-0 border-t pt-2 sm:pt-3" style="background-color: var(--color-base); border-color: var(--color-border);">
-        <ChatInput />
-      </div>
     </div>
   </div>
 </template>
@@ -77,7 +74,6 @@
 import { computed, onMounted, ref, watch, nextTick } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import ChatHistory from './ChatHistory.vue'
-import ChatInput from './ChatInput.vue'
 import { 
   ChatBubbleLeftRightIcon, 
   ArrowPathIcon,
