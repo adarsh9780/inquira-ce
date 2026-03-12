@@ -1284,17 +1284,28 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setTableViewport(start, end, total) {
-    tableWindowStart.value = Math.max(0, Number(start || 0))
-    tableWindowEnd.value = Math.max(0, Number(end || 0))
-    tableRowCount.value = Math.max(0, Number(total || 0))
-    scheduleLocalSnapshotSave()
+    const nextStart = Math.max(0, Number(start || 0))
+    const nextEnd = Math.max(0, Number(end || 0))
+    const nextTotal = Math.max(0, Number(total || 0))
+    if (
+      tableWindowStart.value === nextStart &&
+      tableWindowEnd.value === nextEnd &&
+      tableRowCount.value === nextTotal
+    ) {
+      return
+    }
+    tableWindowStart.value = nextStart
+    tableWindowEnd.value = nextEnd
+    tableRowCount.value = nextTotal
   }
 
   function clearTableViewport() {
+    if (tableWindowStart.value === 0 && tableWindowEnd.value === 0 && tableRowCount.value === 0) {
+      return
+    }
     tableWindowStart.value = 0
     tableWindowEnd.value = 0
     tableRowCount.value = 0
-    scheduleLocalSnapshotSave()
   }
 
   function tableOffsetKey(workspaceId, artifactId) {
@@ -1309,6 +1320,7 @@ export const useAppStore = defineStore('app', () => {
     const key = tableOffsetKey(workspaceId, artifactId)
     if (!key || key === '::') return
     const normalizedPage = Math.max(0, Number(page || 0))
+    if (Number(tablePageOffsets.value?.[key] || 0) === normalizedPage) return
     tablePageOffsets.value = {
       ...tablePageOffsets.value,
       [key]: normalizedPage
