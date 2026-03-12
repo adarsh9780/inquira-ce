@@ -36,9 +36,9 @@
 
           <div
             class="relative min-w-[9rem] flex-1"
-            style="max-width: min(30vw, 16rem);"
+            style="max-width: min(24vw, 13rem);"
           >
-            <MagnifyingGlassIcon
+            <FunnelIcon
               class="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
               aria-hidden="true"
             />
@@ -222,7 +222,7 @@ import { persistExportFile } from '../../utils/exportFile'
 ModuleRegistry.registerModules([AllCommunityModule])
 import {
   ArrowDownTrayIcon,
-  MagnifyingGlassIcon,
+  FunnelIcon,
   TableCellsIcon,
   TrashIcon
 } from '@heroicons/vue/24/outline'
