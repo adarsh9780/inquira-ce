@@ -263,6 +263,7 @@ let selectedArtifactLoadToken = 0
 let currentDatasourceToken = 0
 let isRecoveringMissingArtifact = false
 let tableSearchDebounceTimer = null
+let kernelRecoveryPoller = null
 const pendingRestorePageByArtifact = new Map()
 
 onMounted(() => {
@@ -272,6 +273,7 @@ onMounted(() => {
 onUnmounted(() => {
   cancelPendingRequests()
   listAbortController?.abort()
+  stopKernelRecoveryPolling()
   if (tableSearchDebounceTimer) {
     clearTimeout(tableSearchDebounceTimer)
     tableSearchDebounceTimer = null
@@ -457,6 +459,10 @@ function isAbortError(error) {
   return error?.name === 'AbortError'
 }
 
+function isKernelReadinessTimeoutMessage(message) {
+  return String(message || '').includes('Kernel did not become ready in 120 seconds')
+}
+
 function isMissingArtifactRowsError(error) {
   const message = String(error?.message || '')
   if (!message) return false
@@ -524,6 +530,52 @@ async function waitForKernelReady(workspaceId, signal) {
   throw new Error(`Kernel did not become ready in 120 seconds (last status: ${lastStatus}).`)
 }
 
+function stopKernelRecoveryPolling() {
+  if (kernelRecoveryPoller) {
+    clearInterval(kernelRecoveryPoller)
+    kernelRecoveryPoller = null
+  }
+}
+
+async function recoverTableStateAfterKernelReady() {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (!workspaceId || !appStore.hasWorkspace || appStore.dataPane !== 'table') return
+
+  try {
+    const statusPayload = await apiService.v1GetWorkspaceKernelStatus(workspaceId)
+    const status = String(statusPayload?.status || '').trim().toLowerCase()
+    if (status !== 'ready') return
+
+    stopKernelRecoveryPolling()
+    kernelReadyWorkspaceId = workspaceId
+    artifactListError.value = ''
+    tableError.value = ''
+    appStore.clearDataPaneError()
+
+    await loadWorkspaceArtifacts(workspaceId)
+
+    const selectedId = String(selectedArtifactId.value || '').trim()
+    if (!selectedId || isMemoryArtifactId(selectedId)) return
+    const artifactStillExists = allArtifacts.value.some(
+      (entry) => String(entry?.artifact_id || '').trim() === selectedId,
+    )
+    if (!artifactStillExists) return
+    await prepareArtifact(selectedId)
+  } catch (error) {
+    if (isAbortError(error)) return
+  }
+}
+
+function startKernelRecoveryPolling() {
+  if (kernelRecoveryPoller) return
+  void recoverTableStateAfterKernelReady()
+  kernelRecoveryPoller = setInterval(() => {
+    if (!document.hidden) {
+      void recoverTableStateAfterKernelReady()
+    }
+  }, 5000)
+}
+
 // ---------------------------------------------------------------------------
 // Load workspace artifact list whenever the workspace changes
 // ---------------------------------------------------------------------------
@@ -575,6 +627,9 @@ async function loadWorkspaceArtifacts(workspaceId) {
     const brief = error?.response?.data?.detail || error?.message || 'Failed to load tables'
     artifactListError.value = brief
     appStore.setDataPaneError(brief)
+    if (isKernelReadinessTimeoutMessage(brief)) {
+      startKernelRecoveryPolling()
+    }
     workspaceArtifacts.value = []
   } finally {
     isLoadingArtifacts.value = false
@@ -608,6 +663,7 @@ async function recoverFromMissingArtifact(artifactId) {
 
 watch(() => appStore.activeWorkspaceId, (id) => {
   kernelReadyWorkspaceId = ''
+  stopKernelRecoveryPolling()
   tableSearch.value = ''
   pendingRestorePageByArtifact.clear()
   selectedArtifactLoadToken += 1
@@ -681,6 +737,17 @@ watch(tableSearch, () => {
     })
   }, 200)
 })
+
+watch(
+  () => [tableError.value, artifactListError.value, appStore.dataPaneError].join('||'),
+  (combinedMessage) => {
+    if (isKernelReadinessTimeoutMessage(combinedMessage)) {
+      startKernelRecoveryPolling()
+      return
+    }
+    stopKernelRecoveryPolling()
+  }
+)
 
 // ---------------------------------------------------------------------------
 // Computed helpers
