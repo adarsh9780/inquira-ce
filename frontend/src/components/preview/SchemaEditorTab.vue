@@ -278,6 +278,35 @@ function normalizeDatasetEntries(items) {
     .filter(Boolean)
 }
 
+function extractWorkspaceTableNames(columns) {
+  const seen = new Set()
+  const tables = []
+
+  ;(Array.isArray(columns) ? columns : []).forEach((column) => {
+    const tableName = String(column?.table_name || '').trim()
+    const tableKey = tableName.toLowerCase()
+    if (!tableName || seen.has(tableKey)) return
+    seen.add(tableKey)
+    tables.push(tableName)
+  })
+
+  return tables
+}
+
+function buildSchemaDatasetEntries(catalogItems, workspaceColumns) {
+  const runtimeTables = extractWorkspaceTableNames(workspaceColumns)
+  if (runtimeTables.length === 0) return []
+
+  const catalogByTable = new Map(
+    normalizeDatasetEntries(catalogItems).map((item) => [item.tableName.toLowerCase(), item])
+  )
+
+  return runtimeTables.map((tableName) => {
+    const catalogEntry = catalogByTable.get(tableName.toLowerCase())
+    return catalogEntry || { tableName, sourcePath: '' }
+  })
+}
+
 function normalizeAliasList(value) {
   const source = Array.isArray(value)
     ? value
@@ -336,8 +365,14 @@ async function loadSchemaDatasets() {
   }
 
   try {
-    const response = await apiService.v1ListDatasets(workspaceId)
-    datasetOptions.value = normalizeDatasetEntries(response?.datasets || [])
+    const [datasetResponse, columnsResponse] = await Promise.all([
+      apiService.v1ListDatasets(workspaceId).catch(() => ({ datasets: [] })),
+      apiService.v1GetWorkspaceColumns(workspaceId).catch(() => ({ columns: [] }))
+    ])
+    datasetOptions.value = buildSchemaDatasetEntries(
+      datasetResponse?.datasets || [],
+      columnsResponse?.columns || []
+    )
   } catch (error) {
     datasetOptions.value = []
   }
@@ -525,8 +560,9 @@ async function regenerateSchemaForPath(dataPath, tableName = null, options = {})
   try {
     regenerationStatus.value = 'Loading dataset context...'
     regenerationProgress.value = 10
+    const saveTableName = (tableName || selectedDatasetTable.value || appStore.ingestedTableName || '').trim()
     const normalizedPath = (dataPath || '').trim()
-    if (!normalizedPath) {
+    if (!normalizedPath && !(saveTableName && appStore.activeWorkspaceId)) {
       schemaError.value = 'Please configure your data file path in settings first.'
       return false
     }
@@ -534,7 +570,6 @@ async function regenerateSchemaForPath(dataPath, tableName = null, options = {})
     regenerationStatus.value = 'Analyzing data columns with AI...'
     regenerationProgress.value = 30
 
-    const saveTableName = (tableName || selectedDatasetTable.value || appStore.ingestedTableName || '').trim()
     const generatedSchema = (saveTableName && appStore.activeWorkspaceId)
       ? await apiService.v1RegenerateDatasetSchema(appStore.activeWorkspaceId, saveTableName, {
           context: schemaContext.value || ''
@@ -591,8 +626,8 @@ async function handleDatasetSelection(value) {
   schemaError.value = ''
   previewService.clearSchemaCache()
 
-  if (!selected?.sourcePath) return
-  await fetchSchemaDataForPath(selected.sourcePath, selected.tableName)
+  if (!selected) return
+  await fetchSchemaData()
 }
 
 function handleDatasetSwitch(event) {
@@ -624,8 +659,8 @@ function handleDatasetSwitch(event) {
 
 onMounted(async () => {
   await loadSchemaDatasets()
-  if (selectedDatasetPath.value && selectedDatasetTable.value) {
-    await fetchSchemaDataForPath(selectedDatasetPath.value, selectedDatasetTable.value)
+  if (selectedDatasetTable.value) {
+    await fetchSchemaData()
   }
   window.addEventListener('dataset-switched', handleDatasetSwitch)
 })
@@ -643,8 +678,8 @@ watch(
     schemaContext.value = ''
     schemaError.value = ''
     await loadSchemaDatasets()
-    if (selectedDatasetPath.value && selectedDatasetTable.value) {
-      await fetchSchemaDataForPath(selectedDatasetPath.value, selectedDatasetTable.value)
+    if (selectedDatasetTable.value) {
+      await fetchSchemaData()
     }
   }
 )

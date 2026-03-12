@@ -31,6 +31,17 @@ test('schema editor auto-regenerates on dataset switch/load failures with progre
   assert.equal(source.includes('apiService.v1RegenerateDatasetSchema('), true)
 })
 
+test('schema editor derives dataset options from workspace tables and does not require source_path for selection', () => {
+  const schemaEditorPath = resolve(process.cwd(), 'src/components/preview/SchemaEditorTab.vue')
+  const source = readFileSync(schemaEditorPath, 'utf-8')
+
+  assert.equal(source.includes('function extractWorkspaceTableNames(columns)'), true)
+  assert.equal(source.includes('function buildSchemaDatasetEntries(catalogItems, workspaceColumns)'), true)
+  assert.equal(source.includes('apiService.v1GetWorkspaceColumns(workspaceId)'), true)
+  assert.equal(source.includes('if (!normalizedPath && !(saveTableName && appStore.activeWorkspaceId)) {'), true)
+  assert.equal(source.includes('if (!selected?.sourcePath) return'), false)
+})
+
 test('schema editor does not label blank descriptions as active generation', () => {
   const schemaEditorPath = resolve(process.cwd(), 'src/components/preview/SchemaEditorTab.vue')
   const source = readFileSync(schemaEditorPath, 'utf-8')

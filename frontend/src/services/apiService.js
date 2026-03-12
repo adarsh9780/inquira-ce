@@ -286,14 +286,6 @@ export const apiService = {
     return this.v1SaveDatasetSchema(workspaceId, tableName, { context, columns })
   },
 
-  // List schemas
-  async listSchemas() {
-    const { useAppStore } = await import('../stores/appStore')
-    const appStore = useAppStore()
-    if (!appStore.activeWorkspaceId) return { schemas: [] }
-    return this.v1ListSchemas(appStore.activeWorkspaceId)
-  },
-
   // Get database and schema paths
   async getDatabasePaths() {
     const { useAppStore } = await import('../stores/appStore')
@@ -645,10 +637,6 @@ export const apiService = {
       `/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema/regenerate`,
       payload
     )
-  },
-
-  async v1ListSchemas(workspaceId) {
-    return axios.get(`/api/v1/workspaces/${workspaceId}/schemas`)
   },
 
   async v1SyncBrowserDataset(workspaceId, payload) {
