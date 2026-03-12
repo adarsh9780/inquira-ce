@@ -2,8 +2,8 @@
   <div class="flex flex-col h-full">
     <!-- Figure Header (Teleported) -->
     <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'figure'">
-      <div class="flex items-center justify-end w-full gap-4">
-        <div class="flex items-center space-x-3 text-sm mr-auto">
+      <div class="flex min-w-0 items-center justify-end w-full gap-3">
+        <div class="mr-auto flex min-w-0 items-center space-x-3 text-sm">
           <span v-if="appStore.isCodeRunning" class="text-xs px-2 py-1 rounded text-orange-600 bg-orange-100">
             Processing
           </span>
@@ -15,9 +15,13 @@
           </span>
         </div>
         
-        <div class="flex items-center space-x-2">
+        <div class="flex min-w-0 flex-1 items-center justify-end gap-2">
           <!-- Figure Selector -->
-          <div v-if="orderedFigures && orderedFigures.length > 1" class="flex min-w-0 items-center" style="max-width: min(42vw, 24rem);">
+          <div
+            v-if="orderedFigures && orderedFigures.length > 1"
+            class="flex min-w-[10rem] flex-1 items-center"
+            style="max-width: min(34vw, 20rem);"
+          >
             <HeaderDropdown
               id="figure-select"
               v-model="selectedArtifactId"
@@ -36,24 +40,32 @@
             @click="deleteSelectedFigure"
             type="button"
             :disabled="!canDeleteSelectedFigure || isDeletingArtifact"
-            class="inline-flex items-center px-3 py-1.5 border border-red-200 text-sm leading-4 font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-gray-500 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
             :class="(!canDeleteSelectedFigure || isDeletingArtifact) ? 'opacity-50 cursor-not-allowed' : ''"
+            :title="isDeletingArtifact ? 'Deleting chart' : 'Delete chart'"
+            :aria-label="isDeletingArtifact ? 'Deleting chart' : 'Delete chart'"
           >
-            <TrashIcon class="h-4 w-4 mr-1" />
-            {{ isDeletingArtifact ? 'Deleting...' : 'Delete' }}
+            <div
+              v-if="isDeletingArtifact"
+              class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-red-500"
+            ></div>
+            <TrashIcon v-else class="h-4 w-4" />
           </button>
 
           <!-- Export Menu -->
           <Menu as="div" class="relative inline-flex">
             <MenuButton
               :disabled="!selectedFigure || isDownloading"
-              class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+              class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
               :class="(!selectedFigure || isDownloading) ? 'opacity-50 cursor-not-allowed' : ''"
+              :title="isDownloading ? 'Exporting chart' : 'Export chart'"
+              :aria-label="isDownloading ? 'Exporting chart' : 'Export chart'"
             >
-              <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4 mr-1.5" />
-              <div v-else class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-1.5"></div>
-              <span>{{ isDownloading ? 'Exporting...' : 'Export' }}</span>
-              <ChevronDownIcon class="h-4 w-4 ml-1.5" />
+              <div class="relative flex items-center justify-center">
+                <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4" />
+                <div v-else class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"></div>
+                <ChevronDownIcon class="absolute -right-2 -bottom-1 h-3 w-3 rounded-full bg-white" />
+              </div>
             </MenuButton>
             <transition
               enter-active-class="transition duration-100 ease-out"
@@ -133,6 +145,7 @@ import Plotly from 'plotly.js-dist-min'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import apiService from '../../services/apiService'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
+import { persistExportFile } from '../../utils/exportFile'
 import { applyPlotlyTheme, applyPlotlyConfigTheme, PLOTLY_THEME_MODE } from '../../utils/plotlyTheme'
 import { toast } from '../../composables/useToast'
 import { 
@@ -552,55 +565,6 @@ function decodeBase64ToBytes(base64Text) {
     bytes[i] = raw.charCodeAt(i)
   }
   return bytes
-}
-
-async function persistExportFile({
-  defaultFileName,
-  mimeType,
-  payload,
-  tauriFilters,
-  browserFileTypes
-}) {
-  if (window.__TAURI_INTERNALS__) {
-    const { save } = await import('@tauri-apps/plugin-dialog')
-    const savePath = await save({
-      defaultPath: defaultFileName,
-      filters: Array.isArray(tauriFilters) ? tauriFilters : []
-    })
-    if (!savePath) return false
-    const { writeFile } = await import('@tauri-apps/plugin-fs')
-    await writeFile(savePath, payload)
-    return true
-  }
-
-  if (typeof window.showSaveFilePicker === 'function') {
-    try {
-      const handle = await window.showSaveFilePicker({
-        suggestedName: defaultFileName,
-        types: Array.isArray(browserFileTypes) ? browserFileTypes : []
-      })
-      const writable = await handle.createWritable()
-      await writable.write(payload)
-      await writable.close()
-      return true
-    } catch (error) {
-      if (error?.name === 'AbortError') return false
-      throw error
-    }
-  }
-
-  const blobData = payload instanceof Uint8Array ? payload : new TextEncoder().encode(String(payload || ''))
-  const blob = new Blob([blobData], { type: mimeType })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.setAttribute('href', url)
-  link.setAttribute('download', defaultFileName)
-  link.style.visibility = 'hidden'
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
-  return true
 }
 
 async function downloadPng() {

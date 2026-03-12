@@ -34,15 +34,24 @@
             />
           </div>
 
-          <input
-            v-model="tableSearch"
-            type="text"
-            placeholder="Search rows"
-            class="h-8 min-w-[9rem] flex-1 rounded-md border px-2 text-sm"
-            style="max-width: min(30vw, 16rem); border-color: var(--color-border); background-color: var(--color-surface, #fff); color: var(--color-text);"
-            :disabled="!selectedArtifactId"
-            aria-label="Search rows"
-          />
+          <div
+            class="relative min-w-[9rem] flex-1"
+            style="max-width: min(30vw, 16rem);"
+          >
+            <MagnifyingGlassIcon
+              class="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+              aria-hidden="true"
+            />
+            <input
+              v-model="tableSearch"
+              type="text"
+              placeholder="Search rows"
+              class="h-8 w-full rounded-md border pl-8 pr-2 text-sm"
+              style="border-color: var(--color-border); background-color: var(--color-surface, #fff); color: var(--color-text);"
+              :disabled="!selectedArtifactId"
+              aria-label="Search rows"
+            />
+          </div>
 
           <!-- Delete selected table -->
           <button
@@ -213,6 +222,7 @@ import { persistExportFile } from '../../utils/exportFile'
 ModuleRegistry.registerModules([AllCommunityModule])
 import {
   ArrowDownTrayIcon,
+  MagnifyingGlassIcon,
   TableCellsIcon,
   TrashIcon
 } from '@heroicons/vue/24/outline'

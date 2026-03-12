@@ -1,17 +1,20 @@
 <template>
   <div class="flex h-full flex-col overflow-hidden">
     <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'output'">
-      <div class="flex w-full items-center justify-end gap-2">
-        <div class="text-xs tabular-nums" style="color: var(--color-text-muted);">
+      <div class="flex min-w-0 w-full items-center justify-end gap-2">
+        <div class="mr-auto text-xs tabular-nums" style="color: var(--color-text-muted);">
           {{ filteredEvents.length }} {{ filteredEvents.length === 1 ? 'event' : 'events' }}
         </div>
-        <HeaderDropdown
-          v-model="activeFilter"
-          :options="filterOptions"
-          placeholder="All"
-          aria-label="Filter output events"
-          max-width-class="w-[136px]"
-        />
+        <div class="flex min-w-[9rem] flex-1 items-center justify-end gap-2" style="max-width: min(28vw, 11rem);">
+          <FunnelIcon class="h-4 w-4 shrink-0" style="color: var(--color-text-muted);" aria-hidden="true" />
+          <HeaderDropdown
+            v-model="activeFilter"
+            :options="filterOptions"
+            placeholder="All"
+            aria-label="Filter output events"
+            max-width-class="w-full"
+          />
+        </div>
       </div>
     </Teleport>
 
@@ -185,6 +188,7 @@ import {
   CheckCircleIcon,
   ChevronDownIcon,
   ExclamationTriangleIcon,
+  FunnelIcon,
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()

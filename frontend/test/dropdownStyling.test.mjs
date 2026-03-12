@@ -18,7 +18,7 @@ test('table and figure headers use shared HeaderDropdown control instead of nati
   assert.equal(tableTab.includes('<select'), false)
   assert.equal(figureTab.includes(':fit-to-longest-label="true"'), true)
   assert.equal(tableTab.includes(':fit-to-longest-label="true"'), true)
-  assert.equal(figureTab.includes('max-width: min(42vw, 24rem);'), true)
+  assert.equal(figureTab.includes('max-width: min(34vw, 20rem);'), true)
   assert.equal(tableTab.includes('max-width: min(34vw, 20rem);'), true)
   assert.equal(figureTab.includes('max-width-class="w-full"'), true)
   assert.equal(tableTab.includes('max-width-class="w-full"'), true)

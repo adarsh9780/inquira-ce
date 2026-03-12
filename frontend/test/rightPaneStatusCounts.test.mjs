@@ -49,12 +49,11 @@ test('figure tab header removes explicit Figure label next to dropdown', () => {
   assert.equal(source.includes('>Fullscreen<'), false)
   assert.equal(source.includes('>PNG<'), false)
   assert.equal(source.includes('>HTML<'), false)
-  assert.equal(source.includes("isDownloading ? 'Exporting...' : 'Export'"), true)
+  assert.equal(source.includes(":title=\"isDownloading ? 'Exporting chart' : 'Export chart'\""), true)
+  assert.equal(source.includes(":title=\"isDeletingArtifact ? 'Deleting chart' : 'Delete chart'\""), true)
   assert.equal(source.includes('PNG image (.png)'), true)
   assert.equal(source.includes('HTML file (.html)'), true)
-  assert.equal(source.includes('showSaveFilePicker'), true)
-  assert.equal(source.includes('@tauri-apps/plugin-dialog'), true)
-  assert.equal(source.includes('@tauri-apps/plugin-fs'), true)
+  assert.equal(source.includes("import { persistExportFile } from '../../utils/exportFile'"), true)
 })
 
 test('app store keeps figureCount synchronized with setFigures output', () => {
