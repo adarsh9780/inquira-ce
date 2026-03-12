@@ -1,9 +1,9 @@
 <template>
   <div class="flex flex-col h-full">
     <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'table'">
-      <div class="flex items-center justify-end w-full gap-4">
+      <div class="flex min-w-0 items-center justify-end w-full gap-3">
         <!-- Loading / error status (left) -->
-        <div class="flex items-center space-x-3 text-sm mr-auto">
+        <div class="mr-auto flex min-w-0 items-center space-x-3 text-sm">
           <div v-if="tableStatusMessage" class="flex items-center gap-2 text-xs" :class="tableStatusClass">
             <div
               v-if="isPageLoading"
@@ -14,9 +14,13 @@
           </div>
         </div>
 
-        <div class="flex items-center space-x-2">
+        <div class="flex min-w-0 flex-1 items-center justify-end gap-2">
           <!-- Table selector dropdown — always shown when artifacts are available -->
-          <div v-if="displayArtifacts.length > 0" class="flex min-w-0 items-center" style="max-width: min(42vw, 24rem);">
+          <div
+            v-if="displayArtifacts.length > 0"
+            class="flex min-w-[10rem] flex-1 items-center"
+            style="max-width: min(34vw, 20rem);"
+          >
             <HeaderDropdown
               id="dataframe-select"
               v-model="selectedArtifactId"
@@ -34,8 +38,8 @@
             v-model="tableSearch"
             type="text"
             placeholder="Search rows"
-            class="h-8 w-48 rounded-md border px-2 text-sm"
-            style="border-color: var(--color-border); background-color: var(--color-surface, #fff); color: var(--color-text);"
+            class="h-8 min-w-[9rem] flex-1 rounded-md border px-2 text-sm"
+            style="max-width: min(30vw, 16rem); border-color: var(--color-border); background-color: var(--color-surface, #fff); color: var(--color-text);"
             :disabled="!selectedArtifactId"
             aria-label="Search rows"
           />
@@ -45,23 +49,29 @@
             @click="deleteSelectedArtifact"
             type="button"
             :disabled="!canDeleteSelectedArtifact || isDeletingArtifact"
-            class="inline-flex items-center px-3 py-1.5 border border-red-200 text-sm leading-4 font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-gray-500 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
             :class="(!canDeleteSelectedArtifact || isDeletingArtifact) ? 'opacity-50 cursor-not-allowed' : ''"
+            :title="isDeletingArtifact ? 'Deleting table' : 'Delete table'"
+            :aria-label="isDeletingArtifact ? 'Deleting table' : 'Delete table'"
           >
-            <TrashIcon class="h-4 w-4 mr-1" />
-            {{ isDeletingArtifact ? 'Deleting...' : 'Delete' }}
+            <div
+              v-if="isDeletingArtifact"
+              class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-red-500"
+            ></div>
+            <TrashIcon v-else class="h-4 w-4" />
           </button>
 
           <!-- CSV download -->
           <button
             @click="downloadCsv"
             :disabled="!downloadRows.length || isDownloading"
-            class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
             :class="!downloadRows.length ? 'opacity-50 cursor-not-allowed' : ''"
+            :title="isDownloading ? 'Exporting CSV' : 'Export CSV'"
+            :aria-label="isDownloading ? 'Exporting CSV' : 'Export CSV'"
           >
-            <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4 mr-1" />
-            <div v-else class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-1"></div>
-            {{ isDownloading ? 'Downloading...' : 'CSV' }}
+            <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4" />
+            <div v-else class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"></div>
           </button>
         </div>
       </div>
@@ -197,6 +207,8 @@ import { AgGridVue } from 'ag-grid-vue3'
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
+import { toast } from '../../composables/useToast'
+import { persistExportFile } from '../../utils/exportFile'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 import {
@@ -1068,17 +1080,23 @@ async function downloadCsv() {
   try {
     const csvContent = convertToCSV(downloadRows.value)
     const dfName = selectedArtifactMeta.value?.logical_name || 'dataframe'
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `${dfName}_${new Date().toISOString().split('T')[0]}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    const filename = `${dfName}_${new Date().toISOString().split('T')[0]}.csv`
+    const bytes = new TextEncoder().encode(csvContent)
+    const exported = await persistExportFile({
+      defaultFileName: filename,
+      mimeType: 'text/csv;charset=utf-8;',
+      payload: bytes,
+      tauriFilters: [{ name: 'CSV File', extensions: ['csv'] }],
+      browserFileTypes: [{ description: 'CSV File', accept: { 'text/csv': ['.csv'] } }]
+    })
+    if (!exported) {
+      toast.info('Export canceled')
+      return
+    }
+    toast.success('Export complete', `${filename} saved.`)
   } catch (error) {
     console.error('Failed to download CSV:', error)
+    toast.error('Export failed', 'Unable to save CSV file.')
   } finally {
     isDownloading.value = false
   }
