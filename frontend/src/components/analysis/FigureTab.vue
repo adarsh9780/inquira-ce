@@ -61,11 +61,8 @@
               :title="isDownloading ? 'Exporting chart' : 'Export chart'"
               :aria-label="isDownloading ? 'Exporting chart' : 'Export chart'"
             >
-              <div class="relative flex items-center justify-center">
-                <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4" />
-                <div v-else class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"></div>
-                <ChevronDownIcon class="absolute -right-2 -bottom-1 h-3 w-3 rounded-full bg-white" />
-              </div>
+              <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4" />
+              <div v-else class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"></div>
             </MenuButton>
             <transition
               enter-active-class="transition duration-100 ease-out"
@@ -150,7 +147,6 @@ import { applyPlotlyTheme, applyPlotlyConfigTheme, PLOTLY_THEME_MODE } from '../
 import { toast } from '../../composables/useToast'
 import { 
   ArrowDownTrayIcon,
-  ChevronDownIcon,
   ChartBarIcon,
   TrashIcon
 } from '@heroicons/vue/24/outline'

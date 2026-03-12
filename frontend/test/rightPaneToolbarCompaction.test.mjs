@@ -12,6 +12,7 @@ test('figure toolbar uses flexible selector width and icon-only actions', () => 
   assert.equal(source.includes('style="max-width: min(34vw, 20rem);"'), true)
   assert.equal(source.includes(`:title="isDeletingArtifact ? 'Deleting chart' : 'Delete chart'"`), true)
   assert.equal(source.includes(`:title="isDownloading ? 'Exporting chart' : 'Export chart'"`), true)
+  assert.equal(source.includes('ChevronDownIcon'), false)
   assert.equal(source.includes('hover:text-red-600'), true)
 })
 
