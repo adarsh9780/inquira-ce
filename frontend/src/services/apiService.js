@@ -4,6 +4,7 @@ import { v1Api } from './contracts/v1Api'
 import { parseSseBuffer } from '../utils/sseParser'
 import { inferTableNameFromDataPath } from '../utils/chatBootstrap'
 import { normalizeExecutionResponse } from '../utils/runtimeExecution'
+import { extractApiErrorMessage } from '../utils/apiError'
 
 // ------------------------------------------------------------------
 // GLOBAL AXIOS CONFIGURATION
@@ -129,6 +130,10 @@ axios.interceptors.response.use(
       error.status = error.response.status
       error.statusText = error.response.statusText
       error.data = error.response.data
+      error.message = extractApiErrorMessage(
+        error,
+        error.message || `Request failed with status ${error.response.status}`,
+      )
     } else if (error.request) {
       // Network error
       error.code = 'NETWORK_ERROR'
@@ -518,7 +523,24 @@ export const apiService = {
       throw new Error('Create/select a workspace before loading a dataset.')
     }
 
-    const ds = await this.v1AddDataset(appStore.activeWorkspaceId, filePath)
+    const workspaceId = appStore.activeWorkspaceId
+    let ds = null
+    try {
+      ds = await this.v1AddDataset(workspaceId, filePath)
+    } catch (error) {
+      const detail = extractApiErrorMessage(error, '')
+      const normalizedDetail = String(detail || '').toLowerCase()
+      const isWorkspaceLockConflict =
+        error?.status === 409 &&
+        normalizedDetail.includes('workspace database is currently locked')
+
+      if (!isWorkspaceLockConflict) {
+        throw error
+      }
+
+      await this.v1ResetWorkspaceKernel(workspaceId)
+      ds = await this.v1AddDataset(workspaceId, filePath)
+    }
     const kernelReady = await appStore.ensureWorkspaceKernelConnected(appStore.activeWorkspaceId)
     if (!kernelReady) {
       const reason = String(appStore.runtimeError || 'Workspace runtime bootstrap failed.')
