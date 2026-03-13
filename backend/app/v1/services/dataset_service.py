@@ -12,12 +12,14 @@ import json
 import os
 from pathlib import Path
 
-import duckdb
-import pandas as pd
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...services.code_executor import (
+    ensure_workspace_kernel_active,
+    ingest_workspace_dataset_via_kernel,
+)
 from ..models import WorkspaceDataset
 from ..repositories.workspace_repository import WorkspaceRepository
 
@@ -88,91 +90,36 @@ class DatasetService:
         ):
             return existing
 
-        def _ingest() -> tuple[int, str]:
-            try:
-                con = duckdb.connect(workspace.duckdb_path)
-            except duckdb.IOException as exc:
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        "Workspace database is currently locked by another running execution. "
-                        "Please wait, stop running code, or reset the workspace kernel and try again."
-                    ),
-                ) from exc
-            try:
-                if file_type in {"csv", "tsv"}:
-                    con.execute(
-                        f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM read_csv_auto(?)",
-                        [str(source)],
-                    )
-                elif file_type == "parquet":
-                    con.execute(
-                        f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM read_parquet(?)",
-                        [str(source)],
-                    )
-                elif file_type == "json":
-                    con.execute(
-                        f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM read_json_auto(?)",
-                        [str(source)],
-                    )
-                elif file_type in {"xlsx", "xls"}:
-                    try:
-                        excel_df = pd.read_excel(str(source), engine="openpyxl")
-                    except ImportError as exc:
-                        raise HTTPException(
-                            status_code=500,
-                            detail=(
-                                "Excel ingestion requires the 'openpyxl' dependency. "
-                                "Install it in the backend environment and retry."
-                            ),
-                        ) from exc
-                    except Exception as exc:
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"Failed to read Excel file: {str(exc)}",
-                        ) from exc
+        try:
+            await ensure_workspace_kernel_active(workspace_id, "Loading a dataset")
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-                    con.register("_inquira_excel_df", excel_df)
-                    try:
-                        con.execute(
-                            f'CREATE OR REPLACE TABLE "{table_name}" AS SELECT * FROM _inquira_excel_df'
-                        )
-                    finally:
-                        try:
-                            con.unregister("_inquira_excel_df")
-                        except Exception:
-                            pass
-                else:
-                    raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_type}")
+        if file_type not in {"csv", "tsv", "parquet", "json", "xlsx", "xls"}:
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_type}")
 
-                row_value = con.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
-                if row_value is None:
-                    raise HTTPException(status_code=500, detail="Failed to compute row count after ingest")
-                row_count = int(row_value[0])
-                schema_rows = con.execute(f"DESCRIBE {table_name}").fetchall()
-                schema = {
-                    "table_name": table_name,
-                    "columns": [
-                        {
-                            "name": r[0],
-                            "dtype": r[1],
-                            "description": "",
-                            "samples": [],
-                        }
-                        for r in schema_rows
-                    ],
-                }
-            except duckdb.IOException as exc:
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        "Workspace database is currently locked by another running execution. "
-                        "Please wait, stop running code, or reset the workspace kernel and try again."
-                    ),
-                ) from exc
-            finally:
-                con.close()
+        try:
+            kernel_result = await ingest_workspace_dataset_via_kernel(
+                workspace_id=workspace_id,
+                source_path=str(source),
+                table_name=table_name,
+                file_type=file_type,
+            )
+        except RuntimeError as exc:
+            detail = str(exc).strip() or "Failed to load dataset through the workspace kernel."
+            lowered = detail.lower()
+            if "requires an active workspace kernel" in lowered or "kernel ready" in lowered:
+                raise HTTPException(status_code=409, detail=detail) from exc
+            if "openpyxl" in lowered or "failed to read" in lowered or "unsupported file type" in lowered:
+                raise HTTPException(status_code=400, detail=detail) from exc
+            raise HTTPException(status_code=500, detail=detail) from exc
 
+        def _write_schema() -> tuple[int, str]:
+            row_count = int(kernel_result.get("row_count") or 0)
+            schema = {
+                "table_name": table_name,
+                "columns": kernel_result.get("columns") or [],
+            }
             schema_dir = Path(workspace.duckdb_path).parent / "meta"
             schema_dir.mkdir(parents=True, exist_ok=True)
             schema_path = schema_dir / f"{table_name}_schema.json"
@@ -180,7 +127,7 @@ class DatasetService:
                 json.dump(schema, file, indent=2)
             return row_count, str(schema_path)
 
-        row_count, schema_path = await asyncio.to_thread(_ingest)
+        row_count, schema_path = await asyncio.to_thread(_write_schema)
 
         if existing:
             existing.source_path = str(source)

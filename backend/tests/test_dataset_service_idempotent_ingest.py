@@ -64,11 +64,6 @@ async def test_add_dataset_skips_ingest_when_source_unchanged(monkeypatch, tmp_p
         fake_workspace,
     )
 
-    def should_not_connect(_path):
-        raise AssertionError("duckdb.connect must not be called for unchanged files")
-
-    monkeypatch.setattr(dataset_service_module.duckdb, "connect", should_not_connect)
-
     result = await DatasetService.add_dataset(
         session=session,
         user=user,
@@ -111,28 +106,25 @@ async def test_add_dataset_reingests_when_source_changed(monkeypatch, tmp_path):
         fake_workspace,
     )
 
-    calls = {"create": 0}
+    calls = {"ingest": 0}
 
-    class FakeConn:
-        def __init__(self):
-            self._last_sql = ""
+    async def fake_ensure_kernel(workspace_id, operation_name):
+        assert workspace_id == "ws-1"
+        assert "dataset" in operation_name.lower()
 
-        def execute(self, sql, _params=None):
-            self._last_sql = str(sql)
-            if "CREATE OR REPLACE TABLE" in self._last_sql:
-                calls["create"] += 1
-            return self
+    async def fake_ingest_dataset_via_kernel(*, workspace_id, source_path, table_name, file_type):
+        assert workspace_id == "ws-1"
+        assert source_path == str(source)
+        assert table_name == DatasetService._normalize_table_name(str(source))
+        assert file_type == "csv"
+        calls["ingest"] += 1
+        return {
+            "row_count": 1,
+            "columns": [{"name": "a", "dtype": "INTEGER", "description": "", "samples": []}],
+        }
 
-        def fetchone(self):
-            return (1,)
-
-        def fetchall(self):
-            return [("a", "INTEGER")]
-
-        def close(self):
-            return None
-
-    monkeypatch.setattr(dataset_service_module.duckdb, "connect", lambda _path: FakeConn())
+    monkeypatch.setattr(dataset_service_module, "ensure_workspace_kernel_active", fake_ensure_kernel)
+    monkeypatch.setattr(dataset_service_module, "ingest_workspace_dataset_via_kernel", fake_ingest_dataset_via_kernel)
 
     result = await DatasetService.add_dataset(
         session=session,
@@ -142,7 +134,7 @@ async def test_add_dataset_reingests_when_source_changed(monkeypatch, tmp_path):
     )
 
     assert result is existing
-    assert calls["create"] == 1
+    assert calls["ingest"] == 1
     assert session.committed is True
 
 
@@ -165,44 +157,27 @@ async def test_add_dataset_ingests_excel_via_pandas_openpyxl(monkeypatch, tmp_pa
         fake_workspace,
     )
 
-    calls = {"read_excel": 0, "register": 0, "create": 0, "unregister": 0}
+    calls = {"ingest": 0}
 
-    class FakeConn:
-        def __init__(self):
-            self._last_sql = ""
+    async def fake_ensure_kernel(workspace_id, operation_name):
+        assert workspace_id == "ws-1"
+        assert "dataset" in operation_name.lower()
 
-        def register(self, name, dataframe):
-            _ = dataframe
-            if name == "_inquira_excel_df":
-                calls["register"] += 1
+    async def fake_ingest_dataset_via_kernel(*, workspace_id, source_path, table_name, file_type):
+        assert workspace_id == "ws-1"
+        assert source_path == str(source)
+        assert file_type == "xlsx"
+        calls["ingest"] += 1
+        return {
+            "row_count": 2,
+            "columns": [
+                {"name": "a", "dtype": "INTEGER", "description": "", "samples": []},
+                {"name": "b", "dtype": "VARCHAR", "description": "", "samples": []},
+            ],
+        }
 
-        def unregister(self, name):
-            if name == "_inquira_excel_df":
-                calls["unregister"] += 1
-
-        def execute(self, sql, _params=None):
-            self._last_sql = str(sql)
-            if "CREATE OR REPLACE TABLE" in self._last_sql and "_inquira_excel_df" in self._last_sql:
-                calls["create"] += 1
-            return self
-
-        def fetchone(self):
-            return (2,)
-
-        def fetchall(self):
-            return [("a", "INTEGER"), ("b", "VARCHAR")]
-
-        def close(self):
-            return None
-
-    def fake_read_excel(path, engine=None):
-        assert path == str(source)
-        assert engine == "openpyxl"
-        calls["read_excel"] += 1
-        return [{"a": 1, "b": "x"}, {"a": 2, "b": "y"}]
-
-    monkeypatch.setattr(dataset_service_module.pd, "read_excel", fake_read_excel)
-    monkeypatch.setattr(dataset_service_module.duckdb, "connect", lambda _path: FakeConn())
+    monkeypatch.setattr(dataset_service_module, "ensure_workspace_kernel_active", fake_ensure_kernel)
+    monkeypatch.setattr(dataset_service_module, "ingest_workspace_dataset_via_kernel", fake_ingest_dataset_via_kernel)
 
     result = await DatasetService.add_dataset(
         session=session,
@@ -212,8 +187,5 @@ async def test_add_dataset_ingests_excel_via_pandas_openpyxl(monkeypatch, tmp_pa
     )
 
     assert result.file_type == "xlsx"
-    assert calls["read_excel"] == 1
-    assert calls["register"] == 1
-    assert calls["create"] == 1
-    assert calls["unregister"] == 1
+    assert calls["ingest"] == 1
     assert session.committed is True

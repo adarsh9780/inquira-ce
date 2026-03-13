@@ -55,6 +55,35 @@ async def get_workspace_kernel_status(workspace_id: str) -> str:
     return await manager.get_status(workspace_id)
 
 
+def _kernel_required_message(operation_name: str, status: str) -> str:
+    operation = str(operation_name or "This operation").strip() or "This operation"
+    if status == "error":
+        return (
+            f"{operation} requires an active workspace kernel because Inquira now reuses the "
+            "kernel-owned DuckDB connections for workspace data and artifacts. The current kernel "
+            "is in an error state. Restart the workspace kernel and try again."
+        )
+    if status == "starting":
+        return (
+            f"{operation} requires the workspace kernel to finish starting because Inquira now "
+            "reuses the kernel-owned DuckDB connections for workspace data and artifacts. Wait "
+            "for the status bar to show Kernel Ready, then try again."
+        )
+    return (
+        f"{operation} requires an active workspace kernel because Inquira now reuses the "
+        "kernel-owned DuckDB connections for workspace data and artifacts. Start or restart "
+        "the workspace kernel, wait for Kernel Ready, then try again."
+    )
+
+
+async def ensure_workspace_kernel_active(workspace_id: str, operation_name: str) -> None:
+    """Raise a clear error when an operation requires a live workspace kernel."""
+    status = await get_workspace_kernel_status(workspace_id)
+    if status in {"ready", "busy"}:
+        return
+    raise RuntimeError(_kernel_required_message(operation_name, status))
+
+
 async def interrupt_workspace_kernel(workspace_id: str) -> bool:
     """Interrupt a workspace kernel."""
     manager = await get_workspace_kernel_manager()
@@ -71,6 +100,7 @@ async def get_workspace_dataframe_rows(
     search_text: str | None = None,
 ) -> dict[str, Any] | None:
     """Fetch a paginated slice of a stored dataframe artifact."""
+    await ensure_workspace_kernel_active(workspace_id, "Viewing dataframe artifacts")
     manager = await get_workspace_kernel_manager()
     return await manager.get_dataframe_rows(
         workspace_id=workspace_id,
@@ -88,6 +118,7 @@ async def list_workspace_artifacts_via_kernel(
     kind: str | None = None,
 ) -> list[dict[str, Any]]:
     """List artifacts via the kernel's in-process scratchpad connection (lock-safe)."""
+    await ensure_workspace_kernel_active(workspace_id, "Listing workspace artifacts")
     manager = await get_workspace_kernel_manager()
     return await manager.list_workspace_artifacts(
         workspace_id=workspace_id,
@@ -99,6 +130,7 @@ async def get_workspace_artifact_usage_via_kernel(
     workspace_id: str,
 ) -> dict[str, int]:
     """Fetch workspace artifact usage using kernel-owned scratchpad connection."""
+    await ensure_workspace_kernel_active(workspace_id, "Loading workspace artifact usage")
     manager = await get_workspace_kernel_manager()
     return await manager.get_workspace_artifact_usage(workspace_id=workspace_id)
 
@@ -108,6 +140,7 @@ async def get_workspace_artifact_metadata_via_kernel(
     artifact_id: str,
 ) -> dict[str, Any] | None:
     """Fetch one artifact metadata payload via kernel-owned scratchpad connection."""
+    await ensure_workspace_kernel_active(workspace_id, "Loading artifact metadata")
     manager = await get_workspace_kernel_manager()
     return await manager.get_workspace_artifact(
         workspace_id=workspace_id,
@@ -120,6 +153,7 @@ async def delete_workspace_artifact_via_kernel(
     artifact_id: str,
 ) -> bool:
     """Delete one artifact using the kernel-owned scratchpad connection."""
+    await ensure_workspace_kernel_active(workspace_id, "Deleting an artifact")
     manager = await get_workspace_kernel_manager()
     return await manager.delete_workspace_artifact(
         workspace_id=workspace_id,
@@ -132,8 +166,55 @@ async def get_workspace_run_exports(
     run_id: str,
 ) -> list[dict[str, Any]]:
     """Read exported artifacts cached in kernel runtime for a run."""
+    await ensure_workspace_kernel_active(workspace_id, "Loading run artifacts")
     manager = await get_workspace_kernel_manager()
     return await manager.get_run_exports(workspace_id=workspace_id, run_id=run_id)
+
+
+async def ingest_workspace_dataset_via_kernel(
+    *,
+    workspace_id: str,
+    source_path: str,
+    table_name: str,
+    file_type: str,
+) -> dict[str, Any]:
+    """Import a dataset through the active workspace kernel."""
+    await ensure_workspace_kernel_active(workspace_id, "Loading a dataset")
+    manager = await get_workspace_kernel_manager()
+    result = await manager.ingest_dataset(
+        workspace_id=workspace_id,
+        source_path=source_path,
+        table_name=table_name,
+        file_type=file_type,
+    )
+    if result is None:
+        raise RuntimeError(_kernel_required_message("Loading a dataset", "missing"))
+    return result
+
+
+async def get_workspace_columns_via_kernel(
+    workspace_id: str,
+) -> list[dict[str, str]]:
+    """Read workspace column catalog through the active kernel-owned connection."""
+    await ensure_workspace_kernel_active(workspace_id, "Loading workspace columns")
+    manager = await get_workspace_kernel_manager()
+    return await manager.get_workspace_columns(workspace_id=workspace_id)
+
+
+async def get_workspace_table_schema_via_kernel(
+    *,
+    workspace_id: str,
+    table_name: str,
+    allow_sample_values: bool = False,
+) -> list[dict[str, Any]] | None:
+    """Describe one workspace table through the active kernel-owned connection."""
+    await ensure_workspace_kernel_active(workspace_id, "Loading dataset schema")
+    manager = await get_workspace_kernel_manager()
+    return await manager.get_workspace_table_schema(
+        workspace_id=workspace_id,
+        table_name=table_name,
+        allow_sample_values=allow_sample_values,
+    )
 
 
 async def execute_code(

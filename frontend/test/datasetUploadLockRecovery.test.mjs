@@ -17,12 +17,13 @@ test('dataset upload retries once after resetting the kernel on workspace lock c
   const uploadBlock = extractBlock(
     source,
     'async uploadDataPath(filePath) {',
-    'const kernelReady = await appStore.ensureWorkspaceKernelConnected(appStore.activeWorkspaceId)',
+    'let columns = []',
   )
 
   assert.equal(uploadBlock.includes('const isWorkspaceLockConflict ='), true)
   assert.equal(uploadBlock.includes("normalizedDetail.includes('workspace database is currently locked')"), true)
   assert.equal(uploadBlock.includes('await this.v1ResetWorkspaceKernel(workspaceId)'), true)
+  assert.equal(uploadBlock.includes('await appStore.ensureWorkspaceKernelConnected(workspaceId)'), true)
   assert.equal(
     uploadBlock.includes('ds = await this.v1AddDataset(workspaceId, filePath)'),
     true,

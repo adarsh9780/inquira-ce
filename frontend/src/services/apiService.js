@@ -524,6 +524,11 @@ export const apiService = {
     }
 
     const workspaceId = appStore.activeWorkspaceId
+    const kernelReady = await appStore.ensureWorkspaceKernelConnected(workspaceId)
+    if (!kernelReady) {
+      const reason = String(appStore.runtimeError || 'Workspace runtime bootstrap failed.')
+      throw new Error(reason)
+    }
     let ds = null
     try {
       ds = await this.v1AddDataset(workspaceId, filePath)
@@ -540,11 +545,6 @@ export const apiService = {
 
       await this.v1ResetWorkspaceKernel(workspaceId)
       ds = await this.v1AddDataset(workspaceId, filePath)
-    }
-    const kernelReady = await appStore.ensureWorkspaceKernelConnected(appStore.activeWorkspaceId)
-    if (!kernelReady) {
-      const reason = String(appStore.runtimeError || 'Workspace runtime bootstrap failed.')
-      throw new Error(reason)
     }
     let columns = []
     try {

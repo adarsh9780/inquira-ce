@@ -23,14 +23,15 @@ from ...services.code_executor import (
     execute_code,
     get_workspace_artifact_metadata_via_kernel,
     get_workspace_artifact_usage_via_kernel,
+    get_workspace_columns_via_kernel,
     get_workspace_dataframe_rows,
     get_workspace_kernel_status,
     get_workspace_run_exports,
+    get_workspace_table_schema_via_kernel,
     interrupt_workspace_kernel,
     list_workspace_artifacts_via_kernel,
     reset_workspace_kernel,
 )
-from ...services.artifact_scratchpad import get_artifact_scratchpad_store
 from ...services.output_capture import build_run_wrapped_code
 from ..db.session import get_appdata_db_session
 from ..repositories.preferences_repository import PreferencesRepository
@@ -517,79 +518,6 @@ def _normalize_schema_columns(raw: Any) -> list[dict[str, Any]]:
     return normalized
 
 
-def _table_exists_in_workspace_db(duckdb_path: str, table_name: str) -> bool:
-    con = duckdb.connect(duckdb_path, read_only=True)
-    try:
-        row = con.execute(
-            """
-            SELECT 1
-            FROM information_schema.tables
-            WHERE table_schema = 'main' AND lower(table_name) = ?
-            LIMIT 1
-            """,
-            [table_name.lower()],
-        ).fetchone()
-        return row is not None
-    finally:
-        con.close()
-
-
-def _read_workspace_columns(duckdb_path: str) -> list[dict[str, str]]:
-    con = duckdb.connect(duckdb_path, read_only=True)
-    try:
-        rows = con.execute(
-            """
-            SELECT table_name, column_name, data_type
-            FROM information_schema.columns
-            WHERE table_schema = 'main'
-            ORDER BY table_name, ordinal_position
-            """
-        ).fetchall()
-    finally:
-        con.close()
-
-    return [
-        {
-            "table_name": str(row[0]),
-            "column_name": str(row[1]),
-            "dtype": str(row[2] or ""),
-        }
-        for row in rows
-    ]
-
-
-def _read_table_columns_for_prompt(
-    duckdb_path: str,
-    table_name: str,
-    allow_sample_values: bool,
-) -> list[dict[str, Any]]:
-    con = duckdb.connect(duckdb_path, read_only=True)
-    try:
-        rows = con.execute(f'DESCRIBE "{table_name}"').fetchall()
-        columns: list[dict[str, Any]] = []
-        for row in rows:
-            col_name = str(row[0])
-            col_dtype = str(row[1])
-            samples: list[Any] = []
-            if allow_sample_values:
-                sample_rows = con.execute(
-                    f'SELECT DISTINCT "{col_name}" FROM "{table_name}" LIMIT 10'
-                ).fetchall()
-                samples = [s[0] for s in sample_rows]
-            columns.append(
-                {
-                    "name": col_name,
-                    "dtype": col_dtype,
-                    "samples": samples,
-                    "description": "",
-                    "aliases": [],
-                }
-            )
-        return columns
-    finally:
-        con.close()
-
-
 def _read_columns_from_schema_file(
     schema_path: str,
     allow_sample_values: bool,
@@ -869,13 +797,9 @@ async def get_workspace_columns(
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
     try:
-        columns = await asyncio.to_thread(
-            _read_workspace_columns, str(workspace.duckdb_path)
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to load workspace columns: {str(exc)}"
-        ) from exc
+        columns = await get_workspace_columns_via_kernel(workspace_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return WorkspaceColumnsResponse(columns=columns)
 
 
@@ -1076,7 +1000,6 @@ async def get_workspace_dataframe_artifact_rows(
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
-    store = get_artifact_scratchpad_store()
     parsed_sort_model = _parse_grid_query_model(
         raw_value=sort_model,
         field_name="sort_model",
@@ -1088,24 +1011,7 @@ async def get_workspace_dataframe_artifact_rows(
         expected_kind=dict,
     )
     search_text = _normalize_search_query(search)
-    rows: dict[str, Any] | None = None
     try:
-        rows = store.get_dataframe_rows(
-            workspace_duckdb_path=str(workspace.duckdb_path),
-            artifact_id=artifact_id,
-            offset=offset,
-            limit=limit,
-            sort_model=cast(list[dict[str, Any]], parsed_sort_model),
-            filter_model=cast(dict[str, Any], parsed_filter_model),
-            search_text=search_text,
-        )
-    except duckdb.IOException as exc:
-        message = str(exc)
-        if "Conflicting lock is held" not in message:
-            raise HTTPException(
-                status_code=503, detail=f"Artifact store unavailable: {message}"
-            ) from exc
-        # Kernel path shares the in-process scratchpad connection, so use it as lock-safe fallback.
         rows = await get_workspace_dataframe_rows(
             workspace_id=workspace_id,
             artifact_id=artifact_id,
@@ -1115,6 +1021,8 @@ async def get_workspace_dataframe_artifact_rows(
             filter_model=cast(dict[str, Any], parsed_filter_model),
             search_text=search_text,
         )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if rows is None:
         raise HTTPException(status_code=404, detail="Dataframe artifact not found")
     return DataframeArtifactRowsResponse(**rows)
@@ -1140,7 +1048,6 @@ async def get_workspace_artifact_rows(
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
-    store = get_artifact_scratchpad_store()
     parsed_sort_model = _parse_grid_query_model(
         raw_value=sort_model,
         field_name="sort_model",
@@ -1152,23 +1059,7 @@ async def get_workspace_artifact_rows(
         expected_kind=dict,
     )
     search_text = _normalize_search_query(search)
-    rows: dict[str, Any] | None = None
     try:
-        rows = store.get_dataframe_rows(
-            workspace_duckdb_path=str(workspace.duckdb_path),
-            artifact_id=artifact_id,
-            offset=offset,
-            limit=limit,
-            sort_model=cast(list[dict[str, Any]], parsed_sort_model),
-            filter_model=cast(dict[str, Any], parsed_filter_model),
-            search_text=search_text,
-        )
-    except duckdb.IOException as exc:
-        message = str(exc)
-        if "Conflicting lock is held" not in message:
-            raise HTTPException(
-                status_code=503, detail=f"Artifact store unavailable: {message}"
-            ) from exc
         rows = await get_workspace_dataframe_rows(
             workspace_id=workspace_id,
             artifact_id=artifact_id,
@@ -1178,6 +1069,8 @@ async def get_workspace_artifact_rows(
             filter_model=cast(dict[str, Any], parsed_filter_model),
             search_text=search_text,
         )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if rows is None:
         raise HTTPException(status_code=404, detail="Artifact rows not found")
     return DataframeArtifactRowsResponse(**rows)
@@ -1194,17 +1087,10 @@ async def get_workspace_artifact_usage(
 ):
     """Return scratchpad usage summary used by status-bar artifact pressure warning."""
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
-    store = get_artifact_scratchpad_store()
     try:
-        usage = store.get_workspace_artifact_usage(
-            workspace_duckdb_path=str(workspace.duckdb_path),
-        )
-    except duckdb.IOException as exc:
-        if "Conflicting lock is held" not in str(exc):
-            raise HTTPException(
-                status_code=503, detail=f"Artifact usage unavailable: {exc}"
-            ) from exc
         usage = await get_workspace_artifact_usage_via_kernel(workspace_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     duckdb_bytes = max(0, int(usage.get("duckdb_bytes") or 0))
     figure_count = max(0, int(usage.get("figure_count") or 0))
@@ -1233,24 +1119,13 @@ async def get_workspace_artifact_metadata(
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
-    store = get_artifact_scratchpad_store()
-    artifact: dict[str, Any] | None = None
     try:
-        artifact = store.get_artifact(
-            workspace_duckdb_path=str(workspace.duckdb_path),
-            artifact_id=artifact_id,
-        )
-    except duckdb.IOException as exc:
-        message = str(exc)
-        if "Conflicting lock is held" not in message:
-            raise HTTPException(
-                status_code=503, detail=f"Artifact store unavailable: {message}"
-            ) from exc
-        # Lock-safe fallback: query through the kernel's in-process scratchpad connection.
         artifact = await get_workspace_artifact_metadata_via_kernel(
             workspace_id=workspace_id,
             artifact_id=artifact_id,
         )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if artifact is None:
         raise HTTPException(status_code=404, detail="Artifact not found")
     return ArtifactMetadataResponse(**artifact)
@@ -1267,23 +1142,13 @@ async def delete_workspace_artifact(
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
-    store = get_artifact_scratchpad_store()
-    deleted = False
     try:
-        deleted = store.delete_artifact(
-            workspace_duckdb_path=str(workspace.duckdb_path),
-            artifact_id=artifact_id,
-        )
-    except duckdb.IOException as exc:
-        message = str(exc)
-        if "Conflicting lock is held" not in message:
-            raise HTTPException(
-                status_code=503, detail=f"Artifact store unavailable: {message}"
-            ) from exc
         deleted = await delete_workspace_artifact_via_kernel(
             workspace_id=workspace_id,
             artifact_id=artifact_id,
         )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not deleted:
         raise HTTPException(status_code=404, detail="Artifact not found")
     return ArtifactDeleteResponse(artifact_id=artifact_id, deleted=True)
@@ -1304,19 +1169,10 @@ async def list_workspace_artifacts(
 ):
     """List all non-expired artifacts for a workspace, optionally filtered by kind."""
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
-    store = get_artifact_scratchpad_store()
     try:
-        items = store.list_artifacts_for_workspace(
-            workspace_duckdb_path=str(workspace.duckdb_path),
-            kind=kind,
-        )
-    except duckdb.IOException as exc:
-        if "Conflicting lock is held" not in str(exc):
-            raise HTTPException(
-                status_code=503, detail=f"Artifact store unavailable: {exc}"
-            ) from exc
-        # Lock-safe fallback: query through the kernel's in-process scratchpad connection.
         items = await list_workspace_artifacts_via_kernel(workspace_id, kind=kind)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     summaries = [
         WorkspaceArtifactSummary(
             artifact_id=item["artifact_id"],
@@ -1656,10 +1512,6 @@ async def get_workspace_dataset_schema(
         workspace_id=workspace_id,
         table_name=normalized,
     )
-    if dataset is None and not _table_exists_in_workspace_db(
-        workspace.duckdb_path, normalized
-    ):
-        raise HTTPException(status_code=404, detail="Dataset table not found")
 
     if dataset is not None and dataset.schema_path:
         schema_path = Path(dataset.schema_path)
@@ -1676,30 +1528,16 @@ async def get_workspace_dataset_schema(
                 # Fall back to DuckDB introspection when saved schema metadata is unreadable.
                 pass
 
-    con = duckdb.connect(workspace.duckdb_path, read_only=True)
     try:
-        rows = con.execute(f'DESCRIBE "{normalized}"').fetchall()
-    except Exception as exc:
-        raise HTTPException(
-            status_code=404,
-            detail=(
-                "Dataset schema unavailable. The saved schema metadata is invalid "
-                "and table introspection failed."
-            ),
-        ) from exc
-    finally:
-        con.close()
-
-    columns = [
-        {
-            "name": row[0],
-            "dtype": row[1],
-            "description": "",
-            "samples": [],
-            "aliases": [],
-        }
-        for row in rows
-    ]
+        columns = await get_workspace_table_schema_via_kernel(
+            workspace_id=workspace_id,
+            table_name=normalized,
+            allow_sample_values=False,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not columns:
+        raise HTTPException(status_code=404, detail="Dataset table not found")
     return DatasetSchemaResponse(table_name=normalized, context="", columns=columns)
 
 
@@ -1773,10 +1611,6 @@ async def regenerate_workspace_dataset_schema(
         workspace_id=workspace_id,
         table_name=normalized,
     )
-    if dataset is None and not _table_exists_in_workspace_db(
-        workspace.duckdb_path, normalized
-    ):
-        raise HTTPException(status_code=404, detail="Dataset table not found")
 
     prefs = await PreferencesRepository.get_or_create(session, current_user.id)
     context = (
@@ -1797,15 +1631,16 @@ async def regenerate_workspace_dataset_schema(
             detail="API key not set. Please configure your API key in Settings.",
         )
 
-    columns: list[dict[str, Any]] = []
     try:
-        columns = await asyncio.to_thread(
-            _read_table_columns_for_prompt,
-            workspace.duckdb_path,
-            normalized,
-            allow_sample_values,
+        columns = await get_workspace_table_schema_via_kernel(
+            workspace_id=workspace_id,
+            table_name=normalized,
+            allow_sample_values=allow_sample_values,
         )
-    except Exception:
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    if not columns:
         columns = []
 
     if not columns and dataset is not None and dataset.schema_path:

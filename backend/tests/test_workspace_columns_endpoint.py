@@ -68,7 +68,16 @@ async def test_workspace_columns_endpoint_returns_catalog(monkeypatch, tmp_path)
         _ = (session, user_id, workspace_id)
         return workspace
 
+    async def fake_get_workspace_columns_via_kernel(workspace_id):
+        assert workspace_id == "ws-1"
+        return [
+            {"table_name": "sales", "column_name": "id", "dtype": "INTEGER"},
+            {"table_name": "sales", "column_name": "amount", "dtype": "DOUBLE"},
+            {"table_name": "sales", "column_name": "city", "dtype": "VARCHAR"},
+        ]
+
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "get_workspace_columns_via_kernel", fake_get_workspace_columns_via_kernel)
     _patch_command_turn_persistence(monkeypatch)
 
     response = await runtime_api.get_workspace_columns(
@@ -88,6 +97,39 @@ async def test_workspace_columns_endpoint_returns_catalog(monkeypatch, tmp_path)
         "column_name": "amount",
         "dtype": "DOUBLE",
     } in response.columns
+
+
+@pytest.mark.asyncio
+async def test_workspace_columns_endpoint_returns_explicit_error_when_kernel_is_inactive(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws-columns-kernel-missing"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    async def fake_get_workspace_columns_via_kernel(_workspace_id):
+        raise RuntimeError(
+            "Loading workspace columns requires an active workspace kernel because Inquira now "
+            "reuses the kernel-owned DuckDB connections for workspace data and artifacts. Start "
+            "or restart the workspace kernel, wait for Kernel Ready, then try again."
+        )
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "get_workspace_columns_via_kernel", fake_get_workspace_columns_via_kernel)
+
+    with pytest.raises(HTTPException) as exc:
+        await runtime_api.get_workspace_columns(
+            workspace_id="ws-1",
+            session=object(),
+            current_user=SimpleNamespace(id="user-1"),
+        )
+
+    assert exc.value.status_code == 409
+    assert "active workspace kernel" in str(exc.value.detail).lower()
 
 
 @pytest.mark.asyncio

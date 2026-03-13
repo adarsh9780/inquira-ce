@@ -300,7 +300,7 @@ quoted_table = quote_ident(table_name)
 try:
     conn  # type: ignore  # noqa
 except NameError:
-    conn = duckdb.connect(r"${dbPath || ''}") if "${dbPath || ''}".strip() else duckdb.connect()
+    raise RuntimeError("Workspace kernel connection is not ready. Start or restart the workspace kernel, wait for Kernel Ready, then run this code again.")
 
 head_100 = conn.sql(f"SELECT * FROM {quoted_table} LIMIT {limit_rows}").df()
 tail_100 = conn.sql(

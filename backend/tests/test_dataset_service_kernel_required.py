@@ -1,7 +1,5 @@
-from pathlib import Path
 from types import SimpleNamespace
 
-import duckdb
 import pytest
 from fastapi import HTTPException
 
@@ -26,7 +24,7 @@ class _Session:
 
 
 @pytest.mark.asyncio
-async def test_add_dataset_returns_409_on_duckdb_lock_conflict(monkeypatch, tmp_path):
+async def test_add_dataset_returns_explicit_error_when_kernel_is_inactive(monkeypatch, tmp_path):
     source = tmp_path / "demo.csv"
     source.write_text("a\n1\n", encoding="utf-8")
     workspace_db = tmp_path / "workspace.duckdb"
@@ -39,24 +37,26 @@ async def test_add_dataset_returns_409_on_duckdb_lock_conflict(monkeypatch, tmp_
         _ = (session, workspace_id, user_id)
         return workspace
 
+    async def fake_ensure_kernel(_workspace_id, _operation_name):
+        raise RuntimeError(
+            "Loading a dataset requires an active workspace kernel because Inquira now reuses the "
+            "kernel-owned DuckDB connections for workspace data and artifacts. Start or restart the "
+            "workspace kernel, wait for Kernel Ready, then try again."
+        )
+
     monkeypatch.setattr(
         dataset_service_module.WorkspaceRepository,
         "get_by_id",
         fake_get_by_id,
     )
-
-    def fake_connect(path):
-        _ = path
-        raise duckdb.IOException("Conflicting lock is held")
-
-    monkeypatch.setattr(dataset_service_module.duckdb, "connect", fake_connect)
+    monkeypatch.setattr(dataset_service_module, "ensure_workspace_kernel_active", fake_ensure_kernel)
 
     with pytest.raises(HTTPException) as exc:
         await DatasetService.add_dataset(
             session=_Session(),
             user=user,
             workspace_id="ws-1",
-            source_path=str(Path(source)),
+            source_path=str(source),
         )
     assert exc.value.status_code == 409
-    assert "currently locked" in str(exc.value.detail).lower()
+    assert "active workspace kernel" in str(exc.value.detail).lower()

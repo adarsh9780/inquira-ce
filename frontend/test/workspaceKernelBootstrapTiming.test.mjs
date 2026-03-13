@@ -45,7 +45,7 @@ test('dataset upload path is the runtime bootstrap trigger', () => {
     'return {',
   )
   assert.equal(
-    uploadBlock.includes('await appStore.ensureWorkspaceKernelConnected(appStore.activeWorkspaceId)'),
+    uploadBlock.includes('await appStore.ensureWorkspaceKernelConnected(workspaceId)'),
     true,
   )
 })

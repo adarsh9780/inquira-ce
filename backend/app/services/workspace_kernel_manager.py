@@ -262,6 +262,189 @@ class WorkspaceKernelManager:
             return []
         return [item for item in parsed.result if isinstance(item, dict)]
 
+    async def get_workspace_columns(
+        self,
+        *,
+        workspace_id: str,
+    ) -> list[dict[str, str]]:
+        async with self._sessions_lock:
+            session = self._sessions.get(workspace_id)
+        if session is None:
+            return []
+
+        probe_code = (
+            "_rows = conn.execute(\"\"\"\n"
+            "    SELECT table_name, column_name, data_type\n"
+            "    FROM information_schema.columns\n"
+            "    WHERE table_schema = 'main'\n"
+            "    ORDER BY table_name, ordinal_position\n"
+            "\"\"\").fetchall()\n"
+            "[\n"
+            "    {\n"
+            "        'table_name': str(_row[0]),\n"
+            "        'column_name': str(_row[1]),\n"
+            "        'dtype': str(_row[2] or ''),\n"
+            "    }\n"
+            "    for _row in _rows\n"
+            "]\n"
+        )
+
+        async with session.lock:
+            session.last_used = datetime.now(UTC)
+            parsed = await self._execute_request(session, probe_code)
+
+        if parsed.error is not None or not isinstance(parsed.result, list):
+            return []
+        return [item for item in parsed.result if isinstance(item, dict)]
+
+    async def get_workspace_table_schema(
+        self,
+        *,
+        workspace_id: str,
+        table_name: str,
+        allow_sample_values: bool = False,
+    ) -> list[dict[str, Any]] | None:
+        async with self._sessions_lock:
+            session = self._sessions.get(workspace_id)
+        if session is None:
+            return None
+
+        escaped_table = str(table_name).replace('"', '""')
+        probe_code = (
+            f"_table_name = {json.dumps(escaped_table, ensure_ascii=True)}\n"
+            f"_allow_sample_values = {bool(allow_sample_values)!r}\n"
+            "try:\n"
+            "    _rows = conn.execute(f'DESCRIBE \"{_table_name}\"').fetchall()\n"
+            "except Exception:\n"
+            "    _result = None\n"
+            "else:\n"
+            "    _result = []\n"
+            "    for _row in _rows:\n"
+            "        _col_name = str(_row[0])\n"
+            "        _samples = []\n"
+            "        if _allow_sample_values:\n"
+            "            _escaped_col = _col_name.replace('\"', '\"\"')\n"
+            "            _sample_rows = conn.execute(\n"
+            "                f'SELECT DISTINCT \"{_escaped_col}\" FROM \"{_table_name}\" LIMIT 10'\n"
+            "            ).fetchall()\n"
+            "            _samples = [_sample[0] for _sample in _sample_rows]\n"
+            "        _result.append({\n"
+            "            'name': _col_name,\n"
+            "            'dtype': str(_row[1]),\n"
+            "            'samples': _samples,\n"
+            "            'description': '',\n"
+            "            'aliases': [],\n"
+            "        })\n"
+            "_result\n"
+        )
+
+        async with session.lock:
+            session.last_used = datetime.now(UTC)
+            parsed = await self._execute_request(session, probe_code)
+
+        if parsed.error is not None:
+            return None
+        if parsed.result is None or not isinstance(parsed.result, list):
+            return None
+        return [item for item in parsed.result if isinstance(item, dict)]
+
+    async def ingest_dataset(
+        self,
+        *,
+        workspace_id: str,
+        source_path: str,
+        table_name: str,
+        file_type: str,
+    ) -> dict[str, Any] | None:
+        async with self._sessions_lock:
+            session = self._sessions.get(workspace_id)
+        if session is None:
+            return None
+
+        escaped_table = str(table_name).replace('"', '""')
+        ingest_code = (
+            "import duckdb as _duckdb\n"
+            f"_source = {json.dumps(str(source_path), ensure_ascii=True)}\n"
+            f"_table_name = {json.dumps(escaped_table, ensure_ascii=True)}\n"
+            f"_duckdb_path = {json.dumps(str(session.workspace_duckdb_path), ensure_ascii=True)}\n"
+            f"_file_type = {json.dumps(str(file_type), ensure_ascii=True)}\n"
+            "_result = None\n"
+            "try:\n"
+            "    try:\n"
+            "        if 'conn' in globals() and conn is not None:\n"
+            "            conn.close()\n"
+            "    except Exception:\n"
+            "        pass\n"
+            "    conn = _duckdb.connect(_duckdb_path, read_only=False)\n"
+            "    if _file_type in {'csv', 'tsv'}:\n"
+            "        conn.execute(\n"
+            "            f'CREATE OR REPLACE TABLE \"{_table_name}\" AS SELECT * FROM read_csv_auto(?)',\n"
+            "            [_source],\n"
+            "        )\n"
+            "    elif _file_type == 'parquet':\n"
+            "        conn.execute(\n"
+            "            f'CREATE OR REPLACE TABLE \"{_table_name}\" AS SELECT * FROM read_parquet(?)',\n"
+            "            [_source],\n"
+            "        )\n"
+            "    elif _file_type == 'json':\n"
+            "        conn.execute(\n"
+            "            f'CREATE OR REPLACE TABLE \"{_table_name}\" AS SELECT * FROM read_json_auto(?)',\n"
+            "            [_source],\n"
+            "        )\n"
+            "    elif _file_type in {'xlsx', 'xls'}:\n"
+            "        import pandas as _pd\n"
+            "        _excel_df = _pd.read_excel(_source, engine='openpyxl')\n"
+            "        conn.register('_inquira_excel_df', _excel_df)\n"
+            "        try:\n"
+            "            conn.execute(\n"
+            "                f'CREATE OR REPLACE TABLE \"{_table_name}\" AS SELECT * FROM _inquira_excel_df'\n"
+            "            )\n"
+            "        finally:\n"
+            "            try:\n"
+            "                conn.unregister('_inquira_excel_df')\n"
+            "            except Exception:\n"
+            "                pass\n"
+            "    else:\n"
+            "        raise RuntimeError(f'Unsupported file type: {_file_type}')\n"
+            "    _row_count = int(conn.execute(f'SELECT COUNT(*) FROM \"{_table_name}\"').fetchone()[0])\n"
+            "    _schema_rows = conn.execute(f'DESCRIBE \"{_table_name}\"').fetchall()\n"
+            "    _result = {\n"
+            "        'row_count': _row_count,\n"
+            "        'columns': [\n"
+            "            {\n"
+            "                'name': str(_row[0]),\n"
+            "                'dtype': str(_row[1]),\n"
+            "                'description': '',\n"
+            "                'samples': [],\n"
+            "            }\n"
+            "            for _row in _schema_rows\n"
+            "        ],\n"
+            "    }\n"
+            "finally:\n"
+            "    try:\n"
+            "        if 'conn' in globals() and conn is not None:\n"
+            "            conn.close()\n"
+            "    except Exception:\n"
+            "        pass\n"
+            "    conn = _duckdb.connect(_duckdb_path, read_only=True)\n"
+            "_result\n"
+        )
+
+        async with session.lock:
+            session.last_used = datetime.now(UTC)
+            parsed = await self._execute_request(
+                session,
+                ingest_code,
+                iopub_idle_timeout=300.0,
+            )
+
+        if parsed.error is not None:
+            message = str(parsed.error).strip().splitlines()[-1].strip()
+            raise RuntimeError(message or "Dataset import failed in workspace kernel.")
+        if not isinstance(parsed.result, dict):
+            raise RuntimeError("Dataset import failed in workspace kernel.")
+        return parsed.result
+
     async def get_dataframe_rows(
         self,
         *,
