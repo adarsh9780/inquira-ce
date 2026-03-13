@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shlex
 from dataclasses import dataclass
 from datetime import date, datetime, time
@@ -13,6 +14,41 @@ import duckdb
 
 DEFAULT_ROW_LIMIT = 500
 MAX_ROW_LIMIT = 2000
+
+_COMMAND_RUNTIME_PREAMBLE = """
+from datetime import date as _cmd_date, datetime as _cmd_datetime, time as _cmd_time
+from decimal import Decimal as _cmd_decimal
+
+def _cmd_safe_value(value):
+    if isinstance(value, (_cmd_datetime, _cmd_date, _cmd_time)):
+        return value.isoformat()
+    if isinstance(value, _cmd_decimal):
+        return float(value)
+    return value
+
+def _cmd_rows_to_dict(columns, rows):
+    out = []
+    for row in rows:
+        item = {}
+        for idx, column_name in enumerate(columns):
+            item[str(column_name)] = _cmd_safe_value(row[idx] if idx < len(row) else None)
+        out.append(item)
+    return out
+
+def _cmd_run_sql(sql, *, row_limit, result_type='table'):
+    _cursor = conn.execute(sql)
+    _columns = [str(col[0]) for col in (_cursor.description or [])]
+    _fetched = _cursor.fetchmany(max(1, int(row_limit)) + 1)
+    _truncated = len(_fetched) > int(row_limit)
+    _rows = _fetched[: int(row_limit)]
+    _data = _cmd_rows_to_dict(_columns, _rows)
+    return {
+        'columns': _columns,
+        'data': _data,
+        'row_count': len(_data),
+        'result_type': result_type,
+    }, _truncated
+"""
 
 
 class CommandExecutionError(ValueError):
@@ -155,6 +191,29 @@ def _build_catalog(con: duckdb.DuckDBPyConnection) -> _Catalog:
         table_key = table_name.lower()
         column_key = column_name.lower()
 
+        tables[table_key] = table_name
+        table_columns = columns.setdefault(table_name, {})
+        table_columns[column_key] = column_name
+        dtypes[(table_name, column_name)] = dtype
+
+    return _Catalog(tables=tables, columns=columns, dtypes=dtypes)
+
+
+def build_catalog_from_workspace_columns(column_rows: list[dict[str, Any]]) -> _Catalog:
+    tables: dict[str, str] = {}
+    columns: dict[str, dict[str, str]] = {}
+    dtypes: dict[tuple[str, str], str] = {}
+
+    for row in column_rows:
+        if not isinstance(row, dict):
+            continue
+        table_name = str(row.get("table_name") or "").strip()
+        column_name = str(row.get("column_name") or "").strip()
+        dtype = str(row.get("dtype") or "")
+        if not table_name or not column_name:
+            continue
+        table_key = table_name.lower()
+        column_key = column_name.lower()
         tables[table_key] = table_name
         table_columns = columns.setdefault(table_name, {})
         table_columns[column_key] = column_name
@@ -754,9 +813,70 @@ def _run_quality(
     raise CommandExecutionError(f"Unsupported quality command: {name}")
 
 
-def execute_workspace_command(
+def _compile_table_payload_code(
     *,
-    duckdb_path: str,
+    name: str,
+    sql: str,
+    output_text: str,
+    row_limit: int,
+) -> str:
+    return (
+        _COMMAND_RUNTIME_PREAMBLE
+        + f"_cmd_payload, _cmd_truncated = _cmd_run_sql({json.dumps(sql, ensure_ascii=True)}, row_limit={int(row_limit)}, result_type='table')\n"
+        + "_cmd_result = {\n"
+        + f"    'name': {json.dumps(name, ensure_ascii=True)},\n"
+        + f"    'output': {json.dumps(output_text, ensure_ascii=True)},\n"
+        + "    'result_type': 'table',\n"
+        + "    'result': _cmd_payload,\n"
+        + "    'truncated': bool(_cmd_truncated),\n"
+        + "}\n"
+        + "_cmd_result\n"
+    )
+
+
+def _compile_scalar_payload_code(
+    *,
+    name: str,
+    sql: str,
+    output_prefix: str,
+    scalar_key: str,
+    row_limit: int,
+) -> str:
+    return (
+        _COMMAND_RUNTIME_PREAMBLE
+        + f"_cmd_payload, _cmd_truncated = _cmd_run_sql({json.dumps(sql, ensure_ascii=True)}, row_limit={int(row_limit)}, result_type='scalar')\n"
+        + "_cmd_rows = _cmd_payload.get('data') or []\n"
+        + f"_cmd_scalar = _cmd_rows[0].get({json.dumps(scalar_key, ensure_ascii=True)}) if _cmd_rows else None\n"
+        + "_cmd_payload['scalar'] = _cmd_scalar\n"
+        + "_cmd_result = {\n"
+        + f"    'name': {json.dumps(name, ensure_ascii=True)},\n"
+        + f"    'output': {json.dumps(output_prefix, ensure_ascii=True)} + str(_cmd_scalar),\n"
+        + "    'result_type': 'scalar',\n"
+        + "    'result': _cmd_payload,\n"
+        + "    'truncated': bool(_cmd_truncated),\n"
+        + "}\n"
+        + "_cmd_result\n"
+    )
+
+
+def _compile_help_command(args: list[str]) -> dict[str, Any]:
+    result = _run_help(args)
+    return {
+        "name": result.name,
+        "output": result.output,
+        "result_type": result.result_type,
+        "result": result.result,
+        "truncated": result.truncated,
+        "python_code": (
+            f"_cmd_result = {repr({'name': result.name, 'output': result.output, 'result_type': result.result_type, 'result': result.result, 'truncated': result.truncated})}\n"
+            "_cmd_result\n"
+        ),
+    }
+
+
+def compile_workspace_command(
+    *,
+    catalog: _Catalog,
     name: str,
     args: list[str],
     default_table: str | None = None,
@@ -773,66 +893,345 @@ def execute_workspace_command(
         raise CommandExecutionError(f"Unknown command '/{normalized_name}'. Available: {known}")
 
     if normalized_name == "help":
-        result = _run_help(args)
-        return {
-            "name": result.name,
-            "output": result.output,
-            "result_type": result.result_type,
-            "result": result.result,
-            "truncated": result.truncated,
-        }
+        return _compile_help_command(args)
 
-    con = duckdb.connect(str(duckdb_path), read_only=True)
-    try:
-        catalog = _build_catalog(con)
-        if not catalog.tables:
-            raise CommandExecutionError("No tables found in workspace database.")
+    if not catalog.tables:
+        raise CommandExecutionError("No tables found in workspace database.")
 
-        if normalized_name in {"describe", "info", "shape", "dtypes", "head", "tail", "sample"}:
-            result = _run_overview(
-                normalized_name,
-                args,
-                con=con,
-                catalog=catalog,
-                default_table=default_table,
-                row_limit=row_limit,
+    if normalized_name in {"describe", "info", "shape", "dtypes", "head", "tail", "sample"}:
+        table = _resolve_table(catalog, args[0] if args else None, default_table)
+        qt = _quote_ident(table)
+        if normalized_name == "describe":
+            sql = f"SUMMARIZE SELECT * FROM {qt}"
+        elif normalized_name == "info":
+            table_literal = _quote_literal(table)
+            sql = (
+                "SELECT p.cid, p.name AS column_name, p.type AS dtype, p.notnull AS not_null, p.pk "
+                f"FROM pragma_table_info({table_literal}) p ORDER BY p.cid"
             )
-        elif normalized_name in {"mean", "median", "mode", "std", "sum", "min", "max", "percentile"}:
-            result = _run_single_column_aggregate(
-                normalized_name,
-                args,
-                con=con,
-                catalog=catalog,
-                default_table=default_table,
-                row_limit=row_limit,
+        elif normalized_name == "shape":
+            table_literal = _quote_literal(table)
+            sql = (
+                f"SELECT COUNT(*) AS row_count, "
+                f"(SELECT COUNT(*) FROM pragma_table_info({table_literal})) AS column_count "
+                f"FROM {qt}"
             )
-        elif normalized_name in {"value_counts", "unique", "histogram", "corr", "crosstab"}:
-            result = _run_distribution(
-                normalized_name,
-                args,
-                con=con,
-                catalog=catalog,
-                default_table=default_table,
-                row_limit=row_limit,
+        elif normalized_name == "dtypes":
+            table_literal = _quote_literal(table)
+            sql = (
+                "SELECT p.name AS column_name, p.type AS dtype "
+                f"FROM pragma_table_info({table_literal}) p ORDER BY p.cid"
             )
-        elif normalized_name in {"nulls", "duplicates", "outliers"}:
-            result = _run_quality(
-                normalized_name,
-                args,
-                con=con,
-                catalog=catalog,
-                default_table=default_table,
-                row_limit=row_limit,
+        elif normalized_name == "head":
+            n = _parse_positive_int(args[1] if len(args) > 1 else None, 10, min_value=1, max_value=MAX_ROW_LIMIT)
+            sql = f"SELECT * FROM {qt} LIMIT {n}"
+        elif normalized_name == "tail":
+            n = _parse_positive_int(args[1] if len(args) > 1 else None, 10, min_value=1, max_value=MAX_ROW_LIMIT)
+            sql = (
+                "WITH numbered AS ("
+                f"SELECT *, ROW_NUMBER() OVER () AS __rownum FROM {qt}"
+                ") "
+                "SELECT * EXCLUDE (__rownum) FROM numbered "
+                f"ORDER BY __rownum DESC LIMIT {n}"
             )
         else:
-            raise CommandExecutionError(f"Unsupported command: /{normalized_name}")
-    finally:
-        con.close()
+            n = _parse_positive_int(args[1] if len(args) > 1 else None, 10, min_value=1, max_value=MAX_ROW_LIMIT)
+            sql = f"SELECT * FROM {qt} USING SAMPLE {n} ROWS"
 
-    return {
-        "name": result.name,
-        "output": result.output,
-        "result_type": result.result_type,
-        "result": result.result,
-        "truncated": result.truncated,
-    }
+        output = f"/{normalized_name} executed for table '{table}'."
+        return {
+            "name": normalized_name,
+            "output": output,
+            "result_type": "table",
+            "python_code": _compile_table_payload_code(
+                name=normalized_name,
+                sql=sql,
+                output_text=output,
+                row_limit=row_limit,
+            ),
+        }
+
+    if normalized_name in {"mean", "median", "mode", "std", "sum", "min", "max", "percentile"}:
+        if not args:
+            raise CommandExecutionError(f"/{normalized_name} requires a column reference (<table>.<col>).")
+        table, column, next_arg_index = _consume_column_ref_tokens(
+            catalog,
+            args,
+            default_table=default_table,
+            start_index=0,
+        )
+        qt = _quote_ident(table)
+        qc = _quote_ident(column)
+        if normalized_name == "mean":
+            expr = f"AVG({qc})"
+        elif normalized_name == "median":
+            expr = f"MEDIAN({qc})"
+        elif normalized_name == "mode":
+            expr = f"MODE({qc})"
+        elif normalized_name == "std":
+            expr = f"STDDEV_SAMP({qc})"
+        elif normalized_name == "sum":
+            expr = f"SUM({qc})"
+        elif normalized_name == "min":
+            expr = f"MIN({qc})"
+        elif normalized_name == "max":
+            expr = f"MAX({qc})"
+        else:
+            percentile = _parse_positive_int(
+                args[next_arg_index] if len(args) > next_arg_index else None,
+                50,
+                min_value=1,
+                max_value=100,
+            )
+            expr = f"QUANTILE_CONT({qc}, {percentile / 100.0})"
+        sql = f"SELECT {expr} AS value FROM {qt}"
+        return {
+            "name": normalized_name,
+            "output": "",
+            "result_type": "scalar",
+            "python_code": _compile_scalar_payload_code(
+                name=normalized_name,
+                sql=sql,
+                output_prefix=f"/{normalized_name} for {table}.{column}: ",
+                scalar_key="value",
+                row_limit=max(1, min(row_limit, 10)),
+            ),
+        }
+
+    if normalized_name in {"value_counts", "unique", "histogram", "corr", "crosstab"}:
+        if normalized_name in {"value_counts", "unique", "histogram"}:
+            if not args:
+                raise CommandExecutionError(f"/{normalized_name} requires a column reference (<table>.<col>).")
+            table, column, next_arg_index = _consume_column_ref_tokens(
+                catalog,
+                args,
+                default_table=default_table,
+                start_index=0,
+            )
+            qt = _quote_ident(table)
+            qc = _quote_ident(column)
+            if normalized_name == "value_counts":
+                n = _parse_positive_int(
+                    args[next_arg_index] if len(args) > next_arg_index else None,
+                    20,
+                    min_value=1,
+                    max_value=MAX_ROW_LIMIT,
+                )
+                sql = (
+                    f"SELECT {qc} AS value, COUNT(*) AS count "
+                    f"FROM {qt} GROUP BY {qc} ORDER BY count DESC, value LIMIT {n}"
+                )
+            elif normalized_name == "unique":
+                sql = (
+                    "WITH stats AS ("
+                    f"SELECT COUNT(DISTINCT {qc}) AS distinct_count FROM {qt}"
+                    "), samples AS ("
+                    f"SELECT DISTINCT {qc} AS sample_value FROM {qt} LIMIT 50"
+                    ") "
+                    "SELECT stats.distinct_count, samples.sample_value FROM stats LEFT JOIN samples ON TRUE"
+                )
+            else:
+                bins = _parse_positive_int(
+                    args[next_arg_index] if len(args) > next_arg_index else None,
+                    10,
+                    min_value=2,
+                    max_value=100,
+                )
+                sql = (
+                    "WITH ranked AS ("
+                    f"SELECT NTILE({bins}) OVER (ORDER BY {qc}) AS bucket "
+                    f"FROM {qt} WHERE {qc} IS NOT NULL"
+                    ") SELECT bucket, COUNT(*) AS frequency FROM ranked GROUP BY bucket ORDER BY bucket"
+                )
+            output = f"/{normalized_name} executed for {table}.{column}."
+            return {
+                "name": normalized_name,
+                "output": output,
+                "result_type": "table",
+                "python_code": _compile_table_payload_code(
+                    name=normalized_name,
+                    sql=sql,
+                    output_text=output,
+                    row_limit=row_limit,
+                ),
+            }
+
+        if len(args) < 2:
+            raise CommandExecutionError(f"/{normalized_name} requires two columns. Usage: /{normalized_name} <table>.<c1> <c2>")
+        table, c1, next_arg_index = _consume_column_ref_tokens(
+            catalog,
+            args,
+            default_table=default_table,
+            start_index=0,
+        )
+        if next_arg_index >= len(args):
+            raise CommandExecutionError(f"/{normalized_name} requires two columns. Usage: /{normalized_name} <table>.<c1> <c2>")
+        table2, c2, _ = _consume_column_ref_tokens(
+            catalog,
+            args,
+            default_table=table,
+            start_index=next_arg_index,
+        )
+        if table2.lower() != table.lower():
+            raise CommandExecutionError("Both columns must belong to the same table.")
+        qt = _quote_ident(table)
+        qc1 = _quote_ident(c1)
+        qc2 = _quote_ident(c2)
+        if normalized_name == "corr":
+            sql = f"SELECT CORR({qc1}, {qc2}) AS correlation FROM {qt}"
+            return {
+                "name": normalized_name,
+                "output": "",
+                "result_type": "scalar",
+                "python_code": _compile_scalar_payload_code(
+                    name=normalized_name,
+                    sql=sql,
+                    output_prefix=f"/{normalized_name} for {table}.{c1} and {table}.{c2}: ",
+                    scalar_key="correlation",
+                    row_limit=5,
+                ),
+            }
+        sql = (
+            f"SELECT {qc1} AS col_1, {qc2} AS col_2, COUNT(*) AS count "
+            f"FROM {qt} GROUP BY {qc1}, {qc2} ORDER BY count DESC LIMIT {row_limit}"
+        )
+        output = f"/{normalized_name} executed for {table}.{c1} and {table}.{c2}."
+        return {
+            "name": normalized_name,
+            "output": output,
+            "result_type": "table",
+            "python_code": _compile_table_payload_code(
+                name=normalized_name,
+                sql=sql,
+                output_text=output,
+                row_limit=row_limit,
+            ),
+        }
+
+    if normalized_name == "nulls":
+        if not args:
+            raise CommandExecutionError("/nulls requires a table or table.column argument.")
+        target = " ".join(str(part or "").strip() for part in args).strip()
+        try:
+            table = _resolve_table(catalog, target, default_table)
+        except CommandExecutionError:
+            table, column, _ = _consume_column_ref_tokens(
+                catalog,
+                args,
+                default_table=default_table,
+                start_index=0,
+            )
+            qt = _quote_ident(table)
+            qc = _quote_ident(column)
+            sql = (
+                f"SELECT COUNT(*) AS null_count, COUNT(*) FILTER (WHERE {qc} IS NOT NULL) AS non_null_count "
+                f"FROM {qt} WHERE {qc} IS NULL OR {qc} IS NOT NULL"
+            )
+            return {
+                "name": normalized_name,
+                "output": "",
+                "result_type": "scalar",
+                "python_code": _compile_scalar_payload_code(
+                    name=normalized_name,
+                    sql=sql,
+                    output_prefix=f"/{normalized_name} for {table}.{column}: ",
+                    scalar_key="null_count",
+                    row_limit=5,
+                ),
+            }
+
+        quoted_cols = [_quote_ident(col) for col in list(catalog.columns.get(table, {}).values())]
+        raw_cols = list(catalog.columns.get(table, {}).values())
+        if not raw_cols:
+            raise CommandExecutionError("No columns found to evaluate nulls.")
+        output = f"/{normalized_name} executed for table '{table}'."
+        python_code = (
+            _COMMAND_RUNTIME_PREAMBLE
+            + f"_cmd_table = {json.dumps(table, ensure_ascii=True)}\n"
+            + f"_cmd_columns = {json.dumps(raw_cols, ensure_ascii=True)}\n"
+            + f"_cmd_quoted_columns = {json.dumps(quoted_cols, ensure_ascii=True)}\n"
+            + "_cmd_rows = []\n"
+            + "for _cmd_column, _cmd_qc in zip(_cmd_columns, _cmd_quoted_columns):\n"
+            + "    _cmd_value = conn.execute(f'SELECT COUNT(*) AS null_count FROM \"{_cmd_table}\" WHERE {_cmd_qc} IS NULL').fetchone()\n"
+            + "    _cmd_rows.append({'column_name': _cmd_column, 'null_count': int(_cmd_value[0] if _cmd_value else 0)})\n"
+            + f"_cmd_data = _cmd_rows[: {int(row_limit)}]\n"
+            + "_cmd_payload = {'columns': ['column_name', 'null_count'], 'data': _cmd_data, 'row_count': len(_cmd_data), 'result_type': 'table'}\n"
+            + "_cmd_result = {\n"
+            + f"    'name': {json.dumps(normalized_name, ensure_ascii=True)},\n"
+            + f"    'output': {json.dumps(output, ensure_ascii=True)},\n"
+            + "    'result_type': 'table',\n"
+            + "    'result': _cmd_payload,\n"
+            + f"    'truncated': len(_cmd_rows) > {int(row_limit)},\n"
+            + "}\n"
+            + "_cmd_result\n"
+        )
+        return {"name": normalized_name, "output": "", "result_type": "table", "python_code": python_code}
+
+    if normalized_name == "duplicates":
+        if not args:
+            raise CommandExecutionError("/duplicates requires a table argument.")
+        table = _resolve_table(catalog, args[0], default_table)
+        qt = _quote_ident(table)
+        specified_cols = " ".join(args[1:]).strip()
+        if specified_cols:
+            raw_cols = [item.strip() for item in specified_cols.split(",") if item.strip()]
+            if not raw_cols:
+                raise CommandExecutionError("Could not parse duplicate grouping columns.")
+            resolved_cols = [_resolve_column(catalog, table, item) for item in raw_cols]
+        else:
+            resolved_cols = list(catalog.columns.get(table, {}).values())
+        if not resolved_cols:
+            raise CommandExecutionError("No columns found to evaluate duplicates.")
+        quoted_cols = ", ".join(_quote_ident(col) for col in resolved_cols)
+        sql = (
+            f"SELECT {quoted_cols}, COUNT(*) AS duplicate_count "
+            f"FROM {qt} GROUP BY {quoted_cols} HAVING COUNT(*) > 1 "
+            f"ORDER BY duplicate_count DESC LIMIT {row_limit}"
+        )
+        output = f"/{normalized_name} executed for table '{table}'."
+        return {
+            "name": normalized_name,
+            "output": output,
+            "result_type": "table",
+            "python_code": _compile_table_payload_code(
+                name=normalized_name,
+                sql=sql,
+                output_text=output,
+                row_limit=row_limit,
+            ),
+        }
+
+    if normalized_name == "outliers":
+        if not args:
+            raise CommandExecutionError("/outliers requires a column reference (<table>.<col>).")
+        table, column, _ = _consume_column_ref_tokens(
+            catalog,
+            args,
+            default_table=default_table,
+            start_index=0,
+        )
+        qt = _quote_ident(table)
+        qc = _quote_ident(column)
+        sql = (
+            "WITH quantiles AS ("
+            f"SELECT QUANTILE_CONT({qc}, 0.25) AS q1, QUANTILE_CONT({qc}, 0.75) AS q3 FROM {qt}"
+            "), bounds AS ("
+            "SELECT q1, q3, (q3 - q1) AS iqr, q1 - 1.5 * (q3 - q1) AS lower_bound, q3 + 1.5 * (q3 - q1) AS upper_bound FROM quantiles"
+            ") "
+            f"SELECT t.*, b.lower_bound, b.upper_bound FROM {qt} t CROSS JOIN bounds b "
+            f"WHERE t.{qc} < b.lower_bound OR t.{qc} > b.upper_bound LIMIT {row_limit}"
+        )
+        output = f"/{normalized_name} executed for {table}.{column}."
+        return {
+            "name": normalized_name,
+            "output": output,
+            "result_type": "table",
+            "python_code": _compile_table_payload_code(
+                name=normalized_name,
+                sql=sql,
+                output_text=output,
+                row_limit=row_limit,
+            ),
+        }
+
+    raise CommandExecutionError(f"Unsupported command: /{normalized_name}")

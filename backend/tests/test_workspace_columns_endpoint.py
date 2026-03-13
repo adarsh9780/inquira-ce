@@ -50,6 +50,59 @@ def _patch_command_turn_persistence(monkeypatch):
     monkeypatch.setattr(runtime_api, "_persist_command_turn", fake_persist_command_turn)
 
 
+def _patch_kernel_backed_command_execution(
+    monkeypatch,
+    *,
+    columns,
+    command_payload,
+    code_assertions=None,
+):
+    async def fake_bootstrap_workspace_runtime(*, workspace_id, workspace_duckdb_path, progress_callback=None):
+        _ = (workspace_duckdb_path, progress_callback)
+        assert workspace_id.startswith("ws-")
+        return True
+
+    async def fake_get_workspace_columns_via_kernel(workspace_id):
+        assert workspace_id.startswith("ws-")
+        return columns
+
+    async def fake_execute_code(*, code, timeout, working_dir, workspace_id, workspace_duckdb_path):
+        _ = (timeout, working_dir, workspace_id, workspace_duckdb_path)
+        assert "duckdb.connect" not in code
+        assert "conn.execute" in code
+        if code_assertions is not None:
+            code_assertions(code)
+        return {
+            "success": True,
+            "stdout": "",
+            "stderr": "",
+            "has_stdout": False,
+            "has_stderr": False,
+            "error": None,
+            "result": command_payload,
+            "result_type": "scalar",
+            "result_kind": "scalar",
+            "result_name": "result",
+            "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
+            "artifacts": [],
+        }
+
+    monkeypatch.setattr(runtime_api, "bootstrap_workspace_runtime", fake_bootstrap_workspace_runtime)
+    monkeypatch.setattr(runtime_api, "get_workspace_columns_via_kernel", fake_get_workspace_columns_via_kernel)
+    monkeypatch.setattr(runtime_api, "execute_code", fake_execute_code)
+
+
+def _assert_shape_command_code(code: str) -> None:
+    assert "COUNT(*) AS row_count" in code
+    assert "pragma_table_info('sales')" in code
+
+
+def _assert_unique_match_id_code(code: str) -> None:
+    assert "COUNT(DISTINCT" in code
+    assert "Match ID" in code
+    assert "sample_value" in code
+
+
 @pytest.mark.asyncio
 async def test_workspace_columns_endpoint_returns_catalog(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws-columns"
@@ -153,6 +206,26 @@ async def test_workspace_command_execute_runs_shape_command(monkeypatch, tmp_pat
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     _patch_command_turn_persistence(monkeypatch)
+    _patch_kernel_backed_command_execution(
+        monkeypatch,
+        columns=[
+            {"table_name": "sales", "column_name": "id", "dtype": "INTEGER"},
+            {"table_name": "sales", "column_name": "amount", "dtype": "DOUBLE"},
+        ],
+        command_payload={
+            "name": "shape",
+            "output": "/shape executed for table 'sales'.",
+            "result_type": "table",
+            "result": {
+                "columns": ["row_count", "column_count"],
+                "data": [{"row_count": 3, "column_count": 2}],
+                "row_count": 1,
+                "result_type": "table",
+            },
+            "truncated": False,
+        },
+        code_assertions=_assert_shape_command_code,
+    )
 
     payload = runtime_api.CommandExecuteRequest(text="/shape sales")
     response = await runtime_api.execute_workspace_slash_command(
@@ -174,7 +247,7 @@ async def test_workspace_command_execute_runs_shape_command(monkeypatch, tmp_pat
 
 
 @pytest.mark.asyncio
-async def test_workspace_command_execute_succeeds_when_only_read_only_connect_is_allowed(monkeypatch, tmp_path):
+async def test_workspace_command_execute_uses_kernel_python_instead_of_opening_duckdb_directly(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws-commands-read-only"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     duckdb_path = workspace_dir / "workspace.duckdb"
@@ -194,15 +267,25 @@ async def test_workspace_command_execute_succeeds_when_only_read_only_connect_is
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     _patch_command_turn_persistence(monkeypatch)
-
-    real_connect = duckdb.connect
-
-    def lock_sensitive_connect(*args, **kwargs):
-        if kwargs.get("read_only") is not True:
-            raise duckdb.IOException("Conflicting lock is held")
-        return real_connect(*args, **kwargs)
-
-    monkeypatch.setattr(runtime_api.duckdb, "connect", lock_sensitive_connect)
+    _patch_kernel_backed_command_execution(
+        monkeypatch,
+        columns=[
+            {"table_name": "sales", "column_name": "id", "dtype": "INTEGER"},
+            {"table_name": "sales", "column_name": "amount", "dtype": "DOUBLE"},
+        ],
+        command_payload={
+            "name": "shape",
+            "output": "/shape executed for table 'sales'.",
+            "result_type": "table",
+            "result": {
+                "columns": ["row_count", "column_count"],
+                "data": [{"row_count": 2, "column_count": 2}],
+                "row_count": 1,
+                "result_type": "table",
+            },
+            "truncated": False,
+        },
+    )
 
     payload = runtime_api.CommandExecuteRequest(text="/shape sales")
     response = await runtime_api.execute_workspace_slash_command(
@@ -243,6 +326,26 @@ async def test_workspace_command_execute_unique_supports_quoted_and_legacy_brack
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     _patch_command_turn_persistence(monkeypatch)
+    _patch_kernel_backed_command_execution(
+        monkeypatch,
+        columns=[
+            {"table_name": "sales", "column_name": "Match ID", "dtype": "INTEGER"},
+            {"table_name": "sales", "column_name": "amount", "dtype": "DOUBLE"},
+        ],
+        command_payload={
+            "name": "unique",
+            "output": "/unique executed for sales.Match ID.",
+            "result_type": "table",
+            "result": {
+                "columns": ["distinct_count", "sample_value"],
+                "data": [{"distinct_count": 2, "sample_value": 1}, {"distinct_count": 2, "sample_value": 2}],
+                "row_count": 2,
+                "result_type": "table",
+            },
+            "truncated": False,
+        },
+        code_assertions=_assert_unique_match_id_code,
+    )
 
     quoted_payload = runtime_api.CommandExecuteRequest(text='/unique sales."Match ID"')
     quoted_response = await runtime_api.execute_workspace_slash_command(
@@ -298,6 +401,26 @@ async def test_workspace_command_execute_unique_supports_unquoted_spaced_column_
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     _patch_command_turn_persistence(monkeypatch)
+    _patch_kernel_backed_command_execution(
+        monkeypatch,
+        columns=[
+            {"table_name": "sales", "column_name": "Match ID", "dtype": "INTEGER"},
+            {"table_name": "sales", "column_name": "amount", "dtype": "DOUBLE"},
+        ],
+        command_payload={
+            "name": "unique",
+            "output": "/unique executed for sales.Match ID.",
+            "result_type": "table",
+            "result": {
+                "columns": ["distinct_count", "sample_value"],
+                "data": [{"distinct_count": 2, "sample_value": 1}, {"distinct_count": 2, "sample_value": 2}],
+                "row_count": 2,
+                "result_type": "table",
+            },
+            "truncated": False,
+        },
+        code_assertions=_assert_unique_match_id_code,
+    )
 
     unquoted_payload = runtime_api.CommandExecuteRequest(text="/unique sales.Match ID")
     unquoted_response = await runtime_api.execute_workspace_slash_command(
@@ -380,6 +503,17 @@ async def test_workspace_command_execute_persists_error_turn_when_command_fails(
         fake_resolve_or_create_command_conversation,
     )
     monkeypatch.setattr(runtime_api, "_persist_command_turn", fake_persist_command_turn)
+    async def fake_bootstrap_workspace_runtime(**_kwargs):
+        return True
+
+    async def fake_get_workspace_columns_via_kernel(_workspace_id):
+        return [
+            {"table_name": "sales", "column_name": "Match ID", "dtype": "INTEGER"},
+            {"table_name": "sales", "column_name": "amount", "dtype": "DOUBLE"},
+        ]
+
+    monkeypatch.setattr(runtime_api, "bootstrap_workspace_runtime", fake_bootstrap_workspace_runtime)
+    monkeypatch.setattr(runtime_api, "get_workspace_columns_via_kernel", fake_get_workspace_columns_via_kernel)
 
     payload = runtime_api.CommandExecuteRequest(text="/unique sales.unknown_column")
     with pytest.raises(HTTPException) as exc:

@@ -59,7 +59,8 @@ from ...services.websocket_manager import websocket_manager
 from ...core.logger import logprint
 from ..services.command_service import (
     CommandExecutionError,
-    execute_workspace_command,
+    build_catalog_from_workspace_columns,
+    compile_workspace_command,
     list_command_definitions,
     parse_command_text,
 )
@@ -851,9 +852,14 @@ async def execute_workspace_slash_command(
         command_text = f"/{parsed_name}" + (f" {raw_args}" if raw_args else "")
 
     try:
-        result = await asyncio.to_thread(
-            execute_workspace_command,
-            duckdb_path=str(workspace.duckdb_path),
+        await bootstrap_workspace_runtime(
+            workspace_id=workspace_id,
+            workspace_duckdb_path=str(workspace.duckdb_path),
+        )
+        catalog_rows = await get_workspace_columns_via_kernel(workspace_id)
+        catalog = build_catalog_from_workspace_columns(catalog_rows)
+        compiled = compile_workspace_command(
+            catalog=catalog,
             name=parsed_name,
             args=args,
             default_table=payload.default_table,
@@ -870,8 +876,8 @@ async def execute_workspace_slash_command(
             error_detail=str(exc),
         )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except duckdb.Error as exc:
-        detail = f"Command execution failed: {str(exc)}"
+    except RuntimeError as exc:
+        detail = str(exc).strip() or "Command execution failed."
         await _persist_failed_command_turn_best_effort(
             session=session,
             principal_id=str(current_user.id),
@@ -881,9 +887,7 @@ async def execute_workspace_slash_command(
             command_name=parsed_name or "command",
             error_detail=detail,
         )
-        raise HTTPException(
-            status_code=400, detail=f"Command execution failed: {str(exc)}"
-        ) from exc
+        raise HTTPException(status_code=409, detail=detail) from exc
     except Exception as exc:
         detail = f"Command execution failed: {str(exc)}"
         await _persist_failed_command_turn_best_effort(
@@ -898,6 +902,62 @@ async def execute_workspace_slash_command(
         raise HTTPException(
             status_code=500, detail=f"Command execution failed: {str(exc)}"
         ) from exc
+
+    try:
+        execution = await execute_code(
+            code=str(compiled.get("python_code") or ""),
+            timeout=60,
+            working_dir=str(Path(workspace.duckdb_path).parent),
+            workspace_id=workspace_id,
+            workspace_duckdb_path=str(workspace.duckdb_path),
+        )
+    except Exception as exc:
+        detail = f"Command execution failed: {str(exc)}"
+        await _persist_failed_command_turn_best_effort(
+            session=session,
+            principal_id=str(current_user.id),
+            workspace_id=workspace_id,
+            conversation_id=payload.conversation_id,
+            command_text=command_text,
+            command_name=parsed_name or "command",
+            error_detail=detail,
+        )
+        raise HTTPException(status_code=500, detail=detail) from exc
+
+    if not execution.get("success"):
+        detail = str(execution.get("error") or execution.get("stderr") or "Command execution failed.").strip()
+        await _persist_failed_command_turn_best_effort(
+            session=session,
+            principal_id=str(current_user.id),
+            workspace_id=workspace_id,
+            conversation_id=payload.conversation_id,
+            command_text=command_text,
+            command_name=parsed_name or "command",
+            error_detail=detail,
+        )
+        raise HTTPException(status_code=400, detail=detail)
+
+    raw_result = execution.get("result")
+    if not isinstance(raw_result, dict):
+        detail = "Command execution returned an invalid payload."
+        await _persist_failed_command_turn_best_effort(
+            session=session,
+            principal_id=str(current_user.id),
+            workspace_id=workspace_id,
+            conversation_id=payload.conversation_id,
+            command_text=command_text,
+            command_name=parsed_name or "command",
+            error_detail=detail,
+        )
+        raise HTTPException(status_code=500, detail=detail)
+
+    result = {
+        "name": str(raw_result.get("name") or compiled.get("name") or parsed_name),
+        "output": str(raw_result.get("output") or compiled.get("output") or ""),
+        "result_type": str(raw_result.get("result_type") or compiled.get("result_type") or "message"),
+        "result": raw_result.get("result") if isinstance(raw_result.get("result"), dict) else None,
+        "truncated": bool(raw_result.get("truncated")),
+    }
 
     conversation = await _resolve_or_create_command_conversation(
         session=session,
