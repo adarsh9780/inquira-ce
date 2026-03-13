@@ -10,9 +10,6 @@
           <span v-else-if="isLoadingArtifacts || isLoadingFigure || isDeletingArtifact" class="text-xs px-2 py-1 rounded text-gray-700 bg-gray-100">
             {{ isDeletingArtifact ? 'Deleting chart...' : 'Loading charts...' }}
           </span>
-          <span v-else-if="artifactListError" class="text-xs px-2 py-1 rounded text-red-700 bg-red-100">
-            {{ artifactListError }}
-          </span>
         </div>
         
         <div class="flex min-w-0 flex-1 items-center justify-end gap-2">
@@ -124,10 +121,22 @@
         class="absolute inset-0 flex items-center justify-center"
         style="background-color: var(--color-base);"
       >
-        <div class="text-center">
+        <div class="max-w-xl px-6 text-center">
           <ChartBarIcon class="h-12 w-12 mx-auto mb-3" style="color: var(--color-border);" />
           <p class="text-sm" style="color: var(--color-text-muted);">No chart to display</p>
-          <p class="text-xs mt-1" style="color: var(--color-text-muted);">Run code that generates a Plotly figure</p>
+          <p
+            v-if="artifactListError"
+            class="mt-3 rounded-md px-4 py-3 text-sm text-red-700 bg-red-100"
+          >
+            {{ artifactListError }}
+          </p>
+          <p
+            v-else
+            class="text-xs mt-1"
+            style="color: var(--color-text-muted);"
+          >
+            Run code that generates a Plotly figure
+          </p>
         </div>
       </div>
     </div>

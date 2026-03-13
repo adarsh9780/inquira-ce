@@ -16,6 +16,16 @@ test('FigureTab uses workspace artifact catalog as canonical source and resolves
   assert.equal(source.includes(':key="selectedArtifactId"'), true)
 })
 
+test('FigureTab renders artifact load errors inside the centered empty state instead of the toolbar', () => {
+  const figureTabPath = resolve(process.cwd(), 'src/components/analysis/FigureTab.vue')
+  const source = readFileSync(figureTabPath, 'utf-8')
+
+  assert.equal(source.includes("v-if=\"artifactListError\""), true)
+  assert.equal(source.includes("{{ artifactListError }}"), true)
+  assert.equal(source.includes("class=\"mt-3 rounded-md px-4 py-3 text-sm text-red-700 bg-red-100\""), true)
+  assert.equal(source.includes("v-else-if=\"artifactListError\""), false)
+})
+
 test('apiService exposes workspace artifact metadata route used by FigureTab', () => {
   const apiServicePath = resolve(process.cwd(), 'src/services/apiService.js')
   const source = readFileSync(apiServicePath, 'utf-8')
