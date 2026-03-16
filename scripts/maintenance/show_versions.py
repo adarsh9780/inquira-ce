@@ -16,8 +16,6 @@ TAURI_CARGO = ROOT / "src-tauri" / "Cargo.toml"
 TAURI_CONF = ROOT / "src-tauri" / "tauri.conf.json"
 FRONTEND_PACKAGE = ROOT / "frontend" / "package.json"
 FRONTEND_LOCK = ROOT / "frontend" / "package-lock.json"
-INSTALL_SH = ROOT / "scripts" / "install-inquira.sh"
-INSTALL_PS1 = ROOT / "scripts" / "install-inquira.ps1"
 RELEASE_METADATA = ROOT / ".github" / "release" / "metadata.json"
 
 
@@ -51,18 +49,6 @@ def _read_frontend_lock_root_version(path: Path) -> str | None:
     return None
 
 
-def _read_wheel_url_version(path: Path) -> str | None:
-    text = path.read_text(encoding="utf-8")
-    pattern = (
-        r"https://github\.com/adarsh9780/inquira-ce/releases/download/"
-        r"v([^/]+)/inquira_ce-[^-]+-py3-none-any\.whl"
-    )
-    match = re.search(pattern, text)
-    if match:
-        return match.group(1)
-    return None
-
-
 def collect_versions() -> dict[str, str]:
     values: dict[str, str] = {}
     values["VERSION"] = VERSION_FILE.read_text(encoding="utf-8").strip()
@@ -86,12 +72,6 @@ def collect_versions() -> dict[str, str]:
     )
     values["frontend/package-lock.json.packages[''].version"] = (
         _read_frontend_lock_root_version(FRONTEND_LOCK) or "<missing>"
-    )
-    values["scripts/install-inquira.sh.wheel_version"] = (
-        _read_wheel_url_version(INSTALL_SH) or "<missing>"
-    )
-    values["scripts/install-inquira.ps1.wheel_version"] = (
-        _read_wheel_url_version(INSTALL_PS1) or "<missing>"
     )
     if RELEASE_METADATA.exists():
         values[".github/release/metadata.json.version"] = (

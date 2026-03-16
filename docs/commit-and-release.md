@@ -43,15 +43,16 @@ Only run this when preparing a release/tag.
 
 1. Set a new version (must be strictly greater than current `VERSION`):
 ```bash
-make set-version 0.5.0a7
+make set-version X.Y.ZaN
 ```
 This writes the version to `VERSION` and applies it across backend/frontend/tauri packaging files.
+If `release_metadata.md` exists, it also refreshes `.github/release/metadata.json` for the new tag.
 
-2. Update release metadata JSON from your local `release_metadata.md`:
+2. If you edit `release_metadata.md` after the version bump, refresh the tracked metadata JSON:
 ```bash
 make metadata
 ```
-This generates `.github/release/metadata.json` used by the release workflow.
+This regenerates `.github/release/metadata.json` used by the release workflow.
 
 3. Commit and push (prefer atomic commands):
 ```bash

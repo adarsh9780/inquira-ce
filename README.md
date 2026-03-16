@@ -24,13 +24,13 @@ Hosted docs site (GitHub Pages): [https://adarsh9780.github.io/inquira-ce/](http
 - Turn natural language requests into reproducible Python/data operations.
 - Package the app as a desktop experience with backend + frontend + Tauri shell.
 
-## What's New (Since v0.5.7a6)
+## What's New (Since v0.5.7a8)
 
-- Built-in multi-provider LLM support (Ollama, OpenAI, Anthropic) using `inquira.toml`.
-- Replaced Variable Explorer with a Timeline Output Inspector that streams stdout/stderr via SSE.
-- Added backend-driven EDA slash commands and hybrid alias-aware schema retrieval.
-- Arrow-key message recall, VS Code-aligned keyboard shortcuts, and redesigned chat history styling.
-- Improved stability around DuckDB locks, backend auto-healing, and API key management.
+- Kept the chat composer available in both chat and code views, so follow-up questions no longer require tab switching.
+- Moved slash commands, dataset ingestion, schema reads, and artifact access onto the active workspace kernel to avoid competing DuckDB connections.
+- Improved recovery from workspace lock conflicts and kernel restarts during dataset uploads and table browsing.
+- Smoothed table browsing with cached dataframe pages, lighter pagination updates, and better compact-toolbar behavior on tablet widths.
+- Fixed several right-pane UX issues, including centered figure errors, cleaner export controls, and schema editor table selection from live workspace data.
 
 ## Upcoming Changes
 
@@ -88,8 +88,7 @@ make test-pretty
 
 Optional release flow:
 ```bash
-make set-version 0.5.0a7
-make metadata
+make set-version X.Y.ZaN
 make ruff-test
 make mypy-test
 make test
@@ -98,6 +97,9 @@ make git-commit
 make git-push
 make git-tag
 ```
+
+`make set-version` now refreshes `.github/release/metadata.json` from `release_metadata.md` when that source file exists.
+Run `make metadata` separately only if you edit `release_metadata.md` again after bumping the version.
 
 ## Documentation Map
 

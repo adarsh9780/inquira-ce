@@ -37,16 +37,17 @@ Do not bump version for every commit.
 Bump only when preparing a release/tag:
 
 ```bash
-make set-version 0.5.0a7
+make set-version X.Y.ZaN
 ```
 
 This enforces that the new version is greater than current `VERSION`.
-Use PEP 440 input (`0.5.0a7`). Tag style (`v0.5.0a7`) is normalized automatically.
+Use PEP 440 input such as `0.5.7a9`. Tag style such as `v0.5.7a9` is normalized automatically.
+If `release_metadata.md` exists, the version bump also refreshes `.github/release/metadata.json`.
 
 ## Updating Release Metadata
 
 1. Edit `release_metadata.md` in repo root.
-2. Generate tracked metadata JSON used by the release workflow:
+2. Generate tracked metadata JSON used by the release workflow if you changed `release_metadata.md` after the version bump:
 
 ```bash
 make metadata

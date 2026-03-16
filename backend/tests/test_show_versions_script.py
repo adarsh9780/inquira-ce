@@ -27,8 +27,6 @@ def test_collect_versions_includes_expected_keys():
         "frontend/package.json.version",
         "frontend/package-lock.json.version",
         "frontend/package-lock.json.packages[''].version",
-        "scripts/install-inquira.sh.wheel_version",
-        "scripts/install-inquira.ps1.wheel_version",
     }
     assert expected_keys.issubset(set(data.keys()))
 

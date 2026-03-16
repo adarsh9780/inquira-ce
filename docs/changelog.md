@@ -5,24 +5,20 @@ All notable changes should be documented in this file.
 ## Unreleased
 
 ### Added
-- Multi-provider chat model factory (Ollama, OpenAI, Anthropic) configurable via `inquira.toml`.
-- Native real-time Output pane capturing execution logs (stdout/stderr) via SSE.
-- Backend-driven Exploratory Data Analysis (EDA) slash commands with autocomplete.
-- Hybrid schema retrieval using editable schema aliases in the schema generator.
-- Arrow-key recall for chat input, and global VS Code-style keyboard shortcuts.
-- Config-driven agent v2 scaffold with intervention-ready SSE flows.
+- Shared the left-pane chat composer across both chat and code views so follow-up prompts stay available while reviewing generated code.
 
 ### Changed
-- Split persistence model into auth and appdata databases using principal-based ownership.
-- Dataframe and figure outputs are now auto-captured from arbitrary variable names.
-- Schema editor UI modernized with an in-tab dataset switcher.
+- Routed slash commands, dataset ingestion, schema introspection, and artifact reads through the active workspace kernel instead of opening competing API-side DuckDB connections.
+- Updated the schema editor to build its dataset selector from live workspace tables, including runtime-created tables without `source_path` metadata.
+- Tightened right-pane toolbars for tablet-width layouts with more compact filter, export, and delete controls.
 
 ### Fixed
-- Synced backend state to accurately reflect API key requirements (fixes Ollama API key bug).
-- Restored sorting and search features in AG Grid artifact tables.
-- Fixed scrolling snapback in chat and improved contextual scroll-to-bottom behavior.
-- Stabilized DuckDB runtime with read-only connections for safe schema introspection.
-- Regenerated analysis code defensively to recover from runtime tool failures.
+- Recovered dataset uploads from workspace DuckDB lock conflicts by surfacing the real backend error, resetting the kernel once, and retrying the import path.
+- Restored table and chart panes after kernel interruptions by reloading artifacts and clearing stale missing-kernel errors when the workspace becomes healthy again.
+- Smoothed dataframe navigation by caching artifact pages across artifact switches and reducing reactive churn during pagination.
+- Kept generated code visible during AI responses by replacing the blocking overlay with a non-blocking read-only state.
+- Moved figure artifact errors into the centered empty state so the failure is shown where users expect chart output.
+- Removed stale or crowded right-pane controls, including the overlapping figure export chevron and oversized table toolbar actions.
 
 ## [v0.5.7a6]
 

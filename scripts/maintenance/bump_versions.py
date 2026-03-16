@@ -11,8 +11,7 @@ Targets:
 - src-tauri/tauri.conf.json version (SemVer-compatible)
 - frontend/package.json version
 - frontend/package-lock.json top-level version + packages[""].version
-- scripts/install-inquira.sh default wheel URL (PEP 440 tag/wheel)
-- scripts/install-inquira.ps1 default wheel URL (PEP 440 tag/wheel)
+- .github/release/metadata.json version/tag/name/body when release_metadata.md exists
 """
 
 from __future__ import annotations
@@ -29,10 +28,10 @@ BACKEND_PYPROJECT = ROOT / "backend" / "pyproject.toml"
 BACKEND_MAIN = ROOT / "backend" / "app" / "main.py"
 TAURI_CARGO = ROOT / "src-tauri" / "Cargo.toml"
 TAURI_CONF = ROOT / "src-tauri" / "tauri.conf.json"
-INSTALL_SH = ROOT / "scripts" / "install-inquira.sh"
-INSTALL_PS1 = ROOT / "scripts" / "install-inquira.ps1"
 FRONTEND_PACKAGE = ROOT / "frontend" / "package.json"
 FRONTEND_LOCK = ROOT / "frontend" / "package-lock.json"
+RELEASE_METADATA_SOURCE = ROOT / "release_metadata.md"
+RELEASE_METADATA_JSON = ROOT / ".github" / "release" / "metadata.json"
 
 
 def normalize_version_input(version: str) -> str:
@@ -94,11 +93,60 @@ def resolve_target_versions(
     }
 
 
-def wheel_url_for(version: str) -> str:
-    return (
-        "https://github.com/adarsh9780/inquira-ce/releases/download/"
-        f"v{version}/inquira_ce-{version}-py3-none-any.whl"
+def parse_release_metadata_markdown(markdown: str) -> tuple[str, str]:
+    lines = markdown.splitlines()
+
+    title_index = None
+    for idx, raw in enumerate(lines):
+        if raw.strip():
+            title_index = idx
+            break
+
+    if title_index is None:
+        raise ValueError("release_metadata.md is empty; provide a title and body")
+
+    raw_title = lines[title_index].strip()
+    if raw_title.startswith("#"):
+        raw_title = raw_title.lstrip("#").strip()
+    if not raw_title:
+        raise ValueError("release_metadata.md title line is empty")
+
+    body_lines = lines[title_index + 1 :]
+    while body_lines and not body_lines[0].strip():
+        body_lines.pop(0)
+    body = "\n".join(body_lines).strip()
+    return raw_title, body
+
+
+def build_release_metadata_payload(version: str, title: str, body: str) -> dict[str, str]:
+    tag = version if version.startswith("v") else f"v{version}"
+    return {
+        "version": version.removeprefix("v"),
+        "tag": tag,
+        "release_name": title,
+        "release_body": body,
+    }
+
+
+def update_release_metadata(version: str) -> bool:
+    if not RELEASE_METADATA_SOURCE.exists():
+        return False
+
+    title, body = parse_release_metadata_markdown(
+        RELEASE_METADATA_SOURCE.read_text(encoding="utf-8")
     )
+    payload = build_release_metadata_payload(version=version, title=title, body=body)
+    updated = json.dumps(payload, indent=2) + "\n"
+    current = (
+        RELEASE_METADATA_JSON.read_text(encoding="utf-8")
+        if RELEASE_METADATA_JSON.exists()
+        else None
+    )
+    if current == updated:
+        return False
+    RELEASE_METADATA_JSON.parent.mkdir(parents=True, exist_ok=True)
+    RELEASE_METADATA_JSON.write_text(updated, encoding="utf-8")
+    return True
 
 
 def replace_text(path: Path, pattern: str, replacement: str) -> bool:
@@ -171,19 +219,6 @@ def update_frontend_lock(frontend_version: str) -> bool:
     return changed
 
 
-def update_install_scripts(version: str) -> list[Path]:
-    url = wheel_url_for(version)
-    changed: list[Path] = []
-    pattern = (
-        r"https://github.com/adarsh9780/inquira-ce/releases/download/"
-        r"[^/'\"\s]+/inquira_ce-[^/'\"\s]+-py3-none-any\.whl"
-    )
-    for path in (INSTALL_SH, INSTALL_PS1):
-        if replace_text(path, pattern, url):
-            changed.append(path)
-    return changed
-
-
 def run_updates(
     base_version: str,
     dry_run: bool = False,
@@ -197,13 +232,11 @@ def run_updates(
         tauri_version=tauri_version,
         frontend_version=frontend_version,
     )
-    wheel_url = wheel_url_for(versions["backend"])
     results: list[str] = [
         f"base_version={versions['base']}",
         f"backend_version={versions['backend']}",
         f"tauri_version={versions['tauri']}",
         f"frontend_version={versions['frontend']}",
-        f"wheel_url={wheel_url}",
     ]
     if dry_run:
         return results
@@ -221,10 +254,8 @@ def run_updates(
         changed.append("frontend/package.json")
     if update_frontend_lock(versions["frontend"]):
         changed.append("frontend/package-lock.json")
-    changed.extend(
-        str(p.relative_to(ROOT))
-        for p in update_install_scripts(versions["backend"])
-    )
+    if update_release_metadata(versions["base"]):
+        changed.append(".github/release/metadata.json")
 
     if changed:
         results.append("updated_files=" + ",".join(changed))

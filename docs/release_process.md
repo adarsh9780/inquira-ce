@@ -11,11 +11,12 @@ CI must pass on `master`.
 Use the Makefile guard (recommended):
 
 ```bash
-make set-version 0.5.0a7
+make set-version X.Y.ZaN
 ```
 
 This writes to `VERSION` and updates backend/frontend/tauri packaging files.
 It also blocks same-or-lower version values.
+If `release_metadata.md` already exists, this step also refreshes `.github/release/metadata.json`.
 
 ## 3. Generate release metadata
 
@@ -23,7 +24,7 @@ Update `release_metadata.md` in repo root with:
 - first non-empty line as title
 - remaining content as release body
 
-Then generate tracked metadata JSON:
+If you update `release_metadata.md` after that, regenerate the tracked metadata JSON:
 
 ```bash
 make metadata
