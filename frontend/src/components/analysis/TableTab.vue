@@ -218,6 +218,7 @@ import 'ag-grid-community/styles/ag-theme-quartz.css'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import { toast } from '../../composables/useToast'
 import { persistExportFile } from '../../utils/exportFile'
+import { chooseTableSelectionAfterRefresh } from '../../utils/tableSelection'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 import {
@@ -265,6 +266,7 @@ let isRecoveringMissingArtifact = false
 let tableSearchDebounceTimer = null
 let kernelRecoveryPoller = null
 const pendingRestorePageByArtifact = new Map()
+const pendingAutoSelectArtifactId = ref('')
 
 onMounted(() => {
   isMounted.value = true
@@ -397,19 +399,14 @@ function resolveLatestMemoryArtifactId() {
 }
 
 function resolvePreferredTableSelectionId(workspaceId, availableArtifactIds) {
-  const rememberedArtifactId = String(appStore.getSelectedTableArtifact(workspaceId) || '').trim()
-  if (rememberedArtifactId && availableArtifactIds.has(rememberedArtifactId)) {
-    return rememberedArtifactId
-  }
-  const latestArtifactId = String(appStore.dataframes?.[0]?.data?.artifact_id || '').trim()
-  if (latestArtifactId && availableArtifactIds.has(latestArtifactId)) {
-    return latestArtifactId
-  }
-  const latestMemoryId = resolveLatestMemoryArtifactId()
-  if (latestMemoryId && availableArtifactIds.has(latestMemoryId)) {
-    return latestMemoryId
-  }
-  return ''
+  return chooseTableSelectionAfterRefresh({
+    currentSelectionId: selectedArtifactId.value,
+    availableArtifactIds,
+    rememberedArtifactId: appStore.getSelectedTableArtifact(workspaceId),
+    latestArtifactId: appStore.dataframes?.[0]?.data?.artifact_id,
+    latestMemoryArtifactId: resolveLatestMemoryArtifactId(),
+    pendingAutoSelectArtifactId: pendingAutoSelectArtifactId.value,
+  })
 }
 
 watch(
@@ -417,17 +414,20 @@ watch(
   () => {
     const latestArtifactId = String(appStore.dataframes?.[0]?.data?.artifact_id || '').trim()
     if (latestArtifactId && latestArtifactId !== selectedArtifactId.value) {
+      pendingAutoSelectArtifactId.value = latestArtifactId
       const existsInArtifactList = allArtifacts.value.some(
         (item) => String(item?.artifact_id || '').trim() === latestArtifactId,
       )
       if (existsInArtifactList) {
         selectedArtifactId.value = latestArtifactId
+        pendingAutoSelectArtifactId.value = ''
       }
     } else {
       const latestMemoryId = resolveLatestMemoryArtifactId()
       if (latestMemoryId && latestMemoryId !== selectedArtifactId.value) {
         selectedArtifactId.value = latestMemoryId
       }
+      pendingAutoSelectArtifactId.value = ''
     }
     if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) return
     void loadWorkspaceArtifacts(appStore.activeWorkspaceId)
@@ -611,15 +611,18 @@ async function loadWorkspaceArtifacts(workspaceId) {
         .map((item) => String(item?.artifact_id || '').trim())
         .filter(Boolean),
     )
-    const currentSelection = String(selectedArtifactId.value || '').trim()
-    const hasCurrentSelection = Boolean(currentSelection && availableArtifactIds.has(currentSelection))
-    if (!hasCurrentSelection) {
-      const preferredSelection = resolvePreferredTableSelectionId(
-        normalizedWorkspaceId,
-        availableArtifactIds,
-      )
-      const fallbackSelection = preferredSelection || displayArtifacts.value[0]?.artifact_id || null
-      selectedArtifactId.value = fallbackSelection
+    const preferredSelection = resolvePreferredTableSelectionId(normalizedWorkspaceId, availableArtifactIds)
+    if (preferredSelection) {
+      selectedArtifactId.value = preferredSelection
+      if (preferredSelection === String(pendingAutoSelectArtifactId.value || '').trim()) {
+        pendingAutoSelectArtifactId.value = ''
+      }
+    } else {
+      const currentSelection = String(selectedArtifactId.value || '').trim()
+      const hasCurrentSelection = Boolean(currentSelection && availableArtifactIds.has(currentSelection))
+      if (!hasCurrentSelection) {
+        selectedArtifactId.value = displayArtifacts.value[0]?.artifact_id || null
+      }
     }
   } catch (error) {
     if (isAbortError(error)) return
@@ -666,6 +669,7 @@ watch(() => appStore.activeWorkspaceId, (id) => {
   stopKernelRecoveryPolling()
   tableSearch.value = ''
   pendingRestorePageByArtifact.clear()
+  pendingAutoSelectArtifactId.value = ''
   selectedArtifactLoadToken += 1
   selectedArtifactId.value = null
   resetTableState()
