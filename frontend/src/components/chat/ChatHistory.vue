@@ -119,20 +119,35 @@
             <div v-html="renderMarkdown(message.explanation)"></div>
           </div>
 
-          <div v-if="shouldRenderCodeSnapshot(message)" class="chat-code-block mt-3">
-            <div class="chat-code-header">
-              <span>python</span>
-              <button
-                type="button"
-                class="text-xs font-medium underline-offset-2 hover:underline"
-                style="color: #A1A1AA;"
-                @click="openCodePane"
+          <details v-if="shouldRenderCodeDetails(message)" class="mt-3 rounded-xl border code-details-panel" style="border-color: var(--color-border);">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium" style="color: var(--color-text-main);">
+              <span>Generated code details</span>
+              <span class="text-xs uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Optional</span>
+            </summary>
+            <div class="px-4 pb-4 pt-1">
+              <div
+                v-if="message.codeExplanation"
+                class="chat-markdown-content text-sm leading-relaxed max-w-none mb-3"
+                style="color: var(--color-text-main);"
               >
-                Open Code
-              </button>
+                <div v-html="renderMarkdown(message.codeExplanation)"></div>
+              </div>
+              <div v-if="shouldRenderCodeSnapshot(message)" class="chat-code-block">
+                <div class="chat-code-header">
+                  <span>python</span>
+                  <button
+                    type="button"
+                    class="text-xs font-medium underline-offset-2 hover:underline"
+                    style="color: #A1A1AA;"
+                    @click="openCodePane"
+                  >
+                    Open Code
+                  </button>
+                </div>
+                <pre class="chat-code-scroll"><code class="language-python" v-html="renderCodeSnapshot(message.codeSnapshot)"></code></pre>
+              </div>
             </div>
-            <pre class="chat-code-scroll"><code class="language-python" v-html="renderCodeSnapshot(message.codeSnapshot)"></code></pre>
-          </div>
+          </details>
 
           <details v-if="message.toolEvents && message.toolEvents.length" class="mt-3 rounded p-2" style="border: 1px solid var(--color-border);">
             <summary class="text-xs cursor-pointer" style="color: var(--color-text-muted);">Tool artifacts</summary>
@@ -232,7 +247,7 @@ const end = ref(null)
 const ephemeralExpandedRows = ref(new Set())
 const pendingInterventionIds = ref(new Set())
 const suppressMutationAutoScroll = ref(false)
-const SHOW_EPHEMERAL_TRACE = false
+const SHOW_EPHEMERAL_TRACE = true
 const showScrollToBottomButton = ref(false)
 let shouldAutoScroll = true
 let mutationObserver = null
@@ -334,11 +349,10 @@ const EPHEMERAL_LABELS = {
   check_safety: 'Checking if query is safe to process',
   check_relevancy: 'Checking if query matches your data',
   require_code: 'Determining whether code generation is needed',
-  create_plan: 'Planning the analysis steps'
+  create_plan: 'Planning the analysis steps',
+  agent_status: null // Use message from event payload directly
 }
 const HIDDEN_EPHEMERAL_NODES = new Set([
-  'code_generator',
-  'retry_code_generator',
   'code_guard',
   'explain_code'
 ])
@@ -474,7 +488,7 @@ function streamToolCalls(message) {
 }
 
 function toolActivityRows(message) {
-  return streamToolCalls(message)
+  return streamToolCalls(message).filter((activity) => String(activity?.tool || '').trim().toLowerCase() !== 'execute_python')
 }
 
 function pendingIntervention(message) {
@@ -491,6 +505,7 @@ function normalizeNodeName(nodeName) {
 
 function describeNode(nodeName) {
   const normalized = normalizeNodeName(nodeName)
+  if (normalized === 'agent_status') return null // handled by message field
   if (EPHEMERAL_LABELS[normalized]) return EPHEMERAL_LABELS[normalized]
   if (!normalized) return 'Processing update'
   return normalized
@@ -540,10 +555,12 @@ function ephemeralRows(message) {
     const stage = String(event?.stage || '').trim().toLowerCase()
 
     let summary = 'Processing update'
-    if (type === 'status') {
+    if (node === 'agent_status') {
+      summary = String(event?.message || 'Processing...')
+    } else if (type === 'status') {
       summary = String(event?.message || 'Updating analysis status')
     } else if (type === 'node') {
-      summary = describeNode(node)
+      summary = describeNode(node) || String(event?.message || 'Processing update')
     }
 
     const output = eventOutputText(event, message)
@@ -562,7 +579,7 @@ function hasStreamTrace(message) {
 function hasAssistantContent(message) {
   return Boolean(
     message?.explanation ||
-    shouldRenderCodeSnapshot(message) ||
+    shouldRenderCodeDetails(message) ||
     toolActivityRows(message).length > 0 ||
     pendingIntervention(message) ||
     (SHOW_EPHEMERAL_TRACE && hasStreamTrace(message)) ||
@@ -579,6 +596,13 @@ function shouldRenderCodeSnapshot(message) {
   const hasSnapshot = Boolean(String(message?.codeSnapshot || '').trim())
   if (!hasSnapshot) return false
   return !explanationHasCodeBlocks(message)
+}
+
+function shouldRenderCodeDetails(message) {
+  return Boolean(
+    String(message?.codeExplanation || '').trim() ||
+    shouldRenderCodeSnapshot(message)
+  )
 }
 
 function openCodePane() {

@@ -576,6 +576,8 @@ export const useAppStore = defineStore('app', () => {
 
   function addChatMessage(question, explanation, options = {}) {
     const codeSnapshot = String(options?.codeSnapshot || '')
+    const resultExplanation = String(options?.resultExplanation || explanation || '')
+    const codeExplanation = String(options?.codeExplanation || '')
     const streamTrace = options?.streamTrace && typeof options.streamTrace === 'object'
       ? {
         planText: String(options.streamTrace.planText || ''),
@@ -592,7 +594,9 @@ export const useAppStore = defineStore('app', () => {
     chatHistory.value.push({
       id: Date.now(),
       question,
-      explanation,
+      explanation: resultExplanation,
+      resultExplanation,
+      codeExplanation,
       streamTrace,
       codeSnapshot,
       codeUpdated: Boolean(codeSnapshot.trim()),
@@ -600,7 +604,7 @@ export const useAppStore = defineStore('app', () => {
       timestamp: new Date().toISOString()
     })
     currentQuestion.value = question
-    currentExplanation.value = explanation
+    currentExplanation.value = resultExplanation
   }
 
   function addQuestionHistoryEntry(question) {
@@ -619,6 +623,7 @@ export const useAppStore = defineStore('app', () => {
     const lastMessage = getLastChatMessage()
     if (!lastMessage) return
     lastMessage.explanation = explanation
+    lastMessage.resultExplanation = explanation
     currentExplanation.value = explanation
   }
 
@@ -628,7 +633,14 @@ export const useAppStore = defineStore('app', () => {
     const current = String(lastMessage.explanation || '')
     const updated = current + text
     lastMessage.explanation = updated
+    lastMessage.resultExplanation = updated
     currentExplanation.value = updated
+  }
+
+  function setLastMessageCodeExplanation(explanation) {
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage) return
+    lastMessage.codeExplanation = String(explanation || '')
   }
 
   function appendLastMessagePlanChunk(text, node = '') {
@@ -930,6 +942,8 @@ export const useAppStore = defineStore('app', () => {
       id: turn.id,
       question: turn.user_text,
       explanation: turn.assistant_text,
+      resultExplanation: String(turn?.metadata?.result_explanation || turn.assistant_text || ''),
+      codeExplanation: String(turn?.metadata?.code_explanation || ''),
       toolEvents: turn.tool_events || null,
       streamTrace: null,
       codeSnapshot: turn.code_snapshot || '',
@@ -1867,6 +1881,7 @@ export const useAppStore = defineStore('app', () => {
     addChatMessage,
     addQuestionHistoryEntry,
     updateLastMessageExplanation,
+    setLastMessageCodeExplanation,
     appendLastMessageExplanationChunk,
     appendLastMessagePlanChunk,
     appendLastMessageTraceEvent,

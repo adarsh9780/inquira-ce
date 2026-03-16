@@ -73,6 +73,8 @@ async def analyze(
         is_relevant=response_payload["is_relevant"],
         code=response_payload["code"],
         explanation=response_payload["explanation"],
+        result_explanation=response_payload.get("result_explanation"),
+        code_explanation=response_payload.get("code_explanation"),
         run_id=response_payload.get("run_id"),
         execution=response_payload.get("execution"),
         artifacts=response_payload.get("artifacts") or [],

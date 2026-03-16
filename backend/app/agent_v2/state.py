@@ -38,6 +38,11 @@ class AgentOutput(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
     final_code: str | None
     final_explanation: str | None
+    result_explanation: str | None
+    code_explanation: str | None
+    final_execution: dict[str, Any] | None
+    final_artifacts: list[dict[str, Any]]
+    final_executed_code: str | None
     output_contract: list[dict[str, str]]
     known_columns: list[dict[str, str]]
     route: str
@@ -49,6 +54,11 @@ class AgentState(AgentInput, total=False):
     route: str
     final_code: str | None
     final_explanation: str | None
+    result_explanation: str | None
+    code_explanation: str | None
+    final_execution: dict[str, Any] | None
+    final_artifacts: list[dict[str, Any]]
+    final_executed_code: str | None
     output_contract: list[dict[str, str]]
     known_columns: list[dict[str, str]]
     metadata: dict[str, Any]

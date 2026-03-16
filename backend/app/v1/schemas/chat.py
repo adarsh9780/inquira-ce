@@ -26,6 +26,8 @@ class AnalyzeResponse(BaseModel):
     is_relevant: bool
     code: str
     explanation: str
+    result_explanation: str | None = None
+    code_explanation: str | None = None
     run_id: str | None = None
     execution: dict | None = None
     artifacts: list[dict] = Field(default_factory=list)

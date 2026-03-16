@@ -798,6 +798,16 @@ async function handleSubmit() {
             })
             return
           }
+          if (evt.event === 'agent_status' && evt.data?.message) {
+            appStore.appendLastMessageTraceEvent({
+              type: 'status',
+              node: 'agent_status',
+              stage: evt.data.step || '',
+              message: evt.data.message,
+              output: ''
+            })
+            return
+          }
           if (evt.event === 'tool_call' && evt.data?.call_id) {
             appStore.appendLastMessageToolCall(evt.data)
             return
@@ -826,16 +836,18 @@ async function handleSubmit() {
       await appStore.fetchConversations()
     }
 
-    const { is_safe, code, current_code, explanation } = response
+    const { is_safe, code, current_code, explanation, result_explanation, code_explanation } = response
     const finalCode = (code ?? current_code ?? '').toString()
+    const finalExplanation = (result_explanation ?? explanation ?? '').toString()
     appStore.setLastMessageCodeSnapshot(finalCode)
+    appStore.setLastMessageCodeExplanation((code_explanation ?? '').toString())
 
     if (!is_safe) {
-      appStore.updateLastMessageExplanation(explanation || 'Your query was flagged as potentially unsafe.')
+      appStore.updateLastMessageExplanation(finalExplanation || 'Your query was flagged as potentially unsafe.')
       return
     }
 
-    appStore.updateLastMessageExplanation(explanation)
+    appStore.updateLastMessageExplanation(finalExplanation)
     appStore.setGeneratedCode(finalCode)
     if (finalCode.trim()) {
       appStore.setPythonFileContent(finalCode)

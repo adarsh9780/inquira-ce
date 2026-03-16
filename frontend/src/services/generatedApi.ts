@@ -48,6 +48,12 @@ export interface AnalyzeResponse {
   is_relevant: boolean;
   code: string;
   explanation: string;
+  result_explanation?: string | null;
+  code_explanation?: string | null;
+  run_id?: string | null;
+  execution?: { [key: string]: any } | null;
+  artifacts?: Array<{ [key: string]: any }>;
+  final_script_artifact_id?: string | null;
 }
 
 export interface ApiKeyUpdateRequest {

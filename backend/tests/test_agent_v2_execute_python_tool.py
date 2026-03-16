@@ -14,7 +14,6 @@ async def test_execute_python_returns_actionable_error_when_workspace_db_is_miss
         events.append((event, payload))
 
     monkeypatch.setattr("app.agent_v2.tools.execute_python.emit_agent_event", fake_emit)
-    monkeypatch.setattr("app.agent_v2.tools.execute_python.execute_code", _fail_execute_code)
 
     missing_db = tmp_path / "workspace.db"
     result = await execute_python(

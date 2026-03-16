@@ -15,10 +15,13 @@ from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
 from ..agent.code_guard import guard_code
+from ..agent.events import emit_agent_event
 from ..agent.registry import load_agent_runtime_config
 from ..services.chat_model_factory import create_chat_model
+from ..services.code_executor import get_workspace_run_exports
 from ..services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
 from ..services.llm_provider_catalog import normalize_llm_provider, provider_requires_api_key
+from ..services.output_capture import build_run_wrapped_code
 from .router import decide_route
 from .streaming import emit_stream_token
 from .tools.bash_tool import run_bash
@@ -27,12 +30,16 @@ from .tools.finish_analysis import finish_analysis
 from .tools.pip_install import pip_install
 from .tools.sample_data import sample_data
 from .tools.search_schema import search_schema
+from .tools.validate_result import validate_and_summarize_result
 
 _ANALYSIS_PROMPT = (
     Path(__file__).resolve().parent / "prompts" / "react_system.yaml"
 ).read_text(encoding="utf-8")
 _GENERAL_CHAT_PROMPT = (
     Path(__file__).resolve().parent / "prompts" / "general_chat_system.yaml"
+).read_text(encoding="utf-8")
+_RESULT_EXPLANATION_PROMPT = (
+    Path(__file__).resolve().parent / "prompts" / "result_explanation_system.yaml"
 ).read_text(encoding="utf-8")
 
 
@@ -45,6 +52,11 @@ class AnalysisOutput(BaseModel):
 
 class ChatOutput(BaseModel):
     answer: str | None = None
+
+
+class ResultExplanation(BaseModel):
+    result_explanation: str | None = None
+    code_explanation: str | None = None
 
 
 def _stringify_content(content: Any) -> str:
@@ -344,6 +356,51 @@ def _is_non_retriable_execution_error(message: str) -> bool:
     return any(marker in text for marker in non_retriable_markers)
 
 
+def _truncate_text(value: Any, *, limit: int = 2400) -> str:
+    text = str(value or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 3)].rstrip() + "..."
+
+
+async def _generate_result_explanations(
+    *,
+    question: str,
+    code: str,
+    code_explanation: str,
+    result_summary: dict[str, Any],
+    config: RunnableConfig,
+) -> ResultExplanation:
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", _RESULT_EXPLANATION_PROMPT),
+            (
+                "human",
+                (
+                    "User question:\n{question}\n\n"
+                    "Generated code:\n```python\n{code}\n```\n\n"
+                    "Existing technical explanation:\n{code_explanation}\n\n"
+                    "Execution summary JSON:\n{result_summary_json}"
+                ),
+            ),
+        ]
+    )
+    model = _get_model(config, lite=True)
+    chain = prompt | model.with_structured_output(ResultExplanation)
+    output = _invoke_structured_chain(
+        chain,
+        {
+            "question": question,
+            "code": code,
+            "code_explanation": code_explanation,
+            "result_summary_json": _safe_json_dumps(result_summary),
+        },
+    )
+    if isinstance(output, ResultExplanation):
+        return output
+    return ResultExplanation.model_validate(output)
+
+
 async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
     messages = list(state.get("messages") or [])
     table_name = str(state.get("table_name") or "")
@@ -409,6 +466,10 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
     candidate_code = ""
     execution_feedback = ""
     last_executed_code = ""
+    final_execution: dict[str, Any] | None = None
+    final_artifacts: list[dict[str, Any]] = []
+    final_executed_code = ""
+    sanitized_output_contract: list[dict[str, str]] = []
     for _attempt in range(total_iterations):
         call_messages = list(messages)
         if retry_feedback:
@@ -420,6 +481,12 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
                     )
                 )
             )
+
+        emit_agent_event("agent_status", {
+            "step": "generating_code",
+            "message": "Generating analysis code..." if not retry_feedback else "Regenerating code...",
+            "attempt": _attempt + 1,
+        })
 
         output = _invoke_structured_chain(
             chain,
@@ -448,6 +515,10 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
             for query in pending_search_queries:
                 if search_calls >= max_schema_search_calls:
                     break
+                emit_agent_event("agent_status", {
+                    "step": "searching_schema",
+                    "message": f"Searching schema for \"{query}\"...",
+                })
                 searched_schema_queries.add(query.lower())
                 search_calls += 1
                 search_result = search_schema(
@@ -475,32 +546,79 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
             retry_feedback = "No code was produced. Generate executable Python code."
             continue
 
+        sanitized_output_contract = _sanitize_output_contract(best_output.output_contract)
+
         guard = guard_code(candidate_code, table_name=table_name or None)
         if not guard.blocked:
             candidate_code = guard.code
         else:
+            emit_agent_event("agent_status", {
+                "step": "code_validation_failed",
+                "message": "Code validation failed. Regenerating...",
+            })
             retry_feedback = str(guard.reason or "Generated code failed validation.")
             candidate_code = ""
             continue
 
         execution_attempts += 1
+        emit_agent_event("agent_status", {
+            "step": "executing_code",
+            "message": "Running code...",
+            "attempt": execution_attempts,
+        })
+        wrapped_code = build_run_wrapped_code(
+            candidate_code,
+            str(state.get("run_id") or ""),
+            sanitized_output_contract,
+        )
         execution = await execute_python(
             workspace_id=workspace_id,
             data_path=data_path or None,
-            code=candidate_code,
+            code=wrapped_code,
             timeout=min(90, max(10, int(runtime.turn_timeout))),
+            emit_tool_events=False,
         )
         last_executed_code = candidate_code
+        final_executed_code = wrapped_code
         if bool(execution.get("success")):
+            emit_agent_event("agent_status", {
+                "step": "execution_success",
+                "message": "Code executed successfully.",
+            })
+            final_execution = execution
+            final_artifacts = [
+                item for item in (execution.get("artifacts") or []) if isinstance(item, dict)
+            ]
+            if not final_artifacts:
+                try:
+                    exports = await get_workspace_run_exports(
+                        workspace_id=workspace_id,
+                        run_id=str(state.get("run_id") or ""),
+                    )
+                except Exception:
+                    exports = []
+                final_artifacts = [item for item in exports if isinstance(item, dict)]
             execution_feedback = ""
             retry_feedback = ""
             break
 
         execution_feedback = str(execution.get("error") or execution.get("stderr") or "").strip()
         if _is_non_retriable_execution_error(execution_feedback):
+            emit_agent_event("agent_status", {
+                "step": "execution_failed",
+                "message": f"Execution failed: {execution_feedback[:200]}",
+            })
             break
         if execution_attempts >= max_attempts:
+            emit_agent_event("agent_status", {
+                "step": "execution_failed",
+                "message": f"Code failed after {execution_attempts} attempts.",
+            })
             break
+        emit_agent_event("agent_status", {
+            "step": "execution_retry",
+            "message": f"Code execution failed. Retrying (attempt {execution_attempts + 1}/{max_attempts})...",
+        })
         retry_feedback = (
             "Execution failed. Regenerate code that fixes this runtime error.\n"
             f"Runtime error: {execution_feedback[:1200]}"
@@ -509,32 +627,91 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
     if not candidate_code and execution_feedback:
         candidate_code = last_executed_code
 
-    explanation = str(best_output.explanation or "").strip()
-    if execution_feedback:
-        explanation = (
-            f"{explanation}\n\nExecution warning: {execution_feedback}"
-            if explanation
-            else f"Execution warning: {execution_feedback}"
-        )
-    if retry_feedback and not candidate_code:
-        explanation = (
-            f"{explanation}\n\nI could not produce safe executable code.\nReason: {retry_feedback}"
-            if explanation
-            else f"I could not produce safe executable code.\nReason: {retry_feedback}"
-        )
-    if not explanation:
-        explanation = "Analysis completed. Review the generated code and output."
+    code_explanation = str(best_output.explanation or "").strip()
+    result_explanation = ""
+    result_summary: dict[str, Any] = {
+        "success": bool(final_execution and final_execution.get("success")),
+        "stdout": "",
+        "stderr": _truncate_text(execution_feedback, limit=1800),
+        "artifact_count": len(final_artifacts),
+    }
 
-    _emit_text_chunks("finalize", explanation)
+    if final_execution:
+        if final_artifacts and any(
+            str(item.get("kind") or "").strip().lower() == "dataframe"
+            and int(item.get("row_count") or 0) > 10
+            for item in final_artifacts
+            if isinstance(item, dict)
+        ):
+            emit_agent_event(
+                "agent_status",
+                {
+                    "step": "sampling_results",
+                    "message": "Sampling result data before explaining the outcome...",
+                },
+            )
+        emit_agent_event(
+            "agent_status",
+            {"step": "analyzing_results", "message": "Analyzing results..."},
+        )
+        result_summary = await validate_and_summarize_result(
+            workspace_id=workspace_id,
+            run_id=str(state.get("run_id") or ""),
+            execution_result=final_execution,
+        )
+        try:
+            explained = await _generate_result_explanations(
+                question=user_text,
+                code=candidate_code,
+                code_explanation=code_explanation,
+                result_summary=result_summary,
+                config=config,
+            )
+            result_explanation = str(explained.result_explanation or "").strip()
+            code_explanation = str(explained.code_explanation or code_explanation).strip()
+        except Exception as exc:
+            fallback = _truncate_text(exc, limit=200)
+            emit_agent_event(
+                "agent_status",
+                {
+                    "step": "result_analysis_failed",
+                    "message": f"Result analysis fallback applied after explanation error: {fallback}",
+                },
+            )
+            result_explanation = ""
+
+    if not result_explanation:
+        if execution_feedback:
+            result_explanation = (
+                "I ran the analysis but could not complete it successfully. "
+                f"The last runtime error was: {execution_feedback}"
+            )
+        elif retry_feedback and not candidate_code:
+            result_explanation = (
+                "I could not produce safe executable code for this request. "
+                f"Reason: {retry_feedback}"
+            )
+        elif code_explanation:
+            result_explanation = code_explanation
+        else:
+            result_explanation = "Analysis completed."
+
+    _emit_text_chunks("finalize", result_explanation)
     return {
         "route": "analysis",
         "final_code": candidate_code or "",
-        "final_explanation": explanation,
-        "output_contract": _sanitize_output_contract(best_output.output_contract),
+        "final_explanation": result_explanation,
+        "result_explanation": result_explanation,
+        "code_explanation": code_explanation,
+        "final_execution": final_execution,
+        "final_artifacts": final_artifacts,
+        "final_executed_code": final_executed_code or "",
+        "output_contract": sanitized_output_contract,
         "metadata": {"is_safe": True, "is_relevant": True},
-        "messages": [AIMessage(content=explanation)],
+        "messages": [AIMessage(content=result_explanation)],
         "last_error": retry_feedback or execution_feedback,
         "known_columns": known_columns,
+        "run_id": str(state.get("run_id") or ""),
     }
 
 
@@ -559,10 +736,16 @@ def chat_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         "route": "general_chat",
         "final_code": "",
         "final_explanation": text,
+        "result_explanation": text,
+        "code_explanation": "",
+        "final_execution": None,
+        "final_artifacts": [],
+        "final_executed_code": "",
         "output_contract": [],
         "known_columns": _normalize_known_columns(state.get("known_columns") or []),
         "metadata": {"is_safe": True, "is_relevant": False},
         "messages": [AIMessage(content=text)],
+        "run_id": str(state.get("run_id") or ""),
     }
 
 
@@ -577,10 +760,16 @@ def reject_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]
         "route": "unsafe",
         "final_code": "",
         "final_explanation": text,
+        "result_explanation": text,
+        "code_explanation": "",
+        "final_execution": None,
+        "final_artifacts": [],
+        "final_executed_code": "",
         "output_contract": [],
         "known_columns": _normalize_known_columns(state.get("known_columns") or []),
         "metadata": {"is_safe": False, "is_relevant": False},
         "messages": [AIMessage(content=text)],
+        "run_id": str(state.get("run_id") or ""),
     }
 
 
@@ -601,18 +790,27 @@ def finalize_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, An
         str(state.get("final_code") or ""),
         state.get("scratchpad_path"),
     )
-    explanation = _strip_scratchpad_references(
-        str(state.get("final_explanation") or ""),
+    result_explanation = _strip_scratchpad_references(
+        str(state.get("result_explanation") or state.get("final_explanation") or ""),
         state.get("scratchpad_path"),
     )
-    if not explanation:
-        explanation = "Analysis completed."
+    code_explanation = _strip_scratchpad_references(
+        str(state.get("code_explanation") or ""),
+        state.get("scratchpad_path"),
+    )
+    if not result_explanation:
+        result_explanation = "Analysis completed."
 
-    finish = finish_analysis(explanation=explanation, code=code)
+    finish = finish_analysis(explanation=result_explanation, code=code)
     return {
         "final_code": finish.get("final_code", code),
-        "final_explanation": finish.get("final_explanation", explanation),
-        "messages": [AIMessage(content=finish.get("final_explanation", explanation))],
+        "final_explanation": finish.get("final_explanation", result_explanation),
+        "result_explanation": result_explanation,
+        "code_explanation": code_explanation,
+        "final_execution": state.get("final_execution"),
+        "final_artifacts": state.get("final_artifacts") or [],
+        "final_executed_code": state.get("final_executed_code") or "",
+        "messages": [AIMessage(content=finish.get("final_explanation", result_explanation))],
         "output_contract": state.get("output_contract") or [],
         "known_columns": _normalize_known_columns(state.get("known_columns") or []),
         "route": state.get("route") or "analysis",

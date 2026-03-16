@@ -245,6 +245,7 @@ async def test_react_loop_node_merges_search_schema_results_into_known_columns(m
     )
 
     assert result["final_code"] == 'result_df = conn.sql("select gross_margin from orders").fetchdf()'
-    assert len(payloads) == 2
+    assert len(payloads) == 3
     assert "gross_margin" in payloads[1]["known_columns_json"]
+    assert "artifact_count" in str(payloads[2].get("result_summary_json") or "")
     assert any(col["name"] == "gross_margin" for col in result["known_columns"])
