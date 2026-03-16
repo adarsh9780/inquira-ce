@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import os
 import re
@@ -17,6 +18,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...services.artifact_scratchpad import get_artifact_scratchpad_store
 from ...services.code_executor import (
     bootstrap_workspace_runtime,
     delete_workspace_artifact_via_kernel,
@@ -113,6 +115,23 @@ def _normalize_search_query(raw_value: Any) -> str | None:
         return None
     text = raw_value.strip()
     return text or None
+
+
+def _is_duckdb_lock_conflict(exc: duckdb.IOException) -> bool:
+    return "Conflicting lock is held" in str(exc)
+
+
+async def _read_table_columns_for_prompt(
+    *,
+    workspace_id: str,
+    table_name: str,
+    allow_sample_values: bool,
+) -> list[dict[str, Any]]:
+    return await get_workspace_table_schema_via_kernel(
+        workspace_id=workspace_id,
+        table_name=table_name,
+        allow_sample_values=allow_sample_values,
+    ) or []
 
 
 class ExecuteRequest(BaseModel):
@@ -951,13 +970,15 @@ async def execute_workspace_slash_command(
         )
         raise HTTPException(status_code=500, detail=detail)
 
-    result = {
-        "name": str(raw_result.get("name") or compiled.get("name") or parsed_name),
-        "output": str(raw_result.get("output") or compiled.get("output") or ""),
-        "result_type": str(raw_result.get("result_type") or compiled.get("result_type") or "message"),
-        "result": raw_result.get("result") if isinstance(raw_result.get("result"), dict) else None,
-        "truncated": bool(raw_result.get("truncated")),
-    }
+    result_name = str(raw_result.get("name") or compiled.get("name") or parsed_name)
+    result_output = str(raw_result.get("output") or compiled.get("output") or "")
+    result_type = str(
+        raw_result.get("result_type") or compiled.get("result_type") or "message"
+    )
+    result_payload: dict[str, Any] | None = (
+        raw_result.get("result") if isinstance(raw_result.get("result"), dict) else None
+    )
+    result_truncated = bool(raw_result.get("truncated"))
 
     conversation = await _resolve_or_create_command_conversation(
         session=session,
@@ -971,22 +992,20 @@ async def execute_workspace_slash_command(
         session=session,
         conversation=conversation,
         command_text=command_text,
-        command_name=str(result.get("name") or parsed_name),
-        command_output=str(result.get("output") or ""),
-        command_result_type=str(result.get("result_type") or "message"),
-        command_result=result.get("result")
-        if isinstance(result.get("result"), dict)
-        else None,
-        truncated=bool(result.get("truncated")),
+        command_name=result_name,
+        command_output=result_output,
+        command_result_type=result_type,
+        command_result=result_payload,
+        truncated=result_truncated,
     )
 
     return CommandExecuteResponse(
         command=command_text,
-        name=str(result.get("name") or parsed_name),
-        output=str(result.get("output") or ""),
-        result_type=str(result.get("result_type") or "message"),
-        result=result.get("result") if isinstance(result.get("result"), dict) else None,
-        truncated=bool(result.get("truncated")),
+        name=result_name,
+        output=result_output,
+        result_type=result_type,
+        result=result_payload,
+        truncated=result_truncated,
         conversation_id=str(getattr(conversation, "id", "") or ""),
         turn_id=turn_id,
     )
@@ -1072,6 +1091,18 @@ async def get_workspace_dataframe_artifact_rows(
     )
     search_text = _normalize_search_query(search)
     try:
+        rows = get_artifact_scratchpad_store().get_dataframe_rows(
+            workspace_duckdb_path=str(workspace.duckdb_path),
+            artifact_id=artifact_id,
+            offset=offset,
+            limit=limit,
+            sort_model=cast(list[dict[str, Any]], parsed_sort_model),
+            filter_model=cast(dict[str, Any], parsed_filter_model),
+            search_text=search_text,
+        )
+    except duckdb.IOException as exc:
+        if not _is_duckdb_lock_conflict(exc):
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         rows = await get_workspace_dataframe_rows(
             workspace_id=workspace_id,
             artifact_id=artifact_id,
@@ -1107,7 +1138,7 @@ async def get_workspace_artifact_rows(
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
-    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    await _require_workspace_access(session, current_user.id, workspace_id)
     parsed_sort_model = _parse_grid_query_model(
         raw_value=sort_model,
         field_name="sort_model",
@@ -1148,6 +1179,12 @@ async def get_workspace_artifact_usage(
     """Return scratchpad usage summary used by status-bar artifact pressure warning."""
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     try:
+        usage = get_artifact_scratchpad_store().get_workspace_artifact_usage(
+            workspace_duckdb_path=str(workspace.duckdb_path)
+        )
+    except duckdb.IOException as exc:
+        if not _is_duckdb_lock_conflict(exc):
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         usage = await get_workspace_artifact_usage_via_kernel(workspace_id)
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -1180,6 +1217,13 @@ async def get_workspace_artifact_metadata(
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     try:
+        artifact = get_artifact_scratchpad_store().get_artifact(
+            workspace_duckdb_path=str(workspace.duckdb_path),
+            artifact_id=artifact_id,
+        )
+    except duckdb.IOException as exc:
+        if not _is_duckdb_lock_conflict(exc):
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         artifact = await get_workspace_artifact_metadata_via_kernel(
             workspace_id=workspace_id,
             artifact_id=artifact_id,
@@ -1203,6 +1247,13 @@ async def delete_workspace_artifact(
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     try:
+        deleted = get_artifact_scratchpad_store().delete_artifact(
+            workspace_duckdb_path=str(workspace.duckdb_path),
+            artifact_id=artifact_id,
+        )
+    except duckdb.IOException as exc:
+        if not _is_duckdb_lock_conflict(exc):
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         deleted = await delete_workspace_artifact_via_kernel(
             workspace_id=workspace_id,
             artifact_id=artifact_id,
@@ -1228,7 +1279,7 @@ async def list_workspace_artifacts(
     current_user=Depends(get_current_user),
 ):
     """List all non-expired artifacts for a workspace, optionally filtered by kind."""
-    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    await _require_workspace_access(session, current_user.id, workspace_id)
     try:
         items = await list_workspace_artifacts_via_kernel(workspace_id, kind=kind)
     except RuntimeError as exc:
@@ -1562,7 +1613,7 @@ async def get_workspace_dataset_schema(
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
-    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    await _require_workspace_access(session, current_user.id, workspace_id)
     normalized = _normalize_table_name(table_name)
     if not normalized:
         raise HTTPException(status_code=400, detail="Invalid table name")
@@ -1691,14 +1742,21 @@ async def regenerate_workspace_dataset_schema(
             detail="API key not set. Please configure your API key in Settings.",
         )
 
+    read_columns_error: RuntimeError | None = None
     try:
-        columns = await get_workspace_table_schema_via_kernel(
+        columns_result = _read_table_columns_for_prompt(
             workspace_id=workspace_id,
             table_name=normalized,
             allow_sample_values=allow_sample_values,
         )
+        columns = (
+            await columns_result
+            if inspect.isawaitable(columns_result)
+            else cast(list[dict[str, Any]], columns_result)
+        )
     except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        columns = []
+        read_columns_error = exc
 
     if not columns:
         columns = []
@@ -1711,6 +1769,8 @@ async def regenerate_workspace_dataset_schema(
         )
 
     if not columns:
+        if read_columns_error is not None:
+            raise HTTPException(status_code=409, detail=str(read_columns_error)) from read_columns_error
         raise HTTPException(
             status_code=400, detail="No columns found for this dataset table"
         )

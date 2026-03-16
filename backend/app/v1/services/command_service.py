@@ -1182,10 +1182,10 @@ def compile_workspace_command(
             resolved_cols = list(catalog.columns.get(table, {}).values())
         if not resolved_cols:
             raise CommandExecutionError("No columns found to evaluate duplicates.")
-        quoted_cols = ", ".join(_quote_ident(col) for col in resolved_cols)
+        quoted_group_cols = ", ".join(_quote_ident(col) for col in resolved_cols)
         sql = (
-            f"SELECT {quoted_cols}, COUNT(*) AS duplicate_count "
-            f"FROM {qt} GROUP BY {quoted_cols} HAVING COUNT(*) > 1 "
+            f"SELECT {quoted_group_cols}, COUNT(*) AS duplicate_count "
+            f"FROM {qt} GROUP BY {quoted_group_cols} HAVING COUNT(*) > 1 "
             f"ORDER BY duplicate_count DESC LIMIT {row_limit}"
         )
         output = f"/{normalized_name} executed for table '{table}'."
