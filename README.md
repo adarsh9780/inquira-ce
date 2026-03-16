@@ -24,7 +24,7 @@ Hosted docs site (GitHub Pages): [https://adarsh9780.github.io/inquira-ce/](http
 - Turn natural language requests into reproducible Python/data operations.
 - Package the app as a desktop experience with backend + frontend + Tauri shell.
 
-## What's New (Since v0.5.7a8)
+## What's New (Since v0.5.7a10)
 
 - Kept the chat composer available in both chat and code views, so follow-up questions no longer require tab switching.
 - Moved slash commands, dataset ingestion, schema reads, and artifact access onto the active workspace kernel to avoid competing DuckDB connections.
