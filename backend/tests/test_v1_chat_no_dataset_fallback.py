@@ -19,9 +19,6 @@ async def test_chat_uses_empty_schema_when_workspace_has_no_dataset(monkeypatch)
     async def fake_get_conversation(_session, _conversation_id):
         return SimpleNamespace(id="conv-1", workspace_id="ws-1", title="New Conversation")
 
-    async def fake_get_latest_dataset(_session, _workspace_id):
-        return None
-
     async def fake_get_graph(_workspace_id, _memory_path):
         class _Graph:
             async def ainvoke(self, input_state, config=None):
@@ -39,7 +36,10 @@ async def test_chat_uses_empty_schema_when_workspace_has_no_dataset(monkeypatch)
     monkeypatch.setattr("app.v1.services.chat_service.WorkspaceRepository.get_by_id", fake_get_workspace)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationService.create_conversation", fake_create_conversation)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.get_conversation", fake_get_conversation)
-    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_latest_for_workspace", fake_get_latest_dataset)
+    async def fake_list_for_workspace(_session, _workspace_id):
+        return []
+
+    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.list_for_workspace", fake_list_for_workspace)
     monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_for_workspace_table", lambda *_args, **_kwargs: None)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
@@ -75,7 +75,7 @@ async def test_chat_uses_empty_schema_when_workspace_has_no_dataset(monkeypatch)
         api_key="x",
     )
 
-    assert captured["schema"] == {"table_name": "", "columns": []}
+    assert captured["schema"] == {"table_name": "", "tables": []}
     assert response["is_safe"] is True
     assert conversation_id == "conv-1"
     assert turn_id == "turn-1"
@@ -93,9 +93,6 @@ async def test_chat_keeps_backend_columns_when_client_schema_override_present(mo
 
     async def fake_get_conversation(_session, _conversation_id):
         return SimpleNamespace(id="conv-2", workspace_id="ws-1", title="New Conversation")
-
-    async def fake_get_latest_dataset(_session, _workspace_id):
-        return None
 
     async def fake_get_for_workspace_table(*, session, workspace_id, table_name):
         return SimpleNamespace(
@@ -123,7 +120,16 @@ async def test_chat_keeps_backend_columns_when_client_schema_override_present(mo
     monkeypatch.setattr("app.v1.services.chat_service.WorkspaceRepository.get_by_id", fake_get_workspace)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationService.create_conversation", fake_create_conversation)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.get_conversation", fake_get_conversation)
-    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_latest_for_workspace", fake_get_latest_dataset)
+    async def fake_list_for_workspace(_session, _workspace_id):
+        return [
+            SimpleNamespace(
+                table_name="deliveries",
+                source_path="browser://deliveries",
+                schema_path="/tmp/deliveries_schema.json",
+            )
+        ]
+
+    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.list_for_workspace", fake_list_for_workspace)
     async def fake_load_schema(_path):
         return {"table_name": "deliveries", "columns": []}
 
@@ -177,8 +183,9 @@ async def test_chat_keeps_backend_columns_when_client_schema_override_present(mo
 
     assert captured["table_name"] == "deliveries"
     assert captured["schema"]["table_name"] == "deliveries"
-    assert captured["schema"]["columns"][0]["name"] == "batter"
-    assert captured["schema"]["context"] == "from-client-context"
+    assert captured["schema"]["tables"][0]["table_name"] == "deliveries"
+    assert captured["schema"]["tables"][0]["columns"][0]["name"] == "batter"
+    assert captured["schema"]["tables"][0]["context"] == "from-client-context"
     assert captured["data_path"] == "/tmp/ws.duckdb"
 
 
@@ -223,6 +230,81 @@ async def test_chat_fails_when_explicit_table_override_is_missing(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_chat_loads_workspace_schema_for_multiple_tables(monkeypatch):
+    captured = {}
+
+    async def fake_get_workspace(_session, _workspace_id, _user_id):
+        return SimpleNamespace(id="ws-1", duckdb_path="/tmp/ws.duckdb")
+
+    async def fake_create_conversation(*, session, principal_id, workspace_id, title):
+        return SimpleNamespace(id="conv-3", title=title)
+
+    async def fake_get_graph(_workspace_id, _memory_path):
+        class _Graph:
+            async def ainvoke(self, input_state, config=None):
+                captured["schema"] = input_state.active_schema
+                captured["table_name"] = input_state.table_name
+                return {"metadata": {"is_safe": True, "is_relevant": True}, "plan": "ok", "current_code": ""}
+
+        return _Graph()
+
+    async def fake_next_seq_no(_session, _conversation_id):
+        return 1
+
+    async def fake_create_turn(*, session, **kwargs):
+        return SimpleNamespace(id="turn-3")
+
+    async def fake_load_schema(path):
+        if path.endswith("orders.json"):
+            return {"table_name": "orders", "columns": [{"name": "customer_id", "dtype": "VARCHAR"}]}
+        return {"table_name": "customers", "columns": [{"name": "customer_id", "dtype": "VARCHAR"}]}
+
+    async def fake_live_columns(_duckdb_path, table_name):
+        if table_name == "orders":
+            return [{"name": "order_total", "dtype": "DOUBLE"}]
+        return [{"name": "customer_name", "dtype": "VARCHAR"}]
+
+    monkeypatch.setattr("app.v1.services.chat_service.WorkspaceRepository.get_by_id", fake_get_workspace)
+    monkeypatch.setattr("app.v1.services.chat_service.ConversationService.create_conversation", fake_create_conversation)
+    async def fake_list_for_workspace(_session, _workspace_id):
+        return [
+            SimpleNamespace(table_name="orders", schema_path="/tmp/orders.json"),
+            SimpleNamespace(table_name="customers", schema_path="/tmp/customers.json"),
+        ]
+
+    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.list_for_workspace", fake_list_for_workspace)
+    monkeypatch.setattr("app.v1.services.chat_service.ChatService._load_schema", fake_load_schema)
+    monkeypatch.setattr("app.v1.services.chat_service.ChatService._read_live_table_columns", fake_live_columns)
+    monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
+    monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
+
+    session = SimpleNamespace()
+
+    async def _commit():
+        return None
+
+    session.commit = _commit
+    langgraph_manager = SimpleNamespace(get_graph=fake_get_graph)
+    user = SimpleNamespace(id="u1", username="alice")
+
+    await ChatService.analyze_and_persist_turn(
+        session=session,
+        langgraph_manager=langgraph_manager,
+        user=user,
+        workspace_id="ws-1",
+        conversation_id=None,
+        question="Which customers have the highest order totals?",
+        current_code="",
+        model="google/gemini-2.5-flash",
+        context=None,
+        api_key="x",
+    )
+
+    assert captured["table_name"] is None
+    assert {table["table_name"] for table in captured["schema"]["tables"]} == {"orders", "customers"}
+
+
+@pytest.mark.asyncio
 async def test_chat_falls_back_to_live_columns_when_schema_file_missing(monkeypatch):
     captured = {}
 
@@ -238,9 +320,6 @@ async def test_chat_falls_back_to_live_columns_when_schema_file_missing(monkeypa
             source_path="/tmp/deliveries.csv",
             schema_path="/tmp/missing_schema.json",
         )
-
-    async def fake_get_latest_dataset(_session, _workspace_id):
-        return None
 
     async def fake_load_schema(_path):
         raise HTTPException(status_code=404, detail="missing")
@@ -265,7 +344,16 @@ async def test_chat_falls_back_to_live_columns_when_schema_file_missing(monkeypa
     monkeypatch.setattr("app.v1.services.chat_service.WorkspaceRepository.get_by_id", fake_get_workspace)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationService.create_conversation", fake_create_conversation)
     monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_for_workspace_table", fake_get_for_workspace_table)
-    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_latest_for_workspace", fake_get_latest_dataset)
+    async def fake_list_for_workspace(_session, _workspace_id):
+        return [
+            SimpleNamespace(
+                table_name="deliveries",
+                source_path="/tmp/deliveries.csv",
+                schema_path="/tmp/missing_schema.json",
+            )
+        ]
+
+    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.list_for_workspace", fake_list_for_workspace)
     monkeypatch.setattr("app.v1.services.chat_service.ChatService._load_schema", fake_load_schema)
     monkeypatch.setattr("app.v1.services.chat_service.ChatService._read_live_table_columns", fake_live_columns)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
@@ -298,7 +386,7 @@ async def test_chat_falls_back_to_live_columns_when_schema_file_missing(monkeypa
     )
 
     assert captured["schema"]["table_name"] == "deliveries"
-    assert [col["name"] for col in captured["schema"]["columns"]] == ["Batter Runs"]
+    assert [col["name"] for col in captured["schema"]["tables"][0]["columns"]] == ["Batter Runs"]
 
 
 @pytest.mark.asyncio
@@ -310,9 +398,6 @@ async def test_chat_uses_keychain_api_key_when_payload_key_missing(monkeypatch):
 
     async def fake_create_conversation(*, session, principal_id, workspace_id, title):
         return SimpleNamespace(id="conv-3", title=title)
-
-    async def fake_get_latest_dataset(_session, _workspace_id):
-        return None
 
     async def fake_get_graph(_workspace_id, _memory_path):
         class _Graph:
@@ -330,7 +415,10 @@ async def test_chat_uses_keychain_api_key_when_payload_key_missing(monkeypatch):
 
     monkeypatch.setattr("app.v1.services.chat_service.WorkspaceRepository.get_by_id", fake_get_workspace)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationService.create_conversation", fake_create_conversation)
-    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_latest_for_workspace", fake_get_latest_dataset)
+    async def fake_list_for_workspace(_session, _workspace_id):
+        return []
+
+    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.list_for_workspace", fake_list_for_workspace)
     monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_for_workspace_table", lambda *_args, **_kwargs: None)
     monkeypatch.setattr("app.v1.services.chat_service.ChatService._read_live_table_columns", lambda *_args, **_kwargs: [])
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
@@ -384,9 +472,6 @@ async def test_chat_allows_ollama_without_api_key(monkeypatch):
     async def fake_create_conversation(*, session, principal_id, workspace_id, title):
         return SimpleNamespace(id="conv-ollama", title=title)
 
-    async def fake_get_latest_dataset(_session, _workspace_id):
-        return None
-
     async def fake_get_graph(_workspace_id, _memory_path):
         class _Graph:
             async def ainvoke(self, input_state, config=None):
@@ -404,7 +489,10 @@ async def test_chat_allows_ollama_without_api_key(monkeypatch):
 
     monkeypatch.setattr("app.v1.services.chat_service.WorkspaceRepository.get_by_id", fake_get_workspace)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationService.create_conversation", fake_create_conversation)
-    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_latest_for_workspace", fake_get_latest_dataset)
+    async def fake_list_for_workspace(_session, _workspace_id):
+        return []
+
+    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.list_for_workspace", fake_list_for_workspace)
     monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_for_workspace_table", lambda *_args, **_kwargs: None)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
@@ -513,6 +601,16 @@ async def test_chat_merges_saved_schema_with_live_duckdb_columns(monkeypatch):
     monkeypatch.setattr("app.v1.services.chat_service.ConversationService.create_conversation", fake_create_conversation)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.get_conversation", fake_get_conversation)
     monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_for_workspace_table", fake_get_for_workspace_table)
+    async def fake_list_for_workspace(_session, _workspace_id):
+        return [
+            SimpleNamespace(
+                table_name="ball_by_ball_ipl__5c3afffa",
+                source_path="/tmp/ball_by_ball_ipl.csv",
+                schema_path="/tmp/ball_by_ball_schema.json",
+            )
+        ]
+
+    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.list_for_workspace", fake_list_for_workspace)
     monkeypatch.setattr("app.v1.services.chat_service.ChatService._load_schema", fake_load_schema)
     monkeypatch.setattr("app.v1.services.chat_service.ChatService._read_live_table_columns", fake_live_columns)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
@@ -544,7 +642,7 @@ async def test_chat_merges_saved_schema_with_live_duckdb_columns(monkeypatch):
         api_key="x",
     )
 
-    names = [col["name"] for col in captured["schema"]["columns"]]
+    names = [col["name"] for col in captured["schema"]["tables"][0]["columns"]]
     assert names == ["Batter", "Batter Runs", "Runs From Ball"]
-    batter_runs = next(col for col in captured["schema"]["columns"] if col["name"] == "Batter Runs")
+    batter_runs = next(col for col in captured["schema"]["tables"][0]["columns"] if col["name"] == "Batter Runs")
     assert batter_runs["description"] == "runs scored by batter"

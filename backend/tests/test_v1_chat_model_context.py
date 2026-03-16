@@ -18,9 +18,6 @@ async def test_chat_service_passes_model_and_context_to_graph(monkeypatch):
     async def fake_create_conversation(*, session, principal_id, workspace_id, title):
         return SimpleNamespace(id="conv-1", title=title)
 
-    async def fake_get_latest_dataset(_session, _workspace_id):
-        return None
-
     async def fake_next_seq_no(_session, _conversation_id):
         return 1
 
@@ -38,7 +35,10 @@ async def test_chat_service_passes_model_and_context_to_graph(monkeypatch):
 
     monkeypatch.setattr("app.v1.services.chat_service.WorkspaceRepository.get_by_id", fake_get_workspace)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationService.create_conversation", fake_create_conversation)
-    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_latest_for_workspace", fake_get_latest_dataset)
+    async def fake_list_for_workspace(_session, _workspace_id):
+        return []
+
+    monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.list_for_workspace", fake_list_for_workspace)
     monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_for_workspace_table", lambda *_args, **_kwargs: None)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)

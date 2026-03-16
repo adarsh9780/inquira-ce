@@ -28,6 +28,7 @@ from ...services.output_capture import (
     normalize_output_contract,
 )
 from ...services.llm_provider_catalog import (
+    model_supports_vision,
     normalize_llm_provider,
     provider_default_base_url,
     provider_requires_api_key,
@@ -576,6 +577,106 @@ class ChatService:
         return merged
 
     @staticmethod
+    def _merge_workspace_schema_tables(
+        tables: list[dict[str, Any]],
+        preferred_table_name: str | None,
+    ) -> dict[str, Any]:
+        normalized_tables: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for table in tables:
+            if not isinstance(table, dict):
+                continue
+            table_name = str(table.get("table_name") or "").strip()
+            if not table_name:
+                continue
+            dedupe = table_name.lower()
+            if dedupe in seen:
+                continue
+            seen.add(dedupe)
+            normalized_tables.append(
+                {
+                    "table_name": table_name,
+                    "context": str(table.get("context") or ""),
+                    "columns": table.get("columns") if isinstance(table.get("columns"), list) else [],
+                }
+            )
+
+        preferred_table = str(preferred_table_name or "").strip()
+        return {
+            "table_name": preferred_table,
+            "tables": normalized_tables,
+        }
+
+    @staticmethod
+    async def _load_workspace_schema(
+        *,
+        session: AsyncSession,
+        workspace_id: str,
+        duckdb_path: str,
+        preferred_table_name: str | None,
+        active_schema_override: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        datasets = await DatasetRepository.list_for_workspace(session, workspace_id)
+        tables: list[dict[str, Any]] = []
+        for dataset in datasets:
+            table_name = str(getattr(dataset, "table_name", "") or "").strip()
+            if not table_name:
+                continue
+            schema: dict[str, Any] | None = None
+            schema_path = str(getattr(dataset, "schema_path", "") or "").strip()
+            if schema_path:
+                try:
+                    schema = await ChatService._load_schema(schema_path)
+                except HTTPException as exc:
+                    if exc.status_code != 404:
+                        raise
+            live_columns = await ChatService._read_live_table_columns(duckdb_path, table_name)
+            if live_columns:
+                schema = ChatService._merge_schema_with_live_columns(schema, table_name, live_columns)
+            if schema is None:
+                schema = {"table_name": table_name, "context": "", "columns": []}
+            schema = ChatService._merge_override_metadata(schema, active_schema_override, table_name) or schema
+            tables.append(schema)
+
+        if not tables and active_schema_override and isinstance(active_schema_override, dict):
+            override_table = str(active_schema_override.get("table_name") or "").strip()
+            if override_table:
+                tables.append(
+                    ChatService._merge_override_metadata(
+                        {"table_name": override_table, "context": "", "columns": []},
+                        active_schema_override,
+                        override_table,
+                    )
+                    or {"table_name": override_table, "context": "", "columns": []}
+                )
+
+        return ChatService._merge_workspace_schema_tables(tables, preferred_table_name)
+
+    @staticmethod
+    def _normalize_chat_attachments(raw: Any) -> list[dict[str, str]]:
+        if not isinstance(raw, list):
+            return []
+        normalized: list[dict[str, str]] = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            attachment_id = str(item.get("attachment_id") or "").strip()
+            filename = str(item.get("filename") or "").strip()
+            media_type = str(item.get("media_type") or "").strip()
+            data_base64 = str(item.get("data_base64") or "").strip()
+            if not attachment_id or not filename or not media_type or not data_base64:
+                continue
+            normalized.append(
+                {
+                    "attachment_id": attachment_id,
+                    "filename": filename,
+                    "media_type": media_type,
+                    "data_base64": data_base64,
+                }
+            )
+        return normalized
+
+    @staticmethod
     def _workspace_db_missing_detail(duckdb_path: str) -> str:
         return (
             "Workspace database is missing.\n"
@@ -608,6 +709,7 @@ class ChatService:
         conversation_id: str | None,
         question: str,
         table_name_override: str | None,
+        preferred_table_name: str | None,
         active_schema_override: dict[str, Any] | None,
     ) -> tuple[Any, str, dict[str, Any], str, str]:
         """Shared logic to validate workspace, conversation, and dataset before analysis."""
@@ -670,38 +772,27 @@ class ChatService:
                         "Re-select your dataset and try again."
                     ),
                 )
-
-        if schema is None:
-            latest_dataset = await DatasetRepository.get_latest_for_workspace(session, workspace_id)
-            if latest_dataset is not None:
-                table_name = latest_dataset.table_name
-                if latest_dataset.schema_path:
-                    try:
-                        schema = await ChatService._load_schema(latest_dataset.schema_path)
-                    except HTTPException as exc:
-                        if exc.status_code != 404:
-                            raise
-
-        schema = ChatService._merge_override_metadata(
-            schema,
-            active_schema_override,
-            table_name or "",
-        )
-
-        if table_name:
-            live_columns = await ChatService._read_live_table_columns(
-                workspace.duckdb_path,
-                table_name,
+        elif preferred_table_name and str(preferred_table_name).strip():
+            preferred = _normalize_table_name(str(preferred_table_name))
+            selected_dataset = await DatasetRepository.get_for_workspace_table(
+                session=session,
+                workspace_id=workspace_id,
+                table_name=preferred,
             )
-            if live_columns:
-                schema = ChatService._merge_schema_with_live_columns(
-                    schema,
-                    table_name,
-                    live_columns,
-                )
+            if selected_dataset is not None:
+                table_name = selected_dataset.table_name
+        else:
+            datasets = await DatasetRepository.list_for_workspace(session, workspace_id)
+            if len(datasets) == 1:
+                table_name = str(datasets[0].table_name or "").strip() or None
 
-        if schema is None:
-            schema = {"table_name": table_name or "", "columns": []}
+        schema = await ChatService._load_workspace_schema(
+            session=session,
+            workspace_id=workspace_id,
+            duckdb_path=workspace_duckdb_path,
+            preferred_table_name=table_name,
+            active_schema_override=active_schema_override,
+        )
 
         if conversation_id is None:
             raise HTTPException(status_code=500, detail="Conversation initialization failed")
@@ -720,7 +811,9 @@ class ChatService:
         model: str,
         context: str | None,
         table_name_override: str | None = None,
+        preferred_table_name: str | None = None,
         active_schema_override: dict[str, Any] | None = None,
+        attachments: list[dict[str, str]] | None = None,
         api_key: str | None = None,
     ) -> tuple[dict[str, Any], str, str]:
         """Run one analysis cycle and persist resulting turn."""
@@ -731,6 +824,7 @@ class ChatService:
             conversation_id=conversation_id,
             question=question,
             table_name_override=table_name_override,
+            preferred_table_name=preferred_table_name,
             active_schema_override=active_schema_override,
         )
 
@@ -743,6 +837,7 @@ class ChatService:
             workspace_id=workspace_id,
         )
 
+        normalized_attachments = ChatService._normalize_chat_attachments(attachments)
         input_state = bindings.build_input_state(
             question=question,
             schema=schema,
@@ -756,6 +851,7 @@ class ChatService:
                 WorkspaceStorageService.build_scratchpad_db_path(user.username, workspace_id)
             ),
             known_columns=known_columns,
+            attachments=normalized_attachments,
         )
         input_state = ChatService._coerce_input_state_for_graph(input_state)
         thread_id = f"{user.id}:{workspace_id}:{conversation_id}"
@@ -777,6 +873,11 @@ class ChatService:
         config["configurable"]["default_model"] = llm_prefs["selected_main_model"]
         if llm_prefs["requires_api_key"] and not resolved_api_key:
             raise HTTPException(status_code=401, detail="API key not configured")
+        if normalized_attachments and not model_supports_vision(llm_prefs["provider"], model):
+            raise HTTPException(
+                status_code=400,
+                detail="The selected model does not support image attachments.",
+            )
 
         result = await graph.ainvoke(input_state, config=config)
         await ChatService._save_workspace_known_columns(
@@ -861,6 +962,7 @@ class ChatService:
             conversation=conversation,
             conversation_id=conversation_id,
             question=question,
+            attachments=normalized_attachments,
             response_payload=response_payload,
             result=result,
         )
@@ -920,6 +1022,17 @@ class ChatService:
 
         metadata["result_explanation"] = result_explanation or explanation
         metadata["code_explanation"] = code_explanation
+        metadata["tables_used"] = [
+            str(item).strip()
+            for item in (metadata.get("tables_used") or [])
+            if str(item).strip()
+        ]
+        metadata["join_keys"] = [
+            str(item).strip()
+            for item in (metadata.get("join_keys") or [])
+            if str(item).strip()
+        ]
+        metadata["joins_used"] = bool(metadata.get("joins_used"))
 
         execution_payload = result.get("final_execution")
         normalized_execution = None
@@ -960,6 +1073,7 @@ class ChatService:
         conversation: Any,
         conversation_id: str,
         question: str,
+        attachments: list[dict[str, str]] | None,
         response_payload: dict[str, Any],
         result: dict[str, Any],
     ) -> str:
@@ -968,6 +1082,9 @@ class ChatService:
         if seq_no == 1 and (conversation.title or "").strip().lower() == "new conversation":
             conversation.title = ChatService._derive_conversation_title(question)
         
+        metadata = dict(response_payload.get("metadata", {}) or {})
+        metadata["user_attachments"] = attachments or []
+
         turn = await ConversationRepository.create_turn(
             session=session,
             conversation_id=conversation_id,
@@ -975,7 +1092,7 @@ class ChatService:
             user_text=question,
             assistant_text=response_payload["explanation"],
             tool_events=[{"type": "artifact", "data": item} for item in (response_payload.get("artifacts") or [])],
-            metadata=response_payload.get("metadata", {}),
+            metadata=metadata,
             code_snapshot=response_payload["code"],
         )
         await session.commit()
@@ -993,7 +1110,9 @@ class ChatService:
         model: str,
         context: str | None,
         table_name_override: str | None = None,
+        preferred_table_name: str | None = None,
         active_schema_override: dict[str, Any] | None = None,
+        attachments: list[dict[str, str]] | None = None,
         api_key: str | None = None,
     ):
         """Async generator that yields incremental analysis events (SSE-compatible)."""
@@ -1017,6 +1136,7 @@ class ChatService:
                         conversation_id=conversation_id,
                         question=question,
                         table_name_override=table_name_override,
+                        preferred_table_name=preferred_table_name,
                         active_schema_override=active_schema_override,
                     )
                 )
@@ -1031,6 +1151,7 @@ class ChatService:
                     workspace_id=workspace_id,
                 )
 
+                normalized_attachments = ChatService._normalize_chat_attachments(attachments)
                 input_state = bindings.build_input_state(
                     question=question,
                     schema=schema,
@@ -1044,6 +1165,7 @@ class ChatService:
                         WorkspaceStorageService.build_scratchpad_db_path(user.username, workspace_id)
                     ),
                     known_columns=known_columns,
+                    attachments=normalized_attachments,
                 )
                 input_state = ChatService._coerce_input_state_for_graph(input_state)
                 thread_id = f"{user.id}:{workspace_id}:{resolved_conversation_id}"
@@ -1065,6 +1187,11 @@ class ChatService:
                 config["configurable"]["default_model"] = llm_prefs["selected_main_model"]
                 if llm_prefs["requires_api_key"] and not resolved_api_key:
                     raise HTTPException(status_code=401, detail="API key not configured")
+                if normalized_attachments and not model_supports_vision(llm_prefs["provider"], model):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="The selected model does not support image attachments.",
+                    )
 
                 def emit_token(node_name: str, text: str) -> None:
                     queue_event("token", {"node": node_name, "text": text})
@@ -1202,6 +1329,7 @@ class ChatService:
                     conversation=conversation,
                     conversation_id=resolved_conversation_id,
                     question=question,
+                    attachments=normalized_attachments,
                     response_payload=response_payload,
                     result=aggregated,
                 )

@@ -578,6 +578,12 @@ export const useAppStore = defineStore('app', () => {
     const codeSnapshot = String(options?.codeSnapshot || '')
     const resultExplanation = String(options?.resultExplanation || explanation || '')
     const codeExplanation = String(options?.codeExplanation || '')
+    const analysisMetadata = options?.analysisMetadata && typeof options.analysisMetadata === 'object'
+      ? { ...options.analysisMetadata }
+      : {}
+    const attachments = Array.isArray(options?.attachments)
+      ? options.attachments.map((item) => ({ ...item }))
+      : []
     const streamTrace = options?.streamTrace && typeof options.streamTrace === 'object'
       ? {
         planText: String(options.streamTrace.planText || ''),
@@ -597,6 +603,8 @@ export const useAppStore = defineStore('app', () => {
       explanation: resultExplanation,
       resultExplanation,
       codeExplanation,
+      analysisMetadata,
+      attachments,
       streamTrace,
       codeSnapshot,
       codeUpdated: Boolean(codeSnapshot.trim()),
@@ -641,6 +649,12 @@ export const useAppStore = defineStore('app', () => {
     const lastMessage = getLastChatMessage()
     if (!lastMessage) return
     lastMessage.codeExplanation = String(explanation || '')
+  }
+
+  function setLastMessageAnalysisMetadata(metadata) {
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage) return
+    lastMessage.analysisMetadata = metadata && typeof metadata === 'object' ? { ...metadata } : {}
   }
 
   function appendLastMessagePlanChunk(text, node = '') {
@@ -944,6 +958,8 @@ export const useAppStore = defineStore('app', () => {
       explanation: turn.assistant_text,
       resultExplanation: String(turn?.metadata?.result_explanation || turn.assistant_text || ''),
       codeExplanation: String(turn?.metadata?.code_explanation || ''),
+      analysisMetadata: turn?.metadata && typeof turn.metadata === 'object' ? { ...turn.metadata } : {},
+      attachments: Array.isArray(turn?.metadata?.user_attachments) ? turn.metadata.user_attachments.map((item) => ({ ...item })) : [],
       toolEvents: turn.tool_events || null,
       streamTrace: null,
       codeSnapshot: turn.code_snapshot || '',
@@ -1882,6 +1898,7 @@ export const useAppStore = defineStore('app', () => {
     addQuestionHistoryEntry,
     updateLastMessageExplanation,
     setLastMessageCodeExplanation,
+    setLastMessageAnalysisMetadata,
     appendLastMessageExplanationChunk,
     appendLastMessagePlanChunk,
     appendLastMessageTraceEvent,

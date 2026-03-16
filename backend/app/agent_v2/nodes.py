@@ -48,6 +48,9 @@ class AnalysisOutput(BaseModel):
     explanation: str | None = None
     output_contract: list[dict[str, str]] = Field(default_factory=list)
     search_schema_queries: list[str] = Field(default_factory=list)
+    selected_tables: list[str] = Field(default_factory=list)
+    join_keys: list[str] = Field(default_factory=list)
+    joins_used: bool = False
 
 
 class ChatOutput(BaseModel):
@@ -160,6 +163,45 @@ def _normalize_search_queries(raw: Any) -> list[str]:
         if len(normalized) >= 3:
             break
     return normalized
+
+
+def _normalize_table_names(raw: Any, *, max_items: int = 8) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for entry in raw:
+        table_name = str(entry or "").strip()
+        if not table_name:
+            continue
+        dedupe = table_name.lower()
+        if dedupe in seen:
+            continue
+        seen.add(dedupe)
+        normalized.append(table_name)
+        if len(normalized) >= max_items:
+            break
+    return normalized
+
+
+def _extract_schema_table_names(schema: dict[str, Any]) -> list[str]:
+    tables = schema.get("tables")
+    if isinstance(tables, list):
+        return _normalize_table_names(
+            [str(item.get("table_name") or "").strip() for item in tables if isinstance(item, dict)]
+        )
+    scoped = str(schema.get("table_name") or "").strip()
+    return [scoped] if scoped else []
+
+
+def _select_sample_table(schema: dict[str, Any], preferred_table: str | None) -> str | None:
+    preferred = str(preferred_table or "").strip()
+    if preferred:
+        return preferred
+    tables = _extract_schema_table_names(schema)
+    if len(tables) == 1:
+        return tables[0]
+    return None
 
 
 def _iter_schema_columns(schema: dict[str, Any], table_name: str | None) -> list[tuple[str, str]]:
@@ -412,8 +454,10 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
     runtime = load_agent_runtime_config()
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
 
-    schema_summary = _build_schema_summary(schema=schema, table_name=table_name or None)
-    sample = sample_data(data_path=data_path or None, table_name=table_name or None, limit=5)
+    preferred_table = table_name or None
+    schema_summary = _build_schema_summary(schema=schema, table_name=None)
+    sample_table = _select_sample_table(schema, preferred_table)
+    sample = sample_data(data_path=data_path or None, table_name=sample_table, limit=5)
 
     requested_packages = _extract_packages_from_prompt(user_text)
     if requested_packages:
@@ -442,9 +486,11 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
                 "system",
                 (
                     "Workspace database path: {workspace_db_path}\n"
-                    "Table: {table_name}\n"
+                    "Preferred table: {table_name}\n"
+                    "Workspace tables: {workspace_tables_json}\n"
                     "Schema summary (column names only): {schema_summary}\n"
                     "Known columns: {known_columns_json}\n"
+                    "Sample table: {sample_table}\n"
                     "Sample rows: {sample_json}\n"
                     "Context: {context}"
                 ),
@@ -492,10 +538,12 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
             chain,
             {
                 "messages": call_messages,
-                "table_name": table_name or "data_table",
+                "table_name": preferred_table or "",
+                "workspace_tables_json": _safe_json_dumps(_extract_schema_table_names(schema)),
                 "workspace_db_path": data_path or "",
                 "schema_summary": schema_summary,
                 "known_columns_json": _safe_json_dumps(known_columns),
+                "sample_table": sample_table or "",
                 "sample_json": _safe_json_dumps(sample),
                 "context": str(state.get("context") or ""),
             },
@@ -524,7 +572,7 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
                 search_result = search_schema(
                     schema=schema,
                     query=query,
-                    table_name=table_name or None,
+                    table_name=None,
                     max_results=20,
                 )
                 discovered = search_result.get("columns") if isinstance(search_result, dict) else []
@@ -696,6 +744,10 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
         else:
             result_explanation = "Analysis completed."
 
+    selected_tables = _normalize_table_names(best_output.selected_tables)
+    if not selected_tables and preferred_table:
+        selected_tables = [preferred_table]
+
     _emit_text_chunks("finalize", result_explanation)
     return {
         "route": "analysis",
@@ -707,7 +759,19 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
         "final_artifacts": final_artifacts,
         "final_executed_code": final_executed_code or "",
         "output_contract": sanitized_output_contract,
-        "metadata": {"is_safe": True, "is_relevant": True},
+        "metadata": {
+            "is_safe": True,
+            "is_relevant": True,
+            "tables_used": selected_tables,
+            "joins_used": bool(best_output.joins_used),
+            "join_keys": [
+                str(item).strip()
+                for item in (best_output.join_keys or [])
+                if str(item).strip()
+            ][:8],
+            "preferred_table": preferred_table or "",
+            "sample_table": sample_table or "",
+        },
         "messages": [AIMessage(content=result_explanation)],
         "last_error": retry_feedback or execution_feedback,
         "known_columns": known_columns,

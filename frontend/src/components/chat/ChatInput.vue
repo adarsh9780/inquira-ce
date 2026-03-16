@@ -5,13 +5,25 @@
       <div
         ref="inputCardRef"
         class="relative flex flex-col rounded-2xl border transition-all duration-150"
+        @dragenter.prevent="handleAttachmentDragEnter"
+        @dragover.prevent="handleAttachmentDragOver"
+        @dragleave.prevent="handleAttachmentDragLeave"
+        @drop.prevent="handleAttachmentDrop"
         style="
           background-color: var(--color-base);
           border-color: var(--color-border);
           box-shadow: 0 1px 4px rgba(0,0,0,0.06);
         "
-        :style="isFocused ? { borderColor: 'var(--color-border-hover)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-text-main) 5%, transparent)' } : {}"
+        :style="composerCardStyle"
       >
+      <input
+        ref="attachmentInputRef"
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        multiple
+        class="hidden"
+        @change="handleAttachmentSelection"
+      />
       <!-- Textarea -->
       <textarea
         ref="textareaRef"
@@ -29,6 +41,46 @@
         :disabled="!appStore.canAnalyze || appStore.isLoading"
       />
 
+      <div v-if="pendingAttachments.length" class="px-4 pb-2">
+        <div class="flex flex-wrap gap-2">
+          <div
+            v-for="attachment in pendingAttachments"
+            :key="attachment.attachment_id"
+            class="group/attachment flex items-center gap-2 rounded-xl border px-2 py-2"
+            style="border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-surface) 75%, transparent);"
+          >
+            <img
+              :src="attachment.preview_url"
+              :alt="attachment.filename"
+              class="h-12 w-12 rounded-lg object-cover"
+            />
+            <div class="min-w-0">
+              <p class="max-w-[150px] truncate text-xs font-medium" style="color: var(--color-text-main);">{{ attachment.filename }}</p>
+              <p class="text-[11px]" style="color: var(--color-text-muted);">{{ formatAttachmentSize(attachment.size) }}</p>
+            </div>
+            <button
+              type="button"
+              class="btn-icon opacity-70 transition-opacity group-hover/attachment:opacity-100"
+              title="Remove image"
+              @click="removePendingAttachment(attachment.attachment_id)"
+            >
+              <XMarkIcon class="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-if="isAttachmentDragActive"
+        class="pointer-events-none absolute inset-3 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed"
+        style="border-color: var(--color-border-hover); background-color: color-mix(in srgb, var(--color-base) 80%, transparent);"
+      >
+        <div class="text-center">
+          <PhotoIcon class="mx-auto h-6 w-6" style="color: var(--color-text-main);" />
+          <p class="mt-2 text-sm font-medium" style="color: var(--color-text-main);">Drop images to attach</p>
+        </div>
+      </div>
+
       <!-- Bottom Action Row -->
       <div class="flex items-center justify-between px-3 pb-3 pt-1">
 
@@ -36,7 +88,8 @@
         <button
           type="button"
           class="btn-icon"
-          title="Attach file"
+          title="Attach images"
+          @click="openAttachmentPicker"
         >
           <PlusIcon class="w-5 h-5" />
         </button>
@@ -52,17 +105,17 @@
           <!-- Mic (empty) → ArrowUp (has text) -->
           <button
             @click="handleSubmit"
-            :disabled="appStore.isLoading || !appStore.canAnalyze"
+            :disabled="appStore.isLoading || !appStore.canAnalyze || !canSend"
             class="w-6 h-6 flex items-center justify-center transition-all duration-150 focus:outline-none"
             :class="
-              question.trim().length > 0
+              canSend
                 ? 'text-zinc-900 hover:text-zinc-700'
                 : 'cursor-default opacity-50'
             "
-            :title="question.trim().length > 0 ? 'Send (Enter)' : 'Start typing to send'"
+            :title="canSend ? 'Send (Enter)' : 'Type a message or attach images to send'"
           >
             <!-- Mic icon: empty state -->
-            <MicrophoneIcon v-if="question.trim().length === 0" class="w-5 h-5" />
+            <MicrophoneIcon v-if="question.trim().length === 0 && pendingAttachments.length === 0" class="w-5 h-5" />
             <!-- Arrow Up icon: text entered -->
             <ArrowUpCircleIcon v-else class="w-6 h-6" />
           </button>
@@ -132,12 +185,15 @@ import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { buildBrowserDataPath, inferTableNameFromDataPath } from '../../utils/chatBootstrap'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
+import { modelSupportsImages, SUPPORTED_CHAT_IMAGE_TYPES } from '../../utils/modelCapabilities'
 import ModelSelector from '../ui/ModelSelector.vue'
 import ColumnSuggest from './ColumnSuggest.vue'
 import {
   PlusIcon,
   MicrophoneIcon,
   ExclamationTriangleIcon,
+  XMarkIcon,
+  PhotoIcon,
 } from '@heroicons/vue/24/outline'
 import { ArrowUpCircleIcon } from '@heroicons/vue/24/solid'
 
@@ -147,6 +203,7 @@ const question = ref('')
 const isFocused = ref(false)
 const textareaRef = ref(null)
 const inputCardRef = ref(null)
+const attachmentInputRef = ref(null)
 const commandSuggestions = ref([])
 const selectedCommandIndex = ref(0)
 const columnSuggestions = ref([])
@@ -155,13 +212,33 @@ const questionHistoryIndex = ref(-1)
 const questionHistoryDraft = ref('')
 const activeTokenRange = ref({ start: 0, end: 0, token: '' })
 const suggestionsOpenUp = ref(false)
+const pendingAttachments = ref([])
+const isAttachmentDragActive = ref(false)
+const dragDepth = ref(0)
 
 const showCommandSuggestions = computed(() => commandSuggestions.value.length > 0)
 const showColumnSuggestions = computed(() => columnSuggestions.value.length > 0)
+const imageAttachmentsSupported = computed(() => modelSupportsImages(appStore.selectedModel))
+const composerCardStyle = computed(() => {
+  const style = isFocused.value
+    ? {
+      borderColor: 'var(--color-border-hover)',
+      boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-text-main) 5%, transparent)',
+    }
+    : {}
+  if (isAttachmentDragActive.value) {
+    return {
+      ...style,
+      borderColor: 'var(--color-border-hover)',
+      boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-border-hover) 18%, transparent)',
+    }
+  }
+  return style
+})
 
 const canSend = computed(() =>
   appStore.canAnalyze &&
-  question.value.trim().length > 0 &&
+  (question.value.trim().length > 0 || pendingAttachments.value.length > 0) &&
   question.value.length <= 1000 &&
   !appStore.isLoading
 )
@@ -190,6 +267,107 @@ function sortArtifactsNewestFirst(items) {
     if (delta !== 0) return delta
     return String(right?.artifact_id || '').localeCompare(String(left?.artifact_id || ''))
   })
+}
+
+function formatAttachmentSize(size) {
+  const bytes = Number(size || 0)
+  if (!Number.isFinite(bytes) || bytes <= 0) return 'Image'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function buildAttachmentId(file) {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${String(file?.name || 'image')}`
+}
+
+function openAttachmentPicker() {
+  if (!imageAttachmentsSupported.value) {
+    toast.error('Images Not Supported', 'The selected model does not support image attachments.')
+    return
+  }
+  attachmentInputRef.value?.click()
+}
+
+async function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result || '')
+      resolve(result.includes(',') ? result.split(',')[1] : result)
+    }
+    reader.onerror = () => reject(reader.error || new Error('Failed to read image file.'))
+    reader.readAsDataURL(file)
+  })
+}
+
+async function appendPendingAttachments(files) {
+  if (!imageAttachmentsSupported.value) {
+    toast.error('Images Not Supported', 'Switch to a vision-capable model before attaching images.')
+    return
+  }
+  const normalizedFiles = Array.from(files || []).filter((file) => SUPPORTED_CHAT_IMAGE_TYPES.has(String(file?.type || '').toLowerCase()))
+  if (normalizedFiles.length === 0) {
+    toast.error('Unsupported File', 'Only PNG, JPG, WEBP, and GIF images can be attached.')
+    return
+  }
+
+  for (const file of normalizedFiles) {
+    const dataBase64 = await fileToBase64(file)
+    pendingAttachments.value.push({
+      attachment_id: buildAttachmentId(file),
+      filename: String(file.name || 'image'),
+      media_type: String(file.type || 'image/png'),
+      data_base64: dataBase64,
+      preview_url: `data:${String(file.type || 'image/png')};base64,${dataBase64}`,
+      size: Number(file.size || 0),
+    })
+  }
+}
+
+async function handleAttachmentSelection(event) {
+  try {
+    await appendPendingAttachments(event?.target?.files || [])
+  } catch (error) {
+    toast.error('Image Attach Failed', extractApiErrorMessage(error, 'Failed to attach image.'))
+  } finally {
+    if (event?.target) event.target.value = ''
+  }
+}
+
+function removePendingAttachment(attachmentId) {
+  const targetId = String(attachmentId || '').trim()
+  pendingAttachments.value = pendingAttachments.value.filter(
+    (item) => String(item?.attachment_id || '') !== targetId
+  )
+}
+
+function handleAttachmentDragEnter() {
+  dragDepth.value += 1
+  if (!imageAttachmentsSupported.value) return
+  isAttachmentDragActive.value = true
+}
+
+function handleAttachmentDragOver() {
+  if (!imageAttachmentsSupported.value) return
+  isAttachmentDragActive.value = true
+}
+
+function handleAttachmentDragLeave() {
+  dragDepth.value = Math.max(0, dragDepth.value - 1)
+  if (dragDepth.value === 0) {
+    isAttachmentDragActive.value = false
+  }
+}
+
+async function handleAttachmentDrop(event) {
+  dragDepth.value = 0
+  isAttachmentDragActive.value = false
+  try {
+    await appendPendingAttachments(event?.dataTransfer?.files || [])
+  } catch (error) {
+    toast.error('Image Attach Failed', extractApiErrorMessage(error, 'Failed to attach image.'))
+  }
 }
 
 function handleModelChange(model) {
@@ -706,21 +884,44 @@ async function handleSlashCommand(questionText) {
 
 async function handleSubmit() {
   if (!canSend.value) return
+  if (pendingAttachments.value.length > 0 && !imageAttachmentsSupported.value) {
+    toast.error('Images Not Supported', 'The selected model does not support image attachments.')
+    return
+  }
 
-  const questionText = question.value.trim()
-  if (!questionText) return
-  appStore.addQuestionHistoryEntry(questionText)
+  const rawQuestionText = question.value.trim()
+  const questionText = rawQuestionText || 'Please analyze the attached image(s).'
+  const attachmentsPayload = pendingAttachments.value.map((item) => ({
+    attachment_id: item.attachment_id,
+    filename: item.filename,
+    media_type: item.media_type,
+    data_base64: item.data_base64,
+  }))
+  if (rawQuestionText) {
+    appStore.addQuestionHistoryEntry(questionText)
+  }
   questionHistoryIndex.value = -1
   questionHistoryDraft.value = ''
   question.value = ''
   clearSuggestions()
+  pendingAttachments.value = []
 
   if (isCommand(questionText)) {
+    if (attachmentsPayload.length > 0) {
+      toast.error('Slash Commands Do Not Support Images', 'Remove attached images before running a slash command.')
+      pendingAttachments.value = attachmentsPayload.map((item) => ({
+        ...item,
+        preview_url: `data:${item.media_type};base64,${item.data_base64}`,
+        size: 0,
+      }))
+      question.value = rawQuestionText
+      return
+    }
     await handleSlashCommand(questionText)
     return
   }
 
-  appStore.addChatMessage(questionText, '')
+  appStore.addChatMessage(questionText, '', { attachments: attachmentsPayload })
   appStore.setLoading(true)
 
   const abortController = new AbortController()
@@ -764,8 +965,10 @@ async function handleSubmit() {
         current_code: appStore.pythonFileContent || '',
         model: appStore.selectedModel,
         context: appStore.schemaContext.trim() || null,
-        table_name: schemaPayload.tableName,
+        table_name: null,
+        preferred_table_name: schemaPayload.tableName,
         active_schema: schemaPayload.activeSchema,
+        attachments: attachmentsPayload,
         api_key: null
       },
       {
@@ -838,6 +1041,7 @@ async function handleSubmit() {
 
     const { is_safe, code, current_code, explanation, result_explanation, code_explanation } = response
     const finalCode = (code ?? current_code ?? '').toString()
+    appStore.setLastMessageAnalysisMetadata(response?.metadata || {})
     const finalExplanation = (result_explanation ?? explanation ?? '').toString()
     appStore.setLastMessageCodeSnapshot(finalCode)
     appStore.setLastMessageCodeExplanation((code_explanation ?? '').toString())
@@ -959,6 +1163,13 @@ async function handleSubmit() {
     toast.error(errorTitle, errorMessage)
     appStore.setTerminalOutput(`Error: ${errorMessage}`)
     appStore.updateLastMessageExplanation(errorMessage)
+    if (attachmentsPayload.length > 0) {
+      pendingAttachments.value = attachmentsPayload.map((item) => ({
+        ...item,
+        preview_url: `data:${item.media_type};base64,${item.data_base64}`,
+        size: 0,
+      }))
+    }
   } finally {
     if (warningTimer) clearTimeout(warningTimer)
     if (cancelTimer) clearTimeout(cancelTimer)

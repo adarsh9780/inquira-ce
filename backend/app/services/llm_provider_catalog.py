@@ -100,6 +100,35 @@ def provider_default_base_url(provider: str) -> str:
     )
 
 
+def model_supports_vision(provider: str, model: str) -> bool:
+    normalized_provider = normalize_llm_provider(provider)
+    normalized_model = str(model or "").strip().lower()
+    if not normalized_model:
+        return False
+
+    if normalized_provider == "anthropic":
+        return "claude-3" in normalized_model or "claude-sonnet-4" in normalized_model
+
+    if normalized_provider in {"openrouter", "openai"}:
+        vision_markers = (
+            "gpt-4o",
+            "gpt-4.1",
+            "gemini",
+            "claude-3",
+            "claude-sonnet-4",
+            "qwen-vl",
+            "llava",
+            "pixtral",
+            "vision",
+        )
+        return any(marker in normalized_model for marker in vision_markers)
+
+    if normalized_provider == "ollama":
+        return any(marker in normalized_model for marker in ("llava", "vision", "moondream", "minicpm-v"))
+
+    return False
+
+
 def _load_toml_data() -> dict[str, Any]:
     cfg_path = os.getenv("INQUIRA_TOML_PATH")
     if cfg_path:

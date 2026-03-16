@@ -3,6 +3,15 @@
 from pydantic import BaseModel, Field
 
 
+class ChatImageAttachment(BaseModel):
+    """Inline image attachment payload."""
+
+    attachment_id: str = Field(min_length=1)
+    filename: str = Field(min_length=1)
+    media_type: str = Field(min_length=1)
+    data_base64: str = Field(min_length=1)
+
+
 class AnalyzeRequest(BaseModel):
     """Analyze input payload bound to workspace+conversation."""
 
@@ -13,7 +22,9 @@ class AnalyzeRequest(BaseModel):
     model: str = "google/gemini-2.5-flash"
     context: str | None = None
     table_name: str | None = None
+    preferred_table_name: str | None = None
     active_schema: dict | None = None
+    attachments: list[ChatImageAttachment] = Field(default_factory=list)
     api_key: str | None = None
 
 
@@ -30,6 +41,7 @@ class AnalyzeResponse(BaseModel):
     code_explanation: str | None = None
     run_id: str | None = None
     execution: dict | None = None
+    metadata: dict | None = None
     artifacts: list[dict] = Field(default_factory=list)
     final_script_artifact_id: str | None = None
 

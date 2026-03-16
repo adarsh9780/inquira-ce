@@ -62,7 +62,9 @@ async def analyze(
         model=payload.model,
         context=payload.context,
         table_name_override=payload.table_name,
+        preferred_table_name=payload.preferred_table_name,
         active_schema_override=payload.active_schema,
+        attachments=[item.model_dump() for item in payload.attachments],
         api_key=payload.api_key,
     )
 
@@ -77,6 +79,7 @@ async def analyze(
         code_explanation=response_payload.get("code_explanation"),
         run_id=response_payload.get("run_id"),
         execution=response_payload.get("execution"),
+        metadata=response_payload.get("metadata"),
         artifacts=response_payload.get("artifacts") or [],
         final_script_artifact_id=response_payload.get("final_script_artifact_id"),
     )
@@ -104,7 +107,9 @@ async def stream_analyze(
                 model=payload.model,
                 context=payload.context,
                 table_name_override=payload.table_name,
+                preferred_table_name=payload.preferred_table_name,
                 active_schema_override=payload.active_schema,
+                attachments=[item.model_dump() for item in payload.attachments],
                 api_key=payload.api_key,
             ):
                 yield _to_sse(event["event"], event["data"])

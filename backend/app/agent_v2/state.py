@@ -32,6 +32,7 @@ class AgentInput(TypedDict):
     previous_code: str
     current_code: str
     known_columns: list[dict[str, str]]
+    attachments: list[dict[str, str]]
 
 
 class AgentOutput(TypedDict):
@@ -88,6 +89,7 @@ def build_input_state(
     user_id: str,
     scratchpad_path: str,
     known_columns: list[dict[str, str]] | None = None,
+    attachments: list[dict[str, str]] | None = None,
     run_id: str | None = None,
     **_: Any,
 ) -> AgentInput:
@@ -107,8 +109,38 @@ def build_input_state(
             }
         )
 
+    normalized_attachments: list[dict[str, str]] = []
+    content_blocks: list[dict[str, Any]] = []
+    if str(question or "").strip():
+        content_blocks.append({"type": "text", "text": str(question)})
+    for item in attachments or []:
+        if not isinstance(item, dict):
+            continue
+        attachment_id = str(item.get("attachment_id") or "").strip()
+        media_type = str(item.get("media_type") or "").strip()
+        filename = str(item.get("filename") or "").strip()
+        data_base64 = str(item.get("data_base64") or "").strip()
+        if not attachment_id or not media_type or not filename or not data_base64:
+            continue
+        normalized_attachments.append(
+            {
+                "attachment_id": attachment_id,
+                "media_type": media_type,
+                "filename": filename,
+                "data_base64": data_base64,
+            }
+        )
+        content_blocks.append(
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{media_type};base64,{data_base64}",
+                },
+            }
+        )
+
     return AgentInput(
-        messages=[HumanMessage(content=question)],
+        messages=[HumanMessage(content=content_blocks or str(question or ""))],
         workspace_id=workspace_id,
         user_id=user_id,
         table_name=table_name or None,
@@ -121,4 +153,5 @@ def build_input_state(
         previous_code=str(current_code or ""),
         current_code=str(current_code or ""),
         known_columns=normalized_known_columns,
+        attachments=normalized_attachments,
     )

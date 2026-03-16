@@ -31,7 +31,21 @@
 
     <!-- List -->
     <Transition name="sidebar-list">
-      <div v-show="!isCollapsed && appStore.hasWorkspace" class="flex flex-col mt-0.5 space-y-0.5 pl-6 pr-2 pb-2">
+      <div
+        v-show="!isCollapsed && appStore.hasWorkspace"
+        class="flex flex-col mt-0.5 space-y-0.5 pl-6 pr-2 pb-2"
+        @dragenter.prevent="handleDropDragEnter"
+        @dragover.prevent="handleDropDragOver"
+        @dragleave.prevent="handleDropDragLeave"
+        @drop.prevent="handleDatasetDrop"
+      >
+        <div
+          v-if="isDropActive"
+          class="rounded-xl border-2 border-dashed px-3 py-4 text-center text-xs"
+          style="border-color: var(--color-border-hover); color: var(--color-text-main); background-color: color-mix(in srgb, var(--color-surface) 78%, transparent);"
+        >
+          Drop CSV, Parquet, Excel, JSON, or TSV files to add them to this workspace.
+        </div>
         <div v-if="loading" class="px-2 py-2 text-[11px] text-center flex items-center justify-center gap-2" style="color: var(--color-text-muted);">
           <div class="animate-spin w-3 h-3 border-2 rounded-full" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);"></div>
           <span>Loading datasets...</span>
@@ -67,6 +81,7 @@ import { apiService } from '../../../services/apiService'
 import { previewService } from '../../../services/previewService'
 import { inferTableNameFromDataPath } from '../../../utils/chatBootstrap'
 import { mergeDatasetSources } from '../../../utils/datasetCatalogMerge'
+import { toast } from '../../../composables/useToast'
 import { 
   FolderIcon,
   CircleStackIcon, 
@@ -82,6 +97,10 @@ const emit = defineEmits(['header-click', 'select', 'open-settings'])
 const appStore = useAppStore()
 const loading = ref(false)
 const datasets = ref([])
+const isDropActive = ref(false)
+const dropDepth = ref(0)
+
+const SUPPORTED_DATASET_EXTENSIONS = new Set(['.csv', '.tsv', '.parquet', '.json', '.xlsx', '.xls'])
 
 const currentDataPath = computed(() => appStore.dataFilePath)
 
@@ -189,6 +208,82 @@ function openSettings() {
 function handleDatasetSwitched() {
   if (!appStore.hasWorkspace || props.isCollapsed) return
   void loadDatasets()
+}
+
+function getDroppedDatasetPaths(files) {
+  return Array.from(files || [])
+    .map((file) => {
+      const path = String(file?.path || '')
+      const lowerPath = path.toLowerCase()
+      const extension = lowerPath.includes('.') ? lowerPath.slice(lowerPath.lastIndexOf('.')) : ''
+      if (!path || !SUPPORTED_DATASET_EXTENSIONS.has(extension)) return null
+      return path
+    })
+    .filter(Boolean)
+}
+
+function handleDropDragEnter() {
+  dropDepth.value += 1
+  isDropActive.value = true
+}
+
+function handleDropDragOver() {
+  isDropActive.value = true
+}
+
+function handleDropDragLeave() {
+  dropDepth.value = Math.max(0, dropDepth.value - 1)
+  if (dropDepth.value === 0) {
+    isDropActive.value = false
+  }
+}
+
+async function handleDatasetDrop(event) {
+  dropDepth.value = 0
+  isDropActive.value = false
+  if (!appStore.activeWorkspaceId) {
+    toast.error('Workspace Required', 'Create or select a workspace before dropping datasets.')
+    return
+  }
+
+  const droppedPaths = getDroppedDatasetPaths(event?.dataTransfer?.files || [])
+  if (droppedPaths.length === 0) {
+    toast.error('Unsupported Files', 'Drop CSV, Parquet, Excel, JSON, or TSV files.')
+    return
+  }
+
+  const successes = []
+  const failures = []
+
+  for (const path of droppedPaths) {
+    try {
+      const result = await apiService.uploadDataPath(path)
+      successes.push(result)
+    } catch (error) {
+      failures.push({ path, error })
+    }
+  }
+
+  if (successes.length > 0) {
+    const last = successes[successes.length - 1]
+    await loadDatasets()
+    if (last?.file_path) {
+      await selectDataset({
+        file_path: last.file_path,
+        table_name: last.table_name,
+      })
+    }
+    toast.success(
+      'Datasets Added',
+      failures.length > 0
+        ? `${successes.length} file(s) added. ${failures.length} file(s) failed.`
+        : `${successes.length} file(s) added to this workspace.`
+    )
+  }
+
+  if (failures.length > 0 && successes.length === 0) {
+    toast.error('Dataset Import Failed', 'None of the dropped files could be added.')
+  }
 }
 
 // Automatically load datasets when workspace changes

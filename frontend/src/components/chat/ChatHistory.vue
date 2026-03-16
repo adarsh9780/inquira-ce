@@ -27,6 +27,16 @@
       <!-- User Message -->
       <div class="w-full mb-2">
         <div class="px-4 py-3 rounded-2xl rounded-tl-sm" style="background-color: #EDE9DE;">
+          <div v-if="message.attachments && message.attachments.length" class="mb-3 grid grid-cols-2 gap-2">
+            <img
+              v-for="attachment in message.attachments"
+              :key="attachment.attachment_id || attachment.filename"
+              :src="attachmentPreviewSrc(attachment)"
+              :alt="attachment.filename || 'Attached image'"
+              class="w-full max-h-48 rounded-xl object-cover border"
+              style="border-color: color-mix(in srgb, var(--color-border) 70%, transparent);"
+            />
+          </div>
           <p
             class="chat-question-text text-sm whitespace-pre-wrap"
             style="color: var(--color-text-main);"
@@ -117,6 +127,10 @@
 
           <div v-if="message.explanation" class="chat-markdown-content text-sm leading-relaxed max-w-none" style="color: var(--color-text-main);">
             <div v-html="renderMarkdown(message.explanation)"></div>
+          </div>
+
+          <div v-if="tableUsageSummary(message)" class="mt-3 rounded-xl border px-3 py-2 text-xs" style="border-color: var(--color-border); color: var(--color-text-muted);">
+            {{ tableUsageSummary(message) }}
           </div>
 
           <details v-if="shouldRenderCodeDetails(message)" class="mt-3 rounded-xl border code-details-panel" style="border-color: var(--color-border);">
@@ -258,6 +272,33 @@ const lastMessageId = computed(() => appStore.chatHistory.at(-1)?.id)
 const SCROLL_THRESHOLD_PX = 100
 const SHOW_SCROLL_BUTTON_THRESHOLD_PX = 220
 const QUESTION_REFERENCE_RE = /\b[A-Za-z_][A-Za-z0-9_]*\."(?:[^"]|"")+"|\b[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*/g
+
+function attachmentPreviewSrc(attachment) {
+  const mediaType = String(attachment?.media_type || 'image/png').trim()
+  const dataBase64 = String(attachment?.data_base64 || '').trim()
+  if (!dataBase64) return ''
+  return `data:${mediaType};base64,${dataBase64}`
+}
+
+function tableUsageSummary(message) {
+  const metadata = message?.analysisMetadata
+  if (!metadata || typeof metadata !== 'object') return ''
+  const tables = Array.isArray(metadata.tables_used)
+    ? metadata.tables_used.map((item) => String(item || '').trim()).filter(Boolean)
+    : []
+  if (tables.length === 0) return ''
+  const joinsUsed = Boolean(metadata.joins_used)
+  const joinKeys = Array.isArray(metadata.join_keys)
+    ? metadata.join_keys.map((item) => String(item || '').trim()).filter(Boolean)
+    : []
+  if (!joinsUsed) {
+    return `Tables used: ${tables.join(', ')}.`
+  }
+  if (joinKeys.length > 0) {
+    return `Tables used: ${tables.join(', ')}. Joined using: ${joinKeys.join(', ')}.`
+  }
+  return `Tables used: ${tables.join(', ')}. A conservative join was used.`
+}
 
 function escapeHtml(rawValue) {
   return String(rawValue || '')
