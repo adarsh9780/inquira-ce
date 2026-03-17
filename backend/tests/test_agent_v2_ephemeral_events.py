@@ -301,3 +301,104 @@ async def test_react_loop_emits_agent_status_on_schema_search(monkeypatch):
     assert "searching_schema" in steps, f"Expected searching_schema step, got: {steps}"
     search_events = [p for _, p in status_events if p["step"] == "searching_schema"]
     assert any("revenue" in p["message"].lower() for p in search_events)
+
+
+@pytest.mark.asyncio
+async def test_react_loop_emits_reasoning_detail_in_agent_status_events(monkeypatch):
+    """Verify agent_status payloads include detail/next_action for UI chevron content."""
+    events: list[tuple[str, dict]] = []
+
+    def fake_emit(event: str, payload: dict) -> None:
+        events.append((event, payload))
+
+    monkeypatch.setattr("app.agent_v2.nodes.emit_agent_event", fake_emit)
+    monkeypatch.setattr(
+        "app.agent_v2.nodes.load_agent_runtime_config",
+        lambda: SimpleNamespace(max_code_executions=1, turn_timeout=120, max_tool_calls=3),
+    )
+    monkeypatch.setattr(
+        "app.agent_v2.nodes.sample_data",
+        lambda **_kwargs: {"rows": [], "columns": [], "row_count": 0},
+    )
+    monkeypatch.setattr(
+        "app.agent_v2.nodes.ChatPromptTemplate.from_messages",
+        lambda *_args, **_kwargs: _FakePrompt(),
+    )
+    monkeypatch.setattr("app.agent_v2.nodes._get_model", lambda *_args, **_kwargs: _FakeModel())
+    monkeypatch.setattr(
+        "app.agent_v2.nodes.guard_code",
+        lambda code, table_name=None: SimpleNamespace(blocked=False, code=code, reason=None),
+    )
+    monkeypatch.setattr("app.agent_v2.nodes.emit_stream_token", lambda *_args, **_kwargs: None)
+
+    outputs = iter([
+        AnalysisOutput(
+            code="",
+            explanation="need schema",
+            output_contract=[],
+            search_schema_queries=["player name"],
+        ),
+        AnalysisOutput(
+            code="print('ok')",
+            explanation="done",
+            output_contract=[],
+            search_schema_queries=[],
+        ),
+    ])
+    monkeypatch.setattr(
+        "app.agent_v2.nodes._invoke_structured_chain",
+        lambda _chain, _payload: next(outputs),
+    )
+    monkeypatch.setattr(
+        "app.agent_v2.nodes.search_schema",
+        lambda **_kwargs: {
+            "query": "player name",
+            "match_count": 1,
+            "columns": [{"table_name": "sales", "name": "player_name", "dtype": "TEXT", "description": ""}],
+        },
+    )
+
+    async def fake_execute_python(**_kwargs):
+        return {"success": True, "artifacts": []}
+
+    monkeypatch.setattr("app.agent_v2.nodes.execute_python", fake_execute_python)
+    async def fake_get_workspace_run_exports(**_kwargs):
+        return []
+
+    monkeypatch.setattr("app.agent_v2.nodes.get_workspace_run_exports", fake_get_workspace_run_exports)
+
+    async def fake_validate_and_summarize_result(**_kwargs):
+        return {"success": True, "stdout": "", "stderr": "", "artifact_count": 0}
+
+    monkeypatch.setattr("app.agent_v2.nodes.validate_and_summarize_result", fake_validate_and_summarize_result)
+
+    async def fake_result_explanations(**_kwargs):
+        return SimpleNamespace(result_explanation="ok", code_explanation="ok")
+
+    monkeypatch.setattr("app.agent_v2.nodes._generate_result_explanations", fake_result_explanations)
+
+    await react_loop_node(
+        {
+            "messages": [HumanMessage(content="show player name metrics")],
+            "table_name": "sales",
+            "data_path": "/tmp/ws.duckdb",
+            "active_schema": {"table_name": "sales", "columns": []},
+            "workspace_id": "ws-1",
+            "user_id": "u-1",
+            "context": "",
+            "known_columns": [],
+        },
+        {"configurable": {"api_key": "key"}},
+    )
+
+    status_events = [p for event, p in events if event == "agent_status"]
+    assert status_events, "Expected agent_status events."
+    assert all(str(p.get("detail") or "").strip() for p in status_events), (
+        "Each status event should include a non-empty detail field."
+    )
+    search_result_events = [p for p in status_events if p.get("step") == "schema_search_result"]
+    assert search_result_events, "Expected schema_search_result status event."
+    assert search_result_events[0].get("context", {}).get("match_count") == 1
+    assert any(str(p.get("next_action") or "").strip() for p in status_events), (
+        "Expected at least one status event with next_action guidance."
+    )

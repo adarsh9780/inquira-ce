@@ -1007,7 +1007,7 @@ async function handleSubmit() {
               node: 'agent_status',
               stage: evt.data.step || '',
               message: evt.data.message,
-              output: ''
+              output: evt.data?.detail || evt.data?.output || ''
             })
             return
           }

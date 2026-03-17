@@ -405,6 +405,32 @@ def _truncate_text(value: Any, *, limit: int = 2400) -> str:
     return text[: max(0, limit - 3)].rstrip() + "..."
 
 
+def _emit_agent_status(
+    *,
+    step: str,
+    message: str,
+    detail: str = "",
+    attempt: int | None = None,
+    next_action: str = "",
+    context: dict[str, Any] | None = None,
+) -> None:
+    payload: dict[str, Any] = {
+        "step": str(step or "").strip(),
+        "message": str(message or "").strip(),
+    }
+    normalized_detail = str(detail or "").strip()
+    if normalized_detail:
+        payload["detail"] = normalized_detail
+    if attempt is not None:
+        payload["attempt"] = int(attempt)
+    normalized_next_action = str(next_action or "").strip()
+    if normalized_next_action:
+        payload["next_action"] = normalized_next_action
+    if isinstance(context, dict) and context:
+        payload["context"] = context
+    emit_agent_event("agent_status", payload)
+
+
 async def _generate_result_explanations(
     *,
     question: str,
@@ -528,11 +554,23 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
                 )
             )
 
-        emit_agent_event("agent_status", {
-            "step": "generating_code",
-            "message": "Generating analysis code..." if not retry_feedback else "Regenerating code...",
-            "attempt": _attempt + 1,
-        })
+        is_regeneration = bool(retry_feedback)
+        generation_message = "Generating analysis code..." if not is_regeneration else "Regenerating code..."
+        generation_detail = (
+            "Drafting initial executable Python code from your question and current schema."
+            if not is_regeneration
+            else (
+                "Updating the previous code draft using failure feedback.\n"
+                f"Feedback: {_truncate_text(retry_feedback, limit=320)}"
+            )
+        )
+        _emit_agent_status(
+            step="generating_code",
+            message=generation_message,
+            detail=generation_detail,
+            attempt=_attempt + 1,
+            next_action="Validate generated code and run it if it passes safety checks.",
+        )
 
         output = _invoke_structured_chain(
             chain,
@@ -563,10 +601,16 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
             for query in pending_search_queries:
                 if search_calls >= max_schema_search_calls:
                     break
-                emit_agent_event("agent_status", {
-                    "step": "searching_schema",
-                    "message": f"Searching schema for \"{query}\"...",
-                })
+                _emit_agent_status(
+                    step="searching_schema",
+                    message=f"Searching schema for \"{query}\"...",
+                    detail=(
+                        f"Looking up columns related to \"{query}\" so generated code can map "
+                        "user language to real schema fields."
+                    ),
+                    next_action="Use matching columns to regenerate executable code.",
+                    context={"query": query},
+                )
                 searched_schema_queries.add(query.lower())
                 search_calls += 1
                 search_result = search_schema(
@@ -581,6 +625,16 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
                         known_columns,
                         discovered,
                         max_items=50,
+                    )
+                    _emit_agent_status(
+                        step="schema_search_result",
+                        message=f"Found {len(discovered)} schema matches for \"{query}\".",
+                        detail=(
+                            "These matches were added to known columns so the next code draft can "
+                            "use concrete field names."
+                        ),
+                        next_action="Regenerate code with the updated column context.",
+                        context={"query": query, "match_count": len(discovered)},
                     )
             retry_feedback = (
                 "Additional schema details were retrieved with search_schema. "
@@ -600,20 +654,31 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
         if not guard.blocked:
             candidate_code = guard.code
         else:
-            emit_agent_event("agent_status", {
-                "step": "code_validation_failed",
-                "message": "Code validation failed. Regenerating...",
-            })
+            _emit_agent_status(
+                step="code_validation_failed",
+                message="Code validation failed. Regenerating...",
+                detail=(
+                    "The generated code was blocked by safety/validation rules.\n"
+                    f"Reason: {_truncate_text(guard.reason, limit=260) or 'Generated code failed validation.'}"
+                ),
+                next_action="Generate a safer executable version of the code.",
+            )
             retry_feedback = str(guard.reason or "Generated code failed validation.")
             candidate_code = ""
             continue
 
         execution_attempts += 1
-        emit_agent_event("agent_status", {
-            "step": "executing_code",
-            "message": "Running code...",
-            "attempt": execution_attempts,
-        })
+        execution_timeout = min(90, max(10, int(runtime.turn_timeout)))
+        _emit_agent_status(
+            step="executing_code",
+            message="Running code...",
+            detail=(
+                "Executing the generated Python against the workspace runtime."
+                f" (timeout: {execution_timeout}s)"
+            ),
+            attempt=execution_attempts,
+            next_action="Capture runtime output and artifacts to decide if retries are needed.",
+        )
         wrapped_code = build_run_wrapped_code(
             candidate_code,
             str(state.get("run_id") or ""),
@@ -623,16 +688,12 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
             workspace_id=workspace_id,
             data_path=data_path or None,
             code=wrapped_code,
-            timeout=min(90, max(10, int(runtime.turn_timeout))),
+            timeout=execution_timeout,
             emit_tool_events=False,
         )
         last_executed_code = candidate_code
         final_executed_code = wrapped_code
         if bool(execution.get("success")):
-            emit_agent_event("agent_status", {
-                "step": "execution_success",
-                "message": "Code executed successfully.",
-            })
             final_execution = execution
             final_artifacts = [
                 item for item in (execution.get("artifacts") or []) if isinstance(item, dict)
@@ -646,27 +707,55 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
                 except Exception:
                     exports = []
                 final_artifacts = [item for item in exports if isinstance(item, dict)]
+            _emit_agent_status(
+                step="execution_success",
+                message="Code executed successfully.",
+                detail=(
+                    f"Execution completed successfully and produced {len(final_artifacts)} artifact(s)."
+                ),
+                next_action="Analyze the results and produce a final explanation.",
+                attempt=execution_attempts,
+            )
             execution_feedback = ""
             retry_feedback = ""
             break
 
         execution_feedback = str(execution.get("error") or execution.get("stderr") or "").strip()
         if _is_non_retriable_execution_error(execution_feedback):
-            emit_agent_event("agent_status", {
-                "step": "execution_failed",
-                "message": f"Execution failed: {execution_feedback[:200]}",
-            })
+            _emit_agent_status(
+                step="execution_failed",
+                message=f"Execution failed: {execution_feedback[:200]}",
+                detail=(
+                    "The runtime returned a non-retriable error.\n"
+                    f"Error: {_truncate_text(execution_feedback, limit=320)}"
+                ),
+                next_action="Stop retries and return the failure summary.",
+                attempt=execution_attempts,
+            )
             break
         if execution_attempts >= max_attempts:
-            emit_agent_event("agent_status", {
-                "step": "execution_failed",
-                "message": f"Code failed after {execution_attempts} attempts.",
-            })
+            _emit_agent_status(
+                step="execution_failed",
+                message=f"Code failed after {execution_attempts} attempts.",
+                detail=(
+                    "The code kept failing with retriable runtime errors and reached the retry limit.\n"
+                    f"Last error: {_truncate_text(execution_feedback, limit=320)}"
+                ),
+                next_action="Return the final failure details to the user.",
+                attempt=execution_attempts,
+            )
             break
-        emit_agent_event("agent_status", {
-            "step": "execution_retry",
-            "message": f"Code execution failed. Retrying (attempt {execution_attempts + 1}/{max_attempts})...",
-        })
+        _emit_agent_status(
+            step="execution_retry",
+            message=f"Code execution failed. Retrying (attempt {execution_attempts + 1}/{max_attempts})...",
+            detail=(
+                "Execution failed with a retriable runtime error, so the next code draft will adapt "
+                "to this failure.\n"
+                f"Error: {_truncate_text(execution_feedback, limit=320)}"
+            ),
+            attempt=execution_attempts + 1,
+            next_action="Regenerate code using runtime error feedback and execute again.",
+        )
         retry_feedback = (
             "Execution failed. Regenerate code that fixes this runtime error.\n"
             f"Runtime error: {execution_feedback[:1200]}"
@@ -691,16 +780,22 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
             for item in final_artifacts
             if isinstance(item, dict)
         ):
-            emit_agent_event(
-                "agent_status",
-                {
-                    "step": "sampling_results",
-                    "message": "Sampling result data before explaining the outcome...",
-                },
+            _emit_agent_status(
+                step="sampling_results",
+                message="Sampling result data before explaining the outcome...",
+                detail=(
+                    "A large dataframe result was detected, so a sample will be analyzed first "
+                    "to create a concise explanation."
+                ),
+                next_action="Validate and summarize sampled execution output.",
             )
-        emit_agent_event(
-            "agent_status",
-            {"step": "analyzing_results", "message": "Analyzing results..."},
+        _emit_agent_status(
+            step="analyzing_results",
+            message="Analyzing results...",
+            detail=(
+                "Summarizing runtime output and artifacts, then preparing final user-facing findings."
+            ),
+            next_action="Generate result explanation from execution summary.",
         )
         result_summary = await validate_and_summarize_result(
             workspace_id=workspace_id,
@@ -719,12 +814,13 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
             code_explanation = str(explained.code_explanation or code_explanation).strip()
         except Exception as exc:
             fallback = _truncate_text(exc, limit=200)
-            emit_agent_event(
-                "agent_status",
-                {
-                    "step": "result_analysis_failed",
-                    "message": f"Result analysis fallback applied after explanation error: {fallback}",
-                },
+            _emit_agent_status(
+                step="result_analysis_failed",
+                message=f"Result analysis fallback applied after explanation error: {fallback}",
+                detail=(
+                    "The explanation helper failed, so the agent is using a fallback final message."
+                ),
+                next_action="Return fallback result explanation.",
             )
             result_explanation = ""
 

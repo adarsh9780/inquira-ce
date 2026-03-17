@@ -11,6 +11,8 @@ test('chat input handles tool and intervention SSE events', () => {
   assert.equal(source.includes("evt.event === 'tool_result'"), true)
   assert.equal(source.includes("evt.event === 'intervention_request'"), true)
   assert.equal(source.includes("evt.event === 'intervention_response'"), true)
+  assert.equal(source.includes("evt.event === 'agent_status'"), true)
+  assert.equal(source.includes("output: evt.data?.detail || evt.data?.output || ''"), true)
 })
 
 test('chat history renders tool cards and intervention component', () => {
