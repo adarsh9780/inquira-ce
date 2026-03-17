@@ -17,6 +17,7 @@ def test_openapi_contains_required_v1_routes():
     assert "/api/v1/workspaces/{workspace_id}/datasets/browser-sync" in paths
     assert "/api/v1/preferences" in paths
     assert "/api/v1/preferences/api-key" in paths
+    assert "/api/v1/legal/terms" in paths
 
 
 def test_v1_analyze_contract_includes_workspace_dataset_fields():

@@ -667,6 +667,10 @@ export const apiService = {
     return v1Api.preferences.deleteApiKey(provider)
   },
 
+  async v1GetTermsAndConditions() {
+    return axios.get('/api/v1/legal/terms')
+  },
+
   async v1GetWorkspacePaths(workspaceId) {
     return axios.get(`/api/v1/workspaces/${workspaceId}/paths`)
   },
