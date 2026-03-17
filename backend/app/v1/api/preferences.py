@@ -88,6 +88,7 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
         enabled_models=enabled_models,
         schema_context=prefs.schema_context,
         allow_schema_sample_values=bool(prefs.allow_schema_sample_values),
+        terminal_risk_acknowledged=bool(getattr(prefs, "terminal_risk_acknowledged", False)),
         chat_overlay_width=float(prefs.chat_overlay_width),
         is_sidebar_collapsed=bool(prefs.is_sidebar_collapsed),
         hide_shortcuts_modal=bool(prefs.hide_shortcuts_modal),
@@ -170,6 +171,8 @@ async def update_preferences(
         prefs.schema_context = payload.schema_context
     if payload.allow_schema_sample_values is not None:
         prefs.allow_schema_sample_values = payload.allow_schema_sample_values
+    if payload.terminal_risk_acknowledged is not None:
+        prefs.terminal_risk_acknowledged = bool(payload.terminal_risk_acknowledged)
     if payload.chat_overlay_width is not None:
         prefs.chat_overlay_width = payload.chat_overlay_width
     if payload.is_sidebar_collapsed is not None:

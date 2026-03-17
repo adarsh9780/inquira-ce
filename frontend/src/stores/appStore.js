@@ -301,6 +301,7 @@ export const useAppStore = defineStore('app', () => {
           enabled_models: availableModels.value,
           schema_context: schemaContext.value,
           allow_schema_sample_values: allowSchemaSampleValues.value,
+          terminal_risk_acknowledged: terminalConsentGranted.value,
           chat_overlay_width: chatOverlayWidth.value,
           is_sidebar_collapsed: isSidebarCollapsed.value,
           hide_shortcuts_modal: hideShortcutsModal.value,
@@ -1619,6 +1620,7 @@ export const useAppStore = defineStore('app', () => {
 
   function setTerminalConsentGranted(granted) {
     terminalConsentGranted.value = !!granted
+    saveLocalConfig()
   }
   function setTerminalCwd(cwd) {
     terminalCwd.value = String(cwd || '')
@@ -1754,6 +1756,9 @@ export const useAppStore = defineStore('app', () => {
     if (typeof prefs?.schema_context === 'string') schemaContext.value = prefs.schema_context
     if (typeof prefs?.allow_schema_sample_values === 'boolean') {
       allowSchemaSampleValues.value = prefs.allow_schema_sample_values
+    }
+    if (typeof prefs?.terminal_risk_acknowledged === 'boolean') {
+      terminalConsentGranted.value = prefs.terminal_risk_acknowledged
     }
     if (typeof prefs?.plotly_theme_mode === 'string') {
       const normalizedPlotlyThemeMode = prefs.plotly_theme_mode.trim().toLowerCase()

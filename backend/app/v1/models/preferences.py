@@ -32,6 +32,7 @@ class UserPreferences(AppDataBase):
     enabled_main_models_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     schema_context: Mapped[str] = mapped_column(Text, nullable=False, default="")
     allow_schema_sample_values: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    terminal_risk_acknowledged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     chat_overlay_width: Mapped[float] = mapped_column(Float, nullable=False, default=0.25)
     is_sidebar_collapsed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     hide_shortcuts_modal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

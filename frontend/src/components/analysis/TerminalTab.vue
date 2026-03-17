@@ -12,13 +12,13 @@
       <div class="mx-auto max-w-xl rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
         <p class="font-semibold">Local terminal access</p>
         <p class="mt-2">Commands here run on your machine with your user permissions in the active workspace context.</p>
-        <p class="mt-1">Consent is required once per app session.</p>
+        <p class="mt-1">Consent is required before terminal use and is remembered for your account.</p>
         <p class="mt-1 text-xs">Some commands may be blocked by terminal security policy.</p>
         <button
           class="mt-4 rounded bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700"
           @click="grantConsent"
         >
-          Enable terminal for this session
+          Enable terminal
         </button>
       </div>
     </div>

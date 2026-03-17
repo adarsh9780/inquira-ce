@@ -21,6 +21,7 @@ class PreferencesResponse(BaseModel):
     enabled_models: list[str] = Field(default_factory=list)
     schema_context: str = ""
     allow_schema_sample_values: bool = False
+    terminal_risk_acknowledged: bool = False
     chat_overlay_width: float = 0.25
     is_sidebar_collapsed: bool = True
     hide_shortcuts_modal: bool = False
@@ -46,6 +47,7 @@ class PreferencesUpdateRequest(BaseModel):
     enabled_models: list[str] | None = None
     schema_context: str | None = None
     allow_schema_sample_values: bool | None = None
+    terminal_risk_acknowledged: bool | None = None
     chat_overlay_width: float | None = Field(default=None, ge=0.1, le=0.9)
     is_sidebar_collapsed: bool | None = None
     hide_shortcuts_modal: bool | None = None

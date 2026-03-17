@@ -20,4 +20,7 @@ test('app store reads available models from v1 preferences payload', () => {
   assert.equal(source.includes('availableModels.value = prefs.available_models'), true)
   assert.equal(source.includes('if (prefs?.selected_coding_model)'), true)
   assert.equal(source.includes('selectedCodingModel.value = prefs.selected_coding_model'), true)
+  assert.equal(source.includes('if (typeof prefs?.terminal_risk_acknowledged === \'boolean\')'), true)
+  assert.equal(source.includes('terminalConsentGranted.value = prefs.terminal_risk_acknowledged'), true)
+  assert.equal(source.includes('terminal_risk_acknowledged: terminalConsentGranted.value'), true)
 })
