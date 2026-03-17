@@ -27,6 +27,10 @@ def test_terminal_policy_blocks_disallowed_commands():
     config = _runtime_config()
     with pytest.raises(HTTPException):
         runtime_api._enforce_terminal_command_policy("rm -rf .", config)
+    with pytest.raises(HTTPException):
+        runtime_api._enforce_terminal_command_policy("rm -rf /", config)
+    with pytest.raises(HTTPException):
+        runtime_api._enforce_terminal_command_policy(":(){ :|:& };:", config)
 
 
 def test_terminal_policy_blocks_chaining_and_redirection():

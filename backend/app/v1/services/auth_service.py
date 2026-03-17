@@ -9,7 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..repositories.auth_repository import AuthRepository, AuthSessionRecord
 from ..repositories.auth_repository_factory import get_auth_repository
-from .security_service import generate_salt, hash_password, generate_session_token
+from .security_service import (
+    generate_salt,
+    generate_session_token,
+    hash_password,
+    verify_password,
+)
 
 
 class AuthService:
@@ -71,8 +76,7 @@ class AuthService:
         if user is None:
             raise HTTPException(status_code=401, detail="Username does not exist")
 
-        candidate = hash_password(password, user.salt)
-        if candidate != user.password_hash:
+        if not verify_password(password, user.salt, user.password_hash):
             raise HTTPException(status_code=401, detail="Invalid username or password")
 
         session_token = generate_session_token()

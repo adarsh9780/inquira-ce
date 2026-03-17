@@ -348,8 +348,8 @@ _INSTALL_BLOCK_RE = re.compile(
     r"(?im)(?:^\s*!?\s*%?\s*pip\s+install\b|uv\s+pip\s+install\b|python\s+-m\s+pip\s+install\b)"
 )
 _DEFAULT_TERMINAL_DENYLIST = [
-    r"(^|\\s)rm\\s+-rf\\s+/",
-    r":\\(\\)\\s*\\{\\s*:\\|:\\s*&\\s*\\};:",
+    r"(^|\s)rm\s+-rf\s+/",
+    r":\(\)\s*\{\s*:\|:\s*&\s*\};:",
 ]
 _DEFAULT_TERMINAL_ALLOWLIST = {
     "uv",
@@ -1363,6 +1363,7 @@ async def execute_workspace_terminal_command(
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     runtime = load_execution_runtime_config()
     _enforce_terminal_enabled(runtime)
+    await _enforce_terminal_risk_acknowledged(session, current_user.id)
     _enforce_terminal_command_policy(payload.command, runtime)
     workspace_dir = str(Path(workspace.duckdb_path).parent)
     _validate_terminal_cwd(payload.cwd, workspace_dir)
@@ -1398,6 +1399,7 @@ async def stream_workspace_terminal_command_sse(
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     runtime = load_execution_runtime_config()
     _enforce_terminal_enabled(runtime)
+    await _enforce_terminal_risk_acknowledged(session, current_user.id)
     _enforce_terminal_command_policy(payload.command, runtime)
     workspace_dir = str(Path(workspace.duckdb_path).parent)
     _validate_terminal_cwd(payload.cwd, workspace_dir)
@@ -1461,6 +1463,7 @@ async def reset_workspace_terminal_session(
 ):
     runtime = load_execution_runtime_config()
     _enforce_terminal_enabled(runtime)
+    await _enforce_terminal_risk_acknowledged(session, current_user.id)
     await _require_workspace_access(session, current_user.id, workspace_id)
     reset = await stop_workspace_terminal_session(
         user_id=current_user.id,
@@ -1995,6 +1998,19 @@ def _enforce_terminal_enabled(config: Any) -> None:
     raise HTTPException(
         status_code=403,
         detail="Terminal feature is disabled. Enable [terminal].enable in inquira.toml.",
+    )
+
+
+async def _enforce_terminal_risk_acknowledged(
+    session: AsyncSession,
+    user_id: str,
+) -> None:
+    prefs = await PreferencesRepository.get_or_create(session, str(user_id))
+    if bool(getattr(prefs, "terminal_risk_acknowledged", False)):
+        return
+    raise HTTPException(
+        status_code=403,
+        detail="Terminal access requires risk acknowledgment in user preferences.",
     )
 
 

@@ -1,12 +1,20 @@
-from app.v1.services.security_service import hash_password
+import hashlib
+
+from app.v1.services.security_service import hash_password, verify_password
 
 
-def test_hash_password_is_deterministic_for_same_input():
-    salt = "abc123"
-    password = "iamhappy"
+def test_hash_password_uses_pbkdf2_format_and_verifies():
+    salt = "abc123salt"
+    hashed = hash_password("secret123", salt)
 
-    first = hash_password(password, salt)
-    second = hash_password(password, salt)
+    assert hashed.startswith("pbkdf2_sha256$")
+    assert verify_password("secret123", salt, hashed) is True
+    assert verify_password("wrong", salt, hashed) is False
 
-    assert first == second
-    assert len(first) == 64
+
+def test_verify_password_supports_legacy_sha256_hashes():
+    salt = "legacy-salt"
+    legacy_hash = hashlib.sha256(f"secret123{salt}".encode("utf-8")).hexdigest()
+
+    assert verify_password("secret123", salt, legacy_hash) is True
+    assert verify_password("wrong", salt, legacy_hash) is False

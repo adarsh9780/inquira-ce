@@ -874,8 +874,17 @@ async def test_workspace_terminal_execute_endpoint(monkeypatch, tmp_path):
             "persistent": True,
         }
 
+    async def fake_enforce_terminal_risk_acknowledged(session, user_id):
+        _ = (session, user_id)
+        return None
+
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(runtime_api, "run_workspace_terminal_command", fake_run_terminal_command)
+    monkeypatch.setattr(
+        runtime_api,
+        "_enforce_terminal_risk_acknowledged",
+        fake_enforce_terminal_risk_acknowledged,
+    )
 
     response = await runtime_api.execute_workspace_terminal_command(
         workspace_id="ws-7",
@@ -911,8 +920,17 @@ async def test_workspace_terminal_session_reset_endpoint(monkeypatch, tmp_path):
         assert workspace_id == "ws-9"
         return True
 
+    async def fake_enforce_terminal_risk_acknowledged(session, user_id):
+        _ = (session, user_id)
+        return None
+
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(runtime_api, "stop_workspace_terminal_session", fake_stop_terminal)
+    monkeypatch.setattr(
+        runtime_api,
+        "_enforce_terminal_risk_acknowledged",
+        fake_enforce_terminal_risk_acknowledged,
+    )
 
     response = await runtime_api.reset_workspace_terminal_session(
         workspace_id="ws-9",
@@ -943,8 +961,17 @@ async def test_workspace_terminal_execute_enforces_allowlist_policy(monkeypatch,
             terminal_command_denylist=[],
         )
 
+    async def fake_enforce_terminal_risk_acknowledged(session, user_id):
+        _ = (session, user_id)
+        return None
+
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(runtime_api, "load_execution_runtime_config", fake_load_runtime_config)
+    monkeypatch.setattr(
+        runtime_api,
+        "_enforce_terminal_risk_acknowledged",
+        fake_enforce_terminal_risk_acknowledged,
+    )
 
     with pytest.raises(runtime_api.HTTPException) as exc:
         await runtime_api.execute_workspace_terminal_command(
@@ -955,6 +982,49 @@ async def test_workspace_terminal_execute_enforces_allowlist_policy(monkeypatch,
         )
 
     assert exc.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_workspace_terminal_execute_requires_risk_acknowledgment(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws10b"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    def fake_load_runtime_config():
+        return SimpleNamespace(
+            terminal_enabled=True,
+            terminal_command_allowlist=[],
+            terminal_command_denylist=[],
+        )
+
+    async def fake_get_prefs(session, principal_id):
+        _ = (session, principal_id)
+        return SimpleNamespace(terminal_risk_acknowledged=False)
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "load_execution_runtime_config", fake_load_runtime_config)
+    monkeypatch.setattr(
+        runtime_api.PreferencesRepository,
+        "get_or_create",
+        fake_get_prefs,
+    )
+
+    with pytest.raises(runtime_api.HTTPException) as exc:
+        await runtime_api.execute_workspace_terminal_command(
+            workspace_id="ws-10b",
+            payload=runtime_api.TerminalExecuteRequest(command="pwd", cwd=None, timeout=30),
+            session=object(),
+            current_user=SimpleNamespace(id="user-1"),
+        )
+
+    assert exc.value.status_code == 403
+    assert "risk acknowledgment" in str(exc.value.detail).lower()
 
 
 @pytest.mark.asyncio
