@@ -78,8 +78,23 @@
               class="w-full text-left px-3 py-1.5 text-[11px] font-medium hover:bg-zinc-50 transition-colors"
               style="color: var(--color-text-main);"
             >
-              Terms &amp; Conditions
+              <span class="flex items-center justify-between gap-2">
+                <span>Terms &amp; Conditions</span>
+                <ChevronDownIcon v-if="isTermsOpen" class="w-3.5 h-3.5" />
+                <ChevronRightIcon v-else class="w-3.5 h-3.5" />
+              </span>
             </button>
+            <div
+              v-if="isTermsOpen"
+              class="mx-3 mb-2 rounded-md border px-2.5 py-2 text-[10px] leading-relaxed"
+              style="border-color: var(--color-border); background-color: var(--color-base); color: var(--color-text-main);"
+            >
+              <p class="font-semibold">Inquira Terms (Summary)</p>
+              <p class="mt-1">Use Inquira only for lawful work. You are responsible for all commands, queries, and generated outputs you run.</p>
+              <p class="mt-1">Terminal and code execution can modify files and data. Review generated code before running and keep backups for important work.</p>
+              <p class="mt-1">Do not upload or expose data you are not authorized to process. Sensitive data handling remains your responsibility.</p>
+              <p class="mt-1">The tool is provided as-is. Validate analytical results before making decisions based on them.</p>
+            </div>
             <div class="border-t my-1" style="border-color: var(--color-border);"></div>
             <button
               @click="promptLogout"
@@ -239,6 +254,7 @@ let artifactUsageAbortController = null
 
 const accountMenuRef = ref(null)
 const isAccountMenuOpen = ref(false)
+const isTermsOpen = ref(false)
 const isSettingsOpen = ref(false)
 const settingsInitialTab = ref('api')
 const isLogoutConfirmOpen = ref(false)
@@ -387,6 +403,7 @@ function toggleSidebarFromStatusBar() {
 
 function toggleAccountMenu() {
   isAccountMenuOpen.value = !isAccountMenuOpen.value
+  if (!isAccountMenuOpen.value) isTermsOpen.value = false
 }
 
 function updateWebSocketStatus(connected) {
@@ -493,6 +510,7 @@ function openSettings(tab = 'api') {
   settingsInitialTab.value = tab
   isSettingsOpen.value = true
   isAccountMenuOpen.value = false
+  isTermsOpen.value = false
 }
 
 function closeSettings() {
@@ -501,13 +519,13 @@ function closeSettings() {
 }
 
 function openTerms() {
-  isAccountMenuOpen.value = false
-  window.open('/terms-and-conditions.html', '_blank', 'noopener')
+  isTermsOpen.value = !isTermsOpen.value
 }
 
 function promptLogout() {
   isLogoutConfirmOpen.value = true
   isAccountMenuOpen.value = false
+  isTermsOpen.value = false
 }
 
 function cancelLogout() {
@@ -609,6 +627,7 @@ function handleDocumentClick(event) {
   if (!root) return
   if (!root.contains(event.target)) {
     isAccountMenuOpen.value = false
+    isTermsOpen.value = false
   }
 }
 
@@ -624,6 +643,7 @@ function handleDocumentKeydown(event) {
   }
   if (isAccountMenuOpen.value) {
     isAccountMenuOpen.value = false
+    isTermsOpen.value = false
   }
 }
 

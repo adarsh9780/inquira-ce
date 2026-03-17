@@ -40,6 +40,10 @@ test('status bar keeps account controls first and uses sidebar-style drop-up men
   assert.equal(statusBarSource.includes('Right Section: Terminal & Version'), true)
   assert.equal(statusBarSource.includes('<SettingsModal'), true)
   assert.equal(statusBarSource.includes('<ConfirmationModal'), true)
+  assert.equal(statusBarSource.includes('const isTermsOpen = ref(false)'), true)
+  assert.equal(statusBarSource.includes('v-if="isTermsOpen"'), true)
+  assert.equal(statusBarSource.includes('Inquira Terms (Summary)'), true)
+  assert.equal(statusBarSource.includes('window.open(\'/terms-and-conditions.html\''), false)
   assert.equal(
     statusBarSource.indexOf('ref="accountMenuRef"') < statusBarSource.indexOf('Toggle terminal panel (Cmd/Ctrl+J)'),
     true,
