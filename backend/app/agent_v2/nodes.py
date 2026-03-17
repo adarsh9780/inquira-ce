@@ -10,13 +10,14 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from ..agent.code_guard import guard_code
 from ..agent.events import emit_agent_event
 from ..agent.registry import load_agent_runtime_config
+from ..coding_agent import AnalysisOutput, build_coding_chain, invoke_coding_chain
 from ..services.chat_model_factory import create_chat_model
 from ..services.code_executor import get_workspace_run_exports
 from ..services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
@@ -32,25 +33,12 @@ from .tools.sample_data import sample_data
 from .tools.search_schema import search_schema
 from .tools.validate_result import validate_and_summarize_result
 
-_ANALYSIS_PROMPT = (
-    Path(__file__).resolve().parent / "prompts" / "react_system.yaml"
-).read_text(encoding="utf-8")
 _GENERAL_CHAT_PROMPT = (
     Path(__file__).resolve().parent / "prompts" / "general_chat_system.yaml"
 ).read_text(encoding="utf-8")
 _RESULT_EXPLANATION_PROMPT = (
     Path(__file__).resolve().parent / "prompts" / "result_explanation_system.yaml"
 ).read_text(encoding="utf-8")
-
-
-class AnalysisOutput(BaseModel):
-    code: str | None = None
-    explanation: str | None = None
-    output_contract: list[dict[str, str]] = Field(default_factory=list)
-    search_schema_queries: list[str] = Field(default_factory=list)
-    selected_tables: list[str] = Field(default_factory=list)
-    join_keys: list[str] = Field(default_factory=list)
-    joins_used: bool = False
 
 
 class ChatOutput(BaseModel):
@@ -505,27 +493,8 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
                 timeout=60,
             )
 
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", _ANALYSIS_PROMPT),
-            (
-                "system",
-                (
-                    "Workspace database path: {workspace_db_path}\n"
-                    "Preferred table: {table_name}\n"
-                    "Workspace tables: {workspace_tables_json}\n"
-                    "Schema summary (column names only): {schema_summary}\n"
-                    "Known columns: {known_columns_json}\n"
-                    "Sample table: {sample_table}\n"
-                    "Sample rows: {sample_json}\n"
-                    "Context: {context}"
-                ),
-            ),
-            MessagesPlaceholder("messages"),
-        ]
-    )
     model = _get_model(config, lite=False)
-    chain = prompt | model.with_structured_output(AnalysisOutput)
+    chain = build_coding_chain(model=model)
 
     retry_feedback = ""
     best_output = AnalysisOutput(code="", explanation="", output_contract=[])
@@ -572,24 +541,19 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
             next_action="Validate generated code and run it if it passes safety checks.",
         )
 
-        output = _invoke_structured_chain(
-            chain,
-            {
-                "messages": call_messages,
-                "table_name": preferred_table or "",
-                "workspace_tables_json": _safe_json_dumps(_extract_schema_table_names(schema)),
-                "workspace_db_path": data_path or "",
-                "schema_summary": schema_summary,
-                "known_columns_json": _safe_json_dumps(known_columns),
-                "sample_table": sample_table or "",
-                "sample_json": _safe_json_dumps(sample),
-                "context": str(state.get("context") or ""),
-            },
+        best_output = invoke_coding_chain(
+            chain=chain,
+            messages=call_messages,
+            table_name=preferred_table or "",
+            workspace_tables_json=_safe_json_dumps(_extract_schema_table_names(schema)),
+            workspace_db_path=data_path or "",
+            schema_summary=schema_summary,
+            known_columns_json=_safe_json_dumps(known_columns),
+            sample_table=sample_table or "",
+            sample_json=_safe_json_dumps(sample),
+            context=str(state.get("context") or ""),
+            invoke_structured_chain=_invoke_structured_chain,
         )
-        if isinstance(output, AnalysisOutput):
-            best_output = output
-        else:
-            best_output = AnalysisOutput.model_validate(output)
 
         search_queries = _normalize_search_queries(best_output.search_schema_queries)
         pending_search_queries = [
