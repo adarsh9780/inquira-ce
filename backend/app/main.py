@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import os
+import uuid
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -168,15 +169,23 @@ patch_print()
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     import traceback
-    
+
+    request_id = uuid.uuid4().hex[:12]
     # Log the full traceback using logprint so we can see it in terminal
-    logprint(f"Unhandled server error at {request.url}: {exc}", level="error")
+    logprint(
+        f"Unhandled server error at {request.url} (request_id={request_id}): {exc}",
+        level="error",
+    )
     for line in traceback.format_exc().splitlines():
         logprint(line, level="error")
-        
+
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal Server Error"},
+        content={
+            "detail": "Internal Server Error",
+            "message": "Something went wrong while processing your request. Please retry.",
+            "request_id": request_id,
+        },
     )
 
 # Configure CORS

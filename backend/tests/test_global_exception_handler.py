@@ -23,4 +23,8 @@ async def test_global_exception_handler_hides_internal_exception_text():
 
     assert response.status_code == 500
     payload = json.loads(response.body.decode("utf-8"))
-    assert payload == {"detail": "Internal Server Error"}
+    assert payload["detail"] == "Internal Server Error"
+    assert "secret internals" not in json.dumps(payload)
+    assert "something went wrong" in str(payload.get("message", "")).lower()
+    request_id = str(payload.get("request_id") or "")
+    assert len(request_id) == 12
