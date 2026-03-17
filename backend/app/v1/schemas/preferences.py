@@ -17,6 +17,7 @@ class PreferencesResponse(BaseModel):
     available_providers: list[str] = Field(default_factory=list)
     selected_model: str = "google/gemini-2.5-flash"
     selected_lite_model: str = "google/gemini-2.5-flash-lite"
+    selected_coding_model: str = "google/gemini-2.5-flash"
     enabled_models: list[str] = Field(default_factory=list)
     schema_context: str = ""
     allow_schema_sample_values: bool = False
@@ -41,6 +42,7 @@ class PreferencesUpdateRequest(BaseModel):
     llm_provider: str | None = None
     selected_model: str | None = None
     selected_lite_model: str | None = None
+    selected_coding_model: str | None = None
     enabled_models: list[str] | None = None
     schema_context: str | None = None
     allow_schema_sample_values: bool | None = None

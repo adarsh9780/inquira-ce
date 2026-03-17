@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 from langchain_core.messages import HumanMessage
 
-from app.agent_v2.nodes import AnalysisOutput, react_loop_node
+from app.agent_v2.nodes import AnalysisOutput, _get_model, react_loop_node
 
 
 class _FakePrompt:
@@ -15,6 +15,40 @@ class _FakePrompt:
 class _FakeModel:
     def with_structured_output(self, _schema):
         return object()
+
+
+def test_agent_v2_get_model_prefers_coding_model_for_non_lite(monkeypatch):
+    called: dict[str, str] = {}
+
+    def fake_create_chat_model(**kwargs):
+        called.update(kwargs)
+        return _FakeModel()
+
+    monkeypatch.setattr("app.agent_v2.nodes.create_chat_model", fake_create_chat_model)
+    monkeypatch.setattr(
+        "app.agent_v2.nodes.load_llm_runtime_config",
+        lambda: SimpleNamespace(
+            provider="openrouter",
+            base_url="http://localhost:4000/v1",
+            default_model="google/gemini-2.5-flash",
+            lite_model="google/gemini-2.5-flash-lite",
+            code_generation_max_tokens=4096,
+        ),
+    )
+
+    _get_model(
+        {
+            "configurable": {
+                "api_key": "k",
+                "default_model": "google/gemini-2.5-flash",
+                "lite_model": "google/gemini-2.5-flash-lite",
+                "coding_model": "openai/gpt-4.1-mini",
+            }
+        },
+        lite=False,
+    )
+
+    assert called["model"] == "openai/gpt-4.1-mini"
 
 
 @pytest.mark.asyncio

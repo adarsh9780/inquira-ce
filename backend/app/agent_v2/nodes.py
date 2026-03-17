@@ -88,7 +88,11 @@ def _get_model(config: RunnableConfig, *, lite: bool) -> BaseChatModel:
         str(configurable.get("lite_model") or runtime.lite_model).strip()
     )
     selected = normalize_model_id(str(configurable.get("model") or "").strip())
-    model_name = selected or (lite_model if lite else default_model)
+    coding_model = normalize_model_id(str(configurable.get("coding_model") or "").strip())
+    if lite:
+        model_name = selected or lite_model or default_model
+    else:
+        model_name = coding_model or selected or default_model
     api_key = str(configurable.get("api_key") or "").strip()
     if provider_requires_api_key(provider) and not api_key:
         raise ValueError("API key not configured for agent v2.")

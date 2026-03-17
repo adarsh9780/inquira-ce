@@ -137,6 +137,7 @@ class ChatService:
                 "requires_api_key": provider_requires_api_key(provider),
                 "selected_lite_model": runtime.lite_model,
                 "selected_main_model": runtime.default_model,
+                "selected_coding_model": runtime.default_model,
             }
 
         provider = normalize_llm_provider(getattr(prefs, "llm_provider", runtime.provider))
@@ -150,6 +151,11 @@ class ChatService:
             "requires_api_key": provider_requires_api_key(provider),
             "selected_lite_model": selected_lite_model,
             "selected_main_model": str(getattr(prefs, "selected_model", runtime.default_model) or runtime.default_model).strip(),
+            "selected_coding_model": str(
+                getattr(prefs, "selected_coding_model", getattr(prefs, "selected_model", runtime.default_model))
+                or getattr(prefs, "selected_model", runtime.default_model)
+                or runtime.default_model
+            ).strip(),
         }
 
     @staticmethod
@@ -871,6 +877,7 @@ class ChatService:
         config["configurable"]["base_url"] = llm_prefs["base_url"]
         config["configurable"]["lite_model"] = llm_prefs["selected_lite_model"]
         config["configurable"]["default_model"] = llm_prefs["selected_main_model"]
+        config["configurable"]["coding_model"] = llm_prefs.get("selected_coding_model") or llm_prefs["selected_main_model"]
         if llm_prefs["requires_api_key"] and not resolved_api_key:
             raise HTTPException(status_code=401, detail="API key not configured")
         if normalized_attachments and not model_supports_vision(llm_prefs["provider"], model):
@@ -1185,6 +1192,7 @@ class ChatService:
                 config["configurable"]["base_url"] = llm_prefs["base_url"]
                 config["configurable"]["lite_model"] = llm_prefs["selected_lite_model"]
                 config["configurable"]["default_model"] = llm_prefs["selected_main_model"]
+                config["configurable"]["coding_model"] = llm_prefs.get("selected_coding_model") or llm_prefs["selected_main_model"]
                 if llm_prefs["requires_api_key"] and not resolved_api_key:
                     raise HTTPException(status_code=401, detail="API key not configured")
                 if normalized_attachments and not model_supports_vision(llm_prefs["provider"], model):

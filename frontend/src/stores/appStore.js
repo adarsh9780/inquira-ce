@@ -32,6 +32,7 @@ export const useAppStore = defineStore('app', () => {
   const availableProviders = ref([...DEFAULT_PROVIDER_LIST])
   const selectedModel = ref('google/gemini-2.5-flash')
   const selectedLiteModel = ref(DEFAULT_LITE_MODEL)
+  const selectedCodingModel = ref('google/gemini-2.5-flash')
   const availableModels = ref([...DEFAULT_MODELS])
   const providerMainModels = ref([...DEFAULT_MODELS])
   const providerLiteModels = ref([DEFAULT_LITE_MODEL])
@@ -296,6 +297,7 @@ export const useAppStore = defineStore('app', () => {
           llm_provider: llmProvider.value,
           selected_model: selectedModel.value,
           selected_lite_model: selectedLiteModel.value,
+          selected_coding_model: selectedCodingModel.value,
           enabled_models: availableModels.value,
           schema_context: schemaContext.value,
           allow_schema_sample_values: allowSchemaSampleValues.value,
@@ -354,6 +356,7 @@ export const useAppStore = defineStore('app', () => {
     availableProviders.value = [...DEFAULT_PROVIDER_LIST]
     selectedModel.value = 'google/gemini-2.5-flash'
     selectedLiteModel.value = DEFAULT_LITE_MODEL
+    selectedCodingModel.value = 'google/gemini-2.5-flash'
     availableModels.value = [...DEFAULT_MODELS]
     providerMainModels.value = [...DEFAULT_MODELS]
     providerLiteModels.value = [DEFAULT_LITE_MODEL]
@@ -501,6 +504,11 @@ export const useAppStore = defineStore('app', () => {
 
   function setSelectedLiteModel(model) {
     selectedLiteModel.value = String(model || '').trim()
+    saveLocalConfig()
+  }
+
+  function setSelectedCodingModel(model) {
+    selectedCodingModel.value = String(model || '').trim()
     saveLocalConfig()
   }
 
@@ -1737,6 +1745,12 @@ export const useAppStore = defineStore('app', () => {
     if (!providerLiteModels.value.includes(selectedLiteModel.value)) {
       selectedLiteModel.value = providerLiteModels.value[0] || DEFAULT_LITE_MODEL
     }
+    if (prefs?.selected_coding_model) {
+      selectedCodingModel.value = prefs.selected_coding_model
+    }
+    if (!availableModels.value.includes(selectedCodingModel.value)) {
+      selectedCodingModel.value = selectedModel.value
+    }
     if (typeof prefs?.schema_context === 'string') schemaContext.value = prefs.schema_context
     if (typeof prefs?.allow_schema_sample_values === 'boolean') {
       allowSchemaSampleValues.value = prefs.allow_schema_sample_values
@@ -1804,6 +1818,7 @@ export const useAppStore = defineStore('app', () => {
     availableProviders,
     selectedModel,
     selectedLiteModel,
+    selectedCodingModel,
     availableModels,
     providerMainModels,
     providerLiteModels,
@@ -1888,6 +1903,7 @@ export const useAppStore = defineStore('app', () => {
     setApiKey,
     setLlmProvider,
     setSelectedLiteModel,
+    setSelectedCodingModel,
     setEnabledModels,
     setApiKeyConfigured,
     setSelectedModel,

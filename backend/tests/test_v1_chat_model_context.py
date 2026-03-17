@@ -147,3 +147,24 @@ def test_agent_structured_invoke_suppresses_known_pydantic_serializer_warning():
 
     assert result == {"ok": True}
     assert len(captured_warnings) == 0
+
+
+@pytest.mark.asyncio
+async def test_resolve_llm_preferences_includes_selected_coding_model(monkeypatch):
+    prefs = SimpleNamespace(
+        llm_provider="openrouter",
+        selected_model="google/gemini-2.5-flash",
+        selected_lite_model="google/gemini-2.5-flash-lite",
+        selected_coding_model="openai/gpt-4.1-mini",
+    )
+
+    async def fake_get_or_create(_session, _user_id):
+        return prefs
+
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.PreferencesRepository.get_or_create",
+        fake_get_or_create,
+    )
+
+    resolved = await ChatService._resolve_llm_preferences(SimpleNamespace(), "u1")
+    assert resolved["selected_coding_model"] == "openai/gpt-4.1-mini"

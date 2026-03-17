@@ -52,6 +52,19 @@
         />
       </div>
 
+      <div>
+        <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
+          Coding Model (subagent)
+        </label>
+        <HeaderDropdown
+          :model-value="appStore.selectedCodingModel"
+          @update:model-value="handleCodingModelChange"
+          :options="codingModelOptions"
+          placeholder="Select coding model"
+          max-width-class="max-w-md w-full"
+        />
+      </div>
+
       <!-- API Key Input -->
       <div v-if="requiresApiKey">
         <label for="api-key-input" class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
@@ -234,6 +247,7 @@ const runnerInstallDetails = ref('')
 const providerOptions = computed(() => appStore.availableProviders.map(p => ({ label: p, value: p })))
 const mainModelOptions = computed(() => appStore.providerMainModels.map(m => ({ label: m, value: m })))
 const liteModelOptions = computed(() => appStore.providerLiteModels.map(m => ({ label: m, value: m })))
+const codingModelOptions = computed(() => appStore.availableModels.map(m => ({ label: m, value: m })))
 
 const messageTypeClass = computed(() => {
   return messageType.value === 'success'
@@ -258,6 +272,9 @@ function syncProviderCatalog(provider) {
   }
   if (!appStore.availableModels.includes(appStore.selectedModel)) {
     appStore.setSelectedModel(appStore.availableModels[0] || '')
+  }
+  if (!appStore.availableModels.includes(appStore.selectedCodingModel)) {
+    appStore.setSelectedCodingModel(appStore.selectedModel || appStore.availableModels[0] || '')
   }
   if (liteModels.length) {
     appStore.providerLiteModels = [...liteModels]
@@ -286,6 +303,11 @@ function handleLiteModelChange(event) {
   clearMessage()
 }
 
+function handleCodingModelChange(event) {
+  appStore.setSelectedCodingModel(event?.target?.value ?? event)
+  clearMessage()
+}
+
 function toggleEnabledModel(model, event) {
   const checked = !!event?.target?.checked
   const current = [...appStore.availableModels]
@@ -299,6 +321,9 @@ function toggleEnabledModel(model, event) {
   if (!next.includes(appStore.selectedModel)) {
     appStore.setSelectedModel(next[0])
   }
+  if (!next.includes(appStore.selectedCodingModel)) {
+    appStore.setSelectedCodingModel(next[0])
+  }
   clearMessage()
 }
 
@@ -311,6 +336,9 @@ function handleMainModelsChange(next) {
   appStore.setEnabledModels(next)
   if (!next.includes(appStore.selectedModel)) {
     appStore.setSelectedModel(next[0])
+  }
+  if (!next.includes(appStore.selectedCodingModel)) {
+    appStore.setSelectedCodingModel(next[0])
   }
   clearMessage()
 }
@@ -367,6 +395,7 @@ async function saveApiSettings() {
       llm_provider: appStore.llmProvider,
       selected_model: appStore.selectedModel,
       selected_lite_model: appStore.selectedLiteModel,
+      selected_coding_model: appStore.selectedCodingModel,
       enabled_models: appStore.availableModels,
       allow_schema_sample_values: appStore.allowSchemaSampleValues,
     })

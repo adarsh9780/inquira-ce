@@ -72,6 +72,9 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
     selected_lite_model = str(getattr(prefs, "selected_lite_model", "") or "").strip()
     if selected_lite_model not in catalog["lite_models"]:
         selected_lite_model = catalog["default_lite_model"]
+    selected_coding_model = str(getattr(prefs, "selected_coding_model", "") or "").strip()
+    if selected_coding_model not in enabled_models:
+        selected_coding_model = selected_model
 
     execution_runtime = load_execution_runtime_config()
     requires_api_key = provider_requires_api_key(provider)
@@ -81,6 +84,7 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
         available_providers=list(SUPPORTED_LLM_PROVIDERS),
         selected_model=selected_model,
         selected_lite_model=selected_lite_model,
+        selected_coding_model=selected_coding_model,
         enabled_models=enabled_models,
         schema_context=prefs.schema_context,
         allow_schema_sample_values=bool(prefs.allow_schema_sample_values),
@@ -158,6 +162,10 @@ async def update_preferences(
         selected_lite_model = str(payload.selected_lite_model or "").strip()
         if selected_lite_model in catalog["lite_models"]:
             prefs.selected_lite_model = selected_lite_model
+    if payload.selected_coding_model is not None:
+        selected_coding_model = str(payload.selected_coding_model or "").strip()
+        if selected_coding_model in enabled_models:
+            prefs.selected_coding_model = selected_coding_model
     if payload.schema_context is not None:
         prefs.schema_context = payload.schema_context
     if payload.allow_schema_sample_values is not None:
@@ -190,6 +198,10 @@ async def update_preferences(
         prefs.selected_lite_model = provider_model_catalog(provider)[
             "default_lite_model"
         ]
+    if str(getattr(prefs, "selected_coding_model", "") or "").strip() not in enabled_models:
+        prefs.selected_coding_model = str(getattr(prefs, "selected_model", "") or "").strip() or (
+            enabled_models[0] if enabled_models else provider_model_catalog(provider)["default_main_model"]
+        )
 
     await session.commit()
     key_presence = SecretStorageService.get_api_key_presence_map(

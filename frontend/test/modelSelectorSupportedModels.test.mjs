@@ -18,4 +18,6 @@ test('app store reads available models from v1 preferences payload', () => {
 
   assert.equal(source.includes('if (Array.isArray(prefs?.available_models) && prefs.available_models.length)'), true)
   assert.equal(source.includes('availableModels.value = prefs.available_models'), true)
+  assert.equal(source.includes('if (prefs?.selected_coding_model)'), true)
+  assert.equal(source.includes('selectedCodingModel.value = prefs.selected_coding_model'), true)
 })

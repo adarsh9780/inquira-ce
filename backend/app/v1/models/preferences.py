@@ -26,6 +26,9 @@ class UserPreferences(AppDataBase):
     selected_lite_model: Mapped[str] = mapped_column(
         String(120), nullable=False, default="google/gemini-2.5-flash-lite"
     )
+    selected_coding_model: Mapped[str] = mapped_column(
+        String(120), nullable=False, default="google/gemini-2.5-flash"
+    )
     enabled_main_models_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     schema_context: Mapped[str] = mapped_column(Text, nullable=False, default="")
     allow_schema_sample_values: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

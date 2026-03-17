@@ -42,5 +42,6 @@ def test_v1_preferences_response_exposes_available_models():
     assert "llm_provider" in properties
     assert "available_models" in properties
     assert "selected_lite_model" in properties
+    assert "selected_coding_model" in properties
     assert "enabled_models" in properties
     assert "plotly_theme_mode" in properties
