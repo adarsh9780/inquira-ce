@@ -100,6 +100,7 @@ import executionService from '../../services/executionService'
 import { toast } from '../../composables/useToast'
 import { buildExecutionViewModel } from '../../utils/executionViewModel'
 import { normalizeExecutionResponse } from '../../utils/runtimeExecution'
+import { persistExportFile } from '../../utils/exportFile'
 import {
   decideExecutionTabWithSelection,
   prioritizeByName,
@@ -743,21 +744,27 @@ async function initializeEditor() {
   })
 }
 
-function downloadCode() {
+async function downloadCode() {
   try {
     const code = appStore.pythonFileContent || '# No code in editor'
-    const blob = new Blob([code], { type: 'text/plain' })
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
-    link.download = `python_code_${timestamp}.py`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
+    const filename = `python_code_${timestamp}.py`
+    const bytes = new TextEncoder().encode(code)
+    const exported = await persistExportFile({
+      defaultFileName: filename,
+      mimeType: 'text/x-python;charset=utf-8;',
+      payload: bytes,
+      tauriFilters: [{ name: 'Python file', extensions: ['py'] }],
+      browserFileTypes: [{ description: 'Python file', accept: { 'text/x-python': ['.py'] } }],
+    })
+    if (!exported) {
+      toast.info('Export canceled')
+      return
+    }
+    toast.success('Export complete', `${filename} saved.`)
   } catch (error) {
     console.error('Failed to download code:', error)
+    toast.error('Export failed', 'Unable to save code file.')
   }
 }
 
