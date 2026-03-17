@@ -15,6 +15,9 @@ test('right panel animates terminal open and close via height and opacity transi
   assert.equal(panelSource.includes('transition-[height,opacity,border-color] duration-300'), true)
   assert.equal(panelSource.includes('h-0 opacity-0 pointer-events-none'), true)
   assert.equal(panelSource.includes('v-show="appStore.isTerminalOpen && appStore.activeTab === \'workspace\'"'), false)
+  assert.equal(panelSource.includes('v-if="!appStore.isDataFocusMode"'), true)
+  assert.equal(panelSource.includes('const rightPaneWidth = computed(() => appStore.isDataFocusMode ? 100 : (100 - appStore.leftPaneWidth))'), true)
+  assert.equal(panelSource.includes(':style="{ width: rightPaneWidth + \'%\' }"'), true)
 })
 
 test('sidebar and explorer sections use animated collapse transitions', () => {

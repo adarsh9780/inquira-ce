@@ -113,6 +113,12 @@ function handleGlobalShortcuts(event) {
   if (key === 'j') {
     event.preventDefault()
     appStore.toggleTerminal()
+    return
+  }
+
+  if (key === 'd' && event.shiftKey) {
+    event.preventDefault()
+    appStore.toggleDataFocusMode()
   }
 }
 

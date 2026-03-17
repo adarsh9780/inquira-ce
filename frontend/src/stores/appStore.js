@@ -98,6 +98,7 @@ export const useAppStore = defineStore('app', () => {
   const isChatOverlayOpen = ref(true)
   const chatOverlayWidth = ref(0.25) // 25% of area
   const isSidebarCollapsed = ref(false)
+  const isDataFocusMode = ref(false)
   const hideShortcutsModal = ref(false)
 
   // Editor State
@@ -157,6 +158,7 @@ export const useAppStore = defineStore('app', () => {
         terminal_open: !!isTerminalOpen.value,
         terminal_height: Number(terminalHeight.value || 30),
         is_sidebar_collapsed: !!isSidebarCollapsed.value,
+        data_focus_mode: !!isDataFocusMode.value,
         hide_shortcuts_modal: !!hideShortcutsModal.value,
         table_row_count: Number(tableRowCount.value || 0),
         table_window_start: Number(tableWindowStart.value || 0),
@@ -224,6 +226,9 @@ export const useAppStore = defineStore('app', () => {
     }
     if (typeof ui.is_sidebar_collapsed === 'boolean') {
       isSidebarCollapsed.value = ui.is_sidebar_collapsed
+    }
+    if (typeof ui.data_focus_mode === 'boolean') {
+      isDataFocusMode.value = ui.data_focus_mode
     }
     if (typeof ui.hide_shortcuts_modal === 'boolean') {
       hideShortcutsModal.value = ui.hide_shortcuts_modal
@@ -409,6 +414,7 @@ export const useAppStore = defineStore('app', () => {
     runtimeError.value = ''
     terminalConsentGranted.value = false
     terminalCwd.value = ''
+    isDataFocusMode.value = false
     historicalCodeBlocks.value = []
   }
 
@@ -1643,6 +1649,14 @@ export const useAppStore = defineStore('app', () => {
     isSidebarCollapsed.value = !!collapsed
     saveLocalConfig()
   }
+  function setDataFocusMode(enabled) {
+    isDataFocusMode.value = !!enabled
+    activeTab.value = 'workspace'
+    saveLocalConfig()
+  }
+  function toggleDataFocusMode() {
+    setDataFocusMode(!isDataFocusMode.value)
+  }
   function setHideShortcutsModal(hide) {
     hideShortcutsModal.value = !!hide
     saveLocalConfig()
@@ -1877,6 +1891,7 @@ export const useAppStore = defineStore('app', () => {
     isChatOverlayOpen,
     chatOverlayWidth,
     isSidebarCollapsed,
+    isDataFocusMode,
     hideShortcutsModal,
     editorLine,
     editorCol,
@@ -1986,6 +2001,8 @@ export const useAppStore = defineStore('app', () => {
     setChatOverlayOpen,
     setChatOverlayWidth,
     setSidebarCollapsed,
+    setDataFocusMode,
+    toggleDataFocusMode,
     setHideShortcutsModal,
     setEditorPosition,
     setEditorFocused,

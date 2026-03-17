@@ -166,6 +166,19 @@
 
     <!-- Right Section: Terminal & Version -->
     <div class="flex items-center gap-2 h-full">
+      <!-- Data Focus Toggle -->
+      <button
+        @click="appStore.toggleDataFocusMode()"
+        class="flex items-center gap-1.5 h-full px-1.5 hover:bg-slate-200/50 hover:text-slate-900 transition-colors"
+        :class="appStore.isDataFocusMode ? 'text-blue-600 font-medium' : ''"
+        :title="dataFocusToggleTitle"
+      >
+        <ViewColumnsIcon class="w-3.5 h-3.5" />
+        <span>Data Focus</span>
+      </button>
+
+      <div class="w-px h-3.5 bg-slate-300"></div>
+
       <!-- Terminal Toggle -->
       <button 
         @click="appStore.toggleTerminal()"
@@ -256,6 +269,7 @@ import apiService from '../../services/apiService'
 import { settingsWebSocket } from '../../services/websocketService'
 import {
   CommandLineIcon,
+  ViewColumnsIcon,
   ChevronUpIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -341,6 +355,11 @@ const accountMenuTitle = computed(() => {
 const sidebarToggleTitle = computed(() => {
   if (appStore.isSidebarCollapsed) return 'Show sidebar (Cmd/Ctrl+B)'
   return 'Hide sidebar (Cmd/Ctrl+B)'
+})
+
+const dataFocusToggleTitle = computed(() => {
+  if (appStore.isDataFocusMode) return 'Exit data focus mode (Cmd/Ctrl+Shift+D)'
+  return 'Enter data focus mode (Cmd/Ctrl+Shift+D)'
 })
 
 const wsConnectionMeta = computed(() => {

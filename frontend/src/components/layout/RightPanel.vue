@@ -9,6 +9,7 @@
     >
       <!-- Left Pane (Chat / Code) -->
       <div 
+        v-if="!appStore.isDataFocusMode"
         class="flex flex-col h-full border-r" 
         :style="{ width: appStore.leftPaneWidth + '%', borderColor: 'var(--color-border)' }"
       >
@@ -17,6 +18,7 @@
 
       <!-- Vertical Resizer Handle (Left/Right panes) -->
       <div 
+        v-if="!appStore.isDataFocusMode"
         class="w-[3px] h-full hover:w-1 bg-transparent hover:bg-zinc-300 cursor-col-resize z-10 transition-all duration-150 relative -mx-[1px] hover:shadow-[0_0_6px_rgba(0,0,0,0.15)]"
         @mousedown="startResizeX"
       ></div>
@@ -24,7 +26,7 @@
       <!-- Right Pane (Table / Figure / Output) -->
       <div 
         class="flex flex-col h-full"
-        :style="{ width: (100 - appStore.leftPaneWidth) + '%' }"
+        :style="{ width: rightPaneWidth + '%' }"
       >
         <WorkspaceRightPane />
       </div>
@@ -98,6 +100,7 @@ import { CommandLineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
 const isWorkspaceActive = computed(() => appStore.activeTab === 'workspace')
+const rightPaneWidth = computed(() => appStore.isDataFocusMode ? 100 : (100 - appStore.leftPaneWidth))
 const terminalVisualHeight = computed(() => {
   if (!isWorkspaceActive.value) return 0
   return appStore.isTerminalOpen ? appStore.terminalHeight : 0
