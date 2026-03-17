@@ -151,6 +151,24 @@
           This context will be used to generate more accurate schema descriptions for your data columns.
         </p>
       </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
+          Schema Privacy
+        </label>
+        <label class="inline-flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+          <input
+            type="checkbox"
+            class="mt-0.5"
+            :checked="appStore.allowSchemaSampleValues"
+            @change="handleSampleSharingChange"
+          />
+          <span>Allow sample values in schema generation prompts</span>
+        </label>
+        <p class="mt-1 text-xs text-gray-500">
+          Off by default. When disabled, sample cell values are stripped before schema metadata is saved.
+        </p>
+      </div>
     </div>
 
     <!-- Save Button -->
@@ -353,6 +371,11 @@ function hideProgress() {
 function showMessage(text, type) {
   message.value = text
   messageType.value = type
+}
+
+function handleSampleSharingChange(event) {
+  appStore.setAllowSchemaSampleValues(event.target.checked)
+  clearMessage()
 }
 
 function clearMessage() {

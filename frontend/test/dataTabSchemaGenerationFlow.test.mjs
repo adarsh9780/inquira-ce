@@ -28,3 +28,13 @@ test('api service force regenerate path calls v1 schema regeneration endpoint', 
   assert.equal(source.includes('if (forceRegenerate) {'), true)
   assert.equal(source.includes('return this.v1RegenerateDatasetSchema(workspaceId, tableName, {'), true)
 })
+
+test('data tab contains schema privacy control and updates app preference', () => {
+  const dataTabPath = resolve(process.cwd(), 'src/components/modals/DataTab.vue')
+  const source = readFileSync(dataTabPath, 'utf-8')
+
+  assert.equal(source.includes('Schema Privacy'), true)
+  assert.equal(source.includes('Allow sample values in schema generation prompts'), true)
+  assert.equal(source.includes('function handleSampleSharingChange(event)'), true)
+  assert.equal(source.includes('appStore.setAllowSchemaSampleValues(event.target.checked)'), true)
+})

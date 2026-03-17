@@ -125,40 +125,6 @@
         A key for {{ appStore.llmProvider }} is already configured in secure storage.
       </p>
 
-      <div>
-        <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
-          Schema Privacy
-        </label>
-        <label class="inline-flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
-          <input
-            type="checkbox"
-            class="mt-0.5"
-            :checked="appStore.allowSchemaSampleValues"
-            @change="handleSampleSharingChange"
-          />
-          <span>Allow sample values in schema generation prompts</span>
-        </label>
-        <p class="mt-1 text-xs text-gray-500">
-          Off by default. When disabled, sample cell values are stripped before schema metadata is saved.
-        </p>
-      </div>
-
-      <div class="max-w-2xl rounded-md border p-3" style="border-color: var(--color-border); background-color: var(--color-surface);">
-        <p class="text-sm font-medium" style="color: var(--color-text-main);">Runner package installation</p>
-        <p class="mt-1 text-xs" style="color: var(--color-text-muted);">
-          Use the Terminal tab for package installs so you can see live progress and full errors.
-        </p>
-        <div class="mt-2 flex items-center gap-2">
-          <button
-            type="button"
-            class="px-3 py-1.5 text-xs font-medium rounded-md btn-secondary"
-            @click="openTerminalForPackageInstall"
-          >
-            Open Terminal
-          </button>
-          <code class="text-xs">uv pip install package==version</code>
-        </div>
-      </div>
     </div>
 
     <!-- Save Button -->
@@ -298,11 +264,6 @@ function handleMainModelsChange(next) {
   clearMessage()
 }
 
-function handleSampleSharingChange(event) {
-  appStore.setAllowSchemaSampleValues(event.target.checked)
-  clearMessage()
-}
-
 function clearMessage() {
   message.value = ''
   messageType.value = ''
@@ -352,7 +313,6 @@ async function saveApiSettings() {
       selected_lite_model: appStore.selectedLiteModel,
       selected_coding_model: appStore.selectedCodingModel,
       enabled_models: appStore.availableModels,
-      allow_schema_sample_values: appStore.allowSchemaSampleValues,
     })
     
     // Sync store state with backend response (especially providerRequiresApiKey)
@@ -383,10 +343,4 @@ async function saveApiSettings() {
   }
 }
 
-function openTerminalForPackageInstall() {
-  appStore.setActiveTab('workspace')
-  if (!appStore.isTerminalOpen) {
-    appStore.toggleTerminal()
-  }
-}
 </script>

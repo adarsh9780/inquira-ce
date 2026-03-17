@@ -19,12 +19,11 @@ test('ApiTab saves dedicated coding model preference', () => {
   assert.equal(source.includes('handleCodingModelChange'), true)
 })
 
-test('ApiTab routes runner package installs to terminal guidance instead of inline installer form', () => {
+test('ApiTab is focused on provider/model configuration only', () => {
   const path = resolve(process.cwd(), 'src/components/modals/ApiTab.vue')
   const source = readFileSync(path, 'utf-8')
 
   assert.equal(source.includes('Runner Packages'), false)
-  assert.equal(source.includes('Use the Terminal tab for package installs'), true)
-  assert.equal(source.includes('openTerminalForPackageInstall'), true)
-  assert.equal(source.includes('appStore.toggleTerminal()'), true)
+  assert.equal(source.includes('Schema Privacy'), false)
+  assert.equal(source.includes('allowSchemaSampleValues'), false)
 })

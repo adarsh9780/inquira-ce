@@ -71,6 +71,14 @@
               </button>
 
               <button
+                @click="activeTab = 'packages'"
+                :class="activeTab === 'packages' ? 'nav-tab-active' : 'nav-tab'"
+              >
+                <CubeIcon class="w-4 h-4 shrink-0" />
+                <span class="flex-1 text-left">Packages</span>
+              </button>
+
+              <button
                 @click="activeTab = 'account'"
                 :class="activeTab === 'account' ? 'nav-tab-active' : 'nav-tab'"
               >
@@ -113,6 +121,7 @@
                 v-if="activeTab === 'data'"
                 @data-saved="handleDataSaved"
               />
+              <PackagesTab v-if="activeTab === 'packages'" />
               <AccountTab
                 v-if="activeTab === 'account'"
                 @password-changed="handlePasswordChanged"
@@ -151,10 +160,12 @@ import { ref as vueRef } from 'vue'
 import SettingsProgressModal from './SettingsProgressModal.vue'
 import ApiTab from './ApiTab.vue'
 import DataTab from './DataTab.vue'
+import PackagesTab from './PackagesTab.vue'
 import AccountTab from './AccountTab.vue'
 import {
   XMarkIcon,
   DocumentArrowUpIcon,
+  CubeIcon,
   KeyIcon,
   UserIcon,
   ExclamationTriangleIcon
@@ -167,7 +178,7 @@ const props = defineProps({
   },
   initialTab: {
     type: String,
-    default: 'api' // 'api' | 'data' | 'account'
+    default: 'api' // 'api' | 'data' | 'packages' | 'account'
   }
 })
 
@@ -181,7 +192,7 @@ const activeTab = ref(props.initialTab)
 
 function normalizeTab(tab) {
   const candidate = typeof tab === 'string' ? tab.toLowerCase() : 'api'
-  return ['api', 'data', 'account'].includes(candidate) ? candidate : 'api'
+  return ['api', 'data', 'packages', 'account'].includes(candidate) ? candidate : 'api'
 }
 
 // Watch for modal opening to reset to initial tab
