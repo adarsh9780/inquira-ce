@@ -163,10 +163,6 @@
             </div>
           </details>
 
-          <details v-if="message.toolEvents && message.toolEvents.length" class="mt-3 rounded p-2" style="border: 1px solid var(--color-border);">
-            <summary class="text-xs cursor-pointer" style="color: var(--color-text-muted);">Tool artifacts</summary>
-            <pre class="text-xs whitespace-pre-wrap mt-2 max-h-48 overflow-auto" style="color: var(--color-text-main);">{{ formatToolEvents(message.toolEvents) }}</pre>
-          </details>
         </div>
         <div v-if="message.explanation" class="flex items-center justify-end mt-1 px-4">
           <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
@@ -506,14 +502,6 @@ function renderCodeSnapshot(code) {
   })
 }
 
-function formatToolEvents(events) {
-  try {
-    return JSON.stringify(events, null, 2)
-  } catch (_error) {
-    return String(events)
-  }
-}
-
 function streamPlanText(message) {
   return String(message?.streamTrace?.planText || '').trim()
 }
@@ -623,8 +611,7 @@ function hasAssistantContent(message) {
     shouldRenderCodeDetails(message) ||
     toolActivityRows(message).length > 0 ||
     pendingIntervention(message) ||
-    (SHOW_EPHEMERAL_TRACE && hasStreamTrace(message)) ||
-    (Array.isArray(message?.toolEvents) && message.toolEvents.length > 0)
+    (SHOW_EPHEMERAL_TRACE && hasStreamTrace(message))
   )
 }
 

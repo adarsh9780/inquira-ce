@@ -22,6 +22,7 @@ test('chat history renders visible ephemeral summaries, final separator, and scr
   assert.equal(source.includes("'code_guard'"), true)
   assert.equal(source.includes("'explain_code'"), true)
   assert.equal(source.includes("stage === 'start'"), true)
+  assert.equal(source.includes('Tool artifacts'), false)
   assert.equal(source.includes('Generated code details'), true)
   assert.equal(source.includes('shouldRenderCodeDetails(message)'), true)
   assert.equal(source.includes('max-height: 320px;'), true)
