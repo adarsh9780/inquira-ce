@@ -143,58 +143,20 @@
         </p>
       </div>
 
-      <div>
-        <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
-          Runner Packages
-        </label>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
-          <input
-            v-model="runnerPackageName"
-            type="text"
-            placeholder="Package name (e.g. scikit-learn)"
-            class="input-base"
-          />
-          <input
-            v-model="runnerPackageVersion"
-            type="text"
-            placeholder="Exact version (e.g. 1.5.2)"
-            class="input-base"
-          />
-          <input
-            v-model="runnerIndexUrl"
-            type="text"
-            placeholder="Index URL (optional)"
-            class="sm:col-span-2 input-base"
-          />
-        </div>
-        <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-          <input
-            v-model="saveRunnerDefaults"
-            type="checkbox"
-            class="mt-0.5"
-          />
-          <span>Save as default in <code>inquira.toml</code></span>
-        </label>
-        <div class="mt-3 max-w-2xl">
-          <button
-            @click="installRunnerPackage"
-            :disabled="isInstallingRunnerPackage || !runnerPackageName.trim() || !runnerPackageVersion.trim() || !appStore.activeWorkspaceId"
-            type="button"
-            class="px-3 py-2 text-sm font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-secondary"
-          >
-            <span v-if="!isInstallingRunnerPackage">Install Runner Package</span>
-            <span v-else class="inline-flex items-center">
-              <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-700 mr-2"></div>
-              Installing...
-            </span>
-          </button>
-        </div>
-        <p class="mt-1 text-xs text-gray-500">
-          Installs are restricted to pinned versions (<code>name==version</code>) and run outside analysis execution.
+      <div class="max-w-2xl rounded-md border p-3" style="border-color: var(--color-border); background-color: var(--color-surface);">
+        <p class="text-sm font-medium" style="color: var(--color-text-main);">Runner package installation</p>
+        <p class="mt-1 text-xs" style="color: var(--color-text-muted);">
+          Use the Terminal tab for package installs so you can see live progress and full errors.
         </p>
-        <div v-if="runnerInstallDetails" class="mt-3 max-w-2xl p-3 rounded-md border border-gray-200 bg-gray-50">
-          <p class="text-xs font-medium text-gray-700 mb-1">Last install details</p>
-          <pre class="text-xs text-gray-700 whitespace-pre-wrap break-words">{{ runnerInstallDetails }}</pre>
+        <div class="mt-2 flex items-center gap-2">
+          <button
+            type="button"
+            class="px-3 py-1.5 text-xs font-medium rounded-md btn-secondary"
+            @click="openTerminalForPackageInstall"
+          >
+            Open Terminal
+          </button>
+          <code class="text-xs">uv pip install package==version</code>
         </div>
       </div>
     </div>
@@ -220,7 +182,6 @@
 import { ref, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { apiService } from '../../services/apiService'
-import { toast } from '../../composables/useToast'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import MultiSelectDropdown from '../ui/MultiSelectDropdown.vue'
 import {
@@ -235,14 +196,8 @@ const appStore = useAppStore()
 const showApiKey = ref(false)
 const isTestingApiKey = ref(false)
 const isSaving = ref(false)
-const isInstallingRunnerPackage = ref(false)
 const message = ref('')
 const messageType = ref('') // 'success' | 'error'
-const runnerPackageName = ref('')
-const runnerPackageVersion = ref('')
-const runnerIndexUrl = ref('')
-const saveRunnerDefaults = ref(false)
-const runnerInstallDetails = ref('')
 
 const providerOptions = computed(() => appStore.availableProviders.map(p => ({ label: p, value: p })))
 const mainModelOptions = computed(() => appStore.providerMainModels.map(m => ({ label: m, value: m })))
@@ -428,61 +383,10 @@ async function saveApiSettings() {
   }
 }
 
-async function installRunnerPackage() {
-  const packageName = runnerPackageName.value.trim()
-  const version = runnerPackageVersion.value.trim()
-  const indexUrl = runnerIndexUrl.value.trim()
-
-  if (!appStore.activeWorkspaceId) {
-    message.value = 'Create/select a workspace before installing runner packages.'
-    messageType.value = 'error'
-    return
-  }
-  if (!packageName || !version) {
-    message.value = 'Package name and exact version are required.'
-    messageType.value = 'error'
-    return
-  }
-
-  isInstallingRunnerPackage.value = true
-  clearMessage()
-  runnerInstallDetails.value = ''
-  try {
-    const response = await apiService.v1InstallRunnerPackage({
-      workspace_id: appStore.activeWorkspaceId,
-      package: packageName,
-      version,
-      index_url: indexUrl || null,
-      save_as_default: saveRunnerDefaults.value
-    })
-    const installText = response?.package_spec || `${packageName}==${version}`
-    const commandText = Array.isArray(response?.command) ? response.command.join(' ') : ''
-    const stdoutText = String(response?.stdout || '').trim()
-    const stderrText = String(response?.stderr || '').trim()
-    runnerInstallDetails.value = [
-      commandText ? `Command: ${commandText}` : '',
-      stdoutText ? `stdout:\n${stdoutText}` : '',
-      stderrText ? `stderr:\n${stderrText}` : '',
-    ].filter(Boolean).join('\n\n')
-    message.value = `Installed ${installText} using ${response?.installer || 'uv'}. Workspace kernel reset: ${response?.workspace_kernel_reset ? 'yes' : 'no'}.`
-    messageType.value = 'success'
-    toast.success('Runner Package Installed', message.value)
-  } catch (error) {
-    const errorMessage = error.response?.data?.detail || error.message || 'Failed to install runner package.'
-    const data = error.response?.data || {}
-    const command = Array.isArray(data?.command) ? data.command.join(' ') : ''
-    const stdoutText = String(data?.stdout || '').trim()
-    const stderrText = String(data?.stderr || '').trim()
-    runnerInstallDetails.value = [
-      command ? `Command: ${command}` : '',
-      stdoutText ? `stdout:\n${stdoutText}` : '',
-      stderrText ? `stderr:\n${stderrText}` : '',
-    ].filter(Boolean).join('\n\n')
-    message.value = errorMessage
-    messageType.value = 'error'
-    toast.error('Install Failed', errorMessage)
-  } finally {
-    isInstallingRunnerPackage.value = false
+function openTerminalForPackageInstall() {
+  appStore.setActiveTab('workspace')
+  if (!appStore.isTerminalOpen) {
+    appStore.toggleTerminal()
   }
 }
 </script>
