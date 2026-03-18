@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://github.com/adarsh9780/inquira-ce/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/adarsh9780/inquira-ce/ci.yml?branch=master&label=CI" alt="CI Status"></a>
   <a href="https://github.com/adarsh9780/inquira-ce/releases"><img src="https://img.shields.io/github/v/tag/adarsh9780/inquira-ce?label=release" alt="Latest Release Tag"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License MIT"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-SUL-blue.svg" alt="License SUL"></a>
   <img src="https://img.shields.io/badge/python-3.12%2B-blue.svg" alt="Python 3.12+">
   <img src="https://img.shields.io/badge/stage-alpha-orange.svg" alt="Alpha">
 </p>
@@ -124,4 +124,4 @@ Additional references:
 
 ## License
 
-MIT (see `LICENSE`).
+Sustainable Use License 1.0 (see `LICENSE`). Free for personal, academic, and internal business use. Commercial exploitation or managed service distribution is prohibited without a commercial license.
