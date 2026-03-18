@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-inquira-agent-runtime = "agent_runtime.main:run"
+inquira-agent-runtime = "runtime_server.main:run"
 
 [build-system]
 requires = ["setuptools", "wheel"]
@@ -28,4 +28,4 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["agent_runtime", "agent_runtime.*"]
+include = ["runtime_server", "runtime_server.*", "agent_v1", "agent_v1.*", "agent_v2", "agent_v2.*"]

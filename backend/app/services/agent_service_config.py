@@ -16,6 +16,7 @@ class AgentServiceConfig:
     port: int = 8123
     expected_api_major: int = 1
     startup_timeout_sec: int = 45
+    default_agent: str = "agent_v2"
     auth_mode: str = "shared_secret"
     shared_secret: str = ""
 
@@ -65,6 +66,7 @@ def load_agent_service_config() -> AgentServiceConfig:
         _as_int(section.get("expected_api_major") or section.get("api_major") or 1, 1),
     )
     startup_timeout_sec = max(3, _as_int(section.get("startup_timeout_sec") or 45, 45))
+    default_agent = str(section.get("default_agent") or "agent_v2").strip() or "agent_v2"
     auth_mode = str(auth.get("mode") or "shared_secret").strip().lower() or "shared_secret"
     shared_secret = str(
         os.getenv("INQUIRA_AGENT_SHARED_SECRET") or auth.get("shared_secret") or ""
@@ -75,6 +77,7 @@ def load_agent_service_config() -> AgentServiceConfig:
         port=port,
         expected_api_major=expected_api_major,
         startup_timeout_sec=startup_timeout_sec,
+        default_agent=default_agent,
         auth_mode=auth_mode,
         shared_secret=shared_secret,
     )

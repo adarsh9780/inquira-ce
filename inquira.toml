@@ -75,6 +75,7 @@ port = 8123
 api_major = 1
 expected_api_major = 1
 startup_timeout_sec = 45
+default_agent = "agent_v2"
 # Optional override path where the external agent runtime is launched from.
 # path = "agent-runtime"
 # Optional full command override (defaults to: <venv-python> -m agent_runtime.main)

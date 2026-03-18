@@ -1,0 +1,13 @@
+{
+  "name": "agent_v1",
+  "version": "1.0.0",
+  "description": "Minimal compatibility agent profile for testing alternate architectures.",
+  "last_updated": "2026-03-18",
+  "features": [
+    "Compatibility profile",
+    "Simple explanatory responses"
+  ],
+  "tools": [
+    "reply"
+  ]
+}

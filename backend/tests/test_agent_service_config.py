@@ -17,6 +17,7 @@ host = "127.0.0.1"
 port = 9133
 expected_api_major = 3
 startup_timeout_sec = 99
+default_agent = "agent_v1"
 
 [agent_service.auth]
 mode = "shared_secret"
@@ -32,6 +33,7 @@ shared_secret = "local-secret"
     assert resolved.port == 9133
     assert resolved.expected_api_major == 3
     assert resolved.startup_timeout_sec == 99
+    assert resolved.default_agent == "agent_v1"
     assert resolved.auth_mode == "shared_secret"
     assert resolved.shared_secret == "local-secret"
     assert resolved.base_url == "http://127.0.0.1:9133"

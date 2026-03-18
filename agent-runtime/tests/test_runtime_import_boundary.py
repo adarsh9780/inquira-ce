@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 def test_agent_runtime_does_not_import_backend_app_modules():
-    root = Path(__file__).resolve().parents[1] / "agent_runtime"
+    root = Path(__file__).resolve().parents[1]
     offenders: list[str] = []
 
     for py_file in root.rglob("*.py"):

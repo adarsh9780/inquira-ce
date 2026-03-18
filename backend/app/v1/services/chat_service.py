@@ -18,6 +18,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...services.agent_client import AgentClient, AgentRuntimeError
+from ...services.agent_service_config import load_agent_service_config
 from ...services.code_executor import execute_code, get_workspace_run_exports
 from ...services.output_capture import (
     build_auto_capture_result_code,
@@ -230,6 +231,7 @@ class ChatService:
         attachments: list[dict[str, Any]],
         llm_prefs: dict[str, Any],
         resolved_api_key: str,
+        agent_profile: str,
     ) -> dict[str, Any]:
         return {
             "request_id": request_id,
@@ -243,6 +245,7 @@ class ChatService:
             "table_name": table_name,
             "preferred_table_name": str(preferred_table_name or "").strip(),
             "data_path": data_path,
+            "agent_profile": str(agent_profile or "").strip(),
             "active_schema": schema if isinstance(schema, dict) else {},
             "attachments": attachments,
             "llm": {
@@ -888,6 +891,7 @@ class ChatService:
             attachments=normalized_attachments,
             llm_prefs=llm_prefs,
             resolved_api_key=resolved_api_key,
+            agent_profile=load_agent_service_config().default_agent,
         )
         agent_client = AgentClient()
         try:
@@ -1170,6 +1174,7 @@ class ChatService:
             attachments=normalized_attachments,
             llm_prefs=llm_prefs,
             resolved_api_key=resolved_api_key,
+            agent_profile=load_agent_service_config().default_agent,
         )
         agent_client = AgentClient()
         try:

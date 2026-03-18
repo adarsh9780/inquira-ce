@@ -1,0 +1,10 @@
+{
+  "python_version": "3.12",
+  "dependencies": [
+    "."
+  ],
+  "graphs": {
+    "agent_v1": "agent_v1.graph:build_graph",
+    "agent_v2": "agent_v2.graph:build_graph"
+  }
+}

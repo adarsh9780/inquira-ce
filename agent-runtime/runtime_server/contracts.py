@@ -17,6 +17,7 @@ class AgentRequest(BaseModel):
     table_name: str = ""
     preferred_table_name: str = ""
     data_path: str = ""
+    agent_profile: str = ""
     active_schema: dict[str, Any] = Field(default_factory=dict)
     attachments: list[dict[str, Any]] = Field(default_factory=list)
     llm: dict[str, Any] = Field(default_factory=dict)
@@ -31,3 +32,4 @@ class HealthResponse(BaseModel):
     status: str
     api_major: int
     service: str = "agent-runtime"
+    active_agent: str

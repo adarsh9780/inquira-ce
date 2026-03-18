@@ -655,7 +655,6 @@ fn load_or_create_agent_shared_secret(data_dir: &PathBuf) -> Result<String, Stri
 }
 
 fn start_agent_runtime(
-    backend_dir: &PathBuf,
     agent_dir: &PathBuf,
     venv_path: &PathBuf,
     config: &InquiraConfig,
@@ -688,7 +687,7 @@ fn start_agent_runtime(
 
     let mut cmd = if command_override.trim().is_empty() {
         let mut c = Command::new(&python_bin);
-        c.args(["-m", "agent_runtime.main"]);
+        c.args(["-m", "runtime_server.main"]);
         c
     } else {
         let mut parts = command_override.split_whitespace();
@@ -708,7 +707,7 @@ fn start_agent_runtime(
         .env("INQUIRA_AGENT_SHARED_SECRET", shared_secret)
         .env("INQUIRA_AGENT_HOST", agent_host)
         .env("INQUIRA_AGENT_PORT", agent_port.to_string())
-        .env("PYTHONPATH", format!("{}:{}", backend_dir.display(), agent_dir.display()));
+        .env("PYTHONPATH", agent_dir.display().to_string());
 
     let child = cmd
         .spawn()
@@ -870,7 +869,6 @@ pub fn run() {
 
             app.emit("backend-status", "agent-starting").ok();
             match start_agent_runtime(
-                &backend_dir,
                 &agent_dir,
                 &venv_path,
                 &config,

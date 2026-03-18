@@ -3,13 +3,14 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from typing import Any, AsyncGenerator, Callable
+from typing import Any, AsyncGenerator
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import StreamingResponse
 
 from .config import load_agent_service_config
 from .contracts import AgentRequest, AgentRunResponse, HealthResponse
+from .loader import load_agent_graph
 from .tracing import init_phoenix_tracing
 
 
@@ -30,6 +31,8 @@ def _plain(value: Any) -> Any:
             return _plain(value.dict())
         except Exception:
             return str(value)
+    if hasattr(value, "content"):
+        return str(getattr(value, "content", ""))
     return str(value)
 
 
@@ -54,62 +57,44 @@ def _auth_guard(
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
-def _safe_table(table_name: str) -> str:
-    raw = str(table_name or "").strip() or "data"
-    return raw.replace('"', '""')
-
-
-def _build_analysis_result(req: AgentRequest) -> dict[str, Any]:
-    run_id = str(uuid.uuid4())
-    table_name = _safe_table(req.table_name)
-    route = "analysis"
-    if not table_name:
-        route = "general_chat"
-
-    code = ""
-    explanation = "I can help analyze your data."
-    output_contract: list[dict[str, str]] = []
-
-    if route == "analysis":
-        code = (
-            f'result_df = conn.sql("SELECT * FROM \"{table_name}\" LIMIT 20").fetchdf()\\n'
-            "result_df"
-        )
-        explanation = (
-            f"I prepared a starter analysis query against `{table_name}` and selected 20 rows for review."
-        )
-        output_contract = [{"name": "result_df", "kind": "dataframe"}]
-
+def _build_state(req: AgentRequest) -> dict[str, Any]:
     return {
-        "run_id": run_id,
-        "route": route,
-        "metadata": {
-            "is_safe": True,
-            "is_relevant": route == "analysis",
-            "tables_used": [table_name] if route == "analysis" else [],
-            "joins_used": False,
-            "join_keys": [],
-        },
-        "final_code": code,
-        "final_explanation": explanation,
-        "result_explanation": explanation,
-        "code_explanation": (
-            "The code uses the backend-provided `conn` DuckDB connection and materializes a dataframe."
-            if code
-            else ""
-        ),
-        "output_contract": output_contract,
-        "messages": [],
+        "request_id": req.request_id,
+        "question": req.question,
+        "current_code": req.current_code,
+        "table_name": req.table_name,
+        "preferred_table_name": req.preferred_table_name,
+        "data_path": req.data_path,
+        "active_schema": req.active_schema,
+        "context": req.context,
+        "workspace_id": req.workspace_id,
+        "user_id": req.user_id,
+        "attachments": req.attachments,
     }
 
 
-def _emit_text_chunks(text: str, emit: Callable[[str, dict[str, Any]], None], *, chunk_size: int = 24) -> None:
-    rendered = str(text or "")
-    if not rendered:
-        return
-    step = max(1, int(chunk_size))
-    for idx in range(0, len(rendered), step):
-        emit("token", {"node": "react_loop", "text": rendered[idx : idx + step]})
+def _build_config(req: AgentRequest) -> dict[str, Any]:
+    llm = req.llm if isinstance(req.llm, dict) else {}
+    return {
+        "configurable": {
+            "thread_id": f"{req.user_id}:{req.workspace_id}:{req.conversation_id}",
+            "api_key": str(llm.get("api_key") or "").strip(),
+            "provider": str(llm.get("provider") or "").strip(),
+            "base_url": str(llm.get("base_url") or "").strip(),
+            "model": str(req.model or "").strip(),
+            "default_model": str(llm.get("default_model") or "").strip(),
+            "lite_model": str(llm.get("lite_model") or "").strip(),
+            "coding_model": str(llm.get("coding_model") or "").strip(),
+        }
+    }
+
+
+def _select_agent(req: AgentRequest) -> str:
+    cfg = load_agent_service_config()
+    preferred = str(req.agent_profile or "").strip()
+    if preferred and preferred in cfg.available_agents:
+        return preferred
+    return cfg.default_agent
 
 
 def create_app() -> FastAPI:
@@ -120,15 +105,27 @@ def create_app() -> FastAPI:
     @app.get("/v1/health", response_model=HealthResponse)
     async def health() -> HealthResponse:
         runtime = load_agent_service_config()
-        return HealthResponse(status="ok", api_major=runtime.api_major)
+        return HealthResponse(
+            status="ok",
+            api_major=runtime.api_major,
+            active_agent=runtime.default_agent,
+        )
 
     @app.post("/v1/agent/run", response_model=AgentRunResponse, dependencies=[Depends(_auth_guard)])
     async def run_agent(req: AgentRequest) -> AgentRunResponse:
-        result = _build_analysis_result(req)
-        return AgentRunResponse(run_id=str(result.get("run_id") or uuid.uuid4()), result=_plain(result))
+        agent_name = _select_agent(req)
+        graph = load_agent_graph(agent_name)
+        result = await graph.ainvoke(_build_state(req), config=_build_config(req))
+        run_id = str((result or {}).get("run_id") or uuid.uuid4())
+        return AgentRunResponse(run_id=run_id, result=_plain(result if isinstance(result, dict) else {}))
 
     @app.post("/v1/agent/stream", dependencies=[Depends(_auth_guard)])
     async def stream_agent(req: AgentRequest):
+        agent_name = _select_agent(req)
+        graph = load_agent_graph(agent_name)
+        state = _build_state(req)
+        config = _build_config(req)
+
         async def event_generator() -> AsyncGenerator[str, None]:
             queue: asyncio.Queue[tuple[str, dict[str, Any]]] = asyncio.Queue()
 
@@ -136,11 +133,19 @@ def create_app() -> FastAPI:
                 queue.put_nowait((str(event), _plain(payload) if isinstance(payload, dict) else {"value": _plain(payload)}))
 
             try:
-                result = _build_analysis_result(req)
-                emit("agent_status", {"step": "generating_code", "message": "Generating analysis plan"})
-                emit("node", {"node": "react_loop", "output": str(result.get("final_explanation") or "")})
-                _emit_text_chunks(str(result.get("final_explanation") or ""), emit)
-                emit("final", {"run_id": str(result.get("run_id") or uuid.uuid4()), "result": _plain(result)})
+                aggregated: dict[str, Any] = {}
+                async for step in graph.astream(state, config=config):
+                    for node_name, payload in step.items():
+                        payload_dict = payload if isinstance(payload, dict) else {"value": payload}
+                        if isinstance(payload, dict):
+                            aggregated.update(payload)
+                        emit("node", {"node": str(node_name), "output": str(payload_dict.get("plan") or payload_dict.get("answer") or "")})
+
+                final_payload = {
+                    "run_id": str(aggregated.get("run_id") or uuid.uuid4()),
+                    "result": _plain(aggregated),
+                }
+                emit("final", final_payload)
 
                 while not queue.empty():
                     event, payload = await queue.get()

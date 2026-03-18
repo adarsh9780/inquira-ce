@@ -11,11 +11,11 @@ def test_backend_does_not_import_agent_runtime_modules():
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    if str(alias.name).startswith("agent_runtime"):
+                    if str(alias.name).startswith("agent_runtime") or str(alias.name).startswith("runtime_server"):
                         offenders.append(f"{py_file.relative_to(backend_root)}: import {alias.name}")
             elif isinstance(node, ast.ImportFrom):
                 module = str(node.module or "")
-                if module.startswith("agent_runtime"):
+                if module.startswith("agent_runtime") or module.startswith("runtime_server"):
                     offenders.append(f"{py_file.relative_to(backend_root)}: from {module} import ...")
 
     assert not offenders, "Backend must call agent via API only:\n" + "\n".join(offenders)

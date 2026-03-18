@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from agent_runtime.service import create_app
+from runtime_server.service import create_app
 
 
 def test_health_exposes_api_major():
@@ -11,6 +11,7 @@ def test_health_exposes_api_major():
     body = resp.json()
     assert body["status"] == "ok"
     assert int(body["api_major"]) >= 1
+    assert str(body.get("active_agent") or "").strip() != ""
 
 
 def test_run_requires_bearer_auth_when_shared_secret_unset():

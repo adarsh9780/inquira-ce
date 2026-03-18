@@ -1,0 +1,16 @@
+{
+  "name": "agent_v2",
+  "version": "2.0.0",
+  "description": "Default production agent with starter analytical SQL generation and streaming status events.",
+  "last_updated": "2026-03-18",
+  "features": [
+    "External runtime contract v1",
+    "SSE stream events",
+    "Self-contained coding sub-agent"
+  ],
+  "tools": [
+    "analyze_table",
+    "compose_sql",
+    "finish"
+  ]
+}
