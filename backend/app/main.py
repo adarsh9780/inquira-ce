@@ -39,6 +39,7 @@ from .services.session_variable_store import session_variable_store
 from .services.websocket_manager import websocket_manager
 
 APP_VERSION = "0.5.7a10"
+_LOG_LEVELS = {"trace", "debug", "info", "warning", "error", "critical"}
 
 
 def _default_cors_origins() -> list[str]:
@@ -324,6 +325,12 @@ def run(argv: list[str] | None = None):
     except Exception:
         access_log = True
         uvicorn_log_level = "info"
+
+    override_level = str(os.getenv("INQUIRA_LOG_CONSOLE_LEVEL") or "").strip().lower()
+    if override_level in _LOG_LEVELS:
+        uvicorn_log_level = override_level
+        if override_level in {"error", "critical"}:
+            access_log = False
 
     uvicorn.run(
         app,

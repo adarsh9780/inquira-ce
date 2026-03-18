@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -38,6 +39,7 @@ def _load_logging_config() -> tuple[str, str, bool]:
     color_errors = True
 
     try:
+        env_console = str(os.getenv("INQUIRA_LOG_CONSOLE_LEVEL") or "").strip()
         default_cfg = Path(__file__).parent.parent / "app_config.json"
         user_cfg = Path.home() / ".inquira" / "config.json"
 
@@ -52,6 +54,8 @@ def _load_logging_config() -> tuple[str, str, bool]:
             console_level = _normalize_level(logging_cfg.get("console_level"), console_level)
             file_level = _normalize_level(logging_cfg.get("file_level"), file_level)
             color_errors = bool(logging_cfg.get("color_errors", color_errors))
+        if env_console:
+            console_level = _normalize_level(env_console, console_level)
     except Exception:
         pass
 

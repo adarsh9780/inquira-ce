@@ -24,6 +24,7 @@ struct InquiraConfig {
     backend: Option<BackendConfig>,
     execution: Option<ExecutionConfig>,
     agent_service: Option<AgentServiceConfig>,
+    logging: Option<LoggingConfig>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -63,6 +64,11 @@ struct AgentServiceConfig {
     startup_timeout_sec: Option<u64>,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+struct LoggingConfig {
+    console_level: Option<String>,
+}
+
 fn load_config(config_path: &PathBuf) -> InquiraConfig {
     if config_path.exists() {
         let content = fs::read_to_string(config_path).unwrap_or_default();
@@ -80,6 +86,7 @@ fn load_config(config_path: &PathBuf) -> InquiraConfig {
                     backend: None,
                     execution: None,
                     agent_service: None,
+                    logging: None,
                 }
             }
         }
@@ -90,6 +97,7 @@ fn load_config(config_path: &PathBuf) -> InquiraConfig {
             backend: None,
             execution: None,
             agent_service: None,
+            logging: None,
         }
     }
 }
@@ -100,6 +108,35 @@ fn resolve_resource_path(resource_dir: &PathBuf, relative: &str) -> PathBuf {
         return direct;
     }
     resource_dir.join("_up_").join(relative)
+}
+
+fn normalize_console_level(raw: &str) -> String {
+    match raw.trim().to_uppercase().as_str() {
+        "TRACE" => "TRACE".to_string(),
+        "DEBUG" => "DEBUG".to_string(),
+        "INFO" => "INFO".to_string(),
+        "WARNING" => "WARNING".to_string(),
+        "ERROR" => "ERROR".to_string(),
+        "CRITICAL" => "CRITICAL".to_string(),
+        _ => "ERROR".to_string(),
+    }
+}
+
+fn resolve_shared_console_log_level(config: &InquiraConfig) -> String {
+    if let Ok(value) = std::env::var("INQUIRA_LOG_CONSOLE_LEVEL") {
+        if !value.trim().is_empty() {
+            return normalize_console_level(&value);
+        }
+    }
+    if let Some(value) = config
+        .logging
+        .as_ref()
+        .and_then(|l| l.console_level.clone())
+        .filter(|v| !v.trim().is_empty())
+    {
+        return normalize_console_level(&value);
+    }
+    "ERROR".to_string()
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -646,6 +683,7 @@ fn start_backend(
     }
 
     let mut cmd = Command::new(&python_bin);
+    let console_log_level = resolve_shared_console_log_level(config);
     let execution_provider = config
         .execution
         .as_ref()
@@ -661,6 +699,7 @@ fn start_backend(
             "INQUIRA_TOML_PATH",
             inquira_toml_path.to_string_lossy().to_string(),
         )
+        .env("INQUIRA_LOG_CONSOLE_LEVEL", console_log_level)
         .env("INQUIRA_EXECUTION_PROVIDER", execution_provider);
 
     apply_proxy_env(&mut cmd, config);
@@ -718,6 +757,7 @@ fn start_agent_runtime(
         .as_ref()
         .and_then(|a| a.command.clone())
         .unwrap_or_default();
+    let console_log_level = resolve_shared_console_log_level(config);
     let langgraph_bin = if cfg!(target_os = "windows") {
         venv_path.join("Scripts").join("langgraph.exe")
     } else {
@@ -771,6 +811,7 @@ fn start_agent_runtime(
     cmd.current_dir(agent_dir)
         .env("VIRTUAL_ENV", venv_path.to_string_lossy().to_string())
         .env("INQUIRA_TOML_PATH", inquira_toml_path.to_string_lossy().to_string())
+        .env("LOG_LEVEL", console_log_level)
         .env("INQUIRA_AGENT_SHARED_SECRET", shared_secret)
         .env("INQUIRA_AGENT_HOST", agent_host)
         .env("INQUIRA_AGENT_PORT", agent_port.to_string())
@@ -1065,7 +1106,8 @@ pub fn run() {
 mod tests {
     use super::{
         detect_default_shell, needs_python_bootstrap, resolve_pty_cwd, resolve_resource_path,
-        resolve_uv_index_url, stop_child_process, InquiraConfig, PythonConfig,
+        resolve_shared_console_log_level, resolve_uv_index_url, stop_child_process, InquiraConfig,
+        LoggingConfig, PythonConfig,
     };
     use std::fs;
     use std::path::PathBuf;
@@ -1132,6 +1174,7 @@ mod tests {
             backend: None,
             execution: None,
             agent_service: None,
+            logging: None,
         }
     }
 
@@ -1144,8 +1187,43 @@ mod tests {
             backend: None,
             execution: None,
             agent_service: None,
+            logging: None,
         };
         assert_eq!(resolve_uv_index_url(&config), "https://pypi.org/simple");
+    }
+
+    #[test]
+    fn shared_console_log_level_defaults_to_error() {
+        std::env::remove_var("INQUIRA_LOG_CONSOLE_LEVEL");
+        let config = InquiraConfig {
+            python: None,
+            proxy: None,
+            backend: None,
+            execution: None,
+            agent_service: None,
+            logging: None,
+        };
+        assert_eq!(resolve_shared_console_log_level(&config), "ERROR");
+    }
+
+    #[test]
+    fn shared_console_log_level_uses_toml_and_env_override() {
+        std::env::remove_var("INQUIRA_LOG_CONSOLE_LEVEL");
+        let config = InquiraConfig {
+            python: None,
+            proxy: None,
+            backend: None,
+            execution: None,
+            agent_service: None,
+            logging: Some(LoggingConfig {
+                console_level: Some("info".to_string()),
+            }),
+        };
+        assert_eq!(resolve_shared_console_log_level(&config), "INFO");
+
+        std::env::set_var("INQUIRA_LOG_CONSOLE_LEVEL", "critical");
+        assert_eq!(resolve_shared_console_log_level(&config), "CRITICAL");
+        std::env::remove_var("INQUIRA_LOG_CONSOLE_LEVEL");
     }
 
     #[test]

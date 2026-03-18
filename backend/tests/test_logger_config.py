@@ -65,6 +65,19 @@ def test_load_logging_config_reads_user_overrides(monkeypatch, tmp_path):
     assert color_errors is False
 
 
+def test_load_logging_config_honors_env_console_override(monkeypatch, tmp_path):
+    from app.core import logger as logger_module
+
+    logger_module = importlib.reload(logger_module)
+    monkeypatch.setenv("INQUIRA_LOG_CONSOLE_LEVEL", "warning")
+
+    fake_home = tmp_path / "home"
+    monkeypatch.setattr(logger_module.Path, "home", staticmethod(lambda: fake_home))
+
+    console_level, _file_level, _color_errors = logger_module._load_logging_config()
+    assert console_level == "WARNING"
+
+
 def test_should_emit_respects_levels():
     from app.core import logger as logger_module
 
