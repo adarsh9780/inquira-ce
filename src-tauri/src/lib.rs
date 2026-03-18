@@ -60,15 +60,7 @@ struct AgentServiceConfig {
     port: Option<u16>,
     path: Option<String>,
     command: Option<String>,
-    api_major: Option<u16>,
-    expected_api_major: Option<u16>,
     startup_timeout_sec: Option<u64>,
-    auth: Option<AgentServiceAuthConfig>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-struct AgentServiceAuthConfig {
-    mode: Option<String>,
 }
 
 fn load_config(config_path: &PathBuf) -> InquiraConfig {
