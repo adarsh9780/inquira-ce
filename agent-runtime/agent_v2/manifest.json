@@ -1,16 +1,22 @@
 {
   "name": "agent_v2",
-  "version": "2.0.0",
-  "description": "Default production agent with starter analytical SQL generation and streaming status events.",
+  "version": "2.1.0",
+  "description": "Externalized modular agent v2 with LangGraph routing, coding subagent, schema search, guarded code generation, and local runtime execution helpers.",
   "last_updated": "2026-03-18",
   "features": [
-    "External runtime contract v1",
-    "SSE stream events",
-    "Self-contained coding sub-agent"
+    "Route classification (analysis/general_chat/unsafe)",
+    "Coding subagent with structured output",
+    "Schema search and sample-data tools",
+    "Code safety guardrails and retry loop",
+    "SSE-friendly status/token/tool events",
+    "Self-contained runtime config and Phoenix-compatible tracing hooks"
   ],
   "tools": [
-    "analyze_table",
-    "compose_sql",
-    "finish"
+    "search_schema",
+    "sample_data",
+    "execute_python",
+    "bash",
+    "pip_install",
+    "finish_analysis"
   ]
 }

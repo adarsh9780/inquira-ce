@@ -11,9 +11,9 @@ from langchain_core.messages import AnyMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from pydantic import BaseModel
 
-from ..services.chat_model_factory import create_chat_model
-from ..services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
-from ..services.llm_provider_catalog import normalize_llm_provider, provider_requires_api_key
+from .services.chat_model_factory import create_chat_model
+from .services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
+from .services.llm_provider_catalog import normalize_llm_provider, provider_requires_api_key
 
 _ROUTER_PROMPT = (
     Path(__file__).resolve().parent / "prompts" / "router_system.yaml"

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 import shlex
 from pathlib import Path
 from typing import Any
 
-from ...services.terminal_executor import stream_workspace_terminal_command
 from ..events import emit_agent_event
 from ..runtime import load_agent_runtime_config
 from . import new_tool_call_id
@@ -48,6 +48,7 @@ async def run_bash(
     command: str,
     timeout: int = 60,
 ) -> dict[str, Any]:
+    _ = user_id, workspace_id
     call_id = new_tool_call_id("bash")
     emit_agent_event(
         "tool_call",
@@ -72,36 +73,37 @@ async def run_bash(
         return payload
 
     workspace_dir = str(Path(data_path).resolve().parent)
-    final_result: dict[str, Any] | None = None
-    async for event in stream_workspace_terminal_command(
-        user_id=user_id,
-        workspace_id=workspace_id,
-        command=command,
-        workspace_dir=workspace_dir,
+    proc = await asyncio.create_subprocess_shell(
+        command,
         cwd=workspace_dir,
-        timeout=max(5, int(timeout)),
-    ):
-        event_type = str(event.get("type") or "")
-        if event_type == "output":
-            emit_agent_event(
-                "tool_progress",
-                {"call_id": call_id, "line": str(event.get("line") or "")},
-            )
-        elif event_type == "final":
-            final_result = event.get("result") if isinstance(event.get("result"), dict) else {}
-        elif event_type == "error":
-            final_result = {
-                "error": str(event.get("error") or "Terminal execution failed."),
-                "stdout": "",
-                "stderr": str(event.get("error") or "Terminal execution failed."),
-                "exit_code": 1,
-            }
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
 
-    response = final_result or {
-        "error": "Terminal command did not return a result.",
-        "stdout": "",
-        "stderr": "Missing terminal result",
-        "exit_code": 1,
+    try:
+        out_b, err_b = await asyncio.wait_for(proc.communicate(), timeout=max(5, int(timeout)))
+    except TimeoutError:
+        proc.kill()
+        await proc.communicate()
+        response = {"error": "Command timed out.", "stdout": "", "stderr": "Timed out", "exit_code": 124}
+        emit_agent_event(
+            "tool_result",
+            {"call_id": call_id, "output": response, "status": "error", "duration_ms": 1},
+        )
+        return response
+
+    stdout = out_b.decode(errors="ignore")
+    stderr = err_b.decode(errors="ignore")
+    for line in stdout.splitlines():
+        emit_agent_event("tool_progress", {"call_id": call_id, "line": line})
+    for line in stderr.splitlines():
+        emit_agent_event("tool_progress", {"call_id": call_id, "line": line})
+
+    response = {
+        "error": "" if proc.returncode == 0 else (stderr.strip() or "Command failed."),
+        "stdout": stdout,
+        "stderr": stderr,
+        "exit_code": int(proc.returncode or 0),
     }
     status = "success" if int(response.get("exit_code") or 1) == 0 else "error"
     emit_agent_event(

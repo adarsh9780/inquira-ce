@@ -28,7 +28,7 @@ def _load_toml_data() -> dict[str, Any]:
     if cfg_path:
         path = Path(cfg_path)
     else:
-        path = Path(__file__).resolve().parents[3] / "inquira.toml"
+        path = Path(__file__).resolve().parents[2] / "inquira.toml"
 
     if not path.exists():
         return {}

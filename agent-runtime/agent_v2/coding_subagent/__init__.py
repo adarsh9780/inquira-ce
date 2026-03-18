@@ -1,5 +1,10 @@
-"""Coding sub-agent for agent_v2."""
+"""Reusable coding subagent primitives."""
 
-from .graph import generate_code_plan
+from .generator import build_coding_chain, invoke_coding_chain
+from .schema import AnalysisOutput
 
-__all__ = ["generate_code_plan"]
+__all__ = [
+    "AnalysisOutput",
+    "build_coding_chain",
+    "invoke_coding_chain",
+]

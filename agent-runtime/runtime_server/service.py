@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
 import uuid
 from typing import Any, AsyncGenerator
@@ -59,6 +60,7 @@ def _auth_guard(
 
 def _build_state(req: AgentRequest) -> dict[str, Any]:
     return {
+        "run_id": str(uuid.uuid4()),
         "request_id": req.request_id,
         "question": req.question,
         "current_code": req.current_code,
@@ -71,6 +73,32 @@ def _build_state(req: AgentRequest) -> dict[str, Any]:
         "user_id": req.user_id,
         "attachments": req.attachments,
     }
+
+
+def _bind_agent_emitters(
+    *,
+    agent_name: str,
+    emit: Any,
+) -> tuple[Any, Any, Any, Any]:
+    set_event = None
+    reset_event = None
+    set_token = None
+    reset_token = None
+    try:
+        mod = importlib.import_module(f"{agent_name}.events")
+        set_event = getattr(mod, "set_agent_event_emitter", None)
+        reset_event = getattr(mod, "reset_agent_event_emitter", None)
+    except Exception:
+        set_event = None
+        reset_event = None
+    try:
+        mod = importlib.import_module(f"{agent_name}.streaming")
+        set_token = getattr(mod, "set_stream_token_emitter", None)
+        reset_token = getattr(mod, "reset_stream_token_emitter", None)
+    except Exception:
+        set_token = None
+        reset_token = None
+    return set_event, reset_event, set_token, reset_token
 
 
 def _build_config(req: AgentRequest) -> dict[str, Any]:
@@ -134,12 +162,29 @@ def create_app() -> FastAPI:
 
             try:
                 aggregated: dict[str, Any] = {}
-                async for step in graph.astream(state, config=config):
-                    for node_name, payload in step.items():
-                        payload_dict = payload if isinstance(payload, dict) else {"value": payload}
-                        if isinstance(payload, dict):
-                            aggregated.update(payload)
-                        emit("node", {"node": str(node_name), "output": str(payload_dict.get("plan") or payload_dict.get("answer") or "")})
+                set_event, reset_event, set_token, reset_token = _bind_agent_emitters(
+                    agent_name=agent_name,
+                    emit=emit,
+                )
+                event_token = None
+                stream_token = None
+                try:
+                    if callable(set_event):
+                        event_token = set_event(lambda name, payload: emit(str(name), payload if isinstance(payload, dict) else {"value": payload}))
+                    if callable(set_token):
+                        stream_token = set_token(lambda node, text: emit("token", {"node": str(node), "text": str(text)}))
+
+                    async for step in graph.astream(state, config=config):
+                        for node_name, payload in step.items():
+                            payload_dict = payload if isinstance(payload, dict) else {"value": payload}
+                            if isinstance(payload, dict):
+                                aggregated.update(payload)
+                            emit("node", {"node": str(node_name), "output": str(payload_dict.get("plan") or payload_dict.get("answer") or "")})
+                finally:
+                    if callable(reset_event) and event_token is not None:
+                        reset_event(event_token)
+                    if callable(reset_token) and stream_token is not None:
+                        reset_token(stream_token)
 
                 final_payload = {
                     "run_id": str(aggregated.get("run_id") or uuid.uuid4()),
