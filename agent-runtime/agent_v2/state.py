@@ -19,6 +19,7 @@ class SystemInfo(TypedDict):
 
 
 class AgentInput(TypedDict):
+    question: str
     messages: Annotated[list[AnyMessage], add_messages]
     workspace_id: str
     user_id: str
@@ -140,6 +141,7 @@ def build_input_state(
         )
 
     return AgentInput(
+        question=str(question or ""),
         messages=[HumanMessage(content=content_blocks or str(question or ""))],
         workspace_id=workspace_id,
         user_id=user_id,
