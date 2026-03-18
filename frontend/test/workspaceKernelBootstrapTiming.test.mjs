@@ -11,7 +11,7 @@ function extractBlock(source, startMarker, endMarker) {
   return source.slice(start, end)
 }
 
-test('workspace create/switch/list flows do not eagerly bootstrap kernel', () => {
+test('workspace list flow bootstraps kernel only for single-workspace sessions', () => {
   const appStorePath = resolve(process.cwd(), 'src/stores/appStore.js')
   const source = readFileSync(appStorePath, 'utf-8')
 
@@ -31,7 +31,11 @@ test('workspace create/switch/list flows do not eagerly bootstrap kernel', () =>
     'async function fetchConversations() {',
   )
 
-  assert.equal(fetchBlock.includes('ensureWorkspaceKernelConnected('), false)
+  assert.equal(
+    fetchBlock.includes('if (items.length === 1 && activeWorkspaceId.value === items[0]?.id) {'),
+    true,
+  )
+  assert.equal(fetchBlock.includes('await ensureWorkspaceKernelConnected(activeWorkspaceId.value)'), true)
   assert.equal(createBlock.includes('ensureWorkspaceKernelConnected('), false)
   assert.equal(activateBlock.includes('ensureWorkspaceKernelConnected('), false)
 })
