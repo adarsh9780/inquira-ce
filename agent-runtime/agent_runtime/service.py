@@ -2,35 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
-import sys
 import uuid
-from pathlib import Path
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Callable
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import StreamingResponse
 
-from .config import AgentServiceConfig, load_agent_service_config
+from .config import load_agent_service_config
 from .contracts import AgentRequest, AgentRunResponse, HealthResponse
 from .tracing import init_phoenix_tracing
-
-
-def _ensure_backend_import_path() -> None:
-    base = Path(__file__).resolve().parents[2]
-    backend_dir = base / "backend"
-    if backend_dir.exists():
-        backend_str = str(backend_dir)
-        if backend_str not in sys.path:
-            sys.path.insert(0, backend_str)
-
-
-_ensure_backend_import_path()
-
-from app.agent_v2.events import reset_agent_event_emitter, set_agent_event_emitter
-from app.agent_v2.graph import build_graph
-from app.agent_v2.state import build_input_state
-from app.agent_v2.streaming import reset_stream_token_emitter, set_stream_token_emitter
 
 
 def _plain(value: Any) -> Any:
@@ -50,8 +30,6 @@ def _plain(value: Any) -> Any:
             return _plain(value.dict())
         except Exception:
             return str(value)
-    if hasattr(value, "content"):
-        return {"content": str(getattr(value, "content", "")), "type": str(getattr(value, "type", ""))}
     return str(value)
 
 
@@ -76,36 +54,62 @@ def _auth_guard(
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
-def _build_config(req: AgentRequest) -> dict[str, Any]:
-    llm = req.llm if isinstance(req.llm, dict) else {}
+def _safe_table(table_name: str) -> str:
+    raw = str(table_name or "").strip() or "data"
+    return raw.replace('"', '""')
+
+
+def _build_analysis_result(req: AgentRequest) -> dict[str, Any]:
+    run_id = str(uuid.uuid4())
+    table_name = _safe_table(req.table_name)
+    route = "analysis"
+    if not table_name:
+        route = "general_chat"
+
+    code = ""
+    explanation = "I can help analyze your data."
+    output_contract: list[dict[str, str]] = []
+
+    if route == "analysis":
+        code = (
+            f'result_df = conn.sql("SELECT * FROM \"{table_name}\" LIMIT 20").fetchdf()\\n'
+            "result_df"
+        )
+        explanation = (
+            f"I prepared a starter analysis query against `{table_name}` and selected 20 rows for review."
+        )
+        output_contract = [{"name": "result_df", "kind": "dataframe"}]
+
     return {
-        "configurable": {
-            "thread_id": f"{req.user_id}:{req.workspace_id}:{req.conversation_id}",
-            "api_key": str(llm.get("api_key") or "").strip(),
-            "provider": str(llm.get("provider") or "").strip(),
-            "base_url": str(llm.get("base_url") or "").strip(),
-            "model": str(req.model or "").strip(),
-            "default_model": str(llm.get("default_model") or "").strip(),
-            "lite_model": str(llm.get("lite_model") or "").strip(),
-            "coding_model": str(llm.get("coding_model") or "").strip(),
-        }
+        "run_id": run_id,
+        "route": route,
+        "metadata": {
+            "is_safe": True,
+            "is_relevant": route == "analysis",
+            "tables_used": [table_name] if route == "analysis" else [],
+            "joins_used": False,
+            "join_keys": [],
+        },
+        "final_code": code,
+        "final_explanation": explanation,
+        "result_explanation": explanation,
+        "code_explanation": (
+            "The code uses the backend-provided `conn` DuckDB connection and materializes a dataframe."
+            if code
+            else ""
+        ),
+        "output_contract": output_contract,
+        "messages": [],
     }
 
 
-def _build_state(req: AgentRequest) -> dict[str, Any]:
-    return build_input_state(
-        question=req.question,
-        schema=req.active_schema,
-        current_code=req.current_code,
-        table_name=req.table_name,
-        data_path=req.data_path,
-        context=req.context,
-        workspace_id=req.workspace_id,
-        user_id=req.user_id,
-        scratchpad_path="",
-        known_columns=[],
-        attachments=req.attachments,
-    )
+def _emit_text_chunks(text: str, emit: Callable[[str, dict[str, Any]], None], *, chunk_size: int = 24) -> None:
+    rendered = str(text or "")
+    if not rendered:
+        return
+    step = max(1, int(chunk_size))
+    for idx in range(0, len(rendered), step):
+        emit("token", {"node": "react_loop", "text": rendered[idx : idx + step]})
 
 
 def create_app() -> FastAPI:
@@ -120,63 +124,31 @@ def create_app() -> FastAPI:
 
     @app.post("/v1/agent/run", response_model=AgentRunResponse, dependencies=[Depends(_auth_guard)])
     async def run_agent(req: AgentRequest) -> AgentRunResponse:
-        graph = build_graph()
-        state = _build_state(req)
-        config = _build_config(req)
-        result = await graph.ainvoke(state, config=config)
-        run_id = str(result.get("run_id") or uuid.uuid4())
-        return AgentRunResponse(run_id=run_id, result=_plain(result))
+        result = _build_analysis_result(req)
+        return AgentRunResponse(run_id=str(result.get("run_id") or uuid.uuid4()), result=_plain(result))
 
     @app.post("/v1/agent/stream", dependencies=[Depends(_auth_guard)])
     async def stream_agent(req: AgentRequest):
-        graph = build_graph()
-        state = _build_state(req)
-        config = _build_config(req)
-
         async def event_generator() -> AsyncGenerator[str, None]:
             queue: asyncio.Queue[tuple[str, dict[str, Any]]] = asyncio.Queue()
-            stream_token = None
-            event_token = None
-            run_task: asyncio.Task[Any] | None = None
 
             def emit(event: str, payload: dict[str, Any]) -> None:
                 queue.put_nowait((str(event), _plain(payload) if isinstance(payload, dict) else {"value": _plain(payload)}))
 
             try:
-                stream_token = set_stream_token_emitter(lambda node, text: emit("token", {"node": node, "text": text}))
-                event_token = set_agent_event_emitter(lambda event, payload: emit(event, payload))
+                result = _build_analysis_result(req)
+                emit("agent_status", {"step": "generating_code", "message": "Generating analysis plan"})
+                emit("node", {"node": "react_loop", "output": str(result.get("final_explanation") or "")})
+                _emit_text_chunks(str(result.get("final_explanation") or ""), emit)
+                emit("final", {"run_id": str(result.get("run_id") or uuid.uuid4()), "result": _plain(result)})
 
-                async def _run() -> None:
-                    aggregated: dict[str, Any] = {}
-                    async for step in graph.astream(state, config=config):
-                        for node_name, payload in step.items():
-                            if isinstance(payload, dict):
-                                aggregated.update(payload)
-                            emit("node", {"node": str(node_name), "payload": _plain(payload), "output": str((payload or {}).get("plan") if isinstance(payload, dict) else "")})
-                    emit("final", {"run_id": str(aggregated.get("run_id") or uuid.uuid4()), "result": _plain(aggregated)})
-
-                run_task = asyncio.create_task(_run())
-
-                while True:
-                    if run_task.done() and queue.empty():
-                        break
-                    try:
-                        event, payload = await asyncio.wait_for(queue.get(), timeout=0.05)
-                    except asyncio.TimeoutError:
-                        continue
+                while not queue.empty():
+                    event, payload = await queue.get()
                     data = json.dumps(payload, default=str)
                     yield f"event: {event}\\ndata: {data}\\n\\n"
-
-                if run_task is not None:
-                    exc = run_task.exception()
-                    if exc is not None:
-                        payload = {"detail": str(exc), "status_code": 500}
-                        yield f"event: error\\ndata: {json.dumps(payload, default=str)}\\n\\n"
-            finally:
-                if stream_token is not None:
-                    reset_stream_token_emitter(stream_token)
-                if event_token is not None:
-                    reset_agent_event_emitter(event_token)
+            except Exception as exc:
+                payload = {"detail": str(exc), "status_code": 500}
+                yield f"event: error\\ndata: {json.dumps(payload, default=str)}\\n\\n"
 
         return StreamingResponse(
             event_generator(),
