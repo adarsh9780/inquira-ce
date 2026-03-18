@@ -912,6 +912,11 @@ export const useAppStore = defineStore('app', () => {
       return columnCatalog.value
     }
     try {
+      const kernelReady = await ensureWorkspaceKernelConnected(workspaceId)
+      if (!kernelReady) {
+        columnCatalog.value = []
+        return []
+      }
       const response = await apiService.getWorkspaceColumns(workspaceId)
       const columns = Array.isArray(response?.columns) ? response.columns : []
       columnCatalog.value = columns

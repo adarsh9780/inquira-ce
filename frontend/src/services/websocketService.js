@@ -1,9 +1,40 @@
+let tauriWsBaseOverride = ''
+
+function toWsBase(rawApiBase) {
+  const trimmed = String(rawApiBase || '').trim().replace(/\/+$/, '')
+  if (!trimmed) return ''
+  if (trimmed.startsWith('ws://') || trimmed.startsWith('wss://')) return trimmed
+  if (trimmed.startsWith('https://')) return `wss://${trimmed.slice('https://'.length)}`
+  if (trimmed.startsWith('http://')) return `ws://${trimmed.slice('http://'.length)}`
+  return ''
+}
+
+function initializeTauriWsBase() {
+  if (typeof window === 'undefined') return
+  if (!window.__TAURI_INTERNALS__) return
+
+  const globalBase = toWsBase(window.__INQUIRA_API_BASE__)
+  if (globalBase) {
+    tauriWsBaseOverride = globalBase
+    return
+  }
+
+  import('@tauri-apps/api/core')
+    .then(({ invoke }) => invoke('get_backend_url'))
+    .then((value) => {
+      const resolved = toWsBase(value)
+      if (resolved) tauriWsBaseOverride = resolved
+    })
+    .catch(() => {})
+}
+
 function getDefaultWsBase() {
   if (typeof window === 'undefined') {
     return 'ws://localhost:8000'
   }
 
   if (window.__TAURI_INTERNALS__) {
+    if (tauriWsBaseOverride) return tauriWsBaseOverride
     return 'ws://localhost:8000'
   }
 
@@ -26,6 +57,8 @@ function resolveWsBase() {
 
   return getDefaultWsBase()
 }
+
+initializeTauriWsBase()
 
 function buildWsUrl(path) {
   const base = resolveWsBase().replace(/\/$/, '')

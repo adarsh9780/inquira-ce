@@ -18,7 +18,7 @@ function getDefaultApiBase() {
   }
 
   if (window.__TAURI_INTERNALS__) {
-    // In packaged Tauri apps, window origin is tauri://localhost and is not the Python backend.
+    // Keep a localhost fallback until the Tauri backend URL command resolves.
     return 'http://localhost:8000'
   }
 
@@ -33,7 +33,42 @@ function getDefaultApiBase() {
 }
 
 const resolvedEnvBase = (import.meta.env.VITE_API_BASE || '').trim()
-const apiBaseUrl = resolvedEnvBase || getDefaultApiBase()
+let apiBaseUrl = resolvedEnvBase || getDefaultApiBase()
+
+function normalizeApiBase(rawBase) {
+  return String(rawBase || '').trim().replace(/\/+$/, '')
+}
+
+function setResolvedApiBase(rawBase) {
+  const normalized = normalizeApiBase(rawBase)
+  if (!normalized) return
+  apiBaseUrl = normalized
+  axios.defaults.baseURL = normalized
+  if (typeof window !== 'undefined') {
+    window.__INQUIRA_API_BASE__ = normalized
+  }
+}
+
+function initializeTauriApiBase() {
+  if (typeof window === 'undefined') return
+  if (resolvedEnvBase) {
+    setResolvedApiBase(resolvedEnvBase)
+    return
+  }
+  if (!window.__TAURI_INTERNALS__) {
+    setResolvedApiBase(apiBaseUrl)
+    return
+  }
+
+  import('@tauri-apps/api/core')
+    .then(({ invoke }) => invoke('get_backend_url'))
+    .then((value) => {
+      setResolvedApiBase(value)
+    })
+    .catch(() => {
+      setResolvedApiBase(apiBaseUrl)
+    })
+}
 const artifactRowsInFlight = new Map()
 const artifactRowsCache = new Map()
 const ARTIFACT_ROWS_CACHE_LIMIT = 200
@@ -95,6 +130,7 @@ axios.defaults.baseURL = apiBaseUrl
 axios.defaults.timeout = 360000 // 6 minutes
 axios.defaults.withCredentials = true
 axios.defaults.headers.common['Content-Type'] = 'application/json'
+initializeTauriApiBase()
 
 // Request interceptor
 axios.interceptors.request.use(

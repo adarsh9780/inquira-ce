@@ -3,11 +3,11 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('api service uses http backend base in packaged Tauri mode', () => {
+test('api service resolves Tauri backend base via get_backend_url command', () => {
   const servicePath = resolve(process.cwd(), 'src/services/apiService.js')
   const source = readFileSync(servicePath, 'utf-8')
 
   assert.equal(source.includes('if (window.__TAURI_INTERNALS__)'), true)
-  assert.equal(source.includes("return 'http://localhost:8000'"), true)
-  assert.equal(source.includes('return window.location.origin'), false)
+  assert.equal(source.includes("invoke('get_backend_url')"), true)
+  assert.equal(source.includes('window.__INQUIRA_API_BASE__'), true)
 })

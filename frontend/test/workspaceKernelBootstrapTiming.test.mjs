@@ -53,3 +53,15 @@ test('dataset upload path is the runtime bootstrap trigger', () => {
     true,
   )
 })
+
+test('column catalog path bootstraps runtime before loading columns', () => {
+  const appStorePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const source = readFileSync(appStorePath, 'utf-8')
+  const catalogBlock = extractBlock(
+    source,
+    'async function fetchColumnCatalog({ force = false } = {}) {',
+    'async function ensureWorkspaceKernelConnected(workspaceId = activeWorkspaceId.value) {',
+  )
+  assert.equal(catalogBlock.includes('await ensureWorkspaceKernelConnected(workspaceId)'), true)
+  assert.equal(catalogBlock.includes('apiService.getWorkspaceColumns(workspaceId)'), true)
+})
