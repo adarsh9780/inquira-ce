@@ -6,7 +6,6 @@ Persists turns in app DB and uses per-workspace LangGraph checkpoint state.
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
 import time
 import uuid
@@ -18,8 +17,7 @@ import duckdb
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...agent_v2.events import reset_agent_event_emitter, set_agent_event_emitter
-from ...agent_v2.registry import get_agent_bindings
+from ...services.agent_client import AgentClient, AgentRuntimeError
 from ...services.code_executor import execute_code, get_workspace_run_exports
 from ...services.output_capture import (
     build_auto_capture_result_code,
@@ -213,6 +211,49 @@ class ChatService:
             await graph.aupdate_state(cfg, {"known_columns": normalized})
         except Exception:
             return
+
+    @staticmethod
+    def _build_remote_agent_payload(
+        *,
+        request_id: str,
+        user_id: str,
+        workspace_id: str,
+        conversation_id: str,
+        question: str,
+        current_code: str,
+        model: str,
+        context: str,
+        table_name: str,
+        preferred_table_name: str | None,
+        data_path: str,
+        schema: dict[str, Any],
+        attachments: list[dict[str, Any]],
+        llm_prefs: dict[str, Any],
+        resolved_api_key: str,
+    ) -> dict[str, Any]:
+        return {
+            "request_id": request_id,
+            "user_id": user_id,
+            "workspace_id": workspace_id,
+            "conversation_id": conversation_id,
+            "question": question,
+            "current_code": current_code,
+            "model": model,
+            "context": context,
+            "table_name": table_name,
+            "preferred_table_name": str(preferred_table_name or "").strip(),
+            "data_path": data_path,
+            "active_schema": schema if isinstance(schema, dict) else {},
+            "attachments": attachments,
+            "llm": {
+                "provider": llm_prefs["provider"],
+                "base_url": llm_prefs["base_url"],
+                "api_key": resolved_api_key,
+                "lite_model": llm_prefs["selected_lite_model"],
+                "default_model": llm_prefs["selected_main_model"],
+                "coding_model": llm_prefs.get("selected_coding_model") or llm_prefs["selected_main_model"],
+            },
+        }
 
     @staticmethod
     def _build_node_stream_payload(
@@ -817,50 +858,12 @@ class ChatService:
             active_schema_override=active_schema_override,
         )
 
-        bindings = get_agent_bindings()
-        memory_path = WorkspaceStorageService.build_agent_memory_path(user.username, workspace_id)
-        graph = await langgraph_manager.get_graph(workspace_id, memory_path)
-        known_columns = await ChatService._load_workspace_known_columns(
-            graph=graph,
-            user_id=str(user.id),
-            workspace_id=workspace_id,
-        )
-
         normalized_attachments = ChatService._normalize_chat_attachments(attachments)
-        input_state = bindings.build_input_state(
-            question=question,
-            schema=schema,
-            current_code=current_code,
-            table_name=table_name,
-            data_path=data_path,
-            context=context or "",
-            workspace_id=workspace_id,
-            user_id=str(user.id),
-            scratchpad_path=str(
-                WorkspaceStorageService.build_scratchpad_db_path(user.username, workspace_id)
-            ),
-            known_columns=known_columns,
-            attachments=normalized_attachments,
-        )
-        input_state = ChatService._coerce_input_state_for_graph(input_state)
         thread_id = f"{user.id}:{workspace_id}:{conversation_id}"
-        config = {
-            "configurable": {
-                "api_key": api_key,
-                "thread_id": thread_id,
-                "model": model,
-            }
-        }
         llm_prefs = await ChatService._resolve_llm_preferences(session, str(user.id))
         resolved_api_key = (api_key or "").strip() or (
             SecretStorageService.get_api_key(user.id, provider=llm_prefs["provider"]) or ""
         )
-        config["configurable"]["api_key"] = resolved_api_key
-        config["configurable"]["provider"] = llm_prefs["provider"]
-        config["configurable"]["base_url"] = llm_prefs["base_url"]
-        config["configurable"]["lite_model"] = llm_prefs["selected_lite_model"]
-        config["configurable"]["default_model"] = llm_prefs["selected_main_model"]
-        config["configurable"]["coding_model"] = llm_prefs.get("selected_coding_model") or llm_prefs["selected_main_model"]
         if llm_prefs["requires_api_key"] and not resolved_api_key:
             raise HTTPException(status_code=401, detail="API key not configured")
         if normalized_attachments and not model_supports_vision(llm_prefs["provider"], model):
@@ -869,13 +872,30 @@ class ChatService:
                 detail="The selected model does not support image attachments.",
             )
 
-        result = await graph.ainvoke(input_state, config=config)
-        await ChatService._save_workspace_known_columns(
-            graph=graph,
+        payload = ChatService._build_remote_agent_payload(
+            request_id=thread_id,
             user_id=str(user.id),
             workspace_id=workspace_id,
-            known_columns=result.get("known_columns"),
+            conversation_id=conversation_id,
+            question=question,
+            current_code=current_code,
+            model=model,
+            context=context or "",
+            table_name=table_name,
+            preferred_table_name=preferred_table_name,
+            data_path=data_path,
+            schema=schema,
+            attachments=normalized_attachments,
+            llm_prefs=llm_prefs,
+            resolved_api_key=resolved_api_key,
         )
+        agent_client = AgentClient()
+        try:
+            await agent_client.assert_health()
+            result = await agent_client.run(payload)
+        except AgentRuntimeError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
         response_payload = ChatService._build_response_payload(result)
         run_id = str(response_payload.get("run_id") or result.get("run_id") or uuid.uuid4())
         response_payload["run_id"] = run_id
@@ -1106,255 +1126,159 @@ class ChatService:
         api_key: str | None = None,
     ):
         """Async generator that yields incremental analysis events (SSE-compatible)."""
-        event_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
-        active_emitter_token = None
-        active_agent_event_token = None
-        bindings = get_agent_bindings()
+        _ = langgraph_manager
+        conversation, resolved_conversation_id, schema, table_name, data_path = (
+            await ChatService._preflight_check(
+                session=session,
+                user=user,
+                workspace_id=workspace_id,
+                conversation_id=conversation_id,
+                question=question,
+                table_name_override=table_name_override,
+                preferred_table_name=preferred_table_name,
+                active_schema_override=active_schema_override,
+            )
+        )
 
-        def queue_event(event: str, data: dict[str, Any]) -> None:
-            event_queue.put_nowait({"event": event, "data": data})
+        normalized_attachments = ChatService._normalize_chat_attachments(attachments)
+        thread_id = f"{user.id}:{workspace_id}:{resolved_conversation_id}"
+        llm_prefs = await ChatService._resolve_llm_preferences(session, str(user.id))
+        resolved_api_key = (api_key or "").strip() or (
+            SecretStorageService.get_api_key(user.id, provider=llm_prefs["provider"]) or ""
+        )
+        if llm_prefs["requires_api_key"] and not resolved_api_key:
+            raise HTTPException(status_code=401, detail="API key not configured")
+        if normalized_attachments and not model_supports_vision(llm_prefs["provider"], model):
+            raise HTTPException(
+                status_code=400,
+                detail="The selected model does not support image attachments.",
+            )
 
-        async def run_pipeline() -> None:
-            nonlocal active_emitter_token, active_agent_event_token, bindings
-            try:
-                conversation, resolved_conversation_id, schema, table_name, data_path = (
-                    await ChatService._preflight_check(
-                        session=session,
-                        user=user,
-                        workspace_id=workspace_id,
-                        conversation_id=conversation_id,
-                        question=question,
-                        table_name_override=table_name_override,
-                        preferred_table_name=preferred_table_name,
-                        active_schema_override=active_schema_override,
-                    )
-                )
-
-                queue_event("status", {"stage": "start", "message": "Starting analysis"})
-
-                memory_path = WorkspaceStorageService.build_agent_memory_path(user.username, workspace_id)
-                graph = await langgraph_manager.get_graph(workspace_id, memory_path)
-                known_columns = await ChatService._load_workspace_known_columns(
-                    graph=graph,
-                    user_id=str(user.id),
-                    workspace_id=workspace_id,
-                )
-
-                normalized_attachments = ChatService._normalize_chat_attachments(attachments)
-                input_state = bindings.build_input_state(
-                    question=question,
-                    schema=schema,
-                    current_code=current_code,
-                    table_name=table_name,
-                    data_path=data_path,
-                    context=context or "",
-                    workspace_id=workspace_id,
-                    user_id=str(user.id),
-                    scratchpad_path=str(
-                        WorkspaceStorageService.build_scratchpad_db_path(user.username, workspace_id)
-                    ),
-                    known_columns=known_columns,
-                    attachments=normalized_attachments,
-                )
-                input_state = ChatService._coerce_input_state_for_graph(input_state)
-                thread_id = f"{user.id}:{workspace_id}:{resolved_conversation_id}"
-                config = {
-                    "configurable": {
-                        "api_key": api_key,
-                        "thread_id": thread_id,
-                        "model": model,
-                    }
-                }
-                llm_prefs = await ChatService._resolve_llm_preferences(session, str(user.id))
-                resolved_api_key = (api_key or "").strip() or (
-                    SecretStorageService.get_api_key(user.id, provider=llm_prefs["provider"]) or ""
-                )
-                config["configurable"]["api_key"] = resolved_api_key
-                config["configurable"]["provider"] = llm_prefs["provider"]
-                config["configurable"]["base_url"] = llm_prefs["base_url"]
-                config["configurable"]["lite_model"] = llm_prefs["selected_lite_model"]
-                config["configurable"]["default_model"] = llm_prefs["selected_main_model"]
-                config["configurable"]["coding_model"] = llm_prefs.get("selected_coding_model") or llm_prefs["selected_main_model"]
-                if llm_prefs["requires_api_key"] and not resolved_api_key:
-                    raise HTTPException(status_code=401, detail="API key not configured")
-                if normalized_attachments and not model_supports_vision(llm_prefs["provider"], model):
-                    raise HTTPException(
-                        status_code=400,
-                        detail="The selected model does not support image attachments.",
-                    )
-
-                def emit_token(node_name: str, text: str) -> None:
-                    queue_event("token", {"node": node_name, "text": text})
-
-                if callable(bindings.set_stream_token_emitter):
-                    active_emitter_token = bindings.set_stream_token_emitter(emit_token)
-                active_agent_event_token = set_agent_event_emitter(
-                    lambda event, data: queue_event(event, data)
-                )
-
-                aggregated: dict[str, Any] = {}
-                async for step in graph.astream(input_state, config=config):
-                    for node_name, payload in step.items():
-                        if isinstance(payload, dict):
-                            aggregated.update(payload)
-                        if node_name == "code_guard":
-                            logprint(
-                                "[V1 Chat] code_guard node",
-                                level="INFO",
-                                request_id=thread_id,
-                                guard_status=aggregated.get("guard_status"),
-                                retry_count=aggregated.get("code_guard_retries", 0),
-                                feedback=aggregated.get("code_guard_feedback", ""),
-                            )
-                        queue_event(
-                            "node",
-                            ChatService._build_node_stream_payload(
-                                node_name=node_name,
-                                payload=payload,
-                                aggregated=aggregated,
-                            ),
-                        )
-
-                # Final state merge if checkpointer is active
-                try:
-                    final_state = await graph.aget_state(config)
-                    if getattr(final_state, "values", None):
-                        aggregated = final_state.values
-                except Exception:
-                    pass
-
-                await ChatService._save_workspace_known_columns(
-                    graph=graph,
-                    user_id=str(user.id),
-                    workspace_id=workspace_id,
-                    known_columns=aggregated.get("known_columns"),
-                )
-
-                response_payload = ChatService._build_response_payload(aggregated)
-                run_id = str(response_payload.get("run_id") or aggregated.get("run_id") or uuid.uuid4())
-                response_payload["run_id"] = run_id
-                response_payload["execution"] = response_payload.get("execution")
-                response_payload["artifacts"] = response_payload.get("artifacts") or []
-                response_payload["final_script_artifact_id"] = response_payload.get("final_script_artifact_id")
-
-                code_to_execute = str(response_payload.get("code") or "").strip()
-                if code_to_execute and response_payload.get("execution") is None:
-                    execution_result, retry_count, duration_ms, executed_code = (
-                        await ChatService._execute_generated_code_with_retries(
-                            workspace_id=workspace_id,
-                            workspace_duckdb_path=data_path,
-                            generated_code=code_to_execute,
-                            run_id=run_id,
-                            output_contract=response_payload.get("output_contract") or [],
-                            max_retries=2,
-                        )
-                    )
-                    await ChatService._finalize_kernel_run(
-                        workspace_id=workspace_id,
-                        workspace_duckdb_path=data_path,
-                        run_id=run_id,
-                        question=question,
-                        generated_code=code_to_execute,
-                        executed_code=executed_code,
-                        stdout=str(execution_result.get("stdout") or ""),
-                        stderr=str(execution_result.get("stderr") or execution_result.get("error") or ""),
-                        execution_status="success" if bool(execution_result.get("success")) else "failed",
-                        retry_count=retry_count,
-                    )
-                    artifacts = [
-                        item
-                        for item in (execution_result.get("artifacts") or [])
-                        if isinstance(item, dict)
-                    ]
-                    if not artifacts:
-                        artifacts = await get_workspace_run_exports(
-                            workspace_id=workspace_id,
-                            run_id=run_id,
-                        )
-                    if not artifacts:
-                        artifacts = ChatService._build_inline_artifact_fallback(
-                            run_id=run_id,
-                            execution_result=execution_result,
-                        )
-                    response_payload["artifacts"] = artifacts
-                    response_payload["final_script_artifact_id"] = None
-                    response_payload["execution"] = {
-                        "status": "success" if bool(execution_result.get("success")) else "failed",
-                        "stdout": str(execution_result.get("stdout") or ""),
-                        "stderr": str(execution_result.get("stderr") or execution_result.get("error") or ""),
-                        "retry_count": int(retry_count),
-                        "duration_ms": int(duration_ms),
-                    }
-                elif code_to_execute and response_payload.get("execution") is not None:
-                    execution_result = response_payload.get("execution") or {}
-                    executed_code = str(aggregated.get("final_executed_code") or code_to_execute)
-                    await ChatService._finalize_kernel_run(
-                        workspace_id=workspace_id,
-                        workspace_duckdb_path=data_path,
-                        run_id=run_id,
-                        question=question,
-                        generated_code=code_to_execute,
-                        executed_code=executed_code,
-                        stdout=str(execution_result.get("stdout") or ""),
-                        stderr=str(execution_result.get("stderr") or execution_result.get("error") or ""),
-                        execution_status="success" if bool(execution_result.get("success")) else "failed",
-                        retry_count=int(execution_result.get("retry_count") or 0),
-                    )
-
-                logprint(
-                    "[V1 Chat] final response summary",
-                    level="INFO",
-                    request_id=thread_id,
-                    has_code=bool((response_payload.get("code", "") or "").strip()),
-                    code_len=len(response_payload.get("code", "") or ""),
-                    has_await_query=("await query(" in (response_payload.get("code", "") or "")),
-                    guard_status=aggregated.get("guard_status", ""),
-                    guard_feedback=aggregated.get("code_guard_feedback", ""),
-                )
-
-                turn_id = await ChatService._persist_turn(
-                    session=session,
-                    conversation=conversation,
-                    conversation_id=resolved_conversation_id,
-                    question=question,
-                    attachments=normalized_attachments,
-                    response_payload=response_payload,
-                    result=aggregated,
-                )
-
-                response_payload.update(
-                    {
-                        "conversation_id": resolved_conversation_id,
-                        "turn_id": turn_id,
-                    }
-                )
-                queue_event("final", response_payload)
-            except HTTPException as exc:
-                queue_event(
-                    "error",
-                    {"detail": str(exc.detail), "status_code": int(exc.status_code)},
-                )
-            except Exception as exc:
-                queue_event("error", {"detail": str(exc), "status_code": 500})
-            finally:
-                if active_emitter_token is not None and callable(bindings.reset_stream_token_emitter):
-                    bindings.reset_stream_token_emitter(active_emitter_token)
-                if active_agent_event_token is not None:
-                    reset_agent_event_emitter(active_agent_event_token)
-
-        runner = asyncio.create_task(run_pipeline())
+        payload = ChatService._build_remote_agent_payload(
+            request_id=thread_id,
+            user_id=str(user.id),
+            workspace_id=workspace_id,
+            conversation_id=resolved_conversation_id,
+            question=question,
+            current_code=current_code,
+            model=model,
+            context=context or "",
+            table_name=table_name,
+            preferred_table_name=preferred_table_name,
+            data_path=data_path,
+            schema=schema,
+            attachments=normalized_attachments,
+            llm_prefs=llm_prefs,
+            resolved_api_key=resolved_api_key,
+        )
+        agent_client = AgentClient()
         try:
-            while True:
-                if runner.done() and event_queue.empty():
-                    break
-                try:
-                    queued = await asyncio.wait_for(event_queue.get(), timeout=0.05)
-                except asyncio.TimeoutError:
-                    continue
-                if queued:
-                    yield queued
-        finally:
-            if not runner.done():
-                runner.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await runner
+            await agent_client.assert_health()
+        except AgentRuntimeError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+        yield {"event": "status", "data": {"stage": "start", "message": "Starting analysis"}}
+
+        aggregated: dict[str, Any] = {}
+        async for item in agent_client.stream(payload):
+            event_name = str(item.get("event") or "message").strip() or "message"
+            data = item.get("data")
+            payload_dict = data if isinstance(data, dict) else {"value": data}
+            if event_name == "final":
+                candidate = payload_dict.get("result")
+                if isinstance(candidate, dict):
+                    aggregated = candidate
+                continue
+            yield {"event": event_name, "data": payload_dict}
+
+        if not aggregated:
+            raise HTTPException(status_code=502, detail="Agent stream completed without final result")
+
+        response_payload = ChatService._build_response_payload(aggregated)
+        run_id = str(response_payload.get("run_id") or aggregated.get("run_id") or uuid.uuid4())
+        response_payload["run_id"] = run_id
+        response_payload["execution"] = response_payload.get("execution")
+        response_payload["artifacts"] = response_payload.get("artifacts") or []
+        response_payload["final_script_artifact_id"] = response_payload.get("final_script_artifact_id")
+
+        code_to_execute = str(response_payload.get("code") or "").strip()
+        if code_to_execute and response_payload.get("execution") is None:
+            execution_result, retry_count, duration_ms, executed_code = (
+                await ChatService._execute_generated_code_with_retries(
+                    workspace_id=workspace_id,
+                    workspace_duckdb_path=data_path,
+                    generated_code=code_to_execute,
+                    run_id=run_id,
+                    output_contract=response_payload.get("output_contract") or [],
+                    max_retries=2,
+                )
+            )
+            await ChatService._finalize_kernel_run(
+                workspace_id=workspace_id,
+                workspace_duckdb_path=data_path,
+                run_id=run_id,
+                question=question,
+                generated_code=code_to_execute,
+                executed_code=executed_code,
+                stdout=str(execution_result.get("stdout") or ""),
+                stderr=str(execution_result.get("stderr") or execution_result.get("error") or ""),
+                execution_status="success" if bool(execution_result.get("success")) else "failed",
+                retry_count=retry_count,
+            )
+            artifacts = [
+                item
+                for item in (execution_result.get("artifacts") or [])
+                if isinstance(item, dict)
+            ]
+            if not artifacts:
+                artifacts = await get_workspace_run_exports(
+                    workspace_id=workspace_id,
+                    run_id=run_id,
+                )
+            if not artifacts:
+                artifacts = ChatService._build_inline_artifact_fallback(
+                    run_id=run_id,
+                    execution_result=execution_result,
+                )
+            response_payload["artifacts"] = artifacts
+            response_payload["final_script_artifact_id"] = None
+            response_payload["execution"] = {
+                "status": "success" if bool(execution_result.get("success")) else "failed",
+                "stdout": str(execution_result.get("stdout") or ""),
+                "stderr": str(execution_result.get("stderr") or execution_result.get("error") or ""),
+                "retry_count": int(retry_count),
+                "duration_ms": int(duration_ms),
+            }
+        elif code_to_execute and response_payload.get("execution") is not None:
+            execution_result = response_payload.get("execution") or {}
+            executed_code = str(aggregated.get("final_executed_code") or code_to_execute)
+            await ChatService._finalize_kernel_run(
+                workspace_id=workspace_id,
+                workspace_duckdb_path=data_path,
+                run_id=run_id,
+                question=question,
+                generated_code=code_to_execute,
+                executed_code=executed_code,
+                stdout=str(execution_result.get("stdout") or ""),
+                stderr=str(execution_result.get("stderr") or execution_result.get("error") or ""),
+                execution_status="success" if bool(execution_result.get("success")) else "failed",
+                retry_count=int(execution_result.get("retry_count") or 0),
+            )
+
+        turn_id = await ChatService._persist_turn(
+            session=session,
+            conversation=conversation,
+            conversation_id=resolved_conversation_id,
+            question=question,
+            attachments=normalized_attachments,
+            response_payload=response_payload,
+            result=aggregated,
+        )
+
+        response_payload.update(
+            {
+                "conversation_id": resolved_conversation_id,
+                "turn_id": turn_id,
+            }
+        )
+        yield {"event": "final", "data": response_payload}

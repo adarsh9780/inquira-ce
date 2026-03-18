@@ -2,9 +2,11 @@ use std::collections::HashMap;
 use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::{Read, Write};
+use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::{Child as StdChild, Command};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use serde::{Deserialize, Serialize};
@@ -21,6 +23,7 @@ struct InquiraConfig {
     proxy: Option<ProxyConfig>,
     backend: Option<BackendConfig>,
     execution: Option<ExecutionConfig>,
+    agent_service: Option<AgentServiceConfig>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -51,6 +54,23 @@ struct ExecutionConfig {
     provider: Option<String>,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+struct AgentServiceConfig {
+    host: Option<String>,
+    port: Option<u16>,
+    path: Option<String>,
+    command: Option<String>,
+    api_major: Option<u16>,
+    expected_api_major: Option<u16>,
+    startup_timeout_sec: Option<u64>,
+    auth: Option<AgentServiceAuthConfig>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+struct AgentServiceAuthConfig {
+    mode: Option<String>,
+}
+
 fn load_config(config_path: &PathBuf) -> InquiraConfig {
     if config_path.exists() {
         let content = fs::read_to_string(config_path).unwrap_or_default();
@@ -67,6 +87,7 @@ fn load_config(config_path: &PathBuf) -> InquiraConfig {
                     proxy: None,
                     backend: None,
                     execution: None,
+                    agent_service: None,
                 }
             }
         }
@@ -76,6 +97,7 @@ fn load_config(config_path: &PathBuf) -> InquiraConfig {
             proxy: None,
             backend: None,
             execution: None,
+            agent_service: None,
         }
     }
 }
@@ -93,6 +115,7 @@ fn resolve_resource_path(resource_dir: &PathBuf, relative: &str) -> PathBuf {
 // ─────────────────────────────────────────────────────────────────────
 
 struct BackendProcess(Mutex<Option<StdChild>>);
+struct AgentProcess(Mutex<Option<StdChild>>);
 
 struct PtySession {
     writer: Box<dyn Write + Send>,
@@ -615,6 +638,118 @@ fn start_backend(
     Ok(child)
 }
 
+fn load_or_create_agent_shared_secret(data_dir: &PathBuf) -> Result<String, String> {
+    let secret_path = data_dir.join(".agent-shared-secret");
+    if secret_path.exists() {
+        let existing = fs::read_to_string(&secret_path)
+            .map_err(|e| format!("Failed to read agent secret: {}", e))?;
+        let trimmed = existing.trim().to_string();
+        if !trimmed.is_empty() {
+            return Ok(trimmed);
+        }
+    }
+    let generated = format!("inquira-agent-{}", std::process::id());
+    fs::write(&secret_path, &generated)
+        .map_err(|e| format!("Failed to write agent secret: {}", e))?;
+    Ok(generated)
+}
+
+fn start_agent_runtime(
+    backend_dir: &PathBuf,
+    agent_dir: &PathBuf,
+    venv_path: &PathBuf,
+    config: &InquiraConfig,
+    inquira_toml_path: &PathBuf,
+    shared_secret: &str,
+) -> Result<StdChild, String> {
+    let python_bin = python_bin_from_venv(venv_path);
+    if !python_bin.exists() {
+        return Err(format!(
+            "Python executable not found in venv: {}",
+            python_bin.display()
+        ));
+    }
+
+    let agent_host = config
+        .agent_service
+        .as_ref()
+        .and_then(|a| a.host.clone())
+        .unwrap_or_else(|| "127.0.0.1".to_string());
+    let agent_port = config
+        .agent_service
+        .as_ref()
+        .and_then(|a| a.port)
+        .unwrap_or(8123);
+    let command_override = config
+        .agent_service
+        .as_ref()
+        .and_then(|a| a.command.clone())
+        .unwrap_or_default();
+
+    let mut cmd = if command_override.trim().is_empty() {
+        let mut c = Command::new(&python_bin);
+        c.args(["-m", "agent_runtime.main"]);
+        c
+    } else {
+        let mut parts = command_override.split_whitespace();
+        let head = parts
+            .next()
+            .ok_or_else(|| "Invalid agent_service.command".to_string())?;
+        let mut c = Command::new(head);
+        for part in parts {
+            c.arg(part);
+        }
+        c
+    };
+
+    cmd.current_dir(agent_dir)
+        .env("VIRTUAL_ENV", venv_path.to_string_lossy().to_string())
+        .env("INQUIRA_TOML_PATH", inquira_toml_path.to_string_lossy().to_string())
+        .env("INQUIRA_AGENT_SHARED_SECRET", shared_secret)
+        .env("INQUIRA_AGENT_HOST", agent_host)
+        .env("INQUIRA_AGENT_PORT", agent_port.to_string())
+        .env("PYTHONPATH", format!("{}:{}", backend_dir.display(), agent_dir.display()));
+
+    let child = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to start agent runtime: {}", e))?;
+    Ok(child)
+}
+
+fn wait_for_http_health(
+    host: &str,
+    port: u16,
+    path: &str,
+    timeout: Duration,
+) -> Result<String, String> {
+    let start = Instant::now();
+    while start.elapsed() < timeout {
+        match TcpStream::connect((host, port)) {
+            Ok(mut stream) => {
+                let req = format!(
+                    "GET {} HTTP/1.1\r\nHost: {}:{}\r\nConnection: close\r\n\r\n",
+                    path, host, port
+                );
+                if stream.write_all(req.as_bytes()).is_ok() {
+                    let mut body = String::new();
+                    let _ = stream.read_to_string(&mut body);
+                    if body.starts_with("HTTP/1.1 200") || body.starts_with("HTTP/1.0 200") {
+                        return Ok(body);
+                    }
+                }
+            }
+            Err(_) => {}
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    Err(format!("Timed out waiting for {}:{}{}", host, port, path))
+}
+
+fn response_contains_api_major(body: &str, expected: u16) -> bool {
+    let needle = format!("\"api_major\":{}", expected);
+    body.contains(&needle)
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // App Entry Point
 // ─────────────────────────────────────────────────────────────────────
@@ -625,6 +760,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(BackendProcess(Mutex::new(None)))
+        .manage(AgentProcess(Mutex::new(None)))
         .manage(PtySessions(Mutex::new(HashMap::new())))
         .setup(|app| {
             // Set up logging in debug mode
@@ -677,6 +813,16 @@ pub fn run() {
                     .and_then(|e| e.provider.clone())
                     .unwrap_or_else(|| "local_jupyter".to_string())
             );
+            let agent_dir = if cfg!(debug_assertions) {
+                let configured = config
+                    .agent_service
+                    .as_ref()
+                    .and_then(|a| a.path.clone())
+                    .unwrap_or_else(|| "../agent-runtime".to_string());
+                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(configured)
+            } else {
+                resolve_resource_path(&resource_dir, "agent-runtime")
+            };
             let venv_path = data_dir.join(".venv");
             let backend_env_marker = data_dir.join(".backend-env-fingerprint");
             let expected_backend_env_fingerprint = backend_env_fingerprint(&backend_dir);
@@ -713,8 +859,38 @@ pub fn run() {
                 }
             }
 
-            // Phase 2: Start the backend
-            app.emit("backend-status", "Starting backend...").ok();
+            let shared_secret = match load_or_create_agent_shared_secret(&data_dir) {
+                Ok(secret) => secret,
+                Err(e) => {
+                    app.emit("backend-status", &format!("Startup failed: {}", e))
+                        .ok();
+                    return Ok(());
+                }
+            };
+
+            app.emit("backend-status", "agent-starting").ok();
+            match start_agent_runtime(
+                &backend_dir,
+                &agent_dir,
+                &venv_path,
+                &config,
+                &runtime_config_path,
+                &shared_secret,
+            ) {
+                Ok(child) => {
+                    log::info!("Agent runtime started (PID: {})", child.id());
+                    let state = app.state::<AgentProcess>();
+                    *state.0.lock().unwrap() = Some(child);
+                }
+                Err(e) => {
+                    log::error!("Agent runtime start failed: {}", e);
+                    app.emit("backend-status", &format!("Agent failed: {}", e))
+                        .ok();
+                    return Ok(());
+                }
+            }
+
+            app.emit("backend-status", "backend-starting").ok();
             match start_backend(
                 &uv_bin,
                 &backend_dir,
@@ -726,14 +902,82 @@ pub fn run() {
                     log::info!("Backend process started (PID: {})", child.id());
                     let state = app.state::<BackendProcess>();
                     *state.0.lock().unwrap() = Some(child);
-                    app.emit("backend-status", "ready").ok();
                 }
                 Err(e) => {
                     log::error!("Backend start failed: {}", e);
                     app.emit("backend-status", &format!("Backend failed: {}", e))
                         .ok();
+                    return Ok(());
                 }
             }
+
+            app.emit("backend-status", "health-checking").ok();
+            let backend_host = config
+                .backend
+                .as_ref()
+                .and_then(|b| b.host.clone())
+                .unwrap_or_else(|| "localhost".to_string());
+            let backend_port = config.backend.as_ref().and_then(|b| b.port).unwrap_or(8000);
+            let agent_host = config
+                .agent_service
+                .as_ref()
+                .and_then(|a| a.host.clone())
+                .unwrap_or_else(|| "127.0.0.1".to_string());
+            let agent_port = config
+                .agent_service
+                .as_ref()
+                .and_then(|a| a.port)
+                .unwrap_or(8123);
+            let expected_api_major = config
+                .agent_service
+                .as_ref()
+                .and_then(|a| a.expected_api_major.or(a.api_major))
+                .unwrap_or(1);
+            let timeout_sec = config
+                .agent_service
+                .as_ref()
+                .and_then(|a| a.startup_timeout_sec)
+                .unwrap_or(45);
+
+            let backend_health = wait_for_http_health(
+                &backend_host,
+                backend_port,
+                "/health",
+                Duration::from_secs(timeout_sec),
+            );
+            if let Err(e) = backend_health {
+                app.emit("backend-status", &format!("Backend health failed: {}", e))
+                    .ok();
+                return Ok(());
+            }
+            let agent_health = wait_for_http_health(
+                &agent_host,
+                agent_port,
+                "/v1/health",
+                Duration::from_secs(timeout_sec),
+            );
+            match agent_health {
+                Ok(body) => {
+                    if !response_contains_api_major(&body, expected_api_major) {
+                        app.emit(
+                            "backend-status",
+                            &format!(
+                                "Agent API major mismatch: expected {}",
+                                expected_api_major
+                            ),
+                        )
+                        .ok();
+                        return Ok(());
+                    }
+                }
+                Err(e) => {
+                    app.emit("backend-status", &format!("Agent health failed: {}", e))
+                        .ok();
+                    return Ok(());
+                }
+            }
+
+            app.emit("backend-status", "ready").ok();
 
             Ok(())
         })
@@ -747,8 +991,16 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building Inquira")
         .run(|app, event| {
-            // Kill the backend process when the app exits
+            // Kill child processes when the app exits
             if let tauri::RunEvent::Exit = event {
+                if let Some(state) = app.try_state::<AgentProcess>() {
+                    if let Ok(mut guard) = state.0.lock() {
+                        if let Some(ref mut child) = *guard {
+                            log::info!("Shutting down agent runtime process...");
+                            let _ = child.kill();
+                        }
+                    }
+                }
                 if let Some(state) = app.try_state::<BackendProcess>() {
                     if let Ok(mut guard) = state.0.lock() {
                         if let Some(ref mut child) = *guard {
@@ -820,6 +1072,7 @@ mod tests {
             proxy: None,
             backend: None,
             execution: None,
+            agent_service: None,
         }
     }
 
@@ -831,6 +1084,7 @@ mod tests {
             proxy: None,
             backend: None,
             execution: None,
+            agent_service: None,
         };
         assert_eq!(resolve_uv_index_url(&config), "https://pypi.org/simple");
     }

@@ -69,6 +69,25 @@ project = "inquira-dev"
 # Local Phoenix collector endpoint (OTLP HTTP)
 endpoint = "http://127.0.0.1:6006/v1/traces"
 
+[agent_service]
+host = "127.0.0.1"
+port = 8123
+api_major = 1
+expected_api_major = 1
+startup_timeout_sec = 45
+# Optional override path where the external agent runtime is launched from.
+# path = "agent-runtime"
+# Optional full command override (defaults to: <venv-python> -m agent_runtime.main)
+# command = ""
+
+[agent_service.auth]
+mode = "shared_secret"
+
+[agent_service.phoenix]
+enabled = false
+project = "inquira-agent"
+endpoint = "http://127.0.0.1:6006/v1/traces"
+
 [llm]
 # Supported providers: "openrouter", "openai", "ollama", "anthropic"
 # - openrouter: uses OpenRouter API (default, requires OPENROUTER_API_KEY)

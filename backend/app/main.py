@@ -37,7 +37,6 @@ from .services.execution_config import load_execution_runtime_config
 from .services.terminal_executor import shutdown_terminal_sessions
 from .services.session_variable_store import session_variable_store
 from .services.websocket_manager import websocket_manager
-from .services.tracing import init_phoenix_tracing
 
 APP_VERSION = "0.5.7a10"
 
@@ -79,7 +78,6 @@ def _load_cors_origins() -> list[str]:
 async def lifespan(app: FastAPI):
     """Manage the lifecycle of the application"""
     logprint("API server started. Authentication system initialized.")
-    init_phoenix_tracing()
 
     # Initialize app state with None values
     app.state.api_key = None
@@ -202,6 +200,11 @@ app.add_middleware(
 
 # Include v1 router only
 app.include_router(v1_router)
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "backend"}
 
 
 async def _resolve_websocket_user(websocket: WebSocket):
