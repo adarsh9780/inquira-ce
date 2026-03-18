@@ -140,6 +140,48 @@ struct PtyStopResponse {
     stopped: bool,
 }
 
+fn stop_child_process(name: &str, child: &mut StdChild) {
+    match child.try_wait() {
+        Ok(Some(status)) => {
+            log::info!("{name} process already exited with status: {status}");
+            return;
+        }
+        Ok(None) => {}
+        Err(e) => {
+            log::warn!("Failed to check {name} process status before shutdown: {e}");
+        }
+    }
+
+    if let Err(e) = child.kill() {
+        log::warn!("Failed to kill {name} process: {e}");
+    }
+    if let Err(e) = child.wait() {
+        log::warn!("Failed to wait for {name} process exit: {e}");
+    }
+}
+
+fn stop_agent_process(app: &tauri::AppHandle) {
+    if let Some(state) = app.try_state::<AgentProcess>() {
+        if let Ok(mut guard) = state.0.lock() {
+            if let Some(mut child) = guard.take() {
+                log::info!("Shutting down agent runtime process...");
+                stop_child_process("agent runtime", &mut child);
+            }
+        }
+    }
+}
+
+fn stop_backend_process(app: &tauri::AppHandle) {
+    if let Some(state) = app.try_state::<BackendProcess>() {
+        if let Ok(mut guard) = state.0.lock() {
+            if let Some(mut child) = guard.take() {
+                log::info!("Shutting down backend process...");
+                stop_child_process("backend", &mut child);
+            }
+        }
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Tauri Commands (callable from frontend via invoke())
 // ─────────────────────────────────────────────────────────────────────
@@ -923,6 +965,7 @@ pub fn run() {
                 }
                 Err(e) => {
                     log::error!("Backend start failed: {}", e);
+                    stop_agent_process(&app.handle());
                     app.emit("backend-status", &format!("Backend failed: {}", e))
                         .ok();
                     return Ok(());
@@ -959,6 +1002,8 @@ pub fn run() {
                 Duration::from_secs(timeout_sec),
             );
             if let Err(e) = backend_health {
+                stop_backend_process(&app.handle());
+                stop_agent_process(&app.handle());
                 app.emit("backend-status", &format!("Backend health failed: {}", e))
                     .ok();
                 return Ok(());
@@ -972,6 +1017,8 @@ pub fn run() {
             match agent_health {
                 Ok(_body) => {}
                 Err(e) => {
+                    stop_backend_process(&app.handle());
+                    stop_agent_process(&app.handle());
                     app.emit("backend-status", &format!("Agent health failed: {}", e))
                         .ok();
                     return Ok(());
@@ -992,31 +1039,22 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building Inquira")
         .run(|app, event| {
-            // Kill child processes when the app exits
-            if let tauri::RunEvent::Exit = event {
-                if let Some(state) = app.try_state::<AgentProcess>() {
-                    if let Ok(mut guard) = state.0.lock() {
-                        if let Some(ref mut child) = *guard {
-                            log::info!("Shutting down agent runtime process...");
-                            let _ = child.kill();
-                        }
-                    }
-                }
-                if let Some(state) = app.try_state::<BackendProcess>() {
-                    if let Ok(mut guard) = state.0.lock() {
-                        if let Some(ref mut child) = *guard {
-                            log::info!("Shutting down backend process...");
-                            let _ = child.kill();
-                        }
-                    }
-                }
+            let should_shutdown_children = matches!(
+                event,
+                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
+            );
+            if !should_shutdown_children {
+                return;
+            }
 
-                if let Some(sessions) = app.try_state::<PtySessions>() {
-                    if let Ok(mut guard) = sessions.0.lock() {
-                        for (session_id, mut session) in guard.drain() {
-                            let _ = session.child.kill();
-                            let _ = app.emit("terminal:pty-exit", PtyExitEvent { session_id });
-                        }
+            stop_agent_process(app);
+            stop_backend_process(app);
+
+            if let Some(sessions) = app.try_state::<PtySessions>() {
+                if let Ok(mut guard) = sessions.0.lock() {
+                    for (session_id, mut session) in guard.drain() {
+                        let _ = session.child.kill();
+                        let _ = app.emit("terminal:pty-exit", PtyExitEvent { session_id });
                     }
                 }
             }
@@ -1027,10 +1065,11 @@ pub fn run() {
 mod tests {
     use super::{
         detect_default_shell, needs_python_bootstrap, resolve_pty_cwd, resolve_resource_path,
-        resolve_uv_index_url, InquiraConfig, PythonConfig,
+        resolve_uv_index_url, stop_child_process, InquiraConfig, PythonConfig,
     };
     use std::fs;
     use std::path::PathBuf;
+    use std::process::Command;
 
     #[test]
     fn bootstrap_required_when_venv_missing() {
@@ -1061,6 +1100,25 @@ mod tests {
         fs::write(&marker, "same").expect("write marker");
 
         assert!(!needs_python_bootstrap(&venv, &marker, "same", false));
+    }
+
+    #[test]
+    fn stop_child_process_terminates_running_child() {
+        let mut child = if cfg!(target_os = "windows") {
+            Command::new("cmd")
+                .args(["/C", "timeout /T 30 /NOBREAK >NUL"])
+                .spawn()
+                .expect("spawn child")
+        } else {
+            Command::new("sh")
+                .args(["-c", "sleep 30"])
+                .spawn()
+                .expect("spawn child")
+        };
+
+        stop_child_process("test", &mut child);
+        let status = child.try_wait().expect("query child status");
+        assert!(status.is_some(), "child should be terminated");
     }
 
     fn base_config_with_index(index_url: Option<&str>) -> InquiraConfig {
