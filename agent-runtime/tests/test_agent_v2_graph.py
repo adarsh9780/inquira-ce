@@ -1,10 +1,17 @@
 import asyncio
+import inspect
 
 from agent_v2.graph import build_graph
 
 
+def test_agent_v2_build_graph_matches_langgraph_factory_signature() -> None:
+    params = list(inspect.signature(build_graph).parameters.values())
+    assert len(params) == 1
+    assert params[0].name == "config"
+
+
 def test_agent_v2_unsafe_prompt_routes_to_reject() -> None:
-    graph = build_graph()
+    graph = build_graph({})
     result = asyncio.run(
         graph.ainvoke(
             {
@@ -24,7 +31,7 @@ def test_agent_v2_unsafe_prompt_routes_to_reject() -> None:
 
 
 def test_agent_v2_unsafe_prompt_stream_emits_finalize() -> None:
-    graph = build_graph()
+    graph = build_graph({})
 
     async def _collect() -> list[dict]:
         events: list[dict] = []

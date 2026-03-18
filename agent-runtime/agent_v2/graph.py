@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from typing import Any
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 
 from .nodes import (
@@ -62,9 +63,8 @@ class AgentV2Graph:
         async for step in self._graph.astream(input_state, config=config or {}):
             yield step if isinstance(step, dict) else {"unknown": {"value": step}}
 
-
-
-def build_graph(*_args: Any, **_kwargs: Any) -> AgentV2Graph:
+def build_graph(config: RunnableConfig) -> AgentV2Graph:
+    _ = config
     from langgraph.graph import END, START, StateGraph
 
     from .state import AgentInput, AgentOutput, AgentState
