@@ -5,12 +5,12 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from ...agent.events import emit_agent_event
-from ...agent.registry import load_agent_runtime_config
 from ...services.code_executor import bootstrap_workspace_runtime, reset_workspace_kernel
 from ...services.execution_config import load_execution_runtime_config
 from ...services.runner_env import install_runner_package
 from ...v1.services.agent_intervention_service import get_agent_intervention_service
+from ..events import emit_agent_event
+from ..runtime import load_agent_runtime_config
 from . import new_tool_call_id
 
 

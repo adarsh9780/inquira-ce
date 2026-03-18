@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ...agent.events import emit_agent_event
+from ..events import emit_agent_event
 from . import new_tool_call_id
 
 

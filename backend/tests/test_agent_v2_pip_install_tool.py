@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.agent.events import reset_agent_event_emitter, set_agent_event_emitter
+from app.agent_v2.events import reset_agent_event_emitter, set_agent_event_emitter
 from app.agent_v2.tools.pip_install import pip_install
 
 

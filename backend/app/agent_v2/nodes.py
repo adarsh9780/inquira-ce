@@ -14,16 +14,16 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel
 
-from ..agent.code_guard import guard_code
-from ..agent.events import emit_agent_event
-from ..agent.registry import load_agent_runtime_config
 from ..coding_agent import AnalysisOutput, build_coding_chain, invoke_coding_chain
 from ..services.chat_model_factory import create_chat_model
 from ..services.code_executor import get_workspace_run_exports
 from ..services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
 from ..services.llm_provider_catalog import normalize_llm_provider, provider_requires_api_key
 from ..services.output_capture import build_run_wrapped_code
+from .code_guard import guard_code
+from .events import emit_agent_event
 from .router import decide_route
+from .runtime import load_agent_runtime_config
 from .streaming import emit_stream_token
 from .tools.bash_tool import run_bash
 from .tools.execute_python import execute_python

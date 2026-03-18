@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...agent.events import emit_agent_event
+from ..events import emit_agent_event
 from . import new_tool_call_id
 
 

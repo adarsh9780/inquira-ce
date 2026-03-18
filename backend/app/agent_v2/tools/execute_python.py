@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ...agent.events import emit_agent_event
 from ...services.execution_service import get_code_execution_service
+from ..events import emit_agent_event
 from . import new_tool_call_id
 
 

@@ -7,9 +7,9 @@ import shlex
 from pathlib import Path
 from typing import Any
 
-from ...agent.events import emit_agent_event
-from ...agent.registry import load_agent_runtime_config
 from ...services.terminal_executor import stream_workspace_terminal_command
+from ..events import emit_agent_event
+from ..runtime import load_agent_runtime_config
 from . import new_tool_call_id
 
 
