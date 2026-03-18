@@ -4,14 +4,16 @@ from app.services.agent_client import AgentClient, AgentRuntimeError
 
 
 @pytest.mark.asyncio
-async def test_agent_client_fails_on_api_major_mismatch(monkeypatch):
+async def test_agent_client_fails_on_contract_api_major_mismatch(monkeypatch):
     class _Resp:
-        status_code = 200
-        text = ""
-        content = b"{}"
+        def __init__(self, status_code: int = 200, payload=None):
+            self.status_code = status_code
+            self.text = ""
+            self.content = b"{}"
+            self._payload = payload if payload is not None else {}
 
         def json(self):
-            return {"status": "ok", "api_major": 9}
+            return self._payload
 
     class _Client:
         def __init__(self, *args, **kwargs):
@@ -24,19 +26,34 @@ async def test_agent_client_fails_on_api_major_mismatch(monkeypatch):
             _ = exc_type, exc, tb
             return False
 
-        async def get(self, *args, **kwargs):
+        async def get(self, url, *args, **kwargs):
             _ = args, kwargs
-            return _Resp()
+            if url.endswith("/ok"):
+                return _Resp(200, {"ok": True})
+            if url.endswith("/info"):
+                return _Resp(200, {"version": "0.0.0"})
+            return _Resp(404, {})
+
+        async def post(self, url, *args, **kwargs):
+            _ = args, kwargs
+            if url.endswith("/assistants/search"):
+                return _Resp(200, [{"assistant_id": "agent_v2"}])
+            return _Resp(404, {})
 
     monkeypatch.setattr("app.services.agent_client.httpx.AsyncClient", _Client)
     monkeypatch.setattr(
         "app.services.agent_client.load_agent_service_config",
-        lambda: type("Cfg", (), {
-            "base_url": "http://127.0.0.1:8123",
-            "expected_api_major": 1,
-            "auth_mode": "shared_secret",
-            "shared_secret": "abc",
-        })(),
+        lambda: type(
+            "Cfg",
+            (),
+            {
+                "base_url": "http://127.0.0.1:8123",
+                "expected_api_major": 9,
+                "default_agent": "agent_v2",
+                "auth_mode": "shared_secret",
+                "shared_secret": "abc",
+            },
+        )(),
     )
 
     client = AgentClient()

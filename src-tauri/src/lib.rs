@@ -684,11 +684,44 @@ fn start_agent_runtime(
         .as_ref()
         .and_then(|a| a.command.clone())
         .unwrap_or_default();
+    let langgraph_bin = if cfg!(target_os = "windows") {
+        venv_path.join("Scripts").join("langgraph.exe")
+    } else {
+        venv_path.join("bin").join("langgraph")
+    };
 
     let mut cmd = if command_override.trim().is_empty() {
-        let mut c = Command::new(&python_bin);
-        c.args(["-m", "runtime_server.main"]);
-        c
+        if langgraph_bin.exists() {
+            let mut c = Command::new(&langgraph_bin);
+            c.args([
+                "dev",
+                "--config",
+                "langgraph.json",
+                "--host",
+                &agent_host,
+                "--port",
+                &agent_port.to_string(),
+                "--no-browser",
+                "--no-reload",
+            ]);
+            c
+        } else {
+            let mut c = Command::new(&python_bin);
+            c.args([
+                "-m",
+                "langgraph_cli.cli",
+                "dev",
+                "--config",
+                "langgraph.json",
+                "--host",
+                &agent_host,
+                "--port",
+                &agent_port.to_string(),
+                "--no-browser",
+                "--no-reload",
+            ]);
+            c
+        }
     } else {
         let mut parts = command_override.split_whitespace();
         let head = parts
@@ -742,11 +775,6 @@ fn wait_for_http_health(
         std::thread::sleep(Duration::from_millis(200));
     }
     Err(format!("Timed out waiting for {}:{}{}", host, port, path))
-}
-
-fn response_contains_api_major(body: &str, expected: u16) -> bool {
-    let needle = format!("\"api_major\":{}", expected);
-    body.contains(&needle)
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -926,11 +954,6 @@ pub fn run() {
                 .as_ref()
                 .and_then(|a| a.port)
                 .unwrap_or(8123);
-            let expected_api_major = config
-                .agent_service
-                .as_ref()
-                .and_then(|a| a.expected_api_major.or(a.api_major))
-                .unwrap_or(1);
             let timeout_sec = config
                 .agent_service
                 .as_ref()
@@ -951,23 +974,11 @@ pub fn run() {
             let agent_health = wait_for_http_health(
                 &agent_host,
                 agent_port,
-                "/v1/health",
+                "/ok",
                 Duration::from_secs(timeout_sec),
             );
             match agent_health {
-                Ok(body) => {
-                    if !response_contains_api_major(&body, expected_api_major) {
-                        app.emit(
-                            "backend-status",
-                            &format!(
-                                "Agent API major mismatch: expected {}",
-                                expected_api_major
-                            ),
-                        )
-                        .ok();
-                        return Ok(());
-                    }
-                }
+                Ok(_body) => {}
                 Err(e) => {
                     app.emit("backend-status", &format!("Agent health failed: {}", e))
                         .ok();
