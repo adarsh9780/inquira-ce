@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any, AsyncGenerator
 
@@ -18,6 +19,7 @@ class AgentClient:
     _CONTRACT_API_MAJOR = 1
     _RUN_MAX_RETRIES = 1
     _STREAM_MAX_RETRIES = 1
+    _RETRY_BACKOFF_SECONDS = 0.6
 
     def __init__(self) -> None:
         self._cfg = load_agent_service_config()
@@ -231,7 +233,6 @@ class AgentClient:
                                         detail = payload_data if isinstance(payload_data, dict) else {"detail": str(payload_data)}
                                         if (
                                             attempt < attempts - 1
-                                            and not yielded_payload
                                             and self._is_retryable_connection_error_detail(detail)
                                         ):
                                             raise AgentRuntimeError("__retry_stream__")
@@ -258,5 +259,6 @@ class AgentClient:
                 raise self._unreachable_error("stream", exc) from exc
             except AgentRuntimeError as exc:
                 if str(exc) == "__retry_stream__":
+                    await asyncio.sleep(self._RETRY_BACKOFF_SECONDS * (attempt + 1))
                     continue
                 raise

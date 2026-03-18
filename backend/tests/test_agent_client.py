@@ -248,6 +248,9 @@ async def test_agent_client_stream_retries_once_on_retryable_api_connection_erro
             type(self).stream_calls += 1
             if type(self).stream_calls == 1:
                 lines = [
+                    "event: updates",
+                    'data: {"route":{"next":"react_loop"}}',
+                    "",
                     "event: error",
                     'data: {"error":"APIConnectionError","message":"Connection error."}',
                     "",
@@ -285,5 +288,4 @@ async def test_agent_client_stream_retries_once_on_retryable_api_connection_erro
         events.append(event)
 
     assert _Client.stream_calls == 2
-    assert len(events) == 1
-    assert events[0]["event"] == "values"
+    assert [evt["event"] for evt in events] == ["updates", "values"]
