@@ -12,7 +12,7 @@ from typing import Any
 
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from ...agent.registry import get_agent_bindings
+from ...agent_v2.registry import get_agent_bindings
 
 
 class WorkspaceLangGraphManager:

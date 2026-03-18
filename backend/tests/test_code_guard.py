@@ -1,5 +1,4 @@
-from app.agent.code_guard import guard_code
-from app.agent.graph import InquiraAgent, State
+from app.agent_v2.code_guard import guard_code
 
 
 def test_code_guard_allows_conn_backed_duckdb_execution():
@@ -22,16 +21,6 @@ def test_code_guard_blocks_empty_code():
     assert result.should_retry is True
     assert "Empty code" in result.reason
     assert result.code == ""
-
-
-def test_code_guard_node_preserves_valid_code():
-    agent = InquiraAgent()
-    code = "df = conn.sql('SELECT 1 AS value').fetchdf()"
-    state = State(messages=[], code=code, table_name="events")
-
-    result = agent.code_guard(state, {})
-    assert result["guard_status"] == "ok"
-    assert result["code"] == code
 
 
 def test_code_guard_blocks_new_duckdb_connections():

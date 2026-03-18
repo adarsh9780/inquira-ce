@@ -7,7 +7,7 @@ from app.v1.services.chat_service import ChatService
 
 class _FakeGraph:
     async def astream(self, _input_state, config=None):
-        from app.agent.graph import emit_stream_token
+        from app.agent_v2.streaming import emit_stream_token
 
         emit_stream_token("create_plan", "Hello")
         emit_stream_token("create_plan", " world")

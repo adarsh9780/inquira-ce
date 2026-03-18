@@ -1,10 +1,7 @@
 from types import SimpleNamespace
 
 import pytest
-import warnings
 
-from app.agent.graph import InquiraAgent
-from app.services.llm_runtime_config import LlmRuntimeConfig
 from app.v1.services.chat_service import ChatService
 
 
@@ -67,87 +64,6 @@ async def test_chat_service_passes_model_and_context_to_graph(monkeypatch):
 
     assert captured["model"] == "gemini-2.5-pro"
     assert captured["context"] == "retail demand planning"
-
-
-def test_agent_model_selection_uses_configurable_model(monkeypatch):
-    called = {}
-
-    class FakeModel:
-        pass
-
-    def _fake_create_chat_model(**kwargs):
-        called.update(kwargs)
-        return FakeModel()
-
-    monkeypatch.setattr("app.agent.graph.create_chat_model", _fake_create_chat_model)
-    monkeypatch.setattr(
-        "app.agent.graph.load_llm_runtime_config",
-        lambda: LlmRuntimeConfig(
-            provider="openrouter",
-            base_url="http://localhost:4000/v1",
-            default_model="google/gemini-2.5-flash",
-            lite_model="google/gemini-2.5-flash-lite",
-        ),
-    )
-
-    agent = InquiraAgent()
-    agent._get_model(
-        {"configurable": {"model": "openai/gpt-4o-mini", "api_key": "key"}},
-        model_name="gemini-2.5-flash",
-    )
-
-    assert called["model"] == "openai/gpt-4o-mini"
-    assert called["base_url"] == "http://localhost:4000/v1"
-    assert called["api_key"] == "key"
-    assert called["temperature"] == 0
-    assert called["max_tokens"] == 4096
-
-
-def test_agent_model_selection_maps_legacy_lite_model_to_runtime_default(monkeypatch):
-    called = {}
-
-    class FakeModel:
-        pass
-
-    def _fake_create_chat_model(**kwargs):
-        called.update(kwargs)
-        return FakeModel()
-
-    monkeypatch.setattr("app.agent.graph.create_chat_model", _fake_create_chat_model)
-    monkeypatch.setattr(
-        "app.agent.graph.load_llm_runtime_config",
-        lambda: LlmRuntimeConfig(
-            provider="openrouter",
-            base_url="http://localhost:4000/v1",
-            default_model="google/gemini-2.5-flash",
-            lite_model="google/gemini-2.5-flash-lite",
-        ),
-    )
-
-    agent = InquiraAgent()
-    agent._get_model({"configurable": {"api_key": "k"}}, model_name="gemini-2.5-flash-lite")
-
-    assert called["model"] == "google/gemini-2.5-flash-lite"
-    assert called["max_tokens"] == 4096
-
-
-def test_agent_structured_invoke_suppresses_known_pydantic_serializer_warning():
-    class FakeChain:
-        def invoke(self, payload):
-            warnings.warn(
-                "Pydantic serializer warnings:\n"
-                "  PydanticSerializationUnexpectedValue(...)",
-                UserWarning,
-            )
-            return payload
-
-    with warnings.catch_warnings(record=True) as captured_warnings:
-        warnings.simplefilter("always")
-        result = InquiraAgent._invoke_structured_chain(FakeChain(), {"ok": True})
-
-    assert result == {"ok": True}
-    assert len(captured_warnings) == 0
-
 
 @pytest.mark.asyncio
 async def test_resolve_llm_preferences_includes_selected_coding_model(monkeypatch):

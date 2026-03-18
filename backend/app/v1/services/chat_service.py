@@ -12,15 +12,14 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any
-from typing import Callable
 from typing import cast
 
 import duckdb
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...agent.events import reset_agent_event_emitter, set_agent_event_emitter
-from ...agent.registry import get_agent_bindings
+from ...agent_v2.events import reset_agent_event_emitter, set_agent_event_emitter
+from ...agent_v2.registry import get_agent_bindings
 from ...services.code_executor import execute_code, get_workspace_run_exports
 from ...services.output_capture import (
     build_auto_capture_result_code,
@@ -42,22 +41,6 @@ from .conversation_service import ConversationService
 from .secret_storage_service import SecretStorageService
 from .workspace_storage_service import WorkspaceStorageService
 from ...core.logger import logprint
-
-LegacySetStreamEmitter = Callable[[Callable[[str, str], None] | None], Any]
-LegacyResetStreamEmitter = Callable[[Any], None]
-set_legacy_stream_token_emitter: LegacySetStreamEmitter | None
-reset_legacy_stream_token_emitter: LegacyResetStreamEmitter | None
-
-try:
-    from ...agent.graph import (
-        reset_stream_token_emitter as reset_legacy_stream_token_emitter,
-    )
-    from ...agent.graph import (
-        set_stream_token_emitter as set_legacy_stream_token_emitter,
-    )
-except Exception:  # pragma: no cover - legacy fallback only
-    set_legacy_stream_token_emitter = None
-    reset_legacy_stream_token_emitter = None
 
 
 class _AttrAccessDict(dict[str, Any]):
@@ -1125,7 +1108,6 @@ class ChatService:
         """Async generator that yields incremental analysis events (SSE-compatible)."""
         event_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
         active_emitter_token = None
-        active_legacy_emitter_token = None
         active_agent_event_token = None
         bindings = get_agent_bindings()
 
@@ -1133,7 +1115,7 @@ class ChatService:
             event_queue.put_nowait({"event": event, "data": data})
 
         async def run_pipeline() -> None:
-            nonlocal active_emitter_token, active_legacy_emitter_token, active_agent_event_token, bindings
+            nonlocal active_emitter_token, active_agent_event_token, bindings
             try:
                 conversation, resolved_conversation_id, schema, table_name, data_path = (
                     await ChatService._preflight_check(
@@ -1206,8 +1188,6 @@ class ChatService:
 
                 if callable(bindings.set_stream_token_emitter):
                     active_emitter_token = bindings.set_stream_token_emitter(emit_token)
-                if callable(set_legacy_stream_token_emitter):
-                    active_legacy_emitter_token = set_legacy_stream_token_emitter(emit_token)
                 active_agent_event_token = set_agent_event_emitter(
                     lambda event, data: queue_event(event, data)
                 )
@@ -1359,11 +1339,6 @@ class ChatService:
             finally:
                 if active_emitter_token is not None and callable(bindings.reset_stream_token_emitter):
                     bindings.reset_stream_token_emitter(active_emitter_token)
-                if (
-                    active_legacy_emitter_token is not None
-                    and callable(reset_legacy_stream_token_emitter)
-                ):
-                    reset_legacy_stream_token_emitter(active_legacy_emitter_token)
                 if active_agent_event_token is not None:
                     reset_agent_event_emitter(active_agent_event_token)
 
