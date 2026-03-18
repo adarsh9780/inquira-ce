@@ -253,6 +253,31 @@ const FINAL_STREAM_NODES = new Set([
   'reject'
 ])
 
+function extractLangGraphTokenText(payload) {
+  if (!payload) return ''
+  if (typeof payload === 'string') return payload
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const nested = extractLangGraphTokenText(item)
+      if (nested) return nested
+    }
+    return ''
+  }
+  if (typeof payload === 'object') {
+    if (typeof payload.text === 'string' && payload.text) return payload.text
+    if (typeof payload.content === 'string' && payload.content) return payload.content
+    const content = payload.content
+    if (Array.isArray(content)) {
+      for (const item of content) {
+        if (item && typeof item === 'object' && item.type === 'text' && typeof item.text === 'string') {
+          if (item.text) return item.text
+        }
+      }
+    }
+  }
+  return ''
+}
+
 function parseArtifactTimestampMs(value) {
   const raw = String(value || '').trim()
   if (!raw) return 0
@@ -974,6 +999,26 @@ async function handleSubmit() {
       {
         signal,
         onEvent: (evt) => {
+          if ((evt.event === 'messages' || evt.event === 'messages/partial' || evt.event === 'messages-tuple')) {
+            const text = extractLangGraphTokenText(evt.data)
+            if (text) {
+              appStore.appendLastMessageExplanationChunk(text)
+            }
+            return
+          }
+          if (evt.event === 'updates' && evt.data && typeof evt.data === 'object') {
+            Object.entries(evt.data).forEach(([node, output]) => {
+              const normalizedNode = String(node || '')
+              const payload = (output && typeof output === 'object') ? output : {}
+              appStore.appendLastMessageTraceEvent({
+                type: 'node',
+                node: normalizedNode,
+                message: `${normalizedNode} completed`,
+                output: String(payload.plan || payload.answer || payload.code || payload.current_code || '')
+              })
+            })
+            return
+          }
           if (evt.event === 'token' && typeof evt.data?.text === 'string') {
             const nodeName = String(evt.data?.node || '').trim().toLowerCase()
             if (FINAL_STREAM_NODES.has(nodeName)) {

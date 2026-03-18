@@ -14,6 +14,9 @@ def test_openapi_contains_required_v1_routes():
     assert "/api/v1/workspaces/{workspace_id}/database/clear" in paths
     assert "/api/v1/chat/analyze" in paths
     assert "/api/v1/chat/interventions/{intervention_id}/response" in paths
+    assert "/api/v1/agent/ok" in paths
+    assert "/api/v1/agent/info" in paths
+    assert "/api/v1/agent/runs/stream" in paths
     assert "/api/v1/workspaces/{workspace_id}/datasets/browser-sync" in paths
     assert "/api/v1/preferences" in paths
     assert "/api/v1/preferences/api-key" in paths

@@ -1185,14 +1185,24 @@ class ChatService:
         yield {"event": "status", "data": {"stage": "start", "message": "Starting analysis"}}
 
         aggregated: dict[str, Any] = {}
+        stream_run_id = ""
         async for item in agent_client.stream(payload):
             event_name = str(item.get("event") or "message").strip() or "message"
             data = item.get("data")
             payload_dict = data if isinstance(data, dict) else {"value": data}
-            if event_name == "final":
+            if event_name == "metadata":
+                stream_run_id = str(payload_dict.get("run_id") or stream_run_id)
+            elif event_name == "values" and isinstance(data, dict):
+                aggregated.update(data)
+            elif event_name == "updates" and isinstance(data, dict):
+                for node_payload in data.values():
+                    if isinstance(node_payload, dict):
+                        aggregated.update(node_payload)
+            elif event_name == "final":
+                # Defensive compatibility for legacy stream fakes that emit a synthetic final payload.
                 candidate = payload_dict.get("result")
                 if isinstance(candidate, dict):
-                    aggregated = candidate
+                    aggregated.update(candidate)
                 continue
             yield {"event": event_name, "data": payload_dict}
 
@@ -1200,7 +1210,12 @@ class ChatService:
             raise HTTPException(status_code=502, detail="Agent stream completed without final result")
 
         response_payload = ChatService._build_response_payload(aggregated)
-        run_id = str(response_payload.get("run_id") or aggregated.get("run_id") or uuid.uuid4())
+        run_id = str(
+            response_payload.get("run_id")
+            or aggregated.get("run_id")
+            or stream_run_id
+            or uuid.uuid4()
+        )
         response_payload["run_id"] = run_id
         response_payload["execution"] = response_payload.get("execution")
         response_payload["artifacts"] = response_payload.get("artifacts") or []

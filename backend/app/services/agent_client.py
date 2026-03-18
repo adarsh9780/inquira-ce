@@ -32,6 +32,12 @@ class AgentClient:
             headers["Authorization"] = f"Bearer {self._cfg.shared_secret}"
         return headers
 
+    def headers_with(self, extra: dict[str, str] | None = None) -> dict[str, str]:
+        headers = dict(self._headers)
+        if isinstance(extra, dict):
+            headers.update(extra)
+        return headers
+
     @staticmethod
     def _configurable(payload: dict[str, Any]) -> dict[str, Any]:
         llm = payload.get("llm") if isinstance(payload.get("llm"), dict) else {}
@@ -187,8 +193,6 @@ class AgentClient:
 
                     event_name = "message"
                     data_parts: list[str] = []
-                    aggregated: dict[str, Any] = {}
-                    run_id = ""
 
                     async for raw_line in resp.aiter_lines():
                         line = str(raw_line or "")
@@ -200,31 +204,7 @@ class AgentClient:
                                 except Exception:
                                     payload_data = {"raw": payload_text}
 
-                                if event_name == "metadata" and isinstance(payload_data, dict):
-                                    run_id = str(payload_data.get("run_id") or run_id)
-                                elif event_name == "updates" and isinstance(payload_data, dict):
-                                    for node_name, node_payload in payload_data.items():
-                                        payload_dict = node_payload if isinstance(node_payload, dict) else {"value": node_payload}
-                                        if isinstance(node_payload, dict):
-                                            aggregated.update(node_payload)
-                                        yield {
-                                            "event": "node",
-                                            "data": {
-                                                "node": str(node_name),
-                                                "output": str(payload_dict.get("plan") or payload_dict.get("answer") or ""),
-                                            },
-                                        }
-                                elif event_name == "values" and isinstance(payload_data, dict):
-                                    aggregated.update(payload_data)
-                                elif event_name in {"messages", "messages/partial", "messages-tuple"}:
-                                    text = ""
-                                    if isinstance(payload_data, dict):
-                                        text = str(payload_data.get("content") or payload_data.get("text") or "")
-                                    elif isinstance(payload_data, list) and payload_data:
-                                        text = str(payload_data[0] or "")
-                                    if text:
-                                        yield {"event": "token", "data": {"node": "messages", "text": text}}
-                                elif event_name in {"error", "failed"}:
+                                if event_name in {"error", "failed"}:
                                     detail = payload_data if isinstance(payload_data, dict) else {"detail": str(payload_data)}
                                     raise AgentRuntimeError(f"Agent stream error: {detail}")
                                 elif event_name not in {"end"}:
@@ -240,9 +220,5 @@ class AgentClient:
                             continue
                         if line.startswith("data:"):
                             data_parts.append(line[5:].strip())
-
-                    if aggregated:
-                        final_payload = {"run_id": run_id or "", "result": aggregated}
-                        yield {"event": "final", "data": final_payload}
         except httpx.HTTPError as exc:
             raise self._unreachable_error("stream", exc) from exc

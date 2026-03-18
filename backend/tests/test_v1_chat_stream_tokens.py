@@ -77,3 +77,74 @@ async def test_v1_chat_stream_emits_token_events_before_final(monkeypatch):
     assert node_events[0]["data"]["output"] == "Hello world"
     assert final_events
     assert events.index(token_events[0]) < events.index(final_events[0])
+
+
+@pytest.mark.asyncio
+async def test_v1_chat_stream_passthrough_langgraph_events_and_finalize(monkeypatch):
+    async def _fake_preflight(**_kwargs):
+        return (SimpleNamespace(title="New Conversation"), "conv-2", {}, "tbl", "/tmp/ws.db")
+
+    async def _fake_persist_turn(**_kwargs):
+        return "turn-2"
+
+    monkeypatch.setattr(ChatService, "_preflight_check", staticmethod(_fake_preflight))
+    monkeypatch.setattr(ChatService, "_persist_turn", staticmethod(_fake_persist_turn))
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.SecretStorageService.get_api_key",
+        lambda _uid, provider="openrouter": "key",
+    )
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.AgentClient.assert_health",
+        lambda _self: _fake_health(),
+    )
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.AgentClient.stream",
+        lambda _self, _payload: _fake_stream(),
+    )
+
+    async def _fake_health():
+        return {"status": "ok", "api_major": 1}
+
+    async def _fake_stream():
+        yield {"event": "metadata", "data": {"run_id": "run-pass"}}
+        yield {"event": "messages", "data": {"content": "Hello"}}
+        yield {"event": "updates", "data": {"create_plan": {"plan": "Plan A"}}}
+        yield {
+            "event": "values",
+            "data": {
+                "run_id": "run-pass",
+                "metadata": {"is_safe": True, "is_relevant": True},
+                "plan": "Plan A",
+                "current_code": "",
+                "messages": [],
+            },
+        }
+
+    user = SimpleNamespace(id="user-2", username="bob")
+    events = []
+    async for event in ChatService.analyze_and_stream_turns(
+        session=None,
+        langgraph_manager=None,
+        user=user,
+        workspace_id="ws-1",
+        conversation_id="conv-2",
+        question="hello",
+        current_code="",
+        model="google/gemini-2.5-flash",
+        context=None,
+        table_name_override=None,
+        active_schema_override=None,
+        api_key=None,
+    ):
+        events.append(event)
+
+    event_names = [evt.get("event") for evt in events]
+    assert "messages" in event_names
+    assert "updates" in event_names
+    assert "values" in event_names
+
+    final_events = [evt for evt in events if evt.get("event") == "final"]
+    assert final_events
+    assert final_events[-1]["data"]["run_id"] == "run-pass"
+    assert final_events[-1]["data"]["conversation_id"] == "conv-2"
+    assert final_events[-1]["data"]["turn_id"] == "turn-2"
