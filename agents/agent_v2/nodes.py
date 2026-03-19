@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import warnings
@@ -14,7 +15,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel
 
-from .coding_subagent import AnalysisOutput, build_coding_chain, invoke_coding_chain
+from .coding_subagent import AnalysisOutput, ainvoke_coding_chain, build_coding_chain
 from .services.chat_model_factory import create_chat_model
 from .services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
 from .services.llm_provider_catalog import normalize_llm_provider, provider_requires_api_key
@@ -373,6 +374,19 @@ def _invoke_structured_chain(chain: Any, payload: dict[str, Any]) -> Any:
         return chain.invoke(payload)
 
 
+async def _ainvoke_structured_chain(chain: Any, payload: dict[str, Any]) -> Any:
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r"^Pydantic serializer warnings:",
+            category=UserWarning,
+        )
+        ainvoke = getattr(chain, "ainvoke", None)
+        if callable(ainvoke):
+            return await ainvoke(payload)
+        return await asyncio.to_thread(chain.invoke, payload)
+
+
 def _is_non_retriable_execution_error(message: str) -> bool:
     text = str(message or "").strip().lower()
     if not text:
@@ -445,7 +459,7 @@ async def _generate_result_explanations(
     )
     model = _get_model(config, lite=True)
     chain = prompt | model.with_structured_output(ResultExplanation)
-    output = _invoke_structured_chain(
+    output = await _ainvoke_structured_chain(
         chain,
         {
             "question": question,
@@ -544,7 +558,7 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
         )
 
         try:
-            best_output = invoke_coding_chain(
+            best_output = await ainvoke_coding_chain(
                 chain=chain,
                 messages=call_messages,
                 table_name=preferred_table or "",
@@ -555,7 +569,7 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
                 sample_table=sample_table or "",
                 sample_json=_safe_json_dumps(sample),
                 context=str(state.get("context") or ""),
-                invoke_structured_chain=_invoke_structured_chain,
+                invoke_structured_chain=_ainvoke_structured_chain,
             )
         except Exception as exc:
             import traceback
