@@ -96,7 +96,6 @@ def build_input_state(
     schema: dict[str, Any],
     current_code: str,
     table_names: list[str] | None,
-    table_name: str | None = None,
     data_path: str,
     context: str,
     workspace_id: str,
@@ -110,8 +109,6 @@ def build_input_state(
     normalized_table_names: list[str] = []
     seen_tables: set[str] = set()
     candidates = table_names if isinstance(table_names, list) else []
-    if not candidates and str(table_name or "").strip():
-        candidates = [str(table_name or "").strip()]
     for item in candidates:
         candidate = str(item or "").strip()
         if not candidate:

@@ -224,7 +224,6 @@ class ChatService:
         model: str,
         context: str,
         table_names: list[str],
-        table_name: str,
         preferred_table_name: str | None,
         data_path: str,
         schema: dict[str, Any],
@@ -244,8 +243,6 @@ class ChatService:
                 continue
             seen_tables.add(dedupe)
             normalized_table_names.append(candidate)
-        if not normalized_table_names and str(table_name or "").strip():
-            normalized_table_names = [str(table_name or "").strip()]
 
         return {
             "request_id": request_id,
@@ -257,7 +254,6 @@ class ChatService:
             "model": model,
             "context": context,
             "table_names": normalized_table_names,
-            "table_name": table_name,
             "preferred_table_name": str(preferred_table_name or "").strip(),
             "data_path": data_path,
             "agent_profile": str(agent_profile or "").strip(),
@@ -924,7 +920,6 @@ class ChatService:
             model=model,
             context=context or "",
             table_names=ChatService._extract_schema_table_names(schema),
-            table_name=table_name,
             preferred_table_name=preferred_table_name,
             data_path=data_path,
             schema=schema,
@@ -1208,7 +1203,6 @@ class ChatService:
             model=model,
             context=context or "",
             table_names=ChatService._extract_schema_table_names(schema),
-            table_name=table_name,
             preferred_table_name=preferred_table_name,
             data_path=data_path,
             schema=schema,

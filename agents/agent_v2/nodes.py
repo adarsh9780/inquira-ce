@@ -242,13 +242,7 @@ def _normalize_table_names(raw: Any, *, max_items: int = 8) -> list[str]:
 
 
 def _state_table_names(state: dict[str, Any], *, max_items: int = 8) -> list[str]:
-    names = _normalize_table_names(state.get("table_names"), max_items=max_items)
-    if names:
-        return names
-    fallback = str(state.get("table_name") or "").strip()
-    if not fallback:
-        return []
-    return [fallback]
+    return _normalize_table_names(state.get("table_names"), max_items=max_items)
 
 
 def _extract_schema_table_names(schema: dict[str, Any]) -> list[str]:

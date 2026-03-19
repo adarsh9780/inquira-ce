@@ -31,7 +31,7 @@ def test_agent_v2_unsafe_prompt_routes_to_reject() -> None:
                 "workspace_id": "ws1",
                 "user_id": "u1",
                 "data_path": "",
-                "table_name": "",
+                "table_names": [],
                 "active_schema": {},
             },
             config={"configurable": {}},
@@ -53,7 +53,7 @@ def test_agent_v2_unsafe_prompt_stream_emits_finalize() -> None:
                 "workspace_id": "ws1",
                 "user_id": "u1",
                 "data_path": "",
-                "table_name": "",
+                "table_names": [],
                 "active_schema": {},
             },
             config={"configurable": {}},
@@ -80,18 +80,3 @@ def test_prepare_input_node_prefers_table_names_list() -> None:
     )
     assert result.get("table_names") == ["batting", "matches"]
 
-
-def test_prepare_input_node_falls_back_to_legacy_table_name() -> None:
-    result = _prepare_input_node(
-        {
-            "messages": [],
-            "question": "show top scorers",
-            "workspace_id": "ws1",
-            "user_id": "u1",
-            "table_name": "batting",
-            "active_schema": {},
-            "current_code": "",
-        },
-        {},
-    )
-    assert result.get("table_names") == ["batting"]

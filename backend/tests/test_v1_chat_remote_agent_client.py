@@ -66,6 +66,6 @@ async def test_analyze_and_persist_turn_uses_remote_agent_client(monkeypatch):
     assert captured_payload["workspace_id"] == "ws-1"
     assert captured_payload["conversation_id"] == "conv-1"
     assert captured_payload["table_names"] == ["orders"]
-    assert captured_payload["table_name"] == "orders"
+    assert "table_name" not in captured_payload
     assert captured_payload["agent_profile"] == "agent_v2"
     assert captured_payload["llm"]["api_key"] == "key"

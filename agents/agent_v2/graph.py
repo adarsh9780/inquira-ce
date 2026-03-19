@@ -42,7 +42,6 @@ class RuntimeInput(TypedDict, total=False):
     workspace_id: str
     user_id: str
     table_names: list[str]
-    table_name: str
     data_path: str
     scratchpad_path: str
     context: str
@@ -59,10 +58,6 @@ def _prepare_input_node(state: dict[str, Any], config: RunnableConfig) -> dict[s
     raw_table_names = state.get("table_names")
     table_names = [str(item).strip() for item in raw_table_names] if isinstance(raw_table_names, list) else []
     table_names = [item for item in table_names if item]
-    if not table_names:
-        fallback_table = str(state.get("table_name") or "").strip()
-        if fallback_table:
-            table_names = [fallback_table]
 
     messages = state.get("messages")
     if isinstance(messages, list) and messages and not str(state.get("question") or "").strip():
@@ -88,7 +83,6 @@ def _prepare_input_node(state: dict[str, Any], config: RunnableConfig) -> dict[s
         schema=state.get("active_schema") if isinstance(state.get("active_schema"), dict) else {},
         current_code=str(state.get("current_code") or ""),
         table_names=table_names,
-        table_name=str(state.get("table_name") or ""),
         data_path=str(state.get("data_path") or ""),
         context=str(state.get("context") or ""),
         workspace_id=str(state.get("workspace_id") or ""),
