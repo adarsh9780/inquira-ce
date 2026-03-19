@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import asyncio
 import sys
-import threading
 from pathlib import Path
 
 # Ensure shared modules at repo root are importable in agent test runs.
@@ -13,12 +11,53 @@ if str(REPO_ROOT) not in sys.path:
 from shared.observability import phoenix
 
 
+def _build_fake_otel_setup(called: dict) -> dict:
+    class FakeResourceAttributes:
+        PROJECT_NAME = "openinference.project.name"
+
+    class FakeResource:
+        def __init__(self, attributes):
+            self.attributes = attributes
+
+    class FakeTracerProvider:
+        def __init__(self, resource):
+            called["resource"] = resource
+            self.processors = []
+
+        def add_span_processor(self, processor):
+            self.processors.append(processor)
+            called["span_processor"] = processor
+
+    class FakeOTLPSpanExporter:
+        def __init__(self, **kwargs):
+            called["exporter_kwargs"] = kwargs
+
+    class FakeBatchSpanProcessor:
+        def __init__(self, exporter):
+            called["span_exporter"] = exporter
+
+    class FakeTraceApi:
+        @staticmethod
+        def set_tracer_provider(*, tracer_provider):
+            called["trace_provider"] = tracer_provider
+
+    class FakeLangChainInstrumentor:
+        def instrument(self, *, tracer_provider):
+            called["instrumented_provider"] = tracer_provider
+
+    return {
+        "LangChainInstrumentor": FakeLangChainInstrumentor,
+        "ResourceAttributes": FakeResourceAttributes,
+        "trace_api": FakeTraceApi,
+        "OTLPSpanExporter": FakeOTLPSpanExporter,
+        "Resource": FakeResource,
+        "TracerProvider": FakeTracerProvider,
+        "BatchSpanProcessor": FakeBatchSpanProcessor,
+    }
+
+
 def test_shared_phoenix_uses_agent_service_section(monkeypatch, tmp_path):
     called = {}
-
-    def fake_register(**kwargs):
-        called.update(kwargs)
-        return object()
 
     cfg = tmp_path / "inquira.toml"
     cfg.write_text(
@@ -44,21 +83,17 @@ endpoint = "http://127.0.0.1:6006/v1/traces"
             project_env="INQUIRA_AGENT_PHOENIX_PROJECT",
             endpoint_env="INQUIRA_AGENT_PHOENIX_ENDPOINT",
             default_project="inquira-agent",
-            load_register=lambda: fake_register,
+            load_otel_setup=lambda: _build_fake_otel_setup(called),
         )
         is True
     )
-    assert called["auto_instrument"] is True
-    assert called["project_name"] == "agent-from-toml"
-    assert called["endpoint"] == "http://127.0.0.1:6006/v1/traces"
+    assert called["resource"].attributes["openinference.project.name"] == "agent-from-toml"
+    assert called["exporter_kwargs"]["endpoint"] == "http://127.0.0.1:6006/v1/traces"
+    assert called["instrumented_provider"] is called["trace_provider"]
 
 
 def test_shared_phoenix_env_overrides_toml(monkeypatch, tmp_path):
     called = {}
-
-    def fake_register(**kwargs):
-        called.update(kwargs)
-        return object()
 
     cfg = tmp_path / "inquira.toml"
     cfg.write_text(
@@ -84,28 +119,23 @@ endpoint = "http://toml:6006/v1/traces"
             project_env="INQUIRA_AGENT_PHOENIX_PROJECT",
             endpoint_env="INQUIRA_AGENT_PHOENIX_ENDPOINT",
             default_project="inquira-agent",
-            load_register=lambda: fake_register,
+            load_otel_setup=lambda: _build_fake_otel_setup(called),
         )
         is True
     )
-    assert called["project_name"] == "from-env"
-    assert called["endpoint"] == "http://env:6006/v1/traces"
+    assert called["resource"].attributes["openinference.project.name"] == "from-env"
+    assert called["exporter_kwargs"]["endpoint"] == "http://env:6006/v1/traces"
 
 
-def test_shared_phoenix_register_runs_off_event_loop_thread(monkeypatch, tmp_path):
-    register_thread = {"name": ""}
-
-    def fake_register(**kwargs):
-        _ = kwargs
-        register_thread["name"] = threading.current_thread().name
-        return object()
+def test_shared_phoenix_disabled_returns_false(monkeypatch, tmp_path):
+    called = {"invoked": False}
 
     cfg = tmp_path / "inquira.toml"
     cfg.write_text(
         """
 [agent_service.phoenix]
-enabled = true
-project = "thread-check"
+enabled = false
+project = "disabled"
 endpoint = "http://127.0.0.1:6006/v1/traces"
 """.strip(),
         encoding="utf-8",
@@ -113,19 +143,17 @@ endpoint = "http://127.0.0.1:6006/v1/traces"
 
     monkeypatch.setenv("INQUIRA_TOML_PATH", str(cfg))
     monkeypatch.delenv("INQUIRA_AGENT_PHOENIX_ENABLED", raising=False)
-    monkeypatch.delenv("INQUIRA_AGENT_PHOENIX_PROJECT", raising=False)
-    monkeypatch.delenv("INQUIRA_AGENT_PHOENIX_ENDPOINT", raising=False)
     phoenix.reset_phoenix_tracing_state()
 
-    async def _run() -> bool:
-        return phoenix.init_phoenix_tracing(
+    assert (
+        phoenix.init_phoenix_tracing(
             section_path=("agent_service", "phoenix"),
             enabled_env="INQUIRA_AGENT_PHOENIX_ENABLED",
             project_env="INQUIRA_AGENT_PHOENIX_PROJECT",
             endpoint_env="INQUIRA_AGENT_PHOENIX_ENDPOINT",
             default_project="inquira-agent",
-            load_register=lambda: fake_register,
+            load_otel_setup=lambda: called.update({"invoked": True}),
         )
-
-    assert asyncio.run(_run()) is True
-    assert register_thread["name"] != threading.current_thread().name
+        is False
+    )
+    assert called["invoked"] is False

@@ -1,11 +1,14 @@
-"""Shared Phoenix tracing bootstrap used by backend and agent runtimes."""
+"""Shared Phoenix tracing bootstrap used by backend and agent runtimes.
+
+This module configures OTEL exporters directly and sends traces to Phoenix's
+OTLP endpoint. It intentionally avoids phoenix.otel.register() so runtime
+initialization does not depend on local Phoenix working-dir setup.
+"""
 
 from __future__ import annotations
 
-import asyncio
 import os
 import tomllib
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable
 
@@ -42,35 +45,28 @@ def _load_toml_section(section_path: tuple[str, ...]) -> dict[str, Any]:
     return current if isinstance(current, dict) else {}
 
 
-def _load_register() -> Callable[..., Any]:
-    from phoenix.otel import register
+def _load_otel_setup() -> dict[str, Any]:
+    from openinference.instrumentation.langchain import LangChainInstrumentor
+    from openinference.semconv.resource import ResourceAttributes
+    from opentelemetry import trace as trace_api
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-    return register
+    return {
+        "LangChainInstrumentor": LangChainInstrumentor,
+        "ResourceAttributes": ResourceAttributes,
+        "trace_api": trace_api,
+        "OTLPSpanExporter": OTLPSpanExporter,
+        "Resource": Resource,
+        "TracerProvider": TracerProvider,
+        "BatchSpanProcessor": BatchSpanProcessor,
+    }
 
 
 def _logger_noop(message: str, level: str = "info", **kwargs: Any) -> None:
     _ = (message, level, kwargs)
-
-
-def _is_event_loop_thread() -> bool:
-    try:
-        asyncio.get_running_loop()
-        return True
-    except RuntimeError:
-        return False
-
-
-def _run_register(register: Callable[..., Any], kwargs: dict[str, Any]) -> None:
-    # Phoenix register() may touch local filesystem (e.g., working dir creation).
-    # When called from LangGraph ASGI loop thread, offload to a worker thread.
-    if not _is_event_loop_thread():
-        register(**kwargs)
-        return
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        # Use asyncio.to_thread in an isolated runner thread to mirror the
-        # recommended async-safe offloading pattern.
-        future = pool.submit(lambda: asyncio.run(asyncio.to_thread(register, **kwargs)))
-        future.result()
 
 
 def reset_phoenix_tracing_state() -> None:
@@ -86,7 +82,7 @@ def init_phoenix_tracing(
     endpoint_env: str,
     default_project: str,
     log: Callable[..., None] | None = None,
-    load_register: Callable[[], Callable[..., Any]] | None = None,
+    load_otel_setup: Callable[[], dict[str, Any]] | None = None,
 ) -> bool:
     """Initialize Phoenix tracing for a specific process/section."""
 
@@ -101,12 +97,12 @@ def init_phoenix_tracing(
     if not enabled:
         return False
 
-    resolver = load_register or _load_register
+    resolver = load_otel_setup or _load_otel_setup
     try:
-        register = resolver()
+        setup = resolver()
     except Exception as exc:
         logger(
-            f"Phoenix tracing requested but phoenix is not available: {exc}",
+            f"Phoenix tracing requested but OTEL dependencies are not available: {exc}",
             level="warning",
             section=section_key,
         )
@@ -115,15 +111,20 @@ def init_phoenix_tracing(
     project_name = os.getenv(project_env, str(toml_settings.get("project", default_project)))
     endpoint = os.getenv(endpoint_env, str(toml_settings.get("endpoint", ""))).strip()
 
-    kwargs: dict[str, Any] = {
-        "project_name": project_name,
-        "auto_instrument": True,
-    }
-    if endpoint:
-        kwargs["endpoint"] = endpoint
-
     try:
-        _run_register(register, kwargs)
+        resource = setup["Resource"](
+            attributes={setup["ResourceAttributes"].PROJECT_NAME: project_name}
+        )
+        tracer_provider = setup["TracerProvider"](resource=resource)
+        exporter_kwargs: dict[str, Any] = {}
+        if endpoint:
+            exporter_kwargs["endpoint"] = endpoint
+        span_exporter = setup["OTLPSpanExporter"](**exporter_kwargs)
+        span_processor = setup["BatchSpanProcessor"](span_exporter)
+        tracer_provider.add_span_processor(span_processor)
+        setup["trace_api"].set_tracer_provider(tracer_provider=tracer_provider)
+        setup["LangChainInstrumentor"]().instrument(tracer_provider=tracer_provider)
+
         _initialized_keys.add(section_key)
         logger(
             "Phoenix tracing enabled",
