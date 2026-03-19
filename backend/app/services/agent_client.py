@@ -67,6 +67,18 @@ class AgentClient:
             "coding_model": str(llm.get("coding_model") or "").strip(),
         }
 
+    @staticmethod
+    def _trace_safe_input(payload: dict[str, Any]) -> dict[str, Any]:
+        safe_payload = dict(payload or {})
+        safe_payload.pop("api_key", None)
+
+        llm_raw = safe_payload.get("llm")
+        if isinstance(llm_raw, dict):
+            sanitized_llm = dict(llm_raw)
+            sanitized_llm.pop("api_key", None)
+            safe_payload["llm"] = sanitized_llm
+        return safe_payload
+
     def _assistant_id(self, payload: dict[str, Any]) -> str:
         requested = str(payload.get("agent_profile") or "").strip()
         return requested or self._cfg.default_agent
@@ -146,11 +158,12 @@ class AgentClient:
             try:
                 async with httpx.AsyncClient(timeout=timeout) as client:
                     assistant_id = await self._ensure_assistant(client, self._assistant_id(payload))
+                    safe_input = self._trace_safe_input(payload)
                     resp = await client.post(
                         f"{self._cfg.base_url}/runs/wait",
                         json={
                             "assistant_id": assistant_id,
-                            "input": payload,
+                            "input": safe_input,
                             "config": {"configurable": self._configurable(payload)},
                             "metadata": {
                                 "request_id": str(payload.get("request_id") or ""),
@@ -194,12 +207,13 @@ class AgentClient:
             try:
                 async with httpx.AsyncClient(timeout=timeout) as client:
                     assistant_id = await self._ensure_assistant(client, self._assistant_id(payload))
+                    safe_input = self._trace_safe_input(payload)
                     async with client.stream(
                         "POST",
                         f"{self._cfg.base_url}/runs/stream",
                         json={
                             "assistant_id": assistant_id,
-                            "input": payload,
+                            "input": safe_input,
                             "config": {"configurable": self._configurable(payload)},
                             "metadata": {
                                 "request_id": str(payload.get("request_id") or ""),

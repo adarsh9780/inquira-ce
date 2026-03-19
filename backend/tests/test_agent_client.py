@@ -24,6 +24,22 @@ def test_agent_client_configurable_defaults_when_llm_payload_missing():
     assert cfg["coding_model"] == ""
 
 
+def test_agent_client_trace_safe_input_redacts_llm_api_key():
+    payload = {
+        "question": "hello",
+        "llm": {
+            "provider": "openrouter",
+            "api_key": "secret-key",
+            "default_model": "gpt-test",
+        },
+    }
+
+    safe = AgentClient._trace_safe_input(payload)
+    assert isinstance(safe.get("llm"), dict)
+    assert "api_key" not in safe["llm"]
+    assert safe["llm"]["provider"] == "openrouter"
+
+
 @pytest.mark.asyncio
 async def test_agent_client_fails_on_contract_api_major_mismatch(monkeypatch):
     class _Resp:
@@ -318,3 +334,81 @@ async def test_agent_client_stream_retries_once_on_retryable_api_connection_erro
 
     assert _Client.stream_calls == 2
     assert [evt["event"] for evt in events] == ["updates", "values"]
+
+
+@pytest.mark.asyncio
+async def test_agent_client_run_sends_redacted_input_but_keeps_configurable_api_key(monkeypatch):
+    captured: dict[str, dict] = {}
+
+    class _Resp:
+        def __init__(self, status_code: int = 200, payload=None):
+            self.status_code = status_code
+            self.text = ""
+            self.content = b"{}"
+            self._payload = payload if payload is not None else {}
+
+        def json(self):
+            return self._payload
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            _ = args, kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            _ = exc_type, exc, tb
+            return False
+
+        async def post(self, url, *args, **kwargs):
+            _ = args
+            body = kwargs.get("json") if isinstance(kwargs, dict) else None
+            if isinstance(body, dict):
+                captured[url] = body
+            if url.endswith("/assistants/search"):
+                return _Resp(200, [{"assistant_id": "agent_v2"}])
+            if url.endswith("/runs/wait"):
+                return _Resp(200, {"values": {"route": "analysis"}})
+            return _Resp(404, {})
+
+    monkeypatch.setattr("app.services.agent_client.httpx.AsyncClient", _Client)
+    monkeypatch.setattr(
+        "app.services.agent_client.load_agent_service_config",
+        lambda: type(
+            "Cfg",
+            (),
+            {
+                "base_url": "http://127.0.0.1:8123",
+                "expected_api_major": 1,
+                "default_agent": "agent_v2",
+                "auth_mode": "shared_secret",
+                "shared_secret": "abc",
+            },
+        )(),
+    )
+
+    client = AgentClient()
+    _ = await client.run(
+        {
+            "agent_profile": "agent_v2",
+            "user_id": "u1",
+            "workspace_id": "w1",
+            "conversation_id": "c1",
+            "model": "gpt-test",
+            "llm": {
+                "provider": "openrouter",
+                "api_key": "secret-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "default_model": "gpt-test",
+                "lite_model": "gpt-test-lite",
+                "coding_model": "gpt-test",
+            },
+        }
+    )
+
+    run_body = captured["http://127.0.0.1:8123/runs/wait"]
+    assert isinstance(run_body.get("input"), dict)
+    assert isinstance(run_body["input"].get("llm"), dict)
+    assert "api_key" not in run_body["input"]["llm"]
+    assert run_body["config"]["configurable"]["api_key"] == "secret-key"
