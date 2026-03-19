@@ -87,7 +87,8 @@ async def test_chat_uses_empty_schema_when_workspace_has_no_dataset(monkeypatch)
         api_key="x",
     )
 
-    assert captured["payload"]["active_schema"] == {"table_name": "", "tables": []}
+    assert captured["payload"]["table_names"] == []
+    assert "active_schema" not in captured["payload"]
     assert response["is_safe"] is True
     assert conversation_id == "conv-1"
     assert turn_id == "turn-1"
@@ -184,11 +185,8 @@ async def test_chat_keeps_backend_columns_when_client_schema_override_present(mo
     )
 
     payload = captured["payload"]
-    assert payload["table_name"] == "deliveries"
-    assert payload["active_schema"]["table_name"] == "deliveries"
-    assert payload["active_schema"]["tables"][0]["table_name"] == "deliveries"
-    assert payload["active_schema"]["tables"][0]["columns"][0]["name"] == "batter"
-    assert payload["active_schema"]["tables"][0]["context"] == "from-client-context"
+    assert payload["table_names"] == ["deliveries"]
+    assert "active_schema" not in payload
     assert payload["data_path"] == "/tmp/ws.duckdb"
 
 
@@ -295,8 +293,8 @@ async def test_chat_loads_workspace_schema_for_multiple_tables(monkeypatch):
     )
 
     payload = captured["payload"]
-    assert payload["table_name"] == ""
-    assert {table["table_name"] for table in payload["active_schema"]["tables"]} == {"orders", "customers"}
+    assert set(payload["table_names"]) == {"orders", "customers"}
+    assert "active_schema" not in payload
 
 
 @pytest.mark.asyncio
@@ -372,8 +370,8 @@ async def test_chat_falls_back_to_live_columns_when_schema_file_missing(monkeypa
         api_key="x",
     )
 
-    assert captured["payload"]["active_schema"]["table_name"] == "deliveries"
-    assert [col["name"] for col in captured["payload"]["active_schema"]["tables"][0]["columns"]] == ["Batter Runs"]
+    assert captured["payload"]["table_names"] == ["deliveries"]
+    assert "active_schema" not in captured["payload"]
 
 
 @pytest.mark.asyncio
@@ -604,9 +602,5 @@ async def test_chat_merges_saved_schema_with_live_duckdb_columns(monkeypatch):
         api_key="x",
     )
 
-    names = [col["name"] for col in captured["payload"]["active_schema"]["tables"][0]["columns"]]
-    assert names == ["Batter", "Batter Runs", "Runs From Ball"]
-    batter_runs = next(
-        col for col in captured["payload"]["active_schema"]["tables"][0]["columns"] if col["name"] == "Batter Runs"
-    )
-    assert batter_runs["description"] == "runs scored by batter"
+    assert captured["payload"]["table_names"] == ["ball_by_ball_ipl__5c3afffa"]
+    assert "active_schema" not in captured["payload"]

@@ -32,7 +32,6 @@ def test_agent_v2_unsafe_prompt_routes_to_reject() -> None:
                 "user_id": "u1",
                 "data_path": "",
                 "table_names": [],
-                "active_schema": {},
             },
             config={"configurable": {}},
         )
@@ -54,7 +53,6 @@ def test_agent_v2_unsafe_prompt_stream_emits_finalize() -> None:
                 "user_id": "u1",
                 "data_path": "",
                 "table_names": [],
-                "active_schema": {},
             },
             config={"configurable": {}},
         ):
@@ -73,10 +71,8 @@ def test_prepare_input_node_prefers_table_names_list() -> None:
             "workspace_id": "ws1",
             "user_id": "u1",
             "table_names": ["batting", "matches"],
-            "active_schema": {},
             "current_code": "",
         },
         {},
     )
     assert result.get("table_names") == ["batting", "matches"]
-

@@ -45,7 +45,6 @@ class RuntimeInput(TypedDict, total=False):
     data_path: str
     scratchpad_path: str
     context: str
-    active_schema: dict[str, Any]
     current_code: str
     previous_code: str
     run_id: str
@@ -71,7 +70,6 @@ def _prepare_input_node(state: dict[str, Any], config: RunnableConfig) -> dict[s
             "run_id": str(state.get("run_id") or ""),
             "system_info": state.get("system_info") if isinstance(state.get("system_info"), dict) else {},
             "context": str(state.get("context") or ""),
-            "active_schema": state.get("active_schema") if isinstance(state.get("active_schema"), dict) else {},
             "previous_code": str(state.get("previous_code") or state.get("current_code") or ""),
             "current_code": str(state.get("current_code") or ""),
             "known_columns": state.get("known_columns") if isinstance(state.get("known_columns"), list) else [],
@@ -80,7 +78,6 @@ def _prepare_input_node(state: dict[str, Any], config: RunnableConfig) -> dict[s
 
     prepared = build_input_state(
         question=str(state.get("question") or ""),
-        schema=state.get("active_schema") if isinstance(state.get("active_schema"), dict) else {},
         current_code=str(state.get("current_code") or ""),
         table_names=table_names,
         data_path=str(state.get("data_path") or ""),

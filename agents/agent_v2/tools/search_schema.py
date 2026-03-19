@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import duckdb
+
 from ..events import emit_agent_event
 from . import new_tool_call_id
 
@@ -84,9 +86,80 @@ def _match_rank(column: dict[str, Any], normalized_query: str) -> int | None:
     return None
 
 
+def _quote_identifier(identifier: str) -> str:
+    return f'"{identifier.replace(chr(34), chr(34) * 2)}"'
+
+
+def _iter_db_columns(
+    *,
+    data_path: str | None,
+    table_name: str | None,
+    table_names: list[str] | None,
+) -> list[dict[str, Any]]:
+    if not data_path:
+        return []
+
+    requested_table = str(table_name or "").strip()
+    normalized_tables: list[str] = []
+    seen: set[str] = set()
+    for item in table_names or []:
+        candidate = str(item or "").strip()
+        if not candidate:
+            continue
+        dedupe = candidate.lower()
+        if dedupe in seen:
+            continue
+        seen.add(dedupe)
+        normalized_tables.append(candidate)
+
+    try:
+        con = duckdb.connect(data_path, read_only=True)
+    except Exception:
+        return []
+
+    try:
+        if requested_table:
+            candidate_tables = [requested_table]
+        elif normalized_tables:
+            candidate_tables = normalized_tables
+        else:
+            rows = con.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'main' ORDER BY table_name"
+            ).fetchall()
+            candidate_tables = [str(row[0]).strip() for row in rows if row and str(row[0]).strip()]
+
+        columns: list[dict[str, Any]] = []
+        for table in candidate_tables:
+            try:
+                describe_rows = con.execute(f"DESCRIBE {_quote_identifier(table)}").fetchall()
+            except Exception:
+                continue
+            for row in describe_rows:
+                if not row:
+                    continue
+                name = str(row[0] or "").strip()
+                if not name:
+                    continue
+                columns.append(
+                    {
+                        "table_name": table,
+                        "name": name,
+                        "dtype": str(row[1] or "").strip() if len(row) > 1 else "",
+                        "description": "",
+                        "aliases": [],
+                    }
+                )
+        return columns
+    finally:
+        con.close()
+
+
 def search_schema(
     *,
-    schema: dict[str, Any],
+    schema: dict[str, Any] | None = None,
+    data_path: str | None = None,
+    table_names: list[str] | None = None,
     query: str,
     table_name: str | None,
     max_results: int = 20,
@@ -102,6 +175,7 @@ def search_schema(
             "args": {
                 "query": str(query or "").strip(),
                 "table_name": str(table_name or "").strip(),
+                "table_names": [str(item).strip() for item in (table_names or []) if str(item).strip()],
                 "max_results": safe_max,
             },
             "call_id": call_id,
@@ -109,6 +183,8 @@ def search_schema(
     )
 
     rows = _iter_schema_columns(schema if isinstance(schema, dict) else {}, table_name)
+    if not rows:
+        rows = _iter_db_columns(data_path=data_path, table_name=table_name, table_names=table_names)
     ranked: list[tuple[int, str, str, dict[str, Any]]] = []
     for column in rows:
         rank = _match_rank(column, normalized_query)

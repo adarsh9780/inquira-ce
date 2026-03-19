@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import warnings
@@ -538,11 +539,9 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
     messages = _bounded_messages(list(state.get("messages") or []), max_messages=8)
     table_names = _state_table_names(state, max_items=16)
     data_path = str(state.get("data_path") or "")
-    schema = state.get("active_schema") if isinstance(state.get("active_schema"), dict) else {}
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
-    table_hint = table_names[0] if table_names else None
-    sample_table = _select_sample_table(schema, table_hint)
-    schema_summary = _build_schema_summary(schema=schema, table_name=None)
+    sample_table = table_names[0] if len(table_names) == 1 else None
+    schema_summary = "No preloaded schema summary. Use search_schema tool to discover relevant columns."
     user_text = _latest_user_text(messages)
     runtime = load_agent_runtime_config()
     attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
@@ -552,7 +551,7 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
             "messages": messages,
             "user_text": user_text,
             "schema_summary": schema_summary,
-            "schema_tables": _extract_schema_table_names(schema),
+            "schema_tables": table_names,
             "table_names": table_names,
             "sample_table": sample_table or "",
             "data_path": data_path,
@@ -629,7 +628,6 @@ def analysis_assess_to_next(state: dict[str, Any]) -> str:
 async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
     _ = config
     analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
-    schema = state.get("active_schema") if isinstance(state.get("active_schema"), dict) else {}
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
     tool_plan = state.get("tool_plan") if isinstance(state.get("tool_plan"), list) else []
     attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
@@ -654,8 +652,10 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
                 detail="Finding relevant columns before code generation.",
                 next_action="Use found schema columns in next code generation attempt.",
             )
-            result = search_schema(
-                schema=schema,
+            result = await asyncio.to_thread(
+                search_schema,
+                data_path=str(analysis_context.get("data_path") or "") or None,
+                table_names=_normalize_table_names(analysis_context.get("table_names"), max_items=64),
                 query=query,
                 table_name=str(action.get("table_name") or "").strip() or None,
                 max_results=int(action.get("limit") or 20),
@@ -702,7 +702,6 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
     analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
     messages = list(analysis_context.get("messages") or [])
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
-    schema = state.get("active_schema") if isinstance(state.get("active_schema"), dict) else {}
     sample_table = str(analysis_context.get("sample_table") or "").strip() or None
     sample = state.get("enrichment_results", {}).get("sample_data") if isinstance(state.get("enrichment_results"), dict) else None
     if not isinstance(sample, list):
@@ -731,7 +730,7 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
         chain=chain,
         messages=messages,
         table_name=table_hint,
-        workspace_tables_json=_safe_json_dumps(_extract_schema_table_names(schema)),
+        workspace_tables_json=_safe_json_dumps(table_names),
         workspace_db_path=str(analysis_context.get("data_path") or ""),
         schema_summary=str(analysis_context.get("schema_summary") or ""),
         known_columns_json=_safe_json_dumps(known_columns),
@@ -1023,16 +1022,15 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
     messages = list(state.get("messages") or [])
     table_names = _state_table_names(state, max_items=16)
     data_path = str(state.get("data_path") or "")
-    schema = state.get("active_schema") if isinstance(state.get("active_schema"), dict) else {}
     workspace_id = str(state.get("workspace_id") or "")
     user_id = str(state.get("user_id") or "")
     user_text = _latest_user_text(messages)
     runtime = load_agent_runtime_config()
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
 
-    preferred_table = table_names[0] if table_names else None
-    schema_summary = _build_schema_summary(schema=schema, table_name=None)
-    sample_table = _select_sample_table(schema, preferred_table)
+    table_hint = table_names[0] if table_names else None
+    schema_summary = "No preloaded schema summary. Use search_schema for column discovery."
+    sample_table = table_hint if len(table_names) == 1 else None
     sample = sample_data(data_path=data_path or None, table_name=sample_table, limit=5)
 
     requested_packages = _extract_packages_from_prompt(user_text)
@@ -1107,8 +1105,8 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
             best_output = await ainvoke_coding_chain(
                 chain=chain,
                 messages=call_messages,
-                table_name=preferred_table or "",
-                workspace_tables_json=_safe_json_dumps(_extract_schema_table_names(schema)),
+                table_name=table_hint or "",
+                workspace_tables_json=_safe_json_dumps(table_names),
                 workspace_db_path=data_path or "",
                 schema_summary=schema_summary,
                 known_columns_json=_safe_json_dumps(known_columns),
@@ -1149,7 +1147,8 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
                 searched_schema_queries.add(query.lower())
                 search_calls += 1
                 search_result = search_schema(
-                    schema=schema,
+                    data_path=data_path or None,
+                    table_names=table_names,
                     query=query,
                     table_name=None,
                     max_results=20,
@@ -1185,7 +1184,7 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
 
         sanitized_output_contract = _sanitize_output_contract(best_output.output_contract)
 
-        guard = guard_code(candidate_code, table_name=preferred_table)
+        guard = guard_code(candidate_code, table_name=table_hint)
         if not guard.blocked:
             candidate_code = guard.code
         else:
@@ -1362,8 +1361,8 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
             result_explanation = "Analysis completed."
 
     selected_tables = _normalize_table_names(best_output.selected_tables)
-    if not selected_tables and preferred_table:
-        selected_tables = [preferred_table]
+    if not selected_tables and table_hint:
+        selected_tables = [table_hint]
 
     _emit_text_chunks("finalize", result_explanation)
     return {

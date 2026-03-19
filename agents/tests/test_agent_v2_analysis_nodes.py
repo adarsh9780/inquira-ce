@@ -13,24 +13,26 @@ from agent_v2.nodes import (
 
 
 @pytest.mark.asyncio
-async def test_analysis_enrich_context_updates_known_columns_from_search_schema() -> None:
+async def test_analysis_enrich_context_updates_known_columns_from_search_schema(monkeypatch) -> None:
+    def fake_search_schema(**_kwargs):
+        return {
+            "query": "customer",
+            "table_name": "",
+            "match_count": 1,
+            "columns": [
+                {"table_name": "orders", "name": "customer_id", "dtype": "VARCHAR", "description": ""},
+            ],
+        }
+
+    monkeypatch.setattr("agent_v2.nodes.search_schema", fake_search_schema)
+
     state = {
         "workspace_id": "ws1",
         "user_id": "u1",
-        "active_schema": {
-            "tables": [
-                {
-                    "table_name": "orders",
-                    "columns": [
-                        {"name": "order_id", "dtype": "INTEGER"},
-                        {"name": "customer_id", "dtype": "VARCHAR"},
-                    ],
-                }
-            ]
-        },
         "known_columns": [],
         "analysis_context": {
             "data_path": "",
+            "table_names": ["orders"],
             "sample_table": "orders",
         },
         "tool_plan": [{"tool": "search_schema", "query": "customer", "limit": 20}],
@@ -48,9 +50,8 @@ async def test_analysis_enrich_context_ignores_pip_install_tool_plan_entry() -> 
     state = {
         "workspace_id": "ws1",
         "user_id": "u1",
-        "active_schema": {},
         "known_columns": [],
-        "analysis_context": {"data_path": "", "sample_table": ""},
+        "analysis_context": {"data_path": "", "table_names": [], "sample_table": ""},
         "tool_plan": [
             {"tool": "pip_install", "packages": ["pandas"]},
             {"tool": "search_schema", "query": "revenue"},
@@ -111,7 +112,6 @@ async def test_analysis_collect_context_does_not_persist_preferred_table_field()
     state = {
         "messages": [HumanMessage(content="show top scorers")],
         "table_names": ["batting", "matches"],
-        "active_schema": {"tables": [{"table_name": "batting", "columns": []}]},
         "known_columns": [],
         "data_path": "/tmp/ws.db",
     }
