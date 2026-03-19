@@ -22,6 +22,12 @@ test('chat history renders tool cards and intervention component', () => {
   assert.equal(source.includes('<AgentIntervention'), true)
   assert.equal(source.includes('submitInterventionResponse(message, payload)'), true)
   assert.equal(source.includes('v1RespondChatIntervention'), true)
+  assert.equal(source.includes('&gt; {{ row.summary }}'), true)
+})
+
+test('tool activity summary uses ephemeral chevron-style prefix', () => {
+  const source = readFileSync(resolve(process.cwd(), 'src/components/chat/ToolActivityCard.vue'), 'utf-8')
+  assert.equal(source.includes('&gt; {{ summaryText }}'), true)
 })
 
 test('v1 contract includes intervention response endpoint', () => {

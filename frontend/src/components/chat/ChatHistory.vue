@@ -81,14 +81,14 @@
                   class="h-3.5 w-3.5"
                   aria-hidden="true"
                 />
-                <span>{{ row.summary }}</span>
+                <span>&gt; {{ row.summary }}</span>
               </button>
               <p
                 v-else
                 class="text-sm font-medium"
                 style="color: var(--color-text-muted);"
               >
-                {{ row.summary }}
+                &gt; {{ row.summary }}
               </p>
               <div
                 v-if="row.output && isEphemeralRowExpanded(row.id)"

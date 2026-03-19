@@ -1189,6 +1189,12 @@ class ChatService:
             event_name = str(item.get("event") or "message").strip() or "message"
             data = item.get("data")
             payload_dict = data if isinstance(data, dict) else {"value": data}
+            if event_name == "custom" and isinstance(data, dict):
+                custom_event = str(data.get("event") or "").strip()
+                custom_data = data.get("data")
+                if custom_event:
+                    event_name = custom_event
+                    payload_dict = custom_data if isinstance(custom_data, dict) else {"value": custom_data}
             if event_name == "metadata":
                 stream_run_id = str(payload_dict.get("run_id") or stream_run_id)
             elif event_name == "values" and isinstance(data, dict):

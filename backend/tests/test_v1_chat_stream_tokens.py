@@ -107,6 +107,13 @@ async def test_v1_chat_stream_passthrough_langgraph_events_and_finalize(monkeypa
 
     async def _fake_stream():
         yield {"event": "metadata", "data": {"run_id": "run-pass"}}
+        yield {
+            "event": "custom",
+            "data": {
+                "event": "tool_call",
+                "data": {"call_id": "call-1", "tool": "search_schema", "args": {"query": "batsman|batter"}},
+            },
+        }
         yield {"event": "messages", "data": {"content": "Hello"}}
         yield {"event": "updates", "data": {"create_plan": {"plan": "Plan A"}}}
         yield {
@@ -139,9 +146,13 @@ async def test_v1_chat_stream_passthrough_langgraph_events_and_finalize(monkeypa
         events.append(event)
 
     event_names = [evt.get("event") for evt in events]
+    assert "tool_call" in event_names
     assert "messages" in event_names
     assert "updates" in event_names
     assert "values" in event_names
+    tool_call_event = next(evt for evt in events if evt.get("event") == "tool_call")
+    assert tool_call_event["data"]["call_id"] == "call-1"
+    assert tool_call_event["data"]["tool"] == "search_schema"
 
     final_events = [evt for evt in events if evt.get("event") == "final"]
     assert final_events

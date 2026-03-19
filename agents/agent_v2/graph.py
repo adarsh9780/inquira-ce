@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from functools import wraps
+import inspect
 from typing import Any, TypedDict
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 
+from .events import reset_agent_event_emitter, set_agent_event_emitter
 from .nodes import (
     analysis_assess_context_node,
     analysis_assess_to_next,
@@ -88,27 +91,59 @@ def _prepare_input_node(state: dict[str, Any], config: RunnableConfig) -> dict[s
     return dict(prepared)
 
 
+def _with_stream_event_emitter(fn):
+    """Bind agent event emitter to LangGraph custom stream writer for this node run."""
+
+    @wraps(fn)
+    async def _async_wrapped(*args, **kwargs):
+        from langgraph.config import get_stream_writer
+
+        writer = get_stream_writer()
+        token = set_agent_event_emitter(
+            lambda event, payload: writer({"event": str(event), "data": dict(payload or {})})
+        )
+        try:
+            return await fn(*args, **kwargs)
+        finally:
+            reset_agent_event_emitter(token)
+
+    @wraps(fn)
+    def _sync_wrapped(*args, **kwargs):
+        from langgraph.config import get_stream_writer
+
+        writer = get_stream_writer()
+        token = set_agent_event_emitter(
+            lambda event, payload: writer({"event": str(event), "data": dict(payload or {})})
+        )
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            reset_agent_event_emitter(token)
+
+    return _async_wrapped if inspect.iscoroutinefunction(fn) else _sync_wrapped
+
+
 def build_graph(config: RunnableConfig) -> CompiledStateGraph:
     _ = config
     init_phoenix_tracing()
     from langgraph.graph import END, START, StateGraph
 
     builder = StateGraph(AgentState, input_schema=RuntimeInput, output_schema=AgentOutput)
-    builder.add_node("prepare_input", _prepare_input_node)
-    builder.add_node("route", route_node)
-    builder.add_node("analysis_collect_context", analysis_collect_context_node)
-    builder.add_node("analysis_assess_context", analysis_assess_context_node)
-    builder.add_node("analysis_enrich_context", analysis_enrich_context_node)
-    builder.add_node("analysis_generate_code", analysis_generate_code_node)
-    builder.add_node("analysis_guard_code", analysis_guard_code_node)
-    builder.add_node("analysis_execute_code", analysis_execute_code_node)
-    builder.add_node("analysis_retry_decider", analysis_retry_decider_node)
-    builder.add_node("analysis_validate_result", analysis_validate_result_node)
-    builder.add_node("analysis_finalize_success", analysis_finalize_success_node)
-    builder.add_node("analysis_finalize_failure", analysis_finalize_failure_node)
-    builder.add_node("chat", chat_node)
-    builder.add_node("reject", reject_node)
-    builder.add_node("finalize", finalize_node)
+    builder.add_node("prepare_input", _with_stream_event_emitter(_prepare_input_node))
+    builder.add_node("route", _with_stream_event_emitter(route_node))
+    builder.add_node("analysis_collect_context", _with_stream_event_emitter(analysis_collect_context_node))
+    builder.add_node("analysis_assess_context", _with_stream_event_emitter(analysis_assess_context_node))
+    builder.add_node("analysis_enrich_context", _with_stream_event_emitter(analysis_enrich_context_node))
+    builder.add_node("analysis_generate_code", _with_stream_event_emitter(analysis_generate_code_node))
+    builder.add_node("analysis_guard_code", _with_stream_event_emitter(analysis_guard_code_node))
+    builder.add_node("analysis_execute_code", _with_stream_event_emitter(analysis_execute_code_node))
+    builder.add_node("analysis_retry_decider", _with_stream_event_emitter(analysis_retry_decider_node))
+    builder.add_node("analysis_validate_result", _with_stream_event_emitter(analysis_validate_result_node))
+    builder.add_node("analysis_finalize_success", _with_stream_event_emitter(analysis_finalize_success_node))
+    builder.add_node("analysis_finalize_failure", _with_stream_event_emitter(analysis_finalize_failure_node))
+    builder.add_node("chat", _with_stream_event_emitter(chat_node))
+    builder.add_node("reject", _with_stream_event_emitter(reject_node))
+    builder.add_node("finalize", _with_stream_event_emitter(finalize_node))
 
     builder.add_edge(START, "prepare_input")
     builder.add_edge("prepare_input", "route")
