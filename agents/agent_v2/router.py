@@ -39,7 +39,7 @@ def _latest_user_text(messages: list[AnyMessage]) -> str:
     return ""
 
 
-def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
+async def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
     user_text = _latest_user_text(messages)
     if _UNSAFE_RE.search(user_text):
         return "unsafe"
@@ -88,7 +88,7 @@ def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
                 message=r"^Pydantic serializer warnings:",
                 category=UserWarning,
             )
-            decision = chain.invoke({"messages": messages})
+            decision = await chain.ainvoke({"messages": messages})
         route = str(getattr(decision, "route", "")).strip().lower()
         if route in {"analysis", "general_chat", "unsafe"}:
             return route

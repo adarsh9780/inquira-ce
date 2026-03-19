@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import re
 import warnings
@@ -326,8 +325,8 @@ def _merge_known_columns_lru(
     return ordered
 
 
-def route_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-    route = decide_route(state.get("messages") or [], config.get("configurable", {}))
+async def route_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+    route = await decide_route(state.get("messages") or [], config.get("configurable", {}))
     if route == "unsafe":
         metadata = {"is_safe": False, "is_relevant": False}
     elif route == "general_chat":
@@ -364,16 +363,6 @@ def _extract_packages_from_prompt(user_text: str) -> list[str]:
     return packages[:5]
 
 
-def _invoke_structured_chain(chain: Any, payload: dict[str, Any]) -> Any:
-    with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            message=r"^Pydantic serializer warnings:",
-            category=UserWarning,
-        )
-        return chain.invoke(payload)
-
-
 async def _ainvoke_structured_chain(chain: Any, payload: dict[str, Any]) -> Any:
     with warnings.catch_warnings():
         warnings.filterwarnings(
@@ -382,9 +371,9 @@ async def _ainvoke_structured_chain(chain: Any, payload: dict[str, Any]) -> Any:
             category=UserWarning,
         )
         ainvoke = getattr(chain, "ainvoke", None)
-        if callable(ainvoke):
-            return await ainvoke(payload)
-        return await asyncio.to_thread(chain.invoke, payload)
+        if not callable(ainvoke):
+            raise TypeError("Async contract violation: runnable is missing ainvoke().")
+        return await ainvoke(payload)
 
 
 def _is_non_retriable_execution_error(message: str) -> bool:
@@ -850,7 +839,7 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
     }
 
 
-def chat_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+async def chat_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", _GENERAL_CHAT_PROMPT),
@@ -859,7 +848,7 @@ def chat_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
     )
     model = _get_model(config, lite=True)
     chain = prompt | model.with_structured_output(ChatOutput)
-    output = _invoke_structured_chain(chain, {"messages": list(state.get("messages") or [])})
+    output = await _ainvoke_structured_chain(chain, {"messages": list(state.get("messages") or [])})
     if isinstance(output, ChatOutput):
         text = str(output.answer or "").strip()
     else:
