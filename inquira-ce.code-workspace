@@ -1,0 +1,26 @@
+{
+  "folders": [
+    {
+      "name": "Backend",
+      "path": "backend"
+    },
+    {
+      "name": "Agent Runtime",
+      "path": "agent-runtime"
+    },
+    {
+      "name": "Frontend",
+      "path": "frontend"
+    },
+    {
+      "name": "Root",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "python.venvPath": "${workspaceFolder}",
+    "python.venvFolders": [
+      ".venv"
+    ]
+  }
+}
