@@ -223,6 +223,7 @@ class ChatService:
         current_code: str,
         model: str,
         context: str,
+        table_names: list[str],
         table_name: str,
         preferred_table_name: str | None,
         data_path: str,
@@ -232,6 +233,20 @@ class ChatService:
         resolved_api_key: str,
         agent_profile: str,
     ) -> dict[str, Any]:
+        normalized_table_names: list[str] = []
+        seen_tables: set[str] = set()
+        for item in table_names or []:
+            candidate = str(item or "").strip()
+            if not candidate:
+                continue
+            dedupe = candidate.lower()
+            if dedupe in seen_tables:
+                continue
+            seen_tables.add(dedupe)
+            normalized_table_names.append(candidate)
+        if not normalized_table_names and str(table_name or "").strip():
+            normalized_table_names = [str(table_name or "").strip()]
+
         return {
             "request_id": request_id,
             "user_id": user_id,
@@ -241,6 +256,7 @@ class ChatService:
             "current_code": current_code,
             "model": model,
             "context": context,
+            "table_names": normalized_table_names,
             "table_name": table_name,
             "preferred_table_name": str(preferred_table_name or "").strip(),
             "data_path": data_path,
@@ -256,6 +272,30 @@ class ChatService:
                 "coding_model": llm_prefs.get("selected_coding_model") or llm_prefs["selected_main_model"],
             },
         }
+
+    @staticmethod
+    def _extract_schema_table_names(schema: dict[str, Any]) -> list[str]:
+        if not isinstance(schema, dict):
+            return []
+        normalized: list[str] = []
+        seen: set[str] = set()
+        tables = schema.get("tables")
+        if isinstance(tables, list):
+            for item in tables:
+                if not isinstance(item, dict):
+                    continue
+                candidate = str(item.get("table_name") or "").strip()
+                if not candidate:
+                    continue
+                dedupe = candidate.lower()
+                if dedupe in seen:
+                    continue
+                seen.add(dedupe)
+                normalized.append(candidate)
+        scoped = str(schema.get("table_name") or "").strip()
+        if scoped and scoped.lower() not in seen:
+            normalized.append(scoped)
+        return normalized
 
     @staticmethod
     def _build_node_stream_payload(
@@ -883,6 +923,7 @@ class ChatService:
             current_code=current_code,
             model=model,
             context=context or "",
+            table_names=ChatService._extract_schema_table_names(schema),
             table_name=table_name,
             preferred_table_name=preferred_table_name,
             data_path=data_path,
@@ -1166,6 +1207,7 @@ class ChatService:
             current_code=current_code,
             model=model,
             context=context or "",
+            table_names=ChatService._extract_schema_table_names(schema),
             table_name=table_name,
             preferred_table_name=preferred_table_name,
             data_path=data_path,

@@ -1,7 +1,7 @@
 import asyncio
 import inspect
 
-from agent_v2.graph import build_graph
+from agent_v2.graph import _prepare_input_node, build_graph
 
 
 def test_agent_v2_build_graph_matches_langgraph_factory_signature() -> None:
@@ -63,3 +63,35 @@ def test_agent_v2_unsafe_prompt_stream_emits_finalize() -> None:
 
     stream = asyncio.run(_collect())
     assert any("finalize" in step for step in stream)
+
+
+def test_prepare_input_node_prefers_table_names_list() -> None:
+    result = _prepare_input_node(
+        {
+            "messages": [],
+            "question": "show top scorers",
+            "workspace_id": "ws1",
+            "user_id": "u1",
+            "table_names": ["batting", "matches"],
+            "active_schema": {},
+            "current_code": "",
+        },
+        {},
+    )
+    assert result.get("table_names") == ["batting", "matches"]
+
+
+def test_prepare_input_node_falls_back_to_legacy_table_name() -> None:
+    result = _prepare_input_node(
+        {
+            "messages": [],
+            "question": "show top scorers",
+            "workspace_id": "ws1",
+            "user_id": "u1",
+            "table_name": "batting",
+            "active_schema": {},
+            "current_code": "",
+        },
+        {},
+    )
+    assert result.get("table_names") == ["batting"]

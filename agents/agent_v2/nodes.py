@@ -241,6 +241,16 @@ def _normalize_table_names(raw: Any, *, max_items: int = 8) -> list[str]:
     return normalized
 
 
+def _state_table_names(state: dict[str, Any], *, max_items: int = 8) -> list[str]:
+    names = _normalize_table_names(state.get("table_names"), max_items=max_items)
+    if names:
+        return names
+    fallback = str(state.get("table_name") or "").strip()
+    if not fallback:
+        return []
+    return [fallback]
+
+
 def _extract_schema_table_names(schema: dict[str, Any]) -> list[str]:
     tables = schema.get("tables")
     if isinstance(tables, list):
@@ -532,11 +542,11 @@ async def _generate_result_explanations(
 async def analysis_collect_context_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
     _ = config
     messages = _bounded_messages(list(state.get("messages") or []), max_messages=8)
-    table_name = str(state.get("table_name") or "")
+    table_names = _state_table_names(state, max_items=16)
     data_path = str(state.get("data_path") or "")
     schema = state.get("active_schema") if isinstance(state.get("active_schema"), dict) else {}
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
-    preferred_table = table_name or None
+    preferred_table = table_names[0] if table_names else None
     sample_table = _select_sample_table(schema, preferred_table)
     schema_summary = _build_schema_summary(schema=schema, table_name=None)
     user_text = _latest_user_text(messages)
@@ -549,6 +559,7 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
             "user_text": user_text,
             "schema_summary": schema_summary,
             "schema_tables": _extract_schema_table_names(schema),
+            "table_names": table_names,
             "sample_table": sample_table or "",
             "preferred_table": preferred_table or "",
             "data_path": data_path,
@@ -769,7 +780,8 @@ def analysis_generate_to_next(state: dict[str, Any]) -> str:
 async def analysis_guard_code_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
     _ = config
     code = str(state.get("candidate_code") or "").strip()
-    table_name = str(state.get("table_name") or "").strip() or None
+    table_names = _state_table_names(state, max_items=16)
+    table_name = table_names[0] if table_names else None
     if not code:
         return {
             "guard_result": {"blocked": True, "reason": "No code was produced."},
@@ -1015,7 +1027,7 @@ async def analysis_finalize_failure_node(state: dict[str, Any], config: Runnable
 
 async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
     messages = list(state.get("messages") or [])
-    table_name = str(state.get("table_name") or "")
+    table_names = _state_table_names(state, max_items=16)
     data_path = str(state.get("data_path") or "")
     schema = state.get("active_schema") if isinstance(state.get("active_schema"), dict) else {}
     workspace_id = str(state.get("workspace_id") or "")
@@ -1024,7 +1036,7 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
     runtime = load_agent_runtime_config()
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
 
-    preferred_table = table_name or None
+    preferred_table = table_names[0] if table_names else None
     schema_summary = _build_schema_summary(schema=schema, table_name=None)
     sample_table = _select_sample_table(schema, preferred_table)
     sample = sample_data(data_path=data_path or None, table_name=sample_table, limit=5)
@@ -1179,7 +1191,7 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
 
         sanitized_output_contract = _sanitize_output_contract(best_output.output_contract)
 
-        guard = guard_code(candidate_code, table_name=table_name or None)
+        guard = guard_code(candidate_code, table_name=preferred_table)
         if not guard.blocked:
             candidate_code = guard.code
         else:

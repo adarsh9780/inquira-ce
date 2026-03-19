@@ -23,7 +23,7 @@ class AgentInput(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
     workspace_id: str
     user_id: str
-    table_name: str | None
+    table_names: list[str]
     data_path: str | None
     scratchpad_path: str | None
     run_id: str
@@ -95,7 +95,8 @@ def build_input_state(
     question: str,
     schema: dict[str, Any],
     current_code: str,
-    table_name: str,
+    table_names: list[str] | None,
+    table_name: str | None = None,
     data_path: str,
     context: str,
     workspace_id: str,
@@ -106,6 +107,21 @@ def build_input_state(
     run_id: str | None = None,
     **_: Any,
 ) -> AgentInput:
+    normalized_table_names: list[str] = []
+    seen_tables: set[str] = set()
+    candidates = table_names if isinstance(table_names, list) else []
+    if not candidates and str(table_name or "").strip():
+        candidates = [str(table_name or "").strip()]
+    for item in candidates:
+        candidate = str(item or "").strip()
+        if not candidate:
+            continue
+        dedupe = candidate.lower()
+        if dedupe in seen_tables:
+            continue
+        seen_tables.add(dedupe)
+        normalized_table_names.append(candidate)
+
     normalized_known_columns: list[dict[str, str]] = []
     for item in known_columns or []:
         if not isinstance(item, dict):
@@ -157,7 +173,7 @@ def build_input_state(
         messages=[HumanMessage(content=content_blocks or str(question or ""))],
         workspace_id=workspace_id,
         user_id=user_id,
-        table_name=table_name or None,
+        table_names=normalized_table_names,
         data_path=data_path or None,
         scratchpad_path=scratchpad_path or None,
         run_id=str(run_id or uuid.uuid4()),
