@@ -38,7 +38,6 @@ from ..repositories.preferences_repository import PreferencesRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .conversation_service import ConversationService
 from .secret_storage_service import SecretStorageService
-from .workspace_storage_service import WorkspaceStorageService
 from ...core.logger import logprint
 
 
