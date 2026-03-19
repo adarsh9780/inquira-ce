@@ -67,6 +67,18 @@ class AgentState(AgentInput, total=False):
     tool_calls: int
     code_attempts: int
     last_error: str
+    analysis_context: dict[str, Any]
+    context_sufficiency: dict[str, Any]
+    tool_plan: list[dict[str, Any]]
+    enrichment_results: dict[str, Any]
+    candidate_code: str
+    guard_result: dict[str, Any]
+    execution_result: dict[str, Any]
+    retry_feedback: str
+    retry_target: str
+    attempt_counters: dict[str, int]
+    analysis_output: dict[str, Any]
+    result_summary: dict[str, Any]
 
 
 def default_system_info() -> SystemInfo:

@@ -37,6 +37,18 @@ _GENERAL_CHAT_PROMPT = (
 _RESULT_EXPLANATION_PROMPT = (
     Path(__file__).resolve().parent / "prompts" / "result_explanation_system.yaml"
 ).read_text(encoding="utf-8")
+_ASSESS_CONTEXT_PROMPT = (
+    "You decide whether the agent has enough schema/data context to generate executable analysis code.\n"
+    "Return strict JSON with fields:\n"
+    "- enough_context: boolean\n"
+    "- missing_context: string[] (short gaps)\n"
+    "- tool_plan: list of tool actions.\n"
+    "Allowed tool actions:\n"
+    "- {tool: \"search_schema\", query: string, table_name?: string, limit?: int}\n"
+    "- {tool: \"sample_data\", table_name?: string, limit?: int}\n"
+    "- {tool: \"bash\", command: string}\n"
+    "Never emit pip_install. Keep tool_plan empty when enough_context=true."
+)
 
 
 class ChatOutput(BaseModel):
@@ -46,6 +58,20 @@ class ChatOutput(BaseModel):
 class ResultExplanation(BaseModel):
     result_explanation: str | None = None
     code_explanation: str | None = None
+
+
+class AnalysisToolPlanItem(BaseModel):
+    tool: str
+    query: str | None = None
+    table_name: str | None = None
+    limit: int | None = None
+    command: str | None = None
+
+
+class AnalysisContextAssessment(BaseModel):
+    enough_context: bool = False
+    missing_context: list[str] = []
+    tool_plan: list[AnalysisToolPlanItem] = []
 
 
 def _stringify_content(content: Any) -> str:
@@ -72,6 +98,47 @@ def _latest_user_text(messages: list[AnyMessage]) -> str:
     if messages:
         return _stringify_content(getattr(messages[-1], "content", "")).strip()
     return ""
+
+
+def _bounded_messages(messages: list[AnyMessage], *, max_messages: int = 8) -> list[AnyMessage]:
+    if not isinstance(messages, list):
+        return []
+    safe_max = max(1, int(max_messages))
+    return list(messages[-safe_max:])
+
+
+def _sanitize_tool_plan(raw: Any, *, max_items: int = 5) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    accepted: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        tool = str(item.get("tool") or "").strip().lower()
+        if tool not in {"search_schema", "sample_data", "bash"}:
+            continue
+        normalized: dict[str, Any] = {"tool": tool}
+        if tool == "search_schema":
+            query = str(item.get("query") or "").strip()
+            if not query:
+                continue
+            normalized["query"] = query
+            if str(item.get("table_name") or "").strip():
+                normalized["table_name"] = str(item.get("table_name") or "").strip()
+            normalized["limit"] = max(1, min(50, int(item.get("limit") or 20)))
+        elif tool == "sample_data":
+            if str(item.get("table_name") or "").strip():
+                normalized["table_name"] = str(item.get("table_name") or "").strip()
+            normalized["limit"] = max(1, min(20, int(item.get("limit") or 5)))
+        elif tool == "bash":
+            command = str(item.get("command") or "").strip()
+            if not command:
+                continue
+            normalized["command"] = command
+        accepted.append(normalized)
+        if len(accepted) >= max_items:
+            break
+    return accepted
 
 
 def _get_model(config: RunnableConfig, *, lite: bool) -> BaseChatModel:
@@ -342,7 +409,7 @@ def route_to_next(state: dict[str, Any]) -> str:
         return "reject"
     if route == "general_chat":
         return "chat"
-    return "react_loop"
+    return "analysis_collect_context"
 
 
 def _extract_packages_from_prompt(user_text: str) -> list[str]:
@@ -460,6 +527,490 @@ async def _generate_result_explanations(
     if isinstance(output, ResultExplanation):
         return output
     return ResultExplanation.model_validate(output)
+
+
+async def analysis_collect_context_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+    _ = config
+    messages = _bounded_messages(list(state.get("messages") or []), max_messages=8)
+    table_name = str(state.get("table_name") or "")
+    data_path = str(state.get("data_path") or "")
+    schema = state.get("active_schema") if isinstance(state.get("active_schema"), dict) else {}
+    known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
+    preferred_table = table_name or None
+    sample_table = _select_sample_table(schema, preferred_table)
+    schema_summary = _build_schema_summary(schema=schema, table_name=None)
+    user_text = _latest_user_text(messages)
+    runtime = load_agent_runtime_config()
+    attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
+
+    return {
+        "analysis_context": {
+            "messages": messages,
+            "user_text": user_text,
+            "schema_summary": schema_summary,
+            "schema_tables": _extract_schema_table_names(schema),
+            "sample_table": sample_table or "",
+            "preferred_table": preferred_table or "",
+            "data_path": data_path,
+            "context": str(state.get("context") or ""),
+        },
+        "known_columns": known_columns,
+        "attempt_counters": {
+            "generation": int(attempt_counters.get("generation") or 0),
+            "execution": int(attempt_counters.get("execution") or 0),
+            "enrichment": int(attempt_counters.get("enrichment") or 0),
+            "max_code_executions": max(1, int(runtime.max_code_executions)),
+            "max_tool_calls": max(1, int(runtime.max_tool_calls)),
+        },
+        "enrichment_results": state.get("enrichment_results") if isinstance(state.get("enrichment_results"), dict) else {},
+        "retry_feedback": str(state.get("retry_feedback") or ""),
+    }
+
+
+async def analysis_assess_context_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+    analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
+    messages = list(analysis_context.get("messages") or [])
+    user_text = str(analysis_context.get("user_text") or "")
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", _ASSESS_CONTEXT_PROMPT),
+            (
+                "human",
+                (
+                    "User question: {user_text}\n\n"
+                    "Schema summary:\n{schema_summary}\n\n"
+                    "Known columns: {known_columns_json}\n\n"
+                    "Prior retry feedback: {retry_feedback}\n\n"
+                    "Messages window size: {message_count}"
+                ),
+            ),
+        ]
+    )
+    model = _get_model(config, lite=True)
+    chain = prompt | model.with_structured_output(AnalysisContextAssessment)
+    output = await _ainvoke_structured_chain(
+        chain,
+        {
+            "user_text": user_text,
+            "schema_summary": str(analysis_context.get("schema_summary") or ""),
+            "known_columns_json": _safe_json_dumps(state.get("known_columns") or []),
+            "retry_feedback": str(state.get("retry_feedback") or ""),
+            "message_count": len(messages),
+        },
+    )
+    if isinstance(output, AnalysisContextAssessment):
+        assessed = output
+    else:
+        assessed = AnalysisContextAssessment.model_validate(output)
+
+    tool_plan = _sanitize_tool_plan([item.model_dump() for item in assessed.tool_plan], max_items=5)
+    return {
+        "context_sufficiency": {
+            "enough_context": bool(assessed.enough_context),
+            "missing_context": [str(item).strip() for item in (assessed.missing_context or []) if str(item).strip()][:6],
+        },
+        "tool_plan": tool_plan,
+    }
+
+
+def analysis_assess_to_next(state: dict[str, Any]) -> str:
+    sufficiency = state.get("context_sufficiency") if isinstance(state.get("context_sufficiency"), dict) else {}
+    enough_context = bool(sufficiency.get("enough_context"))
+    tool_plan = state.get("tool_plan") if isinstance(state.get("tool_plan"), list) else []
+    if enough_context or not tool_plan:
+        return "analysis_generate_code"
+    return "analysis_enrich_context"
+
+
+async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+    _ = config
+    analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
+    schema = state.get("active_schema") if isinstance(state.get("active_schema"), dict) else {}
+    known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
+    tool_plan = state.get("tool_plan") if isinstance(state.get("tool_plan"), list) else []
+    attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
+    max_tool_calls = max(1, int(attempt_counters.get("max_tool_calls") or 5))
+    enrichment_count = int(attempt_counters.get("enrichment") or 0)
+    performed = 0
+    enrichment_results: dict[str, Any] = {}
+
+    for action in tool_plan:
+        if not isinstance(action, dict):
+            continue
+        if performed >= max_tool_calls:
+            break
+        tool = str(action.get("tool") or "").strip().lower()
+        if tool == "search_schema":
+            query = str(action.get("query") or "").strip()
+            if not query:
+                continue
+            _emit_agent_status(
+                step="searching_schema",
+                message=f"Searching schema for \"{query}\"...",
+                detail="Finding relevant columns before code generation.",
+                next_action="Use found schema columns in next code generation attempt.",
+            )
+            result = search_schema(
+                schema=schema,
+                query=query,
+                table_name=str(action.get("table_name") or "").strip() or None,
+                max_results=int(action.get("limit") or 20),
+            )
+            discovered = result.get("columns") if isinstance(result, dict) else []
+            if isinstance(discovered, list):
+                known_columns = _merge_known_columns_lru(known_columns, discovered, max_items=50)
+            enrichment_results.setdefault("search_schema", []).append(result)
+            performed += 1
+        elif tool == "sample_data":
+            sample = sample_data(
+                data_path=str(analysis_context.get("data_path") or "") or None,
+                table_name=str(action.get("table_name") or analysis_context.get("sample_table") or "").strip() or None,
+                limit=int(action.get("limit") or 5),
+            )
+            enrichment_results["sample_data"] = sample
+            performed += 1
+        elif tool == "bash":
+            command = str(action.get("command") or "").strip()
+            if not command:
+                continue
+            output = await run_bash(
+                user_id=str(state.get("user_id") or ""),
+                workspace_id=str(state.get("workspace_id") or ""),
+                data_path=str(analysis_context.get("data_path") or "") or None,
+                command=command,
+                timeout=60,
+            )
+            enrichment_results.setdefault("bash", []).append(output)
+            performed += 1
+
+    return {
+        "known_columns": known_columns,
+        "enrichment_results": enrichment_results,
+        "attempt_counters": {
+            **attempt_counters,
+            "enrichment": enrichment_count + 1,
+        },
+        "retry_feedback": "Context enrichment completed. Regenerate executable code using enriched context.",
+    }
+
+
+async def analysis_generate_code_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+    analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
+    messages = list(analysis_context.get("messages") or [])
+    known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
+    schema = state.get("active_schema") if isinstance(state.get("active_schema"), dict) else {}
+    sample_table = str(analysis_context.get("sample_table") or "").strip() or None
+    sample = state.get("enrichment_results", {}).get("sample_data") if isinstance(state.get("enrichment_results"), dict) else None
+    if not isinstance(sample, list):
+        sample = sample_data(
+            data_path=str(analysis_context.get("data_path") or "") or None,
+            table_name=sample_table,
+            limit=5,
+        )
+
+    retry_feedback = str(state.get("retry_feedback") or "").strip()
+    if retry_feedback:
+        messages = list(messages) + [HumanMessage(content=f"Fix the previous issue: {retry_feedback}")]
+
+    _emit_agent_status(
+        step="generating_code",
+        message="Generating analysis code...",
+        detail="Creating executable Python code from available schema and context.",
+        next_action="Validate generated code and execute it.",
+    )
+
+    model = _get_model(config, lite=False)
+    chain = build_coding_chain(model=model)
+    output = await ainvoke_coding_chain(
+        chain=chain,
+        messages=messages,
+        table_name=str(analysis_context.get("preferred_table") or ""),
+        workspace_tables_json=_safe_json_dumps(_extract_schema_table_names(schema)),
+        workspace_db_path=str(analysis_context.get("data_path") or ""),
+        schema_summary=str(analysis_context.get("schema_summary") or ""),
+        known_columns_json=_safe_json_dumps(known_columns),
+        sample_table=sample_table or "",
+        sample_json=_safe_json_dumps(sample),
+        context=str(analysis_context.get("context") or ""),
+        invoke_structured_chain=_ainvoke_structured_chain,
+    )
+    candidate_code = str(output.code or "").strip()
+    sanitized_output_contract = _sanitize_output_contract(output.output_contract)
+    selected_tables = _normalize_table_names(output.selected_tables)
+
+    attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
+    return {
+        "analysis_output": output.model_dump(),
+        "candidate_code": candidate_code,
+        "output_contract": sanitized_output_contract,
+        "metadata": {
+            "is_safe": True,
+            "is_relevant": True,
+            "tables_used": selected_tables or ([str(analysis_context.get("preferred_table") or "")] if str(analysis_context.get("preferred_table") or "") else []),
+            "joins_used": bool(output.joins_used),
+            "join_keys": [str(item).strip() for item in (output.join_keys or []) if str(item).strip()][:8],
+            "preferred_table": str(analysis_context.get("preferred_table") or ""),
+            "sample_table": str(sample_table or ""),
+        },
+        "attempt_counters": {
+            **attempt_counters,
+            "generation": int(attempt_counters.get("generation") or 0) + 1,
+        },
+    }
+
+
+def analysis_generate_to_next(state: dict[str, Any]) -> str:
+    code = str(state.get("candidate_code") or "").strip()
+    if not code:
+        return "analysis_retry_decider"
+    return "analysis_guard_code"
+
+
+async def analysis_guard_code_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+    _ = config
+    code = str(state.get("candidate_code") or "").strip()
+    table_name = str(state.get("table_name") or "").strip() or None
+    if not code:
+        return {
+            "guard_result": {"blocked": True, "reason": "No code was produced."},
+            "retry_feedback": "No code was produced. Generate executable Python code.",
+        }
+    guard = guard_code(code, table_name=table_name)
+    if guard.blocked:
+        reason = str(guard.reason or "Generated code failed validation.")
+        _emit_agent_status(
+            step="code_validation_failed",
+            message="Code validation failed. Regenerating...",
+            detail=f"Reason: {_truncate_text(reason, limit=260)}",
+            next_action="Generate safer executable code.",
+        )
+        return {
+            "guard_result": {"blocked": True, "reason": reason},
+            "retry_feedback": reason,
+        }
+    return {
+        "candidate_code": str(guard.code or "").strip(),
+        "guard_result": {"blocked": False, "reason": ""},
+    }
+
+
+def analysis_guard_to_next(state: dict[str, Any]) -> str:
+    guard_result = state.get("guard_result") if isinstance(state.get("guard_result"), dict) else {}
+    if bool(guard_result.get("blocked")):
+        return "analysis_retry_decider"
+    return "analysis_execute_code"
+
+
+async def analysis_execute_code_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+    _ = config
+    code = str(state.get("candidate_code") or "").strip()
+    analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
+    attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
+    execution_attempts = int(attempt_counters.get("execution") or 0) + 1
+    runtime = load_agent_runtime_config()
+    timeout = min(90, max(10, int(runtime.turn_timeout)))
+    _emit_agent_status(
+        step="executing_code",
+        message="Running code...",
+        detail=f"Executing generated Python in workspace runtime (timeout: {timeout}s).",
+        attempt=execution_attempts,
+        next_action="Use runtime output to decide retry or finalization.",
+    )
+    execution = await execute_python(
+        workspace_id=str(state.get("workspace_id") or ""),
+        data_path=str(analysis_context.get("data_path") or "") or None,
+        code=code,
+        timeout=timeout,
+        emit_tool_events=False,
+    )
+    return {
+        "execution_result": execution,
+        "final_executed_code": code,
+        "attempt_counters": {
+            **attempt_counters,
+            "execution": execution_attempts,
+        },
+    }
+
+
+def analysis_execute_to_next(state: dict[str, Any]) -> str:
+    execution = state.get("execution_result") if isinstance(state.get("execution_result"), dict) else {}
+    if bool(execution.get("success")):
+        return "analysis_validate_result"
+    return "analysis_retry_decider"
+
+
+async def analysis_retry_decider_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+    _ = config
+    execution = state.get("execution_result") if isinstance(state.get("execution_result"), dict) else {}
+    attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
+    max_attempts = max(1, int(attempt_counters.get("max_code_executions") or 3))
+    execution_attempts = int(attempt_counters.get("execution") or 0)
+    generation_attempts = int(attempt_counters.get("generation") or 0)
+
+    guard_result = state.get("guard_result") if isinstance(state.get("guard_result"), dict) else {}
+    if bool(guard_result.get("blocked")):
+        return {
+            "retry_feedback": str(guard_result.get("reason") or "Generated code failed validation."),
+            "retry_target": "analysis_generate_code",
+        }
+
+    candidate_code = str(state.get("candidate_code") or "").strip()
+    if not candidate_code:
+        if generation_attempts >= max_attempts:
+            return {
+                "retry_feedback": "No code was produced after retry limit.",
+                "retry_target": "analysis_finalize_failure",
+            }
+        return {
+            "retry_feedback": "No code was produced. Generate executable Python code.",
+            "retry_target": "analysis_generate_code",
+        }
+
+    error_text = str(execution.get("error") or execution.get("stderr") or "").strip()
+    if not error_text:
+        return {
+            "retry_feedback": "Execution did not return output.",
+            "retry_target": "analysis_finalize_failure",
+        }
+    if _is_non_retriable_execution_error(error_text):
+        return {
+            "retry_feedback": error_text,
+            "retry_target": "analysis_finalize_failure",
+        }
+    if execution_attempts >= max_attempts:
+        return {
+            "retry_feedback": error_text,
+            "retry_target": "analysis_finalize_failure",
+        }
+
+    lowered = error_text.lower()
+    if any(token in lowered for token in ["column", "table", "schema", "not found"]):
+        return {
+            "retry_feedback": f"Execution failed due to missing schema context: {error_text[:1200]}",
+            "retry_target": "analysis_enrich_context",
+        }
+    return {
+        "retry_feedback": f"Execution failed. Regenerate code that fixes this runtime error: {error_text[:1200]}",
+        "retry_target": "analysis_generate_code",
+    }
+
+
+def analysis_retry_to_next(state: dict[str, Any]) -> str:
+    target = str(state.get("retry_target") or "").strip()
+    if target == "analysis_enrich_context":
+        return "analysis_enrich_context"
+    if target == "analysis_generate_code":
+        return "analysis_generate_code"
+    return "analysis_finalize_failure"
+
+
+async def analysis_validate_result_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+    execution = state.get("execution_result") if isinstance(state.get("execution_result"), dict) else {}
+    artifacts = [item for item in (execution.get("artifacts") or []) if isinstance(item, dict)]
+    analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
+    code = str(state.get("candidate_code") or "").strip()
+    analysis_output = state.get("analysis_output") if isinstance(state.get("analysis_output"), dict) else {}
+    code_explanation = str(analysis_output.get("explanation") or "").strip()
+    _emit_agent_status(
+        step="analyzing_results",
+        message="Analyzing results...",
+        detail="Summarizing runtime output and preparing final user-facing findings.",
+        next_action="Generate final explanation.",
+    )
+    result_summary = await validate_and_summarize_result(
+        workspace_id=str(state.get("workspace_id") or ""),
+        run_id=str(state.get("run_id") or ""),
+        execution_result=execution,
+    )
+    result_explanation = ""
+    try:
+        explained = await _generate_result_explanations(
+            question=str(analysis_context.get("user_text") or ""),
+            code=code,
+            code_explanation=code_explanation,
+            result_summary=result_summary,
+            config=config,
+        )
+        result_explanation = str(explained.result_explanation or "").strip()
+        code_explanation = str(explained.code_explanation or code_explanation).strip()
+    except Exception:
+        result_explanation = ""
+
+    if not result_explanation:
+        stdout = str(execution.get("stdout") or "").strip()
+        if stdout:
+            result_explanation = stdout[:1200]
+        elif code_explanation:
+            result_explanation = code_explanation
+        else:
+            result_explanation = "Analysis completed successfully."
+
+    return {
+        "final_execution": execution,
+        "final_artifacts": artifacts,
+        "result_summary": result_summary,
+        "result_explanation": result_explanation,
+        "code_explanation": code_explanation,
+    }
+
+
+async def analysis_finalize_success_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+    _ = config
+    result_explanation = str(state.get("result_explanation") or "").strip() or "Analysis completed."
+    _emit_text_chunks("finalize", result_explanation)
+    return {
+        "route": "analysis",
+        "final_code": str(state.get("candidate_code") or ""),
+        "final_explanation": result_explanation,
+        "result_explanation": result_explanation,
+        "code_explanation": str(state.get("code_explanation") or ""),
+        "final_execution": state.get("final_execution"),
+        "final_artifacts": state.get("final_artifacts") or [],
+        "final_executed_code": str(state.get("final_executed_code") or state.get("candidate_code") or ""),
+        "output_contract": _sanitize_output_contract(state.get("output_contract") or []),
+        "metadata": state.get("metadata") or {"is_safe": True, "is_relevant": True},
+        "messages": [AIMessage(content=result_explanation)],
+        "last_error": "",
+        "known_columns": _normalize_known_columns(state.get("known_columns") or []),
+        "run_id": str(state.get("run_id") or ""),
+    }
+
+
+async def analysis_finalize_failure_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+    _ = config
+    retry_feedback = str(state.get("retry_feedback") or "").strip()
+    execution = state.get("execution_result") if isinstance(state.get("execution_result"), dict) else {}
+    runtime_error = str(execution.get("error") or execution.get("stderr") or "").strip()
+    if runtime_error:
+        result_explanation = (
+            "I ran the analysis but could not complete it successfully. "
+            f"The last runtime error was: {runtime_error}"
+        )
+    elif retry_feedback:
+        result_explanation = (
+            "I could not produce safe executable code for this request. "
+            f"Reason: {retry_feedback}"
+        )
+    else:
+        result_explanation = "I could not complete this analysis."
+    _emit_text_chunks("finalize", result_explanation)
+    return {
+        "route": "analysis",
+        "final_code": str(state.get("candidate_code") or ""),
+        "final_explanation": result_explanation,
+        "result_explanation": result_explanation,
+        "code_explanation": str(state.get("code_explanation") or ""),
+        "final_execution": None,
+        "final_artifacts": [],
+        "final_executed_code": str(state.get("final_executed_code") or ""),
+        "output_contract": _sanitize_output_contract(state.get("output_contract") or []),
+        "metadata": state.get("metadata") or {"is_safe": True, "is_relevant": True},
+        "messages": [AIMessage(content=result_explanation)],
+        "last_error": retry_feedback or runtime_error,
+        "known_columns": _normalize_known_columns(state.get("known_columns") or []),
+        "run_id": str(state.get("run_id") or ""),
+    }
 
 
 async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:

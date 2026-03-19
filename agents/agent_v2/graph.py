@@ -8,9 +8,23 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 
 from .nodes import (
+    analysis_assess_context_node,
+    analysis_assess_to_next,
+    analysis_collect_context_node,
+    analysis_enrich_context_node,
+    analysis_execute_code_node,
+    analysis_execute_to_next,
+    analysis_finalize_failure_node,
+    analysis_finalize_success_node,
+    analysis_generate_code_node,
+    analysis_generate_to_next,
+    analysis_guard_code_node,
+    analysis_guard_to_next,
+    analysis_retry_decider_node,
+    analysis_retry_to_next,
+    analysis_validate_result_node,
     chat_node,
     finalize_node,
-    react_loop_node,
     reject_node,
     route_node,
     route_to_next,
@@ -82,7 +96,16 @@ def build_graph(config: RunnableConfig) -> CompiledStateGraph:
     builder = StateGraph(AgentState, input_schema=RuntimeInput, output_schema=AgentOutput)
     builder.add_node("prepare_input", _prepare_input_node)
     builder.add_node("route", route_node)
-    builder.add_node("react_loop", react_loop_node)
+    builder.add_node("analysis_collect_context", analysis_collect_context_node)
+    builder.add_node("analysis_assess_context", analysis_assess_context_node)
+    builder.add_node("analysis_enrich_context", analysis_enrich_context_node)
+    builder.add_node("analysis_generate_code", analysis_generate_code_node)
+    builder.add_node("analysis_guard_code", analysis_guard_code_node)
+    builder.add_node("analysis_execute_code", analysis_execute_code_node)
+    builder.add_node("analysis_retry_decider", analysis_retry_decider_node)
+    builder.add_node("analysis_validate_result", analysis_validate_result_node)
+    builder.add_node("analysis_finalize_success", analysis_finalize_success_node)
+    builder.add_node("analysis_finalize_failure", analysis_finalize_failure_node)
     builder.add_node("chat", chat_node)
     builder.add_node("reject", reject_node)
     builder.add_node("finalize", finalize_node)
@@ -93,12 +116,57 @@ def build_graph(config: RunnableConfig) -> CompiledStateGraph:
         "route",
         route_to_next,
         {
-            "react_loop": "react_loop",
+            "analysis_collect_context": "analysis_collect_context",
             "chat": "chat",
             "reject": "reject",
         },
     )
-    builder.add_edge("react_loop", "finalize")
+    builder.add_edge("analysis_collect_context", "analysis_assess_context")
+    builder.add_conditional_edges(
+        "analysis_assess_context",
+        analysis_assess_to_next,
+        {
+            "analysis_enrich_context": "analysis_enrich_context",
+            "analysis_generate_code": "analysis_generate_code",
+        },
+    )
+    builder.add_edge("analysis_enrich_context", "analysis_generate_code")
+    builder.add_conditional_edges(
+        "analysis_generate_code",
+        analysis_generate_to_next,
+        {
+            "analysis_guard_code": "analysis_guard_code",
+            "analysis_retry_decider": "analysis_retry_decider",
+        },
+    )
+    builder.add_conditional_edges(
+        "analysis_guard_code",
+        analysis_guard_to_next,
+        {
+            "analysis_execute_code": "analysis_execute_code",
+            "analysis_retry_decider": "analysis_retry_decider",
+        },
+    )
+    builder.add_conditional_edges(
+        "analysis_execute_code",
+        analysis_execute_to_next,
+        {
+            "analysis_validate_result": "analysis_validate_result",
+            "analysis_retry_decider": "analysis_retry_decider",
+        },
+    )
+    builder.add_conditional_edges(
+        "analysis_retry_decider",
+        analysis_retry_to_next,
+        {
+            "analysis_enrich_context": "analysis_enrich_context",
+            "analysis_generate_code": "analysis_generate_code",
+            "analysis_finalize_failure": "analysis_finalize_failure",
+        },
+    )
+    builder.add_edge("analysis_validate_result", "analysis_finalize_success")
+    builder.add_edge("analysis_finalize_success", "finalize")
+    builder.add_edge("analysis_finalize_failure", "finalize")
     builder.add_edge("chat", "finalize")
     builder.add_edge("reject", "finalize")
     builder.add_edge("finalize", END)
