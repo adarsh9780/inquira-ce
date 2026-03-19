@@ -6,6 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from agent_v2.nodes import (
     _ASSESS_CONTEXT_PROMPT,
+    analysis_collect_context_node,
     analysis_enrich_context_node,
     analysis_retry_decider_node,
 )
@@ -103,3 +104,18 @@ def test_assess_context_prompt_escapes_literal_tool_examples() -> None:
         ]
     )
     assert "tool" not in prompt.input_variables
+
+
+@pytest.mark.asyncio
+async def test_analysis_collect_context_does_not_persist_preferred_table_field() -> None:
+    state = {
+        "messages": [HumanMessage(content="show top scorers")],
+        "table_names": ["batting", "matches"],
+        "active_schema": {"tables": [{"table_name": "batting", "columns": []}]},
+        "known_columns": [],
+        "data_path": "/tmp/ws.db",
+    }
+    result = await analysis_collect_context_node(state, {"configurable": {}})
+    analysis_context = result.get("analysis_context") if isinstance(result, dict) else {}
+    assert isinstance(analysis_context, dict)
+    assert "preferred_table" not in analysis_context

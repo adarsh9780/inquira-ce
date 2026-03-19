@@ -540,8 +540,8 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
     data_path = str(state.get("data_path") or "")
     schema = state.get("active_schema") if isinstance(state.get("active_schema"), dict) else {}
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
-    preferred_table = table_names[0] if table_names else None
-    sample_table = _select_sample_table(schema, preferred_table)
+    table_hint = table_names[0] if table_names else None
+    sample_table = _select_sample_table(schema, table_hint)
     schema_summary = _build_schema_summary(schema=schema, table_name=None)
     user_text = _latest_user_text(messages)
     runtime = load_agent_runtime_config()
@@ -555,7 +555,6 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
             "schema_tables": _extract_schema_table_names(schema),
             "table_names": table_names,
             "sample_table": sample_table or "",
-            "preferred_table": preferred_table or "",
             "data_path": data_path,
             "context": str(state.get("context") or ""),
         },
@@ -716,6 +715,8 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
     retry_feedback = str(state.get("retry_feedback") or "").strip()
     if retry_feedback:
         messages = list(messages) + [HumanMessage(content=f"Fix the previous issue: {retry_feedback}")]
+    table_names = _normalize_table_names(analysis_context.get("table_names"), max_items=16)
+    table_hint = table_names[0] if table_names else ""
 
     _emit_agent_status(
         step="generating_code",
@@ -729,7 +730,7 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
     output = await ainvoke_coding_chain(
         chain=chain,
         messages=messages,
-        table_name=str(analysis_context.get("preferred_table") or ""),
+        table_name=table_hint,
         workspace_tables_json=_safe_json_dumps(_extract_schema_table_names(schema)),
         workspace_db_path=str(analysis_context.get("data_path") or ""),
         schema_summary=str(analysis_context.get("schema_summary") or ""),
@@ -751,10 +752,9 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
         "metadata": {
             "is_safe": True,
             "is_relevant": True,
-            "tables_used": selected_tables or ([str(analysis_context.get("preferred_table") or "")] if str(analysis_context.get("preferred_table") or "") else []),
+            "tables_used": selected_tables or ([table_hint] if table_hint else []),
             "joins_used": bool(output.joins_used),
             "join_keys": [str(item).strip() for item in (output.join_keys or []) if str(item).strip()][:8],
-            "preferred_table": str(analysis_context.get("preferred_table") or ""),
             "sample_table": str(sample_table or ""),
         },
         "attempt_counters": {
@@ -1386,7 +1386,6 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
                 for item in (best_output.join_keys or [])
                 if str(item).strip()
             ][:8],
-            "preferred_table": preferred_table or "",
             "sample_table": sample_table or "",
         },
         "messages": [AIMessage(content=result_explanation)],
