@@ -641,9 +641,25 @@ fn python_bin_from_venv(venv_path: &PathBuf) -> PathBuf {
     }
 }
 
-fn kill_stale_backend_on_port(port: u16, backend_dir: &PathBuf) {
-    // Best-effort cleanup for orphan listeners from previous dev runs.
-    // We only kill processes that look like Inquira backend listeners.
+fn parse_lsof_pid_lines(raw: &[u8]) -> Vec<String> {
+    let mut pids: Vec<String> = Vec::new();
+    for line in String::from_utf8_lossy(raw).lines() {
+        let pid = line.trim();
+        if pid.is_empty() {
+            continue;
+        }
+        if !pid.chars().all(|ch| ch.is_ascii_digit()) {
+            continue;
+        }
+        if pids.iter().any(|existing| existing == pid) {
+            continue;
+        }
+        pids.push(pid.to_string());
+    }
+    pids
+}
+
+fn list_listening_pids_on_port(port: u16) -> Vec<String> {
     let output = Command::new("lsof")
         .args(["-t", "-nP", "-iTCP"])
         .arg(format!("{port}"))
@@ -651,59 +667,76 @@ fn kill_stale_backend_on_port(port: u16, backend_dir: &PathBuf) {
         .output();
 
     let Ok(output) = output else {
-        return;
+        return Vec::new();
     };
     if !output.status.success() {
-        return;
+        return Vec::new();
     }
+    parse_lsof_pid_lines(&output.stdout)
+}
 
-    let pids = String::from_utf8_lossy(&output.stdout);
-    let backend_dir_hint = backend_dir.to_string_lossy().to_string();
-    for pid in pids.lines().map(str::trim).filter(|s| !s.is_empty()) {
-        let ps_output = Command::new("ps")
-            .args(["-o", "command=", "-p", pid])
-            .output();
-
-        let Ok(ps_output) = ps_output else {
-            continue;
-        };
-        if !ps_output.status.success() {
-            continue;
-        }
-
-        let cmdline = String::from_utf8_lossy(&ps_output.stdout).to_string();
-        let lsof_cwd_output = Command::new("lsof")
-            .args(["-a", "-p", pid, "-d", "cwd", "-Fn"])
-            .output();
-        let cwd = if let Ok(cwd_output) = lsof_cwd_output {
-            if cwd_output.status.success() {
-                String::from_utf8_lossy(&cwd_output.stdout)
-                    .lines()
-                    .find_map(|line| line.strip_prefix('n'))
-                    .unwrap_or("")
-                    .to_string()
-            } else {
-                String::new()
+fn kill_all_listeners_on_port(port: u16) -> usize {
+    let pids = list_listening_pids_on_port(port);
+    let mut killed = 0usize;
+    for pid in pids {
+        let status = Command::new("kill").args(["-9", &pid]).status();
+        match status {
+            Ok(s) if s.success() => {
+                log::warn!("Killed process {} listening on port {}", pid, port);
+                killed += 1;
             }
-        } else {
-            String::new()
-        };
-
-        let is_inquira_backend = cmdline.contains("app.main")
-            || cmdline.contains("backend/main.py")
-            || cmdline.contains("inquira")
-            || (!backend_dir_hint.is_empty() && cmdline.contains(&backend_dir_hint))
-            || (!backend_dir_hint.is_empty() && cwd.starts_with(&backend_dir_hint));
-
-        if is_inquira_backend {
-            log::warn!(
-                "Killing stale backend process on port {} (pid {})",
-                port,
-                pid
-            );
-            let _ = Command::new("kill").args(["-9", pid]).status();
+            Ok(s) => {
+                log::warn!(
+                    "Failed to kill process {} on port {} (exit status: {})",
+                    pid,
+                    port,
+                    s
+                );
+            }
+            Err(e) => {
+                log::warn!("Failed to execute kill for pid {} on port {}: {}", pid, port, e);
+            }
         }
     }
+    killed
+}
+
+fn ensure_ports_available(ports: &[u16], app: &tauri::AppHandle, phase: &str) -> Result<(), String> {
+    let mut busy_ports: Vec<(u16, Vec<String>)> = Vec::new();
+    for port in ports {
+        let pids = list_listening_pids_on_port(*port);
+        if !pids.is_empty() {
+            busy_ports.push((*port, pids));
+        }
+    }
+
+    if busy_ports.is_empty() {
+        return Ok(());
+    }
+
+    let summary = busy_ports
+        .iter()
+        .map(|(port, pids)| format!("{port} [{}]", pids.join(",")))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let _ = app.emit(
+        "backend-status",
+        format!("Ports busy during {phase}: {summary}. Cleaning up listeners..."),
+    );
+
+    for (port, _) in &busy_ports {
+        let _ = kill_all_listeners_on_port(*port);
+    }
+
+    for port in ports {
+        if !list_listening_pids_on_port(*port).is_empty() {
+            let msg = format!("Port {port} is still busy after cleanup.");
+            let _ = app.emit("backend-status", msg.clone());
+            return Err(msg);
+        }
+    }
+
+    Ok(())
 }
 
 fn start_backend(
@@ -715,8 +748,6 @@ fn start_backend(
 ) -> Result<StdChild, String> {
     let _ = uv_bin; // kept for signature compatibility with existing call sites
     let port = config.backend.as_ref().and_then(|b| b.port).unwrap_or(8000);
-
-    kill_stale_backend_on_port(port, backend_dir);
 
     log::info!("Starting Inquira backend on port {}...", port);
 
@@ -950,6 +981,7 @@ pub fn run() {
                     .join("inquira.toml")
             };
             let config = load_config(&runtime_config_path);
+            let managed_ports = vec![8000_u16, 8123_u16];
             log::info!(
                 "Runtime config path: {}",
                 runtime_config_path.to_string_lossy()
@@ -1017,6 +1049,13 @@ pub fn run() {
                 }
             };
 
+            if let Err(e) = ensure_ports_available(&managed_ports, &app.handle(), "startup preflight")
+            {
+                log::error!("Port preflight failed: {}", e);
+                let _ = app.emit("backend-status", format!("Startup failed: {}", e));
+                return Ok(());
+            }
+
             app.emit("backend-status", "agent-starting").ok();
             match start_agent_runtime(
                 &agent_dir,
@@ -1032,6 +1071,9 @@ pub fn run() {
                 }
                 Err(e) => {
                     log::error!("Agent runtime start failed: {}", e);
+                    for port in &managed_ports {
+                        let _ = kill_all_listeners_on_port(*port);
+                    }
                     app.emit("backend-status", &format!("Agent failed: {}", e))
                         .ok();
                     return Ok(());
@@ -1054,6 +1096,9 @@ pub fn run() {
                 Err(e) => {
                     log::error!("Backend start failed: {}", e);
                     stop_agent_process(&app.handle());
+                    for port in &managed_ports {
+                        let _ = kill_all_listeners_on_port(*port);
+                    }
                     app.emit("backend-status", &format!("Backend failed: {}", e))
                         .ok();
                     return Ok(());
@@ -1092,6 +1137,9 @@ pub fn run() {
             if let Err(e) = backend_health {
                 stop_backend_process(&app.handle());
                 stop_agent_process(&app.handle());
+                for port in &managed_ports {
+                    let _ = kill_all_listeners_on_port(*port);
+                }
                 app.emit("backend-status", &format!("Backend health failed: {}", e))
                     .ok();
                 return Ok(());
@@ -1107,6 +1155,9 @@ pub fn run() {
                 Err(e) => {
                     stop_backend_process(&app.handle());
                     stop_agent_process(&app.handle());
+                    for port in &managed_ports {
+                        let _ = kill_all_listeners_on_port(*port);
+                    }
                     app.emit("backend-status", &format!("Agent health failed: {}", e))
                         .ok();
                     return Ok(());
@@ -1137,6 +1188,8 @@ pub fn run() {
 
             stop_agent_process(app);
             stop_backend_process(app);
+            let _ = kill_all_listeners_on_port(8000);
+            let _ = kill_all_listeners_on_port(8123);
 
             if let Some(sessions) = app.try_state::<PtySessions>() {
                 if let Ok(mut guard) = sessions.0.lock() {
@@ -1152,9 +1205,9 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        detect_default_shell, needs_python_bootstrap, resolve_pty_cwd, resolve_resource_path,
-        resolve_shared_console_log_level, resolve_uv_index_url, stop_child_process, InquiraConfig,
-        LoggingConfig, PythonConfig,
+        detect_default_shell, needs_python_bootstrap, parse_lsof_pid_lines, resolve_pty_cwd,
+        resolve_resource_path, resolve_shared_console_log_level, resolve_uv_index_url,
+        stop_child_process, InquiraConfig, LoggingConfig, PythonConfig,
     };
     use std::fs;
     use std::path::PathBuf;
@@ -1208,6 +1261,13 @@ mod tests {
         stop_child_process("test", &mut child);
         let status = child.try_wait().expect("query child status");
         assert!(status.is_some(), "child should be terminated");
+    }
+
+    #[test]
+    fn parse_lsof_pid_lines_keeps_numeric_unique_pids() {
+        let raw = b"1234\n\nabc\n1234\n5678\n";
+        let parsed = parse_lsof_pid_lines(raw);
+        assert_eq!(parsed, vec!["1234".to_string(), "5678".to_string()]);
     }
 
     fn base_config_with_index(index_url: Option<&str>) -> InquiraConfig {
