@@ -44,9 +44,9 @@ _ASSESS_CONTEXT_PROMPT = (
     "- missing_context: string[] (short gaps)\n"
     "- tool_plan: list of tool actions.\n"
     "Allowed tool actions:\n"
-    "- {tool: \"search_schema\", query: string, table_name?: string, limit?: int}\n"
-    "- {tool: \"sample_data\", table_name?: string, limit?: int}\n"
-    "- {tool: \"bash\", command: string}\n"
+    "- {{tool: \"search_schema\", query: string, table_name?: string, limit?: int}}\n"
+    "- {{tool: \"sample_data\", table_name?: string, limit?: int}}\n"
+    "- {{tool: \"bash\", command: string}}\n"
     "Never emit pip_install. Keep tool_plan empty when enough_context=true."
 )
 

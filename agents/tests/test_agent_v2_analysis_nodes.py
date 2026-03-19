@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import pytest
 from langchain_core.messages import HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
 
 from agent_v2.nodes import (
+    _ASSESS_CONTEXT_PROMPT,
     analysis_enrich_context_node,
     analysis_retry_decider_node,
 )
@@ -91,3 +93,13 @@ async def test_analysis_retry_decider_routes_non_retriable_to_failure() -> None:
     }
     result = await analysis_retry_decider_node(state, {"configurable": {}})
     assert result.get("retry_target") == "analysis_finalize_failure"
+
+
+def test_assess_context_prompt_escapes_literal_tool_examples() -> None:
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", _ASSESS_CONTEXT_PROMPT),
+            ("human", "User question: {user_text}"),
+        ]
+    )
+    assert "tool" not in prompt.input_variables
