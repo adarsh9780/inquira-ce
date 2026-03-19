@@ -4,6 +4,26 @@ import httpx
 from app.services.agent_client import AgentClient, AgentRuntimeError
 
 
+def test_agent_client_configurable_defaults_when_llm_payload_missing():
+    payload = {
+        "user_id": "u1",
+        "workspace_id": "w1",
+        "conversation_id": "c1",
+        "model": "gpt-test",
+        "llm": None,
+    }
+
+    cfg = AgentClient._configurable(payload)
+    assert cfg["thread_id"] == "u1:w1:c1"
+    assert cfg["model"] == "gpt-test"
+    assert cfg["api_key"] == ""
+    assert cfg["provider"] == ""
+    assert cfg["base_url"] == ""
+    assert cfg["default_model"] == ""
+    assert cfg["lite_model"] == ""
+    assert cfg["coding_model"] == ""
+
+
 @pytest.mark.asyncio
 async def test_agent_client_fails_on_contract_api_major_mismatch(monkeypatch):
     class _Resp:

@@ -54,7 +54,8 @@ class AgentClient:
 
     @staticmethod
     def _configurable(payload: dict[str, Any]) -> dict[str, Any]:
-        llm = payload.get("llm") if isinstance(payload.get("llm"), dict) else {}
+        llm_raw = payload.get("llm")
+        llm: dict[str, Any] = llm_raw if isinstance(llm_raw, dict) else {}
         return {
             "thread_id": f"{payload.get('user_id', '')}:{payload.get('workspace_id', '')}:{payload.get('conversation_id', '')}",
             "api_key": str(llm.get("api_key") or "").strip(),
