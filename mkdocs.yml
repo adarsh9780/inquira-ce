@@ -32,6 +32,7 @@ nav:
   - Overview: overview.md
   - Install: install.md
   - Development: development.md
+  - Admin Policy: admin-policy.md
   - Commit And Release: commit-and-release.md
   - CI And Release Automation: ci-and-release-automation.md
   - Architecture: architecture.md

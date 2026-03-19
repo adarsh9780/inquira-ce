@@ -1,0 +1,174 @@
+# Inquira Admin Policy (Example)
+# =============================
+#
+# Purpose:
+# - Central policy file managed by IT/Security.
+# - Higher priority than user-editable inquira.toml and UI toggles.
+# - If a key is locked/disabled here, end users must not be able to bypass it.
+#
+# Recommended placement:
+# - macOS/Linux: /etc/inquira/policy.toml
+# - Windows: C:\ProgramData\Inquira\policy.toml
+#
+# Runtime discovery:
+# - Set INQUIRA_POLICY_PATH to point backend/agent launchers to this file.
+#
+# Reference:
+# - docs/admin-policy.md
+#
+# Key links:
+# - Each key below includes a "Docs:" comment with an anchor for future hosted docs.
+
+[meta]
+# Policy schema version used by runtime validation.
+# Docs: docs/admin-policy.md#meta-version
+version = "1"
+
+# Human-readable owner for audit/support.
+# Docs: docs/admin-policy.md#meta-owner
+owner = "IT Security Team"
+
+# Free-form change ticket reference for traceability.
+# Docs: docs/admin-policy.md#meta-change-ticket
+change_ticket = ""
+
+[enforcement]
+# Enforce mode:
+# - "enforce": hard block when policy forbids a setting.
+# - "audit": allow but log violations (for dry-runs/migration).
+# Docs: docs/admin-policy.md#enforcement-mode
+mode = "enforce"
+
+[ui]
+# Hide advanced settings that are centrally managed.
+# Docs: docs/admin-policy.md#ui-hide-managed-settings
+hide_managed_settings = false
+
+[observability]
+# Master allow switch for telemetry/tracing backends.
+# If false, all observability providers below are force-disabled.
+# Docs: docs/admin-policy.md#observability-allow
+allow = true
+
+# Force redaction of sensitive content in traces/log-export payloads.
+# Docs: docs/admin-policy.md#observability-redact-sensitive-content
+redact_sensitive_content = true
+
+[backend.phoenix]
+# Allow backend process to export traces to Phoenix.
+# Docs: docs/admin-policy.md#backend-phoenix-allow
+allow = true
+
+# Lock backend Phoenix toggle in UI/config.
+# If true, user cannot modify backend Phoenix behavior.
+# Docs: docs/admin-policy.md#backend-phoenix-locked
+locked = true
+
+# Optional allowlist of Phoenix endpoints for backend exporter.
+# Empty means "no endpoint allowlist enforcement".
+# Docs: docs/admin-policy.md#backend-phoenix-allowed-endpoints
+allowed_endpoints = ["http://127.0.0.1:6006/v1/traces"]
+
+[agent_service.phoenix]
+# Allow agent process to export traces to Phoenix.
+# Docs: docs/admin-policy.md#agent-service-phoenix-allow
+allow = true
+
+# Lock agent Phoenix toggle in UI/config.
+# Docs: docs/admin-policy.md#agent-service-phoenix-locked
+locked = true
+
+# Optional allowlist of Phoenix endpoints for agent exporter.
+# Docs: docs/admin-policy.md#agent-service-phoenix-allowed-endpoints
+allowed_endpoints = ["http://127.0.0.1:6006/v1/traces"]
+
+[llm]
+# Allowed providers for runtime model calls.
+# Any provider not listed is blocked.
+# Docs: docs/admin-policy.md#llm-allowed-providers
+allowed_providers = ["openai", "anthropic", "ollama", "openrouter"]
+
+# If true, block user/API overrides for custom base URLs.
+# Docs: docs/admin-policy.md#llm-block-custom-base-url
+block_custom_base_url = false
+
+# If true, block user-supplied API keys and require centrally managed keys.
+# Docs: docs/admin-policy.md#llm-block-user-api-keys
+block_user_api_keys = false
+
+[llm.models]
+# Allowed model IDs per provider.
+# If a provider list is empty, runtime uses provider defaults.
+# Docs: docs/admin-policy.md#llm-models
+openai = []
+anthropic = []
+ollama = []
+openrouter = []
+
+[tools]
+# Master switch for agent tools.
+# Docs: docs/admin-policy.md#tools-allow
+allow = true
+
+[tools.bash]
+# Allow/deny terminal command execution tool.
+# Docs: docs/admin-policy.md#tools-bash-allow
+allow = true
+
+# Lock user control for bash tool.
+# Docs: docs/admin-policy.md#tools-bash-locked
+locked = true
+
+# Strict command allowlist for bash tool.
+# Docs: docs/admin-policy.md#tools-bash-allowed-commands
+allowed_commands = ["rg", "grep", "wc", "head", "tail", "ls", "cat", "find"]
+
+[tools.pip_install]
+# Allow/deny runtime package installation from prompts.
+# Docs: docs/admin-policy.md#tools-pip-install-allow
+allow = false
+
+# Lock user control for pip install tool.
+# Docs: docs/admin-policy.md#tools-pip-install-locked
+locked = true
+
+[execution]
+# Hard limits for runtime safety/cost.
+# Docs: docs/admin-policy.md#execution
+max_timeout_seconds = 120
+max_memory_mb = 1024
+max_output_kb = 2048
+
+[network]
+# Restrict outbound network calls (when enforcement supports it).
+# Docs: docs/admin-policy.md#network-allowed-hosts
+allowed_hosts = []
+
+# Enforce use of organization proxy.
+# Docs: docs/admin-policy.md#network-require-proxy
+require_proxy = false
+
+[data]
+# Allowed workspace root directories.
+# Empty means runtime default behavior.
+# Docs: docs/admin-policy.md#data-allowed-workspace-roots
+allowed_workspace_roots = []
+
+# Disable exporting datasets/artifacts outside managed workspace.
+# Docs: docs/admin-policy.md#data-block-export
+block_export = false
+
+[retention]
+# Maximum conversation retention (days) if app supports retention controls.
+# Docs: docs/admin-policy.md#retention-max-conversation-days
+max_conversation_days = 30
+
+# Maximum artifact retention (hours).
+# Docs: docs/admin-policy.md#retention-max-artifact-hours
+max_artifact_hours = 72
+
+[audit]
+# Emit audit logs when user attempts to override managed policy.
+# Docs: docs/admin-policy.md#audit-log-policy-violations
+log_policy_violations = true
+
