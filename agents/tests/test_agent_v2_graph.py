@@ -10,6 +10,18 @@ def test_agent_v2_build_graph_matches_langgraph_factory_signature() -> None:
     assert params[0].name == "config"
 
 
+def test_agent_v2_build_graph_initializes_phoenix_tracing(monkeypatch) -> None:
+    called = {"count": 0}
+
+    def fake_init():
+        called["count"] += 1
+        return True
+
+    monkeypatch.setattr("agent_v2.graph.init_phoenix_tracing", fake_init)
+    _ = build_graph({})
+    assert called["count"] == 1
+
+
 def test_agent_v2_unsafe_prompt_routes_to_reject() -> None:
     graph = build_graph({})
     result = asyncio.run(

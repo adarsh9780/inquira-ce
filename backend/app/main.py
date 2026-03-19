@@ -37,6 +37,7 @@ from .services.execution_config import load_execution_runtime_config
 from .services.terminal_executor import shutdown_terminal_sessions
 from .services.session_variable_store import session_variable_store
 from .services.websocket_manager import websocket_manager
+from .services.tracing import init_phoenix_tracing
 
 APP_VERSION = "0.5.7a10"
 _LOG_LEVELS = {"trace", "debug", "info", "warning", "error", "critical"}
@@ -99,6 +100,9 @@ async def lifespan(app: FastAPI):
         logprint(f"Failed to load configuration: {e}", level="error")
         # Create a default config if loading fails
         app.state.config = AppConfig()
+
+    # Initialize tracing early so startup/request spans are captured.
+    init_phoenix_tracing()
 
     # Initialize v1 ORM database schema
     try:

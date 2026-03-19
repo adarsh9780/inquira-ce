@@ -15,6 +15,7 @@ from .nodes import (
     route_node,
     route_to_next,
 )
+from .services.tracing import init_phoenix_tracing
 from .state import AgentOutput, AgentState, build_input_state
 
 
@@ -75,6 +76,7 @@ def _prepare_input_node(state: dict[str, Any], config: RunnableConfig) -> dict[s
 
 def build_graph(config: RunnableConfig) -> CompiledStateGraph:
     _ = config
+    init_phoenix_tracing()
     from langgraph.graph import END, START, StateGraph
 
     builder = StateGraph(AgentState, input_schema=RuntimeInput, output_schema=AgentOutput)
