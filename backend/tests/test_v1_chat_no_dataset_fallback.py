@@ -6,6 +6,26 @@ from fastapi import HTTPException
 from app.v1.services.chat_service import ChatService
 
 
+def _patch_remote_agent(monkeypatch, captured: dict, response: dict | None = None) -> None:
+    async def fake_health(self):
+        _ = self
+        return {"status": "ok", "api_major": 1}
+
+    async def fake_run(self, payload):
+        _ = self
+        captured["payload"] = payload
+        return response or {
+            "route": "analysis",
+            "metadata": {"is_safe": True, "is_relevant": True},
+            "final_code": "",
+            "final_explanation": "ok",
+            "messages": [],
+        }
+
+    monkeypatch.setattr("app.v1.services.chat_service.AgentClient.assert_health", fake_health)
+    monkeypatch.setattr("app.v1.services.chat_service.AgentClient.run", fake_run)
+
+
 @pytest.mark.asyncio
 async def test_chat_uses_empty_schema_when_workspace_has_no_dataset(monkeypatch):
     captured = {}
@@ -18,14 +38,6 @@ async def test_chat_uses_empty_schema_when_workspace_has_no_dataset(monkeypatch)
 
     async def fake_get_conversation(_session, _conversation_id):
         return SimpleNamespace(id="conv-1", workspace_id="ws-1", title="New Conversation")
-
-    async def fake_get_graph(_workspace_id, _memory_path):
-        class _Graph:
-            async def ainvoke(self, input_state, config=None):
-                captured["schema"] = input_state.active_schema
-                return {"metadata": {"is_safe": True, "is_relevant": True}, "plan": "ok", "current_code": ""}
-
-        return _Graph()
 
     async def fake_next_seq_no(_session, _conversation_id):
         return 1
@@ -43,6 +55,7 @@ async def test_chat_uses_empty_schema_when_workspace_has_no_dataset(monkeypatch)
     monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_for_workspace_table", lambda *_args, **_kwargs: None)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
+    _patch_remote_agent(monkeypatch, captured)
 
     session = SimpleNamespace(commit=lambda: None)
 
@@ -59,12 +72,11 @@ async def test_chat_uses_empty_schema_when_workspace_has_no_dataset(monkeypatch)
 
     session.execute = _execute
 
-    langgraph_manager = SimpleNamespace(get_graph=fake_get_graph)
     user = SimpleNamespace(id="u1", username="alice")
 
     response, conversation_id, turn_id = await ChatService.analyze_and_persist_turn(
         session=session,
-        langgraph_manager=langgraph_manager,
+        langgraph_manager=None,
         user=user,
         workspace_id="ws-1",
         conversation_id=None,
@@ -75,7 +87,7 @@ async def test_chat_uses_empty_schema_when_workspace_has_no_dataset(monkeypatch)
         api_key="x",
     )
 
-    assert captured["schema"] == {"table_name": "", "tables": []}
+    assert captured["payload"]["active_schema"] == {"table_name": "", "tables": []}
     assert response["is_safe"] is True
     assert conversation_id == "conv-1"
     assert turn_id == "turn-1"
@@ -100,16 +112,6 @@ async def test_chat_keeps_backend_columns_when_client_schema_override_present(mo
             source_path="browser://deliveries",
             schema_path="/tmp/deliveries_schema.json",
         )
-
-    async def fake_get_graph(_workspace_id, _memory_path):
-        class _Graph:
-            async def ainvoke(self, input_state, config=None):
-                captured["schema"] = input_state.active_schema
-                captured["table_name"] = input_state.table_name
-                captured["data_path"] = input_state.data_path
-                return {"metadata": {"is_safe": True, "is_relevant": True}, "plan": "ok", "current_code": ""}
-
-        return _Graph()
 
     async def fake_next_seq_no(_session, _conversation_id):
         return 1
@@ -141,6 +143,7 @@ async def test_chat_keeps_backend_columns_when_client_schema_override_present(mo
     monkeypatch.setattr("app.v1.services.chat_service.ChatService._read_live_table_columns", fake_live_columns)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
+    _patch_remote_agent(monkeypatch, captured)
 
     session = SimpleNamespace()
 
@@ -157,7 +160,6 @@ async def test_chat_keeps_backend_columns_when_client_schema_override_present(mo
 
     session.execute = _execute
 
-    langgraph_manager = SimpleNamespace(get_graph=fake_get_graph)
     user = SimpleNamespace(id="u1", username="alice")
 
     override_schema = {
@@ -168,7 +170,7 @@ async def test_chat_keeps_backend_columns_when_client_schema_override_present(mo
 
     _response, _conversation_id, _turn_id = await ChatService.analyze_and_persist_turn(
         session=session,
-        langgraph_manager=langgraph_manager,
+        langgraph_manager=None,
         user=user,
         workspace_id="ws-1",
         conversation_id=None,
@@ -181,12 +183,13 @@ async def test_chat_keeps_backend_columns_when_client_schema_override_present(mo
         api_key="x",
     )
 
-    assert captured["table_name"] == "deliveries"
-    assert captured["schema"]["table_name"] == "deliveries"
-    assert captured["schema"]["tables"][0]["table_name"] == "deliveries"
-    assert captured["schema"]["tables"][0]["columns"][0]["name"] == "batter"
-    assert captured["schema"]["tables"][0]["context"] == "from-client-context"
-    assert captured["data_path"] == "/tmp/ws.duckdb"
+    payload = captured["payload"]
+    assert payload["table_name"] == "deliveries"
+    assert payload["active_schema"]["table_name"] == "deliveries"
+    assert payload["active_schema"]["tables"][0]["table_name"] == "deliveries"
+    assert payload["active_schema"]["tables"][0]["columns"][0]["name"] == "batter"
+    assert payload["active_schema"]["tables"][0]["context"] == "from-client-context"
+    assert payload["data_path"] == "/tmp/ws.duckdb"
 
 
 @pytest.mark.asyncio
@@ -239,15 +242,6 @@ async def test_chat_loads_workspace_schema_for_multiple_tables(monkeypatch):
     async def fake_create_conversation(*, session, principal_id, workspace_id, title):
         return SimpleNamespace(id="conv-3", title=title)
 
-    async def fake_get_graph(_workspace_id, _memory_path):
-        class _Graph:
-            async def ainvoke(self, input_state, config=None):
-                captured["schema"] = input_state.active_schema
-                captured["table_name"] = input_state.table_name
-                return {"metadata": {"is_safe": True, "is_relevant": True}, "plan": "ok", "current_code": ""}
-
-        return _Graph()
-
     async def fake_next_seq_no(_session, _conversation_id):
         return 1
 
@@ -277,6 +271,7 @@ async def test_chat_loads_workspace_schema_for_multiple_tables(monkeypatch):
     monkeypatch.setattr("app.v1.services.chat_service.ChatService._read_live_table_columns", fake_live_columns)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
+    _patch_remote_agent(monkeypatch, captured)
 
     session = SimpleNamespace()
 
@@ -284,12 +279,11 @@ async def test_chat_loads_workspace_schema_for_multiple_tables(monkeypatch):
         return None
 
     session.commit = _commit
-    langgraph_manager = SimpleNamespace(get_graph=fake_get_graph)
     user = SimpleNamespace(id="u1", username="alice")
 
     await ChatService.analyze_and_persist_turn(
         session=session,
-        langgraph_manager=langgraph_manager,
+        langgraph_manager=None,
         user=user,
         workspace_id="ws-1",
         conversation_id=None,
@@ -300,8 +294,9 @@ async def test_chat_loads_workspace_schema_for_multiple_tables(monkeypatch):
         api_key="x",
     )
 
-    assert captured["table_name"] is None
-    assert {table["table_name"] for table in captured["schema"]["tables"]} == {"orders", "customers"}
+    payload = captured["payload"]
+    assert payload["table_name"] == ""
+    assert {table["table_name"] for table in payload["active_schema"]["tables"]} == {"orders", "customers"}
 
 
 @pytest.mark.asyncio
@@ -323,14 +318,6 @@ async def test_chat_falls_back_to_live_columns_when_schema_file_missing(monkeypa
 
     async def fake_load_schema(_path):
         raise HTTPException(status_code=404, detail="missing")
-
-    async def fake_get_graph(_workspace_id, _memory_path):
-        class _Graph:
-            async def ainvoke(self, input_state, config=None):
-                captured["schema"] = input_state.active_schema
-                return {"metadata": {"is_safe": True, "is_relevant": True}, "plan": "ok", "current_code": ""}
-
-        return _Graph()
 
     async def fake_live_columns(_duckdb_path, _table_name):
         return [{"name": "Batter Runs", "dtype": "INTEGER"}]
@@ -358,6 +345,7 @@ async def test_chat_falls_back_to_live_columns_when_schema_file_missing(monkeypa
     monkeypatch.setattr("app.v1.services.chat_service.ChatService._read_live_table_columns", fake_live_columns)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
+    _patch_remote_agent(monkeypatch, captured)
 
     session = SimpleNamespace()
 
@@ -367,12 +355,11 @@ async def test_chat_falls_back_to_live_columns_when_schema_file_missing(monkeypa
     session.commit = _commit
     session.execute = lambda *_args, **_kwargs: None
 
-    langgraph_manager = SimpleNamespace(get_graph=fake_get_graph)
     user = SimpleNamespace(id="u1", username="alice")
 
     _response, _conversation_id, _turn_id = await ChatService.analyze_and_persist_turn(
         session=session,
-        langgraph_manager=langgraph_manager,
+        langgraph_manager=None,
         user=user,
         workspace_id="ws-1",
         conversation_id=None,
@@ -385,8 +372,8 @@ async def test_chat_falls_back_to_live_columns_when_schema_file_missing(monkeypa
         api_key="x",
     )
 
-    assert captured["schema"]["table_name"] == "deliveries"
-    assert [col["name"] for col in captured["schema"]["tables"][0]["columns"]] == ["Batter Runs"]
+    assert captured["payload"]["active_schema"]["table_name"] == "deliveries"
+    assert [col["name"] for col in captured["payload"]["active_schema"]["tables"][0]["columns"]] == ["Batter Runs"]
 
 
 @pytest.mark.asyncio
@@ -398,14 +385,6 @@ async def test_chat_uses_keychain_api_key_when_payload_key_missing(monkeypatch):
 
     async def fake_create_conversation(*, session, principal_id, workspace_id, title):
         return SimpleNamespace(id="conv-3", title=title)
-
-    async def fake_get_graph(_workspace_id, _memory_path):
-        class _Graph:
-            async def ainvoke(self, input_state, config=None):
-                captured["api_key"] = config["configurable"].get("api_key")
-                return {"metadata": {"is_safe": True, "is_relevant": True}, "plan": "ok", "current_code": ""}
-
-        return _Graph()
 
     async def fake_next_seq_no(_session, _conversation_id):
         return 1
@@ -423,6 +402,7 @@ async def test_chat_uses_keychain_api_key_when_payload_key_missing(monkeypatch):
     monkeypatch.setattr("app.v1.services.chat_service.ChatService._read_live_table_columns", lambda *_args, **_kwargs: [])
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
+    _patch_remote_agent(monkeypatch, captured)
     monkeypatch.setattr(
         "app.v1.services.chat_service.SecretStorageService.get_api_key",
         lambda _uid, provider="openrouter": "key-from-keychain",
@@ -443,12 +423,11 @@ async def test_chat_uses_keychain_api_key_when_payload_key_missing(monkeypatch):
 
     session.execute = _execute
 
-    langgraph_manager = SimpleNamespace(get_graph=fake_get_graph)
     user = SimpleNamespace(id="u1", username="alice")
 
     _response, _conversation_id, _turn_id = await ChatService.analyze_and_persist_turn(
         session=session,
-        langgraph_manager=langgraph_manager,
+        langgraph_manager=None,
         user=user,
         workspace_id="ws-1",
         conversation_id=None,
@@ -459,7 +438,7 @@ async def test_chat_uses_keychain_api_key_when_payload_key_missing(monkeypatch):
         api_key=None,
     )
 
-    assert captured["api_key"] == "key-from-keychain"
+    assert captured["payload"]["llm"]["api_key"] == "key-from-keychain"
 
 
 @pytest.mark.asyncio
@@ -471,15 +450,6 @@ async def test_chat_allows_ollama_without_api_key(monkeypatch):
 
     async def fake_create_conversation(*, session, principal_id, workspace_id, title):
         return SimpleNamespace(id="conv-ollama", title=title)
-
-    async def fake_get_graph(_workspace_id, _memory_path):
-        class _Graph:
-            async def ainvoke(self, input_state, config=None):
-                captured["provider"] = config["configurable"].get("provider")
-                captured["api_key"] = config["configurable"].get("api_key")
-                return {"metadata": {"is_safe": True, "is_relevant": True}, "plan": "ok", "current_code": ""}
-
-        return _Graph()
 
     async def fake_next_seq_no(_session, _conversation_id):
         return 1
@@ -496,6 +466,7 @@ async def test_chat_allows_ollama_without_api_key(monkeypatch):
     monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_for_workspace_table", lambda *_args, **_kwargs: None)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
+    _patch_remote_agent(monkeypatch, captured)
     async def _fake_resolve_llm_preferences(_session, _user_id):
         return {
             "provider": "ollama",
@@ -521,12 +492,11 @@ async def test_chat_allows_ollama_without_api_key(monkeypatch):
 
     session.commit = _commit
     session.execute = lambda *_args, **_kwargs: None
-    langgraph_manager = SimpleNamespace(get_graph=fake_get_graph)
     user = SimpleNamespace(id="u1", username="alice")
 
     response, _conversation_id, _turn_id = await ChatService.analyze_and_persist_turn(
         session=session,
-        langgraph_manager=langgraph_manager,
+        langgraph_manager=None,
         user=user,
         workspace_id="ws-1",
         conversation_id=None,
@@ -538,8 +508,8 @@ async def test_chat_allows_ollama_without_api_key(monkeypatch):
     )
 
     assert response["is_safe"] is True
-    assert captured["provider"] == "ollama"
-    assert captured["api_key"] == ""
+    assert captured["payload"]["llm"]["provider"] == "ollama"
+    assert captured["payload"]["llm"]["api_key"] == ""
 
 
 @pytest.mark.asyncio
@@ -583,14 +553,6 @@ async def test_chat_merges_saved_schema_with_live_duckdb_columns(monkeypatch):
             {"name": "Runs From Ball", "dtype": "INTEGER"},
         ]
 
-    async def fake_get_graph(_workspace_id, _memory_path):
-        class _Graph:
-            async def ainvoke(self, input_state, config=None):
-                captured["schema"] = input_state.active_schema
-                return {"metadata": {"is_safe": True, "is_relevant": True}, "plan": "ok", "current_code": ""}
-
-        return _Graph()
-
     async def fake_next_seq_no(_session, _conversation_id):
         return 1
 
@@ -615,6 +577,7 @@ async def test_chat_merges_saved_schema_with_live_duckdb_columns(monkeypatch):
     monkeypatch.setattr("app.v1.services.chat_service.ChatService._read_live_table_columns", fake_live_columns)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
+    _patch_remote_agent(monkeypatch, captured)
 
     session = SimpleNamespace()
 
@@ -624,12 +587,11 @@ async def test_chat_merges_saved_schema_with_live_duckdb_columns(monkeypatch):
     session.commit = _commit
     session.execute = lambda *_args, **_kwargs: None
 
-    langgraph_manager = SimpleNamespace(get_graph=fake_get_graph)
     user = SimpleNamespace(id="u1", username="alice")
 
     _response, _conversation_id, _turn_id = await ChatService.analyze_and_persist_turn(
         session=session,
-        langgraph_manager=langgraph_manager,
+        langgraph_manager=None,
         user=user,
         workspace_id="ws-1",
         conversation_id=None,
@@ -642,7 +604,9 @@ async def test_chat_merges_saved_schema_with_live_duckdb_columns(monkeypatch):
         api_key="x",
     )
 
-    names = [col["name"] for col in captured["schema"]["tables"][0]["columns"]]
+    names = [col["name"] for col in captured["payload"]["active_schema"]["tables"][0]["columns"]]
     assert names == ["Batter", "Batter Runs", "Runs From Ball"]
-    batter_runs = next(col for col in captured["schema"]["tables"][0]["columns"] if col["name"] == "Batter Runs")
+    batter_runs = next(
+        col for col in captured["payload"]["active_schema"]["tables"][0]["columns"] if col["name"] == "Batter Runs"
+    )
     assert batter_runs["description"] == "runs scored by batter"

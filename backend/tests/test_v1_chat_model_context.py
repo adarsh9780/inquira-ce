@@ -6,7 +6,7 @@ from app.v1.services.chat_service import ChatService
 
 
 @pytest.mark.asyncio
-async def test_chat_service_passes_model_and_context_to_graph(monkeypatch):
+async def test_chat_service_passes_model_and_context_to_agent_payload(monkeypatch):
     captured = {}
 
     async def fake_get_workspace(_session, _workspace_id, _user_id):
@@ -21,14 +21,21 @@ async def test_chat_service_passes_model_and_context_to_graph(monkeypatch):
     async def fake_create_turn(*, session, **kwargs):
         return SimpleNamespace(id="turn-1")
 
-    async def fake_get_graph(_workspace_id, _memory_path):
-        class _Graph:
-            async def ainvoke(self, input_state, config=None):
-                captured["context"] = input_state.context
-                captured["model"] = config.get("configurable", {}).get("model")
-                return {"metadata": {"is_safe": True, "is_relevant": True}, "plan": "ok", "current_code": ""}
+    async def fake_health(self):
+        _ = self
+        return {"status": "ok", "api_major": 1}
 
-        return _Graph()
+    async def fake_run(self, payload):
+        _ = self
+        captured["context"] = payload.get("context")
+        captured["model"] = payload.get("model")
+        return {
+            "route": "analysis",
+            "metadata": {"is_safe": True, "is_relevant": True},
+            "final_code": "",
+            "final_explanation": "ok",
+            "messages": [],
+        }
 
     monkeypatch.setattr("app.v1.services.chat_service.WorkspaceRepository.get_by_id", fake_get_workspace)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationService.create_conversation", fake_create_conversation)
@@ -39,6 +46,8 @@ async def test_chat_service_passes_model_and_context_to_graph(monkeypatch):
     monkeypatch.setattr("app.v1.services.chat_service.DatasetRepository.get_for_workspace_table", lambda *_args, **_kwargs: None)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
+    monkeypatch.setattr("app.v1.services.chat_service.AgentClient.assert_health", fake_health)
+    monkeypatch.setattr("app.v1.services.chat_service.AgentClient.run", fake_run)
 
     session = SimpleNamespace()
 
@@ -46,12 +55,11 @@ async def test_chat_service_passes_model_and_context_to_graph(monkeypatch):
         return None
 
     session.commit = _commit
-    langgraph_manager = SimpleNamespace(get_graph=fake_get_graph)
     user = SimpleNamespace(id="u1", username="alice")
 
     await ChatService.analyze_and_persist_turn(
         session=session,
-        langgraph_manager=langgraph_manager,
+        langgraph_manager=None,
         user=user,
         workspace_id="ws-1",
         conversation_id=None,

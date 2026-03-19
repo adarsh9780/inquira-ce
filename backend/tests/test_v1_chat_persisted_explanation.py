@@ -5,22 +5,6 @@ import pytest
 from app.v1.services.chat_service import ChatService
 
 
-class _FakeGraph:
-    def __init__(self, result):
-        self._result = result
-
-    async def ainvoke(self, _input_state, config=None):  # noqa: ARG002
-        return dict(self._result)
-
-
-class _FakeLanggraphManager:
-    def __init__(self, result):
-        self._result = result
-
-    async def get_graph(self, _workspace_id, _memory_path):
-        return _FakeGraph(self._result)
-
-
 def _build_execution_result() -> dict:
     return {
         "success": True,
@@ -60,10 +44,20 @@ async def test_analyze_and_persist_turn_uses_final_explanation_for_assistant_tex
         "plan": "Fallback plan explanation",
         "messages": [],
     }
+    async def fake_health(self):
+        _ = self
+        return {"status": "ok", "api_major": 1}
+
+    async def fake_run(self, payload):
+        _ = self, payload
+        return dict(result)
+
+    monkeypatch.setattr("app.v1.services.chat_service.AgentClient.assert_health", fake_health)
+    monkeypatch.setattr("app.v1.services.chat_service.AgentClient.run", fake_run)
 
     payload, conversation_id, turn_id = await ChatService.analyze_and_persist_turn(
         session=object(),
-        langgraph_manager=_FakeLanggraphManager(result),
+        langgraph_manager=None,
         user=SimpleNamespace(id="user-1", username="alice"),
         workspace_id="ws-1",
         conversation_id=None,
@@ -109,10 +103,20 @@ async def test_analyze_and_persist_turn_falls_back_to_plan_when_final_explanatio
         "plan": "Fallback explanation from plan node.",
         "messages": [],
     }
+    async def fake_health(self):
+        _ = self
+        return {"status": "ok", "api_major": 1}
+
+    async def fake_run(self, payload):
+        _ = self, payload
+        return dict(result)
+
+    monkeypatch.setattr("app.v1.services.chat_service.AgentClient.assert_health", fake_health)
+    monkeypatch.setattr("app.v1.services.chat_service.AgentClient.run", fake_run)
 
     payload, conversation_id, turn_id = await ChatService.analyze_and_persist_turn(
         session=object(),
-        langgraph_manager=_FakeLanggraphManager(result),
+        langgraph_manager=None,
         user=SimpleNamespace(id="user-1", username="alice"),
         workspace_id="ws-1",
         conversation_id=None,
