@@ -10,7 +10,7 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel
 
@@ -543,19 +543,28 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
             next_action="Validate generated code and run it if it passes safety checks.",
         )
 
-        best_output = invoke_coding_chain(
-            chain=chain,
-            messages=call_messages,
-            table_name=preferred_table or "",
-            workspace_tables_json=_safe_json_dumps(_extract_schema_table_names(schema)),
-            workspace_db_path=data_path or "",
-            schema_summary=schema_summary,
-            known_columns_json=_safe_json_dumps(known_columns),
-            sample_table=sample_table or "",
-            sample_json=_safe_json_dumps(sample),
-            context=str(state.get("context") or ""),
-            invoke_structured_chain=_invoke_structured_chain,
-        )
+        try:
+            best_output = invoke_coding_chain(
+                chain=chain,
+                messages=call_messages,
+                table_name=preferred_table or "",
+                workspace_tables_json=_safe_json_dumps(_extract_schema_table_names(schema)),
+                workspace_db_path=data_path or "",
+                schema_summary=schema_summary,
+                known_columns_json=_safe_json_dumps(known_columns),
+                sample_table=sample_table or "",
+                sample_json=_safe_json_dumps(sample),
+                context=str(state.get("context") or ""),
+                invoke_structured_chain=_invoke_structured_chain,
+            )
+        except Exception as exc:
+            import traceback
+            import sys
+            print(f"DEBUG: Error inside invoke_coding_chain: {exc}", file=sys.stderr)
+            if hasattr(exc, "__cause__"):
+                print(f"DEBUG: Cause: {exc.__cause__}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            raise
 
         search_queries = _normalize_search_queries(best_output.search_schema_queries)
         pending_search_queries = [
