@@ -56,7 +56,7 @@ def test_tauri_bundle_resources_include_backend_project_files():
     assert "../backend/app/services" in resources
     assert "../backend/app/tools" not in resources
     assert "../backend/app/v1" in resources
-    assert "../agent-runtime" in resources
+    assert "../agents" in resources
     assert "../backend/alembic" in resources
     assert "../backend/alembic.ini" in resources
     assert "../backend/main.py" in resources

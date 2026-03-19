@@ -77,7 +77,7 @@ expected_api_major = 1
 startup_timeout_sec = 45
 default_agent = "agent_v2"
 # Optional override path where the external agent runtime is launched from.
-# path = "agent-runtime"
+# path = "agents"
 # Optional full command override (defaults to: langgraph dev --config langgraph.json ...)
 # command = ""
 

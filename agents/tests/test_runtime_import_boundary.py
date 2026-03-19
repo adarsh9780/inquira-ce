@@ -26,4 +26,4 @@ def test_agent_runtime_does_not_import_backend_app_modules():
                 if module.startswith("app") or module.startswith("backend"):
                     offenders.append(f"{py_file.relative_to(root)}: from {module} import ...")
 
-    assert not offenders, "agent-runtime must be backend-independent:\n" + "\n".join(offenders)
+    assert not offenders, "agents runtime must be backend-independent:\n" + "\n".join(offenders)

@@ -921,10 +921,10 @@ pub fn run() {
                     .agent_service
                     .as_ref()
                     .and_then(|a| a.path.clone())
-                    .unwrap_or_else(|| "../agent-runtime".to_string());
+                    .unwrap_or_else(|| "../agents".to_string());
                 PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(configured)
             } else {
-                resolve_resource_path(&resource_dir, "agent-runtime")
+                resolve_resource_path(&resource_dir, "agents")
             };
             let venv_path = data_dir.join(".venv");
             let backend_env_marker = data_dir.join(".backend-env-fingerprint");

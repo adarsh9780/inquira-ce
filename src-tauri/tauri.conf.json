@@ -37,7 +37,7 @@
       "../backend/app/logo",
       "../backend/app/services",
       "../backend/app/v1",
-      "../agent-runtime",
+      "../agents",
       "../backend/alembic",
       "../backend/alembic.ini",
       "../backend/main.py",
