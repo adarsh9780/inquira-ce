@@ -6,6 +6,7 @@ use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::{Child as StdChild, Command};
 use std::sync::Mutex;
+use std::thread;
 use std::time::{Duration, Instant};
 
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
@@ -178,6 +179,9 @@ struct PtyStopResponse {
 }
 
 fn stop_child_process(name: &str, child: &mut StdChild) {
+    const GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(3);
+    const GRACEFUL_SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_millis(100);
+
     match child.try_wait() {
         Ok(Some(status)) => {
             log::info!("{name} process already exited with status: {status}");
@@ -186,6 +190,48 @@ fn stop_child_process(name: &str, child: &mut StdChild) {
         Ok(None) => {}
         Err(e) => {
             log::warn!("Failed to check {name} process status before shutdown: {e}");
+        }
+    }
+
+    #[cfg(unix)]
+    {
+        let pid = child.id().to_string();
+        match Command::new("kill").args(["-TERM", &pid]).status() {
+            Ok(status) if status.success() => {
+                let started = Instant::now();
+                loop {
+                    match child.try_wait() {
+                        Ok(Some(status)) => {
+                            log::info!("{name} process exited gracefully with status: {status}");
+                            return;
+                        }
+                        Ok(None) => {
+                            if started.elapsed() >= GRACEFUL_SHUTDOWN_TIMEOUT {
+                                break;
+                            }
+                            thread::sleep(GRACEFUL_SHUTDOWN_POLL_INTERVAL);
+                        }
+                        Err(e) => {
+                            log::warn!(
+                                "Failed while waiting for graceful {name} shutdown: {e}"
+                            );
+                            break;
+                        }
+                    }
+                }
+                log::warn!(
+                    "{name} process did not exit after SIGTERM within {:?}; force-killing.",
+                    GRACEFUL_SHUTDOWN_TIMEOUT
+                );
+            }
+            Ok(status) => {
+                log::warn!(
+                    "Failed to send SIGTERM to {name} process (exit status: {status}); force-killing."
+                );
+            }
+            Err(e) => {
+                log::warn!("Failed to send SIGTERM to {name} process: {e}; force-killing.");
+            }
         }
     }
 
