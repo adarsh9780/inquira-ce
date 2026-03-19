@@ -25,7 +25,7 @@
             'tool-activity-summary-error': toolStatus === 'error'
           }"
         >
-          &gt; {{ summaryText }}
+          {{ summaryText }}
           <span v-if="durationLabel" class="tool-activity-duration">{{ durationLabel }}</span>
         </span>
       </button>
@@ -38,7 +38,7 @@
         }"
         style="display: inline;"
       >
-        &gt; {{ summaryText }}
+        {{ summaryText }}
       </p>
     </div>
 

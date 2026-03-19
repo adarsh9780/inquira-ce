@@ -81,14 +81,14 @@
                   class="h-3.5 w-3.5"
                   aria-hidden="true"
                 />
-                <span>&gt; {{ row.summary }}</span>
+                <span>{{ row.summary }}</span>
               </button>
               <p
                 v-else
                 class="text-sm font-medium"
                 style="color: var(--color-text-muted);"
               >
-                &gt; {{ row.summary }}
+                {{ row.summary }}
               </p>
               <div
                 v-if="row.output && isEphemeralRowExpanded(row.id)"
@@ -257,7 +257,7 @@ const end = ref(null)
 const ephemeralExpandedRows = ref(new Set())
 const pendingInterventionIds = ref(new Set())
 const suppressMutationAutoScroll = ref(false)
-const SHOW_EPHEMERAL_TRACE = true
+const SHOW_EPHEMERAL_TRACE = false
 const showScrollToBottomButton = ref(false)
 let shouldAutoScroll = true
 let mutationObserver = null

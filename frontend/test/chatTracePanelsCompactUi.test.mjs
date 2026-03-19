@@ -3,11 +3,11 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('chat history renders visible ephemeral summaries, final separator, and scrollable code blocks', () => {
+test('chat history keeps ephemeral trace hidden while preserving final response and code details', () => {
   const chatHistoryPath = resolve(process.cwd(), 'src/components/chat/ChatHistory.vue')
   const source = readFileSync(chatHistoryPath, 'utf-8')
 
-  assert.equal(source.includes('const SHOW_EPHEMERAL_TRACE = true'), true)
+  assert.equal(source.includes('const SHOW_EPHEMERAL_TRACE = false'), true)
   assert.equal(source.includes('SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length'), true)
   assert.equal(source.includes('(SHOW_EPHEMERAL_TRACE && hasStreamTrace(message))'), true)
   assert.equal(source.includes('Checking if query is safe to process'), true)
