@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import tomllib
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable
 
@@ -48,6 +50,25 @@ def _load_register() -> Callable[..., Any]:
 
 def _logger_noop(message: str, level: str = "info", **kwargs: Any) -> None:
     _ = (message, level, kwargs)
+
+
+def _is_event_loop_thread() -> bool:
+    try:
+        asyncio.get_running_loop()
+        return True
+    except RuntimeError:
+        return False
+
+
+def _run_register(register: Callable[..., Any], kwargs: dict[str, Any]) -> None:
+    # Phoenix register() may touch local filesystem (e.g., working dir creation).
+    # When called from LangGraph ASGI loop thread, offload to a worker thread.
+    if not _is_event_loop_thread():
+        register(**kwargs)
+        return
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(register, **kwargs)
+        future.result()
 
 
 def reset_phoenix_tracing_state() -> None:
@@ -100,7 +121,7 @@ def init_phoenix_tracing(
         kwargs["endpoint"] = endpoint
 
     try:
-        register(**kwargs)
+        _run_register(register, kwargs)
         _initialized_keys.add(section_key)
         logger(
             "Phoenix tracing enabled",
@@ -117,4 +138,3 @@ def init_phoenix_tracing(
             section=section_key,
         )
         return False
-

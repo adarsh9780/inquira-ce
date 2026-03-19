@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import sys
+import threading
 from pathlib import Path
 
 # Ensure shared modules at repo root are importable in agent test runs.
@@ -89,3 +91,41 @@ endpoint = "http://toml:6006/v1/traces"
     assert called["project_name"] == "from-env"
     assert called["endpoint"] == "http://env:6006/v1/traces"
 
+
+def test_shared_phoenix_register_runs_off_event_loop_thread(monkeypatch, tmp_path):
+    register_thread = {"name": ""}
+
+    def fake_register(**kwargs):
+        _ = kwargs
+        register_thread["name"] = threading.current_thread().name
+        return object()
+
+    cfg = tmp_path / "inquira.toml"
+    cfg.write_text(
+        """
+[agent_service.phoenix]
+enabled = true
+project = "thread-check"
+endpoint = "http://127.0.0.1:6006/v1/traces"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("INQUIRA_TOML_PATH", str(cfg))
+    monkeypatch.delenv("INQUIRA_AGENT_PHOENIX_ENABLED", raising=False)
+    monkeypatch.delenv("INQUIRA_AGENT_PHOENIX_PROJECT", raising=False)
+    monkeypatch.delenv("INQUIRA_AGENT_PHOENIX_ENDPOINT", raising=False)
+    phoenix.reset_phoenix_tracing_state()
+
+    async def _run() -> bool:
+        return phoenix.init_phoenix_tracing(
+            section_path=("agent_service", "phoenix"),
+            enabled_env="INQUIRA_AGENT_PHOENIX_ENABLED",
+            project_env="INQUIRA_AGENT_PHOENIX_PROJECT",
+            endpoint_env="INQUIRA_AGENT_PHOENIX_ENDPOINT",
+            default_project="inquira-agent",
+            load_register=lambda: fake_register,
+        )
+
+    assert asyncio.run(_run()) is True
+    assert register_thread["name"] != threading.current_thread().name
