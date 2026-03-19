@@ -63,7 +63,7 @@ enable = true
 
 [backend.phoenix]
 # Enable Phoenix tracing for LangGraph/LangChain (used by backend startup)
-enabled = false
+enabled = true
 # Phoenix project name shown in UI
 project = "inquira-dev"
 # Local Phoenix collector endpoint (OTLP HTTP)
@@ -85,7 +85,7 @@ default_agent = "agent_v2"
 mode = "shared_secret"
 
 [agent_service.phoenix]
-enabled = false
+enabled = true
 project = "inquira-agent"
 endpoint = "http://127.0.0.1:6006/v1/traces"
 

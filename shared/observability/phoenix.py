@@ -67,7 +67,9 @@ def _run_register(register: Callable[..., Any], kwargs: dict[str, Any]) -> None:
         register(**kwargs)
         return
     with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(register, **kwargs)
+        # Use asyncio.to_thread in an isolated runner thread to mirror the
+        # recommended async-safe offloading pattern.
+        future = pool.submit(lambda: asyncio.run(asyncio.to_thread(register, **kwargs)))
         future.result()
 
 
