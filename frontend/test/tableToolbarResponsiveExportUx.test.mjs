@@ -12,10 +12,11 @@ test('table toolbar keeps selector flexible and uses icon-only actions with hove
   assert.equal(source.includes('style="max-width: min(34vw, 20rem);"'), true)
   assert.equal(source.includes('FunnelIcon'), true)
   assert.equal(source.includes('max-width: min(24vw, 13rem);'), true)
-  assert.equal(source.includes('class="h-8 w-full rounded-md border pl-8 pr-2 text-sm"'), true)
+  assert.equal(source.includes('class="input-base h-8 pl-8 pr-2"'), true)
   assert.equal(source.includes(`:title="isDeletingArtifact ? 'Deleting table' : 'Delete table'"`), true)
   assert.equal(source.includes(`:title="isDownloading ? 'Exporting CSV' : 'Export CSV'"`), true)
-  assert.equal(source.includes('hover:text-red-600'), true)
+  assert.equal(source.includes('class="btn-icon h-8 w-8 shrink-0 border"'), true)
+  assert.equal(source.includes('style="border-color: var(--color-border); color: var(--color-text-muted);"'), true)
 })
 
 test('table csv export uses save dialog flow instead of forcing downloads folder', () => {

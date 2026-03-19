@@ -13,7 +13,8 @@ test('figure toolbar uses flexible selector width and icon-only actions', () => 
   assert.equal(source.includes(`:title="isDeletingArtifact ? 'Deleting chart' : 'Delete chart'"`), true)
   assert.equal(source.includes(`:title="isDownloading ? 'Exporting chart' : 'Export chart'"`), true)
   assert.equal(source.includes('ChevronDownIcon'), false)
-  assert.equal(source.includes('hover:text-red-600'), true)
+  assert.equal(source.includes('class="btn-icon h-8 w-8 shrink-0 border"'), true)
+  assert.equal(source.includes('style="border-color: var(--color-border); color: var(--color-text-muted);"'), true)
 })
 
 test('output toolbar keeps filter controls flexible and icon-assisted', () => {

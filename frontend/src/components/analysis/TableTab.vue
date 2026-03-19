@@ -46,8 +46,7 @@
               v-model="tableSearch"
               type="text"
               placeholder="Search rows"
-              class="h-8 w-full rounded-md border pl-8 pr-2 text-sm"
-              style="border-color: var(--color-border); background-color: var(--color-surface, #fff); color: var(--color-text);"
+              class="input-base h-8 pl-8 pr-2"
               :disabled="!selectedArtifactId"
               aria-label="Search rows"
             />
@@ -55,10 +54,11 @@
 
           <!-- Delete selected table -->
           <button
-            @click="deleteSelectedArtifact"
+            @click="openDeleteDialog"
             type="button"
             :disabled="!canDeleteSelectedArtifact || isDeletingArtifact"
-            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-gray-500 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+            class="btn-icon h-8 w-8 shrink-0 border"
+            style="border-color: var(--color-border); color: var(--color-text-muted);"
             :class="(!canDeleteSelectedArtifact || isDeletingArtifact) ? 'opacity-50 cursor-not-allowed' : ''"
             :title="isDeletingArtifact ? 'Deleting table' : 'Delete table'"
             :aria-label="isDeletingArtifact ? 'Deleting table' : 'Delete table'"
@@ -74,7 +74,8 @@
           <button
             @click="downloadCsv"
             :disabled="!downloadRows.length || isDownloading"
-            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            class="btn-icon h-8 w-8 shrink-0 border"
+            style="border-color: var(--color-border); color: var(--color-text-muted);"
             :class="!downloadRows.length ? 'opacity-50 cursor-not-allowed' : ''"
             :title="isDownloading ? 'Exporting CSV' : 'Export CSV'"
             :aria-label="isDownloading ? 'Exporting CSV' : 'Export CSV'"
@@ -206,6 +207,16 @@
       </div>
     </div>
   </div>
+
+  <ConfirmationModal
+    :is-open="isDeleteDialogOpen"
+    title="Delete Table"
+    :message="deleteDialogMessage"
+    confirm-text="Delete"
+    cancel-text="Cancel"
+    @close="closeDeleteDialog"
+    @confirm="deleteSelectedArtifact"
+  />
 </template>
 
 <script setup>
@@ -216,6 +227,7 @@ import { AgGridVue } from 'ag-grid-vue3'
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
+import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import { toast } from '../../composables/useToast'
 import { persistExportFile } from '../../utils/exportFile'
 import { chooseTableSelectionAfterRefresh } from '../../utils/tableSelection'
@@ -234,6 +246,7 @@ const pageSize = 100
 const MEMORY_ARTIFACT_PREFIX = 'memory:'
 const isDownloading = ref(false)
 const isDeletingArtifact = ref(false)
+const isDeleteDialogOpen = ref(false)
 const isPageLoading = ref(false)
 const isLoadingArtifacts = ref(false)
 const workspaceKnownSavedTables = ref({})
@@ -766,6 +779,13 @@ const canDeleteSelectedArtifact = computed(() => {
   return selectedArtifactMeta.value.source === 'artifact'
 })
 
+const deleteDialogMessage = computed(() => {
+  const artifactId = String(selectedArtifactId.value || '').trim()
+  if (!artifactId) return 'Delete this table? This cannot be undone.'
+  const artifactLabel = String(selectedArtifactMeta.value?.logical_name || artifactId)
+  return `Delete table "${artifactLabel}"? This cannot be undone.`
+})
+
 const useInfiniteModel = computed(() => {
   return !!selectedArtifactId.value && !useClientFallback.value
 })
@@ -1209,16 +1229,14 @@ async function retrySelectedArtifact() {
   }
 }
 
-async function resolveConfirmation(message) {
-  try {
-    const decision = window.confirm(message)
-    if (decision && typeof decision.then === 'function') {
-      return Boolean(await decision)
-    }
-    return Boolean(decision)
-  } catch (_error) {
-    return false
-  }
+function openDeleteDialog() {
+  if (!canDeleteSelectedArtifact.value || isDeletingArtifact.value) return
+  isDeleteDialogOpen.value = true
+}
+
+function closeDeleteDialog() {
+  if (isDeletingArtifact.value) return
+  isDeleteDialogOpen.value = false
 }
 
 async function deleteSelectedArtifact() {
@@ -1227,10 +1245,7 @@ async function deleteSelectedArtifact() {
   if (!workspaceId || !artifactId || isDeletingArtifact.value) return
   if (isMemoryArtifactId(artifactId)) return
 
-  const artifactLabel = String(selectedArtifactMeta.value?.logical_name || artifactId)
-  const confirmed = await resolveConfirmation(`Delete table "${artifactLabel}"? This cannot be undone.`)
-  if (!confirmed) return
-
+  isDeleteDialogOpen.value = false
   isDeletingArtifact.value = true
   tableError.value = ''
   try {

@@ -34,10 +34,11 @@
 
           <!-- Delete Figure -->
           <button
-            @click="deleteSelectedFigure"
+            @click="openDeleteDialog"
             type="button"
             :disabled="!canDeleteSelectedFigure || isDeletingArtifact"
-            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-gray-500 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+            class="btn-icon h-8 w-8 shrink-0 border"
+            style="border-color: var(--color-border); color: var(--color-text-muted);"
             :class="(!canDeleteSelectedFigure || isDeletingArtifact) ? 'opacity-50 cursor-not-allowed' : ''"
             :title="isDeletingArtifact ? 'Deleting chart' : 'Delete chart'"
             :aria-label="isDeletingArtifact ? 'Deleting chart' : 'Delete chart'"
@@ -53,7 +54,8 @@
           <Menu as="div" class="relative inline-flex">
             <MenuButton
               :disabled="!selectedFigure || isDownloading"
-              class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+              class="btn-icon h-8 w-8 shrink-0 border"
+              style="border-color: var(--color-border); color: var(--color-text-muted);"
               :class="(!selectedFigure || isDownloading) ? 'opacity-50 cursor-not-allowed' : ''"
               :title="isDownloading ? 'Exporting chart' : 'Export chart'"
               :aria-label="isDownloading ? 'Exporting chart' : 'Export chart'"
@@ -141,6 +143,16 @@
       </div>
     </div>
   </div>
+
+  <ConfirmationModal
+    :is-open="isDeleteDialogOpen"
+    title="Delete Chart"
+    :message="deleteDialogMessage"
+    confirm-text="Delete"
+    cancel-text="Cancel"
+    @close="closeDeleteDialog"
+    @confirm="deleteSelectedFigure"
+  />
 </template>
 
 <script setup>
@@ -149,6 +161,7 @@ import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
 import { useAppStore } from '../../stores/appStore'
 import Plotly from 'plotly.js-dist-min'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
+import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import apiService from '../../services/apiService'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import { persistExportFile } from '../../utils/exportFile'
@@ -169,6 +182,7 @@ const isDownloading = ref(false)
 const isLoadingArtifacts = ref(false)
 const isLoadingFigure = ref(false)
 const isDeletingArtifact = ref(false)
+const isDeleteDialogOpen = ref(false)
 const selectedArtifactId = ref(null)
 const isMounted = ref(false)
 const workspaceFigureArtifacts = ref([])
@@ -227,6 +241,12 @@ const selectedFigureMeta = computed(() => {
 })
 
 const canDeleteSelectedFigure = computed(() => selectedFigureMeta.value?.source === 'artifact')
+const deleteDialogMessage = computed(() => {
+  const artifactId = String(selectedArtifactId.value || '').trim()
+  if (!artifactId) return 'Delete this chart? This cannot be undone.'
+  const logicalName = String(selectedFigureMeta.value?.logical_name || artifactId)
+  return `Delete chart "${logicalName}"? This cannot be undone.`
+})
 
 const selectedFigure = computed(() => normalizePlotlyFigure(selectedFigurePayload.value))
 
@@ -665,16 +685,14 @@ async function downloadHtml() {
   }
 }
 
-async function resolveConfirmation(message) {
-  try {
-    const decision = window.confirm(message)
-    if (decision && typeof decision.then === 'function') {
-      return Boolean(await decision)
-    }
-    return Boolean(decision)
-  } catch (_error) {
-    return false
-  }
+function openDeleteDialog() {
+  if (!canDeleteSelectedFigure.value || isDeletingArtifact.value) return
+  isDeleteDialogOpen.value = true
+}
+
+function closeDeleteDialog() {
+  if (isDeletingArtifact.value) return
+  isDeleteDialogOpen.value = false
 }
 
 async function deleteSelectedFigure() {
@@ -683,10 +701,7 @@ async function deleteSelectedFigure() {
   if (!workspaceId || !artifactId || isDeletingArtifact.value) return
   if (isMemoryFigureId(artifactId)) return
 
-  const logicalName = String(selectedFigureMeta.value?.logical_name || artifactId)
-  const confirmed = await resolveConfirmation(`Delete chart "${logicalName}"? This cannot be undone.`)
-  if (!confirmed) return
-
+  isDeleteDialogOpen.value = false
   isDeletingArtifact.value = true
   artifactListError.value = ''
   try {
