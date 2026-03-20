@@ -70,6 +70,9 @@
           @update:model-value="handleMainModelsChange"
           :options="mainModelOptions"
           placeholder="Select main models"
+          :searchable="true"
+          :group-by-provider="true"
+          search-placeholder="Search models"
           max-width-class="max-w-md w-full"
         />
       </div>
@@ -83,6 +86,9 @@
           @update:model-value="handleLiteModelChange"
           :options="liteModelOptions"
           placeholder="Select lite model"
+          :searchable="true"
+          :group-by-provider="true"
+          search-placeholder="Search models"
           max-width-class="max-w-md w-full"
         />
       </div>
@@ -96,6 +102,9 @@
           @update:model-value="handleCodingModelChange"
           :options="codingModelOptions"
           placeholder="Select coding model"
+          :searchable="true"
+          :group-by-provider="true"
+          search-placeholder="Search models"
           max-width-class="max-w-md w-full"
         />
       </div>

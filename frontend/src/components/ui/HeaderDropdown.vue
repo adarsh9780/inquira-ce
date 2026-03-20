@@ -23,28 +23,93 @@
             class="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md py-1 shadow-md focus:outline-none"
             style="background-color: var(--color-surface); border: 1px solid var(--color-border);"
           >
-            <ListboxOption
-              v-for="(option, index) in options"
-              :key="optionKey(option, index)"
-              v-slot="{ active, selected }"
-              :value="option.value"
-              as="template"
-            >
-              <li
-                :style="{
-                  backgroundColor: active ? 'color-mix(in srgb, var(--color-text-main) 6%, transparent)' : 'transparent',
-                  color: 'var(--color-text-main)'
-                }"
-                class="relative cursor-default select-none py-2 pl-3 pr-9 text-[13px]"
+            <div v-if="searchable" class="px-2 pb-1">
+              <input
+                v-model="searchQuery"
+                type="text"
+                class="w-full rounded-md border px-2 py-1 text-[12px] focus:outline-none"
+                :placeholder="searchPlaceholder"
+                style="background-color: var(--color-base); border-color: var(--color-border); color: var(--color-text-main);"
+                @click.stop
+                @keydown.stop
+              />
+            </div>
+
+            <template v-if="groupByProvider">
+              <template v-if="groupedFilteredOptions.length">
+                <template v-for="group in groupedFilteredOptions" :key="group.key">
+                  <div
+                    class="px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                    style="color: var(--color-text-muted);"
+                  >
+                    {{ group.label }}
+                  </div>
+                  <ListboxOption
+                    v-for="(option, index) in group.options"
+                    :key="optionKey(option, index, group.key)"
+                    v-slot="{ active, selected }"
+                    :value="option.value"
+                    as="template"
+                  >
+                    <li
+                      :style="{
+                        backgroundColor: active ? 'color-mix(in srgb, var(--color-text-main) 6%, transparent)' : 'transparent',
+                        color: 'var(--color-text-main)'
+                      }"
+                      class="relative cursor-default select-none py-2 pl-3 pr-9 text-[13px]"
+                    >
+                      <span :class="selected ? 'font-semibold' : 'font-normal'" class="block truncate pr-2" :title="option.label">
+                        {{ option.label }}
+                      </span>
+                      <span v-if="selected" class="absolute right-2.5 top-1/2 -translate-y-1/2">
+                        <CheckIcon class="h-4 w-4" style="color: var(--color-text-muted);" />
+                      </span>
+                    </li>
+                  </ListboxOption>
+                </template>
+              </template>
+              <div
+                v-else
+                class="px-3 py-2 text-[12px]"
+                style="color: var(--color-text-muted);"
               >
-                <span :class="selected ? 'font-semibold' : 'font-normal'" class="block truncate pr-2" :title="option.label">
-                  {{ option.label }}
-                </span>
-                <span v-if="selected" class="absolute right-2.5 top-1/2 -translate-y-1/2">
-                  <CheckIcon class="h-4 w-4" style="color: var(--color-text-muted);" />
-                </span>
-              </li>
-            </ListboxOption>
+                {{ noResultsLabel }}
+              </div>
+            </template>
+
+            <template v-else>
+              <template v-if="filteredOptions.length">
+                <ListboxOption
+                  v-for="(option, index) in filteredOptions"
+                  :key="optionKey(option, index)"
+                  v-slot="{ active, selected }"
+                  :value="option.value"
+                  as="template"
+                >
+                  <li
+                    :style="{
+                      backgroundColor: active ? 'color-mix(in srgb, var(--color-text-main) 6%, transparent)' : 'transparent',
+                      color: 'var(--color-text-main)'
+                    }"
+                    class="relative cursor-default select-none py-2 pl-3 pr-9 text-[13px]"
+                  >
+                    <span :class="selected ? 'font-semibold' : 'font-normal'" class="block truncate pr-2" :title="option.label">
+                      {{ option.label }}
+                    </span>
+                    <span v-if="selected" class="absolute right-2.5 top-1/2 -translate-y-1/2">
+                      <CheckIcon class="h-4 w-4" style="color: var(--color-text-muted);" />
+                    </span>
+                  </li>
+                </ListboxOption>
+              </template>
+              <div
+                v-else
+                class="px-3 py-2 text-[12px]"
+                style="color: var(--color-text-muted);"
+              >
+                {{ noResultsLabel }}
+              </div>
+            </template>
           </ListboxOptions>
         </transition>
       </div>
@@ -53,7 +118,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/vue'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/vue/20/solid'
 
@@ -89,14 +154,53 @@ const props = defineProps({
   maxChars: {
     type: Number,
     default: 52
+  },
+  searchable: {
+    type: Boolean,
+    default: false
+  },
+  searchPlaceholder: {
+    type: String,
+    default: 'Search models'
+  },
+  groupByProvider: {
+    type: Boolean,
+    default: false
+  },
+  noResultsLabel: {
+    type: String,
+    default: 'No results found'
   }
 })
 
 const emit = defineEmits(['update:modelValue'])
+const searchQuery = ref('')
 
 const selectedOption = computed(() => props.options.find((option) => option.value === props.modelValue) ?? null)
 const selectedLabel = computed(() => selectedOption.value?.label || props.placeholder)
 const hasSelection = computed(() => !!selectedOption.value)
+const normalizedSearchQuery = computed(() => String(searchQuery.value || '').trim().toLowerCase())
+const filteredOptions = computed(() => {
+  const options = Array.isArray(props.options) ? props.options : []
+  const query = normalizedSearchQuery.value
+  if (!query) return options
+  return options.filter((option) => optionMatchesSearch(option, query))
+})
+const groupedFilteredOptions = computed(() => {
+  const groups = new Map()
+  filteredOptions.value.forEach((option) => {
+    const providerKey = normalizeProviderKey(resolveProvider(option))
+    if (!groups.has(providerKey)) {
+      groups.set(providerKey, [])
+    }
+    groups.get(providerKey).push(option)
+  })
+  return Array.from(groups.entries()).map(([key, options]) => ({
+    key,
+    label: formatProviderLabel(key),
+    options
+  }))
+})
 const maxLabelChars = computed(() => {
   const optionChars = props.options.reduce((maxChars, option) => {
     const label = String(option?.label || '')
@@ -120,12 +224,59 @@ const triggerStyle = computed(() => ({
 }))
 
 function handleChange(value) {
+  if (props.searchable) {
+    searchQuery.value = ''
+  }
   emit('update:modelValue', value)
 }
 
-function optionKey(option, fallbackIndex) {
-  if (option?.key != null) return String(option.key)
-  if (option?.value != null) return String(option.value)
-  return String(fallbackIndex)
+function optionKey(option, fallbackIndex, prefix = '') {
+  const keyPrefix = prefix ? `${prefix}:` : ''
+  if (option?.key != null) return `${keyPrefix}${String(option.key)}`
+  if (option?.value != null) return `${keyPrefix}${String(option.value)}`
+  return `${keyPrefix}${String(fallbackIndex)}`
+}
+
+function optionMatchesSearch(option, query) {
+  const normalized = String(query || '').trim().toLowerCase()
+  if (!normalized) return true
+  const provider = resolveProvider(option)
+  const fields = [
+    option?.label,
+    option?.value,
+    provider,
+    formatProviderLabel(provider)
+  ]
+    .map((value) => String(value || '').toLowerCase())
+    .filter(Boolean)
+  return fields.some((field) => field.includes(normalized))
+}
+
+function resolveProvider(option) {
+  const explicitProvider = String(option?.provider || '').trim()
+  if (explicitProvider) return explicitProvider
+  const rawValue = String(option?.value || '').trim()
+  if (!rawValue.includes('/')) return ''
+  return rawValue.split('/')[0].trim()
+}
+
+function normalizeProviderKey(provider) {
+  const normalized = String(provider || '').trim().toLowerCase()
+  return normalized || 'other'
+}
+
+function formatProviderLabel(provider) {
+  const normalized = String(provider || '').trim().toLowerCase()
+  if (!normalized || normalized === 'other') return 'Other'
+  if (normalized === 'openai') return 'OpenAI'
+  if (normalized === 'openrouter') return 'OpenRouter'
+  if (normalized === 'anthropic') return 'Anthropic'
+  if (normalized === 'google') return 'Google'
+  if (normalized === 'ollama') return 'Ollama'
+  return normalized
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ')
 }
 </script>
