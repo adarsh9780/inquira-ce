@@ -40,17 +40,6 @@ def normalize_model_id(model: str) -> str:
     return _MODEL_ALIASES.get(raw.lower(), raw)
 
 
-def _validate_toml_model_id(value: Any, field_name: str) -> None:
-    raw = str(value or "").strip()
-    if not raw:
-        return
-    normalized = normalize_model_id(raw)
-    if normalized != raw:
-        raise ValueError(
-            f"[llm].{field_name} must use the full model ID '{normalized}', not shorthand '{raw}'."
-        )
-
-
 def _validate_and_normalize_model_list(raw_models: Any, field_name: str) -> list[str]:
     if raw_models is None:
         return []
@@ -117,9 +106,6 @@ def load_llm_runtime_config() -> LlmRuntimeConfig:
     if not isinstance(llm_limits, dict):
         llm_limits = {}
 
-    _validate_toml_model_id(llm.get("default-model"), "default-model")
-    _validate_toml_model_id(llm.get("lite-model"), "lite-model")
-
     provider = str(
         os.getenv("INQUIRA_LLM_PROVIDER") or llm.get("provider") or "openrouter"
     ).strip()
@@ -128,21 +114,18 @@ def load_llm_runtime_config() -> LlmRuntimeConfig:
         or llm.get("base-url")
         or "https://openrouter.ai/api/v1"
     ).strip()
+    # Model selection is controlled by runtime prefs/env, not by inquira.toml.
     default_model = str(
         os.getenv("INQUIRA_LLM_DEFAULT_MODEL")
-        or llm.get("default-model")
         or "google/gemini-2.5-flash"
     ).strip()
     lite_model = str(
         os.getenv("INQUIRA_LLM_LITE_MODEL")
-        or llm.get("lite-model")
         or "google/gemini-2.5-flash-lite"
     ).strip()
     supported_models_raw = os.getenv("INQUIRA_LLM_MODELS")
-    if supported_models_raw is None:
-        supported_models_raw = llm.get("models")
     supported_models = _validate_and_normalize_model_list(
-        supported_models_raw, "[llm].models"
+        supported_models_raw, "INQUIRA_LLM_MODELS"
     )
     if not supported_models:
         supported_models = list(LlmRuntimeConfig.supported_models)

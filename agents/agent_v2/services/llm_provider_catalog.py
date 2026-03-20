@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import os
-import tomllib
-from dataclasses import dataclass
+import copy
 from functools import lru_cache
-from pathlib import Path
 from typing import Any
 
 SUPPORTED_LLM_PROVIDERS: tuple[str, ...] = (
@@ -129,32 +126,9 @@ def model_supports_vision(provider: str, model: str) -> bool:
     return False
 
 
-def _load_toml_data() -> dict[str, Any]:
-    cfg_path = os.getenv("INQUIRA_TOML_PATH")
-    if cfg_path:
-        path = Path(cfg_path)
-    else:
-        path = Path(__file__).resolve().parents[3] / "inquira.toml"
-
-    if not path.exists():
-        return {}
-
-    try:
-        with path.open("rb") as f:
-            data = tomllib.load(f)
-    except Exception:
-        return {}
-
-    return data if isinstance(data, dict) else {}
-
-
 @lru_cache(maxsize=1)
 def _get_merged_catalogs() -> dict[str, dict[str, Any]]:
-    import copy
-
     catalogs = copy.deepcopy(_MODEL_CATALOG)
-    data = _load_toml_data()
-    providers_config = data.get("llm", {}).get("providers", {})
 
     for p in SUPPORTED_LLM_PROVIDERS:
         if p not in catalogs:
@@ -164,33 +138,6 @@ def _get_merged_catalogs() -> dict[str, dict[str, Any]]:
                 "default_main_model": "",
                 "default_lite_model": "",
             }
-
-    for p, config in providers_config.items():
-        if not isinstance(config, dict):
-            continue
-        p = p.lower()
-        if p not in catalogs:
-            continue
-
-        if "main-models" in config and isinstance(config["main-models"], list):
-            catalogs[p]["main_models"] = [
-                str(m).strip() for m in config["main-models"] if str(m).strip()
-            ]
-            if (
-                catalogs[p]["main_models"]
-                and catalogs[p]["default_main_model"] not in catalogs[p]["main_models"]
-            ):
-                catalogs[p]["default_main_model"] = catalogs[p]["main_models"][0]
-
-        if "lite-models" in config and isinstance(config["lite-models"], list):
-            catalogs[p]["lite_models"] = [
-                str(m).strip() for m in config["lite-models"] if str(m).strip()
-            ]
-            if (
-                catalogs[p]["lite_models"]
-                and catalogs[p]["default_lite_model"] not in catalogs[p]["lite_models"]
-            ):
-                catalogs[p]["default_lite_model"] = catalogs[p]["lite_models"][0]
 
     return catalogs
 
