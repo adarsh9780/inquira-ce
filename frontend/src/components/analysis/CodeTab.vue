@@ -110,10 +110,10 @@ import {
 import { EditorView, basicSetup } from 'codemirror'
 import { Compartment, EditorState, Prec } from '@codemirror/state'
 import { python } from '@codemirror/lang-python'
-import { autocompletion } from '@codemirror/autocomplete'
+import { autocompletion, acceptCompletion, completionStatus } from '@codemirror/autocomplete'
 import { keymap } from '@codemirror/view'
 import { searchKeymap } from '@codemirror/search'
-import { toggleComment, indentMore, indentLess } from '@codemirror/commands'
+import { toggleComment, indentMore, indentLess, insertNewlineAndIndent } from '@codemirror/commands'
 import { indentUnit } from '@codemirror/language'
 
 import {
@@ -618,9 +618,22 @@ async function runSelectedCode() {
   }
 }
 
+function acceptCompletionOrIndent(view) {
+  if (acceptCompletion(view)) return true
+  return indentMore(view)
+}
+
+function handleEnterWithoutAutocompleteAccept(view) {
+  if (completionStatus(view.state)) {
+    return insertNewlineAndIndent(view)
+  }
+  return false
+}
+
 const customKeymap = [
   ...searchKeymap,
-  { key: 'Tab', run: indentMore },
+  { key: 'Tab', run: acceptCompletionOrIndent },
+  { key: 'Enter', run: handleEnterWithoutAutocompleteAccept },
   { key: 'Shift-Tab', run: indentLess },
   { key: 'Mod-/', run: toggleComment },
   {

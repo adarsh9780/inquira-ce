@@ -884,15 +884,6 @@ function handleKeydown(event) {
     clearSuggestions()
     return
   }
-  if ((showCommandSuggestions.value || showColumnSuggestions.value) && event.key === 'Enter' && !event.shiftKey) {
-    event.preventDefault()
-    if (showCommandSuggestions.value) {
-      acceptCommandSuggestion()
-    } else {
-      acceptColumnSuggestion()
-    }
-    return
-  }
   if (event.key === 'ArrowUp' && isHistoryNavigationAllowed(event, -1)) {
     const didNavigateHistory = navigateQuestionHistory(-1)
     if (didNavigateHistory) {
