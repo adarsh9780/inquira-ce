@@ -109,25 +109,19 @@
             class="w-6 h-6 flex items-center justify-center transition-all duration-150 focus:outline-none"
             :class="
               canTriggerActionButton
-                ? 'text-zinc-900 hover:text-zinc-700'
+                ? 'hover:opacity-85'
                 : 'cursor-default opacity-50'
             "
             :title="actionButtonTitle"
           >
-            <StopCircleIcon v-if="appStore.isLoading" class="w-6 h-6" />
             <span
-              v-else-if="isVoiceInputActive"
-              class="flex w-6 h-6 items-center justify-center rounded-full bg-zinc-900 text-white animate-pulse"
-            >
-              <MicrophoneIcon class="w-3 h-3" />
-            </span>
-            <span
-              v-else-if="isComposerEmpty"
               class="flex w-6 h-6 items-center justify-center rounded-full bg-zinc-900 text-white"
+              :class="{ 'animate-pulse': isVoiceInputActive }"
             >
-              <MicrophoneIcon class="w-3 h-3" />
+              <StopIcon v-if="appStore.isLoading" class="w-3 h-3" />
+              <MicrophoneIcon v-else-if="isComposerEmpty" class="w-3 h-3" />
+              <ArrowUpIcon v-else class="w-3 h-3" />
             </span>
-            <ArrowUpCircleIcon v-else class="w-6 h-6" />
           </button>
         </div>
 
@@ -204,7 +198,7 @@ import {
   XMarkIcon,
   PhotoIcon,
 } from '@heroicons/vue/24/outline'
-import { ArrowUpCircleIcon, MicrophoneIcon, StopCircleIcon } from '@heroicons/vue/24/solid'
+import { ArrowUpIcon, MicrophoneIcon, StopIcon } from '@heroicons/vue/24/solid'
 
 const appStore = useAppStore()
 
