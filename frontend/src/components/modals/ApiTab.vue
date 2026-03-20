@@ -50,6 +50,7 @@
         Until then, the default model is openrouter/free.
         <a
           :href="openrouterAccountModelsUrl"
+          @click.prevent="openLink(openrouterAccountModelsUrl)"
           target="_blank"
           rel="noopener"
           class="ml-1 underline"
@@ -127,6 +128,7 @@
             Your API key is stored in your OS keychain.
             <a
               :href="providerKeyUrl"
+              @click.prevent="openLink(providerKeyUrl)"
               target="_blank"
               rel="noopener"
               class="hover:underline ml-1"
@@ -182,6 +184,7 @@
 import { ref, computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { apiService } from '../../services/apiService'
+import { openExternalUrl } from '../../services/externalLinkService'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import MultiSelectDropdown from '../ui/MultiSelectDropdown.vue'
 import {
@@ -309,6 +312,10 @@ function handleMainModelsChange(next) {
 function clearMessage() {
   message.value = ''
   messageType.value = ''
+}
+
+function openLink(url) {
+  void openExternalUrl(url)
 }
 
 function extractErrorMessage(error, fallback = 'Request failed. Please try again.') {

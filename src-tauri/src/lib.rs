@@ -286,6 +286,44 @@ fn get_backend_url(app: tauri::AppHandle) -> String {
     format!("http://{}:{}", host, port)
 }
 
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    let value = url.trim();
+    if value.is_empty() {
+        return Err("URL is required.".to_string());
+    }
+    let lower = value.to_lowercase();
+    if !(lower.starts_with("http://") || lower.starts_with("https://")) {
+        return Err("Only http(s) links can be opened externally.".to_string());
+    }
+
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut cmd = Command::new("open");
+        cmd.arg(value);
+        cmd
+    };
+
+    #[cfg(target_os = "linux")]
+    let mut command = {
+        let mut cmd = Command::new("xdg-open");
+        cmd.arg(value);
+        cmd
+    };
+
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut cmd = Command::new("rundll32");
+        cmd.args(["url.dll,FileProtocolHandler", value]);
+        cmd
+    };
+
+    command
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("Failed to open URL: {error}"))
+}
+
 fn detect_default_shell() -> (String, Vec<String>) {
     if cfg!(target_os = "windows") {
         let shell = std::env::var("COMSPEC")
@@ -1170,6 +1208,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_backend_url,
+            open_external_url,
             tauri_terminal_start,
             tauri_terminal_write,
             tauri_terminal_resize,

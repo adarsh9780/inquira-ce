@@ -132,6 +132,7 @@
                 I agree to the
                 <a
                   href="/terms-and-conditions.html"
+                  @click.prevent="openTermsAndConditions"
                   target="_blank"
                   rel="noopener noreferrer"
                   class="font-semibold text-blue-600 hover:text-blue-500"
@@ -184,6 +185,7 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
 import { useAuthStore } from '../../stores/authStore'
+import { openExternalUrl } from '../../services/externalLinkService'
 import {
   XMarkIcon,
   EyeIcon,
@@ -238,6 +240,10 @@ const displayMessage = computed(() => {
 const isErrorMessage = computed(() => {
   return authStore.error || (message.value && messageType.value === 'error')
 })
+
+function openTermsAndConditions() {
+  void openExternalUrl('https://github.com/adarsh9780/inquira-ce/blob/main/frontend/public/terms-and-conditions.html')
+}
 
 // Methods
 function closeModal() {

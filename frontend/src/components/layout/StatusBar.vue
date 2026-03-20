@@ -195,6 +195,7 @@
       <!-- Version -->
       <a 
         href="https://github.com/adarsh9780/inquira" 
+        @click.prevent="openGitHubRepo"
         target="_blank" 
         class="text-slate-400 hover:text-slate-600 transition-colors font-mono"
         title="View on GitHub"
@@ -266,6 +267,7 @@ import DOMPurify from 'dompurify'
 import { useAppStore } from '../../stores/appStore'
 import { useAuthStore } from '../../stores/authStore'
 import apiService from '../../services/apiService'
+import { openExternalUrl } from '../../services/externalLinkService'
 import { settingsWebSocket } from '../../services/websocketService'
 import {
   CommandLineIcon,
@@ -576,6 +578,10 @@ function openSettings(tab = 'api') {
 function closeSettings() {
   isSettingsOpen.value = false
   settingsInitialTab.value = 'api'
+}
+
+function openGitHubRepo() {
+  void openExternalUrl('https://github.com/adarsh9780/inquira')
 }
 
 async function loadTermsAndConditions({ force = false } = {}) {
