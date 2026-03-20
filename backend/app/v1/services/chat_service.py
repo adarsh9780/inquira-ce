@@ -471,6 +471,152 @@ class ChatService:
         return last_result, retries, float(duration_ms), wrapped_code
 
     @staticmethod
+    def _execution_success(payload: dict[str, Any] | None) -> bool:
+        if not isinstance(payload, dict):
+            return False
+        if "success" in payload:
+            return bool(payload.get("success"))
+        return str(payload.get("status") or "").strip().lower() == "success"
+
+    @staticmethod
+    def _normalize_artifacts(items: Any) -> list[dict[str, Any]]:
+        return [item for item in (items or []) if isinstance(item, dict)]
+
+    @staticmethod
+    def _agent_execution_is_authoritative(
+        *,
+        response_payload: dict[str, Any],
+        result_payload: dict[str, Any],
+        code_to_execute: str,
+    ) -> bool:
+        execution = response_payload.get("execution")
+        if not isinstance(execution, dict):
+            return False
+
+        # Keep runtime/UI execution decoupled from agent internals by requiring
+        # an explicit source contract before trusting agent-provided execution.
+        metadata = (
+            response_payload.get("metadata")
+            if isinstance(response_payload.get("metadata"), dict)
+            else {}
+        )
+        source = str(
+            metadata.get("execution_source")
+            or metadata.get("runtime_execution_source")
+            or result_payload.get("execution_source")
+            or ""
+        ).strip().lower()
+        if source not in {"workspace_runtime", "workspace_kernel", "server_runtime"}:
+            return False
+
+        artifacts = ChatService._normalize_artifacts(response_payload.get("artifacts"))
+        if not artifacts:
+            return False
+
+        executed_code = str(result_payload.get("final_executed_code") or "").strip()
+        if executed_code and executed_code != code_to_execute:
+            return False
+
+        return True
+
+    @staticmethod
+    async def _apply_authoritative_execution_to_response(
+        *,
+        workspace_id: str,
+        workspace_duckdb_path: str,
+        question: str,
+        run_id: str,
+        generated_code: str,
+        output_contract: list[dict[str, str]],
+        response_payload: dict[str, Any],
+    ) -> None:
+        execution_result, retry_count, duration_ms, executed_code = (
+            await ChatService._execute_generated_code_with_retries(
+                workspace_id=workspace_id,
+                workspace_duckdb_path=workspace_duckdb_path,
+                generated_code=generated_code,
+                run_id=run_id,
+                output_contract=output_contract,
+                max_retries=2,
+            )
+        )
+        success = ChatService._execution_success(execution_result)
+        await ChatService._finalize_kernel_run(
+            workspace_id=workspace_id,
+            workspace_duckdb_path=workspace_duckdb_path,
+            run_id=run_id,
+            question=question,
+            generated_code=generated_code,
+            executed_code=executed_code,
+            stdout=str(execution_result.get("stdout") or ""),
+            stderr=str(execution_result.get("stderr") or execution_result.get("error") or ""),
+            execution_status="success" if success else "failed",
+            retry_count=retry_count,
+        )
+        artifacts = ChatService._normalize_artifacts(execution_result.get("artifacts"))
+        if not artifacts:
+            artifacts = await get_workspace_run_exports(
+                workspace_id=workspace_id,
+                run_id=run_id,
+            )
+        if not artifacts:
+            artifacts = ChatService._build_inline_artifact_fallback(
+                run_id=run_id,
+                execution_result=execution_result,
+            )
+
+        response_payload["execution"] = {
+            "status": "success" if success else "failed",
+            "stdout": str(execution_result.get("stdout") or ""),
+            "stderr": str(execution_result.get("stderr") or execution_result.get("error") or ""),
+            "retry_count": int(retry_count),
+            "duration_ms": int(duration_ms),
+            "success": bool(success),
+        }
+        response_payload["artifacts"] = artifacts
+        response_payload["final_script_artifact_id"] = None
+        metadata = (
+            response_payload.get("metadata")
+            if isinstance(response_payload.get("metadata"), dict)
+            else {}
+        )
+        response_payload["metadata"] = {
+            **metadata,
+            "execution_source": "workspace_kernel",
+        }
+
+    @staticmethod
+    async def _finalize_with_existing_execution(
+        *,
+        workspace_id: str,
+        workspace_duckdb_path: str,
+        question: str,
+        run_id: str,
+        generated_code: str,
+        response_payload: dict[str, Any],
+        result_payload: dict[str, Any],
+    ) -> None:
+        execution_result = (
+            response_payload.get("execution")
+            if isinstance(response_payload.get("execution"), dict)
+            else {}
+        )
+        success = ChatService._execution_success(execution_result)
+        executed_code = str(result_payload.get("final_executed_code") or generated_code)
+        await ChatService._finalize_kernel_run(
+            workspace_id=workspace_id,
+            workspace_duckdb_path=workspace_duckdb_path,
+            run_id=run_id,
+            question=question,
+            generated_code=generated_code,
+            executed_code=executed_code,
+            stdout=str(execution_result.get("stdout") or ""),
+            stderr=str(execution_result.get("stderr") or execution_result.get("error") or ""),
+            execution_status="success" if success else "failed",
+            retry_count=int(execution_result.get("retry_count") or 0),
+        )
+
+    @staticmethod
     def _assemble_final_script(*, question: str, generated_code: str, run_id: str) -> str:
         lines = [
             "# Inquira portable script",
@@ -943,68 +1089,31 @@ class ChatService:
         response_payload["final_script_artifact_id"] = response_payload.get("final_script_artifact_id")
 
         code_to_execute = str(response_payload.get("code") or "").strip()
-        if code_to_execute and response_payload.get("execution") is None:
-            execution_result, retry_count, duration_ms, executed_code = (
-                await ChatService._execute_generated_code_with_retries(
+        if code_to_execute:
+            if ChatService._agent_execution_is_authoritative(
+                response_payload=response_payload,
+                result_payload=result,
+                code_to_execute=code_to_execute,
+            ):
+                await ChatService._finalize_with_existing_execution(
                     workspace_id=workspace_id,
                     workspace_duckdb_path=data_path,
+                    question=question,
+                    run_id=run_id,
                     generated_code=code_to_execute,
-                    run_id=run_id,
-                    output_contract=response_payload.get("output_contract") or [],
-                    max_retries=2,
+                    response_payload=response_payload,
+                    result_payload=result,
                 )
-            )
-            await ChatService._finalize_kernel_run(
-                workspace_id=workspace_id,
-                workspace_duckdb_path=data_path,
-                run_id=run_id,
-                question=question,
-                generated_code=code_to_execute,
-                executed_code=executed_code,
-                stdout=str(execution_result.get("stdout") or ""),
-                stderr=str(execution_result.get("stderr") or execution_result.get("error") or ""),
-                execution_status="success" if bool(execution_result.get("success")) else "failed",
-                retry_count=retry_count,
-            )
-            artifacts = [
-                item
-                for item in (execution_result.get("artifacts") or [])
-                if isinstance(item, dict)
-            ]
-            if not artifacts:
-                artifacts = await get_workspace_run_exports(
+            else:
+                await ChatService._apply_authoritative_execution_to_response(
                     workspace_id=workspace_id,
+                    workspace_duckdb_path=data_path,
+                    question=question,
                     run_id=run_id,
+                    generated_code=code_to_execute,
+                    output_contract=response_payload.get("output_contract") or [],
+                    response_payload=response_payload,
                 )
-            if not artifacts:
-                artifacts = ChatService._build_inline_artifact_fallback(
-                    run_id=run_id,
-                    execution_result=execution_result,
-                )
-            response_payload["execution"] = {
-                "status": "success" if bool(execution_result.get("success")) else "failed",
-                "stdout": str(execution_result.get("stdout") or ""),
-                "stderr": str(execution_result.get("stderr") or execution_result.get("error") or ""),
-                "retry_count": int(retry_count),
-                "duration_ms": int(duration_ms),
-            }
-            response_payload["artifacts"] = artifacts
-            response_payload["final_script_artifact_id"] = None
-        elif code_to_execute and response_payload.get("execution") is not None:
-            execution_result = response_payload.get("execution") or {}
-            executed_code = str(result.get("final_executed_code") or code_to_execute)
-            await ChatService._finalize_kernel_run(
-                workspace_id=workspace_id,
-                workspace_duckdb_path=data_path,
-                run_id=run_id,
-                question=question,
-                generated_code=code_to_execute,
-                executed_code=executed_code,
-                stdout=str(execution_result.get("stdout") or ""),
-                stderr=str(execution_result.get("stderr") or execution_result.get("error") or ""),
-                execution_status="success" if bool(execution_result.get("success")) else "failed",
-                retry_count=int(execution_result.get("retry_count") or 0),
-            )
 
         turn_id = await ChatService._persist_turn(
             session=session,
@@ -1042,6 +1151,7 @@ class ChatService:
 
         code = (
             result.get("final_code")
+            or result.get("final_executed_code")
             or result.get("current_code", "")
             or result.get("code", "")
             or ""
@@ -1110,9 +1220,7 @@ class ChatService:
             "output_contract": ChatService._normalize_output_contract(result.get("output_contract")),
             "run_id": str(result.get("run_id") or "") or None,
             "execution": normalized_execution,
-            "artifacts": [
-                item for item in (result.get("final_artifacts") or []) if isinstance(item, dict)
-            ],
+            "artifacts": ChatService._normalize_artifacts(result.get("final_artifacts")),
             "final_script_artifact_id": None,
         }
 
@@ -1220,6 +1328,7 @@ class ChatService:
         yield {"event": "status", "data": {"stage": "start", "message": "Starting analysis"}}
 
         aggregated: dict[str, Any] = {}
+        final_values_snapshot: dict[str, Any] | None = None
         stream_run_id = ""
         async for item in agent_client.stream(payload):
             event_name = str(item.get("event") or "message").strip() or "message"
@@ -1235,6 +1344,7 @@ class ChatService:
                 stream_run_id = str(payload_dict.get("run_id") or stream_run_id)
             elif event_name == "values" and isinstance(data, dict):
                 aggregated.update(data)
+                final_values_snapshot = dict(data)
             elif event_name == "updates" and isinstance(data, dict):
                 for node_payload in data.values():
                     if isinstance(node_payload, dict):
@@ -1249,6 +1359,8 @@ class ChatService:
 
         if not aggregated:
             raise HTTPException(status_code=502, detail="Agent stream completed without final result")
+        if isinstance(final_values_snapshot, dict):
+            aggregated = final_values_snapshot
 
         response_payload = ChatService._build_response_payload(aggregated)
         run_id = str(
@@ -1263,68 +1375,31 @@ class ChatService:
         response_payload["final_script_artifact_id"] = response_payload.get("final_script_artifact_id")
 
         code_to_execute = str(response_payload.get("code") or "").strip()
-        if code_to_execute and response_payload.get("execution") is None:
-            execution_result, retry_count, duration_ms, executed_code = (
-                await ChatService._execute_generated_code_with_retries(
+        if code_to_execute:
+            if ChatService._agent_execution_is_authoritative(
+                response_payload=response_payload,
+                result_payload=aggregated,
+                code_to_execute=code_to_execute,
+            ):
+                await ChatService._finalize_with_existing_execution(
                     workspace_id=workspace_id,
                     workspace_duckdb_path=data_path,
+                    question=question,
+                    run_id=run_id,
                     generated_code=code_to_execute,
-                    run_id=run_id,
-                    output_contract=response_payload.get("output_contract") or [],
-                    max_retries=2,
+                    response_payload=response_payload,
+                    result_payload=aggregated,
                 )
-            )
-            await ChatService._finalize_kernel_run(
-                workspace_id=workspace_id,
-                workspace_duckdb_path=data_path,
-                run_id=run_id,
-                question=question,
-                generated_code=code_to_execute,
-                executed_code=executed_code,
-                stdout=str(execution_result.get("stdout") or ""),
-                stderr=str(execution_result.get("stderr") or execution_result.get("error") or ""),
-                execution_status="success" if bool(execution_result.get("success")) else "failed",
-                retry_count=retry_count,
-            )
-            artifacts = [
-                item
-                for item in (execution_result.get("artifacts") or [])
-                if isinstance(item, dict)
-            ]
-            if not artifacts:
-                artifacts = await get_workspace_run_exports(
+            else:
+                await ChatService._apply_authoritative_execution_to_response(
                     workspace_id=workspace_id,
+                    workspace_duckdb_path=data_path,
+                    question=question,
                     run_id=run_id,
+                    generated_code=code_to_execute,
+                    output_contract=response_payload.get("output_contract") or [],
+                    response_payload=response_payload,
                 )
-            if not artifacts:
-                artifacts = ChatService._build_inline_artifact_fallback(
-                    run_id=run_id,
-                    execution_result=execution_result,
-                )
-            response_payload["artifacts"] = artifacts
-            response_payload["final_script_artifact_id"] = None
-            response_payload["execution"] = {
-                "status": "success" if bool(execution_result.get("success")) else "failed",
-                "stdout": str(execution_result.get("stdout") or ""),
-                "stderr": str(execution_result.get("stderr") or execution_result.get("error") or ""),
-                "retry_count": int(retry_count),
-                "duration_ms": int(duration_ms),
-            }
-        elif code_to_execute and response_payload.get("execution") is not None:
-            execution_result = response_payload.get("execution") or {}
-            executed_code = str(aggregated.get("final_executed_code") or code_to_execute)
-            await ChatService._finalize_kernel_run(
-                workspace_id=workspace_id,
-                workspace_duckdb_path=data_path,
-                run_id=run_id,
-                question=question,
-                generated_code=code_to_execute,
-                executed_code=executed_code,
-                stdout=str(execution_result.get("stdout") or ""),
-                stderr=str(execution_result.get("stderr") or execution_result.get("error") or ""),
-                execution_status="success" if bool(execution_result.get("success")) else "failed",
-                retry_count=int(execution_result.get("retry_count") or 0),
-            )
 
         turn_id = await ChatService._persist_turn(
             session=session,
