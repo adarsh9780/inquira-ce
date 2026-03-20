@@ -174,13 +174,20 @@ async def _fetch_openrouter_account_models(
         "Authorization": f"Bearer {api_key}",
     }
 
+    # Prefer OpenRouter's user-filtered list (respects provider preferences/guardrails).
+    # Fallback to /models only when older deployments do not expose /models/user.
     models_response = await client.get(
-        "https://openrouter.ai/api/v1/models",
+        "https://openrouter.ai/api/v1/models/user",
         headers=headers,
     )
+    if int(getattr(models_response, "status_code", 0) or 0) == 404:
+        models_response = await client.get(
+            "https://openrouter.ai/api/v1/models",
+            headers=headers,
+        )
     models_response.raise_for_status()
     models_payload = models_response.json()
-    all_models = _unique_models(
+    user_models = _unique_models(
         [
             str(item.get("id") or "").strip()
             for item in _extract_data_list(models_payload)
@@ -188,45 +195,10 @@ async def _fetch_openrouter_account_models(
         ]
     )
 
-    key_response = await client.get(
-        "https://openrouter.ai/api/v1/auth/key",
-        headers=headers,
-    )
-    key_response.raise_for_status()
-    key_payload = key_response.json()
-    configured_models = _extract_openrouter_account_model_ids(key_payload)
-
-    if not configured_models:
+    if not user_models:
         return ["openrouter/free"], False
 
-    available = set(all_models)
-    filtered = [model_id for model_id in configured_models if model_id in available]
-    if not filtered:
-        filtered = configured_models
-
-    return _unique_models(filtered), True
-
-
-def _extract_openrouter_account_model_ids(payload: Any) -> list[str]:
-    if not isinstance(payload, dict):
-        return []
-    data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
-
-    candidates: list[Any] = [
-        data.get("allowed_models"),
-        data.get("models"),
-        data.get("permitted_models"),
-        data.get("model_ids"),
-    ]
-    model_preferences = data.get("model_preferences")
-    if isinstance(model_preferences, dict):
-        candidates.append(model_preferences.get("models"))
-
-    for candidate in candidates:
-        if isinstance(candidate, list):
-            return _unique_models([str(item or "").strip() for item in candidate])
-
-    return []
+    return user_models, True
 
 
 def _build_catalog(

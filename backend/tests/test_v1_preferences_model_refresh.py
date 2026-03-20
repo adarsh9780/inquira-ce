@@ -37,18 +37,8 @@ async def test_refresh_service_openrouter_falls_back_when_account_models_missing
 
         async def get(self, url, *args, **kwargs):
             _ = args, kwargs
-            if url.endswith("/models"):
-                return _Resp(
-                    200,
-                    {
-                        "data": [
-                            {"id": "openai/gpt-4o-mini"},
-                            {"id": "google/gemini-2.5-flash"},
-                        ]
-                    },
-                )
-            if url.endswith("/auth/key"):
-                return _Resp(200, {"data": {}})
+            if url.endswith("/models/user"):
+                return _Resp(200, {"data": []})
             return _Resp(404, {})
 
     monkeypatch.setattr("app.services.provider_model_refresh.httpx.AsyncClient", _Client)
@@ -59,6 +49,57 @@ async def test_refresh_service_openrouter_falls_back_when_account_models_missing
     assert refreshed.catalog["default_main_model"] == "openrouter/free"
     assert refreshed.catalog["account_models_configured"] is False
     assert "openrouter/free" in refreshed.detail
+
+
+@pytest.mark.asyncio
+async def test_refresh_service_openrouter_uses_user_filtered_models(monkeypatch):
+    class _Resp:
+        def __init__(self, status_code: int, payload: dict):
+            self.status_code = status_code
+            self._payload = payload
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError("unexpected status")
+
+        def json(self):
+            return self._payload
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            _ = args, kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            _ = exc_type, exc, tb
+            return False
+
+        async def get(self, url, *args, **kwargs):
+            _ = args, kwargs
+            if url.endswith("/models/user"):
+                return _Resp(
+                    200,
+                    {
+                        "data": [
+                            {"id": "openai/gpt-4o-mini"},
+                            {"id": "anthropic/claude-3.5-sonnet"},
+                        ]
+                    },
+                )
+            return _Resp(404, {})
+
+    monkeypatch.setattr("app.services.provider_model_refresh.httpx.AsyncClient", _Client)
+
+    refreshed = await refresh_provider_model_catalog("openrouter", api_key="sk-or-test")
+
+    assert refreshed.catalog["main_models"] == [
+        "openai/gpt-4o-mini",
+        "anthropic/claude-3.5-sonnet",
+    ]
+    assert refreshed.catalog["account_models_configured"] is True
+    assert "Refreshed 2 OpenRouter account models." == refreshed.detail
 
 
 @pytest.mark.asyncio
