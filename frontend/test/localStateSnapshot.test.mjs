@@ -12,6 +12,11 @@ test('app store persists local session snapshot via Tauri app data file service'
   assert.equal(source.includes('localStateService.saveSnapshot(snapshot, targetUserId)'), true)
   assert.equal(source.includes('await localStateService.saveSnapshot(buildLocalStateSnapshot(), targetUserId)'), true)
   assert.equal(source.includes('await localStateService.loadSnapshot(targetUserId)'), true)
+  assert.equal(source.includes('llm: {'), true)
+  assert.equal(source.includes('selected_model: selectedModel.value || \'\''), true)
+  assert.equal(source.includes('selected_lite_model: selectedLiteModel.value || \'\''), true)
+  assert.equal(source.includes('selected_coding_model: selectedCodingModel.value || \'\''), true)
+  assert.equal(source.includes('enabled_models: Array.isArray(availableModels.value) ? [...availableModels.value] : []'), true)
   assert.equal(source.includes('terminal_open: !!isTerminalOpen.value'), true)
   assert.equal(source.includes('if (typeof ui.terminal_open === \'boolean\')'), true)
 })
@@ -42,6 +47,18 @@ test('terminal pane visibility changes are persisted to local snapshot', () => {
   assert.equal(source.includes('function toggleTerminal() {'), true)
   assert.equal(source.includes('isTerminalOpen.value = !isTerminalOpen.value'), true)
   assert.equal(source.includes('saveLocalConfig()'), true)
+})
+
+test('local snapshot restore recovers model selections and flushes pending preference sync on app close', () => {
+  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const source = readFileSync(storePath, 'utf-8')
+
+  assert.equal(source.includes('const llm = snapshot.llm || {}'), true)
+  assert.equal(source.includes('if (typeof llm.selected_model === \'string\' && llm.selected_model.trim())'), true)
+  assert.equal(source.includes('if (typeof llm.selected_lite_model === \'string\' && llm.selected_lite_model.trim())'), true)
+  assert.equal(source.includes('if (typeof llm.selected_coding_model === \'string\' && llm.selected_coding_model.trim())'), true)
+  assert.equal(source.includes('if (preferenceSyncTimer) {'), true)
+  assert.equal(source.includes('await syncPreferencesNow(targetUserId)'), true)
 })
 
 test('tauri fs capability allows writing local snapshot into app data scope', () => {

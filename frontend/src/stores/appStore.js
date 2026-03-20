@@ -148,6 +148,15 @@ export const useAppStore = defineStore('app', () => {
     return {
       version: LOCAL_SNAPSHOT_VERSION,
       updated_at: new Date().toISOString(),
+      llm: {
+        llm_provider: llmProvider.value || DEFAULT_PROVIDER,
+        selected_model: selectedModel.value || '',
+        selected_lite_model: selectedLiteModel.value || '',
+        selected_coding_model: selectedCodingModel.value || '',
+        enabled_models: Array.isArray(availableModels.value) ? [...availableModels.value] : [],
+        provider_main_models: Array.isArray(providerMainModels.value) ? [...providerMainModels.value] : [],
+        provider_lite_models: Array.isArray(providerLiteModels.value) ? [...providerLiteModels.value] : [],
+      },
       ui: {
         active_tab: activeTab.value || 'workspace',
         workspace_pane: workspacePane.value || 'code',
@@ -185,9 +194,56 @@ export const useAppStore = defineStore('app', () => {
 
   function applyLocalStateSnapshot(snapshot) {
     if (!snapshot || typeof snapshot !== 'object') return false
+    const llm = snapshot.llm || {}
     const ui = snapshot.ui || {}
     const sessionState = snapshot.session || {}
     const editor = snapshot.editor || {}
+
+    if (typeof llm.llm_provider === 'string' && llm.llm_provider.trim()) {
+      llmProvider.value = llm.llm_provider.trim().toLowerCase()
+    }
+    if (Array.isArray(llm.provider_main_models)) {
+      const restoredMainModels = llm.provider_main_models
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)
+      if (restoredMainModels.length) {
+        providerMainModels.value = restoredMainModels
+      }
+    }
+    if (Array.isArray(llm.provider_lite_models)) {
+      const restoredLiteModels = llm.provider_lite_models
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)
+      if (restoredLiteModels.length) {
+        providerLiteModels.value = restoredLiteModels
+      }
+    }
+    if (Array.isArray(llm.enabled_models)) {
+      const restoredEnabledModels = llm.enabled_models
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)
+      if (restoredEnabledModels.length) {
+        availableModels.value = restoredEnabledModels
+      }
+    }
+    if (typeof llm.selected_model === 'string' && llm.selected_model.trim()) {
+      selectedModel.value = llm.selected_model.trim()
+    }
+    if (!availableModels.value.includes(selectedModel.value)) {
+      selectedModel.value = availableModels.value[0] || selectedModel.value
+    }
+    if (typeof llm.selected_lite_model === 'string' && llm.selected_lite_model.trim()) {
+      selectedLiteModel.value = llm.selected_lite_model.trim()
+    }
+    if (!providerLiteModels.value.includes(selectedLiteModel.value)) {
+      selectedLiteModel.value = providerLiteModels.value[0] || selectedLiteModel.value
+    }
+    if (typeof llm.selected_coding_model === 'string' && llm.selected_coding_model.trim()) {
+      selectedCodingModel.value = llm.selected_coding_model.trim()
+    }
+    if (!availableModels.value.includes(selectedCodingModel.value)) {
+      selectedCodingModel.value = selectedModel.value || selectedCodingModel.value
+    }
 
     if (typeof ui.active_tab === 'string' && ui.active_tab.trim()) {
       const restoredTab = ui.active_tab.trim().toLowerCase()
@@ -295,29 +351,7 @@ export const useAppStore = defineStore('app', () => {
     if (!authStore.isAuthenticated || !targetUserId) return
     if (preferenceSyncTimer) clearTimeout(preferenceSyncTimer)
     preferenceSyncTimer = setTimeout(async () => {
-      const activeUserId = resolveSnapshotUserId()
-      if (!authStore.isAuthenticated || !activeUserId || activeUserId !== targetUserId) return
-      try {
-        const response = await apiService.v1UpdatePreferences({
-          llm_provider: llmProvider.value,
-          selected_model: selectedModel.value,
-          selected_lite_model: selectedLiteModel.value,
-          selected_coding_model: selectedCodingModel.value,
-          enabled_models: availableModels.value,
-          schema_context: schemaContext.value,
-          allow_schema_sample_values: allowSchemaSampleValues.value,
-          terminal_risk_acknowledged: terminalConsentGranted.value,
-          chat_overlay_width: chatOverlayWidth.value,
-          is_sidebar_collapsed: isSidebarCollapsed.value,
-          hide_shortcuts_modal: hideShortcutsModal.value,
-          active_workspace_id: activeWorkspaceId.value || '',
-          active_dataset_path: dataFilePath.value || '',
-          active_table_name: ingestedTableName.value || ''
-        })
-        applyPreferencesResponse(response)
-      } catch (_error) {
-        // Best-effort sync. Keep UI responsive even if backend is unavailable.
-      }
+      await syncPreferencesNow(targetUserId)
     }, 150)
   }
 
@@ -339,12 +373,43 @@ export const useAppStore = defineStore('app', () => {
   async function flushLocalConfig(explicitUserId = null) {
     const targetUserId = resolveSnapshotUserId(explicitUserId)
     if (!targetUserId) return false
+    if (preferenceSyncTimer) {
+      clearTimeout(preferenceSyncTimer)
+      preferenceSyncTimer = null
+      await syncPreferencesNow(targetUserId)
+    }
     if (localStateSyncTimer) {
       clearTimeout(localStateSyncTimer)
       localStateSyncTimer = null
     }
     await localStateService.saveSnapshot(buildLocalStateSnapshot(), targetUserId)
     return true
+  }
+
+  async function syncPreferencesNow(targetUserId) {
+    const activeUserId = resolveSnapshotUserId()
+    if (!authStore.isAuthenticated || !activeUserId || activeUserId !== targetUserId) return
+    try {
+      const response = await apiService.v1UpdatePreferences({
+        llm_provider: llmProvider.value,
+        selected_model: selectedModel.value,
+        selected_lite_model: selectedLiteModel.value,
+        selected_coding_model: selectedCodingModel.value,
+        enabled_models: availableModels.value,
+        schema_context: schemaContext.value,
+        allow_schema_sample_values: allowSchemaSampleValues.value,
+        terminal_risk_acknowledged: terminalConsentGranted.value,
+        chat_overlay_width: chatOverlayWidth.value,
+        is_sidebar_collapsed: isSidebarCollapsed.value,
+        hide_shortcuts_modal: hideShortcutsModal.value,
+        active_workspace_id: activeWorkspaceId.value || '',
+        active_dataset_path: dataFilePath.value || '',
+        active_table_name: ingestedTableName.value || ''
+      })
+      applyPreferencesResponse(response)
+    } catch (_error) {
+      // Best-effort sync. Keep UI responsive even if backend is unavailable.
+    }
   }
 
   async function loadLocalConfig(explicitUserId = null) {
