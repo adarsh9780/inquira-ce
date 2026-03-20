@@ -23,7 +23,11 @@
             class="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md py-1 shadow-md focus:outline-none"
             style="background-color: var(--color-surface); border: 1px solid var(--color-border);"
           >
-            <div v-if="searchable" class="px-2 pb-1">
+            <div
+              v-if="searchable"
+              class="sticky top-0 z-10 px-2 pb-1 pt-1"
+              style="background-color: var(--color-surface); border-bottom: 1px solid var(--color-border);"
+            >
               <input
                 v-model="searchQuery"
                 type="text"
