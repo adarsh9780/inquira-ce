@@ -31,6 +31,23 @@ def _authoritative_execution_result() -> tuple[dict, int, float, str]:
     )
 
 
+def test_agent_execution_authoritative_handles_none_metadata_payload() -> None:
+    is_authoritative = ChatService._agent_execution_is_authoritative(
+        response_payload={
+            "execution": {},
+            "metadata": None,
+            "artifacts": [{"artifact_id": "art-1"}],
+        },
+        result_payload={
+            "execution_source": "workspace_kernel",
+            "final_executed_code": "print('fresh')",
+        },
+        code_to_execute="print('fresh')",
+    )
+
+    assert is_authoritative is True
+
+
 @pytest.mark.asyncio
 async def test_analyze_and_persist_turn_uses_authoritative_runtime_when_agent_execution_is_not_explicitly_authoritative(
     monkeypatch,
@@ -208,3 +225,34 @@ async def test_stream_uses_last_values_snapshot_and_runs_authoritative_runtime(m
     assert final_payload["artifacts"][0]["artifact_id"] == "art-1"
     assert final_payload["metadata"]["execution_source"] == "workspace_kernel"
 
+
+@pytest.mark.asyncio
+async def test_finalize_with_existing_execution_handles_none_execution_payload(monkeypatch):
+    captured: dict[str, str | int] = {}
+
+    async def _fake_finalize_kernel_run(**kwargs):
+        captured.update(
+            {
+                "stdout": str(kwargs.get("stdout") or ""),
+                "stderr": str(kwargs.get("stderr") or ""),
+                "retry_count": int(kwargs.get("retry_count") or 0),
+                "execution_status": str(kwargs.get("execution_status") or ""),
+            }
+        )
+
+    monkeypatch.setattr(ChatService, "_finalize_kernel_run", staticmethod(_fake_finalize_kernel_run))
+
+    await ChatService._finalize_with_existing_execution(
+        workspace_id="ws-1",
+        workspace_duckdb_path="/tmp/ws.duckdb",
+        question="question",
+        run_id="run-1",
+        generated_code="print('x')",
+        response_payload={"execution": None},
+        result_payload={},
+    )
+
+    assert captured["stdout"] == ""
+    assert captured["stderr"] == ""
+    assert captured["retry_count"] == 0
+    assert captured["execution_status"] == "failed"

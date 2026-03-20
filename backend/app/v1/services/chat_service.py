@@ -495,11 +495,8 @@ class ChatService:
 
         # Keep runtime/UI execution decoupled from agent internals by requiring
         # an explicit source contract before trusting agent-provided execution.
-        metadata = (
-            response_payload.get("metadata")
-            if isinstance(response_payload.get("metadata"), dict)
-            else {}
-        )
+        raw_metadata = response_payload.get("metadata")
+        metadata: dict[str, Any] = raw_metadata if isinstance(raw_metadata, dict) else {}
         source = str(
             metadata.get("execution_source")
             or metadata.get("runtime_execution_source")
@@ -575,11 +572,8 @@ class ChatService:
         }
         response_payload["artifacts"] = artifacts
         response_payload["final_script_artifact_id"] = None
-        metadata = (
-            response_payload.get("metadata")
-            if isinstance(response_payload.get("metadata"), dict)
-            else {}
-        )
+        raw_metadata = response_payload.get("metadata")
+        metadata: dict[str, Any] = raw_metadata if isinstance(raw_metadata, dict) else {}
         response_payload["metadata"] = {
             **metadata,
             "execution_source": "workspace_kernel",
@@ -596,10 +590,9 @@ class ChatService:
         response_payload: dict[str, Any],
         result_payload: dict[str, Any],
     ) -> None:
-        execution_result = (
-            response_payload.get("execution")
-            if isinstance(response_payload.get("execution"), dict)
-            else {}
+        raw_execution = response_payload.get("execution")
+        execution_result: dict[str, Any] = (
+            raw_execution if isinstance(raw_execution, dict) else {}
         )
         success = ChatService._execution_success(execution_result)
         executed_code = str(result_payload.get("final_executed_code") or generated_code)
