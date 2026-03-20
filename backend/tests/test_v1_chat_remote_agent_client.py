@@ -66,6 +66,8 @@ async def test_analyze_and_persist_turn_uses_remote_agent_client(monkeypatch):
     assert captured_payload["workspace_id"] == "ws-1"
     assert captured_payload["conversation_id"] == "conv-1"
     assert captured_payload["table_names"] == ["orders"]
+    assert captured_payload["workspace_schema"] == {"tables": [{"table_name": "orders", "columns": []}]}
+    assert captured_payload["scratchpad_path"] == "/tmp/scratchpad/artifacts.duckdb"
     assert "table_name" not in captured_payload
     assert "preferred_table_name" not in captured_payload
     assert "active_schema" not in captured_payload

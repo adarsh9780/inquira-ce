@@ -29,6 +29,7 @@ class AgentInput(TypedDict):
     run_id: str
     system_info: SystemInfo
     context: str
+    workspace_schema: dict[str, Any]
     previous_code: str
     current_code: str
     known_columns: list[dict[str, str]]
@@ -96,6 +97,7 @@ def build_input_state(
     table_names: list[str] | None,
     data_path: str,
     context: str,
+    workspace_schema: dict[str, Any] | None = None,
     workspace_id: str,
     user_id: str,
     scratchpad_path: str,
@@ -174,6 +176,7 @@ def build_input_state(
         run_id=str(run_id or uuid.uuid4()),
         system_info=default_system_info(),
         context=str(context or ""),
+        workspace_schema=workspace_schema if isinstance(workspace_schema, dict) else {},
         previous_code=str(current_code or ""),
         current_code=str(current_code or ""),
         known_columns=normalized_known_columns,

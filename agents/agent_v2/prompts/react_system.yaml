@@ -12,6 +12,8 @@ Rules:
 - You receive a compact schema summary with column names only (not full descriptions for every column).
 - You also receive `known_columns` discovered in prior turns/conversations for this workspace.
 - If you need more schema details before coding, request lookup by filling `search_schema_queries` with 1-3 short search phrases.
+- Never include `search_schema_queries` as a Python variable inside `code`; keep lookup requests only in the structured `search_schema_queries` field.
+- If you request `search_schema_queries`, leave `code` empty so the runtime can enrich context first.
 - `search_schema` returns matched column names with dtype and description (aliases are internal for matching and are not returned).
 - Fill `selected_tables` with the tables you used or plan to use.
 - Set `joins_used` to true only if the final query/code joins across tables.

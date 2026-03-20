@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import ast
 import json
 import re
 import warnings
@@ -223,6 +224,134 @@ def _normalize_search_queries(raw: Any) -> list[str]:
     return normalized
 
 
+def _extract_search_queries_from_code(code: str) -> list[str]:
+    candidate = str(code or "").strip()
+    if not candidate:
+        return []
+    try:
+        parsed = ast.parse(candidate)
+    except Exception:
+        return []
+
+    recovered: list[str] = []
+    seen: set[str] = set()
+    for node in ast.walk(parsed):
+        if not isinstance(node, ast.Assign):
+            continue
+        targets = [target.id for target in node.targets if isinstance(target, ast.Name)]
+        if "search_schema_queries" not in targets:
+            continue
+        value = node.value
+        if not isinstance(value, (ast.List, ast.Tuple)):
+            continue
+        for element in value.elts:
+            if not isinstance(element, ast.Constant) or not isinstance(element.value, str):
+                continue
+            query = str(element.value or "").strip()
+            if not query:
+                continue
+            dedupe = query.lower()
+            if dedupe in seen:
+                continue
+            seen.add(dedupe)
+            recovered.append(query)
+            if len(recovered) >= 3:
+                return recovered
+    return recovered
+
+
+def _truncate_line(value: str, *, limit: int = 140) -> str:
+    text = " ".join(str(value or "").split()).strip()
+    if not text:
+        return ""
+    if len(text) <= limit:
+        return text
+    return f"{text[: max(1, limit - 3)]}..."
+
+
+def _build_schema_summary(
+    *,
+    table_names: list[str],
+    workspace_schema: Any,
+    known_columns: list[dict[str, str]],
+    max_tables: int = 8,
+) -> str:
+    if not isinstance(workspace_schema, dict):
+        if table_names:
+            return f"Workspace tables: {', '.join(table_names)}"
+        return "No preloaded schema summary. Use search_schema tool to discover relevant columns."
+
+    tables = workspace_schema.get("tables")
+    if not isinstance(tables, list):
+        if table_names:
+            return f"Workspace tables: {', '.join(table_names)}"
+        return "No preloaded schema summary. Use search_schema tool to discover relevant columns."
+
+    known_by_table: dict[str, list[str]] = {}
+    for col in known_columns:
+        if not isinstance(col, dict):
+            continue
+        table = str(col.get("table_name") or "").strip().lower()
+        name = str(col.get("name") or "").strip()
+        desc = _truncate_line(str(col.get("description") or ""), limit=120)
+        if not name:
+            continue
+        entry = name if not desc else f"{name}: {desc}"
+        known_by_table.setdefault(table, []).append(entry)
+
+    selected_tables: list[dict[str, Any]] = []
+    table_filter = {str(item).strip().lower() for item in table_names if str(item).strip()}
+    for table in tables:
+        if not isinstance(table, dict):
+            continue
+        table_name = str(table.get("table_name") or "").strip()
+        if not table_name:
+            continue
+        if table_filter and table_name.lower() not in table_filter:
+            continue
+        selected_tables.append(table)
+        if len(selected_tables) >= max_tables:
+            break
+
+    if not selected_tables:
+        return "No preloaded schema summary. Use search_schema tool to discover relevant columns."
+
+    lines: list[str] = []
+    for table in selected_tables:
+        table_name = str(table.get("table_name") or "").strip()
+        table_context = _truncate_line(str(table.get("context") or ""), limit=170)
+        if table_context:
+            lines.append(f"{table_name}: {table_context}")
+        else:
+            lines.append(f"{table_name}: table description unavailable.")
+        raw_columns = table.get("columns")
+        columns = raw_columns if isinstance(raw_columns, list) else []
+        column_names = [str(col.get("name") or "").strip() for col in columns if isinstance(col, dict)]
+        column_names = [name for name in column_names if name]
+        if column_names:
+            lines.append(f"Columns: {', '.join(column_names[:10])}")
+
+        described_columns: list[str] = []
+        for col in columns:
+            if not isinstance(col, dict):
+                continue
+            name = str(col.get("name") or "").strip()
+            desc = _truncate_line(str(col.get("description") or ""), limit=100)
+            if not name or not desc:
+                continue
+            described_columns.append(f"{name}: {desc}")
+            if len(described_columns) >= 2:
+                break
+        if described_columns:
+            lines.append(f"Column descriptions: {'; '.join(described_columns)}")
+
+        known_entries = known_by_table.get(table_name.lower(), [])
+        if known_entries:
+            lines.append(f"Known columns cache: {'; '.join(known_entries[:3])}")
+
+    return "\n".join(lines)
+
+
 def _normalize_table_names(raw: Any, *, max_items: int = 8) -> list[str]:
     if not isinstance(raw, list):
         return []
@@ -264,70 +393,6 @@ def _select_sample_table(schema: dict[str, Any], preferred_table: str | None) ->
     if len(tables) == 1:
         return tables[0]
     return None
-
-
-def _iter_schema_columns(schema: dict[str, Any], table_name: str | None) -> list[tuple[str, str]]:
-    if not isinstance(schema, dict):
-        return []
-    requested_table = str(table_name or "").strip().lower()
-    rows: list[tuple[str, str]] = []
-
-    scoped_table = str(schema.get("table_name") or "").strip()
-    scoped_columns = schema.get("columns")
-    if isinstance(scoped_columns, list):
-        if requested_table and scoped_table and scoped_table.lower() != requested_table:
-            return []
-        for col in scoped_columns:
-            if not isinstance(col, dict):
-                continue
-            name = str(col.get("name") or "").strip()
-            if not name:
-                continue
-            rows.append((scoped_table, name))
-        return rows
-
-    tables = schema.get("tables")
-    if not isinstance(tables, list):
-        return rows
-    for table in tables:
-        if not isinstance(table, dict):
-            continue
-        candidate_table = str(table.get("table_name") or "").strip()
-        if requested_table and candidate_table.lower() != requested_table:
-            continue
-        raw_columns = table.get("columns")
-        if not isinstance(raw_columns, list):
-            continue
-        for col in raw_columns:
-            if not isinstance(col, dict):
-                continue
-            name = str(col.get("name") or "").strip()
-            if not name:
-                continue
-            rows.append((candidate_table, name))
-    return rows
-
-
-def _build_schema_summary(schema: dict[str, Any], table_name: str | None) -> str:
-    grouped: dict[str, list[str]] = {}
-    for candidate_table, name in _iter_schema_columns(schema, table_name):
-        key = candidate_table or (str(table_name or "").strip() or "data_table")
-        grouped.setdefault(key, []).append(name)
-
-    if not grouped:
-        return "No schema columns available."
-
-    lines: list[str] = []
-    for table, columns in grouped.items():
-        deduped: list[str] = []
-        seen: set[str] = set()
-        for col in columns:
-            if col.lower() in seen:
-                continue
-            seen.add(col.lower())
-            deduped.append(col)
-        lines.append(f"Table: {table} ({len(deduped)} columns): {', '.join(deduped)}")
-    return "\n".join(lines)
 
 
 def _normalize_known_columns(raw: Any, *, max_items: int = 50) -> list[dict[str, str]]:
@@ -541,7 +606,12 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
     data_path = str(state.get("data_path") or "")
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
     sample_table = table_names[0] if len(table_names) == 1 else None
-    schema_summary = "No preloaded schema summary. Use search_schema tool to discover relevant columns."
+    workspace_schema = state.get("workspace_schema") if isinstance(state.get("workspace_schema"), dict) else {}
+    schema_summary = _build_schema_summary(
+        table_names=table_names,
+        workspace_schema=workspace_schema,
+        known_columns=known_columns,
+    )
     user_text = _latest_user_text(messages)
     runtime = load_agent_runtime_config()
     attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
@@ -556,6 +626,7 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
             "sample_table": sample_table or "",
             "data_path": data_path,
             "context": str(state.get("context") or ""),
+            "workspace_schema": workspace_schema,
         },
         "known_columns": known_columns,
         "attempt_counters": {
@@ -654,12 +725,35 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
             )
             result = await asyncio.to_thread(
                 search_schema,
+                schema=analysis_context.get("workspace_schema") if isinstance(analysis_context.get("workspace_schema"), dict) else {},
                 data_path=str(analysis_context.get("data_path") or "") or None,
                 table_names=_normalize_table_names(analysis_context.get("table_names"), max_items=64),
                 query=query,
                 table_name=str(action.get("table_name") or "").strip() or None,
                 max_results=int(action.get("limit") or 20),
             )
+            if int(result.get("match_count") or 0) == 0:
+                for keyword in _normalize_search_queries(re.split(r"[\s,;:/|]+", query)):
+                    token = keyword.strip()
+                    if len(token) < 3:
+                        continue
+                    token_result = await asyncio.to_thread(
+                        search_schema,
+                        schema=analysis_context.get("workspace_schema")
+                        if isinstance(analysis_context.get("workspace_schema"), dict)
+                        else {},
+                        data_path=str(analysis_context.get("data_path") or "") or None,
+                        table_names=_normalize_table_names(analysis_context.get("table_names"), max_items=64),
+                        query=token,
+                        table_name=str(action.get("table_name") or "").strip() or None,
+                        max_results=min(10, int(action.get("limit") or 20)),
+                    )
+                    token_columns = token_result.get("columns") if isinstance(token_result, dict) else []
+                    if isinstance(token_columns, list) and token_columns:
+                        merged_columns = result.get("columns") if isinstance(result.get("columns"), list) else []
+                        result["columns"] = [*merged_columns, *token_columns]
+                        result["match_count"] = len(result["columns"])
+                        break
             discovered = result.get("columns") if isinstance(result, dict) else []
             if isinstance(discovered, list):
                 known_columns = _merge_known_columns_lru(known_columns, discovered, max_items=50)
@@ -740,6 +834,26 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
         invoke_structured_chain=_ainvoke_structured_chain,
     )
     candidate_code = str(output.code or "").strip()
+    requested_queries = _normalize_search_queries(output.search_schema_queries)
+    if not requested_queries:
+        requested_queries = _extract_search_queries_from_code(candidate_code)
+    if requested_queries:
+        attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
+        return {
+            "analysis_output": output.model_dump(),
+            "candidate_code": "",
+            "tool_plan": [{"tool": "search_schema", "query": query, "limit": 20} for query in requested_queries],
+            "retry_target": "analysis_enrich_context",
+            "retry_feedback": (
+                "Code generation requested additional schema lookup. "
+                "Run search_schema tool calls before the next generation attempt."
+            ),
+            "attempt_counters": {
+                **attempt_counters,
+                "generation": int(attempt_counters.get("generation") or 0) + 1,
+            },
+        }
+
     sanitized_output_contract = _sanitize_output_contract(output.output_contract)
     selected_tables = _normalize_table_names(output.selected_tables)
 
@@ -747,6 +861,7 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
     return {
         "analysis_output": output.model_dump(),
         "candidate_code": candidate_code,
+        "retry_target": "",
         "output_contract": sanitized_output_contract,
         "metadata": {
             "is_safe": True,
@@ -764,6 +879,8 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
 
 
 def analysis_generate_to_next(state: dict[str, Any]) -> str:
+    if str(state.get("retry_target") or "").strip() == "analysis_enrich_context":
+        return "analysis_enrich_context"
     code = str(state.get("candidate_code") or "").strip()
     if not code:
         return "analysis_retry_decider"
@@ -1125,6 +1242,8 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
             raise
 
         search_queries = _normalize_search_queries(best_output.search_schema_queries)
+        if not search_queries:
+            search_queries = _extract_search_queries_from_code(best_output.code or "")
         pending_search_queries = [
             query
             for query in search_queries
