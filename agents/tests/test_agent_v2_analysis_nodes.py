@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, SystemMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate
 
 from agent_v2.nodes import (
@@ -163,6 +163,27 @@ async def test_analysis_collect_context_does_not_persist_preferred_table_field()
     analysis_context = result.get("analysis_context") if isinstance(result, dict) else {}
     assert isinstance(analysis_context, dict)
     assert "preferred_table" not in analysis_context
+
+
+@pytest.mark.asyncio
+async def test_analysis_collect_context_resets_enrichment_loop_state() -> None:
+    state = {
+        "messages": [HumanMessage(content="show top scorers")],
+        "table_names": ["batting"],
+        "known_columns": [],
+        "data_path": "/tmp/ws.db",
+        "analysis_tool_messages": [AIMessage(content="old", id="old-ai-message")],
+        "retry_feedback": "stale retry",
+        "enrichment_results": {"search_schema": [{"query": "runs"}]},
+        "enrichment_tool_cursor": 9,
+    }
+    result = await analysis_collect_context_node(state, {"configurable": {}})
+    reset_messages = result.get("analysis_tool_messages") or []
+    assert len(reset_messages) == 1
+    assert isinstance(reset_messages[0], RemoveMessage)
+    assert result.get("retry_feedback") == ""
+    assert result.get("enrichment_results") == {}
+    assert result.get("enrichment_tool_cursor") == 0
 
 
 @pytest.mark.asyncio
