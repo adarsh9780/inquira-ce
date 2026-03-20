@@ -215,6 +215,7 @@ const questionHistoryIndex = ref(-1)
 const questionHistoryDraft = ref('')
 const activeTokenRange = ref({ start: 0, end: 0, token: '' })
 const suggestionsOpenUp = ref(false)
+const dismissedSuggestionSignature = ref('')
 const pendingAttachments = ref([])
 const isAttachmentDragActive = ref(false)
 const dragDepth = ref(0)
@@ -657,6 +658,13 @@ function tokenRangeAtCursor(text, cursor) {
   }
 }
 
+function buildSuggestionDismissSignature(text = question.value, cursor = currentCursorPosition()) {
+  const safeText = String(text || '')
+  const range = tokenRangeAtCursor(safeText, cursor)
+  const token = String(range.token || '').trim()
+  return `${range.start}:${range.end}:${token}:${safeText}`
+}
+
 function applyTokenReplacement(replacement, { appendSpace = false } = {}) {
   const value = String(question.value || '')
   const { start, end } = activeTokenRange.value
@@ -710,6 +718,18 @@ async function updateAutocompleteSuggestions() {
   activeTokenRange.value = range
 
   const token = String(range.token || '').trim()
+  const signature = `${range.start}:${range.end}:${token}:${value}`
+  if (
+    dismissedSuggestionSignature.value &&
+    dismissedSuggestionSignature.value === signature
+  ) {
+    clearSuggestions()
+    return
+  }
+  if (dismissedSuggestionSignature.value && dismissedSuggestionSignature.value !== signature) {
+    dismissedSuggestionSignature.value = ''
+  }
+
   if (!token) {
     clearSuggestions()
     return
@@ -860,6 +880,7 @@ function handleKeydown(event) {
   }
   if ((showCommandSuggestions.value || showColumnSuggestions.value) && event.key === 'Escape') {
     event.preventDefault()
+    dismissedSuggestionSignature.value = buildSuggestionDismissSignature()
     clearSuggestions()
     return
   }
