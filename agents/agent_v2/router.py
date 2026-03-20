@@ -61,7 +61,7 @@ async def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
         return "analysis" if analysis_hints.search(user_text) else "general_chat"
 
     selected_model = normalize_model_id(str(configurable.get("model") or "").strip())
-    model_name = selected_model or lite_model or default_model
+    model_name = lite_model or selected_model or default_model
     api_key = str(configurable.get("api_key") or "").strip()
     if provider_requires_api_key(provider) and not api_key:
         return "analysis"

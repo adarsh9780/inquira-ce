@@ -160,9 +160,9 @@ def _get_model(config: RunnableConfig, *, lite: bool) -> BaseChatModel:
     selected = normalize_model_id(str(configurable.get("model") or "").strip())
     coding_model = normalize_model_id(str(configurable.get("coding_model") or "").strip())
     if lite:
-        model_name = selected or lite_model or default_model
+        model_name = lite_model or selected or default_model
     else:
-        model_name = coding_model or selected or default_model
+        model_name = coding_model or default_model
     api_key = str(configurable.get("api_key") or "").strip()
     if provider_requires_api_key(provider) and not api_key:
         raise ValueError("API key not configured for agent v2.")
@@ -890,7 +890,7 @@ async def analysis_assess_context_node(state: dict[str, Any], config: RunnableCo
             ),
         ]
     )
-    model = _get_model(config, lite=True)
+    model = _get_model(config, lite=False)
     chain = prompt | model.with_structured_output(AnalysisContextAssessment)
     try:
         output = await _ainvoke_structured_chain(
