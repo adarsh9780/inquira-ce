@@ -209,6 +209,7 @@ def build_graph(config: RunnableConfig) -> CompiledStateGraph:
         analysis_validate_to_next,
         {
             "analysis_generate_code": "analysis_generate_code",
+            "analysis_finalize_failure": "analysis_finalize_failure",
             "analysis_finalize_success": "analysis_finalize_success",
         },
     )

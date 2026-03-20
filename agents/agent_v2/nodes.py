@@ -679,6 +679,48 @@ def _truncate_text(value: Any, *, limit: int = 2400) -> str:
     return text[: max(0, limit - 3)].rstrip() + "..."
 
 
+def _fallback_context_assessment(
+    *,
+    user_text: str,
+    known_columns: list[dict[str, Any]],
+    table_names: list[str],
+) -> dict[str, Any]:
+    text = str(user_text or "").strip()
+    if not text:
+        return {
+            "context_sufficiency": {"enough_context": bool(known_columns), "missing_context": ["user question text"]},
+            "tool_plan": [],
+        }
+
+    tokens = re.findall(r"[a-zA-Z0-9_]{3,}", text.lower())
+    token_queries: list[str] = []
+    seen: set[str] = set()
+    for token in tokens:
+        if token in seen:
+            continue
+        seen.add(token)
+        token_queries.append(token)
+        if len(token_queries) >= 3:
+            break
+
+    missing_context: list[str] = []
+    if not known_columns:
+        missing_context.append("relevant column names and types")
+    if not table_names:
+        missing_context.append("candidate tables")
+
+    if not token_queries:
+        return {
+            "context_sufficiency": {"enough_context": bool(known_columns), "missing_context": missing_context},
+            "tool_plan": [],
+        }
+
+    return {
+        "context_sufficiency": {"enough_context": False, "missing_context": missing_context or ["schema details"]},
+        "tool_plan": [{"tool": "search_schema", "query": query, "limit": 20} for query in token_queries],
+    }
+
+
 def _emit_agent_status(
     *,
     step: str,
@@ -797,6 +839,9 @@ async def analysis_assess_context_node(state: dict[str, Any], config: RunnableCo
     analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
     messages = list(analysis_context.get("messages") or [])
     user_text = str(analysis_context.get("user_text") or "")
+    known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
+    table_names = _normalize_table_names(analysis_context.get("table_names"), max_items=16)
+    schema_summary = _truncate_text(str(analysis_context.get("schema_summary") or ""), limit=1800)
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", _ASSESS_CONTEXT_PROMPT),
@@ -814,20 +859,31 @@ async def analysis_assess_context_node(state: dict[str, Any], config: RunnableCo
     )
     model = _get_model(config, lite=True)
     chain = prompt | model.with_structured_output(AnalysisContextAssessment)
-    output = await _ainvoke_structured_chain(
-        chain,
-        {
-            "user_text": user_text,
-            "schema_summary": str(analysis_context.get("schema_summary") or ""),
-            "known_columns_json": _safe_json_dumps(state.get("known_columns") or []),
-            "retry_feedback": str(state.get("retry_feedback") or ""),
-            "message_count": len(messages),
-        },
-    )
-    if isinstance(output, AnalysisContextAssessment):
-        assessed = output
-    else:
-        assessed = AnalysisContextAssessment.model_validate(output)
+    try:
+        output = await _ainvoke_structured_chain(
+            chain,
+            {
+                "user_text": _truncate_text(user_text, limit=400),
+                "schema_summary": schema_summary,
+                "known_columns_json": _safe_json_dumps(known_columns[:20]),
+                "retry_feedback": _truncate_text(str(state.get("retry_feedback") or ""), limit=400),
+                "message_count": len(messages),
+            },
+        )
+        if isinstance(output, AnalysisContextAssessment):
+            assessed = output
+        else:
+            assessed = AnalysisContextAssessment.model_validate(output)
+    except Exception as exc:
+        # Structured parsing may fail when provider truncates response (length finish).
+        if "LengthFinishReasonError" not in type(exc).__name__ and "length limit" not in str(exc).lower():
+            raise
+        fallback = _fallback_context_assessment(
+            user_text=user_text,
+            known_columns=known_columns,
+            table_names=table_names,
+        )
+        return fallback
 
     tool_plan = _sanitize_tool_plan([item.model_dump() for item in assessed.tool_plan], max_items=5)
     return {
@@ -1290,6 +1346,11 @@ async def analysis_validate_result_node(state: dict[str, Any], config: RunnableC
 def analysis_validate_to_next(state: dict[str, Any]) -> str:
     outcome = state.get("validation_outcome") if isinstance(state.get("validation_outcome"), dict) else {}
     if str(outcome.get("status") or "").strip().lower() == "retry":
+        attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
+        generation_attempts = int(attempt_counters.get("generation") or 0)
+        max_attempts = max(1, int(attempt_counters.get("max_code_executions") or 3))
+        if generation_attempts >= max_attempts:
+            return "analysis_finalize_failure"
         return "analysis_generate_code"
     return "analysis_finalize_success"
 
