@@ -30,6 +30,7 @@ from .tools.execute_python import execute_python
 from .tools.finish_analysis import finish_analysis
 from .tools.pip_install import pip_install
 from .tools.sample_data import sample_data
+from .tools.schema_chunks import scan_schema_chunks
 from .tools.search_schema import search_schema
 from .tools.validate_result import validate_and_summarize_result
 
@@ -47,9 +48,11 @@ _ASSESS_CONTEXT_PROMPT = (
     "- tool_plan: list of tool actions.\n"
     "Allowed tool actions:\n"
     "- {{tool: \"search_schema\", query: string, table_name?: string, limit?: int}}\n"
+    "- {{tool: \"scan_schema_chunks\", query: string, table_name?: string, limit?: int}}\n"
     "- {{tool: \"sample_data\", table_name?: string, limit?: int}}\n"
     "- {{tool: \"bash\", command: string}}\n"
-    "Never emit pip_install. Keep tool_plan empty when enough_context=true."
+    "Never emit pip_install. Keep tool_plan empty when enough_context=true.\n"
+    "If search_schema results are weak, include scan_schema_chunks to inspect schema metadata in chunks."
 )
 
 
@@ -117,10 +120,10 @@ def _sanitize_tool_plan(raw: Any, *, max_items: int = 5) -> list[dict[str, Any]]
         if not isinstance(item, dict):
             continue
         tool = str(item.get("tool") or "").strip().lower()
-        if tool not in {"search_schema", "sample_data", "bash"}:
+        if tool not in {"search_schema", "scan_schema_chunks", "sample_data", "bash"}:
             continue
         normalized: dict[str, Any] = {"tool": tool}
-        if tool == "search_schema":
+        if tool in {"search_schema", "scan_schema_chunks"}:
             query = str(item.get("query") or "").strip()
             if not query:
                 continue
@@ -258,6 +261,147 @@ def _extract_search_queries_from_code(code: str) -> list[str]:
             if len(recovered) >= 3:
                 return recovered
     return recovered
+
+
+def _schema_memory_md_path(data_path: str | None) -> Path | None:
+    base = str(data_path or "").strip()
+    if not base:
+        return None
+    return Path(base).expanduser().resolve().parent / "context" / "schema_analysis_memory.md"
+
+
+def _load_schema_memory_markdown(data_path: str | None) -> str:
+    path = _schema_memory_md_path(data_path)
+    if path is None or not path.exists():
+        return ""
+    try:
+        text = path.read_text(encoding="utf-8").strip()
+    except Exception:
+        return ""
+    if not text:
+        return ""
+    return text[:12000]
+
+
+def _write_schema_memory_markdown(
+    *,
+    data_path: str | None,
+    user_text: str,
+    known_columns: list[dict[str, str]],
+    relevant_tables: list[dict[str, Any]] | None = None,
+) -> str:
+    path = _schema_memory_md_path(data_path)
+    if path is None:
+        return ""
+    grouped: dict[str, list[dict[str, str]]] = {}
+    for item in known_columns:
+        if not isinstance(item, dict):
+            continue
+        table_name = str(item.get("table_name") or "").strip() or "unknown_table"
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        grouped.setdefault(table_name, []).append(
+            {
+                "name": name,
+                "dtype": str(item.get("dtype") or "").strip(),
+                "description": _truncate_line(str(item.get("description") or ""), limit=140),
+            }
+        )
+
+    lines: list[str] = [
+        "# Schema Analysis Memory",
+        "",
+        f"- Question focus: {_truncate_line(user_text, limit=220)}",
+        "",
+        "## Relevant Tables",
+    ]
+    for table in relevant_tables or []:
+        if not isinstance(table, dict):
+            continue
+        table_name = str(table.get("table_name") or "").strip()
+        if not table_name:
+            continue
+        context = _truncate_line(str(table.get("context") or ""), limit=200)
+        lines.append(f"- {table_name}: {context or 'no table description available'}")
+    if not (relevant_tables or []):
+        lines.append("- none captured yet")
+
+    lines.extend(["", "## Distilled Columns"])
+    if not grouped:
+        lines.append("- none captured yet")
+    else:
+        for table_name, columns in grouped.items():
+            lines.append(f"### {table_name}")
+            for col in columns[:20]:
+                dtype = str(col.get("dtype") or "").strip() or "unknown"
+                description = str(col.get("description") or "").strip() or "no description"
+                lines.append(f"- `{col.get('name')}` ({dtype}): {description}")
+            lines.append("")
+
+    rendered = "\n".join(lines).strip() + "\n"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(rendered, encoding="utf-8")
+    except Exception:
+        return ""
+    return str(path)
+
+
+def _build_schema_search_queries(
+    *,
+    base_query: str,
+    user_text: str,
+    missing_context: list[str],
+    max_queries: int = 6,
+) -> list[str]:
+    phrases: list[str] = []
+    seen: set[str] = set()
+
+    def _push(value: str) -> None:
+        normalized = " ".join(str(value or "").strip().split())
+        if not normalized:
+            return
+        key = normalized.lower()
+        if key in seen:
+            return
+        seen.add(key)
+        phrases.append(normalized)
+
+    _push(base_query)
+    _push(user_text)
+    for item in missing_context:
+        _push(str(item or ""))
+
+    tokens = re.findall(r"[a-zA-Z0-9_]{3,}", " ".join([base_query, user_text, *missing_context]).lower())
+    for token in tokens:
+        _push(token)
+        if len(phrases) >= max_queries:
+            break
+    return phrases[:max_queries]
+
+
+def _extract_relevant_tables_from_chunk_result(result: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = result.get("relevant_tables") if isinstance(result, dict) else []
+    if not isinstance(rows, list):
+        return []
+    normalized: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        table_name = str(row.get("table_name") or "").strip()
+        if not table_name:
+            continue
+        normalized.append(
+            {
+                "table_name": table_name,
+                "context": str(row.get("context") or "").strip(),
+                "score": int(row.get("score") or 0),
+            }
+        )
+        if len(normalized) >= 8:
+            break
+    return normalized
 
 
 def _truncate_line(value: str, *, limit: int = 140) -> str:
@@ -607,11 +751,18 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
     sample_table = table_names[0] if len(table_names) == 1 else None
     workspace_schema = state.get("workspace_schema") if isinstance(state.get("workspace_schema"), dict) else {}
+    schema_memory = await asyncio.to_thread(_load_schema_memory_markdown, data_path)
     schema_summary = _build_schema_summary(
         table_names=table_names,
         workspace_schema=workspace_schema,
         known_columns=known_columns,
     )
+    if schema_memory:
+        schema_summary = (
+            f"{schema_summary}\n\n"
+            "Distilled schema memory from prior runs:\n"
+            f"{schema_memory[:4000]}"
+        )
     user_text = _latest_user_text(messages)
     runtime = load_agent_runtime_config()
     attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
@@ -627,6 +778,7 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
             "data_path": data_path,
             "context": str(state.get("context") or ""),
             "workspace_schema": workspace_schema,
+            "schema_memory": schema_memory,
         },
         "known_columns": known_columns,
         "attempt_counters": {
@@ -706,6 +858,14 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
     enrichment_count = int(attempt_counters.get("enrichment") or 0)
     performed = 0
     enrichment_results: dict[str, Any] = {}
+    context_sufficiency = state.get("context_sufficiency") if isinstance(state.get("context_sufficiency"), dict) else {}
+    missing_context = [
+        str(item).strip()
+        for item in (context_sufficiency.get("missing_context") or [])
+        if str(item).strip()
+    ][:6]
+    user_text = str(analysis_context.get("user_text") or "")
+    relevant_tables: list[dict[str, Any]] = []
 
     for action in tool_plan:
         if not isinstance(action, dict):
@@ -713,51 +873,63 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
         if performed >= max_tool_calls:
             break
         tool = str(action.get("tool") or "").strip().lower()
-        if tool == "search_schema":
+        if tool in {"search_schema", "scan_schema_chunks"}:
             query = str(action.get("query") or "").strip()
             if not query:
                 continue
-            _emit_agent_status(
-                step="searching_schema",
-                message=f"Searching schema for \"{query}\"...",
-                detail="Finding relevant columns before code generation.",
-                next_action="Use found schema columns in next code generation attempt.",
+            search_queries = _build_schema_search_queries(
+                base_query=query,
+                user_text=user_text,
+                missing_context=missing_context,
+                max_queries=6,
             )
-            result = await asyncio.to_thread(
-                search_schema,
-                schema=analysis_context.get("workspace_schema") if isinstance(analysis_context.get("workspace_schema"), dict) else {},
-                data_path=str(analysis_context.get("data_path") or "") or None,
-                table_names=_normalize_table_names(analysis_context.get("table_names"), max_items=64),
-                query=query,
-                table_name=str(action.get("table_name") or "").strip() or None,
-                max_results=int(action.get("limit") or 20),
-            )
-            if int(result.get("match_count") or 0) == 0:
-                for keyword in _normalize_search_queries(re.split(r"[\s,;:/|]+", query)):
-                    token = keyword.strip()
-                    if len(token) < 3:
-                        continue
-                    token_result = await asyncio.to_thread(
-                        search_schema,
-                        schema=analysis_context.get("workspace_schema")
-                        if isinstance(analysis_context.get("workspace_schema"), dict)
-                        else {},
-                        data_path=str(analysis_context.get("data_path") or "") or None,
-                        table_names=_normalize_table_names(analysis_context.get("table_names"), max_items=64),
-                        query=token,
-                        table_name=str(action.get("table_name") or "").strip() or None,
-                        max_results=min(10, int(action.get("limit") or 20)),
-                    )
-                    token_columns = token_result.get("columns") if isinstance(token_result, dict) else []
-                    if isinstance(token_columns, list) and token_columns:
-                        merged_columns = result.get("columns") if isinstance(result.get("columns"), list) else []
-                        result["columns"] = [*merged_columns, *token_columns]
-                        result["match_count"] = len(result["columns"])
-                        break
-            discovered = result.get("columns") if isinstance(result, dict) else []
-            if isinstance(discovered, list):
-                known_columns = _merge_known_columns_lru(known_columns, discovered, max_items=50)
-            enrichment_results.setdefault("search_schema", []).append(result)
+            search_results: list[dict[str, Any]] = []
+            discovered_columns: list[dict[str, Any]] = []
+            for candidate_query in search_queries:
+                _emit_agent_status(
+                    step="searching_schema",
+                    message=f"Searching schema for \"{candidate_query}\"...",
+                    detail="Finding relevant columns before code generation.",
+                    next_action="Use found schema columns in next code generation attempt.",
+                )
+                result = await asyncio.to_thread(
+                    search_schema,
+                    schema=analysis_context.get("workspace_schema")
+                    if isinstance(analysis_context.get("workspace_schema"), dict)
+                    else {},
+                    data_path=str(analysis_context.get("data_path") or "") or None,
+                    table_names=_normalize_table_names(analysis_context.get("table_names"), max_items=64),
+                    query=candidate_query,
+                    table_name=str(action.get("table_name") or "").strip() or None,
+                    max_results=int(action.get("limit") or 20),
+                )
+                search_results.append(result if isinstance(result, dict) else {})
+                current_cols = result.get("columns") if isinstance(result, dict) else []
+                if isinstance(current_cols, list) and current_cols:
+                    discovered_columns.extend(current_cols)
+                if len(discovered_columns) >= 12:
+                    break
+
+            if not discovered_columns:
+                chunk_result = await asyncio.to_thread(
+                    scan_schema_chunks,
+                    schema=analysis_context.get("workspace_schema")
+                    if isinstance(analysis_context.get("workspace_schema"), dict)
+                    else {},
+                    query_terms=search_queries,
+                    table_names=_normalize_table_names(analysis_context.get("table_names"), max_items=64),
+                    chunk_size=4,
+                    max_chunks=12,
+                )
+                enrichment_results.setdefault("scan_schema_chunks", []).append(chunk_result)
+                chunk_columns = chunk_result.get("columns") if isinstance(chunk_result, dict) else []
+                if isinstance(chunk_columns, list):
+                    discovered_columns.extend(chunk_columns)
+                relevant_tables.extend(_extract_relevant_tables_from_chunk_result(chunk_result if isinstance(chunk_result, dict) else {}))
+
+            if discovered_columns:
+                known_columns = _merge_known_columns_lru(known_columns, discovered_columns, max_items=50)
+            enrichment_results.setdefault("search_schema", []).extend(search_results)
             performed += 1
         elif tool == "sample_data":
             sample = sample_data(
@@ -781,9 +953,18 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
             enrichment_results.setdefault("bash", []).append(output)
             performed += 1
 
+    schema_memory_path = await asyncio.to_thread(
+        _write_schema_memory_markdown,
+        data_path=str(analysis_context.get("data_path") or "") or None,
+        user_text=user_text,
+        known_columns=known_columns,
+        relevant_tables=relevant_tables,
+    )
+
     return {
         "known_columns": known_columns,
         "enrichment_results": enrichment_results,
+        "schema_memory_path": schema_memory_path,
         "attempt_counters": {
             **attempt_counters,
             "enrichment": enrichment_count + 1,
@@ -806,6 +987,14 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
         )
 
     retry_feedback = str(state.get("retry_feedback") or "").strip()
+    schema_memory = str(analysis_context.get("schema_memory") or "").strip()
+    generation_context = str(analysis_context.get("context") or "")
+    if schema_memory:
+        generation_context = (
+            f"{generation_context}\n\n"
+            "Use this schema memory as analyst notes before writing code:\n"
+            f"{schema_memory[:5000]}"
+        ).strip()
     if retry_feedback:
         messages = list(messages) + [HumanMessage(content=f"Fix the previous issue: {retry_feedback}")]
     table_names = _normalize_table_names(analysis_context.get("table_names"), max_items=16)
@@ -830,7 +1019,7 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
         known_columns_json=_safe_json_dumps(known_columns),
         sample_table=sample_table or "",
         sample_json=_safe_json_dumps(sample),
-        context=str(analysis_context.get("context") or ""),
+        context=generation_context,
         invoke_structured_chain=_ainvoke_structured_chain,
     )
     candidate_code = str(output.code or "").strip()
@@ -1068,13 +1257,41 @@ async def analysis_validate_result_node(state: dict[str, Any], config: RunnableC
         else:
             result_explanation = "Analysis completed successfully."
 
+    result_kind = str(result_summary.get("result_kind") or "").strip().lower()
+    artifact_count = int(result_summary.get("artifact_count") or 0)
+    has_stdout_signal = bool(str(result_summary.get("stdout") or "").strip())
+    has_result_signal = result_kind in {"dataframe", "figure", "scalar"}
+    validation_outcome = {"status": "ok", "reason": ""}
+    retry_feedback = ""
+    retry_target = ""
+    if not (artifact_count > 0 or has_result_signal or has_stdout_signal):
+        validation_outcome = {
+            "status": "retry",
+            "reason": (
+                "Execution produced no analyzable output. "
+                "Generate code that returns a dataframe, figure, or scalar result."
+            ),
+        }
+        retry_feedback = str(validation_outcome["reason"])
+        retry_target = "analysis_generate_code"
+
     return {
         "final_execution": execution,
         "final_artifacts": artifacts,
         "result_summary": result_summary,
         "result_explanation": result_explanation,
         "code_explanation": code_explanation,
+        "validation_outcome": validation_outcome,
+        "retry_feedback": retry_feedback,
+        "retry_target": retry_target,
     }
+
+
+def analysis_validate_to_next(state: dict[str, Any]) -> str:
+    outcome = state.get("validation_outcome") if isinstance(state.get("validation_outcome"), dict) else {}
+    if str(outcome.get("status") or "").strip().lower() == "retry":
+        return "analysis_generate_code"
+    return "analysis_finalize_success"
 
 
 async def analysis_finalize_success_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:

@@ -26,6 +26,7 @@ from .nodes import (
     analysis_retry_decider_node,
     analysis_retry_to_next,
     analysis_validate_result_node,
+    analysis_validate_to_next,
     chat_node,
     finalize_node,
     reject_node,
@@ -203,7 +204,14 @@ def build_graph(config: RunnableConfig) -> CompiledStateGraph:
             "analysis_finalize_failure": "analysis_finalize_failure",
         },
     )
-    builder.add_edge("analysis_validate_result", "analysis_finalize_success")
+    builder.add_conditional_edges(
+        "analysis_validate_result",
+        analysis_validate_to_next,
+        {
+            "analysis_generate_code": "analysis_generate_code",
+            "analysis_finalize_success": "analysis_finalize_success",
+        },
+    )
     builder.add_edge("analysis_finalize_success", "finalize")
     builder.add_edge("analysis_finalize_failure", "finalize")
     builder.add_edge("chat", "finalize")

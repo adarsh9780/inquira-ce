@@ -9,6 +9,8 @@ from agent_v2.nodes import (
     analysis_collect_context_node,
     analysis_enrich_context_node,
     analysis_generate_code_node,
+    analysis_validate_result_node,
+    analysis_validate_to_next,
     analysis_retry_decider_node,
 )
 from agent_v2.coding_subagent import AnalysisOutput
@@ -231,3 +233,111 @@ async def test_analysis_generate_code_requests_schema_enrichment_when_query_is_i
     assert isinstance(tool_plan, list)
     assert tool_plan and tool_plan[0].get("tool") == "search_schema"
     assert tool_plan[0].get("query") == "batsman"
+
+
+@pytest.mark.asyncio
+async def test_analysis_enrich_context_falls_back_to_scan_schema_chunks_and_persists_memory(
+    monkeypatch, tmp_path
+) -> None:
+    workspace_db = tmp_path / "workspace.duckdb"
+    workspace_db.write_text("", encoding="utf-8")
+
+    def fake_search_schema(**_kwargs):
+        return {"query": "top batsman", "table_name": "", "match_count": 0, "columns": []}
+
+    def fake_scan_schema_chunks(**_kwargs):
+        return {
+            "query_terms": ["top batsman", "batsman"],
+            "chunks_scanned": 1,
+            "relevant_table_count": 1,
+            "relevant_tables": [{"table_name": "ball_by_ball", "context": "Ball-level cricket data", "score": 6}],
+            "columns": [
+                {"table_name": "ball_by_ball", "name": "batsman", "dtype": "VARCHAR", "description": "Batter name"},
+                {"table_name": "ball_by_ball", "name": "batsman_runs", "dtype": "INTEGER", "description": "Runs"},
+            ],
+        }
+
+    monkeypatch.setattr("agent_v2.nodes.search_schema", fake_search_schema)
+    monkeypatch.setattr("agent_v2.nodes.scan_schema_chunks", fake_scan_schema_chunks)
+
+    state = {
+        "workspace_id": "ws1",
+        "user_id": "u1",
+        "known_columns": [],
+        "analysis_context": {
+            "data_path": str(workspace_db),
+            "user_text": "top 10 batsman",
+            "table_names": ["ball_by_ball"],
+            "sample_table": "ball_by_ball",
+            "workspace_schema": {"tables": [{"table_name": "ball_by_ball", "columns": []}]},
+        },
+        "context_sufficiency": {"missing_context": ["column names for batsman and runs"]},
+        "tool_plan": [{"tool": "search_schema", "query": "top batsman", "limit": 20}],
+        "attempt_counters": {"enrichment": 0, "max_tool_calls": 5},
+        "messages": [HumanMessage(content="top 10 batsman")],
+    }
+
+    result = await analysis_enrich_context_node(state, {"configurable": {}})
+    known = result.get("known_columns") or []
+    assert any(str(item.get("name") or "").strip().lower() == "batsman" for item in known)
+    memory_path = str(result.get("schema_memory_path") or "").strip()
+    assert memory_path.endswith("context/schema_analysis_memory.md")
+    assert "schema_analysis_memory.md" in memory_path
+    assert "Distilled Columns" in (tmp_path / "context" / "schema_analysis_memory.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_analysis_collect_context_reads_schema_memory(tmp_path) -> None:
+    workspace_db = tmp_path / "workspace.duckdb"
+    workspace_db.write_text("", encoding="utf-8")
+    memory_dir = tmp_path / "context"
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    memory_file = memory_dir / "schema_analysis_memory.md"
+    memory_file.write_text("# Schema Analysis Memory\n\n- Question focus: top batsman\n", encoding="utf-8")
+
+    state = {
+        "messages": [HumanMessage(content="show top scorers")],
+        "table_names": ["batting"],
+        "known_columns": [],
+        "data_path": str(workspace_db),
+    }
+    result = await analysis_collect_context_node(state, {"configurable": {}})
+    analysis_context = result.get("analysis_context") if isinstance(result, dict) else {}
+    assert isinstance(analysis_context, dict)
+    assert "schema_memory" in analysis_context
+    assert "Schema Analysis Memory" in str(analysis_context.get("schema_memory") or "")
+
+
+@pytest.mark.asyncio
+async def test_analysis_validate_result_retries_when_execution_has_no_signal(monkeypatch) -> None:
+    async def fake_validate_and_summarize_result(**_kwargs):
+        return {
+            "success": True,
+            "stdout": "",
+            "stderr": "",
+            "result_kind": "none",
+            "artifact_count": 0,
+            "artifacts": [],
+        }
+
+    async def fake_generate_result_explanations(**_kwargs):
+        class _Payload:
+            result_explanation = ""
+            code_explanation = "No output"
+
+        return _Payload()
+
+    monkeypatch.setattr("agent_v2.nodes.validate_and_summarize_result", fake_validate_and_summarize_result)
+    monkeypatch.setattr("agent_v2.nodes._generate_result_explanations", fake_generate_result_explanations)
+
+    state = {
+        "workspace_id": "ws1",
+        "run_id": "r1",
+        "execution_result": {"success": True, "stdout": "", "stderr": "", "artifacts": []},
+        "analysis_context": {"user_text": "top batsman"},
+        "candidate_code": "print('x')",
+        "analysis_output": {"explanation": "explain"},
+    }
+    result = await analysis_validate_result_node(state, {"configurable": {}})
+    assert result.get("retry_target") == "analysis_generate_code"
+    assert analysis_validate_to_next(result) == "analysis_generate_code"

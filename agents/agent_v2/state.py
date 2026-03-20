@@ -76,6 +76,8 @@ class AgentState(AgentInput, total=False):
     execution_result: dict[str, Any]
     retry_feedback: str
     retry_target: str
+    schema_memory_path: str
+    validation_outcome: dict[str, Any]
     attempt_counters: dict[str, int]
     analysis_output: dict[str, Any]
     result_summary: dict[str, Any]
