@@ -175,6 +175,7 @@ def build_graph(config: RunnableConfig) -> CompiledStateGraph:
         "analysis_generate_code",
         analysis_generate_to_next,
         {
+            "analysis_enrich_context": "analysis_enrich_context",
             "analysis_guard_code": "analysis_guard_code",
             "analysis_retry_decider": "analysis_retry_decider",
         },

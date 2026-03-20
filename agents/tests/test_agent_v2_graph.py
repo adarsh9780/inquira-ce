@@ -76,3 +76,14 @@ def test_prepare_input_node_prefers_table_names_list() -> None:
         {},
     )
     assert result.get("table_names") == ["batting", "matches"]
+
+
+def test_agent_v2_graph_routes_analysis_generate_code_back_to_context_enrichment() -> None:
+    graph = build_graph({})
+    rendered = graph.get_graph()
+    assert any(
+        edge.source == "analysis_generate_code"
+        and edge.target == "analysis_enrich_context"
+        and bool(edge.conditional)
+        for edge in rendered.edges
+    )
