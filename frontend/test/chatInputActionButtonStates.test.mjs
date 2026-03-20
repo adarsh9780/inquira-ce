@@ -10,7 +10,7 @@ test('chat input action button supports stop and voice-input states', () => {
   assert.equal(source.includes('handleActionButtonClick'), true)
   assert.equal(source.includes('<StopCircleIcon v-if="appStore.isLoading"'), true)
   assert.equal(source.includes('v-else-if="isVoiceInputActive"'), true)
-  assert.equal(source.includes('w-[22px] h-[22px] items-center justify-center rounded-full bg-zinc-900 text-white animate-pulse'), true)
+  assert.equal(source.includes('w-6 h-6 items-center justify-center rounded-full bg-zinc-900 text-white animate-pulse'), true)
   assert.equal(source.includes('v-else-if="isComposerEmpty"'), true)
   assert.equal(source.includes('<MicrophoneIcon class="w-3 h-3" />'), true)
   assert.equal(source.includes('activeAbortController.value?.abort()'), true)
