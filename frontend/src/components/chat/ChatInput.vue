@@ -115,6 +115,10 @@
             :title="actionButtonTitle"
           >
             <StopCircleIcon v-if="appStore.isLoading" class="w-6 h-6" />
+            <MicrophoneIcon
+              v-else-if="isVoiceInputActive"
+              class="w-5 h-5 animate-pulse"
+            />
             <MicrophoneIcon v-else-if="isComposerEmpty" class="w-5 h-5" />
             <ArrowUpCircleIcon v-else class="w-6 h-6" />
           </button>

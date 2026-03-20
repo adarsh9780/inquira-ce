@@ -9,6 +9,8 @@ test('chat input action button supports stop and voice-input states', () => {
 
   assert.equal(source.includes('handleActionButtonClick'), true)
   assert.equal(source.includes('<StopCircleIcon v-if="appStore.isLoading"'), true)
+  assert.equal(source.includes('v-else-if="isVoiceInputActive"'), true)
+  assert.equal(source.includes('animate-pulse'), true)
   assert.equal(source.includes('activeAbortController.value?.abort()'), true)
   assert.equal(source.includes('window.SpeechRecognition || window.webkitSpeechRecognition'), true)
   assert.equal(source.includes('Voice input unavailable on this device/browser'), true)
