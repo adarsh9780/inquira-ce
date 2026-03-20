@@ -33,6 +33,15 @@ test('soft plotly theme updates colors without forcing typography sizes', () => 
   assert.equal(themed.layout.xaxis.tickfont.size, 15)
   assert.equal(themed.layout.xaxis.tickfont.color, '#71717A')
   assert.equal(themed.layout.xaxis.title.font.color, '#27272A')
+  assert.deepEqual(
+    themed.layout.colorscale.sequential,
+    [
+      [0, '#EEF3FF'],
+      [0.35, '#C7D8FF'],
+      [0.68, '#7DA7F8'],
+      [1, '#3B82F6'],
+    ],
+  )
   assert.deepEqual(input, original)
 })
 
@@ -90,3 +99,35 @@ test('invalid mode falls back to soft theming', () => {
   assert.equal(themed.layout.font.size, undefined)
 })
 
+test('single bar trace collapses continuous bar coloring into one UI accent color', () => {
+  const input = {
+    data: [
+      {
+        type: 'bar',
+        x: ['Sandeep Sharma', 'A Nehra', 'Mohammed Shami'],
+        y: [7, 6, 5],
+        marker: {
+          color: [129.85, 104.2, 131.1],
+          colorscale: 'Plasma',
+          colorbar: { title: { text: "Kohli's Strike Rate" } },
+          cmin: 90,
+          cmax: 190,
+        },
+      },
+    ],
+    layout: {
+      coloraxis: {
+        colorscale: 'Plasma',
+      },
+    },
+  }
+
+  const themed = applyPlotlyTheme(input, { mode: PLOTLY_THEME_MODE.SOFT })
+
+  assert.equal(themed.data[0].marker.color, '#3B82F6')
+  assert.equal(themed.data[0].marker.colorscale, undefined)
+  assert.equal(themed.data[0].marker.colorbar, undefined)
+  assert.equal(themed.data[0].marker.cmin, undefined)
+  assert.equal(themed.data[0].marker.cmax, undefined)
+  assert.equal(themed.layout.coloraxis, undefined)
+})

@@ -22,6 +22,21 @@ const COLORWAY = Object.freeze([
 ])
 
 const CARTESIAN_AXIS_KEY = /^(x|y)axis(\d+)?$/i
+const COLOR_AXIS_KEY = /^coloraxis(\d+)?$/i
+const BAR_LIKE_TRACE_TYPES = new Set(['bar', 'histogram', 'funnel', 'waterfall'])
+const BRAND_COLOR_SCALE = Object.freeze({
+  sequential: Object.freeze([
+    [0, '#EEF3FF'],
+    [0.35, '#C7D8FF'],
+    [0.68, '#7DA7F8'],
+    [1, '#3B82F6'],
+  ]),
+  diverging: Object.freeze([
+    [0, '#E26A6A'],
+    [0.5, '#FDFCF8'],
+    [1, '#3B82F6'],
+  ]),
+})
 
 const CARTESIAN_TRACE_TYPES = new Set([
   '',
@@ -105,6 +120,94 @@ function hasCartesianData(data) {
     const traceType = String(trace?.type || '').trim().toLowerCase()
     return CARTESIAN_TRACE_TYPES.has(traceType)
   })
+}
+
+function getTraceType(trace, fallback = '') {
+  return String(trace?.type || fallback).trim().toLowerCase()
+}
+
+function countBarLikeTraces(data) {
+  if (!Array.isArray(data) || data.length === 0) return 0
+  return data.reduce((count, trace) => {
+    if (!isPlainObject(trace)) return count
+    return BAR_LIKE_TRACE_TYPES.has(getTraceType(trace, '')) ? count + 1 : count
+  }, 0)
+}
+
+function normalizeBarMarker(marker, color, forceSingleColor) {
+  const source = isPlainObject(marker) ? marker : {}
+  const nextMarker = mergeDeep(
+    {
+      line: {
+        color: UI_COLORS.surface,
+        width: 1,
+      },
+    },
+    source,
+  )
+
+  if (!forceSingleColor) return nextMarker
+
+  nextMarker.color = color
+  delete nextMarker.autocolorscale
+  delete nextMarker.cauto
+  delete nextMarker.cmid
+  delete nextMarker.cmin
+  delete nextMarker.cmax
+  delete nextMarker.coloraxis
+  delete nextMarker.colorbar
+  delete nextMarker.colorscale
+  delete nextMarker.reversescale
+  delete nextMarker.showscale
+  return nextMarker
+}
+
+function applyBarTraceTemplate(data) {
+  if (!Array.isArray(data)) return []
+  const barLikeTraceCount = countBarLikeTraces(data)
+  if (barLikeTraceCount === 0) return data
+
+  return data.map((trace, index) => {
+    if (!isPlainObject(trace)) return trace
+    const traceType = getTraceType(trace, 'scatter')
+    if (!BAR_LIKE_TRACE_TYPES.has(traceType)) return trace
+
+    const color = COLORWAY[index % COLORWAY.length]
+    const marker = isPlainObject(trace.marker) ? trace.marker : {}
+    const hasPerItemColor = Array.isArray(marker.color) || Array.isArray(trace.color)
+    const hasColorAxis = typeof marker.coloraxis === 'string' || typeof trace.coloraxis === 'string'
+    const forceSingleColor = barLikeTraceCount === 1 && (hasPerItemColor || hasColorAxis)
+
+    const nextTrace = {
+      ...trace,
+      marker: normalizeBarMarker(marker, UI_COLORS.accent, forceSingleColor),
+    }
+
+    if (forceSingleColor) {
+      delete nextTrace.coloraxis
+      if (typeof nextTrace.showscale !== 'undefined') delete nextTrace.showscale
+    }
+
+    if (!nextTrace.marker?.color && !hasPerItemColor && !hasColorAxis) {
+      nextTrace.marker = mergeDeep(nextTrace.marker, { color })
+    }
+
+    return nextTrace
+  })
+}
+
+function stripUnusedColorAxis(layout, data) {
+  if (!isPlainObject(layout)) return layout
+  const usesColorAxis = Array.isArray(data) && data.some((trace) => (
+    typeof trace?.coloraxis === 'string' || typeof trace?.marker?.coloraxis === 'string'
+  ))
+  if (usesColorAxis) return layout
+
+  const nextLayout = { ...layout }
+  for (const key of Object.keys(nextLayout)) {
+    if (COLOR_AXIS_KEY.test(key)) delete nextLayout[key]
+  }
+  return nextLayout
 }
 
 function getSoftAxisPatch() {
@@ -197,7 +300,7 @@ function applyHardTraceDefaults(data) {
   if (!Array.isArray(data)) return []
   return data.map((trace, index) => {
     if (!isPlainObject(trace)) return trace
-    const traceType = String(trace.type || 'scatter').trim().toLowerCase()
+    const traceType = getTraceType(trace, 'scatter')
     const color = COLORWAY[index % COLORWAY.length]
 
     if (traceType === 'bar' || traceType === 'histogram' || traceType === 'funnel' || traceType === 'waterfall') {
@@ -297,11 +400,17 @@ export function applyPlotlyTheme(figure, options = {}) {
 
   const rawData = Array.isArray(figure.data) ? cloneArray(figure.data) : []
   const rawLayout = isPlainObject(figure.layout) ? mergeDeep({}, figure.layout) : {}
+  let themedData = applyBarTraceTemplate(rawData)
 
   const softLayoutPatch = {
     paper_bgcolor: UI_COLORS.base,
     plot_bgcolor: UI_COLORS.surface,
     colorway: [...COLORWAY],
+    colorscale: {
+      sequential: cloneArray(BRAND_COLOR_SCALE.sequential),
+      sequentialminus: cloneArray(BRAND_COLOR_SCALE.sequential),
+      diverging: cloneArray(BRAND_COLOR_SCALE.diverging),
+    },
     font: {
       color: UI_COLORS.textMain,
     },
@@ -333,10 +442,8 @@ export function applyPlotlyTheme(figure, options = {}) {
   }
 
   let themedLayout = mergeDeep(rawLayout, softLayoutPatch)
-  themedLayout = applyAxisTheme(themedLayout, PLOTLY_THEME_MODE.SOFT, rawData)
+  themedLayout = applyAxisTheme(themedLayout, PLOTLY_THEME_MODE.SOFT, themedData)
   themedLayout = applyAnnotationTheme(themedLayout, PLOTLY_THEME_MODE.SOFT)
-
-  let themedData = rawData
   if (mode === PLOTLY_THEME_MODE.HARD) {
     themedLayout = mergeDeep(themedLayout, {
       font: {
@@ -373,10 +480,11 @@ export function applyPlotlyTheme(figure, options = {}) {
       bargroupgap: 0.08,
     })
     themedLayout.margin = mergeDeep(getHardMargins(context), themedLayout.margin)
-    themedLayout = applyAxisTheme(themedLayout, PLOTLY_THEME_MODE.HARD, rawData)
+    themedLayout = applyAxisTheme(themedLayout, PLOTLY_THEME_MODE.HARD, themedData)
     themedLayout = applyAnnotationTheme(themedLayout, PLOTLY_THEME_MODE.HARD)
-    themedData = applyHardTraceDefaults(rawData)
+    themedData = applyHardTraceDefaults(themedData)
   }
+  themedLayout = stripUnusedColorAxis(themedLayout, themedData)
 
   return {
     ...figure,
@@ -416,4 +524,3 @@ export function applyPlotlyConfigTheme(config = {}, options = {}) {
 
   return themedConfig
 }
-
