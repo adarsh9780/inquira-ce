@@ -68,8 +68,11 @@ class AgentState(AgentInput, total=False):
     code_attempts: int
     last_error: str
     analysis_context: dict[str, Any]
+    analysis_tool_messages: Annotated[list[AnyMessage], add_messages]
     context_sufficiency: dict[str, Any]
     tool_plan: list[dict[str, Any]]
+    enrichment_hints: list[str]
+    enrichment_tool_cursor: int
     enrichment_results: dict[str, Any]
     candidate_code: str
     guard_result: dict[str, Any]

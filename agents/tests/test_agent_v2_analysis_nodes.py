@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import pytest
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate
 
 from agent_v2.nodes import (
     _ASSESS_CONTEXT_PROMPT,
     analysis_assess_context_node,
     analysis_collect_context_node,
+    analysis_enrich_to_next,
     analysis_enrich_context_node,
+    analysis_finalize_context_enrichment_node,
     analysis_generate_code_node,
     analysis_validate_result_node,
     analysis_validate_to_next,
@@ -18,19 +20,19 @@ from agent_v2.coding_subagent import AnalysisOutput
 
 
 @pytest.mark.asyncio
-async def test_analysis_enrich_context_updates_known_columns_from_search_schema(monkeypatch) -> None:
-    def fake_search_schema(**_kwargs):
-        return {
-            "query": "customer",
-            "table_name": "",
-            "match_count": 1,
-            "columns": [
-                {"table_name": "orders", "name": "customer_id", "dtype": "VARCHAR", "description": ""},
-            ],
-        }
+async def test_analysis_enrich_context_node_produces_tool_call_message(monkeypatch) -> None:
+    class _FakeBoundModel:
+        async def ainvoke(self, _messages):
+            return AIMessage(
+                content="",
+                tool_calls=[{"name": "search_schema", "args": {"query": "customer"}, "id": "call_1", "type": "tool_call"}],
+            )
 
-    monkeypatch.setattr("agent_v2.nodes.search_schema", fake_search_schema)
+    class _FakeModel:
+        def bind_tools(self, _tools):
+            return _FakeBoundModel()
 
+    monkeypatch.setattr("agent_v2.nodes._get_model", lambda *_args, **_kwargs: _FakeModel())
     state = {
         "workspace_id": "ws1",
         "user_id": "u1",
@@ -39,82 +41,71 @@ async def test_analysis_enrich_context_updates_known_columns_from_search_schema(
             "data_path": "",
             "table_names": ["orders"],
             "sample_table": "orders",
+            "user_text": "show customer totals",
+            "schema_summary": "orders(customer_id, amount)",
         },
-        "tool_plan": [{"tool": "search_schema", "query": "customer", "limit": 20}],
         "attempt_counters": {"enrichment": 0, "max_tool_calls": 5},
         "messages": [HumanMessage(content="show customer totals")],
     }
 
     result = await analysis_enrich_context_node(state, {"configurable": {}})
-    known = result.get("known_columns") or []
-    assert any(str(item.get("name") or "").strip().lower() == "customer_id" for item in known)
+    tool_messages = result.get("analysis_tool_messages") or []
+    assert isinstance(tool_messages, list)
+    assert len(tool_messages) == 3
+    assert isinstance(tool_messages[0], SystemMessage)
+    assert isinstance(tool_messages[-1], AIMessage)
+    assert bool((tool_messages[-1].tool_calls or []))
 
 
 @pytest.mark.asyncio
-async def test_analysis_enrich_context_ignores_pip_install_tool_plan_entry() -> None:
+async def test_analysis_enrich_to_next_routes_to_tool_node_when_ai_has_tool_calls() -> None:
     state = {
-        "workspace_id": "ws1",
-        "user_id": "u1",
-        "known_columns": [],
-        "analysis_context": {"data_path": "", "table_names": [], "sample_table": ""},
-        "tool_plan": [
-            {"tool": "pip_install", "packages": ["pandas"]},
-            {"tool": "search_schema", "query": "revenue"},
-        ],
-        "attempt_counters": {"enrichment": 0, "max_tool_calls": 5},
+        "analysis_tool_messages": [
+            AIMessage(
+                content="",
+                tool_calls=[{"name": "search_schema", "args": {"query": "runs"}, "id": "c1", "type": "tool_call"}],
+            )
+        ]
     }
-
-    result = await analysis_enrich_context_node(state, {"configurable": {}})
-    enrichment_results = result.get("enrichment_results") or {}
-    assert "pip_install" not in enrichment_results
+    assert analysis_enrich_to_next(state) == "analysis_enrich_context_tools"
 
 
 @pytest.mark.asyncio
-async def test_analysis_enrich_context_deduplicates_schema_queries_across_actions(monkeypatch) -> None:
-    called_queries: list[str] = []
+async def test_analysis_enrich_to_next_routes_to_finalize_without_tool_calls() -> None:
+    state = {"analysis_tool_messages": [AIMessage(content='{"enough_context": true, "missing_context": []}')]}
+    assert analysis_enrich_to_next(state) == "analysis_finalize_context_enrichment"
 
-    def fake_search_schema(**kwargs):
-        query = str(kwargs.get("query") or "").strip()
-        called_queries.append(query)
-        return {
-            "query": query,
-            "table_name": "",
-            "match_count": 1,
-            "columns": [
-                {
-                    "table_name": "ball_by_ball",
-                    "name": f"{query}_col",
-                    "dtype": "VARCHAR",
-                    "description": "",
-                }
-            ],
-        }
 
-    monkeypatch.setattr("agent_v2.nodes.search_schema", fake_search_schema)
-
+@pytest.mark.asyncio
+async def test_analysis_finalize_context_enrichment_merges_search_tool_results() -> None:
     state = {
         "workspace_id": "ws1",
         "user_id": "u1",
         "known_columns": [],
         "analysis_context": {
             "data_path": "",
-            "table_names": ["ball_by_ball"],
-            "sample_table": "ball_by_ball",
-            "workspace_schema": {"tables": [{"table_name": "ball_by_ball", "columns": []}]},
-            "user_text": "top runs wicket",
+            "table_names": ["orders"],
+            "sample_table": "orders",
+            "user_text": "show revenue by customer",
         },
-        "context_sufficiency": {"missing_context": []},
-        "tool_plan": [
-            {"tool": "search_schema", "query": "runs", "limit": 20},
-            {"tool": "search_schema", "query": "wicket", "limit": 20},
+        "analysis_tool_messages": [
+            ToolMessage(
+                name="search_schema",
+                tool_call_id="c1",
+                content='{"query":"revenue","columns":[{"table_name":"orders","name":"customer_id","dtype":"VARCHAR","description":"customer key"}]}',
+            ),
+            AIMessage(content='{"enough_context": true, "missing_context": [], "notes": "ready"}'),
         ],
         "attempt_counters": {"enrichment": 0, "max_tool_calls": 5},
+        "enrichment_tool_cursor": 0,
     }
 
-    await analysis_enrich_context_node(state, {"configurable": {}})
-    lowered = [item.lower() for item in called_queries]
-    assert lowered.count("runs") == 1
-    assert lowered.count("wicket") == 1
+    result = await analysis_finalize_context_enrichment_node(state, {"configurable": {}})
+    known = result.get("known_columns") or []
+    assert any(str(item.get("name") or "").strip().lower() == "customer_id" for item in known)
+    enrichment_results = result.get("enrichment_results") or {}
+    assert "search_schema" in enrichment_results
+    assert result.get("context_sufficiency", {}).get("enough_context") is True
 
 
 @pytest.mark.asyncio
@@ -203,45 +194,42 @@ async def test_analysis_collect_context_includes_table_and_column_descriptions()
 
 
 @pytest.mark.asyncio
-async def test_analysis_enrich_context_passes_workspace_schema_and_fallback_keyword(monkeypatch) -> None:
-    calls: list[dict[str, object]] = []
-
-    def fake_search_schema(**kwargs):
-        calls.append(kwargs)
-        query = str(kwargs.get("query") or "")
-        if query == "batsman top runs players":
-            return {"query": query, "table_name": "", "match_count": 0, "columns": []}
-        if query == "batsman":
-            return {
-                "query": query,
-                "table_name": "",
-                "match_count": 1,
-                "columns": [{"table_name": "batting", "name": "batsman", "dtype": "VARCHAR", "description": "Player"}],
-            }
-        return {"query": query, "table_name": "", "match_count": 0, "columns": []}
-
-    monkeypatch.setattr("agent_v2.nodes.search_schema", fake_search_schema)
-
+async def test_analysis_finalize_context_enrichment_persists_memory_from_chunk_results(
+    tmp_path,
+) -> None:
+    workspace_db = tmp_path / "workspace.duckdb"
+    workspace_db.write_text("", encoding="utf-8")
     state = {
         "workspace_id": "ws1",
         "user_id": "u1",
         "known_columns": [],
         "analysis_context": {
-            "data_path": "",
-            "table_names": ["batting"],
-            "sample_table": "batting",
-            "workspace_schema": {"tables": [{"table_name": "batting", "columns": [{"name": "batsman"}]}]},
+            "data_path": str(workspace_db),
+            "table_names": ["ball_by_ball"],
+            "sample_table": "ball_by_ball",
+            "user_text": "top 10 batsman",
         },
-        "tool_plan": [{"tool": "search_schema", "query": "batsman top runs players", "limit": 20}],
+        "analysis_tool_messages": [
+            ToolMessage(
+                name="scan_schema_chunks",
+                tool_call_id="c2",
+                content=(
+                    '{"query_terms":["batsman"],"relevant_tables":[{"table_name":"ball_by_ball","context":"Ball-level cricket data","score":6}],'
+                    '"columns":[{"table_name":"ball_by_ball","name":"batsman","dtype":"VARCHAR","description":"Batter name"}]}'
+                ),
+            ),
+            AIMessage(content='{"enough_context": true, "missing_context": [], "notes": "ready"}'),
+        ],
         "attempt_counters": {"enrichment": 0, "max_tool_calls": 5},
-        "messages": [HumanMessage(content="top batsman")],
+        "enrichment_tool_cursor": 0,
     }
 
-    result = await analysis_enrich_context_node(state, {"configurable": {}})
-    known = result.get("known_columns") or []
-    assert any(str(item.get("name") or "").strip().lower() == "batsman" for item in known)
-    assert isinstance(calls[0].get("schema"), dict)
-    assert any(str(call.get("query") or "") == "batsman" for call in calls)
+    result = await analysis_finalize_context_enrichment_node(state, {"configurable": {}})
+    memory_path = str(result.get("schema_memory_path") or "").strip()
+    assert memory_path.endswith("context/schema_analysis_memory.md")
+    rendered = (tmp_path / "context" / "schema_analysis_memory.md").read_text(encoding="utf-8")
+    assert "ball_by_ball" in rendered
+    assert "batsman" in rendered
 
 
 @pytest.mark.asyncio
@@ -278,61 +266,9 @@ async def test_analysis_generate_code_requests_schema_enrichment_when_query_is_i
     result = await analysis_generate_code_node(state, {"configurable": {}})
     assert result.get("candidate_code") == ""
     assert result.get("retry_target") == "analysis_enrich_context"
-    tool_plan = result.get("tool_plan") or []
-    assert isinstance(tool_plan, list)
-    assert tool_plan and tool_plan[0].get("tool") == "search_schema"
-    assert tool_plan[0].get("query") == "batsman"
-
-
-@pytest.mark.asyncio
-async def test_analysis_enrich_context_falls_back_to_scan_schema_chunks_and_persists_memory(
-    monkeypatch, tmp_path
-) -> None:
-    workspace_db = tmp_path / "workspace.duckdb"
-    workspace_db.write_text("", encoding="utf-8")
-
-    def fake_search_schema(**_kwargs):
-        return {"query": "top batsman", "table_name": "", "match_count": 0, "columns": []}
-
-    def fake_scan_schema_chunks(**_kwargs):
-        return {
-            "query_terms": ["top batsman", "batsman"],
-            "chunks_scanned": 1,
-            "relevant_table_count": 1,
-            "relevant_tables": [{"table_name": "ball_by_ball", "context": "Ball-level cricket data", "score": 6}],
-            "columns": [
-                {"table_name": "ball_by_ball", "name": "batsman", "dtype": "VARCHAR", "description": "Batter name"},
-                {"table_name": "ball_by_ball", "name": "batsman_runs", "dtype": "INTEGER", "description": "Runs"},
-            ],
-        }
-
-    monkeypatch.setattr("agent_v2.nodes.search_schema", fake_search_schema)
-    monkeypatch.setattr("agent_v2.nodes.scan_schema_chunks", fake_scan_schema_chunks)
-
-    state = {
-        "workspace_id": "ws1",
-        "user_id": "u1",
-        "known_columns": [],
-        "analysis_context": {
-            "data_path": str(workspace_db),
-            "user_text": "top 10 batsman",
-            "table_names": ["ball_by_ball"],
-            "sample_table": "ball_by_ball",
-            "workspace_schema": {"tables": [{"table_name": "ball_by_ball", "columns": []}]},
-        },
-        "context_sufficiency": {"missing_context": ["column names for batsman and runs"]},
-        "tool_plan": [{"tool": "search_schema", "query": "top batsman", "limit": 20}],
-        "attempt_counters": {"enrichment": 0, "max_tool_calls": 5},
-        "messages": [HumanMessage(content="top 10 batsman")],
-    }
-
-    result = await analysis_enrich_context_node(state, {"configurable": {}})
-    known = result.get("known_columns") or []
-    assert any(str(item.get("name") or "").strip().lower() == "batsman" for item in known)
-    memory_path = str(result.get("schema_memory_path") or "").strip()
-    assert memory_path.endswith("context/schema_analysis_memory.md")
-    assert "schema_analysis_memory.md" in memory_path
-    assert "Distilled Columns" in (tmp_path / "context" / "schema_analysis_memory.md").read_text(encoding="utf-8")
+    hints = result.get("enrichment_hints") or []
+    assert isinstance(hints, list)
+    assert hints and hints[0] == "batsman"
 
 
 @pytest.mark.asyncio

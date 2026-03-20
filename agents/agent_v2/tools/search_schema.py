@@ -163,24 +163,26 @@ def search_schema(
     query: str,
     table_name: str | None,
     max_results: int = 20,
+    emit_tool_events: bool = True,
 ) -> dict[str, Any]:
-    call_id = new_tool_call_id("search_schema")
+    call_id = new_tool_call_id("search_schema") if emit_tool_events else ""
     normalized_query = _normalize_text(query)
     safe_max = max(1, min(100, int(max_results)))
 
-    emit_agent_event(
-        "tool_call",
-        {
-            "tool": "search_schema",
-            "args": {
-                "query": str(query or "").strip(),
-                "table_name": str(table_name or "").strip(),
-                "table_names": [str(item).strip() for item in (table_names or []) if str(item).strip()],
-                "max_results": safe_max,
+    if emit_tool_events:
+        emit_agent_event(
+            "tool_call",
+            {
+                "tool": "search_schema",
+                "args": {
+                    "query": str(query or "").strip(),
+                    "table_name": str(table_name or "").strip(),
+                    "table_names": [str(item).strip() for item in (table_names or []) if str(item).strip()],
+                    "max_results": safe_max,
+                },
+                "call_id": call_id,
             },
-            "call_id": call_id,
-        },
-    )
+        )
 
     rows = _iter_schema_columns(schema if isinstance(schema, dict) else {}, table_name)
     if not rows:
@@ -223,13 +225,14 @@ def search_schema(
         "match_count": len(deduped),
         "columns": deduped,
     }
-    emit_agent_event(
-        "tool_result",
-        {
-            "call_id": call_id,
-            "output": output,
-            "status": "success",
-            "duration_ms": 1,
-        },
-    )
+    if emit_tool_events:
+        emit_agent_event(
+            "tool_result",
+            {
+                "call_id": call_id,
+                "output": output,
+                "status": "success",
+                "duration_ms": 1,
+            },
+        )
     return output

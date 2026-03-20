@@ -8,13 +8,14 @@ from typing import Any, TypedDict
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.prebuilt import ToolNode
 
 from .events import reset_agent_event_emitter, set_agent_event_emitter
 from .nodes import (
-    analysis_assess_context_node,
-    analysis_assess_to_next,
     analysis_collect_context_node,
+    analysis_enrich_to_next,
     analysis_enrich_context_node,
+    analysis_finalize_context_enrichment_node,
     analysis_execute_code_node,
     analysis_execute_to_next,
     analysis_finalize_failure_node,
@@ -28,6 +29,7 @@ from .nodes import (
     analysis_validate_result_node,
     analysis_validate_to_next,
     chat_node,
+    CONTEXT_ENRICHMENT_TOOLS,
     finalize_node,
     reject_node,
     route_node,
@@ -137,8 +139,15 @@ def build_graph(config: RunnableConfig) -> CompiledStateGraph:
     builder.add_node("prepare_input", _with_stream_event_emitter(_prepare_input_node))
     builder.add_node("route", _with_stream_event_emitter(route_node))
     builder.add_node("analysis_collect_context", _with_stream_event_emitter(analysis_collect_context_node))
-    builder.add_node("analysis_assess_context", _with_stream_event_emitter(analysis_assess_context_node))
     builder.add_node("analysis_enrich_context", _with_stream_event_emitter(analysis_enrich_context_node))
+    builder.add_node(
+        "analysis_enrich_context_tools",
+        ToolNode(CONTEXT_ENRICHMENT_TOOLS, messages_key="analysis_tool_messages"),
+    )
+    builder.add_node(
+        "analysis_finalize_context_enrichment",
+        _with_stream_event_emitter(analysis_finalize_context_enrichment_node),
+    )
     builder.add_node("analysis_generate_code", _with_stream_event_emitter(analysis_generate_code_node))
     builder.add_node("analysis_guard_code", _with_stream_event_emitter(analysis_guard_code_node))
     builder.add_node("analysis_execute_code", _with_stream_event_emitter(analysis_execute_code_node))
@@ -161,16 +170,17 @@ def build_graph(config: RunnableConfig) -> CompiledStateGraph:
             "reject": "reject",
         },
     )
-    builder.add_edge("analysis_collect_context", "analysis_assess_context")
+    builder.add_edge("analysis_collect_context", "analysis_enrich_context")
     builder.add_conditional_edges(
-        "analysis_assess_context",
-        analysis_assess_to_next,
+        "analysis_enrich_context",
+        analysis_enrich_to_next,
         {
-            "analysis_enrich_context": "analysis_enrich_context",
-            "analysis_generate_code": "analysis_generate_code",
+            "analysis_enrich_context_tools": "analysis_enrich_context_tools",
+            "analysis_finalize_context_enrichment": "analysis_finalize_context_enrichment",
         },
     )
-    builder.add_edge("analysis_enrich_context", "analysis_generate_code")
+    builder.add_edge("analysis_enrich_context_tools", "analysis_enrich_context")
+    builder.add_edge("analysis_finalize_context_enrichment", "analysis_generate_code")
     builder.add_conditional_edges(
         "analysis_generate_code",
         analysis_generate_to_next,

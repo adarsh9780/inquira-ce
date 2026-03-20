@@ -66,26 +66,28 @@ def scan_schema_chunks(
     table_names: list[str] | None = None,
     chunk_size: int = 4,
     max_chunks: int = 12,
+    emit_tool_events: bool = True,
 ) -> dict[str, Any]:
-    call_id = new_tool_call_id("scan_schema_chunks")
+    call_id = new_tool_call_id("scan_schema_chunks") if emit_tool_events else ""
     normalized_terms = [_normalize_text(term) for term in (query_terms or []) if _normalize_text(term)]
     table_filter = {str(item or "").strip().lower() for item in (table_names or []) if str(item or "").strip()}
     safe_chunk_size = max(1, min(16, int(chunk_size or 4)))
     safe_max_chunks = max(1, min(40, int(max_chunks or 12)))
 
-    emit_agent_event(
-        "tool_call",
-        {
-            "tool": "scan_schema_chunks",
-            "args": {
-                "query_terms": [str(term) for term in query_terms or []],
-                "table_names": [str(item).strip() for item in (table_names or []) if str(item).strip()],
-                "chunk_size": safe_chunk_size,
-                "max_chunks": safe_max_chunks,
+    if emit_tool_events:
+        emit_agent_event(
+            "tool_call",
+            {
+                "tool": "scan_schema_chunks",
+                "args": {
+                    "query_terms": [str(term) for term in query_terms or []],
+                    "table_names": [str(item).strip() for item in (table_names or []) if str(item).strip()],
+                    "chunk_size": safe_chunk_size,
+                    "max_chunks": safe_max_chunks,
+                },
+                "call_id": call_id,
             },
-            "call_id": call_id,
-        },
-    )
+        )
 
     tables = []
     if isinstance(schema, dict) and isinstance(schema.get("tables"), list):
@@ -146,14 +148,14 @@ def scan_schema_chunks(
         "columns": deduped_columns,
     }
 
-    emit_agent_event(
-        "tool_result",
-        {
-            "call_id": call_id,
-            "output": output,
-            "status": "success",
-            "duration_ms": 1,
-        },
-    )
+    if emit_tool_events:
+        emit_agent_event(
+            "tool_result",
+            {
+                "call_id": call_id,
+                "output": output,
+                "status": "success",
+                "duration_ms": 1,
+            },
+        )
     return output
-

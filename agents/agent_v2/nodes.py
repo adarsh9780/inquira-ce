@@ -8,12 +8,14 @@ import json
 import re
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
-from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, RemoveMessage, SystemMessage, ToolMessage
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import tool
+from langgraph.prebuilt import InjectedState, tools_condition
 from pydantic import BaseModel
 
 from .coding_subagent import AnalysisOutput, ainvoke_coding_chain, build_coding_chain
@@ -56,6 +58,21 @@ _ASSESS_CONTEXT_PROMPT = (
     "Start with 1-3 broad keyword queries, then narrow only after seeing matches.\n"
     "If search_schema results are weak, include scan_schema_chunks to inspect schema metadata in chunks."
 )
+_CONTEXT_ENRICHMENT_TOOL_PROMPT = (
+    "You are a schema context-gathering assistant for Python data analysis.\n"
+    "Decide whether there is enough schema/data context to generate executable analysis code.\n"
+    "If context is insufficient, call one tool at a time to gather missing details.\n"
+    "Available tools:\n"
+    "- search_schema(query: string, table_name?: string, limit?: int)\n"
+    "- scan_schema_chunks(query_terms: string[], table_names?: string[], chunk_size?: int, max_chunks?: int)\n"
+    "- sample_data(table_name?: string, limit?: int)\n"
+    "Rules:\n"
+    "- Prefer search_schema first; use scan_schema_chunks only when matches are weak.\n"
+    "- Avoid repeating the same tool call with identical arguments.\n"
+    "- Stop tool calls as soon as context is sufficient.\n"
+    "When finished, return ONLY valid JSON:\n"
+    "{\"enough_context\": boolean, \"missing_context\": string[], \"notes\": string}\n"
+)
 
 
 class ChatOutput(BaseModel):
@@ -79,6 +96,12 @@ class AnalysisContextAssessment(BaseModel):
     enough_context: bool = False
     missing_context: list[str] = []
     tool_plan: list[AnalysisToolPlanItem] = []
+
+
+class ContextEnrichmentDecision(BaseModel):
+    enough_context: bool = False
+    missing_context: list[str] = []
+    notes: str = ""
 
 
 _SCHEMA_QUERY_STOPWORDS = {
@@ -144,6 +167,27 @@ def _stringify_content(content: Any) -> str:
 
 def _safe_json_dumps(value: Any) -> str:
     return json.dumps(value, ensure_ascii=True, default=str)
+
+
+def _safe_json_loads(value: Any) -> dict[str, Any]:
+    text = str(value or "").strip()
+    if not text:
+        return {}
+    try:
+        parsed = json.loads(text)
+    except Exception:
+        parsed = None
+    if isinstance(parsed, dict):
+        return parsed
+
+    match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+    if not match:
+        return {}
+    try:
+        fallback = json.loads(match.group(0))
+    except Exception:
+        return {}
+    return fallback if isinstance(fallback, dict) else {}
 
 
 def _latest_user_text(messages: list[AnyMessage]) -> str:
@@ -706,6 +750,75 @@ def _merge_known_columns_lru(
     return ordered
 
 
+@tool("search_schema")
+def search_schema_context_tool(
+    query: str,
+    table_name: str = "",
+    limit: int = 20,
+    analysis_context: Annotated[dict[str, Any], InjectedState("analysis_context")] = None,
+) -> dict[str, Any]:
+    """Search schema columns using a keyword query."""
+    context = analysis_context if isinstance(analysis_context, dict) else {}
+    workspace_schema = context.get("workspace_schema") if isinstance(context.get("workspace_schema"), dict) else {}
+    table_names = _normalize_table_names(context.get("table_names"), max_items=64)
+    return search_schema(
+        schema=workspace_schema,
+        data_path=str(context.get("data_path") or "") or None,
+        table_names=table_names,
+        query=str(query or "").strip(),
+        table_name=str(table_name or "").strip() or None,
+        max_results=max(1, min(50, int(limit or 20))),
+        emit_tool_events=False,
+    )
+
+
+@tool("scan_schema_chunks")
+def scan_schema_chunks_context_tool(
+    query_terms: list[str],
+    table_names: list[str] | None = None,
+    chunk_size: int = 4,
+    max_chunks: int = 12,
+    analysis_context: Annotated[dict[str, Any], InjectedState("analysis_context")] = None,
+) -> dict[str, Any]:
+    """Scan schema metadata in chunks for relevant tables/columns."""
+    context = analysis_context if isinstance(analysis_context, dict) else {}
+    workspace_schema = context.get("workspace_schema") if isinstance(context.get("workspace_schema"), dict) else {}
+    requested_tables = _normalize_table_names(table_names, max_items=64) if isinstance(table_names, list) else []
+    default_tables = _normalize_table_names(context.get("table_names"), max_items=64)
+    return scan_schema_chunks(
+        schema=workspace_schema,
+        query_terms=[str(item or "").strip() for item in (query_terms or []) if str(item or "").strip()],
+        table_names=requested_tables or default_tables,
+        chunk_size=max(1, min(16, int(chunk_size or 4))),
+        max_chunks=max(1, min(40, int(max_chunks or 12))),
+        emit_tool_events=False,
+    )
+
+
+@tool("sample_data")
+def sample_data_context_tool(
+    table_name: str = "",
+    limit: int = 5,
+    analysis_context: Annotated[dict[str, Any], InjectedState("analysis_context")] = None,
+) -> dict[str, Any]:
+    """Sample rows from a table to confirm data shape and value patterns."""
+    context = analysis_context if isinstance(analysis_context, dict) else {}
+    fallback_table = str(context.get("sample_table") or "").strip()
+    return sample_data(
+        data_path=str(context.get("data_path") or "") or None,
+        table_name=str(table_name or "").strip() or fallback_table or None,
+        limit=max(1, min(20, int(limit or 5))),
+        emit_tool_events=False,
+    )
+
+
+CONTEXT_ENRICHMENT_TOOLS = [
+    search_schema_context_tool,
+    scan_schema_chunks_context_tool,
+    sample_data_context_tool,
+]
+
+
 async def route_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
     route = await decide_route(state.get("messages") or [], config.get("configurable", {}))
     if route == "unsafe":
@@ -810,6 +923,118 @@ def _truncate_text(value: Any, *, limit: int = 2400) -> str:
     if len(text) <= limit:
         return text
     return text[: max(0, limit - 3)].rstrip() + "..."
+
+
+def _build_context_enrichment_user_prompt(
+    *,
+    user_text: str,
+    schema_summary: str,
+    known_columns: list[dict[str, str]],
+    missing_context: list[str],
+    retry_feedback: str,
+    enrichment_hints: list[str],
+    tool_budget_remaining: int,
+) -> str:
+    known_columns_json = _safe_json_dumps(known_columns[:20])
+    missing_json = _safe_json_dumps(missing_context[:6])
+    hints_json = _safe_json_dumps(enrichment_hints[:8])
+    feedback = _truncate_text(retry_feedback, limit=500)
+    summary = _truncate_text(schema_summary, limit=2200)
+    return (
+        "User question:\n"
+        f"{_truncate_text(user_text, limit=600)}\n\n"
+        "Schema summary:\n"
+        f"{summary}\n\n"
+        f"Known columns JSON:\n{known_columns_json}\n\n"
+        f"Missing context hints JSON:\n{missing_json}\n\n"
+        f"Search keyword hints JSON:\n{hints_json}\n\n"
+        f"Retry feedback:\n{feedback or 'none'}\n\n"
+        f"Tool call budget remaining: {max(0, int(tool_budget_remaining))}\n"
+        "If context is sufficient, do not call tools and return final JSON immediately."
+    )
+
+
+def _parse_context_enrichment_decision(messages: list[AnyMessage]) -> ContextEnrichmentDecision:
+    for message in reversed(messages):
+        if not isinstance(message, AIMessage):
+            continue
+        tool_calls = message.tool_calls if isinstance(message.tool_calls, list) else []
+        if tool_calls:
+            continue
+        payload = _safe_json_loads(_stringify_content(message.content))
+        if payload:
+            try:
+                return ContextEnrichmentDecision.model_validate(payload)
+            except Exception:
+                continue
+    return ContextEnrichmentDecision(enough_context=False, missing_context=[], notes="")
+
+
+def _parse_tool_message_payload(message: ToolMessage) -> dict[str, Any]:
+    content = message.content
+    if isinstance(content, dict):
+        return content
+    if isinstance(content, list):
+        combined = _stringify_content(content).strip()
+        return _safe_json_loads(combined)
+    return _safe_json_loads(str(content or ""))
+
+
+def _collect_enrichment_updates(
+    *,
+    messages: list[AnyMessage],
+    start_index: int,
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+    updates: dict[str, Any] = {}
+    discovered_columns: list[dict[str, Any]] = []
+    relevant_tables: list[dict[str, Any]] = []
+
+    for message in messages[max(0, int(start_index)) :]:
+        if not isinstance(message, ToolMessage):
+            continue
+        tool_name = str(message.name or "").strip()
+        payload = _parse_tool_message_payload(message)
+        if not payload:
+            continue
+
+        if tool_name == "search_schema":
+            updates.setdefault("search_schema", []).append(payload)
+            cols = payload.get("columns")
+            if isinstance(cols, list):
+                discovered_columns.extend(cols)
+            continue
+
+        if tool_name == "scan_schema_chunks":
+            updates.setdefault("scan_schema_chunks", []).append(payload)
+            cols = payload.get("columns")
+            if isinstance(cols, list):
+                discovered_columns.extend(cols)
+            relevant_tables.extend(_extract_relevant_tables_from_chunk_result(payload))
+            continue
+
+        if tool_name == "sample_data":
+            updates["sample_data"] = payload
+
+    return updates, discovered_columns, relevant_tables
+
+
+def _merge_enrichment_results(
+    *,
+    current: dict[str, Any],
+    incoming: dict[str, Any],
+) -> dict[str, Any]:
+    merged = dict(current or {}) if isinstance(current, dict) else {}
+    for key in ("search_schema", "scan_schema_chunks"):
+        existing_rows = merged.get(key)
+        normalized_existing = list(existing_rows) if isinstance(existing_rows, list) else []
+        new_rows = incoming.get(key)
+        if isinstance(new_rows, list) and new_rows:
+            normalized_existing.extend(new_rows)
+        if normalized_existing:
+            merged[key] = normalized_existing
+    if isinstance(incoming.get("sample_data"), dict):
+        merged["sample_data"] = incoming["sample_data"]
+    return merged
 
 
 def _fallback_context_assessment(
@@ -941,6 +1166,12 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
     user_text = _latest_user_text(messages)
     runtime = load_agent_runtime_config()
     attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
+    existing_tool_messages = list(state.get("analysis_tool_messages") or [])
+    reset_tool_messages = [
+        RemoveMessage(id=str(getattr(message, "id")))
+        for message in existing_tool_messages
+        if str(getattr(message, "id", "")).strip()
+    ]
 
     return {
         "analysis_context": {
@@ -963,8 +1194,11 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
             "max_code_executions": max(1, int(runtime.max_code_executions)),
             "max_tool_calls": max(1, int(runtime.max_tool_calls)),
         },
-        "enrichment_results": state.get("enrichment_results") if isinstance(state.get("enrichment_results"), dict) else {},
-        "retry_feedback": str(state.get("retry_feedback") or ""),
+        "enrichment_results": {},
+        "enrichment_hints": [],
+        "enrichment_tool_cursor": 0,
+        "analysis_tool_messages": reset_tool_messages,
+        "retry_feedback": "",
     }
 
 
@@ -1038,139 +1272,146 @@ def analysis_assess_to_next(state: dict[str, Any]) -> str:
 
 
 async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-    _ = config
     analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
-    tool_plan = state.get("tool_plan") if isinstance(state.get("tool_plan"), list) else []
-    attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
-    max_tool_calls = max(1, int(attempt_counters.get("max_tool_calls") or 5))
-    enrichment_count = int(attempt_counters.get("enrichment") or 0)
-    performed = 0
-    enrichment_results: dict[str, Any] = {}
     context_sufficiency = state.get("context_sufficiency") if isinstance(state.get("context_sufficiency"), dict) else {}
     missing_context = [
         str(item).strip()
         for item in (context_sufficiency.get("missing_context") or [])
         if str(item).strip()
     ][:6]
-    user_text = str(analysis_context.get("user_text") or "")
-    relevant_tables: list[dict[str, Any]] = []
-    executed_schema_queries: set[tuple[str, str, str]] = set()
+    retry_feedback = str(state.get("retry_feedback") or "").strip()
+    hints = _normalize_search_queries(state.get("enrichment_hints") or [])
+    attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
+    max_tool_calls = max(1, int(attempt_counters.get("max_tool_calls") or 5))
 
-    for action in tool_plan:
-        if not isinstance(action, dict):
-            continue
-        if performed >= max_tool_calls:
-            break
-        tool = str(action.get("tool") or "").strip().lower()
-        if tool in {"search_schema", "scan_schema_chunks"}:
-            query = str(action.get("query") or "").strip()
-            if not query:
-                continue
-            table_name = str(action.get("table_name") or "").strip()
-            normalized_table_name = table_name.lower()
-            search_queries = _build_schema_search_queries(
-                base_query=query,
-                user_text=user_text,
-                missing_context=missing_context,
-                max_queries=6,
-            )
-            search_results: list[dict[str, Any]] = []
-            discovered_columns: list[dict[str, Any]] = []
-            ran_any_query = False
-            for candidate_query in search_queries:
-                dedupe_key = (tool, candidate_query.lower(), normalized_table_name)
-                if dedupe_key in executed_schema_queries:
-                    continue
-                executed_schema_queries.add(dedupe_key)
-                ran_any_query = True
-                _emit_agent_status(
-                    step="searching_schema",
-                    message=f"Searching schema for \"{candidate_query}\"...",
-                    detail="Finding relevant columns before code generation.",
-                    next_action="Use found schema columns in next code generation attempt.",
+    existing_messages = list(state.get("analysis_tool_messages") or [])
+    executed_tool_calls = sum(1 for message in existing_messages if isinstance(message, ToolMessage))
+    tool_budget_remaining = max(0, max_tool_calls - executed_tool_calls)
+
+    seed_messages: list[AnyMessage] = []
+    should_seed = not existing_messages
+    retry_target = str(state.get("retry_target") or "").strip()
+    if should_seed:
+        seed_messages.append(SystemMessage(content=_CONTEXT_ENRICHMENT_TOOL_PROMPT))
+        seed_messages.append(
+            HumanMessage(
+                content=_build_context_enrichment_user_prompt(
+                    user_text=str(analysis_context.get("user_text") or ""),
+                    schema_summary=str(analysis_context.get("schema_summary") or ""),
+                    known_columns=known_columns,
+                    missing_context=missing_context,
+                    retry_feedback=retry_feedback,
+                    enrichment_hints=hints,
+                    tool_budget_remaining=tool_budget_remaining,
                 )
-                result = await asyncio.to_thread(
-                    search_schema,
-                    schema=analysis_context.get("workspace_schema")
-                    if isinstance(analysis_context.get("workspace_schema"), dict)
-                    else {},
-                    data_path=str(analysis_context.get("data_path") or "") or None,
-                    table_names=_normalize_table_names(analysis_context.get("table_names"), max_items=64),
-                    query=candidate_query,
-                    table_name=table_name or None,
-                    max_results=int(action.get("limit") or 20),
-                )
-                search_results.append(result if isinstance(result, dict) else {})
-                current_cols = result.get("columns") if isinstance(result, dict) else []
-                if isinstance(current_cols, list) and current_cols:
-                    discovered_columns.extend(current_cols)
-                if len(discovered_columns) >= 12:
-                    break
-
-            if not ran_any_query:
-                continue
-
-            if not discovered_columns:
-                chunk_result = await asyncio.to_thread(
-                    scan_schema_chunks,
-                    schema=analysis_context.get("workspace_schema")
-                    if isinstance(analysis_context.get("workspace_schema"), dict)
-                    else {},
-                    query_terms=search_queries,
-                    table_names=_normalize_table_names(analysis_context.get("table_names"), max_items=64),
-                    chunk_size=4,
-                    max_chunks=12,
-                )
-                enrichment_results.setdefault("scan_schema_chunks", []).append(chunk_result)
-                chunk_columns = chunk_result.get("columns") if isinstance(chunk_result, dict) else []
-                if isinstance(chunk_columns, list):
-                    discovered_columns.extend(chunk_columns)
-                relevant_tables.extend(_extract_relevant_tables_from_chunk_result(chunk_result if isinstance(chunk_result, dict) else {}))
-
-            if discovered_columns:
-                known_columns = _merge_known_columns_lru(known_columns, discovered_columns, max_items=50)
-            enrichment_results.setdefault("search_schema", []).extend(search_results)
-            performed += 1
-        elif tool == "sample_data":
-            sample = sample_data(
-                data_path=str(analysis_context.get("data_path") or "") or None,
-                table_name=str(action.get("table_name") or analysis_context.get("sample_table") or "").strip() or None,
-                limit=int(action.get("limit") or 5),
             )
-            enrichment_results["sample_data"] = sample
-            performed += 1
-        elif tool == "bash":
-            command = str(action.get("command") or "").strip()
-            if not command:
-                continue
-            output = await run_bash(
-                user_id=str(state.get("user_id") or ""),
-                workspace_id=str(state.get("workspace_id") or ""),
-                data_path=str(analysis_context.get("data_path") or "") or None,
-                command=command,
-                timeout=60,
+        )
+    elif retry_target == "analysis_enrich_context" and (retry_feedback or hints):
+        seed_messages.append(
+            HumanMessage(
+                content=_build_context_enrichment_user_prompt(
+                    user_text=str(analysis_context.get("user_text") or ""),
+                    schema_summary=str(analysis_context.get("schema_summary") or ""),
+                    known_columns=known_columns,
+                    missing_context=missing_context,
+                    retry_feedback=retry_feedback,
+                    enrichment_hints=hints,
+                    tool_budget_remaining=tool_budget_remaining,
+                )
             )
-            enrichment_results.setdefault("bash", []).append(output)
-            performed += 1
+        )
+
+    if tool_budget_remaining <= 0:
+        fallback_decision = ContextEnrichmentDecision(
+            enough_context=bool(known_columns),
+            missing_context=missing_context,
+            notes="Tool budget reached; continue with currently available schema context.",
+        )
+        return {
+            "analysis_tool_messages": seed_messages
+            + [AIMessage(content=_safe_json_dumps(fallback_decision.model_dump()))],
+            "retry_target": "",
+            "tool_plan": [],
+            "enrichment_hints": [],
+        }
+
+    _emit_agent_status(
+        step="assessing_context",
+        message="Assessing schema context...",
+        detail="Deciding whether more schema/data lookup is required before code generation.",
+        next_action="If needed, call schema tools via ToolNode.",
+    )
+
+    model = _get_model(config, lite=False)
+    model_with_tools = model.bind_tools(CONTEXT_ENRICHMENT_TOOLS)
+    response = await model_with_tools.ainvoke(existing_messages + seed_messages)
+    if not isinstance(response, AIMessage):
+        response = AIMessage(content=_stringify_content(getattr(response, "content", response)))
+
+    return {
+        "analysis_tool_messages": seed_messages + [response],
+        "retry_target": "",
+        "tool_plan": [],
+    }
+
+
+def analysis_enrich_to_next(state: dict[str, Any]) -> str:
+    route = tools_condition(state, messages_key="analysis_tool_messages")
+    if route == "tools":
+        return "analysis_enrich_context_tools"
+    return "analysis_finalize_context_enrichment"
+
+
+async def analysis_finalize_context_enrichment_node(
+    state: dict[str, Any], config: RunnableConfig
+) -> dict[str, Any]:
+    _ = config
+    analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
+    existing_results = state.get("enrichment_results") if isinstance(state.get("enrichment_results"), dict) else {}
+    known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
+    messages = list(state.get("analysis_tool_messages") or [])
+    cursor = max(0, int(state.get("enrichment_tool_cursor") or 0))
+    updates, discovered_columns, relevant_tables = _collect_enrichment_updates(
+        messages=messages,
+        start_index=cursor,
+    )
+    if discovered_columns:
+        known_columns = _merge_known_columns_lru(known_columns, discovered_columns, max_items=50)
+
+    merged_results = _merge_enrichment_results(current=existing_results, incoming=updates)
+    decision = _parse_context_enrichment_decision(messages)
+    missing_context = [
+        str(item).strip()
+        for item in (decision.missing_context or [])
+        if str(item).strip()
+    ][:6]
 
     schema_memory_path = await asyncio.to_thread(
         _write_schema_memory_markdown,
         data_path=str(analysis_context.get("data_path") or "") or None,
-        user_text=user_text,
+        user_text=str(analysis_context.get("user_text") or ""),
         known_columns=known_columns,
         relevant_tables=relevant_tables,
     )
 
+    attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
     return {
         "known_columns": known_columns,
-        "enrichment_results": enrichment_results,
+        "enrichment_results": merged_results,
         "schema_memory_path": schema_memory_path,
+        "context_sufficiency": {
+            "enough_context": bool(decision.enough_context or bool(known_columns)),
+            "missing_context": missing_context,
+            "notes": str(decision.notes or "").strip(),
+        },
+        "enrichment_tool_cursor": len(messages),
+        "enrichment_hints": [],
+        "tool_plan": [],
         "attempt_counters": {
             **attempt_counters,
-            "enrichment": enrichment_count + 1,
+            "enrichment": int(attempt_counters.get("enrichment") or 0) + 1,
         },
-        "retry_feedback": "Context enrichment completed. Regenerate executable code using enriched context.",
     }
 
 
@@ -1232,11 +1473,12 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
         return {
             "analysis_output": output.model_dump(),
             "candidate_code": "",
-            "tool_plan": [{"tool": "search_schema", "query": query, "limit": 20} for query in requested_queries],
+            "tool_plan": [],
+            "enrichment_hints": requested_queries,
             "retry_target": "analysis_enrich_context",
             "retry_feedback": (
                 "Code generation requested additional schema lookup. "
-                "Run search_schema tool calls before the next generation attempt."
+                "Run the context enrichment loop before the next generation attempt."
             ),
             "attempt_counters": {
                 **attempt_counters,
@@ -1398,9 +1640,11 @@ async def analysis_retry_decider_node(state: dict[str, Any], config: RunnableCon
 
     lowered = error_text.lower()
     if any(token in lowered for token in ["column", "table", "schema", "not found"]):
+        hints = _extract_schema_query_keywords(error_text, max_items=3)
         return {
             "retry_feedback": f"Execution failed due to missing schema context: {error_text[:1200]}",
             "retry_target": "analysis_enrich_context",
+            "enrichment_hints": hints,
         }
     return {
         "retry_feedback": f"Execution failed. Regenerate code that fixes this runtime error: {error_text[:1200]}",
