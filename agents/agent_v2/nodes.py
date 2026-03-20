@@ -1055,6 +1055,7 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
     ][:6]
     user_text = str(analysis_context.get("user_text") or "")
     relevant_tables: list[dict[str, Any]] = []
+    executed_schema_queries: set[tuple[str, str, str]] = set()
 
     for action in tool_plan:
         if not isinstance(action, dict):
@@ -1066,6 +1067,8 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
             query = str(action.get("query") or "").strip()
             if not query:
                 continue
+            table_name = str(action.get("table_name") or "").strip()
+            normalized_table_name = table_name.lower()
             search_queries = _build_schema_search_queries(
                 base_query=query,
                 user_text=user_text,
@@ -1074,7 +1077,13 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
             )
             search_results: list[dict[str, Any]] = []
             discovered_columns: list[dict[str, Any]] = []
+            ran_any_query = False
             for candidate_query in search_queries:
+                dedupe_key = (tool, candidate_query.lower(), normalized_table_name)
+                if dedupe_key in executed_schema_queries:
+                    continue
+                executed_schema_queries.add(dedupe_key)
+                ran_any_query = True
                 _emit_agent_status(
                     step="searching_schema",
                     message=f"Searching schema for \"{candidate_query}\"...",
@@ -1089,7 +1098,7 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
                     data_path=str(analysis_context.get("data_path") or "") or None,
                     table_names=_normalize_table_names(analysis_context.get("table_names"), max_items=64),
                     query=candidate_query,
-                    table_name=str(action.get("table_name") or "").strip() or None,
+                    table_name=table_name or None,
                     max_results=int(action.get("limit") or 20),
                 )
                 search_results.append(result if isinstance(result, dict) else {})
@@ -1098,6 +1107,9 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
                     discovered_columns.extend(current_cols)
                 if len(discovered_columns) >= 12:
                     break
+
+            if not ran_any_query:
+                continue
 
             if not discovered_columns:
                 chunk_result = await asyncio.to_thread(

@@ -479,6 +479,64 @@ class ChatService:
         return str(payload.get("status") or "").strip().lower() == "success"
 
     @staticmethod
+    def _looks_like_failure_explanation(text: str) -> bool:
+        normalized = " ".join(str(text or "").strip().lower().split())
+        if not normalized:
+            return True
+        failure_markers = (
+            "could not complete it successfully",
+            "could not complete this analysis",
+            "could not produce safe executable code",
+            "the last runtime error was:",
+            "analysis failed",
+            "runtime error",
+        )
+        return any(marker in normalized for marker in failure_markers)
+
+    @staticmethod
+    def _success_explanation_for_artifacts(artifacts: list[dict[str, Any]]) -> str:
+        kinds = {
+            str(item.get("kind") or "").strip().lower()
+            for item in artifacts
+            if isinstance(item, dict)
+        }
+        has_dataframe = "dataframe" in kinds
+        has_figure = "figure" in kinds
+        if has_dataframe and has_figure:
+            return "Analysis completed successfully. Results are available in both table and chart views."
+        if has_dataframe:
+            return "Analysis completed successfully. Results are available in the table view."
+        if has_figure:
+            return "Analysis completed successfully. Results are available in the chart view."
+        return "Analysis completed successfully."
+
+    @staticmethod
+    def _reconcile_success_explanation(response_payload: dict[str, Any]) -> None:
+        execution = response_payload.get("execution")
+        if not ChatService._execution_success(execution if isinstance(execution, dict) else None):
+            return
+
+        current_explanation = str(response_payload.get("explanation") or "").strip()
+        current_result_explanation = str(response_payload.get("result_explanation") or "").strip()
+        if (
+            not ChatService._looks_like_failure_explanation(current_explanation)
+            and not ChatService._looks_like_failure_explanation(current_result_explanation)
+        ):
+            return
+
+        artifacts = ChatService._normalize_artifacts(response_payload.get("artifacts"))
+        reconciled = ChatService._success_explanation_for_artifacts(artifacts)
+        response_payload["explanation"] = reconciled
+        response_payload["result_explanation"] = reconciled
+
+        raw_metadata = response_payload.get("metadata")
+        metadata: dict[str, Any] = raw_metadata if isinstance(raw_metadata, dict) else {}
+        response_payload["metadata"] = {
+            **metadata,
+            "result_explanation": reconciled,
+        }
+
+    @staticmethod
     def _normalize_artifacts(items: Any) -> list[dict[str, Any]]:
         return [item for item in (items or []) if isinstance(item, dict)]
 
@@ -1107,6 +1165,7 @@ class ChatService:
                     output_contract=response_payload.get("output_contract") or [],
                     response_payload=response_payload,
                 )
+            ChatService._reconcile_success_explanation(response_payload)
 
         turn_id = await ChatService._persist_turn(
             session=session,
@@ -1393,6 +1452,7 @@ class ChatService:
                     output_contract=response_payload.get("output_contract") or [],
                     response_payload=response_payload,
                 )
+            ChatService._reconcile_success_explanation(response_payload)
 
         turn_id = await ChatService._persist_turn(
             session=session,

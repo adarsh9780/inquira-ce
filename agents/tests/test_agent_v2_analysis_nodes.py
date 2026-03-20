@@ -70,6 +70,54 @@ async def test_analysis_enrich_context_ignores_pip_install_tool_plan_entry() -> 
 
 
 @pytest.mark.asyncio
+async def test_analysis_enrich_context_deduplicates_schema_queries_across_actions(monkeypatch) -> None:
+    called_queries: list[str] = []
+
+    def fake_search_schema(**kwargs):
+        query = str(kwargs.get("query") or "").strip()
+        called_queries.append(query)
+        return {
+            "query": query,
+            "table_name": "",
+            "match_count": 1,
+            "columns": [
+                {
+                    "table_name": "ball_by_ball",
+                    "name": f"{query}_col",
+                    "dtype": "VARCHAR",
+                    "description": "",
+                }
+            ],
+        }
+
+    monkeypatch.setattr("agent_v2.nodes.search_schema", fake_search_schema)
+
+    state = {
+        "workspace_id": "ws1",
+        "user_id": "u1",
+        "known_columns": [],
+        "analysis_context": {
+            "data_path": "",
+            "table_names": ["ball_by_ball"],
+            "sample_table": "ball_by_ball",
+            "workspace_schema": {"tables": [{"table_name": "ball_by_ball", "columns": []}]},
+            "user_text": "top runs wicket",
+        },
+        "context_sufficiency": {"missing_context": []},
+        "tool_plan": [
+            {"tool": "search_schema", "query": "runs", "limit": 20},
+            {"tool": "search_schema", "query": "wicket", "limit": 20},
+        ],
+        "attempt_counters": {"enrichment": 0, "max_tool_calls": 5},
+    }
+
+    await analysis_enrich_context_node(state, {"configurable": {}})
+    lowered = [item.lower() for item in called_queries]
+    assert lowered.count("runs") == 1
+    assert lowered.count("wicket") == 1
+
+
+@pytest.mark.asyncio
 async def test_analysis_retry_decider_routes_context_gap_to_enrich() -> None:
     state = {
         "candidate_code": "print('x')",

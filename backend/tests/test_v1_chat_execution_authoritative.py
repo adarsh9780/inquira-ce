@@ -77,6 +77,10 @@ async def test_analyze_and_persist_turn_uses_authoritative_runtime_when_agent_ex
             "route": "analysis",
             "metadata": {"is_safe": True, "is_relevant": True},
             "final_code": "print('fresh')",
+            "result_explanation": (
+                "I ran the analysis but could not complete it successfully. "
+                "The last runtime error was: No module named 'plotly'"
+            ),
             "final_execution": {
                 "success": True,
                 "stdout": "agent-ok",
@@ -124,6 +128,8 @@ async def test_analyze_and_persist_turn_uses_authoritative_runtime_when_agent_ex
     assert payload["execution"]["stdout"] == "workspace-ok"
     assert payload["artifacts"][0]["artifact_id"] == "art-1"
     assert payload["metadata"]["execution_source"] == "workspace_kernel"
+    assert payload["result_explanation"].startswith("Analysis completed successfully.")
+    assert "could not complete it successfully" not in payload["result_explanation"].lower()
 
 
 @pytest.mark.asyncio
@@ -156,6 +162,10 @@ async def test_stream_uses_last_values_snapshot_and_runs_authoritative_runtime(m
                 "route": "analysis",
                 "metadata": {"is_safe": True, "is_relevant": True},
                 "final_code": "print('fresh')",
+                "result_explanation": (
+                    "I ran the analysis but could not complete it successfully. "
+                    "The last runtime error was: No module named 'plotly'"
+                ),
                 "final_execution": {
                     "success": True,
                     "stdout": "agent-ok",
@@ -224,6 +234,8 @@ async def test_stream_uses_last_values_snapshot_and_runs_authoritative_runtime(m
     assert final_payload["execution"]["stdout"] == "workspace-ok"
     assert final_payload["artifacts"][0]["artifact_id"] == "art-1"
     assert final_payload["metadata"]["execution_source"] == "workspace_kernel"
+    assert final_payload["result_explanation"].startswith("Analysis completed successfully.")
+    assert "could not complete it successfully" not in final_payload["result_explanation"].lower()
 
 
 @pytest.mark.asyncio
