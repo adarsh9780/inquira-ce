@@ -31,6 +31,7 @@ export const v1Api = {
   preferences: {
     get: () => axios.get('/api/v1/preferences'),
     update: (payload) => axios.put('/api/v1/preferences', payload),
+    refreshModels: (payload) => axios.post('/api/v1/preferences/models/refresh', payload),
     setApiKey: (apiKey, provider = 'openrouter') =>
       axios.put('/api/v1/preferences/api-key', { api_key: apiKey, provider }),
     deleteApiKey: (provider = 'openrouter') =>

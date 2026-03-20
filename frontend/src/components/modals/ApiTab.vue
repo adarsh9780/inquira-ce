@@ -2,7 +2,7 @@
   <div class="p-6">
     <h2 class="text-xl font-semibold mb-4 flex items-center">
       <KeyIcon class="w-6 h-6 mr-2 text-green-600" />
-      API Configuration
+      Models Configuration
     </h2>
 
     <!-- Success/Error Messages -->
@@ -14,9 +14,24 @@
 
     <div class="space-y-6">
       <div>
-        <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
-          Provider
-        </label>
+        <div class="max-w-md mb-2 flex items-center justify-between gap-2">
+          <label class="block text-sm font-medium" style="color: var(--color-text-main);">
+            Provider
+          </label>
+          <button
+            @click="refreshProviderModels"
+            :disabled="isRefreshingModels || isSaving"
+            class="px-2.5 py-1 text-xs rounded-md border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style="border-color: var(--color-border); color: var(--color-text-main); background-color: var(--color-surface);"
+            type="button"
+          >
+            <span v-if="!isRefreshingModels">Refresh Models</span>
+            <span v-else class="inline-flex items-center">
+              <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-700 mr-2"></div>
+              Refreshing...
+            </span>
+          </button>
+        </div>
         <HeaderDropdown
           :model-value="appStore.llmProvider"
           @update:model-value="handleProviderChange"
@@ -24,6 +39,25 @@
           placeholder="Select provider"
           max-width-class="max-w-md w-full"
         />
+      </div>
+
+      <div
+        v-if="openrouterNeedsAccountModels"
+        class="max-w-md rounded-md border p-3 text-xs"
+        style="border-color: #f5c26b; background-color: #fff8e8; color: #8a5a00;"
+      >
+        OpenRouter account-level models are not configured yet. Configure account models first, then refresh this list.
+        Until then, the default model is openrouter/free.
+        <a
+          :href="openrouterAccountModelsUrl"
+          target="_blank"
+          rel="noopener"
+          class="ml-1 underline"
+          style="color: #8a5a00;"
+        >
+          Open account model settings
+        </a>
+        .
       </div>
 
       <div>
@@ -138,7 +172,7 @@
           <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
           Saving...
         </span>
-        <span v-else>Save API Settings</span>
+        <span v-else>Save Model Settings</span>
       </button>
     </div>
   </div>
@@ -161,6 +195,7 @@ import {
 const appStore = useAppStore()
 const showApiKey = ref(false)
 const isTestingApiKey = ref(false)
+const isRefreshingModels = ref(false)
 const isSaving = ref(false)
 const message = ref('')
 const messageType = ref('') // 'success' | 'error'
@@ -176,6 +211,13 @@ const messageTypeClass = computed(() => {
     : 'bg-red-50 border border-red-200 text-red-800'
 })
 const requiresApiKey = computed(() => !!appStore.providerRequiresApiKey)
+const providerCatalog = computed(() => appStore.providerModelCatalogs?.[appStore.llmProvider] || {})
+const openrouterNeedsAccountModels = computed(() => (
+  appStore.llmProvider === 'openrouter' && providerCatalog.value?.account_models_configured === false
+))
+const openrouterAccountModelsUrl = computed(() => (
+  String(providerCatalog.value?.account_models_url || 'https://openrouter.ai/settings').trim()
+))
 const providerKeyUrl = computed(() => {
   if (appStore.llmProvider === 'openai') return 'https://platform.openai.com/api-keys'
   if (appStore.llmProvider === 'anthropic') return 'https://console.anthropic.com/settings/keys'
@@ -269,6 +311,34 @@ function clearMessage() {
   messageType.value = ''
 }
 
+function extractErrorMessage(error, fallback = 'Request failed. Please try again.') {
+  return error?.response?.data?.detail || error?.data?.detail || error?.message || fallback
+}
+
+async function refreshProviderModels() {
+  isRefreshingModels.value = true
+  clearMessage()
+
+  try {
+    const payload = { provider: appStore.llmProvider }
+    const key = appStore.apiKey.trim()
+    if (key) payload.api_key = key
+    const response = await apiService.v1RefreshProviderModels(payload)
+    if (typeof appStore.applyPreferencesResponse === 'function') {
+      appStore.applyPreferencesResponse(response)
+    }
+    syncProviderCatalog(appStore.llmProvider)
+    message.value = response?.detail || `Refreshed models for provider '${appStore.llmProvider}'.`
+    messageType.value = 'success'
+  } catch (error) {
+    console.error('❌ Failed to refresh provider models:', error)
+    message.value = extractErrorMessage(error, 'Failed to refresh provider models.')
+    messageType.value = 'error'
+  } finally {
+    isRefreshingModels.value = false
+  }
+}
+
 async function testApiKey() {
   const key = appStore.apiKey.trim()
   if (!key) {
@@ -286,8 +356,7 @@ async function testApiKey() {
     messageType.value = 'success'
   } catch (error) {
     console.error('❌ Provider API test failed:', error)
-    const errorMessage = error.response?.data?.detail || error.data?.detail || error.message || 'Failed to validate API key.'
-    message.value = errorMessage
+    message.value = extractErrorMessage(error, 'Failed to validate API key.')
     messageType.value = 'error'
   } finally {
     isTestingApiKey.value = false
@@ -336,7 +405,7 @@ async function saveApiSettings() {
     messageType.value = 'success'
   } catch (error) {
     console.error('❌ Failed to save API settings:', error)
-    message.value = 'Failed to save API settings. Please try again.'
+    message.value = extractErrorMessage(error, 'Failed to save model settings. Please try again.')
     messageType.value = 'error'
   } finally {
     isSaving.value = false

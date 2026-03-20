@@ -695,6 +695,10 @@ export const apiService = {
     return v1Api.preferences.update(payload)
   },
 
+  async v1RefreshProviderModels(payload) {
+    return v1Api.preferences.refreshModels(payload)
+  },
+
   async v1SetApiKey(apiKey, provider = 'openrouter') {
     return v1Api.preferences.setApiKey(apiKey, provider)
   },

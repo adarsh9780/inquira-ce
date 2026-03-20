@@ -11,7 +11,7 @@
         <ExclamationTriangleIcon class="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0" />
         <div class="flex-1">
           <p class="text-sm text-yellow-800">
-            <strong>API Key Required:</strong> Please set your API key in the API tab first before configuring data settings.
+            <strong>API Key Required:</strong> Please set your API key in the Models tab first before configuring data settings.
           </p>
         </div>
       </div>
@@ -619,7 +619,7 @@ async function generateAndSaveSchema() {
 async function saveDataSettings() {
   // Validate API key
   if (!hasApiKey.value) {
-    showMessage('Please set your API key in the API tab first.', 'error')
+    showMessage('Please set your API key in the Models tab first.', 'error')
     return
   }
 

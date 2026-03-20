@@ -47,7 +47,7 @@
                 :class="activeTab === 'api' ? 'nav-tab-active' : 'nav-tab'"
               >
                 <KeyIcon class="w-4 h-4 shrink-0" />
-                <span class="flex-1 text-left">API</span>
+                <span class="flex-1 text-left">Models</span>
                 <ExclamationTriangleIcon
                   v-if="!hasApiKey"
                   class="w-3.5 h-3.5 shrink-0"

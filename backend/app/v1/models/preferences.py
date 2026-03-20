@@ -30,6 +30,9 @@ class UserPreferences(AppDataBase):
         String(120), nullable=False, default="google/gemini-2.5-flash"
     )
     enabled_main_models_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    provider_model_catalogs_json: Mapped[str] = mapped_column(
+        Text, nullable=False, default="{}"
+    )
     schema_context: Mapped[str] = mapped_column(Text, nullable=False, default="")
     allow_schema_sample_values: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     terminal_risk_acknowledged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

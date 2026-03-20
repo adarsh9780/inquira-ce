@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,8 +16,11 @@ from ..schemas.preferences import (
     PreferencesResponse,
     PreferencesUpdateRequest,
     ProviderModelCatalog,
+    ProviderModelsRefreshRequest,
+    ProviderModelsRefreshResponse,
 )
 from ..services.secret_storage_service import SecretStorageService
+from ...services.execution_config import load_execution_runtime_config
 from ...services.llm_provider_catalog import (
     SUPPORTED_LLM_PROVIDERS,
     all_provider_model_catalogs,
@@ -24,7 +28,11 @@ from ...services.llm_provider_catalog import (
     provider_model_catalog,
     provider_requires_api_key,
 )
-from ...services.execution_config import load_execution_runtime_config
+from ...services.provider_model_refresh import (
+    OPENROUTER_ACCOUNT_MODELS_URL,
+    ProviderModelRefreshError,
+    refresh_provider_model_catalog,
+)
 from .deps import ensure_appdata_principal, get_current_user
 
 router = APIRouter(
@@ -34,9 +42,100 @@ router = APIRouter(
 )
 
 
-def _load_enabled_models(raw_json: str, provider: str) -> list[str]:
-    catalog = provider_model_catalog(provider)
-    allowed = set(catalog["main_models"])
+def _clean_models(raw: Any) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        value = str(item or "").strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        cleaned.append(value)
+    return cleaned
+
+
+def _coerce_provider_catalog(
+    provider: str,
+    raw_catalog: Any,
+    fallback: dict[str, Any],
+) -> dict[str, Any]:
+    data = raw_catalog if isinstance(raw_catalog, dict) else {}
+
+    main_models = _clean_models(data.get("main_models"))
+    if not main_models:
+        main_models = _clean_models(fallback.get("main_models", []))
+
+    default_main_model = str(data.get("default_main_model") or "").strip()
+    if default_main_model not in main_models:
+        fallback_default_main = str(fallback.get("default_main_model") or "").strip()
+        default_main_model = (
+            fallback_default_main if fallback_default_main in main_models else (main_models[0] if main_models else "")
+        )
+
+    lite_models = _clean_models(data.get("lite_models"))
+    if not lite_models:
+        lite_models = _clean_models(fallback.get("lite_models", []))
+    if not lite_models and default_main_model:
+        lite_models = [default_main_model]
+
+    default_lite_model = str(data.get("default_lite_model") or "").strip()
+    if default_lite_model not in lite_models:
+        fallback_default_lite = str(fallback.get("default_lite_model") or "").strip()
+        if fallback_default_lite in lite_models:
+            default_lite_model = fallback_default_lite
+        elif lite_models:
+            default_lite_model = lite_models[0]
+        else:
+            default_lite_model = default_main_model
+
+    source = str(data.get("source") or fallback.get("source") or "default").strip() or "default"
+
+    account_models_configured: bool | None
+    if data.get("account_models_configured") is None:
+        account_models_configured = fallback.get("account_models_configured")
+    else:
+        account_models_configured = bool(data.get("account_models_configured"))
+
+    account_models_url = str(
+        data.get("account_models_url")
+        or fallback.get("account_models_url")
+        or (OPENROUTER_ACCOUNT_MODELS_URL if provider == "openrouter" else "")
+    ).strip()
+
+    return {
+        "main_models": main_models,
+        "lite_models": lite_models,
+        "default_main_model": default_main_model,
+        "default_lite_model": default_lite_model,
+        "source": source,
+        "account_models_configured": account_models_configured,
+        "account_models_url": account_models_url,
+    }
+
+
+def _resolve_provider_catalogs(prefs) -> dict[str, dict[str, Any]]:
+    base_catalogs = all_provider_model_catalogs()
+
+    raw_overrides = {}
+    try:
+        parsed = json.loads(str(getattr(prefs, "provider_model_catalogs_json", "{}") or "{}"))
+        if isinstance(parsed, dict):
+            raw_overrides = parsed
+    except Exception:  # noqa: BLE001
+        raw_overrides = {}
+
+    merged: dict[str, dict[str, Any]] = {}
+    for provider in SUPPORTED_LLM_PROVIDERS:
+        fallback = dict(base_catalogs.get(provider, provider_model_catalog(provider)))
+        override = raw_overrides.get(provider)
+        merged[provider] = _coerce_provider_catalog(provider, override, fallback)
+    return merged
+
+
+def _load_enabled_models(raw_json: str, catalog: dict[str, Any]) -> list[str]:
+    allowed = set(_clean_models(catalog.get("main_models", [])))
     parsed: list[str] = []
     try:
         raw = json.loads(str(raw_json or "[]"))
@@ -53,25 +152,67 @@ def _load_enabled_models(raw_json: str, provider: str) -> list[str]:
             enabled.append(model)
     if enabled:
         return enabled
-    return list(catalog["main_models"])
+    return list(catalog.get("main_models", []))
+
+
+def _normalize_model_preferences(prefs, provider_catalogs: dict[str, dict[str, Any]]) -> None:
+    provider = normalize_llm_provider(getattr(prefs, "llm_provider", "openrouter"))
+    catalog = provider_catalogs.get(provider, provider_model_catalog(provider))
+
+    enabled_models = _load_enabled_models(
+        getattr(prefs, "enabled_main_models_json", "[]"),
+        catalog,
+    )
+    if not enabled_models:
+        enabled_models = list(catalog.get("main_models", []))
+    prefs.enabled_main_models_json = json.dumps(enabled_models)
+
+    selected_model = str(getattr(prefs, "selected_model", "") or "").strip()
+    if selected_model not in enabled_models:
+        selected_model = str(catalog.get("default_main_model") or "").strip()
+    if selected_model not in enabled_models:
+        selected_model = enabled_models[0] if enabled_models else ""
+    prefs.selected_model = selected_model
+
+    lite_models = _clean_models(catalog.get("lite_models", []))
+    selected_lite_model = str(getattr(prefs, "selected_lite_model", "") or "").strip()
+    if selected_lite_model not in lite_models:
+        fallback_lite = str(catalog.get("default_lite_model") or "").strip()
+        if fallback_lite in lite_models:
+            selected_lite_model = fallback_lite
+        elif lite_models:
+            selected_lite_model = lite_models[0]
+        else:
+            selected_lite_model = selected_model
+    prefs.selected_lite_model = selected_lite_model
+
+    selected_coding_model = str(getattr(prefs, "selected_coding_model", "") or "").strip()
+    if selected_coding_model not in enabled_models:
+        selected_coding_model = selected_model
+    prefs.selected_coding_model = selected_coding_model
 
 
 def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesResponse:
     provider = normalize_llm_provider(getattr(prefs, "llm_provider", "openrouter"))
-    catalog = provider_model_catalog(provider)
+    provider_catalogs = _resolve_provider_catalogs(prefs)
+    catalog = provider_catalogs.get(provider, provider_model_catalog(provider))
+
     enabled_models = _load_enabled_models(
-        getattr(prefs, "enabled_main_models_json", "[]"), provider
+        getattr(prefs, "enabled_main_models_json", "[]"),
+        catalog,
     )
     selected_model = str(getattr(prefs, "selected_model", "") or "").strip()
     if selected_model not in enabled_models:
-        selected_model = catalog["default_main_model"]
-        if selected_model not in enabled_models:
-            selected_model = (
-                enabled_models[0] if enabled_models else catalog["default_main_model"]
-            )
+        selected_model = str(catalog.get("default_main_model") or "").strip()
+    if selected_model not in enabled_models:
+        selected_model = enabled_models[0] if enabled_models else ""
+
     selected_lite_model = str(getattr(prefs, "selected_lite_model", "") or "").strip()
-    if selected_lite_model not in catalog["lite_models"]:
-        selected_lite_model = catalog["default_lite_model"]
+    if selected_lite_model not in catalog.get("lite_models", []):
+        selected_lite_model = str(catalog.get("default_lite_model") or "").strip()
+    if selected_lite_model not in catalog.get("lite_models", []):
+        selected_lite_model = selected_model
+
     selected_coding_model = str(getattr(prefs, "selected_coding_model", "") or "").strip()
     if selected_coding_model not in enabled_models:
         selected_coding_model = selected_model
@@ -97,11 +238,11 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
         active_table_name=prefs.active_table_name,
         api_key_present=selected_key_present,
         available_models=enabled_models,
-        provider_available_main_models=list(catalog["main_models"]),
-        provider_available_lite_models=list(catalog["lite_models"]),
+        provider_available_main_models=list(catalog.get("main_models", [])),
+        provider_available_lite_models=list(catalog.get("lite_models", [])),
         provider_model_catalogs={
             p: ProviderModelCatalog(**c)
-            for p, c in all_provider_model_catalogs().items()
+            for p, c in provider_catalogs.items()
         },
         api_key_present_by_provider=api_key_presence,
         selected_provider_requires_api_key=requires_api_key,
@@ -130,16 +271,18 @@ async def update_preferences(
     current_user=Depends(get_current_user),
 ):
     prefs = await PreferencesRepository.get_or_create(session, current_user.id)
+    provider_catalogs = _resolve_provider_catalogs(prefs)
+
     provider = normalize_llm_provider(getattr(prefs, "llm_provider", "openrouter"))
-    catalog = provider_model_catalog(provider)
+    catalog = provider_catalogs.get(provider, provider_model_catalog(provider))
 
     if payload.llm_provider is not None:
         provider = normalize_llm_provider(payload.llm_provider)
         prefs.llm_provider = provider
-        catalog = provider_model_catalog(provider)
+        catalog = provider_catalogs.get(provider, provider_model_catalog(provider))
 
     if payload.enabled_models is not None:
-        allowed = set(catalog["main_models"])
+        allowed = set(catalog.get("main_models", []))
         cleaned: list[str] = []
         seen: set[str] = set()
         for model in payload.enabled_models:
@@ -149,11 +292,12 @@ async def update_preferences(
             seen.add(value)
             cleaned.append(value)
         prefs.enabled_main_models_json = json.dumps(
-            cleaned or list(catalog["main_models"])
+            cleaned or list(catalog.get("main_models", []))
         )
 
     enabled_models = _load_enabled_models(
-        getattr(prefs, "enabled_main_models_json", "[]"), provider
+        getattr(prefs, "enabled_main_models_json", "[]"),
+        catalog,
     )
     if payload.selected_model is not None:
         selected_model = str(payload.selected_model or "").strip()
@@ -161,7 +305,7 @@ async def update_preferences(
             prefs.selected_model = selected_model
     if payload.selected_lite_model is not None:
         selected_lite_model = str(payload.selected_lite_model or "").strip()
-        if selected_lite_model in catalog["lite_models"]:
+        if selected_lite_model in catalog.get("lite_models", []):
             prefs.selected_lite_model = selected_lite_model
     if payload.selected_coding_model is not None:
         selected_coding_model = str(payload.selected_coding_model or "").strip()
@@ -188,29 +332,52 @@ async def update_preferences(
     if payload.active_table_name is not None:
         prefs.active_table_name = payload.active_table_name or None
 
-    if str(getattr(prefs, "selected_model", "") or "").strip() not in enabled_models:
-        prefs.selected_model = (
-            enabled_models[0]
-            if enabled_models
-            else provider_model_catalog(provider)["default_main_model"]
-        )
-    if (
-        str(getattr(prefs, "selected_lite_model", "") or "").strip()
-        not in catalog["lite_models"]
-    ):
-        prefs.selected_lite_model = provider_model_catalog(provider)[
-            "default_lite_model"
-        ]
-    if str(getattr(prefs, "selected_coding_model", "") or "").strip() not in enabled_models:
-        prefs.selected_coding_model = str(getattr(prefs, "selected_model", "") or "").strip() or (
-            enabled_models[0] if enabled_models else provider_model_catalog(provider)["default_main_model"]
-        )
+    _normalize_model_preferences(prefs, provider_catalogs)
 
     await session.commit()
     key_presence = SecretStorageService.get_api_key_presence_map(
         current_user.id, list(SUPPORTED_LLM_PROVIDERS)
     )
     return _to_response(prefs, key_presence)
+
+
+@router.post("/models/refresh", response_model=ProviderModelsRefreshResponse)
+async def refresh_provider_models(
+    payload: ProviderModelsRefreshRequest,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    prefs = await PreferencesRepository.get_or_create(session, current_user.id)
+    provider_catalogs = _resolve_provider_catalogs(prefs)
+
+    default_provider = normalize_llm_provider(getattr(prefs, "llm_provider", "openrouter"))
+    provider = normalize_llm_provider(payload.provider or default_provider)
+
+    api_key = str(payload.api_key or "").strip()
+    if not api_key:
+        api_key = str(SecretStorageService.get_api_key(current_user.id, provider=provider) or "").strip()
+
+    try:
+        refresh_result = await refresh_provider_model_catalog(provider, api_key=api_key)
+    except ProviderModelRefreshError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    fallback = provider_catalogs.get(provider, provider_model_catalog(provider))
+    provider_catalogs[provider] = _coerce_provider_catalog(
+        provider,
+        refresh_result.catalog,
+        fallback,
+    )
+    prefs.provider_model_catalogs_json = json.dumps(provider_catalogs)
+
+    _normalize_model_preferences(prefs, provider_catalogs)
+
+    await session.commit()
+    key_presence = SecretStorageService.get_api_key_presence_map(
+        current_user.id, list(SUPPORTED_LLM_PROVIDERS)
+    )
+    response = _to_response(prefs, key_presence)
+    return ProviderModelsRefreshResponse(**response.model_dump(), detail=refresh_result.detail)
 
 
 @router.put("/api-key", response_model=MessageResponse)
