@@ -507,7 +507,28 @@ function formatBytes(bytes) {
   return `${(value / (1024 ** 3)).toFixed(2)} GB`
 }
 
+function isUnauthorizedError(error) {
+  const status = Number(error?.response?.status ?? error?.status ?? 0)
+  if (status === 401) return true
+  return String(error?.message || '').includes('401')
+}
+
+async function handleUnauthorizedPollingError() {
+  stopKernelStatusPolling()
+  stopArtifactUsagePolling()
+  kernelStatus.value = 'missing'
+  resetArtifactUsage()
+  appStore.setRuntimeError('Session expired. Please sign in again.')
+  if (authStore.isAuthenticated) {
+    await authStore.checkAuth()
+  }
+}
+
 async function refreshArtifactUsage() {
+  if (!authStore.isAuthenticated) {
+    resetArtifactUsage()
+    return
+  }
   const workspaceId = String(appStore.activeWorkspaceId || '').trim()
   if (!workspaceId || !appStore.hasWorkspace) {
     resetArtifactUsage()
@@ -533,6 +554,10 @@ async function refreshArtifactUsage() {
     }
   } catch (error) {
     if (error?.name === 'AbortError') return
+    if (isUnauthorizedError(error)) {
+      await handleUnauthorizedPollingError()
+      return
+    }
     resetArtifactUsage()
   } finally {
     isArtifactUsageRequestInFlight.value = false
@@ -548,10 +573,11 @@ function scheduleArtifactUsageRefresh(delayMs = 250) {
 }
 
 function startArtifactUsagePolling() {
+  if (!authStore.isAuthenticated) return
   stopArtifactUsagePolling()
   void refreshArtifactUsage()
   artifactUsagePoller = setInterval(() => {
-    if (!document.hidden) void refreshArtifactUsage()
+    if (!document.hidden && authStore.isAuthenticated) void refreshArtifactUsage()
   }, 15000)
 }
 
@@ -628,6 +654,10 @@ async function confirmLogout() {
 }
 
 async function refreshKernelStatus() {
+  if (!authStore.isAuthenticated) {
+    kernelStatus.value = 'missing'
+    return
+  }
   if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {
     kernelStatus.value = 'missing'
     return
@@ -641,6 +671,10 @@ async function refreshKernelStatus() {
       appStore.setRuntimeError('')
     }
   } catch (error) {
+    if (isUnauthorizedError(error)) {
+      await handleUnauthorizedPollingError()
+      return
+    }
     kernelStatus.value = 'error'
     appStore.setRuntimeError(error?.response?.data?.detail || error?.message || 'Failed to fetch kernel status.')
   } finally {
@@ -649,10 +683,11 @@ async function refreshKernelStatus() {
 }
 
 function startKernelStatusPolling() {
+  if (!authStore.isAuthenticated) return
   stopKernelStatusPolling()
   refreshKernelStatus()
   kernelStatusPoller = setInterval(() => {
-    if (!document.hidden) refreshKernelStatus()
+    if (!document.hidden && authStore.isAuthenticated) refreshKernelStatus()
   }, 5000)
 }
 
@@ -701,7 +736,7 @@ async function restartKernel() {
 
 // Named handler so we can remove the exact same reference on unmount
 function handleVisibilityChange() {
-  if (!document.hidden && appStore.activeWorkspaceId && appStore.hasWorkspace) {
+  if (!document.hidden && authStore.isAuthenticated && appStore.activeWorkspaceId && appStore.hasWorkspace) {
     refreshKernelStatus()
     void refreshArtifactUsage()
   }
@@ -737,7 +772,7 @@ function handleDocumentKeydown(event) {
 
 // Lifecycle and Watchers
 onMounted(() => {
-  if (appStore.activeWorkspaceId && appStore.hasWorkspace) {
+  if (authStore.isAuthenticated && appStore.activeWorkspaceId && appStore.hasWorkspace) {
     startKernelStatusPolling()
     startArtifactUsagePolling()
   }
@@ -760,8 +795,8 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleDocumentKeydown)
 })
 
-watch([() => appStore.activeWorkspaceId, () => appStore.hasWorkspace], ([newId, hasWorkspace]) => {
-  if (newId && hasWorkspace) {
+watch([() => appStore.activeWorkspaceId, () => appStore.hasWorkspace, () => authStore.isAuthenticated], ([newId, hasWorkspace, isAuthenticated]) => {
+  if (isAuthenticated && newId && hasWorkspace) {
     startKernelStatusPolling()
     startArtifactUsagePolling()
   } else {
@@ -772,8 +807,9 @@ watch([() => appStore.activeWorkspaceId, () => appStore.hasWorkspace], ([newId, 
 })
 
 watch(
-  [() => appStore.dataframes, () => appStore.figures, () => appStore.dataframeCount, () => appStore.figureCount],
+  [() => appStore.dataframes, () => appStore.figures, () => appStore.dataframeCount, () => appStore.figureCount, () => authStore.isAuthenticated],
   () => {
+    if (!authStore.isAuthenticated) return
     if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) return
     scheduleArtifactUsageRefresh()
   }

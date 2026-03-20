@@ -879,7 +879,9 @@ export const apiService = {
     })
     if (!response.ok) {
       const detail = await response.json().catch(() => ({}))
-      throw new Error(detail.detail || `Artifact list fetch failed (${response.status})`)
+      const err = new Error(detail.detail || `Artifact list fetch failed (${response.status})`)
+      err.status = response.status
+      throw err
     }
     return response.json()
   },
@@ -893,7 +895,9 @@ export const apiService = {
     })
     if (!response.ok) {
       const detail = await response.json().catch(() => ({}))
-      throw new Error(detail.detail || `Artifact usage fetch failed (${response.status})`)
+      const err = new Error(detail.detail || `Artifact usage fetch failed (${response.status})`)
+      err.status = response.status
+      throw err
     }
     return response.json()
   },
@@ -907,7 +911,9 @@ export const apiService = {
     })
     if (!response.ok) {
       const detail = await response.json().catch(() => ({}))
-      throw new Error(detail.detail || `Artifact metadata fetch failed (${response.status})`)
+      const err = new Error(detail.detail || `Artifact metadata fetch failed (${response.status})`)
+      err.status = response.status
+      throw err
     }
     return response.json()
   },
@@ -921,7 +927,9 @@ export const apiService = {
     })
     if (!response.ok) {
       const detail = await response.json().catch(() => ({}))
-      throw new Error(detail.detail || `Artifact delete failed (${response.status})`)
+      const err = new Error(detail.detail || `Artifact delete failed (${response.status})`)
+      err.status = response.status
+      throw err
     }
     return response.json()
   },

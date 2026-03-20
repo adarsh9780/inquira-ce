@@ -287,6 +287,8 @@ const FINAL_STREAM_NODES = new Set([
   'chat',
   'reject'
 ])
+const DEFAULT_ANALYZE_CANCEL_TIMEOUT_MS = 300000
+const FREE_MODEL_ANALYZE_CANCEL_TIMEOUT_MS = 900000
 
 function extractLangGraphTokenText(payload) {
   if (!payload) return ''
@@ -311,6 +313,15 @@ function extractLangGraphTokenText(payload) {
     }
   }
   return ''
+}
+
+function resolveAnalyzeCancelTimeoutMs(modelId) {
+  const normalized = String(modelId || '').trim().toLowerCase()
+  if (!normalized) return DEFAULT_ANALYZE_CANCEL_TIMEOUT_MS
+  if (normalized.includes('/free') || normalized.endsWith('-free') || normalized.includes(':free')) {
+    return FREE_MODEL_ANALYZE_CANCEL_TIMEOUT_MS
+  }
+  return DEFAULT_ANALYZE_CANCEL_TIMEOUT_MS
 }
 
 function parseArtifactTimestampMs(value) {
@@ -1116,10 +1127,11 @@ async function handleSubmit() {
       toast.warning('Request Taking Longer', 'Your query is taking longer than expected.')
     }, 30000)
 
+    const cancelAfterMs = resolveAnalyzeCancelTimeoutMs(appStore.selectedModel)
     cancelTimer = setTimeout(() => {
       toast.error('Request Cancelled', 'Your query took too long and was cancelled.')
       abortController.abort()
-    }, 300000)
+    }, cancelAfterMs)
 
     let response
     const schemaPayload = buildActiveSchemaPayload()
