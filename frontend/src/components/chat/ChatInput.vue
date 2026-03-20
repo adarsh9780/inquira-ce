@@ -117,15 +117,15 @@
             <StopCircleIcon v-if="appStore.isLoading" class="w-6 h-6" />
             <span
               v-else-if="isVoiceInputActive"
-              class="flex w-6 h-6 items-center justify-center rounded-full bg-zinc-900 text-white animate-pulse"
+              class="flex w-[22px] h-[22px] items-center justify-center rounded-full bg-zinc-900 text-white animate-pulse"
             >
-              <MicrophoneIcon class="w-3.5 h-3.5" />
+              <MicrophoneIcon class="w-3 h-3" />
             </span>
             <span
               v-else-if="isComposerEmpty"
-              class="flex w-6 h-6 items-center justify-center rounded-full bg-zinc-900 text-white"
+              class="flex w-[22px] h-[22px] items-center justify-center rounded-full bg-zinc-900 text-white"
             >
-              <MicrophoneIcon class="w-3.5 h-3.5" />
+              <MicrophoneIcon class="w-3 h-3" />
             </span>
             <ArrowUpCircleIcon v-else class="w-6 h-6" />
           </button>
