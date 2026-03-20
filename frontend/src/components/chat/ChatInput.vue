@@ -117,9 +117,9 @@
             <StopCircleIcon v-if="appStore.isLoading" class="w-6 h-6" />
             <MicrophoneIcon
               v-else-if="isVoiceInputActive"
-              class="w-5 h-5 animate-pulse"
+              class="w-6 h-6 animate-pulse"
             />
-            <MicrophoneIcon v-else-if="isComposerEmpty" class="w-5 h-5" />
+            <MicrophoneIcon v-else-if="isComposerEmpty" class="w-6 h-6" />
             <ArrowUpCircleIcon v-else class="w-6 h-6" />
           </button>
         </div>
@@ -193,13 +193,11 @@ import ModelSelector from '../ui/ModelSelector.vue'
 import ColumnSuggest from './ColumnSuggest.vue'
 import {
   PlusIcon,
-  MicrophoneIcon,
-  StopCircleIcon,
   ExclamationTriangleIcon,
   XMarkIcon,
   PhotoIcon,
 } from '@heroicons/vue/24/outline'
-import { ArrowUpCircleIcon } from '@heroicons/vue/24/solid'
+import { ArrowUpCircleIcon, MicrophoneIcon, StopCircleIcon } from '@heroicons/vue/24/solid'
 
 const appStore = useAppStore()
 
