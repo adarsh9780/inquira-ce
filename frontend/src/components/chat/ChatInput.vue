@@ -104,19 +104,18 @@
 
           <!-- Mic (empty) → ArrowUp (has text) -->
           <button
-            @click="handleSubmit"
-            :disabled="appStore.isLoading || !appStore.canAnalyze || !canSend"
+            @click="handleActionButtonClick"
+            :disabled="!canTriggerActionButton"
             class="w-6 h-6 flex items-center justify-center transition-all duration-150 focus:outline-none"
             :class="
-              canSend
+              canTriggerActionButton
                 ? 'text-zinc-900 hover:text-zinc-700'
                 : 'cursor-default opacity-50'
             "
-            :title="canSend ? 'Send (Enter)' : 'Type a message or attach images to send'"
+            :title="actionButtonTitle"
           >
-            <!-- Mic icon: empty state -->
-            <MicrophoneIcon v-if="question.trim().length === 0 && pendingAttachments.length === 0" class="w-5 h-5" />
-            <!-- Arrow Up icon: text entered -->
+            <StopCircleIcon v-if="appStore.isLoading" class="w-6 h-6" />
+            <MicrophoneIcon v-else-if="isComposerEmpty" class="w-5 h-5" />
             <ArrowUpCircleIcon v-else class="w-6 h-6" />
           </button>
         </div>
@@ -191,6 +190,7 @@ import ColumnSuggest from './ColumnSuggest.vue'
 import {
   PlusIcon,
   MicrophoneIcon,
+  StopCircleIcon,
   ExclamationTriangleIcon,
   XMarkIcon,
   PhotoIcon,
@@ -215,6 +215,12 @@ const suggestionsOpenUp = ref(false)
 const pendingAttachments = ref([])
 const isAttachmentDragActive = ref(false)
 const dragDepth = ref(0)
+const supportsVoiceInput = ref(false)
+const isVoiceInputActive = ref(false)
+const speechRecognition = ref(null)
+const voiceDraftPrefix = ref('')
+const activeAbortController = ref(null)
+const userRequestedStop = ref(false)
 
 const showCommandSuggestions = computed(() => commandSuggestions.value.length > 0)
 const showColumnSuggestions = computed(() => columnSuggestions.value.length > 0)
@@ -242,6 +248,32 @@ const canSend = computed(() =>
   question.value.length <= 1000 &&
   !appStore.isLoading
 )
+const isComposerEmpty = computed(() =>
+  question.value.trim().length === 0 && pendingAttachments.value.length === 0
+)
+const canTriggerVoiceInput = computed(() =>
+  appStore.canAnalyze &&
+  isComposerEmpty.value &&
+  supportsVoiceInput.value &&
+  !appStore.isLoading
+)
+const canTriggerActionButton = computed(() => {
+  if (appStore.isLoading) return true
+  if (!appStore.canAnalyze) return false
+  if (canSend.value) return true
+  return isComposerEmpty.value && supportsVoiceInput.value
+})
+const actionButtonTitle = computed(() => {
+  if (appStore.isLoading) return 'Stop generation'
+  if (canSend.value) return 'Send (Enter)'
+  if (canTriggerVoiceInput.value) {
+    return isVoiceInputActive.value ? 'Stop voice input' : 'Start voice input'
+  }
+  if (isComposerEmpty.value) {
+    return 'Voice input unavailable on this device/browser'
+  }
+  return 'Type a message or attach images to send'
+})
 
 const FINAL_STREAM_NODES = new Set([
   'explain_code',
@@ -397,6 +429,107 @@ async function handleAttachmentDrop(event) {
 
 function handleModelChange(model) {
   appStore.setSelectedModel(model)
+}
+
+function initializeVoiceInput() {
+  if (typeof window === 'undefined') return
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+  if (!SpeechRecognition) {
+    supportsVoiceInput.value = false
+    speechRecognition.value = null
+    return
+  }
+
+  try {
+    const recognition = new SpeechRecognition()
+    recognition.lang = navigator?.language || 'en-US'
+    recognition.interimResults = true
+    recognition.continuous = true
+    recognition.maxAlternatives = 1
+    recognition.onstart = () => {
+      isVoiceInputActive.value = true
+    }
+    recognition.onend = () => {
+      isVoiceInputActive.value = false
+    }
+    recognition.onerror = (event) => {
+      isVoiceInputActive.value = false
+      const errorCode = String(event?.error || 'unknown')
+      if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed') {
+        toast.error('Voice Input Blocked', 'Microphone permission is required for voice input.')
+        return
+      }
+      if (errorCode !== 'aborted') {
+        toast.error('Voice Input Error', `Voice input failed (${errorCode}).`)
+      }
+    }
+    recognition.onresult = (event) => {
+      const transcriptParts = []
+      for (let i = 0; i < event.results.length; i += 1) {
+        const text = String(event.results[i]?.[0]?.transcript || '').trim()
+        if (text) transcriptParts.push(text)
+      }
+      const spokenText = transcriptParts.join(' ').trim()
+      const prefix = voiceDraftPrefix.value.trim()
+      question.value = spokenText ? (prefix ? `${prefix} ${spokenText}` : spokenText) : prefix
+      nextTick(() => {
+        if (textareaRef.value) {
+          textareaRef.value.focus()
+          const caret = question.value.length
+          textareaRef.value.selectionStart = caret
+          textareaRef.value.selectionEnd = caret
+        }
+        void updateAutocompleteSuggestions()
+      })
+    }
+    speechRecognition.value = recognition
+    supportsVoiceInput.value = true
+  } catch (_error) {
+    supportsVoiceInput.value = false
+    speechRecognition.value = null
+  }
+}
+
+function startVoiceInput() {
+  if (!speechRecognition.value || !supportsVoiceInput.value) return
+  voiceDraftPrefix.value = question.value.trim()
+  try {
+    speechRecognition.value.start()
+  } catch (_error) {
+    isVoiceInputActive.value = false
+  }
+}
+
+function stopVoiceInput() {
+  if (!speechRecognition.value) return
+  try {
+    speechRecognition.value.stop()
+  } catch (_error) {
+    isVoiceInputActive.value = false
+  }
+}
+
+function handleStopGeneration() {
+  userRequestedStop.value = true
+  activeAbortController.value?.abort()
+}
+
+function handleActionButtonClick() {
+  if (appStore.isLoading) {
+    handleStopGeneration()
+    return
+  }
+  if (canSend.value) {
+    void handleSubmit()
+    return
+  }
+  if (canTriggerVoiceInput.value) {
+    if (isVoiceInputActive.value) {
+      stopVoiceInput()
+    } else {
+      startVoiceInput()
+    }
+  }
 }
 
 function isSimpleIdentifier(value) {
@@ -909,6 +1042,9 @@ async function handleSlashCommand(questionText) {
 
 async function handleSubmit() {
   if (!canSend.value) return
+  if (isVoiceInputActive.value) {
+    stopVoiceInput()
+  }
   if (pendingAttachments.value.length > 0 && !imageAttachmentsSupported.value) {
     toast.error('Images Not Supported', 'The selected model does not support image attachments.')
     return
@@ -950,6 +1086,8 @@ async function handleSubmit() {
   appStore.setLoading(true)
 
   const abortController = new AbortController()
+  activeAbortController.value = abortController
+  userRequestedStop.value = false
   const signal = abortController.signal
 
   let warningTimer = null
@@ -1183,8 +1321,13 @@ async function handleSubmit() {
     const status = Number(error?.response?.status ?? error?.status ?? 0)
 
     if (error.name === 'AbortError' || signal.aborted) {
-      errorTitle = 'Request Cancelled'
-      errorMessage = 'Your query was cancelled due to timeout.'
+      if (userRequestedStop.value) {
+        errorTitle = 'Generation Stopped'
+        errorMessage = 'Response generation was stopped.'
+      } else {
+        errorTitle = 'Request Cancelled'
+        errorMessage = 'Your query was cancelled due to timeout.'
+      }
     } else if (status === 400) {
       errorTitle = 'Invalid Request'
       errorMessage = extractApiErrorMessage(error, 'The request is invalid. Please review your dataset and schema setup.')
@@ -1218,6 +1361,8 @@ async function handleSubmit() {
   } finally {
     if (warningTimer) clearTimeout(warningTimer)
     if (cancelTimer) clearTimeout(cancelTimer)
+    activeAbortController.value = null
+    userRequestedStop.value = false
     appStore.setLoading(false)
   }
 }
@@ -1235,6 +1380,7 @@ function handleNewLine(event) {
 }
 
 onMounted(() => {
+  initializeVoiceInput()
   if (appStore.activeWorkspaceId) {
     void appStore.fetchColumnCatalog({ force: true })
   }
@@ -1242,6 +1388,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (isVoiceInputActive.value) {
+    stopVoiceInput()
+  }
   window.removeEventListener('resize', updateSuggestionPlacement)
 })
 
