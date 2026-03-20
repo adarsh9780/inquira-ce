@@ -52,6 +52,8 @@ _ASSESS_CONTEXT_PROMPT = (
     "- {{tool: \"sample_data\", table_name?: string, limit?: int}}\n"
     "- {{tool: \"bash\", command: string}}\n"
     "Never emit pip_install. Keep tool_plan empty when enough_context=true.\n"
+    "For search_schema and scan_schema_chunks, query must be a single keyword token (no spaces).\n"
+    "Start with 1-3 broad keyword queries, then narrow only after seeing matches.\n"
     "If search_schema results are weak, include scan_schema_chunks to inspect schema metadata in chunks."
 )
 
@@ -77,6 +79,55 @@ class AnalysisContextAssessment(BaseModel):
     enough_context: bool = False
     missing_context: list[str] = []
     tool_plan: list[AnalysisToolPlanItem] = []
+
+
+_SCHEMA_QUERY_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "bar",
+    "bars",
+    "be",
+    "by",
+    "column",
+    "columns",
+    "data",
+    "dataset",
+    "different",
+    "for",
+    "from",
+    "has",
+    "in",
+    "into",
+    "is",
+    "it",
+    "names",
+    "not",
+    "of",
+    "or",
+    "represent",
+    "show",
+    "specified",
+    "table",
+    "tables",
+    "that",
+    "the",
+    "their",
+    "them",
+    "then",
+    "these",
+    "this",
+    "to",
+    "types",
+    "user",
+    "using",
+    "values",
+    "which",
+    "with",
+}
 
 
 def _stringify_content(content: Any) -> str:
@@ -112,35 +163,88 @@ def _bounded_messages(messages: list[AnyMessage], *, max_messages: int = 8) -> l
     return list(messages[-safe_max:])
 
 
+def _extract_schema_query_keywords(value: Any, *, max_items: int = 6) -> list[str]:
+    text = " ".join(str(value or "").strip().lower().split())
+    if not text:
+        return []
+
+    keywords: list[str] = []
+    seen: set[str] = set()
+    for token in re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*", text):
+        keyword = str(token or "").strip().lower()
+        if not keyword:
+            continue
+        if keyword in seen:
+            continue
+        if keyword in _SCHEMA_QUERY_STOPWORDS:
+            continue
+        if len(keyword) < 2 and keyword != "id":
+            continue
+        seen.add(keyword)
+        keywords.append(keyword)
+        if len(keywords) >= max(1, int(max_items)):
+            break
+    return keywords
+
+
 def _sanitize_tool_plan(raw: Any, *, max_items: int = 5) -> list[dict[str, Any]]:
     if not isinstance(raw, list):
         return []
     accepted: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def _append_action(action: dict[str, Any]) -> None:
+        key = _safe_json_dumps(action)
+        if key in seen:
+            return
+        seen.add(key)
+        accepted.append(action)
+
     for item in raw:
         if not isinstance(item, dict):
             continue
         tool = str(item.get("tool") or "").strip().lower()
         if tool not in {"search_schema", "scan_schema_chunks", "sample_data", "bash"}:
             continue
-        normalized: dict[str, Any] = {"tool": tool}
         if tool in {"search_schema", "scan_schema_chunks"}:
             query = str(item.get("query") or "").strip()
             if not query:
                 continue
-            normalized["query"] = query
+            keyword_queries = _extract_schema_query_keywords(query, max_items=3)
+            if not keyword_queries:
+                continue
             if str(item.get("table_name") or "").strip():
-                normalized["table_name"] = str(item.get("table_name") or "").strip()
-            normalized["limit"] = max(1, min(50, int(item.get("limit") or 20)))
+                normalized_table_name = str(item.get("table_name") or "").strip()
+            else:
+                normalized_table_name = ""
+            normalized_limit = max(1, min(50, int(item.get("limit") or 20)))
+            for keyword in keyword_queries:
+                normalized: dict[str, Any] = {
+                    "tool": tool,
+                    "query": keyword,
+                    "limit": normalized_limit,
+                }
+                if normalized_table_name:
+                    normalized["table_name"] = normalized_table_name
+                _append_action(normalized)
+                if len(accepted) >= max_items:
+                    break
+            if len(accepted) >= max_items:
+                break
+            continue
         elif tool == "sample_data":
+            normalized: dict[str, Any] = {"tool": tool}
             if str(item.get("table_name") or "").strip():
                 normalized["table_name"] = str(item.get("table_name") or "").strip()
             normalized["limit"] = max(1, min(20, int(item.get("limit") or 5)))
+            _append_action(normalized)
         elif tool == "bash":
+            normalized = {"tool": tool}
             command = str(item.get("command") or "").strip()
             if not command:
                 continue
             normalized["command"] = command
-        accepted.append(normalized)
+            _append_action(normalized)
         if len(accepted) >= max_items:
             break
     return accepted
@@ -214,14 +318,14 @@ def _normalize_search_queries(raw: Any) -> list[str]:
     normalized: list[str] = []
     seen: set[str] = set()
     for entry in raw:
-        query = str(entry or "").strip()
-        if not query:
-            continue
-        dedupe = query.lower()
-        if dedupe in seen:
-            continue
-        seen.add(dedupe)
-        normalized.append(query)
+        for query in _extract_schema_query_keywords(entry, max_items=3):
+            dedupe = query.lower()
+            if dedupe in seen:
+                continue
+            seen.add(dedupe)
+            normalized.append(query)
+            if len(normalized) >= 3:
+                break
         if len(normalized) >= 3:
             break
     return normalized
@@ -355,30 +459,26 @@ def _build_schema_search_queries(
     missing_context: list[str],
     max_queries: int = 6,
 ) -> list[str]:
-    phrases: list[str] = []
+    keywords: list[str] = []
     seen: set[str] = set()
 
-    def _push(value: str) -> None:
-        normalized = " ".join(str(value or "").strip().split())
-        if not normalized:
-            return
-        key = normalized.lower()
-        if key in seen:
-            return
-        seen.add(key)
-        phrases.append(normalized)
+    def _push_keywords(value: str) -> None:
+        for token in _extract_schema_query_keywords(value, max_items=max_queries):
+            if token in seen:
+                continue
+            seen.add(token)
+            keywords.append(token)
+            if len(keywords) >= max_queries:
+                break
 
-    _push(base_query)
-    _push(user_text)
+    _push_keywords(base_query)
     for item in missing_context:
-        _push(str(item or ""))
-
-    tokens = re.findall(r"[a-zA-Z0-9_]{3,}", " ".join([base_query, user_text, *missing_context]).lower())
-    for token in tokens:
-        _push(token)
-        if len(phrases) >= max_queries:
+        if len(keywords) >= max_queries:
             break
-    return phrases[:max_queries]
+        _push_keywords(str(item or ""))
+    if len(keywords) < max_queries:
+        _push_keywords(user_text)
+    return keywords[:max_queries]
 
 
 def _extract_relevant_tables_from_chunk_result(result: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1068,7 +1168,7 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
     sample_table = str(analysis_context.get("sample_table") or "").strip() or None
     sample = state.get("enrichment_results", {}).get("sample_data") if isinstance(state.get("enrichment_results"), dict) else None
-    if not isinstance(sample, list):
+    if not isinstance(sample, dict):
         sample = sample_data(
             data_path=str(analysis_context.get("data_path") or "") or None,
             table_name=sample_table,
