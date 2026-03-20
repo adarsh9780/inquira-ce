@@ -657,6 +657,39 @@ async def _ainvoke_structured_chain(chain: Any, payload: dict[str, Any]) -> Any:
         return await ainvoke(payload)
 
 
+def _is_empty_json_structured_parse_error(exc: Exception) -> bool:
+    message = str(exc or "").strip().lower()
+    if not message:
+        return False
+    markers = (
+        "expected value at line 1 column 1",
+        "expecting value: line 1 column 1",
+        "jsondecodeerror",
+    )
+    return any(marker in message for marker in markers)
+
+
+def _extract_chat_text(output: Any) -> str:
+    if isinstance(output, ChatOutput):
+        return str(output.answer or "").strip()
+
+    if isinstance(output, dict):
+        answer = output.get("answer")
+        if str(answer or "").strip():
+            return str(answer).strip()
+        if "content" in output:
+            return _stringify_content(output.get("content")).strip()
+
+    answer_attr = getattr(output, "answer", None)
+    if str(answer_attr or "").strip():
+        return str(answer_attr).strip()
+
+    if hasattr(output, "content"):
+        return _stringify_content(getattr(output, "content", "")).strip()
+
+    return ""
+
+
 def _is_non_retriable_execution_error(message: str) -> bool:
     text = str(message or "").strip().lower()
     if not text:
@@ -1799,12 +1832,17 @@ async def chat_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, 
         ]
     )
     model = _get_model(config, lite=True)
+    messages_payload = {"messages": list(state.get("messages") or [])}
     chain = prompt | model.with_structured_output(ChatOutput)
-    output = await _ainvoke_structured_chain(chain, {"messages": list(state.get("messages") or [])})
-    if isinstance(output, ChatOutput):
-        text = str(output.answer or "").strip()
-    else:
-        text = str(getattr(output, "answer", "") or "").strip()
+    try:
+        output = await _ainvoke_structured_chain(chain, messages_payload)
+    except Exception as exc:
+        if not _is_empty_json_structured_parse_error(exc):
+            raise
+        fallback_chain = prompt | model
+        output = await _ainvoke_structured_chain(fallback_chain, messages_payload)
+
+    text = _extract_chat_text(output)
     if not text:
         text = "I can help you analyze your dataset. Tell me what insight you want."
     _emit_text_chunks("chat", text)
