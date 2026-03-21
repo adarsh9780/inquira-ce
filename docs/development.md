@@ -18,7 +18,14 @@ cd src-tauri
 cargo tauri dev
 ```
 
-This command runs the desktop shell and wires frontend/backend development pieces together.
+This command runs the desktop shell and wires frontend, backend, workspace-kernel, and agent development pieces together.
+
+## Current runtime model
+
+- The desktop app starts the FastAPI backend and connects chat requests to `agent_v2`.
+- `agent_v2` uses structured tool planning and custom tool execution instead of generic `ToolNode` execution.
+- Generated Python is executed through the active backend workspace kernel, not inside the agent process.
+- Long-lived kernel sessions mean generated figure variable names should stay meaningful and stable to avoid overwriting prior chart objects.
 
 ## Local CI Commands
 
@@ -49,6 +56,7 @@ make test
 
 - Run `make test` before committing.
 - Keep backend and frontend changes in focused commits when possible.
+- If you touch agent execution flow, verify both the LangGraph graph path and the backend workspace-kernel runtime path.
 - If you touch release tooling, verify docs and workflow tests in `backend/tests/`.
 
 Next: [Commit And Release Flow](./commit-and-release.md)

@@ -63,7 +63,7 @@ enable = true
 
 [backend.phoenix]
 # Enable Phoenix tracing for LangGraph/LangChain (used by backend startup)
-enabled = true
+enabled = false
 # Phoenix project name shown in UI
 project = "inquira-dev"
 # Local Phoenix collector endpoint (OTLP HTTP)
@@ -96,7 +96,7 @@ mode = "shared_secret"
 # api_key = ""
 
 [agent_service.phoenix]
-enabled = true
+enabled = false
 project = "inquira-agent"
 endpoint = "http://127.0.0.1:6006/v1/traces"
 
@@ -108,55 +108,6 @@ endpoint = "http://127.0.0.1:6006/v1/traces"
 # - anthropic: uses Anthropic API directly (requires ANTHROPIC_API_KEY, base-url is ignored)
 provider = "openrouter"
 base-url = "https://openrouter.ai/api/v1"
-default-model = "google/gemini-2.5-flash"
-lite-model = "google/gemini-2.5-flash-lite"
-# Deprecated in favor of the [llm.providers.*] sections below, but preserved for backwards compatibility
-models = [
-  "google/gemini-3-flash-preview",
-  "google/gemini-2.5-flash",
-  "google/gemini-2.5-flash-lite",
-  "openrouter/free",
-]
-
-[llm.providers.openrouter]
-main-models = [
-    "google/gemini-3-flash-preview",
-    "google/gemini-2.5-flash",
-    "openrouter/free",
-]
-lite-models = [
-    "google/gemma-3-27b-it",
-    "google/gemma-2-9b-it",
-    "google/gemma-3-27b-it:free"
-]
-
-[llm.providers.openai]
-main-models = [
-    "gpt-4.1",
-    "gpt-4o",
-    "gpt-4o-mini",
-]
-lite-models = [
-    "gpt-4.1-mini",
-    "gpt-4.1-nano",
-]
-
-[llm.providers.anthropic]
-main-models = [
-    "claude-3-5-sonnet-latest",
-    "claude-3-7-sonnet-latest",
-]
-lite-models = [
-    "claude-3-5-haiku-latest",
-]
-
-[llm.providers.ollama]
-main-models = [
-    "gemma3:1b"
-]
-lite-models = [
-    "gemma3:1b"
-]
 
 [llm.limits]
 # Default output cap when no endpoint-specific override is used.
