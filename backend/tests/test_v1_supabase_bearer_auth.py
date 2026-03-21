@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from app.v1.api.deps import get_current_user
+from app.v1.services.auth_service import AuthService
 
 
 def _request_with_headers(headers: dict[str, str]) -> Request:
@@ -48,3 +49,53 @@ async def test_get_current_user_rejects_missing_bearer_token_for_supabase(monkey
 
     assert exc.value.status_code == 401
     assert exc.value.detail == "Not authenticated"
+
+
+@pytest.mark.asyncio
+async def test_resolve_supabase_user_uses_certifi_bundle(monkeypatch):
+    captured = {}
+
+    class DummyResponse:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {
+                "id": "user-1",
+                "email": "alice@example.com",
+                "user_metadata": {},
+                "app_metadata": {},
+            }
+
+    class DummyClient:
+        def __init__(self, *args, **kwargs):
+            captured["verify"] = kwargs.get("verify")
+            captured["timeout"] = kwargs.get("timeout")
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url, headers):
+            captured["url"] = url
+            captured["headers"] = headers
+            return DummyResponse()
+
+    monkeypatch.setattr(
+        "app.v1.services.auth_service.settings",
+        SimpleNamespace(
+            supabase_url="https://example.supabase.co",
+            supabase_secret_key="secret-key",
+        ),
+    )
+    monkeypatch.setattr("app.v1.services.auth_service.httpx.AsyncClient", DummyClient)
+
+    user = await AuthService.resolve_supabase_user("token-123")
+
+    assert user.id == "user-1"
+    assert captured["url"] == "https://example.supabase.co/auth/v1/user"
+    assert captured["headers"]["Authorization"] == "Bearer token-123"
+    assert captured["headers"]["apikey"] == "secret-key"
+    assert str(captured["verify"]).endswith("cacert.pem")

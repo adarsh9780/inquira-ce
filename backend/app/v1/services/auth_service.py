@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import certifi
 import httpx
 from fastapi import HTTPException
 
@@ -32,8 +33,13 @@ class AuthService:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, verify=certifi.where()) as client:
                 response = await client.get(url, headers=headers)
+        except httpx.TimeoutException as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="Supabase auth lookup timed out. Check network or TLS configuration.",
+            ) from exc
         except httpx.HTTPError as exc:
             raise HTTPException(
                 status_code=503,
