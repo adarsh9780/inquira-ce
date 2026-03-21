@@ -351,16 +351,35 @@ fn auth_start_loopback_listener(app: tauri::AppHandle) -> Result<AuthLoopbackRes
                 .nth(1)
                 .unwrap_or_default();
             let query = target.split_once('?').map(|(_, raw)| raw).unwrap_or_default();
-            let code = query
-                .split('&')
-                .find_map(|pair| pair.split_once('='))
-                .and_then(|(key, value)| if key == "code" { Some(value.to_string()) } else { None })
+            let params: HashMap<String, String> = url::form_urlencoded::parse(query.as_bytes())
+                .into_owned()
+                .collect();
+            let code = params.get("code").cloned().unwrap_or_default();
+            let error = params.get("error").cloned().unwrap_or_default();
+            let error_description = params
+                .get("error_description")
+                .cloned()
                 .unwrap_or_default();
 
             let body = if code.is_empty() {
+                let _ = app_handle.emit(
+                    "auth:callback",
+                    serde_json::json!({
+                        "code": "",
+                        "error": error,
+                        "error_description": error_description,
+                    }),
+                );
                 "<html><body><h2>Inquira sign-in failed.</h2><p>You can close this window and try again.</p></body></html>"
             } else {
-                let _ = app_handle.emit("auth:callback", serde_json::json!({ "code": code }));
+                let _ = app_handle.emit(
+                    "auth:callback",
+                    serde_json::json!({
+                        "code": code,
+                        "error": error,
+                        "error_description": error_description,
+                    }),
+                );
                 "<html><body><h2>Inquira sign-in complete.</h2><p>You can close this window and return to the app.</p></body></html>"
             };
 

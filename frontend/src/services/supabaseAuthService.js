@@ -58,13 +58,32 @@ async function ensureLoopbackListener() {
     import('@tauri-apps/api/event'),
   ]).then(async ([eventApi]) => {
     await eventApi.listen('auth:callback', async (event) => {
-      const code = String(event?.payload?.code || '').trim()
-      if (!code) return
+      const payload = event?.payload || {}
+      const code = String(payload?.code || '').trim()
+      const errorCode = String(payload?.error || '').trim()
+      const errorDescription = String(payload?.error_description || '').trim()
+      if (errorCode) {
+        console.error('❌ Supabase auth callback returned an error:', errorCode, errorDescription)
+        return
+      }
+      if (!code) {
+        console.error('❌ Supabase auth callback did not include an authorization code.')
+        return
+      }
       const sb = getClient()
       if (!sb) return
       const { error } = await sb.auth.exchangeCodeForSession(code)
       if (error) {
         console.error('❌ Failed to exchange Supabase auth code for session:', error)
+        return
+      }
+      const { data: sessionData, error: sessionError } = await sb.auth.getSession()
+      if (sessionError) {
+        console.error('❌ Supabase session fetch failed after auth code exchange:', sessionError)
+        return
+      }
+      if (!sessionData?.session?.access_token) {
+        console.error('❌ Supabase code exchange completed without a usable session.')
       }
     })
   })

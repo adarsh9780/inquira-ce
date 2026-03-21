@@ -27,3 +27,14 @@ test('auth store does not shadow error ref inside auth action catch blocks', () 
   assert.equal(source.includes('catch (err)'), true)
   assert.equal(source.includes('error.value = err?.message'), true)
 })
+
+test('auth store hydrates backend profile with the fresh callback bearer token', () => {
+  const source = readFileSync(
+    resolve(process.cwd(), 'src/stores/authStore.js'),
+    'utf-8',
+  )
+
+  assert.equal(source.includes('async function hydrateUserFromBackend(accessToken = \'\')'), true)
+  assert.equal(source.includes('Authorization: `Bearer ${token}`'), true)
+  assert.equal(source.includes('await hydrateUserFromBackend(accessToken)'), true)
+})

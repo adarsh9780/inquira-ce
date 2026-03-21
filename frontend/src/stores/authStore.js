@@ -42,9 +42,19 @@ export const useAuthStore = defineStore('auth', () => {
     plan.value = 'FREE'
   }
 
-  async function hydrateUserFromBackend() {
+  async function hydrateUserFromBackend(accessToken = '') {
+    const token = String(accessToken || '').trim()
+    const requestConfig = token
+      ? {
+          timeout: AUTH_PROBE_TIMEOUT_MS,
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      : { timeout: AUTH_PROBE_TIMEOUT_MS }
+
     const profile = await withTimeout(
-      apiService.v1GetCurrentUser({ timeout: AUTH_PROBE_TIMEOUT_MS }),
+      apiService.v1GetCurrentUser(requestConfig),
       AUTH_PROBE_TIMEOUT_MS + 1000,
       'Authentication check timed out.',
     )
@@ -65,7 +75,8 @@ export const useAuthStore = defineStore('auth', () => {
     if (authSubscription || !supabaseAuthService.isConfigured) return
     const { data } = supabaseAuthService.onAuthStateChange(async (_event, session) => {
       authProbeRevision += 1
-      if (!session?.access_token) {
+      const accessToken = String(session?.access_token || '').trim()
+      if (!accessToken) {
         clearLocalState()
         error.value = ''
         pendingAuthAction.value = ''
@@ -73,7 +84,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       try {
-        await hydrateUserFromBackend()
+        await hydrateUserFromBackend(accessToken)
         error.value = ''
       } catch (err) {
         console.error('❌ Failed to hydrate Supabase session from backend:', err)
@@ -115,11 +126,12 @@ export const useAuthStore = defineStore('auth', () => {
         'Authentication check timed out.',
       )
       if (probeRevision !== authProbeRevision) return
-      if (!session?.access_token) {
+      const accessToken = String(session?.access_token || '').trim()
+      if (!accessToken) {
         clearLocalState()
         return
       }
-      await hydrateUserFromBackend()
+      await hydrateUserFromBackend(accessToken)
     } catch (_err) {
       if (probeRevision !== authProbeRevision) return
       clearLocalState()
