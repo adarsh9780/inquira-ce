@@ -772,6 +772,7 @@ export const useAppStore = defineStore('app', () => {
     if (existing) {
       existing.tool = String(event.tool || existing.tool || '')
       existing.args = event.args && typeof event.args === 'object' ? event.args : existing.args || {}
+      existing.explanation = String(event.explanation || existing.explanation || '')
       if (!Array.isArray(existing.lines)) existing.lines = []
       existing.status = String(existing.status || 'running')
       return
@@ -780,6 +781,7 @@ export const useAppStore = defineStore('app', () => {
       call_id: callId,
       tool: String(event.tool || ''),
       args: event.args && typeof event.args === 'object' ? event.args : {},
+      explanation: String(event.explanation || ''),
       lines: [],
       output: null,
       status: 'running',

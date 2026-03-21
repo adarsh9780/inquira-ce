@@ -66,6 +66,7 @@ def scan_schema_chunks(
     table_names: list[str] | None = None,
     chunk_size: int = 4,
     max_chunks: int = 12,
+    explanation: str = "",
     emit_tool_events: bool = True,
 ) -> dict[str, Any]:
     call_id = new_tool_call_id("scan_schema_chunks") if emit_tool_events else ""
@@ -84,8 +85,10 @@ def scan_schema_chunks(
                     "table_names": [str(item).strip() for item in (table_names or []) if str(item).strip()],
                     "chunk_size": safe_chunk_size,
                     "max_chunks": safe_max_chunks,
+                    "explanation": str(explanation or "").strip(),
                 },
                 "call_id": call_id,
+                "explanation": str(explanation or "").strip(),
             },
         )
 

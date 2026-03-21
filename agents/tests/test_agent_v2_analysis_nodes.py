@@ -6,11 +6,14 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from agent_v2.nodes import (
     _ASSESS_CONTEXT_PROMPT,
+    _CONTEXT_ENRICHMENT_TOOL_PROMPT,
     _build_context_enrichment_user_prompt,
     analysis_assess_context_node,
     analysis_collect_context_node,
     analysis_prepare_sample_to_next,
     analysis_prepare_sample_tool_node,
+    analysis_request_execute_tool_node,
+    analysis_request_validate_result_tool_node,
     analysis_enrich_to_next,
     analysis_enrich_context_node,
     analysis_finalize_context_enrichment_node,
@@ -30,7 +33,14 @@ async def test_analysis_enrich_context_node_produces_tool_call_message(monkeypat
         async def ainvoke(self, _messages):
             return AIMessage(
                 content="",
-                tool_calls=[{"name": "search_schema", "args": {"query": "customer"}, "id": "call_1", "type": "tool_call"}],
+                tool_calls=[
+                    {
+                        "name": "search_schema",
+                        "args": {"query": "customer", "explanation": "I need schema matches before writing code."},
+                        "id": "call_1",
+                        "type": "tool_call",
+                    }
+                ],
             )
 
     class _FakeModel:
@@ -60,6 +70,9 @@ async def test_analysis_enrich_context_node_produces_tool_call_message(monkeypat
     assert isinstance(tool_messages[0], SystemMessage)
     assert isinstance(tool_messages[-1], AIMessage)
     assert bool((tool_messages[-1].tool_calls or []))
+    assert (tool_messages[-1].tool_calls or [])[0].get("args", {}).get("explanation") == (
+        "I need schema matches before writing code."
+    )
 
 
 def test_context_enrichment_prompt_includes_prior_search_context() -> None:
@@ -75,6 +88,10 @@ def test_context_enrichment_prompt_includes_prior_search_context() -> None:
     )
     assert "Prior search context:" in rendered
     assert "matches=4" in rendered
+
+
+def test_context_enrichment_prompt_requires_tool_explanations() -> None:
+    assert "Include explanation in every tool call" in _CONTEXT_ENRICHMENT_TOOL_PROMPT
 
 
 @pytest.mark.asyncio
@@ -140,6 +157,36 @@ async def test_analysis_prepare_sample_tool_requests_toolnode_call_when_sample_m
     assert isinstance(runtime_messages[0], AIMessage)
     tool_calls = runtime_messages[0].tool_calls or []
     assert tool_calls and tool_calls[0].get("name") == "sample_data_runtime"
+    assert tool_calls[0].get("args", {}).get("explanation") == (
+        "I need a quick sample of the table before generating code."
+    )
+
+
+@pytest.mark.asyncio
+async def test_analysis_request_execute_tool_includes_short_explanation() -> None:
+    state = {
+        "candidate_code": "print('ok')",
+        "attempt_counters": {"execution": 0},
+    }
+    result = await analysis_request_execute_tool_node(state, {"configurable": {}})
+    runtime_messages = result.get("analysis_runtime_tool_messages") or []
+    tool_calls = runtime_messages[0].tool_calls or []
+    assert tool_calls[0].get("args", {}).get("explanation") == (
+        "I have candidate code and need to run it to verify the result."
+    )
+
+
+@pytest.mark.asyncio
+async def test_analysis_request_validate_result_tool_includes_short_explanation() -> None:
+    state = {
+        "execution_result": {"success": True, "stdout": "done"},
+    }
+    result = await analysis_request_validate_result_tool_node(state, {"configurable": {}})
+    runtime_messages = result.get("analysis_runtime_tool_messages") or []
+    tool_calls = runtime_messages[0].tool_calls or []
+    assert tool_calls[0].get("args", {}).get("explanation") == (
+        "The code ran, so I am checking whether the output is actually useful."
+    )
 
 
 def test_analysis_prepare_sample_to_next_routes_to_runtime_tools_when_pending_call() -> None:

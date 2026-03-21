@@ -11,6 +11,7 @@ def sample_data(
     data_path: str | None,
     table_name: str | None,
     limit: int = 5,
+    explanation: str = "",
     emit_tool_events: bool = True,
 ) -> dict:
     call_id = new_tool_call_id("sample_data") if emit_tool_events else ""
@@ -23,8 +24,10 @@ def sample_data(
                 "args": {
                     "table_name": table_name or "",
                     "limit": safe_limit,
+                    "explanation": str(explanation or "").strip(),
                 },
                 "call_id": call_id,
+                "explanation": str(explanation or "").strip(),
             },
         )
 

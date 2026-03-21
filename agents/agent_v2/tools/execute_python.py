@@ -70,6 +70,7 @@ async def execute_python(
     data_path: str | None,
     code: str,
     timeout: int = 90,
+    explanation: str = "",
     emit_tool_events: bool = True,
 ) -> dict[str, Any]:
     _ = workspace_id
@@ -77,7 +78,12 @@ async def execute_python(
     if emit_tool_events:
         emit_agent_event(
             "tool_call",
-            {"tool": "execute_python", "args": {"timeout": timeout}, "call_id": call_id},
+            {
+                "tool": "execute_python",
+                "args": {"timeout": timeout, "explanation": str(explanation or "").strip()},
+                "call_id": call_id,
+                "explanation": str(explanation or "").strip(),
+            },
         )
 
     if not data_path:

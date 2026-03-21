@@ -31,6 +31,7 @@ from .tools.execute_python import execute_python
 from .tools.sample_data import sample_data
 from .tools.schema_chunks import scan_schema_chunks
 from .tools.search_schema import search_schema
+from .tools import new_tool_call_id
 from .tools.validate_result import validate_and_summarize_result
 
 _GENERAL_CHAT_PROMPT = (
@@ -44,12 +45,12 @@ _ASSESS_CONTEXT_PROMPT = (
     "Return strict JSON with fields:\n"
     "- enough_context: boolean\n"
     "- missing_context: string[] (short gaps)\n"
-    "- tool_plan: list of tool actions.\n"
+    "- tool_plan: list of tool actions, each with a very short explanation string.\n"
     "Allowed tool actions:\n"
-    "- {{tool: \"search_schema\", query: string, table_name?: string, limit?: int}}\n"
-    "- {{tool: \"scan_schema_chunks\", query: string, table_name?: string, limit?: int}}\n"
-    "- {{tool: \"sample_data\", table_name?: string, limit?: int}}\n"
-    "- {{tool: \"bash\", command: string}}\n"
+    "- {{tool: \"search_schema\", query: string, table_name?: string, limit?: int, explanation: string}}\n"
+    "- {{tool: \"scan_schema_chunks\", query: string, table_name?: string, limit?: int, explanation: string}}\n"
+    "- {{tool: \"sample_data\", table_name?: string, limit?: int, explanation: string}}\n"
+    "- {{tool: \"bash\", command: string, explanation: string}}\n"
     "Never emit pip_install. Keep tool_plan empty when enough_context=true.\n"
     "For search_schema and scan_schema_chunks, query must be a single keyword token (no spaces).\n"
     "Start with 1-3 broad keyword queries, then narrow only after seeing matches.\n"
@@ -60,15 +61,16 @@ _CONTEXT_ENRICHMENT_TOOL_PROMPT = (
     "Decide whether there is enough schema/data context to generate executable analysis code.\n"
     "If context is insufficient, call one tool at a time to gather missing details.\n"
     "Available tools:\n"
-    "- search_schema(query?: string, queries?: string[], table_name?: string, limit?: int)\n"
-    "- scan_schema_chunks(query_terms: string[], table_names?: string[], chunk_size?: int, max_chunks?: int)\n"
-    "- sample_data(table_name?: string, limit?: int)\n"
+    "- search_schema(query?: string, queries?: string[], table_name?: string, limit?: int, explanation?: string)\n"
+    "- scan_schema_chunks(query_terms: string[], table_names?: string[], chunk_size?: int, max_chunks?: int, explanation?: string)\n"
+    "- sample_data(table_name?: string, limit?: int, explanation?: string)\n"
     "Rules:\n"
     "- Start with ONE batched search_schema call using queries=[...] containing 3-6 broad single-word keywords.\n"
     "- Keep search keywords as single words (no spaces, no long phrases).\n"
     "- Prefer search_schema first; use scan_schema_chunks only when search_schema matches are weak.\n"
     "- After first results, narrow follow-up queries using: prior search results + user question + known columns + missing context.\n"
     "- Avoid repeating the same tool call with identical arguments.\n"
+    "- Include explanation in every tool call as one short sentence saying why this tool is the next step.\n"
     "- Stop tool calls as soon as context is sufficient.\n"
     "When finished, return ONLY valid JSON:\n"
     "{\"enough_context\": boolean, \"missing_context\": string[], \"notes\": string}\n"
@@ -90,6 +92,7 @@ class AnalysisToolPlanItem(BaseModel):
     table_name: str | None = None
     limit: int | None = None
     command: str | None = None
+    explanation: str | None = None
 
 
 class AnalysisContextAssessment(BaseModel):
@@ -252,6 +255,7 @@ def _sanitize_tool_plan(raw: Any, *, max_items: int = 5) -> list[dict[str, Any]]
             continue
         if tool in {"search_schema", "scan_schema_chunks"}:
             query = str(item.get("query") or "").strip()
+            explanation = str(item.get("explanation") or "").strip()
             if not query:
                 continue
             keyword_queries = _extract_schema_query_keywords(query, max_items=3)
@@ -268,6 +272,8 @@ def _sanitize_tool_plan(raw: Any, *, max_items: int = 5) -> list[dict[str, Any]]
                     "query": keyword,
                     "limit": normalized_limit,
                 }
+                if explanation:
+                    normalized["explanation"] = explanation
                 if normalized_table_name:
                     normalized["table_name"] = normalized_table_name
                 _append_action(normalized)
@@ -278,16 +284,22 @@ def _sanitize_tool_plan(raw: Any, *, max_items: int = 5) -> list[dict[str, Any]]
             continue
         elif tool == "sample_data":
             normalized: dict[str, Any] = {"tool": tool}
+            explanation = str(item.get("explanation") or "").strip()
             if str(item.get("table_name") or "").strip():
                 normalized["table_name"] = str(item.get("table_name") or "").strip()
             normalized["limit"] = max(1, min(20, int(item.get("limit") or 5)))
+            if explanation:
+                normalized["explanation"] = explanation
             _append_action(normalized)
         elif tool == "bash":
             normalized = {"tool": tool}
             command = str(item.get("command") or "").strip()
+            explanation = str(item.get("explanation") or "").strip()
             if not command:
                 continue
             normalized["command"] = command
+            if explanation:
+                normalized["explanation"] = explanation
             _append_action(normalized)
         if len(accepted) >= max_items:
             break
@@ -782,6 +794,7 @@ def search_schema_context_tool(
     queries: list[str] | None = None,
     table_name: str = "",
     limit: int = 20,
+    explanation: str = "",
     analysis_context: Annotated[dict[str, Any], InjectedState("analysis_context")] = None,
 ) -> dict[str, Any]:
     """Search schema columns using one query or multiple query patterns."""
@@ -798,7 +811,8 @@ def search_schema_context_tool(
         queries=normalized_queries,
         table_name=str(table_name or "").strip() or None,
         max_results=max(1, min(50, int(limit or 20))),
-        emit_tool_events=False,
+        explanation=str(explanation or "").strip(),
+        emit_tool_events=True,
     )
 
 
@@ -808,6 +822,7 @@ def scan_schema_chunks_context_tool(
     table_names: list[str] | None = None,
     chunk_size: int = 4,
     max_chunks: int = 12,
+    explanation: str = "",
     analysis_context: Annotated[dict[str, Any], InjectedState("analysis_context")] = None,
 ) -> dict[str, Any]:
     """Scan schema metadata in chunks for relevant tables/columns."""
@@ -821,7 +836,8 @@ def scan_schema_chunks_context_tool(
         table_names=requested_tables or default_tables,
         chunk_size=max(1, min(16, int(chunk_size or 4))),
         max_chunks=max(1, min(40, int(max_chunks or 12))),
-        emit_tool_events=False,
+        explanation=str(explanation or "").strip(),
+        emit_tool_events=True,
     )
 
 
@@ -829,6 +845,7 @@ def scan_schema_chunks_context_tool(
 def sample_data_context_tool(
     table_name: str = "",
     limit: int = 5,
+    explanation: str = "",
     analysis_context: Annotated[dict[str, Any], InjectedState("analysis_context")] = None,
 ) -> dict[str, Any]:
     """Sample rows from a table to confirm data shape and value patterns."""
@@ -838,7 +855,8 @@ def sample_data_context_tool(
         data_path=str(context.get("data_path") or "") or None,
         table_name=str(table_name or "").strip() or fallback_table or None,
         limit=max(1, min(20, int(limit or 5))),
-        emit_tool_events=False,
+        explanation=str(explanation or "").strip(),
+        emit_tool_events=True,
     )
 
 
@@ -853,6 +871,7 @@ CONTEXT_ENRICHMENT_TOOLS = [
 def sample_data_runtime_tool(
     table_name: str = "",
     limit: int = 5,
+    explanation: str = "",
     analysis_context: Annotated[dict[str, Any], InjectedState("analysis_context")] = None,
 ) -> dict[str, Any]:
     """Sample table data during generation/execution flow."""
@@ -862,7 +881,8 @@ def sample_data_runtime_tool(
         data_path=str(context.get("data_path") or "") or None,
         table_name=str(table_name or "").strip() or fallback_table or None,
         limit=max(1, min(20, int(limit or 5))),
-        emit_tool_events=False,
+        explanation=str(explanation or "").strip(),
+        emit_tool_events=True,
     )
 
 
@@ -870,6 +890,7 @@ def sample_data_runtime_tool(
 async def execute_python_runtime_tool(
     code: str,
     timeout: int = 90,
+    explanation: str = "",
     analysis_context: Annotated[dict[str, Any], InjectedState("analysis_context")] = None,
     workspace_id: Annotated[str, InjectedState("workspace_id")] = "",
 ) -> dict[str, Any]:
@@ -880,7 +901,8 @@ async def execute_python_runtime_tool(
         data_path=str(context.get("data_path") or "") or None,
         code=str(code or ""),
         timeout=max(5, int(timeout or 90)),
-        emit_tool_events=False,
+        explanation=str(explanation or "").strip(),
+        emit_tool_events=True,
     )
 
 
@@ -889,17 +911,37 @@ async def validate_result_runtime_tool(
     execution_result: dict[str, Any],
     max_artifacts: int = 3,
     max_rows: int = 5,
+    explanation: str = "",
     workspace_id: Annotated[str, InjectedState("workspace_id")] = "",
     run_id: Annotated[str, InjectedState("run_id")] = "",
 ) -> dict[str, Any]:
     """Normalize runtime execution result for explanation and routing."""
-    return await validate_and_summarize_result(
+    call_id = new_tool_call_id("validate_result_runtime")
+    emit_agent_event(
+        "tool_call",
+        {
+            "tool": "validate_result_runtime",
+            "args": {
+                "max_artifacts": max(1, min(10, int(max_artifacts or 3))),
+                "max_rows": max(1, min(20, int(max_rows or 5))),
+                "explanation": str(explanation or "").strip(),
+            },
+            "call_id": call_id,
+            "explanation": str(explanation or "").strip(),
+        },
+    )
+    result = await validate_and_summarize_result(
         workspace_id=str(workspace_id or ""),
         run_id=str(run_id or ""),
         execution_result=execution_result if isinstance(execution_result, dict) else {},
         max_artifacts=max(1, min(10, int(max_artifacts or 3))),
         max_rows=max(1, min(20, int(max_rows or 5))),
     )
+    emit_agent_event(
+        "tool_result",
+        {"call_id": call_id, "output": result, "status": "success", "duration_ms": 1},
+    )
+    return result
 
 
 RUNTIME_FLOW_TOOLS = [
@@ -1564,7 +1606,11 @@ async def analysis_prepare_sample_tool_node(state: dict[str, Any], config: Runna
     sample_table = str(analysis_context.get("sample_table") or "").strip()
     tool_call = {
         "name": "sample_data_runtime",
-        "args": {"table_name": sample_table, "limit": 5},
+        "args": {
+            "table_name": sample_table,
+            "limit": 5,
+            "explanation": "I need a quick sample of the table before generating code.",
+        },
         "id": "sample_data_runtime_call",
         "type": "tool_call",
     }
@@ -1617,7 +1663,11 @@ async def analysis_request_execute_tool_node(state: dict[str, Any], config: Runn
     )
     tool_call = {
         "name": "execute_python_runtime",
-        "args": {"code": code, "timeout": timeout},
+        "args": {
+            "code": code,
+            "timeout": timeout,
+            "explanation": "I have candidate code and need to run it to verify the result.",
+        },
         "id": f"execute_python_runtime_{execution_attempts}",
         "type": "tool_call",
     }
@@ -1680,7 +1730,10 @@ async def analysis_request_validate_result_tool_node(
     )
     tool_call = {
         "name": "validate_result_runtime",
-        "args": {"execution_result": execution},
+        "args": {
+            "execution_result": execution,
+            "explanation": "The code ran, so I am checking whether the output is actually useful.",
+        },
         "id": "validate_result_runtime_call",
         "type": "tool_call",
     }

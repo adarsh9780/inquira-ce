@@ -86,15 +86,21 @@ const toolName = computed(() => String(props.activity?.tool || '').trim())
 const toolLabel = computed(() => toolName.value || 'tool')
 const normalizedToolName = computed(() => toolName.value.toLowerCase())
 const toolStatus = computed(() => String(props.activity?.status || 'running').trim().toLowerCase())
+const toolExplanation = computed(() => truncateText(props.activity?.explanation, 140))
 const statusLabel = computed(() => {
   if (toolStatus.value === 'running') return 'running'
   if (toolStatus.value === 'success') return 'done'
   if (toolStatus.value === 'error') return 'failed'
   return toolStatus.value || 'running'
 })
-const toolArgs = computed(() => {
+const rawToolArgs = computed(() => {
   const args = props.activity?.args
   return args && typeof args === 'object' ? args : {}
+})
+const toolArgs = computed(() => {
+  const args = { ...rawToolArgs.value }
+  delete args.explanation
+  return args
 })
 const toolLines = computed(() => {
   const lines = props.activity?.lines
@@ -185,6 +191,8 @@ function numericArg(value) {
 }
 
 const summaryText = computed(() => {
+  if (toolExplanation.value) return toolExplanation.value
+
   const tool = toolLabel.value
   const args = toolArgs.value
   const normalized = normalizedToolName.value

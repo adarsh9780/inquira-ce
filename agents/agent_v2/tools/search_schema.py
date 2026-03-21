@@ -208,6 +208,7 @@ def search_schema(
     queries: list[str] | None = None,
     table_name: str | None,
     max_results: int = 20,
+    explanation: str = "",
     emit_tool_events: bool = True,
 ) -> dict[str, Any]:
     call_id = new_tool_call_id("search_schema") if emit_tool_events else ""
@@ -225,8 +226,10 @@ def search_schema(
                     "table_name": str(table_name or "").strip(),
                     "table_names": [str(item).strip() for item in (table_names or []) if str(item).strip()],
                     "max_results": safe_max,
+                    "explanation": str(explanation or "").strip(),
                 },
                 "call_id": call_id,
+                "explanation": str(explanation or "").strip(),
             },
         )
 

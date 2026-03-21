@@ -30,6 +30,18 @@ test('tool activity summary avoids duplicate textual chevron prefix', () => {
   assert.equal(source.includes('&gt; {{ summaryText }}'), false)
 })
 
+test('tool activity card prefers streamed explanation text when present', () => {
+  const source = readFileSync(resolve(process.cwd(), 'src/components/chat/ToolActivityCard.vue'), 'utf-8')
+  assert.equal(source.includes('props.activity?.explanation'), true)
+  assert.equal(source.includes('delete args.explanation'), true)
+})
+
+test('app store preserves tool-call explanations in stream trace', () => {
+  const source = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf-8')
+  assert.equal(source.includes('existing.explanation = String(event.explanation || existing.explanation || \'\')'), true)
+  assert.equal(source.includes('explanation: String(event.explanation || \'\')'), true)
+})
+
 test('v1 contract includes intervention response endpoint', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/services/contracts/v1Api.js'), 'utf-8')
   assert.equal(source.includes('respondIntervention: (interventionId, payload) =>'), true)
