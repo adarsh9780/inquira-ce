@@ -13,23 +13,32 @@ from langgraph.prebuilt import ToolNode
 from .events import reset_agent_event_emitter, set_agent_event_emitter
 from .nodes import (
     analysis_collect_context_node,
+    analysis_capture_execute_tool_result_node,
+    analysis_capture_sample_tool_result_node,
     analysis_enrich_to_next,
     analysis_enrich_context_node,
     analysis_finalize_context_enrichment_node,
-    analysis_execute_code_node,
     analysis_execute_to_next,
     analysis_finalize_failure_node,
     analysis_finalize_success_node,
+    analysis_prepare_sample_to_next,
+    analysis_prepare_sample_tool_node,
     analysis_generate_code_node,
     analysis_generate_to_next,
     analysis_guard_code_node,
     analysis_guard_to_next,
+    analysis_request_execute_to_next,
+    analysis_request_execute_tool_node,
+    analysis_request_validate_result_tool_node,
+    analysis_request_validate_to_next,
     analysis_retry_decider_node,
     analysis_retry_to_next,
+    analysis_runtime_tools_to_next,
     analysis_validate_result_node,
     analysis_validate_to_next,
     chat_node,
     CONTEXT_ENRICHMENT_TOOLS,
+    RUNTIME_FLOW_TOOLS,
     finalize_node,
     reject_node,
     route_node,
@@ -148,9 +157,26 @@ def build_graph(config: RunnableConfig) -> CompiledStateGraph:
         "analysis_finalize_context_enrichment",
         _with_stream_event_emitter(analysis_finalize_context_enrichment_node),
     )
+    builder.add_node("analysis_prepare_sample_tool", _with_stream_event_emitter(analysis_prepare_sample_tool_node))
+    builder.add_node(
+        "analysis_capture_sample_tool_result",
+        _with_stream_event_emitter(analysis_capture_sample_tool_result_node),
+    )
     builder.add_node("analysis_generate_code", _with_stream_event_emitter(analysis_generate_code_node))
     builder.add_node("analysis_guard_code", _with_stream_event_emitter(analysis_guard_code_node))
-    builder.add_node("analysis_execute_code", _with_stream_event_emitter(analysis_execute_code_node))
+    builder.add_node("analysis_request_execute_tool", _with_stream_event_emitter(analysis_request_execute_tool_node))
+    builder.add_node(
+        "analysis_capture_execute_tool_result",
+        _with_stream_event_emitter(analysis_capture_execute_tool_result_node),
+    )
+    builder.add_node(
+        "analysis_request_validate_result_tool",
+        _with_stream_event_emitter(analysis_request_validate_result_tool_node),
+    )
+    builder.add_node(
+        "analysis_runtime_tools",
+        ToolNode(RUNTIME_FLOW_TOOLS, messages_key="analysis_runtime_tool_messages"),
+    )
     builder.add_node("analysis_retry_decider", _with_stream_event_emitter(analysis_retry_decider_node))
     builder.add_node("analysis_validate_result", _with_stream_event_emitter(analysis_validate_result_node))
     builder.add_node("analysis_finalize_success", _with_stream_event_emitter(analysis_finalize_success_node))
@@ -180,7 +206,26 @@ def build_graph(config: RunnableConfig) -> CompiledStateGraph:
         },
     )
     builder.add_edge("analysis_enrich_context_tools", "analysis_enrich_context")
-    builder.add_edge("analysis_finalize_context_enrichment", "analysis_generate_code")
+    builder.add_edge("analysis_finalize_context_enrichment", "analysis_prepare_sample_tool")
+    builder.add_conditional_edges(
+        "analysis_prepare_sample_tool",
+        analysis_prepare_sample_to_next,
+        {
+            "analysis_runtime_tools": "analysis_runtime_tools",
+            "analysis_generate_code": "analysis_generate_code",
+        },
+    )
+    builder.add_conditional_edges(
+        "analysis_runtime_tools",
+        analysis_runtime_tools_to_next,
+        {
+            "analysis_capture_sample_tool_result": "analysis_capture_sample_tool_result",
+            "analysis_capture_execute_tool_result": "analysis_capture_execute_tool_result",
+            "analysis_validate_result": "analysis_validate_result",
+            "analysis_retry_decider": "analysis_retry_decider",
+        },
+    )
+    builder.add_edge("analysis_capture_sample_tool_result", "analysis_generate_code")
     builder.add_conditional_edges(
         "analysis_generate_code",
         analysis_generate_to_next,
@@ -194,16 +239,32 @@ def build_graph(config: RunnableConfig) -> CompiledStateGraph:
         "analysis_guard_code",
         analysis_guard_to_next,
         {
-            "analysis_execute_code": "analysis_execute_code",
+            "analysis_execute_code": "analysis_request_execute_tool",
             "analysis_retry_decider": "analysis_retry_decider",
         },
     )
     builder.add_conditional_edges(
-        "analysis_execute_code",
+        "analysis_request_execute_tool",
+        analysis_request_execute_to_next,
+        {
+            "analysis_runtime_tools": "analysis_runtime_tools",
+            "analysis_retry_decider": "analysis_retry_decider",
+        },
+    )
+    builder.add_conditional_edges(
+        "analysis_capture_execute_tool_result",
         analysis_execute_to_next,
         {
-            "analysis_validate_result": "analysis_validate_result",
+            "analysis_validate_result": "analysis_request_validate_result_tool",
             "analysis_retry_decider": "analysis_retry_decider",
+        },
+    )
+    builder.add_conditional_edges(
+        "analysis_request_validate_result_tool",
+        analysis_request_validate_to_next,
+        {
+            "analysis_runtime_tools": "analysis_runtime_tools",
+            "analysis_finalize_failure": "analysis_finalize_failure",
         },
     )
     builder.add_conditional_edges(

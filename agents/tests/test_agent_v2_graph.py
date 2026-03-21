@@ -94,3 +94,11 @@ def test_agent_v2_graph_contains_native_toolnode_loop_for_context_enrichment() -
     rendered = graph.get_graph()
     assert any(edge.source == "analysis_enrich_context" and edge.target == "analysis_enrich_context_tools" for edge in rendered.edges)
     assert any(edge.source == "analysis_enrich_context_tools" and edge.target == "analysis_enrich_context" for edge in rendered.edges)
+
+
+def test_agent_v2_graph_contains_runtime_toolnode_routing() -> None:
+    graph = build_graph({})
+    rendered = graph.get_graph()
+    assert any(edge.source == "analysis_prepare_sample_tool" and edge.target == "analysis_runtime_tools" for edge in rendered.edges)
+    assert any(edge.source == "analysis_request_execute_tool" and edge.target == "analysis_runtime_tools" for edge in rendered.edges)
+    assert any(edge.source == "analysis_request_validate_result_tool" and edge.target == "analysis_runtime_tools" for edge in rendered.edges)

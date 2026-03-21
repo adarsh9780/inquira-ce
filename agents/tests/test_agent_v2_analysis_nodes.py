@@ -8,10 +8,13 @@ from agent_v2.nodes import (
     _ASSESS_CONTEXT_PROMPT,
     analysis_assess_context_node,
     analysis_collect_context_node,
+    analysis_prepare_sample_to_next,
+    analysis_prepare_sample_tool_node,
     analysis_enrich_to_next,
     analysis_enrich_context_node,
     analysis_finalize_context_enrichment_node,
     analysis_generate_code_node,
+    analysis_runtime_tools_to_next,
     analysis_validate_result_node,
     analysis_validate_to_next,
     analysis_retry_decider_node,
@@ -106,6 +109,38 @@ async def test_analysis_finalize_context_enrichment_merges_search_tool_results()
     enrichment_results = result.get("enrichment_results") or {}
     assert "search_schema" in enrichment_results
     assert result.get("context_sufficiency", {}).get("enough_context") is True
+
+
+@pytest.mark.asyncio
+async def test_analysis_prepare_sample_tool_requests_toolnode_call_when_sample_missing() -> None:
+    state = {
+        "analysis_context": {"sample_table": "orders"},
+        "enrichment_results": {},
+    }
+    result = await analysis_prepare_sample_tool_node(state, {"configurable": {}})
+    runtime_messages = result.get("analysis_runtime_tool_messages") or []
+    assert len(runtime_messages) == 1
+    assert isinstance(runtime_messages[0], AIMessage)
+    tool_calls = runtime_messages[0].tool_calls or []
+    assert tool_calls and tool_calls[0].get("name") == "sample_data_runtime"
+
+
+def test_analysis_prepare_sample_to_next_routes_to_runtime_tools_when_pending_call() -> None:
+    state = {
+        "analysis_runtime_tool_messages": [
+            AIMessage(
+                content="",
+                tool_calls=[{"name": "sample_data_runtime", "args": {}, "id": "c1", "type": "tool_call"}],
+            )
+        ]
+    }
+    assert analysis_prepare_sample_to_next(state) == "analysis_runtime_tools"
+
+
+def test_analysis_runtime_tools_to_next_routes_by_stage() -> None:
+    assert analysis_runtime_tools_to_next({"runtime_tool_stage": "sample"}) == "analysis_capture_sample_tool_result"
+    assert analysis_runtime_tools_to_next({"runtime_tool_stage": "execute"}) == "analysis_capture_execute_tool_result"
+    assert analysis_runtime_tools_to_next({"runtime_tool_stage": "validate"}) == "analysis_validate_result"
 
 
 @pytest.mark.asyncio
