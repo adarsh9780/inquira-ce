@@ -1688,6 +1688,24 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
         requested_queries = _extract_search_queries_from_code(candidate_code)
     if requested_queries:
         attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
+        next_generation_attempt = int(attempt_counters.get("generation") or 0) + 1
+        max_generation_attempts = max(1, int(attempt_counters.get("max_code_executions") or 3))
+        if next_generation_attempt >= max_generation_attempts:
+            return {
+                "analysis_output": output.model_dump(),
+                "candidate_code": "",
+                "tool_plan": [],
+                "enrichment_hints": requested_queries,
+                "retry_target": "",
+                "retry_feedback": (
+                    "Code generation repeatedly requested additional schema lookup and reached the retry limit. "
+                    "Finalize with a clear failure summary."
+                ),
+                "attempt_counters": {
+                    **attempt_counters,
+                    "generation": next_generation_attempt,
+                },
+            }
         return {
             "analysis_output": output.model_dump(),
             "candidate_code": "",
@@ -1700,7 +1718,7 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
             ),
             "attempt_counters": {
                 **attempt_counters,
-                "generation": int(attempt_counters.get("generation") or 0) + 1,
+                "generation": next_generation_attempt,
             },
         }
 

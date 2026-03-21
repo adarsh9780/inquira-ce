@@ -14,6 +14,7 @@ from agent_v2.nodes import (
     analysis_enrich_context_node,
     analysis_finalize_context_enrichment_node,
     analysis_generate_code_node,
+    analysis_generate_to_next,
     analysis_runtime_tools_to_next,
     analysis_validate_result_node,
     analysis_validate_to_next,
@@ -325,6 +326,44 @@ async def test_analysis_generate_code_requests_schema_enrichment_when_query_is_i
     hints = result.get("enrichment_hints") or []
     assert isinstance(hints, list)
     assert hints and hints[0] == "batsman"
+
+
+@pytest.mark.asyncio
+async def test_analysis_generate_code_stops_schema_enrichment_loop_at_generation_cap(monkeypatch) -> None:
+    monkeypatch.setattr("agent_v2.nodes._get_model", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr("agent_v2.nodes.build_coding_chain", lambda **_kwargs: object())
+
+    async def fake_ainvoke_coding_chain(**_kwargs):
+        return AnalysisOutput(
+            code='search_schema_queries = ["runs"]',
+            explanation="Need more schema",
+            output_contract=[],
+            search_schema_queries=["runs"],
+            selected_tables=[],
+            joins_used=False,
+        )
+
+    monkeypatch.setattr("agent_v2.nodes.ainvoke_coding_chain", fake_ainvoke_coding_chain)
+
+    state = {
+        "analysis_context": {
+            "messages": [HumanMessage(content="show top runs")],
+            "data_path": "/tmp/ws.db",
+            "table_names": ["batting"],
+            "schema_summary": "",
+            "sample_table": "",
+            "context": "",
+        },
+        "known_columns": [],
+        "enrichment_results": {"sample_data": {"rows": [], "columns": [], "row_count": 0}},
+        "attempt_counters": {"generation": 2, "max_code_executions": 3},
+    }
+
+    result = await analysis_generate_code_node(state, {"configurable": {}})
+    assert result.get("candidate_code") == ""
+    assert result.get("retry_target") == ""
+    assert int((result.get("attempt_counters") or {}).get("generation") or 0) == 3
+    assert analysis_generate_to_next(result) == "analysis_retry_decider"
 
 
 @pytest.mark.asyncio
