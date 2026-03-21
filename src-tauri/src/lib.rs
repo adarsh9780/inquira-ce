@@ -783,6 +783,7 @@ fn start_backend(
     venv_path: &PathBuf,
     config: &InquiraConfig,
     inquira_toml_path: &PathBuf,
+    shared_secret: &str,
 ) -> Result<StdChild, String> {
     let _ = uv_bin; // kept for signature compatibility with existing call sites
     let port = config.backend.as_ref().and_then(|b| b.port).unwrap_or(8000);
@@ -810,6 +811,7 @@ fn start_backend(
         .env("VIRTUAL_ENV", venv_path.to_str().unwrap())
         .env("INQUIRA_PORT", port.to_string())
         .env("INQUIRA_DESKTOP", "1")
+        .env("INQUIRA_AGENT_SHARED_SECRET", shared_secret)
         .env(
             "INQUIRA_TOML_PATH",
             inquira_toml_path.to_string_lossy().to_string(),
@@ -1125,6 +1127,7 @@ pub fn run() {
                 &venv_path,
                 &config,
                 &runtime_config_path,
+                &shared_secret,
             ) {
                 Ok(child) => {
                     log::info!("Backend process started (PID: {})", child.id());

@@ -39,6 +39,14 @@ class WorkspaceRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_any_by_id(session: AsyncSession, workspace_id: str) -> Workspace | None:
+        """Get workspace by id without principal filtering for trusted internal flows."""
+        result = await session.execute(
+            select(Workspace).where(Workspace.id == workspace_id)
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def get_by_name_normalized(
         session: AsyncSession,
         principal_id: str,

@@ -741,6 +741,53 @@ def _ensure_workspace_db_exists_or_raise(duckdb_path: str) -> None:
     )
 
 
+async def _execute_workspace_code_impl(
+    *,
+    workspace_id: str,
+    workspace_duckdb_path: str,
+    payload: ExecuteRequest,
+) -> ExecuteResponse:
+    _ensure_workspace_db_exists_or_raise(str(workspace_duckdb_path))
+    if _INSTALL_BLOCK_RE.search(payload.code or ""):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Package installation commands are blocked in analysis execution. "
+                "Use Settings > Runner Packages to install pinned dependencies."
+            ),
+        )
+
+    run_id = str(uuid.uuid4())
+    wrapped_code = build_run_wrapped_code(payload.code, run_id, [])
+    result = await execute_code(
+        code=wrapped_code,
+        timeout=payload.timeout,
+        working_dir=str(Path(workspace_duckdb_path).parent),
+        workspace_id=workspace_id,
+        workspace_duckdb_path=str(workspace_duckdb_path),
+    )
+    artifacts = [
+        item for item in (result.get("artifacts") or []) if isinstance(item, dict)
+    ]
+    if not artifacts:
+        try:
+            exports = await get_workspace_run_exports(
+                workspace_id=workspace_id,
+                run_id=run_id,
+            )
+            artifacts = [item for item in exports if isinstance(item, dict)]
+        except Exception:
+            artifacts = []
+    if not artifacts:
+        artifacts = _build_inline_artifact_fallback(
+            run_id=run_id,
+            execution_result=result,
+        )
+    result["run_id"] = run_id
+    result["artifacts"] = artifacts
+    return ExecuteResponse(**result)
+
+
 def _build_inline_artifact_fallback(
     *,
     run_id: str,
@@ -1019,44 +1066,11 @@ async def execute_workspace_code(
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
-    _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
-    if _INSTALL_BLOCK_RE.search(payload.code or ""):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Package installation commands are blocked in analysis execution. "
-                "Use Settings > Runner Packages to install pinned dependencies."
-            ),
-        )
-    run_id = str(uuid.uuid4())
-    wrapped_code = build_run_wrapped_code(payload.code, run_id, [])
-    result = await execute_code(
-        code=wrapped_code,
-        timeout=payload.timeout,
-        working_dir=str(Path(workspace.duckdb_path).parent),
+    return await _execute_workspace_code_impl(
         workspace_id=workspace_id,
         workspace_duckdb_path=str(workspace.duckdb_path),
+        payload=payload,
     )
-    artifacts = [
-        item for item in (result.get("artifacts") or []) if isinstance(item, dict)
-    ]
-    if not artifacts:
-        try:
-            exports = await get_workspace_run_exports(
-                workspace_id=workspace_id,
-                run_id=run_id,
-            )
-            artifacts = [item for item in exports if isinstance(item, dict)]
-        except Exception:
-            artifacts = []
-    if not artifacts:
-        artifacts = _build_inline_artifact_fallback(
-            run_id=run_id,
-            execution_result=result,
-        )
-    result["run_id"] = run_id
-    result["artifacts"] = artifacts
-    return ExecuteResponse(**result)
 
 
 @router.get(

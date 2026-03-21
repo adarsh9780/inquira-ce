@@ -1,16 +1,13 @@
-"""Local Python execution tool for agent-side validation/correction."""
+"""Workspace-kernel Python execution tool for agent-side validation/correction."""
 
 from __future__ import annotations
 
-import asyncio
-import contextlib
-import io
-from pathlib import Path
 from typing import Any
 
-import duckdb
+import httpx
 
 from ..events import emit_agent_event
+from ..runtime import load_agent_runtime_config
 from . import new_tool_call_id
 
 
@@ -30,40 +27,6 @@ def _error(message: str, stderr: str = "") -> dict[str, Any]:
     }
 
 
-def _run_code(code: str, data_path: str) -> dict[str, Any]:
-    stdout = io.StringIO()
-    stderr = io.StringIO()
-    globals_dict: dict[str, Any] = {}
-
-    con = duckdb.connect(data_path, read_only=True)
-    globals_dict["conn"] = con
-
-    try:
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exec(code, globals_dict, globals_dict)  # noqa: S102
-    except Exception as exc:  # noqa: BLE001
-        con.close()
-        return _error(str(exc), stderr.getvalue()) | {"stdout": stdout.getvalue()}
-    finally:
-        try:
-            con.close()
-        except Exception:
-            pass
-
-    return {
-        "success": True,
-        "stdout": stdout.getvalue(),
-        "stderr": stderr.getvalue(),
-        "error": None,
-        "result": None,
-        "result_type": None,
-        "result_kind": "none",
-        "result_name": None,
-        "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
-        "artifacts": [],
-    }
-
-
 async def execute_python(
     *,
     workspace_id: str,
@@ -73,7 +36,7 @@ async def execute_python(
     explanation: str = "",
     emit_tool_events: bool = True,
 ) -> dict[str, Any]:
-    _ = workspace_id
+    _ = data_path
     call_id = new_tool_call_id("execute_python")
     if emit_tool_events:
         emit_agent_event(
@@ -86,8 +49,8 @@ async def execute_python(
             },
         )
 
-    if not data_path:
-        payload = _error("Missing workspace data path.", "Missing data path")
+    if not str(workspace_id or "").strip():
+        payload = _error("Missing workspace id.", "Missing workspace id")
         if emit_tool_events:
             emit_agent_event(
                 "tool_result",
@@ -95,10 +58,28 @@ async def execute_python(
             )
         return payload
 
-    if not Path(data_path).expanduser().exists():
+    runtime = load_agent_runtime_config()
+    url = (
+        f"{runtime.backend_base_url}/api/v1/internal/agent/workspaces/{workspace_id}/execute"
+    )
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    if runtime.backend_shared_secret:
+        headers["Authorization"] = f"Bearer {runtime.backend_shared_secret}"
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(max(5, int(timeout)) + 10.0)) as client:
+            response = await client.post(
+                url,
+                json={
+                    "code": str(code or ""),
+                    "timeout": max(5, int(timeout)),
+                },
+                headers=headers,
+            )
+    except Exception as exc:
         payload = _error(
-            "Workspace database is missing. Please re-create the workspace data by selecting the original dataset again.",
-            f"Missing workspace database: {data_path}",
+            "Workspace kernel execution request failed.",
+            str(exc),
         )
         if emit_tool_events:
             emit_agent_event(
@@ -108,12 +89,31 @@ async def execute_python(
         return payload
 
     try:
-        result = await asyncio.wait_for(
-            asyncio.to_thread(_run_code, str(code or ""), str(data_path)),
-            timeout=max(5, int(timeout)),
+        result = response.json() if response.content else {}
+    except Exception:
+        result = _error(
+            "Workspace kernel returned an invalid execution payload.",
+            response.text,
         )
-    except TimeoutError:
-        result = _error("Code execution timed out.", "Timed out")
+
+    if response.status_code >= 400:
+        detail = result.get("detail") if isinstance(result, dict) else None
+        payload = _error(
+            str(detail or f"Workspace kernel execution failed with status {response.status_code}."),
+            str(detail or response.text or ""),
+        )
+        if emit_tool_events:
+            emit_agent_event(
+                "tool_result",
+                {"call_id": call_id, "output": payload, "status": "error", "duration_ms": 1},
+            )
+        return payload
+
+    if not isinstance(result, dict):
+        result = _error(
+            "Workspace kernel returned an invalid execution payload.",
+            str(result),
+        )
 
     status = "success" if bool(result.get("success")) else "error"
     if emit_tool_events:
