@@ -70,19 +70,30 @@ project = "inquira-dev"
 endpoint = "http://127.0.0.1:6006/v1/traces"
 
 [agent_service]
+# For production, point this to your LangSmith/LangGraph deployment URL.
+# Example: url = "https://your-deployment.example.com"
+# When url is set, it is preferred over host/port.
+# url = ""
 host = "127.0.0.1"
 port = 8123
 api_major = 1
 expected_api_major = 1
 startup_timeout_sec = 45
 default_agent = "agent_v2"
+# Skip assistant create/search calls when using managed deployments.
+manage_assistants = true
+# Recursion budget passed to LangGraph run config to avoid premature stop on
+# multi-step analysis flows.
+recursion_limit = 80
 # Optional override path where the external agent runtime is launched from.
 # path = "agents"
 # Optional full command override (defaults to: langgraph dev --config langgraph.json ...)
 # command = ""
 
 [agent_service.auth]
+# Modes: "shared_secret" (local), "bearer", "x_api_key"
 mode = "shared_secret"
+# api_key = ""
 
 [agent_service.phoenix]
 enabled = true

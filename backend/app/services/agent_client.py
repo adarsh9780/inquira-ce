@@ -32,8 +32,15 @@ class AgentClient:
     @property
     def _headers(self) -> dict[str, str]:
         headers = {"Accept": "application/json"}
-        if self._cfg.auth_mode == "shared_secret" and self._cfg.shared_secret:
-            headers["Authorization"] = f"Bearer {self._cfg.shared_secret}"
+        auth_mode = str(getattr(self._cfg, "auth_mode", "shared_secret") or "").strip().lower()
+        shared_secret = str(getattr(self._cfg, "shared_secret", "") or "").strip()
+        api_key = str(getattr(self._cfg, "api_key", "") or "").strip()
+        if auth_mode == "shared_secret" and shared_secret:
+            headers["Authorization"] = f"Bearer {shared_secret}"
+        elif auth_mode in {"bearer", "langsmith"} and api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        elif auth_mode in {"x_api_key", "x-api-key"} and api_key:
+            headers["x-api-key"] = api_key
         return headers
 
     def headers_with(self, extra: dict[str, str] | None = None) -> dict[str, str]:
@@ -79,16 +86,33 @@ class AgentClient:
             safe_payload["llm"] = sanitized_llm
         return safe_payload
 
+    def _run_config(self, payload: dict[str, Any]) -> dict[str, Any]:
+        configured_limit = max(1, int(getattr(self._cfg, "recursion_limit", 80) or 80))
+        explicit_limit = payload.get("recursion_limit")
+        if explicit_limit is not None:
+            try:
+                configured_limit = max(1, int(explicit_limit))
+            except (TypeError, ValueError):
+                pass
+        return {
+            "configurable": self._configurable(payload),
+            "recursion_limit": configured_limit,
+        }
+
     def _assistant_id(self, payload: dict[str, Any]) -> str:
         requested = str(payload.get("agent_profile") or "").strip()
         return requested or self._cfg.default_agent
 
     async def _ensure_assistant(self, client: httpx.AsyncClient, assistant_id: str) -> str:
+        if not bool(getattr(self._cfg, "manage_assistants", True)):
+            return assistant_id
         search_resp = await client.post(
             f"{self._cfg.base_url}/assistants/search",
             json={"graph_id": assistant_id, "limit": 1, "offset": 0},
             headers={**self._headers, "Content-Type": "application/json"},
         )
+        if search_resp.status_code in {404, 405, 501}:
+            return assistant_id
         if search_resp.status_code != 200:
             raise AgentRuntimeError(
                 f"Assistant lookup failed: {search_resp.status_code} {search_resp.text}"
@@ -164,7 +188,7 @@ class AgentClient:
                         json={
                             "assistant_id": assistant_id,
                             "input": safe_input,
-                            "config": {"configurable": self._configurable(payload)},
+                            "config": self._run_config(payload),
                             "metadata": {
                                 "request_id": str(payload.get("request_id") or ""),
                                 "workspace_id": str(payload.get("workspace_id") or ""),
@@ -203,7 +227,6 @@ class AgentClient:
         timeout = httpx.Timeout(180.0)
         attempts = self._STREAM_MAX_RETRIES + 1
         for attempt in range(attempts):
-            yielded_payload = False
             try:
                 async with httpx.AsyncClient(timeout=timeout) as client:
                     assistant_id = await self._ensure_assistant(client, self._assistant_id(payload))
@@ -214,7 +237,7 @@ class AgentClient:
                         json={
                             "assistant_id": assistant_id,
                             "input": safe_input,
-                            "config": {"configurable": self._configurable(payload)},
+                            "config": self._run_config(payload),
                             "metadata": {
                                 "request_id": str(payload.get("request_id") or ""),
                                 "workspace_id": str(payload.get("workspace_id") or ""),
@@ -255,8 +278,6 @@ class AgentClient:
                                             raise AgentRuntimeError("__retry_stream__")
                                         raise AgentRuntimeError(f"Agent stream error: {detail}")
                                     elif event_name not in {"end"}:
-                                        if event_name not in {"metadata"}:
-                                            yielded_payload = True
                                         yield {"event": event_name, "data": payload_data}
 
                                 event_name = "message"
