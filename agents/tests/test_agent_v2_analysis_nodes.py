@@ -6,6 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from agent_v2.nodes import (
     _ASSESS_CONTEXT_PROMPT,
+    _build_context_enrichment_user_prompt,
     analysis_assess_context_node,
     analysis_collect_context_node,
     analysis_prepare_sample_to_next,
@@ -59,6 +60,21 @@ async def test_analysis_enrich_context_node_produces_tool_call_message(monkeypat
     assert isinstance(tool_messages[0], SystemMessage)
     assert isinstance(tool_messages[-1], AIMessage)
     assert bool((tool_messages[-1].tool_calls or []))
+
+
+def test_context_enrichment_prompt_includes_prior_search_context() -> None:
+    rendered = _build_context_enrichment_user_prompt(
+        user_text="top scorers",
+        schema_summary="batting table",
+        known_columns=[],
+        missing_context=["columns"],
+        retry_feedback="",
+        enrichment_hints=["runs", "batsman"],
+        prior_search_summary="search_schema[runs,batsman] -> matches=4",
+        tool_budget_remaining=3,
+    )
+    assert "Prior search context:" in rendered
+    assert "matches=4" in rendered
 
 
 @pytest.mark.asyncio

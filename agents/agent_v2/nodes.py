@@ -64,7 +64,10 @@ _CONTEXT_ENRICHMENT_TOOL_PROMPT = (
     "- scan_schema_chunks(query_terms: string[], table_names?: string[], chunk_size?: int, max_chunks?: int)\n"
     "- sample_data(table_name?: string, limit?: int)\n"
     "Rules:\n"
-    "- Prefer search_schema first; use scan_schema_chunks only when matches are weak.\n"
+    "- Start with ONE batched search_schema call using queries=[...] containing 3-6 broad single-word keywords.\n"
+    "- Keep search keywords as single words (no spaces, no long phrases).\n"
+    "- Prefer search_schema first; use scan_schema_chunks only when search_schema matches are weak.\n"
+    "- After first results, narrow follow-up queries using: prior search results + user question + known columns + missing context.\n"
     "- Avoid repeating the same tool call with identical arguments.\n"
     "- Stop tool calls as soon as context is sufficient.\n"
     "When finished, return ONLY valid JSON:\n"
@@ -369,6 +372,32 @@ def _normalize_search_queries(raw: Any) -> list[str]:
                 break
         if len(normalized) >= 3:
             break
+    return normalized
+
+
+def _normalize_broad_search_queries(
+    *,
+    query: str | None,
+    queries: list[str] | None,
+    max_items: int = 6,
+) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    candidates: list[str] = []
+    if str(query or "").strip():
+        candidates.append(str(query or "").strip())
+    if isinstance(queries, list):
+        candidates.extend(str(item or "").strip() for item in queries if str(item or "").strip())
+
+    for candidate in candidates:
+        for keyword in _extract_schema_query_keywords(candidate, max_items=max_items):
+            dedupe = keyword.lower()
+            if dedupe in seen:
+                continue
+            seen.add(dedupe)
+            normalized.append(keyword)
+            if len(normalized) >= max(1, int(max_items)):
+                return normalized
     return normalized
 
 
@@ -759,12 +788,14 @@ def search_schema_context_tool(
     context = analysis_context if isinstance(analysis_context, dict) else {}
     workspace_schema = context.get("workspace_schema") if isinstance(context.get("workspace_schema"), dict) else {}
     table_names = _normalize_table_names(context.get("table_names"), max_items=64)
+    normalized_queries = _normalize_broad_search_queries(query=query, queries=queries, max_items=8)
+    primary_query = normalized_queries[0] if normalized_queries else str(query or "").strip()
     return search_schema(
         schema=workspace_schema,
         data_path=str(context.get("data_path") or "") or None,
         table_names=table_names,
-        query=str(query or "").strip(),
-        queries=[str(item).strip() for item in (queries or []) if str(item).strip()],
+        query=primary_query,
+        queries=normalized_queries,
         table_name=str(table_name or "").strip() or None,
         max_results=max(1, min(50, int(limit or 20))),
         emit_tool_events=False,
@@ -974,6 +1005,7 @@ def _build_context_enrichment_user_prompt(
     missing_context: list[str],
     retry_feedback: str,
     enrichment_hints: list[str],
+    prior_search_summary: str,
     tool_budget_remaining: int,
 ) -> str:
     known_columns_json = _safe_json_dumps(known_columns[:20])
@@ -989,10 +1021,43 @@ def _build_context_enrichment_user_prompt(
         f"Known columns JSON:\n{known_columns_json}\n\n"
         f"Missing context hints JSON:\n{missing_json}\n\n"
         f"Search keyword hints JSON:\n{hints_json}\n\n"
+        f"Prior search context:\n{_truncate_text(prior_search_summary, limit=1200) or 'none'}\n\n"
         f"Retry feedback:\n{feedback or 'none'}\n\n"
         f"Tool call budget remaining: {max(0, int(tool_budget_remaining))}\n"
         "If context is sufficient, do not call tools and return final JSON immediately."
     )
+
+
+def _summarize_prior_search_context(enrichment_results: dict[str, Any] | None) -> str:
+    results = enrichment_results if isinstance(enrichment_results, dict) else {}
+    lines: list[str] = []
+    search_rows = results.get("search_schema")
+    if isinstance(search_rows, list):
+        for item in search_rows[-6:]:
+            if not isinstance(item, dict):
+                continue
+            query = str(item.get("query") or "").strip()
+            queries = [str(q).strip() for q in (item.get("queries") or []) if str(q).strip()]
+            match_count = int(item.get("match_count") or 0)
+            columns = item.get("columns") if isinstance(item.get("columns"), list) else []
+            matched_cols = [str(col.get("name") or "").strip() for col in columns if isinstance(col, dict)]
+            matched_cols = [name for name in matched_cols if name][:4]
+            query_label = ", ".join(queries[:6]) if queries else query
+            lines.append(
+                f"search_schema[{query_label or 'unknown'}] -> matches={match_count}, cols={', '.join(matched_cols) or 'none'}"
+            )
+
+    chunk_rows = results.get("scan_schema_chunks")
+    if isinstance(chunk_rows, list):
+        for item in chunk_rows[-4:]:
+            if not isinstance(item, dict):
+                continue
+            terms = [str(term).strip() for term in (item.get("query_terms") or []) if str(term).strip()]
+            rel = int(item.get("relevant_table_count") or 0)
+            lines.append(
+                f"scan_schema_chunks[{', '.join(terms[:6]) or 'none'}] -> relevant_tables={rel}"
+            )
+    return "\n".join(lines).strip()
 
 
 def _parse_context_enrichment_decision(messages: list[AnyMessage]) -> ContextEnrichmentDecision:
@@ -1351,6 +1416,8 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
     ][:6]
     retry_feedback = str(state.get("retry_feedback") or "").strip()
     hints = _normalize_search_queries(state.get("enrichment_hints") or [])
+    existing_results = state.get("enrichment_results") if isinstance(state.get("enrichment_results"), dict) else {}
+    prior_search_summary = _summarize_prior_search_context(existing_results)
     attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
     max_tool_calls = max(1, int(attempt_counters.get("max_tool_calls") or 5))
 
@@ -1372,6 +1439,7 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
                     missing_context=missing_context,
                     retry_feedback=retry_feedback,
                     enrichment_hints=hints,
+                    prior_search_summary=prior_search_summary,
                     tool_budget_remaining=tool_budget_remaining,
                 )
             )
@@ -1386,6 +1454,7 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
                     missing_context=missing_context,
                     retry_feedback=retry_feedback,
                     enrichment_hints=hints,
+                    prior_search_summary=prior_search_summary,
                     tool_budget_remaining=tool_budget_remaining,
                 )
             )

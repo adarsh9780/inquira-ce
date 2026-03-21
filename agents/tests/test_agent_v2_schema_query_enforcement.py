@@ -6,6 +6,7 @@ from langchain_core.messages import HumanMessage
 from agent_v2.coding_subagent import AnalysisOutput
 from agent_v2.nodes import (
     _build_schema_search_queries,
+    _normalize_broad_search_queries,
     _sanitize_tool_plan,
     analysis_generate_code_node,
 )
@@ -40,6 +41,19 @@ def test_build_schema_search_queries_returns_keywords_not_sentences() -> None:
     assert queries
     assert all(" " not in str(query or "") for query in queries)
     assert "year" in queries
+
+
+def test_normalize_broad_search_queries_batches_single_word_keywords() -> None:
+    queries = _normalize_broad_search_queries(
+        query="top batsman by total runs in innings",
+        queries=["powerplay strike rate", "economy"],
+        max_items=8,
+    )
+    assert queries
+    assert all(" " not in str(item or "") for item in queries)
+    assert "batsman" in queries
+    assert "runs" in queries
+    assert any(item in queries for item in ["powerplay", "economy"])
 
 
 @pytest.mark.asyncio
