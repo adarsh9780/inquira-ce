@@ -24,3 +24,31 @@ def test_search_schema_discovers_columns_from_workspace_db(tmp_path) -> None:
     columns = result.get("columns") if isinstance(result, dict) else []
     assert isinstance(columns, list)
     assert any(str(item.get("name") or "").strip().lower() == "customer_name" for item in columns)
+
+
+def test_search_schema_supports_multiple_query_patterns_in_one_call(tmp_path) -> None:
+    db_path = tmp_path / "workspace.duckdb"
+    con = duckdb.connect(str(db_path))
+    try:
+        con.execute(
+            "CREATE TABLE sales (customer_name VARCHAR, total_amount DOUBLE, invoice_date DATE)"
+        )
+    finally:
+        con.close()
+
+    result = search_schema(
+        data_path=str(db_path),
+        table_names=["sales"],
+        query="",
+        queries=["customer", "amount"],
+        table_name=None,
+        max_results=10,
+    )
+
+    columns = result.get("columns") if isinstance(result, dict) else []
+    assert isinstance(columns, list)
+    names = {str(item.get("name") or "").strip().lower() for item in columns}
+    assert "customer_name" in names
+    assert "total_amount" in names
+    first = columns[0] if columns else {}
+    assert isinstance(first.get("matched_queries"), list)

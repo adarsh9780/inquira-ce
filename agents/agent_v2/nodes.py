@@ -60,7 +60,7 @@ _CONTEXT_ENRICHMENT_TOOL_PROMPT = (
     "Decide whether there is enough schema/data context to generate executable analysis code.\n"
     "If context is insufficient, call one tool at a time to gather missing details.\n"
     "Available tools:\n"
-    "- search_schema(query: string, table_name?: string, limit?: int)\n"
+    "- search_schema(query?: string, queries?: string[], table_name?: string, limit?: int)\n"
     "- scan_schema_chunks(query_terms: string[], table_names?: string[], chunk_size?: int, max_chunks?: int)\n"
     "- sample_data(table_name?: string, limit?: int)\n"
     "Rules:\n"
@@ -749,12 +749,13 @@ def _merge_known_columns_lru(
 
 @tool("search_schema")
 def search_schema_context_tool(
-    query: str,
+    query: str = "",
+    queries: list[str] | None = None,
     table_name: str = "",
     limit: int = 20,
     analysis_context: Annotated[dict[str, Any], InjectedState("analysis_context")] = None,
 ) -> dict[str, Any]:
-    """Search schema columns using a keyword query."""
+    """Search schema columns using one query or multiple query patterns."""
     context = analysis_context if isinstance(analysis_context, dict) else {}
     workspace_schema = context.get("workspace_schema") if isinstance(context.get("workspace_schema"), dict) else {}
     table_names = _normalize_table_names(context.get("table_names"), max_items=64)
@@ -763,6 +764,7 @@ def search_schema_context_tool(
         data_path=str(context.get("data_path") or "") or None,
         table_names=table_names,
         query=str(query or "").strip(),
+        queries=[str(item).strip() for item in (queries or []) if str(item).strip()],
         table_name=str(table_name or "").strip() or None,
         max_results=max(1, min(50, int(limit or 20))),
         emit_tool_events=False,

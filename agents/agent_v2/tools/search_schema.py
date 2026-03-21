@@ -14,6 +14,31 @@ def _normalize_text(value: Any) -> str:
     return " ".join(str(value or "").strip().lower().split())
 
 
+def _normalize_queries(
+    *,
+    query: str | None,
+    queries: list[str] | None,
+    max_items: int = 12,
+) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    combined: list[str] = []
+    if isinstance(query, str) and str(query).strip():
+        combined.append(str(query).strip())
+    if isinstance(queries, list):
+        combined.extend(str(item).strip() for item in queries if str(item).strip())
+
+    for candidate in combined:
+        token = _normalize_text(candidate)
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        normalized.append(token)
+        if len(normalized) >= max(1, int(max_items)):
+            break
+    return normalized
+
+
 def _iter_schema_columns(schema: dict[str, Any], table_name: str | None) -> list[dict[str, Any]]:
     normalized_table_filter = _normalize_text(table_name)
     scoped_table = str(schema.get("table_name") or "").strip()
@@ -84,6 +109,25 @@ def _match_rank(column: dict[str, Any], normalized_query: str) -> int | None:
     if normalized_query in description:
         return 5
     return None
+
+
+def _best_match_rank(
+    *,
+    column: dict[str, Any],
+    normalized_queries: list[str],
+) -> tuple[int, list[str]] | None:
+    best_rank: int | None = None
+    matched_queries: list[str] = []
+    for normalized_query in normalized_queries:
+        rank = _match_rank(column, normalized_query)
+        if rank is None:
+            continue
+        matched_queries.append(normalized_query)
+        if best_rank is None or rank < best_rank:
+            best_rank = rank
+    if best_rank is None:
+        return None
+    return best_rank, matched_queries
 
 
 def _quote_identifier(identifier: str) -> str:
@@ -161,12 +205,13 @@ def search_schema(
     data_path: str | None = None,
     table_names: list[str] | None = None,
     query: str,
+    queries: list[str] | None = None,
     table_name: str | None,
     max_results: int = 20,
     emit_tool_events: bool = True,
 ) -> dict[str, Any]:
     call_id = new_tool_call_id("search_schema") if emit_tool_events else ""
-    normalized_query = _normalize_text(query)
+    normalized_queries = _normalize_queries(query=query, queries=queries, max_items=12)
     safe_max = max(1, min(100, int(max_results)))
 
     if emit_tool_events:
@@ -176,6 +221,7 @@ def search_schema(
                 "tool": "search_schema",
                 "args": {
                     "query": str(query or "").strip(),
+                    "queries": [str(item).strip() for item in (queries or []) if str(item).strip()],
                     "table_name": str(table_name or "").strip(),
                     "table_names": [str(item).strip() for item in (table_names or []) if str(item).strip()],
                     "max_results": safe_max,
@@ -187,14 +233,16 @@ def search_schema(
     rows = _iter_schema_columns(schema if isinstance(schema, dict) else {}, table_name)
     if not rows:
         rows = _iter_db_columns(data_path=data_path, table_name=table_name, table_names=table_names)
-    ranked: list[tuple[int, str, str, dict[str, Any]]] = []
+    ranked: list[tuple[int, int, str, str, dict[str, Any]]] = []
     for column in rows:
-        rank = _match_rank(column, normalized_query)
-        if rank is None:
+        matched = _best_match_rank(column=column, normalized_queries=normalized_queries)
+        if matched is None:
             continue
+        rank, matched_queries = matched
         ranked.append(
             (
                 rank,
+                -len(matched_queries),
                 _normalize_text(column.get("table_name")),
                 _normalize_text(column.get("name")),
                 {
@@ -202,15 +250,16 @@ def search_schema(
                     "name": str(column.get("name") or "").strip(),
                     "dtype": str(column.get("dtype") or "").strip(),
                     "description": str(column.get("description") or "").strip(),
+                    "matched_queries": matched_queries,
                 },
             )
         )
 
-    ranked.sort(key=lambda item: (item[0], item[1], item[2]))
+    ranked.sort(key=lambda item: (item[0], item[1], item[2], item[3]))
 
     deduped: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for _, table_key, name_key, payload in ranked:
+    for _, _, table_key, name_key, payload in ranked:
         dedupe_key = f"{table_key}:{name_key}"
         if dedupe_key in seen:
             continue
@@ -221,6 +270,7 @@ def search_schema(
 
     output = {
         "query": str(query or "").strip(),
+        "queries": normalized_queries,
         "table_name": str(table_name or "").strip(),
         "match_count": len(deduped),
         "columns": deduped,
