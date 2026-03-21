@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app.v1.api import agent_runtime_internal as internal_api
+from app.v1.api import internal_agent_router as internal_api
 
 
 def test_agent_runtime_internal_auth_rejects_invalid_secret(monkeypatch):
@@ -53,11 +53,11 @@ async def test_agent_runtime_internal_execute_uses_workspace_id_to_target_kernel
         )
 
     monkeypatch.setattr(
-        "app.v1.api.agent_runtime_internal.WorkspaceRepository.get_any_by_id",
+        "app.v1.api.internal_agent_router.WorkspaceRepository.get_any_by_id",
         fake_get_any_by_id,
     )
     monkeypatch.setattr(
-        "app.v1.api.agent_runtime_internal._execute_workspace_code_impl",
+        "app.v1.api.internal_agent_router._execute_workspace_code_impl",
         fake_execute_impl,
     )
 
