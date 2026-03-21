@@ -6,9 +6,10 @@ from app.main import app
 def test_openapi_contains_required_v1_routes():
     schema = app.openapi()
     paths = schema.get("paths", {})
-    assert "/api/v1/auth/register" in paths
-    assert "/api/v1/auth/login" in paths
     assert "/api/v1/auth/me" in paths
+    assert "/api/v1/auth/logout" in paths
+    assert "/api/v1/auth/register" not in paths
+    assert "/api/v1/auth/login" not in paths
     assert "/api/v1/workspaces" in paths
     assert "/api/v1/workspaces/{workspace_id}" in paths
     assert "/api/v1/workspaces/{workspace_id}/database/clear" in paths

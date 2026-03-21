@@ -5,28 +5,18 @@ from __future__ import annotations
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.settings import settings
-from ..db.session import get_appdata_db_session, get_auth_db_session
+from ..db.session import get_appdata_db_session
 from ..repositories.principal_repository import PrincipalRepository
 from ..services.auth_service import AuthService
 
 
-async def get_current_user(
-    request: Request,
-    auth_session: AsyncSession = Depends(get_auth_db_session),
-):
-    """Resolve authenticated user from bearer token or legacy cookie session."""
-    if settings.auth_provider == "supabase":
-        auth_header = str(request.headers.get("authorization") or "").strip()
-        if not auth_header.lower().startswith("bearer "):
-            raise HTTPException(status_code=401, detail="Not authenticated")
-        access_token = auth_header.split(" ", 1)[1].strip()
-        return await AuthService.resolve_supabase_user(access_token)
-
-    session_token = request.cookies.get("session_token")
-    if not session_token:
+async def get_current_user(request: Request):
+    """Resolve authenticated user from a Supabase bearer token."""
+    auth_header = str(request.headers.get("authorization") or "").strip()
+    if not auth_header.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return await AuthService.resolve_user_from_session(auth_session, session_token)
+    access_token = auth_header.split(" ", 1)[1].strip()
+    return await AuthService.resolve_supabase_user(access_token)
 
 
 async def ensure_appdata_principal(

@@ -159,7 +159,7 @@ axios.interceptors.response.use(
     const isAuthProbe = url.includes('/api/v1/auth/me')
     const isExpectedAuthCheckFailure =
       (status === 401 || !status) &&
-      (isAuthProbe || url.includes('/api/v1/auth/login') || url.includes('/api/v1/auth/logout'))
+      (isAuthProbe || url.includes('/api/v1/auth/logout'))
 
     if (!isExpectedAuthCheckFailure) {
       console.error('API Error:', error)
@@ -193,15 +193,6 @@ axios.interceptors.response.use(
 const client = getInquira()
 
 export const apiService = {
-  // Authentication endpoints
-  async register(username, password) {
-    return client.registerUserAuthRegisterPost({ username, password })
-  },
-
-  async login(username, password) {
-    return client.loginUserAuthLoginPost({ username, password })
-  },
-
   async logout() {
     return client.logoutUserAuthLogoutPost()
   },
@@ -926,14 +917,6 @@ export const apiService = {
 
   async v1GetCurrentUser(options = {}) {
     return v1Api.auth.me(options)
-  },
-
-  async v1Register(username, password) {
-    return v1Api.auth.register(username, password)
-  },
-
-  async v1Login(username, password) {
-    return v1Api.auth.login(username, password)
   },
 
   async v1Logout() {

@@ -17,7 +17,7 @@ def _force_local_jupyter_provider(monkeypatch):
     load_execution_runtime_config.cache_clear()
 
 
-def test_execute_endpoint_requires_auth_cookie():
+def test_execute_endpoint_requires_bearer_auth():
     client = TestClient(app)
     response = client.post(
         "/api/v1/workspaces/ws-1/execute",

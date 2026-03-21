@@ -192,9 +192,9 @@
       <section>
         <h2>7. Cookies, Sessions, and Authentication</h2>
         <ul>
-          <li>Local sessions are authenticated via an HTTP-only cookie set by the local server.</li>
-          <li>Sessions expire after approximately 24 hours.</li>
-          <li>User and session records are stored in the local SQLite database at <code>~/.inquira/inquira.db</code>.</li>
+          <li>Authentication is handled through Supabase and, where chosen, upstream identity providers such as Google, Microsoft, or GitHub.</li>
+          <li>The desktop app stores the authenticated session locally so you do not need to sign in every time the app starts.</li>
+          <li>Account recovery, password changes, and related identity management may be handled in the browser rather than inside the desktop app.</li>
         </ul>
       </section>
 

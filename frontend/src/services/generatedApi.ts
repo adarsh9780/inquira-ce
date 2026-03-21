@@ -16,6 +16,8 @@ export type AnalyzeRequestContext = string | null;
 
 export type AnalyzeRequestTableName = string | null;
 
+export type AnalyzeRequestPreferredTableName = string | null;
+
 export type AnalyzeRequestActiveSchemaAnyOf = { [key: string]: unknown };
 
 export type AnalyzeRequestActiveSchema = AnalyzeRequestActiveSchemaAnyOf | null;
@@ -34,9 +36,29 @@ export interface AnalyzeRequest {
   model?: string;
   context?: AnalyzeRequestContext;
   table_name?: AnalyzeRequestTableName;
+  preferred_table_name?: AnalyzeRequestPreferredTableName;
   active_schema?: AnalyzeRequestActiveSchema;
+  attachments?: ChatImageAttachment[];
   api_key?: AnalyzeRequestApiKey;
 }
+
+export type AnalyzeResponseResultExplanation = string | null;
+
+export type AnalyzeResponseCodeExplanation = string | null;
+
+export type AnalyzeResponseRunId = string | null;
+
+export type AnalyzeResponseExecutionAnyOf = { [key: string]: unknown };
+
+export type AnalyzeResponseExecution = AnalyzeResponseExecutionAnyOf | null;
+
+export type AnalyzeResponseMetadataAnyOf = { [key: string]: unknown };
+
+export type AnalyzeResponseMetadata = AnalyzeResponseMetadataAnyOf | null;
+
+export type AnalyzeResponseArtifactsItem = { [key: string]: unknown };
+
+export type AnalyzeResponseFinalScriptArtifactId = string | null;
 
 /**
  * Analyze output payload with persistence references.
@@ -48,17 +70,55 @@ export interface AnalyzeResponse {
   is_relevant: boolean;
   code: string;
   explanation: string;
-  result_explanation?: string | null;
-  code_explanation?: string | null;
-  run_id?: string | null;
-  execution?: { [key: string]: any } | null;
-  artifacts?: Array<{ [key: string]: any }>;
-  final_script_artifact_id?: string | null;
+  result_explanation?: AnalyzeResponseResultExplanation;
+  code_explanation?: AnalyzeResponseCodeExplanation;
+  run_id?: AnalyzeResponseRunId;
+  execution?: AnalyzeResponseExecution;
+  metadata?: AnalyzeResponseMetadata;
+  artifacts?: AnalyzeResponseArtifactsItem[];
+  final_script_artifact_id?: AnalyzeResponseFinalScriptArtifactId;
 }
 
 export interface ApiKeyUpdateRequest {
+  provider?: string;
   /** @minLength 1 */
   api_key: string;
+}
+
+export interface ArtifactDeleteResponse {
+  artifact_id: string;
+  deleted: boolean;
+}
+
+export type ArtifactMetadataResponseTableName = string | null;
+
+export type ArtifactMetadataResponseSchemaAnyOfItem = { [key: string]: unknown };
+
+export type ArtifactMetadataResponseSchema = ArtifactMetadataResponseSchemaAnyOfItem[] | null;
+
+export type ArtifactMetadataResponseRowCount = number | null;
+
+export type ArtifactMetadataResponsePayloadAnyOf = { [key: string]: unknown };
+
+export type ArtifactMetadataResponsePayload = ArtifactMetadataResponsePayloadAnyOf | null;
+
+export type ArtifactMetadataResponseError = string | null;
+
+export interface ArtifactMetadataResponse {
+  artifact_id: string;
+  run_id: string;
+  workspace_id: string;
+  logical_name: string;
+  kind: string;
+  pointer: string;
+  table_name?: ArtifactMetadataResponseTableName;
+  schema?: ArtifactMetadataResponseSchema;
+  row_count?: ArtifactMetadataResponseRowCount;
+  payload?: ArtifactMetadataResponsePayload;
+  created_at: string;
+  expires_at: string;
+  status: string;
+  error?: ArtifactMetadataResponseError;
 }
 
 /**
@@ -83,6 +143,66 @@ export interface BrowserDatasetSyncRequest {
   columns?: BrowserDatasetSyncRequestColumnsItem[];
   row_count?: BrowserDatasetSyncRequestRowCount;
   allow_sample_values?: boolean;
+}
+
+/**
+ * Inline image attachment payload.
+ */
+export interface ChatImageAttachment {
+  /** @minLength 1 */
+  attachment_id: string;
+  /** @minLength 1 */
+  filename: string;
+  /** @minLength 1 */
+  media_type: string;
+  /** @minLength 1 */
+  data_base64: string;
+}
+
+export type CommandCatalogResponseCommandsItem = {[key: string]: string};
+
+export interface CommandCatalogResponse {
+  commands: CommandCatalogResponseCommandsItem[];
+}
+
+export type CommandExecuteRequestText = string | null;
+
+export type CommandExecuteRequestName = string | null;
+
+export type CommandExecuteRequestDefaultTable = string | null;
+
+export type CommandExecuteRequestConversationId = string | null;
+
+export interface CommandExecuteRequest {
+  text?: CommandExecuteRequestText;
+  name?: CommandExecuteRequestName;
+  raw_args?: string;
+  default_table?: CommandExecuteRequestDefaultTable;
+  conversation_id?: CommandExecuteRequestConversationId;
+  /**
+   * @minimum 1
+   * @maximum 2000
+   */
+  row_limit?: number;
+}
+
+export type CommandExecuteResponseResultAnyOf = { [key: string]: unknown };
+
+export type CommandExecuteResponseResult = CommandExecuteResponseResultAnyOf | null;
+
+export type CommandExecuteResponseConversationId = string | null;
+
+export type CommandExecuteResponseTurnId = string | null;
+
+export interface CommandExecuteResponse {
+  command: string;
+  name: string;
+  output: string;
+  result_type?: string;
+  result?: CommandExecuteResponseResult;
+  truncated?: boolean;
+  conversation_id?: CommandExecuteResponseConversationId;
+  turn_id?: CommandExecuteResponseTurnId;
 }
 
 export type ConversationCreateRequestTitle = string | null;
@@ -124,6 +244,18 @@ export interface ConversationUpdateRequest {
   title?: ConversationUpdateRequestTitle;
 }
 
+export type DataframeArtifactRowsResponseRowsItem = { [key: string]: unknown };
+
+export interface DataframeArtifactRowsResponse {
+  artifact_id: string;
+  name: string;
+  row_count: number;
+  columns: string[];
+  rows: DataframeArtifactRowsResponseRowsItem[];
+  offset: number;
+  limit: number;
+}
+
 /**
  * Add dataset payload using a local source file path.
  */
@@ -137,15 +269,6 @@ export interface DatasetAddRequest {
  */
 export interface DatasetListResponse {
   datasets: DatasetResponse[];
-}
-
-export type DatasetPreviewResponseDataItem = { [key: string]: unknown };
-
-export interface DatasetPreviewResponse {
-  table_name: string;
-  sample_type: string;
-  row_count: number;
-  data: DatasetPreviewResponseDataItem[];
 }
 
 export type DatasetResponseRowCount = number | null;
@@ -185,14 +308,23 @@ export interface ExecuteRequest {
   timeout?: number;
 }
 
+export type ExecuteResponseRunId = string | null;
+
 export type ExecuteResponseError = string | null;
 
 export type ExecuteResponseResult = unknown | null;
 
 export type ExecuteResponseResultType = string | null;
 
+export type ExecuteResponseResultName = string | null;
+
+export type ExecuteResponseVariables = {[key: string]: { [key: string]: unknown }};
+
+export type ExecuteResponseArtifactsItem = { [key: string]: unknown };
+
 export interface ExecuteResponse {
   success: boolean;
+  run_id?: ExecuteResponseRunId;
   stdout?: string;
   stderr?: string;
   has_stdout?: boolean;
@@ -201,12 +333,28 @@ export interface ExecuteResponse {
   result?: ExecuteResponseResult;
   result_type?: ExecuteResponseResultType;
   result_kind?: string;
-  result_name?: string | null;
+  result_name?: ExecuteResponseResultName;
+  variables?: ExecuteResponseVariables;
+  artifacts?: ExecuteResponseArtifactsItem[];
 }
 
+/**
+ * LLM provider to test against.
+ */
+export type GeminiTestRequestProvider = string | null;
+
+/**
+ * Optional model identifier to validate against.
+ */
+export type GeminiTestRequestModel = string | null;
+
 export interface GeminiTestRequest {
-  /** Google Gemini API key to test */
+  /** Provider API key to test */
   api_key: string;
+  /** LLM provider to test against. */
+  provider?: GeminiTestRequestProvider;
+  /** Optional model identifier to validate against. */
+  model?: GeminiTestRequestModel;
 }
 
 export interface HTTPValidationError {
@@ -214,19 +362,28 @@ export interface HTTPValidationError {
 }
 
 /**
- * Login payload.
+ * Ack payload for intervention response submissions.
  */
-export interface LoginRequest {
-  /**
-   * @minLength 3
-   * @maxLength 50
-   */
-  username: string;
-  /**
-   * @minLength 6
-   * @maxLength 128
-   */
-  password: string;
+export interface InterventionResponseAck {
+  intervention_id: string;
+  accepted: boolean;
+}
+
+/**
+ * User decision payload for a pending agent intervention.
+ */
+export interface InterventionResponseRequest {
+  selected?: string[];
+}
+
+export interface KernelResetResponse {
+  workspace_id: string;
+  reset: boolean;
+}
+
+export interface KernelStatusResponse {
+  workspace_id: string;
+  status: string;
 }
 
 /**
@@ -242,11 +399,20 @@ export type PreferencesResponseActiveDatasetPath = string | null;
 
 export type PreferencesResponseActiveTableName = string | null;
 
+export type PreferencesResponseProviderModelCatalogs = {[key: string]: ProviderModelCatalog};
+
+export type PreferencesResponseApiKeyPresentByProvider = {[key: string]: boolean};
+
 export interface PreferencesResponse {
+  llm_provider?: string;
+  available_providers?: string[];
   selected_model?: string;
-  available_models?: string[];
+  selected_lite_model?: string;
+  selected_coding_model?: string;
+  enabled_models?: string[];
   schema_context?: string;
   allow_schema_sample_values?: boolean;
+  terminal_risk_acknowledged?: boolean;
   chat_overlay_width?: number;
   is_sidebar_collapsed?: boolean;
   hide_shortcuts_modal?: boolean;
@@ -254,13 +420,31 @@ export interface PreferencesResponse {
   active_dataset_path?: PreferencesResponseActiveDatasetPath;
   active_table_name?: PreferencesResponseActiveTableName;
   api_key_present?: boolean;
+  available_models?: string[];
+  provider_available_main_models?: string[];
+  provider_available_lite_models?: string[];
+  provider_model_catalogs?: PreferencesResponseProviderModelCatalogs;
+  api_key_present_by_provider?: PreferencesResponseApiKeyPresentByProvider;
+  selected_provider_requires_api_key?: boolean;
+  selected_provider_api_key_present?: boolean;
+  plotly_theme_mode?: string;
 }
 
+export type PreferencesUpdateRequestLlmProvider = string | null;
+
 export type PreferencesUpdateRequestSelectedModel = string | null;
+
+export type PreferencesUpdateRequestSelectedLiteModel = string | null;
+
+export type PreferencesUpdateRequestSelectedCodingModel = string | null;
+
+export type PreferencesUpdateRequestEnabledModels = string[] | null;
 
 export type PreferencesUpdateRequestSchemaContext = string | null;
 
 export type PreferencesUpdateRequestAllowSchemaSampleValues = boolean | null;
+
+export type PreferencesUpdateRequestTerminalRiskAcknowledged = boolean | null;
 
 export type PreferencesUpdateRequestChatOverlayWidth = number | null;
 
@@ -275,9 +459,14 @@ export type PreferencesUpdateRequestActiveDatasetPath = string | null;
 export type PreferencesUpdateRequestActiveTableName = string | null;
 
 export interface PreferencesUpdateRequest {
+  llm_provider?: PreferencesUpdateRequestLlmProvider;
   selected_model?: PreferencesUpdateRequestSelectedModel;
+  selected_lite_model?: PreferencesUpdateRequestSelectedLiteModel;
+  selected_coding_model?: PreferencesUpdateRequestSelectedCodingModel;
+  enabled_models?: PreferencesUpdateRequestEnabledModels;
   schema_context?: PreferencesUpdateRequestSchemaContext;
   allow_schema_sample_values?: PreferencesUpdateRequestAllowSchemaSampleValues;
+  terminal_risk_acknowledged?: PreferencesUpdateRequestTerminalRiskAcknowledged;
   chat_overlay_width?: PreferencesUpdateRequestChatOverlayWidth;
   is_sidebar_collapsed?: PreferencesUpdateRequestIsSidebarCollapsed;
   hide_shortcuts_modal?: PreferencesUpdateRequestHideShortcutsModal;
@@ -286,20 +475,106 @@ export interface PreferencesUpdateRequest {
   active_table_name?: PreferencesUpdateRequestActiveTableName;
 }
 
+export type ProviderModelCatalogAccountModelsConfigured = boolean | null;
+
+export interface ProviderModelCatalog {
+  main_models?: string[];
+  lite_models?: string[];
+  default_main_model?: string;
+  default_lite_model?: string;
+  source?: string;
+  account_models_configured?: ProviderModelCatalogAccountModelsConfigured;
+  account_models_url?: string;
+}
+
+export type ProviderModelsRefreshRequestProvider = string | null;
+
+export type ProviderModelsRefreshRequestApiKey = string | null;
+
+export interface ProviderModelsRefreshRequest {
+  provider?: ProviderModelsRefreshRequestProvider;
+  api_key?: ProviderModelsRefreshRequestApiKey;
+}
+
+export type ProviderModelsRefreshResponseActiveWorkspaceId = string | null;
+
+export type ProviderModelsRefreshResponseActiveDatasetPath = string | null;
+
+export type ProviderModelsRefreshResponseActiveTableName = string | null;
+
+export type ProviderModelsRefreshResponseProviderModelCatalogs = {[key: string]: ProviderModelCatalog};
+
+export type ProviderModelsRefreshResponseApiKeyPresentByProvider = {[key: string]: boolean};
+
+export interface ProviderModelsRefreshResponse {
+  llm_provider?: string;
+  available_providers?: string[];
+  selected_model?: string;
+  selected_lite_model?: string;
+  selected_coding_model?: string;
+  enabled_models?: string[];
+  schema_context?: string;
+  allow_schema_sample_values?: boolean;
+  terminal_risk_acknowledged?: boolean;
+  chat_overlay_width?: number;
+  is_sidebar_collapsed?: boolean;
+  hide_shortcuts_modal?: boolean;
+  active_workspace_id?: ProviderModelsRefreshResponseActiveWorkspaceId;
+  active_dataset_path?: ProviderModelsRefreshResponseActiveDatasetPath;
+  active_table_name?: ProviderModelsRefreshResponseActiveTableName;
+  api_key_present?: boolean;
+  available_models?: string[];
+  provider_available_main_models?: string[];
+  provider_available_lite_models?: string[];
+  provider_model_catalogs?: ProviderModelsRefreshResponseProviderModelCatalogs;
+  api_key_present_by_provider?: ProviderModelsRefreshResponseApiKeyPresentByProvider;
+  selected_provider_requires_api_key?: boolean;
+  selected_provider_api_key_present?: boolean;
+  plotly_theme_mode?: string;
+  detail?: string;
+}
+
+export type RegenerateSchemaRequestContext = string | null;
+
+export type RegenerateSchemaRequestModel = string | null;
+
+export interface RegenerateSchemaRequest {
+  context?: RegenerateSchemaRequestContext;
+  model?: RegenerateSchemaRequestModel;
+}
+
 /**
- * Register payload.
+ * Optional package index URL
  */
-export interface RegisterRequest {
+export type RunnerPackageInstallRequestIndexUrl = string | null;
+
+export interface RunnerPackageInstallRequest {
+  workspace_id: string;
   /**
-   * @minLength 3
-   * @maxLength 50
+   * Package name without version specifier
+   * @minLength 1
    */
-  username: string;
+  package: string;
   /**
-   * @minLength 6
-   * @maxLength 128
+   * Exact package version
+   * @minLength 1
    */
-  password: string;
+  version: string;
+  /** Optional package index URL */
+  index_url?: RunnerPackageInstallRequestIndexUrl;
+  /** Persist package/index settings to inquira.toml runner defaults */
+  save_as_default?: boolean;
+}
+
+export interface RunnerPackageInstallResponse {
+  installed: boolean;
+  package_spec: string;
+  installer: string;
+  command: string[];
+  stdout?: string;
+  stderr?: string;
+  workspace_kernel_reset: boolean;
+  saved_as_default: boolean;
 }
 
 export type SaveSchemaRequestColumnsItem = { [key: string]: unknown };
@@ -313,6 +588,53 @@ export type SchemaListResponseSchemasItem = { [key: string]: unknown };
 
 export interface SchemaListResponse {
   schemas: SchemaListResponseSchemasItem[];
+}
+
+/**
+ * Optional working directory override
+ */
+export type TerminalExecuteRequestCwd = string | null;
+
+export interface TerminalExecuteRequest {
+  /**
+   * Shell command to run
+   * @minLength 1
+   */
+  command: string;
+  /** Optional working directory override */
+  cwd?: TerminalExecuteRequestCwd;
+  /**
+   * Max command execution time in seconds
+   * @minimum 1
+   * @maximum 600
+   */
+  timeout?: number;
+}
+
+export interface TerminalExecuteResponse {
+  stdout?: string;
+  stderr?: string;
+  exit_code: number;
+  cwd: string;
+  shell: string;
+  platform: string;
+  timed_out?: boolean;
+  persistent?: boolean;
+}
+
+export interface TerminalSessionResetResponse {
+  workspace_id: string;
+  reset: boolean;
+}
+
+export type TermsResponseLastUpdated = string | null;
+
+/**
+ * Rendered terms source payload.
+ */
+export interface TermsResponse {
+  markdown: string;
+  last_updated?: TermsResponseLastUpdated;
 }
 
 export type TurnPageResponseNextCursor = string | null;
@@ -357,6 +679,44 @@ export interface ValidationError {
   type: string;
 }
 
+export interface WorkspaceArtifactListResponse {
+  artifacts: WorkspaceArtifactSummary[];
+  total: number;
+}
+
+export type WorkspaceArtifactSummaryRowCount = number | null;
+
+export type WorkspaceArtifactSummaryColumnsAnyOfItem = { [key: string]: unknown };
+
+export type WorkspaceArtifactSummaryColumns = WorkspaceArtifactSummaryColumnsAnyOfItem[] | null;
+
+export interface WorkspaceArtifactSummary {
+  artifact_id: string;
+  logical_name: string;
+  kind: string;
+  row_count?: WorkspaceArtifactSummaryRowCount;
+  columns?: WorkspaceArtifactSummaryColumns;
+  created_at: string;
+  status: string;
+}
+
+export interface WorkspaceArtifactUsageResponse {
+  workspace_id: string;
+  duckdb_bytes: number;
+  duckdb_warning_threshold_bytes: number;
+  figure_count: number;
+  figure_warning_threshold_count: number;
+  duckdb_warning: boolean;
+  figure_warning: boolean;
+  warning: boolean;
+}
+
+export type WorkspaceColumnsResponseColumnsItem = {[key: string]: string};
+
+export interface WorkspaceColumnsResponse {
+  columns: WorkspaceColumnsResponseColumnsItem[];
+}
+
 /**
  * Workspace creation payload.
  */
@@ -366,6 +726,15 @@ export interface WorkspaceCreateRequest {
    * @maxLength 120
    */
   name: string;
+}
+
+/**
+ * Workspace database clear payload.
+ */
+export interface WorkspaceDatabaseClearResponse {
+  workspace_id: string;
+  cleared: boolean;
+  detail: string;
 }
 
 /**
@@ -400,6 +769,18 @@ export interface WorkspacePathsResponse {
   workspace_id: string;
   workspace_dir: string;
   duckdb_path: string;
+  terminal_enabled?: boolean;
+}
+
+/**
+ * Workspace rename payload.
+ */
+export interface WorkspaceRenameRequest {
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  name: string;
 }
 
 /**
@@ -413,6 +794,10 @@ export interface WorkspaceResponse {
   created_at: string;
   updated_at: string;
 }
+
+export type DeleteApiKeyApiV1PreferencesApiKeyDeleteParams = {
+provider?: string | null;
+};
 
 export type ListConversationsApiV1WorkspacesWorkspaceIdConversationsGetParams = {
 /**
@@ -431,49 +816,74 @@ limit?: number;
 before?: string | null;
 };
 
+export type ProxyAssistantsSearchApiV1AgentAssistantsSearchPostBody = { [key: string]: unknown };
+
+export type ProxyAssistantsCreateApiV1AgentAssistantsPostBody = { [key: string]: unknown };
+
+export type ProxyRunsWaitApiV1AgentRunsWaitPostBody = { [key: string]: unknown };
+
+export type ProxyRunsStreamApiV1AgentRunsStreamPostBody = { [key: string]: unknown };
+
 export type ResetEverythingApiV1AdminResetPostParams = {
 token: string;
 };
 
-export type GetWorkspaceDatasetPreviewApiV1WorkspacesWorkspaceIdDatasetsTableNamePreviewGetParams = {
+export type GetWorkspaceDataframeArtifactRowsApiV1WorkspacesWorkspaceIdArtifactsDataframesArtifactIdRowsGetParams = {
 /**
- * @pattern ^(random|first)$
+ * @minimum 0
  */
-sample_type?: string;
+offset?: number;
 /**
  * @minimum 1
- * @maximum 500
+ * @maximum 1000
  */
 limit?: number;
+/**
+ * AG Grid sort model JSON
+ */
+sort_model?: string | null;
+/**
+ * AG Grid filter model JSON
+ */
+filter_model?: string | null;
+/**
+ * Global text search applied across columns
+ */
+search?: string | null;
+};
+
+export type GetWorkspaceArtifactRowsApiV1WorkspacesWorkspaceIdArtifactsArtifactIdRowsGetParams = {
+/**
+ * @minimum 0
+ */
+offset?: number;
+/**
+ * @minimum 1
+ * @maximum 1000
+ */
+limit?: number;
+/**
+ * AG Grid sort model JSON
+ */
+sort_model?: string | null;
+/**
+ * AG Grid filter model JSON
+ */
+filter_model?: string | null;
+/**
+ * Global text search applied across columns
+ */
+search?: string | null;
+};
+
+export type ListWorkspaceArtifactsApiV1WorkspacesWorkspaceIdArtifactsGetParams = {
+/**
+ * Filter by artifact kind, e.g. 'dataframe' or 'figure'
+ */
+kind?: string | null;
 };
 
 export const getInquira = () => {
-/**
- * Register a new user and immediately issue login session cookie.
- * @summary Register User
- */
-const registerUserApiV1AuthRegisterPost = <TData = AxiosResponse<AuthUserResponse>>(
-    registerRequest: RegisterRequest, options?: AxiosRequestConfig
- ): Promise<TData> => {
-    return axios.post(
-      `/api/v1/auth/register`,
-      registerRequest,options
-    );
-  }
-
-/**
- * Login user and issue session cookie.
- * @summary Login User
- */
-const loginUserApiV1AuthLoginPost = <TData = AxiosResponse<AuthUserResponse>>(
-    loginRequest: LoginRequest, options?: AxiosRequestConfig
- ): Promise<TData> => {
-    return axios.post(
-      `/api/v1/auth/login`,
-      loginRequest,options
-    );
-  }
-
 /**
  * Return authenticated user profile and plan for UI rendering.
  * @summary Get Current User Profile
@@ -487,7 +897,7 @@ const getCurrentUserProfileApiV1AuthMeGet = <TData = AxiosResponse<AuthUserRespo
   }
 
 /**
- * Logout user by deleting current v1 session token and clearing cookie.
+ * Return success after the client clears its Supabase session locally.
  * @summary Logout User
  */
 const logoutUserApiV1AuthLogoutPost = <TData = AxiosResponse<MessageResponse>>(
@@ -536,6 +946,20 @@ const activateWorkspaceApiV1WorkspacesWorkspaceIdActivatePut = <TData = AxiosRes
   }
 
 /**
+ * Rename a workspace owned by the authenticated user.
+ * @summary Rename Workspace
+ */
+const renameWorkspaceApiV1WorkspacesWorkspaceIdPatch = <TData = AxiosResponse<WorkspaceResponse>>(
+    workspaceId: string,
+    workspaceRenameRequest: WorkspaceRenameRequest, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.patch(
+      `/api/v1/workspaces/${workspaceId}`,
+      workspaceRenameRequest,options
+    );
+  }
+
+/**
  * Queue async workspace deletion and return job id for polling.
  * @summary Delete Workspace
  */
@@ -544,6 +968,18 @@ const deleteWorkspaceApiV1WorkspacesWorkspaceIdDelete = <TData = AxiosResponse<W
  ): Promise<TData> => {
     return axios.delete(
       `/api/v1/workspaces/${workspaceId}`,options
+    );
+  }
+
+/**
+ * Clear workspace DB/scratchpad content and reset dataset catalog metadata.
+ * @summary Clear Workspace Database
+ */
+const clearWorkspaceDatabaseApiV1WorkspacesWorkspaceIdDatabaseClearPost = <TData = AxiosResponse<WorkspaceDatabaseClearResponse>>(
+    workspaceId: string, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/workspaces/${workspaceId}/database/clear`,undefined,options
     );
   }
 
@@ -595,6 +1031,18 @@ const updatePreferencesApiV1PreferencesPut = <TData = AxiosResponse<PreferencesR
   }
 
 /**
+ * @summary Refresh Provider Models
+ */
+const refreshProviderModelsApiV1PreferencesModelsRefreshPost = <TData = AxiosResponse<ProviderModelsRefreshResponse>>(
+    providerModelsRefreshRequest: ProviderModelsRefreshRequest, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/preferences/models/refresh`,
+      providerModelsRefreshRequest,options
+    );
+  }
+
+/**
  * @summary Set Api Key
  */
 const setApiKeyApiV1PreferencesApiKeyPut = <TData = AxiosResponse<MessageResponse>>(
@@ -610,10 +1058,12 @@ const setApiKeyApiV1PreferencesApiKeyPut = <TData = AxiosResponse<MessageRespons
  * @summary Delete Api Key
  */
 const deleteApiKeyApiV1PreferencesApiKeyDelete = <TData = AxiosResponse<MessageResponse>>(
-     options?: AxiosRequestConfig
+    params?: DeleteApiKeyApiV1PreferencesApiKeyDeleteParams, options?: AxiosRequestConfig
  ): Promise<TData> => {
     return axios.delete(
-      `/api/v1/preferences/api-key`,options
+      `/api/v1/preferences/api-key`,{
+    ...options,
+        params: {...params, ...options?.params},}
     );
   }
 
@@ -654,6 +1104,17 @@ const syncBrowserWorkspaceDatasetApiV1WorkspacesWorkspaceIdDatasetsBrowserSyncPo
     return axios.post(
       `/api/v1/workspaces/${workspaceId}/datasets/browser-sync`,
       browserDatasetSyncRequest,options
+    );
+  }
+
+/**
+ * @summary Get Terms
+ */
+const getTermsApiV1LegalTermsGet = <TData = AxiosResponse<TermsResponse>>(
+     options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/api/v1/legal/terms`,options
     );
   }
 
@@ -766,6 +1227,90 @@ const streamAnalyzeApiV1ChatStreamPost = <TData = AxiosResponse<unknown>>(
   }
 
 /**
+ * Submit a user response for a pending intervention request.
+ * @summary Respond To Intervention
+ */
+const respondToInterventionApiV1ChatInterventionsInterventionIdResponsePost = <TData = AxiosResponse<InterventionResponseAck>>(
+    interventionId: string,
+    interventionResponseRequest: InterventionResponseRequest, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/chat/interventions/${interventionId}/response`,
+      interventionResponseRequest,options
+    );
+  }
+
+/**
+ * @summary Proxy Ok
+ */
+const proxyOkApiV1AgentOkGet = <TData = AxiosResponse<unknown>>(
+     options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/api/v1/agent/ok`,options
+    );
+  }
+
+/**
+ * @summary Proxy Info
+ */
+const proxyInfoApiV1AgentInfoGet = <TData = AxiosResponse<unknown>>(
+     options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/api/v1/agent/info`,options
+    );
+  }
+
+/**
+ * @summary Proxy Assistants Search
+ */
+const proxyAssistantsSearchApiV1AgentAssistantsSearchPost = <TData = AxiosResponse<unknown>>(
+    proxyAssistantsSearchApiV1AgentAssistantsSearchPostBody: ProxyAssistantsSearchApiV1AgentAssistantsSearchPostBody, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/agent/assistants/search`,
+      proxyAssistantsSearchApiV1AgentAssistantsSearchPostBody,options
+    );
+  }
+
+/**
+ * @summary Proxy Assistants Create
+ */
+const proxyAssistantsCreateApiV1AgentAssistantsPost = <TData = AxiosResponse<unknown>>(
+    proxyAssistantsCreateApiV1AgentAssistantsPostBody: ProxyAssistantsCreateApiV1AgentAssistantsPostBody, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/agent/assistants`,
+      proxyAssistantsCreateApiV1AgentAssistantsPostBody,options
+    );
+  }
+
+/**
+ * @summary Proxy Runs Wait
+ */
+const proxyRunsWaitApiV1AgentRunsWaitPost = <TData = AxiosResponse<unknown>>(
+    proxyRunsWaitApiV1AgentRunsWaitPostBody: ProxyRunsWaitApiV1AgentRunsWaitPostBody, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/agent/runs/wait`,
+      proxyRunsWaitApiV1AgentRunsWaitPostBody,options
+    );
+  }
+
+/**
+ * @summary Proxy Runs Stream
+ */
+const proxyRunsStreamApiV1AgentRunsStreamPost = <TData = AxiosResponse<unknown>>(
+    proxyRunsStreamApiV1AgentRunsStreamPostBody: ProxyRunsStreamApiV1AgentRunsStreamPostBody, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/agent/runs/stream`,
+      proxyRunsStreamApiV1AgentRunsStreamPostBody,options
+    );
+  }
+
+/**
  * One-time destructive reset for legacy/users/schema data.
 
 Requires:
@@ -784,7 +1329,7 @@ const resetEverythingApiV1AdminResetPost = <TData = AxiosResponse<MessageRespons
   }
 
 /**
- * Validate a Gemini key by issuing a lightweight test request.
+ * Validate an OpenRouter-compatible key by issuing a lightweight test request.
  * @summary Test Gemini Api Key
  */
 const testGeminiApiKeyApiV1AdminTestGeminiPost = <TData = AxiosResponse<unknown>>(
@@ -808,6 +1353,41 @@ const getWorkspacePathsApiV1WorkspacesWorkspaceIdPathsGet = <TData = AxiosRespon
   }
 
 /**
+ * @summary Get Workspace Columns
+ */
+const getWorkspaceColumnsApiV1WorkspacesWorkspaceIdColumnsGet = <TData = AxiosResponse<WorkspaceColumnsResponse>>(
+    workspaceId: string, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/api/v1/workspaces/${workspaceId}/columns`,options
+    );
+  }
+
+/**
+ * @summary List Workspace Commands
+ */
+const listWorkspaceCommandsApiV1WorkspacesWorkspaceIdCommandsGet = <TData = AxiosResponse<CommandCatalogResponse>>(
+    workspaceId: string, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/api/v1/workspaces/${workspaceId}/commands`,options
+    );
+  }
+
+/**
+ * @summary Execute Workspace Slash Command
+ */
+const executeWorkspaceSlashCommandApiV1WorkspacesWorkspaceIdCommandsExecutePost = <TData = AxiosResponse<CommandExecuteResponse>>(
+    workspaceId: string,
+    commandExecuteRequest: CommandExecuteRequest, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/workspaces/${workspaceId}/commands/execute`,
+      commandExecuteRequest,options
+    );
+  }
+
+/**
  * @summary Execute Workspace Code
  */
 const executeWorkspaceCodeApiV1WorkspacesWorkspaceIdExecutePost = <TData = AxiosResponse<ExecuteResponse>>(
@@ -817,6 +1397,195 @@ const executeWorkspaceCodeApiV1WorkspacesWorkspaceIdExecutePost = <TData = Axios
     return axios.post(
       `/api/v1/workspaces/${workspaceId}/execute`,
       executeRequest,options
+    );
+  }
+
+/**
+ * @summary Get Workspace Dataframe Artifact Rows
+ */
+const getWorkspaceDataframeArtifactRowsApiV1WorkspacesWorkspaceIdArtifactsDataframesArtifactIdRowsGet = <TData = AxiosResponse<DataframeArtifactRowsResponse>>(
+    workspaceId: string,
+    artifactId: string,
+    params?: GetWorkspaceDataframeArtifactRowsApiV1WorkspacesWorkspaceIdArtifactsDataframesArtifactIdRowsGetParams, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/api/v1/workspaces/${workspaceId}/artifacts/dataframes/${artifactId}/rows`,{
+    ...options,
+        params: {...params, ...options?.params},}
+    );
+  }
+
+/**
+ * @summary Get Workspace Artifact Rows
+ */
+const getWorkspaceArtifactRowsApiV1WorkspacesWorkspaceIdArtifactsArtifactIdRowsGet = <TData = AxiosResponse<DataframeArtifactRowsResponse>>(
+    workspaceId: string,
+    artifactId: string,
+    params?: GetWorkspaceArtifactRowsApiV1WorkspacesWorkspaceIdArtifactsArtifactIdRowsGetParams, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/api/v1/workspaces/${workspaceId}/artifacts/${artifactId}/rows`,{
+    ...options,
+        params: {...params, ...options?.params},}
+    );
+  }
+
+/**
+ * Return scratchpad usage summary used by status-bar artifact pressure warning.
+ * @summary Get Workspace Artifact Usage
+ */
+const getWorkspaceArtifactUsageApiV1WorkspacesWorkspaceIdArtifactsUsageGet = <TData = AxiosResponse<WorkspaceArtifactUsageResponse>>(
+    workspaceId: string, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/api/v1/workspaces/${workspaceId}/artifacts/usage`,options
+    );
+  }
+
+/**
+ * @summary Get Workspace Artifact Metadata
+ */
+const getWorkspaceArtifactMetadataApiV1WorkspacesWorkspaceIdArtifactsArtifactIdGet = <TData = AxiosResponse<ArtifactMetadataResponse>>(
+    workspaceId: string,
+    artifactId: string, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/api/v1/workspaces/${workspaceId}/artifacts/${artifactId}`,options
+    );
+  }
+
+/**
+ * @summary Delete Workspace Artifact
+ */
+const deleteWorkspaceArtifactApiV1WorkspacesWorkspaceIdArtifactsArtifactIdDelete = <TData = AxiosResponse<ArtifactDeleteResponse>>(
+    workspaceId: string,
+    artifactId: string, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.delete(
+      `/api/v1/workspaces/${workspaceId}/artifacts/${artifactId}`,options
+    );
+  }
+
+/**
+ * List all non-expired artifacts for a workspace, optionally filtered by kind.
+ * @summary List Workspace Artifacts
+ */
+const listWorkspaceArtifactsApiV1WorkspacesWorkspaceIdArtifactsGet = <TData = AxiosResponse<WorkspaceArtifactListResponse>>(
+    workspaceId: string,
+    params?: ListWorkspaceArtifactsApiV1WorkspacesWorkspaceIdArtifactsGetParams, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/api/v1/workspaces/${workspaceId}/artifacts`,{
+    ...options,
+        params: {...params, ...options?.params},}
+    );
+  }
+
+/**
+ * @summary Install Runner Runtime Package
+ */
+const installRunnerRuntimePackageApiV1RuntimeRunnerPackagesInstallPost = <TData = AxiosResponse<RunnerPackageInstallResponse>>(
+    runnerPackageInstallRequest: RunnerPackageInstallRequest, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/runtime/runner/packages/install`,
+      runnerPackageInstallRequest,options
+    );
+  }
+
+/**
+ * @summary Execute Workspace Terminal Command
+ */
+const executeWorkspaceTerminalCommandApiV1WorkspacesWorkspaceIdTerminalExecutePost = <TData = AxiosResponse<TerminalExecuteResponse>>(
+    workspaceId: string,
+    terminalExecuteRequest: TerminalExecuteRequest, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/workspaces/${workspaceId}/terminal/execute`,
+      terminalExecuteRequest,options
+    );
+  }
+
+/**
+ * @summary Stream Workspace Terminal Command Sse
+ */
+const streamWorkspaceTerminalCommandSseApiV1WorkspacesWorkspaceIdTerminalStreamPost = <TData = AxiosResponse<unknown>>(
+    workspaceId: string,
+    terminalExecuteRequest: TerminalExecuteRequest, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/workspaces/${workspaceId}/terminal/stream`,
+      terminalExecuteRequest,options
+    );
+  }
+
+/**
+ * @summary Reset Workspace Terminal Session
+ */
+const resetWorkspaceTerminalSessionApiV1WorkspacesWorkspaceIdTerminalSessionResetPost = <TData = AxiosResponse<TerminalSessionResetResponse>>(
+    workspaceId: string, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/workspaces/${workspaceId}/terminal/session/reset`,undefined,options
+    );
+  }
+
+/**
+ * Return current workspace kernel status.
+ * @summary Get Workspace Kernel Runtime Status
+ */
+const getWorkspaceKernelRuntimeStatusApiV1WorkspacesWorkspaceIdKernelStatusGet = <TData = AxiosResponse<KernelStatusResponse>>(
+    workspaceId: string, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/api/v1/workspaces/${workspaceId}/kernel/status`,options
+    );
+  }
+
+/**
+ * @summary Bootstrap Workspace Runtime Endpoint
+ */
+const bootstrapWorkspaceRuntimeEndpointApiV1WorkspacesWorkspaceIdRuntimeBootstrapPost = <TData = AxiosResponse<KernelResetResponse>>(
+    workspaceId: string, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/workspaces/${workspaceId}/runtime/bootstrap`,undefined,options
+    );
+  }
+
+/**
+ * Interrupt currently running code in workspace kernel.
+ * @summary Interrupt Workspace Kernel Runtime
+ */
+const interruptWorkspaceKernelRuntimeApiV1WorkspacesWorkspaceIdKernelInterruptPost = <TData = AxiosResponse<KernelResetResponse>>(
+    workspaceId: string, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/workspaces/${workspaceId}/kernel/interrupt`,undefined,options
+    );
+  }
+
+/**
+ * Reset workspace kernel and clear in-memory execution context.
+ * @summary Reset Workspace Kernel Runtime
+ */
+const resetWorkspaceKernelRuntimeApiV1WorkspacesWorkspaceIdKernelResetPost = <TData = AxiosResponse<KernelResetResponse>>(
+    workspaceId: string, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/workspaces/${workspaceId}/kernel/reset`,undefined,options
+    );
+  }
+
+/**
+ * Restart workspace kernel and warm it immediately.
+ * @summary Restart Workspace Kernel Runtime
+ */
+const restartWorkspaceKernelRuntimeApiV1WorkspacesWorkspaceIdKernelRestartPost = <TData = AxiosResponse<KernelResetResponse>>(
+    workspaceId: string, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.post(
+      `/api/v1/workspaces/${workspaceId}/kernel/restart`,undefined,options
     );
   }
 
@@ -847,17 +1616,16 @@ const saveWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchem
   }
 
 /**
- * @summary Get Workspace Dataset Preview
+ * @summary Regenerate Workspace Dataset Schema
  */
-const getWorkspaceDatasetPreviewApiV1WorkspacesWorkspaceIdDatasetsTableNamePreviewGet = <TData = AxiosResponse<DatasetPreviewResponse>>(
+const regenerateWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaRegeneratePost = <TData = AxiosResponse<DatasetSchemaResponse>>(
     workspaceId: string,
     tableName: string,
-    params?: GetWorkspaceDatasetPreviewApiV1WorkspacesWorkspaceIdDatasetsTableNamePreviewGetParams, options?: AxiosRequestConfig
+    regenerateSchemaRequest: RegenerateSchemaRequest, options?: AxiosRequestConfig
  ): Promise<TData> => {
-    return axios.get(
-      `/api/v1/workspaces/${workspaceId}/datasets/${tableName}/preview`,{
-    ...options,
-        params: {...params, ...options?.params},}
+    return axios.post(
+      `/api/v1/workspaces/${workspaceId}/datasets/${tableName}/schema/regenerate`,
+      regenerateSchemaRequest,options
     );
   }
 
@@ -873,6 +1641,17 @@ const listWorkspaceSchemasApiV1WorkspacesWorkspaceIdSchemasGet = <TData = AxiosR
   }
 
 /**
+ * @summary Health
+ */
+const healthHealthGet = <TData = AxiosResponse<unknown>>(
+     options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/health`,options
+    );
+  }
+
+/**
  * Root endpoint to check if API is running
  * @summary Root
  */
@@ -884,24 +1663,26 @@ const rootGet = <TData = AxiosResponse<unknown>>(
     );
   }
 
-return {registerUserApiV1AuthRegisterPost,loginUserApiV1AuthLoginPost,getCurrentUserProfileApiV1AuthMeGet,logoutUserApiV1AuthLogoutPost,listWorkspacesApiV1WorkspacesGet,createWorkspaceApiV1WorkspacesPost,activateWorkspaceApiV1WorkspacesWorkspaceIdActivatePut,deleteWorkspaceApiV1WorkspacesWorkspaceIdDelete,listWorkspaceDeletionsApiV1WorkspacesDeletionsGet,getWorkspaceDeletionApiV1WorkspacesDeletionsJobIdGet,getPreferencesApiV1PreferencesGet,updatePreferencesApiV1PreferencesPut,setApiKeyApiV1PreferencesApiKeyPut,deleteApiKeyApiV1PreferencesApiKeyDelete,listWorkspaceDatasetsApiV1WorkspacesWorkspaceIdDatasetsGet,addWorkspaceDatasetApiV1WorkspacesWorkspaceIdDatasetsPost,syncBrowserWorkspaceDatasetApiV1WorkspacesWorkspaceIdDatasetsBrowserSyncPost,createConversationApiV1WorkspacesWorkspaceIdConversationsPost,listConversationsApiV1WorkspacesWorkspaceIdConversationsGet,clearConversationApiV1ConversationsConversationIdClearPost,deleteConversationApiV1ConversationsConversationIdDelete,patchConversationApiV1ConversationsConversationIdPatch,listTurnsApiV1ConversationsConversationIdTurnsGet,analyzeApiV1ChatAnalyzePost,streamAnalyzeApiV1ChatStreamPost,resetEverythingApiV1AdminResetPost,testGeminiApiKeyApiV1AdminTestGeminiPost,getWorkspacePathsApiV1WorkspacesWorkspaceIdPathsGet,executeWorkspaceCodeApiV1WorkspacesWorkspaceIdExecutePost,getWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaGet,saveWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaPost,getWorkspaceDatasetPreviewApiV1WorkspacesWorkspaceIdDatasetsTableNamePreviewGet,listWorkspaceSchemasApiV1WorkspacesWorkspaceIdSchemasGet,rootGet}};
-export type RegisterUserApiV1AuthRegisterPostResult = AxiosResponse<AuthUserResponse>
-export type LoginUserApiV1AuthLoginPostResult = AxiosResponse<AuthUserResponse>
+return {getCurrentUserProfileApiV1AuthMeGet,logoutUserApiV1AuthLogoutPost,listWorkspacesApiV1WorkspacesGet,createWorkspaceApiV1WorkspacesPost,activateWorkspaceApiV1WorkspacesWorkspaceIdActivatePut,renameWorkspaceApiV1WorkspacesWorkspaceIdPatch,deleteWorkspaceApiV1WorkspacesWorkspaceIdDelete,clearWorkspaceDatabaseApiV1WorkspacesWorkspaceIdDatabaseClearPost,listWorkspaceDeletionsApiV1WorkspacesDeletionsGet,getWorkspaceDeletionApiV1WorkspacesDeletionsJobIdGet,getPreferencesApiV1PreferencesGet,updatePreferencesApiV1PreferencesPut,refreshProviderModelsApiV1PreferencesModelsRefreshPost,setApiKeyApiV1PreferencesApiKeyPut,deleteApiKeyApiV1PreferencesApiKeyDelete,listWorkspaceDatasetsApiV1WorkspacesWorkspaceIdDatasetsGet,addWorkspaceDatasetApiV1WorkspacesWorkspaceIdDatasetsPost,syncBrowserWorkspaceDatasetApiV1WorkspacesWorkspaceIdDatasetsBrowserSyncPost,getTermsApiV1LegalTermsGet,createConversationApiV1WorkspacesWorkspaceIdConversationsPost,listConversationsApiV1WorkspacesWorkspaceIdConversationsGet,clearConversationApiV1ConversationsConversationIdClearPost,deleteConversationApiV1ConversationsConversationIdDelete,patchConversationApiV1ConversationsConversationIdPatch,listTurnsApiV1ConversationsConversationIdTurnsGet,analyzeApiV1ChatAnalyzePost,streamAnalyzeApiV1ChatStreamPost,respondToInterventionApiV1ChatInterventionsInterventionIdResponsePost,proxyOkApiV1AgentOkGet,proxyInfoApiV1AgentInfoGet,proxyAssistantsSearchApiV1AgentAssistantsSearchPost,proxyAssistantsCreateApiV1AgentAssistantsPost,proxyRunsWaitApiV1AgentRunsWaitPost,proxyRunsStreamApiV1AgentRunsStreamPost,resetEverythingApiV1AdminResetPost,testGeminiApiKeyApiV1AdminTestGeminiPost,getWorkspacePathsApiV1WorkspacesWorkspaceIdPathsGet,getWorkspaceColumnsApiV1WorkspacesWorkspaceIdColumnsGet,listWorkspaceCommandsApiV1WorkspacesWorkspaceIdCommandsGet,executeWorkspaceSlashCommandApiV1WorkspacesWorkspaceIdCommandsExecutePost,executeWorkspaceCodeApiV1WorkspacesWorkspaceIdExecutePost,getWorkspaceDataframeArtifactRowsApiV1WorkspacesWorkspaceIdArtifactsDataframesArtifactIdRowsGet,getWorkspaceArtifactRowsApiV1WorkspacesWorkspaceIdArtifactsArtifactIdRowsGet,getWorkspaceArtifactUsageApiV1WorkspacesWorkspaceIdArtifactsUsageGet,getWorkspaceArtifactMetadataApiV1WorkspacesWorkspaceIdArtifactsArtifactIdGet,deleteWorkspaceArtifactApiV1WorkspacesWorkspaceIdArtifactsArtifactIdDelete,listWorkspaceArtifactsApiV1WorkspacesWorkspaceIdArtifactsGet,installRunnerRuntimePackageApiV1RuntimeRunnerPackagesInstallPost,executeWorkspaceTerminalCommandApiV1WorkspacesWorkspaceIdTerminalExecutePost,streamWorkspaceTerminalCommandSseApiV1WorkspacesWorkspaceIdTerminalStreamPost,resetWorkspaceTerminalSessionApiV1WorkspacesWorkspaceIdTerminalSessionResetPost,getWorkspaceKernelRuntimeStatusApiV1WorkspacesWorkspaceIdKernelStatusGet,bootstrapWorkspaceRuntimeEndpointApiV1WorkspacesWorkspaceIdRuntimeBootstrapPost,interruptWorkspaceKernelRuntimeApiV1WorkspacesWorkspaceIdKernelInterruptPost,resetWorkspaceKernelRuntimeApiV1WorkspacesWorkspaceIdKernelResetPost,restartWorkspaceKernelRuntimeApiV1WorkspacesWorkspaceIdKernelRestartPost,getWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaGet,saveWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaPost,regenerateWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaRegeneratePost,listWorkspaceSchemasApiV1WorkspacesWorkspaceIdSchemasGet,healthHealthGet,rootGet}};
 export type GetCurrentUserProfileApiV1AuthMeGetResult = AxiosResponse<AuthUserResponse>
 export type LogoutUserApiV1AuthLogoutPostResult = AxiosResponse<MessageResponse>
 export type ListWorkspacesApiV1WorkspacesGetResult = AxiosResponse<WorkspaceListResponse>
 export type CreateWorkspaceApiV1WorkspacesPostResult = AxiosResponse<WorkspaceResponse>
 export type ActivateWorkspaceApiV1WorkspacesWorkspaceIdActivatePutResult = AxiosResponse<WorkspaceResponse>
+export type RenameWorkspaceApiV1WorkspacesWorkspaceIdPatchResult = AxiosResponse<WorkspaceResponse>
 export type DeleteWorkspaceApiV1WorkspacesWorkspaceIdDeleteResult = AxiosResponse<WorkspaceDeletionJobResponse>
+export type ClearWorkspaceDatabaseApiV1WorkspacesWorkspaceIdDatabaseClearPostResult = AxiosResponse<WorkspaceDatabaseClearResponse>
 export type ListWorkspaceDeletionsApiV1WorkspacesDeletionsGetResult = AxiosResponse<WorkspaceDeletionJobListResponse>
 export type GetWorkspaceDeletionApiV1WorkspacesDeletionsJobIdGetResult = AxiosResponse<WorkspaceDeletionJobResponse>
 export type GetPreferencesApiV1PreferencesGetResult = AxiosResponse<PreferencesResponse>
 export type UpdatePreferencesApiV1PreferencesPutResult = AxiosResponse<PreferencesResponse>
+export type RefreshProviderModelsApiV1PreferencesModelsRefreshPostResult = AxiosResponse<ProviderModelsRefreshResponse>
 export type SetApiKeyApiV1PreferencesApiKeyPutResult = AxiosResponse<MessageResponse>
 export type DeleteApiKeyApiV1PreferencesApiKeyDeleteResult = AxiosResponse<MessageResponse>
 export type ListWorkspaceDatasetsApiV1WorkspacesWorkspaceIdDatasetsGetResult = AxiosResponse<DatasetListResponse>
 export type AddWorkspaceDatasetApiV1WorkspacesWorkspaceIdDatasetsPostResult = AxiosResponse<DatasetResponse>
 export type SyncBrowserWorkspaceDatasetApiV1WorkspacesWorkspaceIdDatasetsBrowserSyncPostResult = AxiosResponse<DatasetResponse>
+export type GetTermsApiV1LegalTermsGetResult = AxiosResponse<TermsResponse>
 export type CreateConversationApiV1WorkspacesWorkspaceIdConversationsPostResult = AxiosResponse<ConversationResponse>
 export type ListConversationsApiV1WorkspacesWorkspaceIdConversationsGetResult = AxiosResponse<ConversationListResponse>
 export type ClearConversationApiV1ConversationsConversationIdClearPostResult = AxiosResponse<MessageResponse>
@@ -910,12 +1691,38 @@ export type PatchConversationApiV1ConversationsConversationIdPatchResult = Axios
 export type ListTurnsApiV1ConversationsConversationIdTurnsGetResult = AxiosResponse<TurnPageResponse>
 export type AnalyzeApiV1ChatAnalyzePostResult = AxiosResponse<AnalyzeResponse>
 export type StreamAnalyzeApiV1ChatStreamPostResult = AxiosResponse<unknown>
+export type RespondToInterventionApiV1ChatInterventionsInterventionIdResponsePostResult = AxiosResponse<InterventionResponseAck>
+export type ProxyOkApiV1AgentOkGetResult = AxiosResponse<unknown>
+export type ProxyInfoApiV1AgentInfoGetResult = AxiosResponse<unknown>
+export type ProxyAssistantsSearchApiV1AgentAssistantsSearchPostResult = AxiosResponse<unknown>
+export type ProxyAssistantsCreateApiV1AgentAssistantsPostResult = AxiosResponse<unknown>
+export type ProxyRunsWaitApiV1AgentRunsWaitPostResult = AxiosResponse<unknown>
+export type ProxyRunsStreamApiV1AgentRunsStreamPostResult = AxiosResponse<unknown>
 export type ResetEverythingApiV1AdminResetPostResult = AxiosResponse<MessageResponse>
 export type TestGeminiApiKeyApiV1AdminTestGeminiPostResult = AxiosResponse<unknown>
 export type GetWorkspacePathsApiV1WorkspacesWorkspaceIdPathsGetResult = AxiosResponse<WorkspacePathsResponse>
+export type GetWorkspaceColumnsApiV1WorkspacesWorkspaceIdColumnsGetResult = AxiosResponse<WorkspaceColumnsResponse>
+export type ListWorkspaceCommandsApiV1WorkspacesWorkspaceIdCommandsGetResult = AxiosResponse<CommandCatalogResponse>
+export type ExecuteWorkspaceSlashCommandApiV1WorkspacesWorkspaceIdCommandsExecutePostResult = AxiosResponse<CommandExecuteResponse>
 export type ExecuteWorkspaceCodeApiV1WorkspacesWorkspaceIdExecutePostResult = AxiosResponse<ExecuteResponse>
+export type GetWorkspaceDataframeArtifactRowsApiV1WorkspacesWorkspaceIdArtifactsDataframesArtifactIdRowsGetResult = AxiosResponse<DataframeArtifactRowsResponse>
+export type GetWorkspaceArtifactRowsApiV1WorkspacesWorkspaceIdArtifactsArtifactIdRowsGetResult = AxiosResponse<DataframeArtifactRowsResponse>
+export type GetWorkspaceArtifactUsageApiV1WorkspacesWorkspaceIdArtifactsUsageGetResult = AxiosResponse<WorkspaceArtifactUsageResponse>
+export type GetWorkspaceArtifactMetadataApiV1WorkspacesWorkspaceIdArtifactsArtifactIdGetResult = AxiosResponse<ArtifactMetadataResponse>
+export type DeleteWorkspaceArtifactApiV1WorkspacesWorkspaceIdArtifactsArtifactIdDeleteResult = AxiosResponse<ArtifactDeleteResponse>
+export type ListWorkspaceArtifactsApiV1WorkspacesWorkspaceIdArtifactsGetResult = AxiosResponse<WorkspaceArtifactListResponse>
+export type InstallRunnerRuntimePackageApiV1RuntimeRunnerPackagesInstallPostResult = AxiosResponse<RunnerPackageInstallResponse>
+export type ExecuteWorkspaceTerminalCommandApiV1WorkspacesWorkspaceIdTerminalExecutePostResult = AxiosResponse<TerminalExecuteResponse>
+export type StreamWorkspaceTerminalCommandSseApiV1WorkspacesWorkspaceIdTerminalStreamPostResult = AxiosResponse<unknown>
+export type ResetWorkspaceTerminalSessionApiV1WorkspacesWorkspaceIdTerminalSessionResetPostResult = AxiosResponse<TerminalSessionResetResponse>
+export type GetWorkspaceKernelRuntimeStatusApiV1WorkspacesWorkspaceIdKernelStatusGetResult = AxiosResponse<KernelStatusResponse>
+export type BootstrapWorkspaceRuntimeEndpointApiV1WorkspacesWorkspaceIdRuntimeBootstrapPostResult = AxiosResponse<KernelResetResponse>
+export type InterruptWorkspaceKernelRuntimeApiV1WorkspacesWorkspaceIdKernelInterruptPostResult = AxiosResponse<KernelResetResponse>
+export type ResetWorkspaceKernelRuntimeApiV1WorkspacesWorkspaceIdKernelResetPostResult = AxiosResponse<KernelResetResponse>
+export type RestartWorkspaceKernelRuntimeApiV1WorkspacesWorkspaceIdKernelRestartPostResult = AxiosResponse<KernelResetResponse>
 export type GetWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaGetResult = AxiosResponse<DatasetSchemaResponse>
 export type SaveWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaPostResult = AxiosResponse<DatasetSchemaResponse>
-export type GetWorkspaceDatasetPreviewApiV1WorkspacesWorkspaceIdDatasetsTableNamePreviewGetResult = AxiosResponse<DatasetPreviewResponse>
+export type RegenerateWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaRegeneratePostResult = AxiosResponse<DatasetSchemaResponse>
 export type ListWorkspaceSchemasApiV1WorkspacesWorkspaceIdSchemasGetResult = AxiosResponse<SchemaListResponse>
+export type HealthHealthGetResult = AxiosResponse<unknown>
 export type RootGetResult = AxiosResponse<unknown>

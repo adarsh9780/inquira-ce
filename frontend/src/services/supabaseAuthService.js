@@ -1,10 +1,24 @@
 import { createClient } from '@supabase/supabase-js'
 import { openExternalUrl } from './externalLinkService'
 
-const SUPABASE_URL = String(import.meta.env.VITE_SB_INQUIRA_CE_URL || '').trim()
-const SUPABASE_PUBLISHABLE_KEY = String(import.meta.env.VITE_SB_INQUIRA_CE_PUBLISHABLE_KEY || '').trim()
-const SITE_URL = String(import.meta.env.VITE_SB_INQUIRA_CE_SITE_URL || '').trim()
-const MANAGE_ACCOUNT_URL = String(import.meta.env.VITE_SB_INQUIRA_CE_MANAGE_ACCOUNT_URL || '').trim()
+function readEnv(...names) {
+  for (const name of names) {
+    const value = String(import.meta.env[name] || '').trim()
+    if (value) return value
+  }
+  return ''
+}
+
+const SUPABASE_URL = readEnv('VITE_SB_INQUIRA_CE_URL', 'SB_INQUIRA_CE_URL')
+const SUPABASE_PUBLISHABLE_KEY = readEnv(
+  'VITE_SB_INQUIRA_CE_PUBLISHABLE_KEY',
+  'SB_INQUIRA_CE_PUBLISHABLE_KEY',
+)
+const SITE_URL = readEnv('VITE_SB_INQUIRA_CE_SITE_URL', 'SB_INQUIRA_CE_SITE_URL')
+const MANAGE_ACCOUNT_URL = readEnv(
+  'VITE_SB_INQUIRA_CE_MANAGE_ACCOUNT_URL',
+  'SB_INQUIRA_CE_MANAGE_ACCOUNT_URL',
+)
 const FALLBACK_SITE_URL = 'https://seekerai.in'
 
 const isBrowser = typeof window !== 'undefined'
@@ -72,7 +86,11 @@ async function startLoopbackRedirect() {
 
 async function signInWithProvider(provider) {
   const sb = getClient()
-  if (!sb) throw new Error('Supabase auth is not configured.')
+  if (!sb) {
+    throw new Error(
+      'Supabase auth is not configured. Set SB_INQUIRA_CE_URL and SB_INQUIRA_CE_PUBLISHABLE_KEY in the root .env file.',
+    )
+  }
 
   if (!isTauriDesktop) {
     const { error } = await sb.auth.signInWithOAuth({
@@ -103,7 +121,11 @@ async function signInWithProvider(provider) {
 
 async function sendMagicLink(email) {
   const sb = getClient()
-  if (!sb) throw new Error('Supabase auth is not configured.')
+  if (!sb) {
+    throw new Error(
+      'Supabase auth is not configured. Set SB_INQUIRA_CE_URL and SB_INQUIRA_CE_PUBLISHABLE_KEY in the root .env file.',
+    )
+  }
 
   const emailAddress = String(email || '').trim()
   if (!emailAddress) {

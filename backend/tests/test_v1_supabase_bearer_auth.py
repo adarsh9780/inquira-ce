@@ -22,11 +22,6 @@ def _request_with_headers(headers: dict[str, str]) -> Request:
 
 @pytest.mark.asyncio
 async def test_get_current_user_uses_supabase_bearer_token(monkeypatch):
-    monkeypatch.setattr(
-        "app.v1.api.deps.settings",
-        SimpleNamespace(auth_provider="supabase"),
-    )
-
     async def fake_resolve(token: str):
         assert token == "token-123"
         return SimpleNamespace(id="user-1", username="alice@example.com", plan="FREE")
@@ -38,7 +33,6 @@ async def test_get_current_user_uses_supabase_bearer_token(monkeypatch):
 
     user = await get_current_user(
         request=_request_with_headers({"Authorization": "Bearer token-123"}),
-        auth_session=object(),
     )
 
     assert user.id == "user-1"
@@ -47,15 +41,9 @@ async def test_get_current_user_uses_supabase_bearer_token(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_current_user_rejects_missing_bearer_token_for_supabase(monkeypatch):
-    monkeypatch.setattr(
-        "app.v1.api.deps.settings",
-        SimpleNamespace(auth_provider="supabase"),
-    )
-
     with pytest.raises(HTTPException) as exc:
         await get_current_user(
             request=_request_with_headers({}),
-            auth_session=object(),
         )
 
     assert exc.value.status_code == 401

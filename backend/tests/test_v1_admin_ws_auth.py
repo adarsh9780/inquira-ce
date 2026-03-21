@@ -9,7 +9,7 @@ from app.v1.api import admin as admin_api
 from app.v1.api import deps as v1_deps
 
 
-def test_admin_test_gemini_requires_auth_cookie():
+def test_admin_test_gemini_requires_authentication():
     client = TestClient(app)
     response = client.post(
         "/api/v1/admin/test-gemini",

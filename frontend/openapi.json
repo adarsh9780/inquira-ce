@@ -5,90 +5,6 @@
     "version": "1.0.0"
   },
   "paths": {
-    "/api/v1/auth/register": {
-      "post": {
-        "tags": [
-          "V1 Authentication"
-        ],
-        "summary": "Register User",
-        "description": "Register a new user and immediately issue login session cookie.",
-        "operationId": "register_user_api_v1_auth_register_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthUserResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/auth/login": {
-      "post": {
-        "tags": [
-          "V1 Authentication"
-        ],
-        "summary": "Login User",
-        "description": "Login user and issue session cookie.",
-        "operationId": "login_user_api_v1_auth_login_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthUserResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/auth/me": {
       "get": {
         "tags": [
@@ -117,7 +33,7 @@
           "V1 Authentication"
         ],
         "summary": "Logout User",
-        "description": "Logout user by deleting current v1 session token and clearing cookie.",
+        "description": "Return success after the client clears its Supabase session locally.",
         "operationId": "logout_user_api_v1_auth_logout_post",
         "responses": {
           "200": {
@@ -239,6 +155,57 @@
       }
     },
     "/api/v1/workspaces/{workspace_id}": {
+      "patch": {
+        "tags": [
+          "V1 Workspaces"
+        ],
+        "summary": "Rename Workspace",
+        "description": "Rename a workspace owned by the authenticated user.",
+        "operationId": "rename_workspace_api_v1_workspaces__workspace_id__patch",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceRenameRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "V1 Workspaces"
@@ -264,6 +231,49 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/WorkspaceDeletionJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/database/clear": {
+      "post": {
+        "tags": [
+          "V1 Workspaces"
+        ],
+        "summary": "Clear Workspace Database",
+        "description": "Clear workspace DB/scratchpad content and reset dataset catalog metadata.",
+        "operationId": "clear_workspace_database_api_v1_workspaces__workspace_id__database_clear_post",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceDatabaseClearResponse"
                 }
               }
             }
@@ -406,6 +416,47 @@
         }
       }
     },
+    "/api/v1/preferences/models/refresh": {
+      "post": {
+        "tags": [
+          "V1 Preferences"
+        ],
+        "summary": "Refresh Provider Models",
+        "operationId": "refresh_provider_models_api_v1_preferences_models_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderModelsRefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderModelsRefreshResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/preferences/api-key": {
       "put": {
         "tags": [
@@ -414,14 +465,14 @@
         "summary": "Set Api Key",
         "operationId": "set_api_key_api_v1_preferences_api_key_put",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ApiKeyUpdateRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -452,6 +503,24 @@
         ],
         "summary": "Delete Api Key",
         "operationId": "delete_api_key_api_v1_preferences_api_key_delete",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -459,6 +528,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -606,6 +685,27 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/legal/terms": {
+      "get": {
+        "tags": [
+          "V1 Legal"
+        ],
+        "summary": "Get Terms",
+        "operationId": "get_terms_api_v1_legal_terms_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermsResponse"
                 }
               }
             }
@@ -1009,6 +1109,271 @@
         }
       }
     },
+    "/api/v1/chat/interventions/{intervention_id}/response": {
+      "post": {
+        "tags": [
+          "V1 Chat"
+        ],
+        "summary": "Respond To Intervention",
+        "description": "Submit a user response for a pending intervention request.",
+        "operationId": "respond_to_intervention_api_v1_chat_interventions__intervention_id__response_post",
+        "parameters": [
+          {
+            "name": "intervention_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Intervention Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterventionResponseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterventionResponseAck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/ok": {
+      "get": {
+        "tags": [
+          "V1 Agent Proxy"
+        ],
+        "summary": "Proxy Ok",
+        "operationId": "proxy_ok_api_v1_agent_ok_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Proxy Ok Api V1 Agent Ok Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/info": {
+      "get": {
+        "tags": [
+          "V1 Agent Proxy"
+        ],
+        "summary": "Proxy Info",
+        "operationId": "proxy_info_api_v1_agent_info_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Proxy Info Api V1 Agent Info Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/assistants/search": {
+      "post": {
+        "tags": [
+          "V1 Agent Proxy"
+        ],
+        "summary": "Proxy Assistants Search",
+        "operationId": "proxy_assistants_search_api_v1_agent_assistants_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Proxy Assistants Search Api V1 Agent Assistants Search Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/assistants": {
+      "post": {
+        "tags": [
+          "V1 Agent Proxy"
+        ],
+        "summary": "Proxy Assistants Create",
+        "operationId": "proxy_assistants_create_api_v1_agent_assistants_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Proxy Assistants Create Api V1 Agent Assistants Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/runs/wait": {
+      "post": {
+        "tags": [
+          "V1 Agent Proxy"
+        ],
+        "summary": "Proxy Runs Wait",
+        "operationId": "proxy_runs_wait_api_v1_agent_runs_wait_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Proxy Runs Wait Api V1 Agent Runs Wait Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/runs/stream": {
+      "post": {
+        "tags": [
+          "V1 Agent Proxy"
+        ],
+        "summary": "Proxy Runs Stream",
+        "operationId": "proxy_runs_stream_api_v1_agent_runs_stream_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/reset": {
       "post": {
         "tags": [
@@ -1058,7 +1423,7 @@
           "V1 Admin"
         ],
         "summary": "Test Gemini Api Key",
-        "description": "Validate a Gemini key by issuing a lightweight test request.",
+        "description": "Validate an OpenRouter-compatible key by issuing a lightweight test request.",
         "operationId": "test_gemini_api_key_api_v1_admin_test_gemini_post",
         "requestBody": {
           "content": {
@@ -1134,6 +1499,142 @@
         }
       }
     },
+    "/api/v1/workspaces/{workspace_id}/columns": {
+      "get": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Get Workspace Columns",
+        "operationId": "get_workspace_columns_api_v1_workspaces__workspace_id__columns_get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceColumnsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/commands": {
+      "get": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "List Workspace Commands",
+        "operationId": "list_workspace_commands_api_v1_workspaces__workspace_id__commands_get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandCatalogResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/commands/execute": {
+      "post": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Execute Workspace Slash Command",
+        "operationId": "execute_workspace_slash_command_api_v1_workspaces__workspace_id__commands_execute_post",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandExecuteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandExecuteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/execute": {
       "post": {
         "tags": [
@@ -1169,6 +1670,865 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ExecuteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/artifacts/dataframes/{artifact_id}/rows": {
+      "get": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Get Workspace Dataframe Artifact Rows",
+        "operationId": "get_workspace_dataframe_artifact_rows_api_v1_workspaces__workspace_id__artifacts_dataframes__artifact_id__rows_get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 1000,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "sort_model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "AG Grid sort model JSON",
+              "title": "Sort Model"
+            },
+            "description": "AG Grid sort model JSON"
+          },
+          {
+            "name": "filter_model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "AG Grid filter model JSON",
+              "title": "Filter Model"
+            },
+            "description": "AG Grid filter model JSON"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Global text search applied across columns",
+              "title": "Search"
+            },
+            "description": "Global text search applied across columns"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataframeArtifactRowsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/artifacts/{artifact_id}/rows": {
+      "get": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Get Workspace Artifact Rows",
+        "operationId": "get_workspace_artifact_rows_api_v1_workspaces__workspace_id__artifacts__artifact_id__rows_get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 1000,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "sort_model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "AG Grid sort model JSON",
+              "title": "Sort Model"
+            },
+            "description": "AG Grid sort model JSON"
+          },
+          {
+            "name": "filter_model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "AG Grid filter model JSON",
+              "title": "Filter Model"
+            },
+            "description": "AG Grid filter model JSON"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Global text search applied across columns",
+              "title": "Search"
+            },
+            "description": "Global text search applied across columns"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataframeArtifactRowsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/artifacts/usage": {
+      "get": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Get Workspace Artifact Usage",
+        "description": "Return scratchpad usage summary used by status-bar artifact pressure warning.",
+        "operationId": "get_workspace_artifact_usage_api_v1_workspaces__workspace_id__artifacts_usage_get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceArtifactUsageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/artifacts/{artifact_id}": {
+      "get": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Get Workspace Artifact Metadata",
+        "operationId": "get_workspace_artifact_metadata_api_v1_workspaces__workspace_id__artifacts__artifact_id__get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactMetadataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Delete Workspace Artifact",
+        "operationId": "delete_workspace_artifact_api_v1_workspaces__workspace_id__artifacts__artifact_id__delete",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactDeleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/artifacts": {
+      "get": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "List Workspace Artifacts",
+        "description": "List all non-expired artifacts for a workspace, optionally filtered by kind.",
+        "operationId": "list_workspace_artifacts_api_v1_workspaces__workspace_id__artifacts_get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by artifact kind, e.g. 'dataframe' or 'figure'",
+              "title": "Kind"
+            },
+            "description": "Filter by artifact kind, e.g. 'dataframe' or 'figure'"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceArtifactListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runtime/runner/packages/install": {
+      "post": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Install Runner Runtime Package",
+        "operationId": "install_runner_runtime_package_api_v1_runtime_runner_packages_install_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunnerPackageInstallRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunnerPackageInstallResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/terminal/execute": {
+      "post": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Execute Workspace Terminal Command",
+        "operationId": "execute_workspace_terminal_command_api_v1_workspaces__workspace_id__terminal_execute_post",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalExecuteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalExecuteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/terminal/stream": {
+      "post": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Stream Workspace Terminal Command Sse",
+        "operationId": "stream_workspace_terminal_command_sse_api_v1_workspaces__workspace_id__terminal_stream_post",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalExecuteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/terminal/session/reset": {
+      "post": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Reset Workspace Terminal Session",
+        "operationId": "reset_workspace_terminal_session_api_v1_workspaces__workspace_id__terminal_session_reset_post",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalSessionResetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/kernel/status": {
+      "get": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Get Workspace Kernel Runtime Status",
+        "description": "Return current workspace kernel status.",
+        "operationId": "get_workspace_kernel_runtime_status_api_v1_workspaces__workspace_id__kernel_status_get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KernelStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/runtime/bootstrap": {
+      "post": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Bootstrap Workspace Runtime Endpoint",
+        "operationId": "bootstrap_workspace_runtime_endpoint_api_v1_workspaces__workspace_id__runtime_bootstrap_post",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KernelResetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/kernel/interrupt": {
+      "post": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Interrupt Workspace Kernel Runtime",
+        "description": "Interrupt currently running code in workspace kernel.",
+        "operationId": "interrupt_workspace_kernel_runtime_api_v1_workspaces__workspace_id__kernel_interrupt_post",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KernelResetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/kernel/reset": {
+      "post": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Reset Workspace Kernel Runtime",
+        "description": "Reset workspace kernel and clear in-memory execution context.",
+        "operationId": "reset_workspace_kernel_runtime_api_v1_workspaces__workspace_id__kernel_reset_post",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KernelResetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/kernel/restart": {
+      "post": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Restart Workspace Kernel Runtime",
+        "description": "Restart workspace kernel and warm it immediately.",
+        "operationId": "restart_workspace_kernel_runtime_api_v1_workspaces__workspace_id__kernel_restart_post",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KernelResetResponse"
                 }
               }
             }
@@ -1296,13 +2656,13 @@
         }
       }
     },
-    "/api/v1/workspaces/{workspace_id}/datasets/{table_name}/preview": {
-      "get": {
+    "/api/v1/workspaces/{workspace_id}/datasets/{table_name}/schema/regenerate": {
+      "post": {
         "tags": [
           "V1 Runtime"
         ],
-        "summary": "Get Workspace Dataset Preview",
-        "operationId": "get_workspace_dataset_preview_api_v1_workspaces__workspace_id__datasets__table_name__preview_get",
+        "summary": "Regenerate Workspace Dataset Schema",
+        "operationId": "regenerate_workspace_dataset_schema_api_v1_workspaces__workspace_id__datasets__table_name__schema_regenerate_post",
         "parameters": [
           {
             "name": "workspace_id",
@@ -1321,38 +2681,25 @@
               "type": "string",
               "title": "Table Name"
             }
-          },
-          {
-            "name": "sample_type",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "pattern": "^(random|first)$",
-              "default": "random",
-              "title": "Sample Type"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 500,
-              "minimum": 1,
-              "default": 100,
-              "title": "Limit"
-            }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegenerateSchemaRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DatasetPreviewResponse"
+                  "$ref": "#/components/schemas/DatasetSchemaResponse"
                 }
               }
             }
@@ -1412,6 +2759,22 @@
         }
       }
     },
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "tags": [
@@ -1465,7 +2828,7 @@
           "model": {
             "type": "string",
             "title": "Model",
-            "default": "gemini-2.5-flash"
+            "default": "google/gemini-2.5-flash"
           },
           "context": {
             "anyOf": [
@@ -1489,6 +2852,17 @@
             ],
             "title": "Table Name"
           },
+          "preferred_table_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Table Name"
+          },
           "active_schema": {
             "anyOf": [
               {
@@ -1500,6 +2874,13 @@
               }
             ],
             "title": "Active Schema"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/ChatImageAttachment"
+            },
+            "type": "array",
+            "title": "Attachments"
           },
           "api_key": {
             "anyOf": [
@@ -1546,6 +2927,82 @@
           "explanation": {
             "type": "string",
             "title": "Explanation"
+          },
+          "result_explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Explanation"
+          },
+          "code_explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Explanation"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "execution": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "artifacts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Artifacts"
+          },
+          "final_script_artifact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Script Artifact Id"
           }
         },
         "type": "object",
@@ -1562,6 +3019,11 @@
       },
       "ApiKeyUpdateRequest": {
         "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "default": "openrouter"
+          },
           "api_key": {
             "type": "string",
             "minLength": 1,
@@ -1573,6 +3035,137 @@
           "api_key"
         ],
         "title": "ApiKeyUpdateRequest"
+      },
+      "ArtifactDeleteResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id"
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "deleted"
+        ],
+        "title": "ArtifactDeleteResponse"
+      },
+      "ArtifactMetadataResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "logical_name": {
+            "type": "string",
+            "title": "Logical Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "pointer": {
+            "type": "string",
+            "title": "Pointer"
+          },
+          "table_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Name"
+          },
+          "schema": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema"
+          },
+          "row_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Count"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "run_id",
+          "workspace_id",
+          "logical_name",
+          "kind",
+          "pointer",
+          "created_at",
+          "expires_at",
+          "status"
+        ],
+        "title": "ArtifactMetadataResponse"
       },
       "AuthUserResponse": {
         "properties": {
@@ -1636,6 +3229,187 @@
         ],
         "title": "BrowserDatasetSyncRequest",
         "description": "Sync browser-loaded table metadata into workspace dataset catalog."
+      },
+      "ChatImageAttachment": {
+        "properties": {
+          "attachment_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Attachment Id"
+          },
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Filename"
+          },
+          "media_type": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Media Type"
+          },
+          "data_base64": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Data Base64"
+          }
+        },
+        "type": "object",
+        "required": [
+          "attachment_id",
+          "filename",
+          "media_type",
+          "data_base64"
+        ],
+        "title": "ChatImageAttachment",
+        "description": "Inline image attachment payload."
+      },
+      "CommandCatalogResponse": {
+        "properties": {
+          "commands": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Commands"
+          }
+        },
+        "type": "object",
+        "required": [
+          "commands"
+        ],
+        "title": "CommandCatalogResponse"
+      },
+      "CommandExecuteRequest": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "raw_args": {
+            "type": "string",
+            "title": "Raw Args",
+            "default": ""
+          },
+          "default_table": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Table"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "row_limit": {
+            "type": "integer",
+            "maximum": 2000.0,
+            "minimum": 1.0,
+            "title": "Row Limit",
+            "default": 500
+          }
+        },
+        "type": "object",
+        "title": "CommandExecuteRequest"
+      },
+      "CommandExecuteResponse": {
+        "properties": {
+          "command": {
+            "type": "string",
+            "title": "Command"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "output": {
+            "type": "string",
+            "title": "Output"
+          },
+          "result_type": {
+            "type": "string",
+            "title": "Result Type",
+            "default": "message"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "command",
+          "name",
+          "output"
+        ],
+        "title": "CommandExecuteResponse"
       },
       "ConversationCreateRequest": {
         "properties": {
@@ -1741,6 +3515,56 @@
         "title": "ConversationUpdateRequest",
         "description": "Conversation update payload."
       },
+      "DataframeArtifactRowsResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "name",
+          "row_count",
+          "columns",
+          "rows",
+          "offset",
+          "limit"
+        ],
+        "title": "DataframeArtifactRowsResponse"
+      },
       "DatasetAddRequest": {
         "properties": {
           "source_path": {
@@ -1772,38 +3596,6 @@
         ],
         "title": "DatasetListResponse",
         "description": "List datasets response."
-      },
-      "DatasetPreviewResponse": {
-        "properties": {
-          "table_name": {
-            "type": "string",
-            "title": "Table Name"
-          },
-          "sample_type": {
-            "type": "string",
-            "title": "Sample Type"
-          },
-          "row_count": {
-            "type": "integer",
-            "title": "Row Count"
-          },
-          "data": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Data"
-          }
-        },
-        "type": "object",
-        "required": [
-          "table_name",
-          "sample_type",
-          "row_count",
-          "data"
-        ],
-        "title": "DatasetPreviewResponse"
       },
       "DatasetResponse": {
         "properties": {
@@ -1925,6 +3717,17 @@
             "type": "boolean",
             "title": "Success"
           },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
           "stdout": {
             "type": "string",
             "title": "Stdout",
@@ -1934,6 +3737,16 @@
             "type": "string",
             "title": "Stderr",
             "default": ""
+          },
+          "has_stdout": {
+            "type": "boolean",
+            "title": "Has Stdout",
+            "default": false
+          },
+          "has_stderr": {
+            "type": "boolean",
+            "title": "Has Stderr",
+            "default": false
           },
           "error": {
             "anyOf": [
@@ -1965,6 +3778,38 @@
               }
             ],
             "title": "Result Type"
+          },
+          "result_kind": {
+            "type": "string",
+            "title": "Result Kind",
+            "default": "none"
+          },
+          "result_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Name"
+          },
+          "variables": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Variables"
+          },
+          "artifacts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Artifacts"
           }
         },
         "type": "object",
@@ -1978,7 +3823,31 @@
           "api_key": {
             "type": "string",
             "title": "Api Key",
-            "description": "Google Gemini API key to test"
+            "description": "Provider API key to test"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider",
+            "description": "LLM provider to test against."
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "Optional model identifier to validate against."
           }
         },
         "type": "object",
@@ -2000,28 +3869,74 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "LoginRequest": {
+      "InterventionResponseAck": {
         "properties": {
-          "username": {
+          "intervention_id": {
             "type": "string",
-            "maxLength": 50,
-            "minLength": 3,
-            "title": "Username"
+            "title": "Intervention Id"
           },
-          "password": {
-            "type": "string",
-            "maxLength": 128,
-            "minLength": 6,
-            "title": "Password"
+          "accepted": {
+            "type": "boolean",
+            "title": "Accepted"
           }
         },
         "type": "object",
         "required": [
-          "username",
-          "password"
+          "intervention_id",
+          "accepted"
         ],
-        "title": "LoginRequest",
-        "description": "Login payload."
+        "title": "InterventionResponseAck",
+        "description": "Ack payload for intervention response submissions."
+      },
+      "InterventionResponseRequest": {
+        "properties": {
+          "selected": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Selected"
+          }
+        },
+        "type": "object",
+        "title": "InterventionResponseRequest",
+        "description": "User decision payload for a pending agent intervention."
+      },
+      "KernelResetResponse": {
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "reset": {
+            "type": "boolean",
+            "title": "Reset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "reset"
+        ],
+        "title": "KernelResetResponse"
+      },
+      "KernelStatusResponse": {
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "status"
+        ],
+        "title": "KernelStatusResponse"
       },
       "MessageResponse": {
         "properties": {
@@ -2039,10 +3954,39 @@
       },
       "PreferencesResponse": {
         "properties": {
+          "llm_provider": {
+            "type": "string",
+            "title": "Llm Provider",
+            "default": "openrouter"
+          },
+          "available_providers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Providers"
+          },
           "selected_model": {
             "type": "string",
             "title": "Selected Model",
-            "default": "gemini-2.5-flash"
+            "default": "google/gemini-2.5-flash"
+          },
+          "selected_lite_model": {
+            "type": "string",
+            "title": "Selected Lite Model",
+            "default": "google/gemini-2.5-flash-lite"
+          },
+          "selected_coding_model": {
+            "type": "string",
+            "title": "Selected Coding Model",
+            "default": "google/gemini-2.5-flash"
+          },
+          "enabled_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Enabled Models"
           },
           "schema_context": {
             "type": "string",
@@ -2052,6 +3996,11 @@
           "allow_schema_sample_values": {
             "type": "boolean",
             "title": "Allow Schema Sample Values",
+            "default": false
+          },
+          "terminal_risk_acknowledged": {
+            "type": "boolean",
+            "title": "Terminal Risk Acknowledged",
             "default": false
           },
           "chat_overlay_width": {
@@ -2106,6 +4055,56 @@
             "type": "boolean",
             "title": "Api Key Present",
             "default": false
+          },
+          "available_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Models"
+          },
+          "provider_available_main_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Provider Available Main Models"
+          },
+          "provider_available_lite_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Provider Available Lite Models"
+          },
+          "provider_model_catalogs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ProviderModelCatalog"
+            },
+            "type": "object",
+            "title": "Provider Model Catalogs"
+          },
+          "api_key_present_by_provider": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "type": "object",
+            "title": "Api Key Present By Provider"
+          },
+          "selected_provider_requires_api_key": {
+            "type": "boolean",
+            "title": "Selected Provider Requires Api Key",
+            "default": true
+          },
+          "selected_provider_api_key_present": {
+            "type": "boolean",
+            "title": "Selected Provider Api Key Present",
+            "default": false
+          },
+          "plotly_theme_mode": {
+            "type": "string",
+            "title": "Plotly Theme Mode",
+            "default": "soft"
           }
         },
         "type": "object",
@@ -2113,6 +4112,17 @@
       },
       "PreferencesUpdateRequest": {
         "properties": {
+          "llm_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Provider"
+          },
           "selected_model": {
             "anyOf": [
               {
@@ -2123,6 +4133,42 @@
               }
             ],
             "title": "Selected Model"
+          },
+          "selected_lite_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Lite Model"
+          },
+          "selected_coding_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Coding Model"
+          },
+          "enabled_models": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled Models"
           },
           "schema_context": {
             "anyOf": [
@@ -2145,6 +4191,17 @@
               }
             ],
             "title": "Allow Schema Sample Values"
+          },
+          "terminal_risk_acknowledged": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminal Risk Acknowledged"
           },
           "chat_overlay_width": {
             "anyOf": [
@@ -2218,28 +4275,371 @@
         "type": "object",
         "title": "PreferencesUpdateRequest"
       },
-      "RegisterRequest": {
+      "ProviderModelCatalog": {
         "properties": {
-          "username": {
-            "type": "string",
-            "maxLength": 50,
-            "minLength": 3,
-            "title": "Username"
+          "main_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Main Models"
           },
-          "password": {
+          "lite_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lite Models"
+          },
+          "default_main_model": {
             "type": "string",
-            "maxLength": 128,
-            "minLength": 6,
-            "title": "Password"
+            "title": "Default Main Model",
+            "default": ""
+          },
+          "default_lite_model": {
+            "type": "string",
+            "title": "Default Lite Model",
+            "default": ""
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "default"
+          },
+          "account_models_configured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Models Configured"
+          },
+          "account_models_url": {
+            "type": "string",
+            "title": "Account Models Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "ProviderModelCatalog"
+      },
+      "ProviderModelsRefreshRequest": {
+        "properties": {
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          }
+        },
+        "type": "object",
+        "title": "ProviderModelsRefreshRequest"
+      },
+      "ProviderModelsRefreshResponse": {
+        "properties": {
+          "llm_provider": {
+            "type": "string",
+            "title": "Llm Provider",
+            "default": "openrouter"
+          },
+          "available_providers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Providers"
+          },
+          "selected_model": {
+            "type": "string",
+            "title": "Selected Model",
+            "default": "google/gemini-2.5-flash"
+          },
+          "selected_lite_model": {
+            "type": "string",
+            "title": "Selected Lite Model",
+            "default": "google/gemini-2.5-flash-lite"
+          },
+          "selected_coding_model": {
+            "type": "string",
+            "title": "Selected Coding Model",
+            "default": "google/gemini-2.5-flash"
+          },
+          "enabled_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Enabled Models"
+          },
+          "schema_context": {
+            "type": "string",
+            "title": "Schema Context",
+            "default": ""
+          },
+          "allow_schema_sample_values": {
+            "type": "boolean",
+            "title": "Allow Schema Sample Values",
+            "default": false
+          },
+          "terminal_risk_acknowledged": {
+            "type": "boolean",
+            "title": "Terminal Risk Acknowledged",
+            "default": false
+          },
+          "chat_overlay_width": {
+            "type": "number",
+            "title": "Chat Overlay Width",
+            "default": 0.25
+          },
+          "is_sidebar_collapsed": {
+            "type": "boolean",
+            "title": "Is Sidebar Collapsed",
+            "default": true
+          },
+          "hide_shortcuts_modal": {
+            "type": "boolean",
+            "title": "Hide Shortcuts Modal",
+            "default": false
+          },
+          "active_workspace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Workspace Id"
+          },
+          "active_dataset_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Dataset Path"
+          },
+          "active_table_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Table Name"
+          },
+          "api_key_present": {
+            "type": "boolean",
+            "title": "Api Key Present",
+            "default": false
+          },
+          "available_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Models"
+          },
+          "provider_available_main_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Provider Available Main Models"
+          },
+          "provider_available_lite_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Provider Available Lite Models"
+          },
+          "provider_model_catalogs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ProviderModelCatalog"
+            },
+            "type": "object",
+            "title": "Provider Model Catalogs"
+          },
+          "api_key_present_by_provider": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "type": "object",
+            "title": "Api Key Present By Provider"
+          },
+          "selected_provider_requires_api_key": {
+            "type": "boolean",
+            "title": "Selected Provider Requires Api Key",
+            "default": true
+          },
+          "selected_provider_api_key_present": {
+            "type": "boolean",
+            "title": "Selected Provider Api Key Present",
+            "default": false
+          },
+          "plotly_theme_mode": {
+            "type": "string",
+            "title": "Plotly Theme Mode",
+            "default": "soft"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "ProviderModelsRefreshResponse"
+      },
+      "RegenerateSchemaRequest": {
+        "properties": {
+          "context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          }
+        },
+        "type": "object",
+        "title": "RegenerateSchemaRequest"
+      },
+      "RunnerPackageInstallRequest": {
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "package": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Package",
+            "description": "Package name without version specifier"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Version",
+            "description": "Exact package version"
+          },
+          "index_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Url",
+            "description": "Optional package index URL"
+          },
+          "save_as_default": {
+            "type": "boolean",
+            "title": "Save As Default",
+            "description": "Persist package/index settings to inquira.toml runner defaults",
+            "default": false
           }
         },
         "type": "object",
         "required": [
-          "username",
-          "password"
+          "workspace_id",
+          "package",
+          "version"
         ],
-        "title": "RegisterRequest",
-        "description": "Register payload."
+        "title": "RunnerPackageInstallRequest"
+      },
+      "RunnerPackageInstallResponse": {
+        "properties": {
+          "installed": {
+            "type": "boolean",
+            "title": "Installed"
+          },
+          "package_spec": {
+            "type": "string",
+            "title": "Package Spec"
+          },
+          "installer": {
+            "type": "string",
+            "title": "Installer"
+          },
+          "command": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Command"
+          },
+          "stdout": {
+            "type": "string",
+            "title": "Stdout",
+            "default": ""
+          },
+          "stderr": {
+            "type": "string",
+            "title": "Stderr",
+            "default": ""
+          },
+          "workspace_kernel_reset": {
+            "type": "boolean",
+            "title": "Workspace Kernel Reset"
+          },
+          "saved_as_default": {
+            "type": "boolean",
+            "title": "Saved As Default"
+          }
+        },
+        "type": "object",
+        "required": [
+          "installed",
+          "package_spec",
+          "installer",
+          "command",
+          "workspace_kernel_reset",
+          "saved_as_default"
+        ],
+        "title": "RunnerPackageInstallResponse"
       },
       "SaveSchemaRequest": {
         "properties": {
@@ -2279,6 +4679,132 @@
           "schemas"
         ],
         "title": "SchemaListResponse"
+      },
+      "TerminalExecuteRequest": {
+        "properties": {
+          "command": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Command",
+            "description": "Shell command to run"
+          },
+          "cwd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cwd",
+            "description": "Optional working directory override"
+          },
+          "timeout": {
+            "type": "integer",
+            "maximum": 600.0,
+            "minimum": 1.0,
+            "title": "Timeout",
+            "description": "Max command execution time in seconds",
+            "default": 120
+          }
+        },
+        "type": "object",
+        "required": [
+          "command"
+        ],
+        "title": "TerminalExecuteRequest"
+      },
+      "TerminalExecuteResponse": {
+        "properties": {
+          "stdout": {
+            "type": "string",
+            "title": "Stdout",
+            "default": ""
+          },
+          "stderr": {
+            "type": "string",
+            "title": "Stderr",
+            "default": ""
+          },
+          "exit_code": {
+            "type": "integer",
+            "title": "Exit Code"
+          },
+          "cwd": {
+            "type": "string",
+            "title": "Cwd"
+          },
+          "shell": {
+            "type": "string",
+            "title": "Shell"
+          },
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
+          "timed_out": {
+            "type": "boolean",
+            "title": "Timed Out",
+            "default": false
+          },
+          "persistent": {
+            "type": "boolean",
+            "title": "Persistent",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "exit_code",
+          "cwd",
+          "shell",
+          "platform"
+        ],
+        "title": "TerminalExecuteResponse"
+      },
+      "TerminalSessionResetResponse": {
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "reset": {
+            "type": "boolean",
+            "title": "Reset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "reset"
+        ],
+        "title": "TerminalSessionResetResponse"
+      },
+      "TermsResponse": {
+        "properties": {
+          "markdown": {
+            "type": "string",
+            "title": "Markdown"
+          },
+          "last_updated": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "markdown"
+        ],
+        "title": "TermsResponse",
+        "description": "Rendered terms source payload."
       },
       "TurnPageResponse": {
         "properties": {
@@ -2418,6 +4944,153 @@
         ],
         "title": "ValidationError"
       },
+      "WorkspaceArtifactListResponse": {
+        "properties": {
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceArtifactSummary"
+            },
+            "type": "array",
+            "title": "Artifacts"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifacts",
+          "total"
+        ],
+        "title": "WorkspaceArtifactListResponse"
+      },
+      "WorkspaceArtifactSummary": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id"
+          },
+          "logical_name": {
+            "type": "string",
+            "title": "Logical Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "row_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Count"
+          },
+          "columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columns"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "logical_name",
+          "kind",
+          "created_at",
+          "status"
+        ],
+        "title": "WorkspaceArtifactSummary"
+      },
+      "WorkspaceArtifactUsageResponse": {
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "duckdb_bytes": {
+            "type": "integer",
+            "title": "Duckdb Bytes"
+          },
+          "duckdb_warning_threshold_bytes": {
+            "type": "integer",
+            "title": "Duckdb Warning Threshold Bytes"
+          },
+          "figure_count": {
+            "type": "integer",
+            "title": "Figure Count"
+          },
+          "figure_warning_threshold_count": {
+            "type": "integer",
+            "title": "Figure Warning Threshold Count"
+          },
+          "duckdb_warning": {
+            "type": "boolean",
+            "title": "Duckdb Warning"
+          },
+          "figure_warning": {
+            "type": "boolean",
+            "title": "Figure Warning"
+          },
+          "warning": {
+            "type": "boolean",
+            "title": "Warning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "duckdb_bytes",
+          "duckdb_warning_threshold_bytes",
+          "figure_count",
+          "figure_warning_threshold_count",
+          "duckdb_warning",
+          "figure_warning",
+          "warning"
+        ],
+        "title": "WorkspaceArtifactUsageResponse"
+      },
+      "WorkspaceColumnsResponse": {
+        "properties": {
+          "columns": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Columns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "columns"
+        ],
+        "title": "WorkspaceColumnsResponse"
+      },
       "WorkspaceCreateRequest": {
         "properties": {
           "name": {
@@ -2433,6 +5106,30 @@
         ],
         "title": "WorkspaceCreateRequest",
         "description": "Workspace creation payload."
+      },
+      "WorkspaceDatabaseClearResponse": {
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "cleared": {
+            "type": "boolean",
+            "title": "Cleared"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "cleared",
+          "detail"
+        ],
+        "title": "WorkspaceDatabaseClearResponse",
+        "description": "Workspace database clear payload."
       },
       "WorkspaceDeletionJobListResponse": {
         "properties": {
@@ -2528,6 +5225,11 @@
           "duckdb_path": {
             "type": "string",
             "title": "Duckdb Path"
+          },
+          "terminal_enabled": {
+            "type": "boolean",
+            "title": "Terminal Enabled",
+            "default": false
           }
         },
         "type": "object",
@@ -2537,6 +5239,22 @@
           "duckdb_path"
         ],
         "title": "WorkspacePathsResponse"
+      },
+      "WorkspaceRenameRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "WorkspaceRenameRequest",
+        "description": "Workspace rename payload."
       },
       "WorkspaceResponse": {
         "properties": {
