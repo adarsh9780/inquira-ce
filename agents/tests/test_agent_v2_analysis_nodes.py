@@ -105,6 +105,16 @@ def test_context_enrichment_prompt_requires_tool_explanations() -> None:
     assert "what I got, what I will do next" in _CONTEXT_ENRICHMENT_TOOL_PROMPT
 
 
+def test_context_enrichment_prompt_escapes_literal_tool_examples() -> None:
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", _CONTEXT_ENRICHMENT_TOOL_PROMPT),
+            ("human", "{tool_request_prompt}"),
+        ]
+    )
+    assert prompt.input_variables == ["tool_request_prompt"]
+
+
 @pytest.mark.asyncio
 async def test_analysis_enrich_to_next_routes_to_custom_tool_node_when_pending_tools_exist() -> None:
     state = {
