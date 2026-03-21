@@ -20,5 +20,8 @@ Inquira CE is a local-first AI data analysis app distributed as Desktop installe
 - Setup and development guides
 - Release and CI workflow documentation
 - Project roadmap and contribution guide
+- Authentication strategy and product account direction
 
 If this is your first time here, start with [Downloads](./downloads.md) and then move to [Install](./install.md).
+
+If you are evaluating product sign-in and account architecture, read [Authentication Strategy](./auth-strategy.md).
