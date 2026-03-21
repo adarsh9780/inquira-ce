@@ -26,3 +26,10 @@ def test_codegen_prompt_includes_plotly_industry_style_standards():
     assert "Structure & clarity: order data logically" in source
     assert "Color: use 2-3 intentional colors" in source
     assert "Labels & typography: label title + axes + legends" in source
+
+
+def test_codegen_prompt_requires_meaningful_figure_names_to_avoid_overwrites():
+    source = _codegen_prompt_text()
+    assert "Figure variable names must be meaningful and business-specific" in source
+    assert "generic names like `fig` can overwrite charts created earlier in the same workspace kernel session" in source
+    assert "strike_rate_by_batter_fig" in source

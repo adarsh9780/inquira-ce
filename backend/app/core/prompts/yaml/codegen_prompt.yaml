@@ -27,6 +27,8 @@ template: |
   - Do NOT use Inquira-specific runtime helpers/functions.
   - Every user-facing output variable must use a descriptive, domain-specific name (for example: `monthly_revenue_summary_df`, `revenue_by_region_fig`).
   - NEVER use generic output names such as `result`, `final_df`, `fig`, `data`, or `output`.
+  - Figure variable names must be meaningful and business-specific because generic names like `fig` can overwrite charts created earlier in the same workspace kernel session.
+  - Prefer figure names that encode the business meaning, such as `strike_rate_by_batter_fig`, `revenue_by_region_fig`, or `monthly_sales_trend_chart`.
   - Intermediate/helper variables should be single-purpose and immutable within a snippet.
   - If data is modified (filter/sort/group/join/pivot/enrich), create a new intermediate variable name for that stage.
   - Final persisted output names should be stable across similar reruns so artifacts overwrite cleanly.
