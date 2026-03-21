@@ -1638,6 +1638,7 @@ dependencies = [
  "tauri-plugin-fs",
  "tauri-plugin-log",
  "toml 0.8.2",
+ "url",
 ]
 
 [[package]]
