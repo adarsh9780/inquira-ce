@@ -10,12 +10,12 @@ import warnings
 from pathlib import Path
 from typing import Annotated, Any
 
-from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, RemoveMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, RemoveMessage, ToolMessage
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
-from langgraph.prebuilt import InjectedState, tools_condition
+from langgraph.prebuilt import InjectedState
 from pydantic import BaseModel
 
 from .coding_subagent import ainvoke_coding_chain, build_coding_chain
@@ -59,21 +59,25 @@ _ASSESS_CONTEXT_PROMPT = (
 _CONTEXT_ENRICHMENT_TOOL_PROMPT = (
     "You are a schema context-gathering assistant for Python data analysis.\n"
     "Decide whether there is enough schema/data context to generate executable analysis code.\n"
-    "If context is insufficient, call one tool at a time to gather missing details.\n"
-    "Available tools:\n"
-    "- search_schema(query?: string, queries?: string[], table_name?: string, limit?: int, explanation?: string)\n"
-    "- scan_schema_chunks(query_terms: string[], table_names?: string[], chunk_size?: int, max_chunks?: int, explanation?: string)\n"
-    "- sample_data(table_name?: string, limit?: int, explanation?: string)\n"
+    "Return strict JSON with fields:\n"
+    "- enough_context: boolean\n"
+    "- missing_context: string[]\n"
+    "- notes: string\n"
+    "- tools: list of tool actions. Each tool action must have:\n"
+    "  - tool: one of search_schema, scan_schema_chunks, sample_data\n"
+    "  - args: object with the tool arguments\n"
+    "  - explanation: one short operational sentence in the format 'what I got, what I will do next'.\n"
+    "Available tools and allowed args:\n"
+    "- search_schema(args={query?: string, queries?: string[], table_name?: string, limit?: int})\n"
+    "- scan_schema_chunks(args={query_terms: string[], table_names?: string[], chunk_size?: int, max_chunks?: int})\n"
+    "- sample_data(args={table_name?: string, limit?: int})\n"
     "Rules:\n"
     "- Start with ONE batched search_schema call using queries=[...] containing 3-6 broad single-word keywords.\n"
-    "- Keep search keywords as single words (no spaces, no long phrases).\n"
+    "- Keep search keywords as single words.\n"
     "- Prefer search_schema first; use scan_schema_chunks only when search_schema matches are weak.\n"
-    "- After first results, narrow follow-up queries using: prior search results + user question + known columns + missing context.\n"
-    "- Avoid repeating the same tool call with identical arguments.\n"
-    "- Include explanation in every tool call as one short sentence saying why this tool is the next step.\n"
-    "- Stop tool calls as soon as context is sufficient.\n"
-    "When finished, return ONLY valid JSON:\n"
-    "{\"enough_context\": boolean, \"missing_context\": string[], \"notes\": string}\n"
+    "- Avoid repeating identical tool calls.\n"
+    "- Keep explanations short, concrete, and about the operation rather than internal reasoning.\n"
+    "- When enough_context=true, tools must be empty.\n"
 )
 
 
@@ -105,6 +109,19 @@ class ContextEnrichmentDecision(BaseModel):
     enough_context: bool = False
     missing_context: list[str] = []
     notes: str = ""
+
+
+class StructuredToolCall(BaseModel):
+    tool: str
+    args: dict[str, Any] = {}
+    explanation: str = ""
+
+
+class ContextEnrichmentPlan(BaseModel):
+    enough_context: bool = False
+    missing_context: list[str] = []
+    notes: str = ""
+    tools: list[StructuredToolCall] = []
 
 
 _SCHEMA_QUERY_STOPWORDS = {
@@ -301,6 +318,90 @@ def _sanitize_tool_plan(raw: Any, *, max_items: int = 5) -> list[dict[str, Any]]
             if explanation:
                 normalized["explanation"] = explanation
             _append_action(normalized)
+        if len(accepted) >= max_items:
+            break
+    return accepted
+
+
+def _sanitize_structured_tool_calls(raw: Any, *, max_items: int = 5) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    accepted: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def _append_action(action: dict[str, Any]) -> None:
+        key = _safe_json_dumps(action)
+        if key in seen:
+            return
+        seen.add(key)
+        accepted.append(action)
+
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        tool = str(item.get("tool") or "").strip().lower()
+        args = item.get("args") if isinstance(item.get("args"), dict) else {}
+        explanation = str(item.get("explanation") or "").strip()
+        if tool == "search_schema":
+            normalized_queries = _normalize_broad_search_queries(
+                query=str(args.get("query") or "").strip(),
+                queries=args.get("queries") if isinstance(args.get("queries"), list) else None,
+                max_items=8,
+            )
+            primary_query = normalized_queries[0] if normalized_queries else ""
+            if not primary_query:
+                continue
+            action_args: dict[str, Any] = {
+                "query": primary_query,
+                "queries": normalized_queries,
+                "limit": max(1, min(50, int(args.get("limit") or 20))),
+            }
+            table_name = str(args.get("table_name") or "").strip()
+            if table_name:
+                action_args["table_name"] = table_name
+            _append_action(
+                {
+                    "tool": tool,
+                    "args": action_args,
+                    "explanation": explanation,
+                }
+            )
+        elif tool == "scan_schema_chunks":
+            query_terms = args.get("query_terms")
+            if not isinstance(query_terms, list):
+                query_terms = _extract_schema_query_keywords(str(args.get("query") or "").strip(), max_items=4)
+            normalized_terms = [str(term).strip() for term in (query_terms or []) if str(term).strip()]
+            if not normalized_terms:
+                continue
+            action_args = {
+                "query_terms": normalized_terms[:6],
+                "chunk_size": max(1, min(16, int(args.get("chunk_size") or 4))),
+                "max_chunks": max(1, min(40, int(args.get("max_chunks") or 12))),
+            }
+            table_names = args.get("table_names")
+            if isinstance(table_names, list):
+                normalized_tables = [str(item).strip() for item in table_names if str(item).strip()]
+                if normalized_tables:
+                    action_args["table_names"] = normalized_tables[:16]
+            _append_action(
+                {
+                    "tool": tool,
+                    "args": action_args,
+                    "explanation": explanation,
+                }
+            )
+        elif tool == "sample_data":
+            action_args = {"limit": max(1, min(20, int(args.get("limit") or 5)))}
+            table_name = str(args.get("table_name") or "").strip()
+            if table_name:
+                action_args["table_name"] = table_name
+            _append_action(
+                {
+                    "tool": tool,
+                    "args": action_args,
+                    "explanation": explanation,
+                }
+            )
         if len(accepted) >= max_items:
             break
     return accepted
@@ -1204,6 +1305,240 @@ def _latest_tool_payload(
     return payload
 
 
+def _record_tool_span_event(
+    *,
+    event_name: str,
+    tool_name: str,
+    call_id: str,
+    explanation: str = "",
+    status: str = "",
+) -> None:
+    try:
+        from opentelemetry import trace as trace_api
+    except Exception:
+        return
+
+    span = trace_api.get_current_span()
+    if span is None or not span.is_recording():
+        return
+
+    span.set_attribute("agent.tool.name", str(tool_name or ""))
+    span.set_attribute("agent.tool.call_id", str(call_id or ""))
+    if explanation:
+        span.set_attribute("agent.tool.explanation", str(explanation))
+    if status:
+        span.set_attribute("agent.tool.status", str(status))
+    span.add_event(
+        event_name,
+        {
+            "tool": str(tool_name or ""),
+            "call_id": str(call_id or ""),
+            "explanation": str(explanation or ""),
+            "status": str(status or ""),
+        },
+    )
+
+
+async def _run_context_search_schema(state: dict[str, Any], args: dict[str, Any], explanation: str) -> dict[str, Any]:
+    analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
+    workspace_schema = analysis_context.get("workspace_schema") if isinstance(analysis_context.get("workspace_schema"), dict) else {}
+    table_names = _normalize_table_names(analysis_context.get("table_names"), max_items=64)
+    queries = _normalize_broad_search_queries(
+        query=str(args.get("query") or "").strip(),
+        queries=args.get("queries") if isinstance(args.get("queries"), list) else None,
+        max_items=8,
+    )
+    primary_query = queries[0] if queries else str(args.get("query") or "").strip()
+    return await asyncio.to_thread(
+        search_schema,
+        schema=workspace_schema,
+        data_path=str(analysis_context.get("data_path") or "") or None,
+        table_names=table_names,
+        query=primary_query,
+        queries=queries,
+        table_name=str(args.get("table_name") or "").strip() or None,
+        max_results=max(1, min(50, int(args.get("limit") or 20))),
+        explanation=explanation,
+        emit_tool_events=False,
+    )
+
+
+async def _run_context_schema_chunks(state: dict[str, Any], args: dict[str, Any], explanation: str) -> dict[str, Any]:
+    analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
+    workspace_schema = analysis_context.get("workspace_schema") if isinstance(analysis_context.get("workspace_schema"), dict) else {}
+    default_tables = _normalize_table_names(analysis_context.get("table_names"), max_items=64)
+    requested_tables = _normalize_table_names(args.get("table_names"), max_items=64) if isinstance(args.get("table_names"), list) else []
+    query_terms = [str(item).strip() for item in (args.get("query_terms") or []) if str(item).strip()]
+    return await asyncio.to_thread(
+        scan_schema_chunks,
+        schema=workspace_schema,
+        query_terms=query_terms,
+        table_names=requested_tables or default_tables,
+        chunk_size=max(1, min(16, int(args.get("chunk_size") or 4))),
+        max_chunks=max(1, min(40, int(args.get("max_chunks") or 12))),
+        explanation=explanation,
+        emit_tool_events=False,
+    )
+
+
+async def _run_sample_data(state: dict[str, Any], args: dict[str, Any], explanation: str) -> dict[str, Any]:
+    analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
+    fallback_table = str(analysis_context.get("sample_table") or "").strip()
+    return await asyncio.to_thread(
+        sample_data,
+        data_path=str(analysis_context.get("data_path") or "") or None,
+        table_name=str(args.get("table_name") or "").strip() or fallback_table or None,
+        limit=max(1, min(20, int(args.get("limit") or 5))),
+        explanation=explanation,
+        emit_tool_events=False,
+    )
+
+
+async def _run_execute_python_runtime(
+    state: dict[str, Any],
+    args: dict[str, Any],
+    explanation: str,
+) -> dict[str, Any]:
+    analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
+    return await execute_python(
+        workspace_id=str(state.get("workspace_id") or ""),
+        data_path=str(analysis_context.get("data_path") or "") or None,
+        code=str(args.get("code") or ""),
+        timeout=max(5, int(args.get("timeout") or 90)),
+        explanation=explanation,
+        emit_tool_events=False,
+    )
+
+
+async def _run_validate_result_runtime(
+    state: dict[str, Any],
+    args: dict[str, Any],
+    explanation: str,
+) -> dict[str, Any]:
+    _ = explanation
+    return await validate_and_summarize_result(
+        workspace_id=str(state.get("workspace_id") or ""),
+        run_id=str(state.get("run_id") or ""),
+        execution_result=args.get("execution_result") if isinstance(args.get("execution_result"), dict) else {},
+        max_artifacts=max(1, min(10, int(args.get("max_artifacts") or 3))),
+        max_rows=max(1, min(20, int(args.get("max_rows") or 5))),
+    )
+
+
+_CUSTOM_CONTEXT_TOOL_REGISTRY: dict[str, Any] = {
+    "search_schema": _run_context_search_schema,
+    "scan_schema_chunks": _run_context_schema_chunks,
+    "sample_data": _run_sample_data,
+}
+
+
+_CUSTOM_RUNTIME_TOOL_REGISTRY: dict[str, Any] = {
+    "sample_data_runtime": _run_sample_data,
+    "execute_python_runtime": _run_execute_python_runtime,
+    "validate_result_runtime": _run_validate_result_runtime,
+}
+
+
+async def execute_pending_tools_node(
+    state: dict[str, Any],
+    config: RunnableConfig,
+    *,
+    message_key: str,
+    registry: dict[str, Any],
+) -> dict[str, Any]:
+    _ = config
+    pending_tools = state.get("pending_tools") if isinstance(state.get("pending_tools"), list) else []
+    tool_messages: list[ToolMessage] = []
+
+    for item in pending_tools:
+        if not isinstance(item, dict):
+            continue
+        tool_name = str(item.get("tool") or "").strip()
+        executor = registry.get(tool_name)
+        if executor is None:
+            continue
+        args = item.get("args") if isinstance(item.get("args"), dict) else {}
+        explanation = str(item.get("explanation") or "").strip()
+        call_id = str(item.get("call_id") or "").strip() or new_tool_call_id(tool_name)
+        event_args = {**args}
+        if explanation:
+            event_args["explanation"] = explanation
+
+        emit_agent_event(
+            "tool_call",
+            {
+                "tool": tool_name,
+                "args": event_args,
+                "call_id": call_id,
+                "explanation": explanation,
+            },
+        )
+        _record_tool_span_event(
+            event_name="agent.tool_call",
+            tool_name=tool_name,
+            call_id=call_id,
+            explanation=explanation,
+        )
+
+        status = "success"
+        try:
+            payload = await executor(state, args, explanation)
+            if tool_name == "execute_python_runtime" and not bool(payload.get("success", False)):
+                status = "error"
+            if tool_name in {"sample_data", "sample_data_runtime"} and str(payload.get("error") or "").strip():
+                status = "error"
+        except Exception as exc:
+            status = "error"
+            payload = {"success": False, "error": str(exc)}
+
+        emit_agent_event(
+            "tool_result",
+            {
+                "call_id": call_id,
+                "output": payload,
+                "status": status,
+                "duration_ms": 1,
+            },
+        )
+        _record_tool_span_event(
+            event_name="agent.tool_result",
+            tool_name=tool_name,
+            call_id=call_id,
+            explanation=explanation,
+            status=status,
+        )
+        tool_messages.append(
+            ToolMessage(
+                name=tool_name,
+                tool_call_id=call_id,
+                content=_safe_json_dumps(payload),
+            )
+        )
+
+    return {
+        message_key: tool_messages,
+        "pending_tools": [],
+    }
+
+
+async def analysis_enrich_context_tools_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+    return await execute_pending_tools_node(
+        state,
+        config,
+        message_key="analysis_tool_messages",
+        registry=_CUSTOM_CONTEXT_TOOL_REGISTRY,
+    )
+
+
+async def analysis_runtime_tools_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+    return await execute_pending_tools_node(
+        state,
+        config,
+        message_key="analysis_runtime_tool_messages",
+        registry=_CUSTOM_RUNTIME_TOOL_REGISTRY,
+    )
+
+
 def _fallback_context_assessment(
     *,
     user_text: str,
@@ -1372,6 +1707,7 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
         "enrichment_tool_cursor": 0,
         "analysis_tool_messages": reset_tool_messages,
         "analysis_runtime_tool_messages": reset_runtime_tool_messages,
+        "pending_tools": [],
         "runtime_tool_cursor": 0,
         "runtime_tool_stage": "",
         "retry_feedback": "",
@@ -1466,41 +1802,16 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
     existing_messages = list(state.get("analysis_tool_messages") or [])
     executed_tool_calls = sum(1 for message in existing_messages if isinstance(message, ToolMessage))
     tool_budget_remaining = max(0, max_tool_calls - executed_tool_calls)
-
-    seed_messages: list[AnyMessage] = []
-    should_seed = not existing_messages
-    retry_target = str(state.get("retry_target") or "").strip()
-    if should_seed:
-        seed_messages.append(SystemMessage(content=_CONTEXT_ENRICHMENT_TOOL_PROMPT))
-        seed_messages.append(
-            HumanMessage(
-                content=_build_context_enrichment_user_prompt(
-                    user_text=str(analysis_context.get("user_text") or ""),
-                    schema_summary=str(analysis_context.get("schema_summary") or ""),
-                    known_columns=known_columns,
-                    missing_context=missing_context,
-                    retry_feedback=retry_feedback,
-                    enrichment_hints=hints,
-                    prior_search_summary=prior_search_summary,
-                    tool_budget_remaining=tool_budget_remaining,
-                )
-            )
-        )
-    elif retry_target == "analysis_enrich_context" and (retry_feedback or hints):
-        seed_messages.append(
-            HumanMessage(
-                content=_build_context_enrichment_user_prompt(
-                    user_text=str(analysis_context.get("user_text") or ""),
-                    schema_summary=str(analysis_context.get("schema_summary") or ""),
-                    known_columns=known_columns,
-                    missing_context=missing_context,
-                    retry_feedback=retry_feedback,
-                    enrichment_hints=hints,
-                    prior_search_summary=prior_search_summary,
-                    tool_budget_remaining=tool_budget_remaining,
-                )
-            )
-        )
+    prompt_payload = _build_context_enrichment_user_prompt(
+        user_text=str(analysis_context.get("user_text") or ""),
+        schema_summary=str(analysis_context.get("schema_summary") or ""),
+        known_columns=known_columns,
+        missing_context=missing_context,
+        retry_feedback=retry_feedback,
+        enrichment_hints=hints,
+        prior_search_summary=prior_search_summary,
+        tool_budget_remaining=tool_budget_remaining,
+    )
 
     if tool_budget_remaining <= 0:
         fallback_decision = ContextEnrichmentDecision(
@@ -1509,36 +1820,64 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
             notes="Tool budget reached; continue with currently available schema context.",
         )
         return {
-            "analysis_tool_messages": seed_messages
-            + [AIMessage(content=_safe_json_dumps(fallback_decision.model_dump()))],
+            "analysis_tool_messages": [AIMessage(content=_safe_json_dumps(fallback_decision.model_dump()))],
             "retry_target": "",
             "tool_plan": [],
             "enrichment_hints": [],
+            "pending_tools": [],
         }
 
     _emit_agent_status(
         step="assessing_context",
         message="Assessing schema context...",
         detail="Deciding whether more schema/data lookup is required before code generation.",
-        next_action="If needed, call schema tools via ToolNode.",
+        next_action="If needed, schedule the next schema lookup tool.",
     )
 
     model = _get_model(config, lite=False)
-    model_with_tools = model.bind_tools(CONTEXT_ENRICHMENT_TOOLS)
-    response = await model_with_tools.ainvoke(existing_messages + seed_messages)
-    if not isinstance(response, AIMessage):
-        response = AIMessage(content=_stringify_content(getattr(response, "content", response)))
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", _CONTEXT_ENRICHMENT_TOOL_PROMPT),
+            ("human", "{tool_request_prompt}"),
+        ]
+    )
+    chain = prompt | model.with_structured_output(ContextEnrichmentPlan)
+    try:
+        output = await _ainvoke_structured_chain(chain, {"tool_request_prompt": prompt_payload})
+        plan = output if isinstance(output, ContextEnrichmentPlan) else ContextEnrichmentPlan.model_validate(output)
+    except Exception as exc:
+        if not _is_empty_json_structured_parse_error(exc):
+            raise
+        plan = ContextEnrichmentPlan(
+            enough_context=bool(known_columns),
+            missing_context=missing_context,
+            notes="Structured enrichment planning failed; continue with current context.",
+            tools=[],
+        )
+
+    decision = ContextEnrichmentDecision(
+        enough_context=bool(plan.enough_context),
+        missing_context=[str(item).strip() for item in (plan.missing_context or []) if str(item).strip()][:6],
+        notes=str(plan.notes or "").strip(),
+    )
+    pending_tools = _sanitize_structured_tool_calls(
+        [item.model_dump() for item in (plan.tools or [])],
+        max_items=max(1, tool_budget_remaining),
+    )
+    if decision.enough_context:
+        pending_tools = []
 
     return {
-        "analysis_tool_messages": seed_messages + [response],
+        "analysis_tool_messages": [AIMessage(content=_safe_json_dumps(decision.model_dump()))],
         "retry_target": "",
         "tool_plan": [],
+        "pending_tools": pending_tools,
     }
 
 
 def analysis_enrich_to_next(state: dict[str, Any]) -> str:
-    route = tools_condition(state, messages_key="analysis_tool_messages")
-    if route == "tools":
+    pending_tools = state.get("pending_tools") if isinstance(state.get("pending_tools"), list) else []
+    if pending_tools:
         return "analysis_enrich_context_tools"
     return "analysis_finalize_context_enrichment"
 
@@ -1588,6 +1927,7 @@ async def analysis_finalize_context_enrichment_node(
         "enrichment_tool_cursor": len(messages),
         "enrichment_hints": [],
         "tool_plan": [],
+        "pending_tools": [],
         "attempt_counters": {
             **attempt_counters,
             "enrichment": int(attempt_counters.get("enrichment") or 0) + 1,
@@ -1600,29 +1940,27 @@ async def analysis_prepare_sample_tool_node(state: dict[str, Any], config: Runna
     enrichment_results = state.get("enrichment_results") if isinstance(state.get("enrichment_results"), dict) else {}
     cached_sample = enrichment_results.get("sample_data")
     if isinstance(cached_sample, dict):
-        return {"runtime_tool_stage": ""}
+        return {"runtime_tool_stage": "", "pending_tools": []}
 
     analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
     sample_table = str(analysis_context.get("sample_table") or "").strip()
     tool_call = {
-        "name": "sample_data_runtime",
+        "tool": "sample_data_runtime",
         "args": {
             "table_name": sample_table,
             "limit": 5,
-            "explanation": "I need a quick sample of the table before generating code.",
         },
-        "id": "sample_data_runtime_call",
-        "type": "tool_call",
+        "explanation": "I have the candidate table, so I’m sampling a few rows before generating code.",
     }
     return {
-        "analysis_runtime_tool_messages": [AIMessage(content="", tool_calls=[tool_call])],
+        "pending_tools": [tool_call],
         "runtime_tool_stage": "sample",
     }
 
 
 def analysis_prepare_sample_to_next(state: dict[str, Any]) -> str:
-    route = tools_condition(state, messages_key="analysis_runtime_tool_messages")
-    if route == "tools":
+    pending_tools = state.get("pending_tools") if isinstance(state.get("pending_tools"), list) else []
+    if pending_tools:
         return "analysis_runtime_tools"
     return "analysis_generate_code"
 
@@ -1662,24 +2000,22 @@ async def analysis_request_execute_tool_node(state: dict[str, Any], config: Runn
         next_action="Use runtime output to decide retry or finalization.",
     )
     tool_call = {
-        "name": "execute_python_runtime",
+        "tool": "execute_python_runtime",
         "args": {
             "code": code,
             "timeout": timeout,
-            "explanation": "I have candidate code and need to run it to verify the result.",
         },
-        "id": f"execute_python_runtime_{execution_attempts}",
-        "type": "tool_call",
+        "explanation": "I have executable code, so I’m running it now and will inspect the result next.",
     }
     return {
-        "analysis_runtime_tool_messages": [AIMessage(content="", tool_calls=[tool_call])],
+        "pending_tools": [tool_call],
         "runtime_tool_stage": "execute",
     }
 
 
 def analysis_request_execute_to_next(state: dict[str, Any]) -> str:
-    route = tools_condition(state, messages_key="analysis_runtime_tool_messages")
-    if route == "tools":
+    pending_tools = state.get("pending_tools") if isinstance(state.get("pending_tools"), list) else []
+    if pending_tools:
         return "analysis_runtime_tools"
     return "analysis_retry_decider"
 
@@ -1729,23 +2065,21 @@ async def analysis_request_validate_result_tool_node(
         next_action="Generate final explanation.",
     )
     tool_call = {
-        "name": "validate_result_runtime",
+        "tool": "validate_result_runtime",
         "args": {
             "execution_result": execution,
-            "explanation": "The code ran, so I am checking whether the output is actually useful.",
         },
-        "id": "validate_result_runtime_call",
-        "type": "tool_call",
+        "explanation": "I have the runtime output, so I’m checking whether it is useful enough to return.",
     }
     return {
-        "analysis_runtime_tool_messages": [AIMessage(content="", tool_calls=[tool_call])],
+        "pending_tools": [tool_call],
         "runtime_tool_stage": "validate",
     }
 
 
 def analysis_request_validate_to_next(state: dict[str, Any]) -> str:
-    route = tools_condition(state, messages_key="analysis_runtime_tool_messages")
-    if route == "tools":
+    pending_tools = state.get("pending_tools") if isinstance(state.get("pending_tools"), list) else []
+    if pending_tools:
         return "analysis_runtime_tools"
     return "analysis_finalize_failure"
 
@@ -1916,7 +2250,7 @@ def analysis_guard_to_next(state: dict[str, Any]) -> str:
 
 
 async def analysis_execute_code_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-    # Deprecated shim kept for compatibility with older imports. Active graph uses ToolNode path.
+    # Deprecated shim kept for compatibility with older imports. Active graph uses the custom tool executor path.
     return await analysis_request_execute_tool_node(state, config)
 
 
@@ -2152,7 +2486,7 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
     # Deprecated shim retained only for backwards compatibility; active graph does not route here.
     text = (
         "The legacy react_loop execution path is disabled. "
-        "Use the native ToolNode-backed analysis graph path."
+        "Use the structured custom-tool analysis graph path."
     )
     return {
         "route": "analysis",

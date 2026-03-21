@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate
 
 from agent_v2.nodes import (
@@ -16,6 +16,7 @@ from agent_v2.nodes import (
     analysis_request_validate_result_tool_node,
     analysis_enrich_to_next,
     analysis_enrich_context_node,
+    analysis_runtime_tools_node,
     analysis_finalize_context_enrichment_node,
     analysis_generate_code_node,
     analysis_generate_to_next,
@@ -23,31 +24,40 @@ from agent_v2.nodes import (
     analysis_validate_result_node,
     analysis_validate_to_next,
     analysis_retry_decider_node,
+    ContextEnrichmentPlan,
+    StructuredToolCall,
 )
 from agent_v2.coding_subagent import AnalysisOutput
 
 
 @pytest.mark.asyncio
-async def test_analysis_enrich_context_node_produces_tool_call_message(monkeypatch) -> None:
-    class _FakeBoundModel:
-        async def ainvoke(self, _messages):
-            return AIMessage(
-                content="",
-                tool_calls=[
-                    {
-                        "name": "search_schema",
-                        "args": {"query": "customer", "explanation": "I need schema matches before writing code."},
-                        "id": "call_1",
-                        "type": "tool_call",
-                    }
-                ],
-            )
+async def test_analysis_enrich_context_node_produces_structured_pending_tools(monkeypatch) -> None:
+    class _FakePrompt:
+        def __or__(self, _other):
+            return object()
 
     class _FakeModel:
-        def bind_tools(self, _tools):
-            return _FakeBoundModel()
+        def with_structured_output(self, _schema):
+            return self
 
     monkeypatch.setattr("agent_v2.nodes._get_model", lambda *_args, **_kwargs: _FakeModel())
+    monkeypatch.setattr("agent_v2.nodes.ChatPromptTemplate.from_messages", lambda *_args, **_kwargs: _FakePrompt())
+    
+    async def fake_ainvoke(*_args, **_kwargs):
+        return ContextEnrichmentPlan(
+            enough_context=False,
+            missing_context=["matching columns"],
+            notes="Need schema matches first.",
+            tools=[
+                StructuredToolCall(
+                    tool="search_schema",
+                    args={"queries": ["customer", "amount"], "table_name": "orders", "limit": 10},
+                    explanation="I have the user goal, so I’m checking schema matches before writing code.",
+                )
+            ],
+        )
+
+    monkeypatch.setattr("agent_v2.nodes._ainvoke_structured_chain", fake_ainvoke)
     state = {
         "workspace_id": "ws1",
         "user_id": "u1",
@@ -64,15 +74,16 @@ async def test_analysis_enrich_context_node_produces_tool_call_message(monkeypat
     }
 
     result = await analysis_enrich_context_node(state, {"configurable": {}})
-    tool_messages = result.get("analysis_tool_messages") or []
-    assert isinstance(tool_messages, list)
-    assert len(tool_messages) == 3
-    assert isinstance(tool_messages[0], SystemMessage)
-    assert isinstance(tool_messages[-1], AIMessage)
-    assert bool((tool_messages[-1].tool_calls or []))
-    assert (tool_messages[-1].tool_calls or [])[0].get("args", {}).get("explanation") == (
-        "I need schema matches before writing code."
+    pending_tools = result.get("pending_tools") or []
+    assert len(pending_tools) == 1
+    assert pending_tools[0]["tool"] == "search_schema"
+    assert pending_tools[0]["args"]["queries"] == ["customer", "amount"]
+    assert pending_tools[0]["explanation"] == (
+        "I have the user goal, so I’m checking schema matches before writing code."
     )
+    tool_messages = result.get("analysis_tool_messages") or []
+    assert len(tool_messages) == 1
+    assert isinstance(tool_messages[0], AIMessage)
 
 
 def test_context_enrichment_prompt_includes_prior_search_context() -> None:
@@ -91,17 +102,14 @@ def test_context_enrichment_prompt_includes_prior_search_context() -> None:
 
 
 def test_context_enrichment_prompt_requires_tool_explanations() -> None:
-    assert "Include explanation in every tool call" in _CONTEXT_ENRICHMENT_TOOL_PROMPT
+    assert "what I got, what I will do next" in _CONTEXT_ENRICHMENT_TOOL_PROMPT
 
 
 @pytest.mark.asyncio
-async def test_analysis_enrich_to_next_routes_to_tool_node_when_ai_has_tool_calls() -> None:
+async def test_analysis_enrich_to_next_routes_to_custom_tool_node_when_pending_tools_exist() -> None:
     state = {
-        "analysis_tool_messages": [
-            AIMessage(
-                content="",
-                tool_calls=[{"name": "search_schema", "args": {"query": "runs"}, "id": "c1", "type": "tool_call"}],
-            )
+        "pending_tools": [
+            {"tool": "search_schema", "args": {"query": "runs"}, "explanation": "I need schema matches next."}
         ]
     }
     assert analysis_enrich_to_next(state) == "analysis_enrich_context_tools"
@@ -146,19 +154,17 @@ async def test_analysis_finalize_context_enrichment_merges_search_tool_results()
 
 
 @pytest.mark.asyncio
-async def test_analysis_prepare_sample_tool_requests_toolnode_call_when_sample_missing() -> None:
+async def test_analysis_prepare_sample_tool_creates_pending_runtime_tool_when_sample_missing() -> None:
     state = {
         "analysis_context": {"sample_table": "orders"},
         "enrichment_results": {},
     }
     result = await analysis_prepare_sample_tool_node(state, {"configurable": {}})
-    runtime_messages = result.get("analysis_runtime_tool_messages") or []
-    assert len(runtime_messages) == 1
-    assert isinstance(runtime_messages[0], AIMessage)
-    tool_calls = runtime_messages[0].tool_calls or []
-    assert tool_calls and tool_calls[0].get("name") == "sample_data_runtime"
-    assert tool_calls[0].get("args", {}).get("explanation") == (
-        "I need a quick sample of the table before generating code."
+    pending_tools = result.get("pending_tools") or []
+    assert len(pending_tools) == 1
+    assert pending_tools[0].get("tool") == "sample_data_runtime"
+    assert pending_tools[0].get("explanation") == (
+        "I have the candidate table, so I’m sampling a few rows before generating code."
     )
 
 
@@ -169,10 +175,9 @@ async def test_analysis_request_execute_tool_includes_short_explanation() -> Non
         "attempt_counters": {"execution": 0},
     }
     result = await analysis_request_execute_tool_node(state, {"configurable": {}})
-    runtime_messages = result.get("analysis_runtime_tool_messages") or []
-    tool_calls = runtime_messages[0].tool_calls or []
-    assert tool_calls[0].get("args", {}).get("explanation") == (
-        "I have candidate code and need to run it to verify the result."
+    pending_tools = result.get("pending_tools") or []
+    assert pending_tools[0].get("explanation") == (
+        "I have executable code, so I’m running it now and will inspect the result next."
     )
 
 
@@ -182,23 +187,63 @@ async def test_analysis_request_validate_result_tool_includes_short_explanation(
         "execution_result": {"success": True, "stdout": "done"},
     }
     result = await analysis_request_validate_result_tool_node(state, {"configurable": {}})
-    runtime_messages = result.get("analysis_runtime_tool_messages") or []
-    tool_calls = runtime_messages[0].tool_calls or []
-    assert tool_calls[0].get("args", {}).get("explanation") == (
-        "The code ran, so I am checking whether the output is actually useful."
+    pending_tools = result.get("pending_tools") or []
+    assert pending_tools[0].get("explanation") == (
+        "I have the runtime output, so I’m checking whether it is useful enough to return."
     )
 
 
 def test_analysis_prepare_sample_to_next_routes_to_runtime_tools_when_pending_call() -> None:
     state = {
-        "analysis_runtime_tool_messages": [
-            AIMessage(
-                content="",
-                tool_calls=[{"name": "sample_data_runtime", "args": {}, "id": "c1", "type": "tool_call"}],
-            )
-        ]
+        "pending_tools": [{"tool": "sample_data_runtime", "args": {}, "explanation": "Sampling rows next."}]
     }
     assert analysis_prepare_sample_to_next(state) == "analysis_runtime_tools"
+
+
+@pytest.mark.asyncio
+async def test_analysis_runtime_tools_node_emits_tool_messages_and_trace_hooks(monkeypatch) -> None:
+    events: list[tuple[str, dict]] = []
+    span_events: list[tuple[str, str, str, str]] = []
+
+    monkeypatch.setattr(
+        "agent_v2.nodes.sample_data",
+        lambda **_kwargs: {"rows": [{"customer_id": "c1"}], "columns": ["customer_id"], "row_count": 1},
+    )
+    monkeypatch.setattr(
+        "agent_v2.nodes.emit_agent_event",
+        lambda event, payload: events.append((event, payload)),
+    )
+    monkeypatch.setattr(
+        "agent_v2.nodes._record_tool_span_event",
+        lambda **kwargs: span_events.append(
+            (
+                str(kwargs.get("event_name") or ""),
+                str(kwargs.get("tool_name") or ""),
+                str(kwargs.get("call_id") or ""),
+                str(kwargs.get("status") or ""),
+            )
+        ),
+    )
+    state = {
+        "analysis_context": {"data_path": "/tmp/ws.db", "sample_table": "orders"},
+        "pending_tools": [
+            {
+                "tool": "sample_data_runtime",
+                "args": {"table_name": "orders", "limit": 5},
+                "explanation": "I found the target table, so I’m sampling rows next.",
+            }
+        ],
+    }
+
+    result = await analysis_runtime_tools_node(state, {"configurable": {}})
+    runtime_messages = result.get("analysis_runtime_tool_messages") or []
+    assert len(runtime_messages) == 1
+    assert isinstance(runtime_messages[0], ToolMessage)
+    payload = runtime_messages[0].content
+    assert "customer_id" in str(payload)
+    assert result.get("pending_tools") == []
+    assert [event for event, _payload in events] == ["tool_call", "tool_result"]
+    assert [item[0] for item in span_events] == ["agent.tool_call", "agent.tool_result"]
 
 
 def test_analysis_runtime_tools_to_next_routes_by_stage() -> None:

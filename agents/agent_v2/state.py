@@ -72,6 +72,7 @@ class AgentState(AgentInput, total=False):
     analysis_runtime_tool_messages: Annotated[list[AnyMessage], add_messages]
     context_sufficiency: dict[str, Any]
     tool_plan: list[dict[str, Any]]
+    pending_tools: list[dict[str, Any]]
     enrichment_hints: list[str]
     enrichment_tool_cursor: int
     runtime_tool_cursor: int

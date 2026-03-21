@@ -8,7 +8,6 @@ from typing import Any, TypedDict
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
-from langgraph.prebuilt import ToolNode
 
 from .events import reset_agent_event_emitter, set_agent_event_emitter
 from .nodes import (
@@ -17,6 +16,7 @@ from .nodes import (
     analysis_capture_sample_tool_result_node,
     analysis_enrich_to_next,
     analysis_enrich_context_node,
+    analysis_enrich_context_tools_node,
     analysis_finalize_context_enrichment_node,
     analysis_execute_to_next,
     analysis_finalize_failure_node,
@@ -33,12 +33,11 @@ from .nodes import (
     analysis_request_validate_to_next,
     analysis_retry_decider_node,
     analysis_retry_to_next,
+    analysis_runtime_tools_node,
     analysis_runtime_tools_to_next,
     analysis_validate_result_node,
     analysis_validate_to_next,
     chat_node,
-    CONTEXT_ENRICHMENT_TOOLS,
-    RUNTIME_FLOW_TOOLS,
     finalize_node,
     reject_node,
     route_node,
@@ -63,6 +62,16 @@ class RuntimeInput(TypedDict, total=False):
     run_id: str
     known_columns: list[dict[str, str]]
     attachments: list[dict[str, str]]
+
+
+class CustomToolNode:
+    """Execute structured pending tools and emit ToolMessages plus trace events."""
+
+    def __init__(self, handler):
+        self._handler = handler
+
+    async def __call__(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+        return await self._handler(state, config)
 
 
 def _prepare_input_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
@@ -110,6 +119,10 @@ def _prepare_input_node(state: dict[str, Any], config: RunnableConfig) -> dict[s
 def _with_stream_event_emitter(fn):
     """Bind agent event emitter to LangGraph custom stream writer for this node run."""
 
+    target = fn
+    if not inspect.isfunction(fn) and not inspect.ismethod(fn) and callable(fn):
+        target = getattr(fn, "__call__", fn)
+
     @wraps(fn)
     async def _async_wrapped(*args, **kwargs):
         from langgraph.config import get_stream_writer
@@ -136,7 +149,7 @@ def _with_stream_event_emitter(fn):
         finally:
             reset_agent_event_emitter(token)
 
-    return _async_wrapped if inspect.iscoroutinefunction(fn) else _sync_wrapped
+    return _async_wrapped if inspect.iscoroutinefunction(target) else _sync_wrapped
 
 
 def build_graph(config: RunnableConfig) -> CompiledStateGraph:
@@ -151,7 +164,7 @@ def build_graph(config: RunnableConfig) -> CompiledStateGraph:
     builder.add_node("analysis_enrich_context", _with_stream_event_emitter(analysis_enrich_context_node))
     builder.add_node(
         "analysis_enrich_context_tools",
-        ToolNode(CONTEXT_ENRICHMENT_TOOLS, messages_key="analysis_tool_messages"),
+        _with_stream_event_emitter(CustomToolNode(analysis_enrich_context_tools_node)),
     )
     builder.add_node(
         "analysis_finalize_context_enrichment",
@@ -175,7 +188,7 @@ def build_graph(config: RunnableConfig) -> CompiledStateGraph:
     )
     builder.add_node(
         "analysis_runtime_tools",
-        ToolNode(RUNTIME_FLOW_TOOLS, messages_key="analysis_runtime_tool_messages"),
+        _with_stream_event_emitter(CustomToolNode(analysis_runtime_tools_node)),
     )
     builder.add_node("analysis_retry_decider", _with_stream_event_emitter(analysis_retry_decider_node))
     builder.add_node("analysis_validate_result", _with_stream_event_emitter(analysis_validate_result_node))
