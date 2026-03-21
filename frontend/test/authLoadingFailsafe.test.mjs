@@ -9,12 +9,12 @@ test('auth store wraps auth requests with explicit timeout fail-safe', () => {
     'utf-8',
   )
 
-  assert.equal(source.includes('const AUTH_ACTION_TIMEOUT_MS = 30000'), true)
+  assert.equal(source.includes('const AUTH_ACTION_TIMEOUT_MS = 45000'), true)
   assert.equal(source.includes('async function withTimeout(promise, timeoutMs, message)'), true)
   assert.equal(source.includes('Promise.race(['), true)
   assert.equal(source.includes("'Authentication check timed out.'"), true)
-  assert.equal(source.includes("'Login request timed out.'"), true)
-  assert.equal(source.includes("'Registration request timed out.'"), true)
+  assert.equal(source.includes("'Provider sign-in request timed out.'"), true)
+  assert.equal(source.includes("'Magic link request timed out.'"), true)
 })
 
 test('auth store does not shadow error ref inside auth action catch blocks', () => {
@@ -25,5 +25,5 @@ test('auth store does not shadow error ref inside auth action catch blocks', () 
 
   assert.equal(source.includes('catch (error)'), false)
   assert.equal(source.includes('catch (err)'), true)
-  assert.equal(source.includes('error.value = err.response?.data?.detail'), true)
+  assert.equal(source.includes('error.value = err?.message'), true)
 })

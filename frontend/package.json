@@ -20,6 +20,7 @@
     "@codemirror/view": "^6.38.1",
     "@headlessui/vue": "^1.7.23",
     "@heroicons/vue": "^2.2.0",
+    "@supabase/supabase-js": "^2.99.3",
     "@tailwindcss/vite": "^4.1.11",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",

@@ -22,6 +22,7 @@ if not hasattr(aiosqlite.Connection, "is_alive"):
 
 from .v1.api.router import router as v1_router
 from .v1.services.auth_service import AuthService
+from .v1.core.settings import settings as v1_settings
 from .v1.db.session import AuthSessionLocal
 from .v1.db.init import init_v1_database
 from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
@@ -213,7 +214,16 @@ async def health():
 
 
 async def _resolve_websocket_user(websocket: WebSocket):
-    """Resolve authenticated websocket user from HTTP-only session cookie."""
+    """Resolve authenticated websocket user from bearer token or legacy cookie."""
+    if v1_settings.auth_provider == "supabase":
+        access_token = str(websocket.query_params.get("access_token") or "").strip()
+        if not access_token:
+            return None
+        try:
+            return await AuthService.resolve_supabase_user(access_token)
+        except Exception:
+            return None
+
     session_token = websocket.cookies.get("session_token")
     if not session_token:
         return None

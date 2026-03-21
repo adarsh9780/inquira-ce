@@ -5,6 +5,7 @@ import { parseSseBuffer } from '../utils/sseParser'
 import { inferTableNameFromDataPath } from '../utils/chatBootstrap'
 import { normalizeExecutionResponse } from '../utils/runtimeExecution'
 import { extractApiErrorMessage } from '../utils/apiError'
+import { supabaseAuthService } from './supabaseAuthService'
 
 // ------------------------------------------------------------------
 // GLOBAL AXIOS CONFIGURATION
@@ -134,8 +135,12 @@ initializeTauriApiBase()
 
 // Request interceptor
 axios.interceptors.request.use(
-  (config) => {
-    // Add any auth headers or other common headers here
+  async (config) => {
+    const accessToken = await supabaseAuthService.getAccessToken().catch(() => null)
+    if (accessToken) {
+      config.headers = config.headers || {}
+      config.headers.Authorization = `Bearer ${accessToken}`
+    }
     return config
   },
   (error) => {
@@ -224,21 +229,6 @@ export const apiService = {
 
       throw error
     }
-  },
-
-  async changePassword(currentPassword, newPassword, confirmPassword) {
-    return client.changePasswordAuthChangePasswordPost({
-      current_password: currentPassword,
-      new_password: newPassword,
-      confirm_password: confirmPassword
-    })
-  },
-
-  async deleteAccount(confirmationText, currentPassword) {
-    return client.deleteAccountAuthDeleteAccountDelete({
-      confirmation_text: confirmationText,
-      current_password: currentPassword
-    })
   },
 
   // Settings management

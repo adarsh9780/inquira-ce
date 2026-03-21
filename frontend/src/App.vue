@@ -11,7 +11,6 @@
     <AuthModal
       :is-open="!authStore.isAuthenticated"
       @close="handleAuthClose"
-      @authenticated="handleAuthenticated"
     />
 
     <!-- Main App (only shown when authenticated) -->
@@ -209,13 +208,18 @@ onMounted(async () => {
   )
   try {
     await authStore.checkAuth()
-    if (authStore.isAuthenticated) {
-      await handleAuthenticated(authStore.user)
-    }
   } catch (error) {
     console.error('❌ Error during app initialization:', error)
   }
 })
+
+watch(
+  () => authStore.userId,
+  async (newUserId, oldUserId) => {
+    if (!newUserId || newUserId === oldUserId) return
+    await handleAuthenticated(authStore.user)
+  },
+)
 
 watch(
   () => appStore.runtimeError,

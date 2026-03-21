@@ -10,6 +10,26 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+
+def _load_env_files() -> None:
+    backend_root = Path(__file__).resolve().parents[2]
+    repo_root = Path(__file__).resolve().parents[4]
+    load_dotenv(backend_root / ".env")
+    load_dotenv(repo_root / ".env")
+
+
+def _first_env(*names: str, default: str = "") -> str:
+    for name in names:
+        value = os.getenv(name)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return default
+
+
+_load_env_files()
+
 
 @dataclass(frozen=True)
 class V1Settings:
@@ -21,6 +41,8 @@ class V1Settings:
     reset_token: str
     allow_schema_bootstrap: bool
     auth_provider: str
+    supabase_url: str
+    supabase_secret_key: str
 
     @staticmethod
     def load() -> "V1Settings":
@@ -42,6 +64,13 @@ class V1Settings:
             reset_token=os.getenv("INQUIRA_RESET_TOKEN", ""),
             allow_schema_bootstrap=os.getenv("INQUIRA_ALLOW_SCHEMA_BOOTSTRAP", "0") == "1",
             auth_provider=os.getenv("INQUIRA_AUTH_PROVIDER", "sqlite").strip().lower(),
+            supabase_url=_first_env("INQUIRA_SUPABASE_URL", "SB_INQUIRA_CE_URL"),
+            supabase_secret_key=_first_env(
+                "INQUIRA_SUPABASE_SECRET_KEY",
+                "SB_INQUIRA_CE_SECRET_KEY",
+                "INQUIRA_SUPABASE_SERVICE_ROLE_KEY",
+                "SB_INQUIRA_CE_SERVICE_ROLE_KEY",
+            ),
         )
 
 

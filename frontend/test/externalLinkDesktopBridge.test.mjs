@@ -38,4 +38,7 @@ test('desktop runtime exposes open_external_url command handler', () => {
 
   assert.equal(source.includes('fn open_external_url(url: String) -> Result<(), String>'), true)
   assert.equal(source.includes('open_external_url,'), true)
+  assert.equal(source.includes('fn auth_start_loopback_listener(app: tauri::AppHandle) -> Result<AuthLoopbackResponse, String>'), true)
+  assert.equal(source.includes('app_handle.emit("auth:callback"'), true)
+  assert.equal(source.includes('auth_start_loopback_listener,'), true)
 })

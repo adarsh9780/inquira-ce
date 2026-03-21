@@ -122,11 +122,7 @@
                 @data-saved="handleDataSaved"
               />
               <PackagesTab v-if="activeTab === 'packages'" />
-              <AccountTab
-                v-if="activeTab === 'account'"
-                @password-changed="handlePasswordChanged"
-                @account-deleted="handleAccountDeleted"
-              />
+              <AccountTab v-if="activeTab === 'account'" />
             </div>
           </div>
         </div>
@@ -239,16 +235,6 @@ function handleApiTested(data) {
 
 function handleDataSaved(data) {
   console.debug('Data settings saved:', data)
-  // Could emit an event or update local state if needed
-}
-
-function handlePasswordChanged(data) {
-  console.debug('Password changed:', data)
-  // Could emit an event or update local state if needed
-}
-
-function handleAccountDeleted(data) {
-  console.debug('Account deleted:', data)
   // Could emit an event or update local state if needed
 }
 

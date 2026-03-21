@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..core.settings import settings
 from ..db.session import get_auth_db_session
 from ..schemas.common import MessageResponse
 from ..schemas.auth import AuthUserResponse, LoginRequest, RegisterRequest
@@ -40,6 +41,12 @@ async def register_user(
     session: AsyncSession = Depends(get_auth_db_session),
 ):
     """Register a new user and immediately issue login session cookie."""
+    if settings.auth_provider == "supabase":
+        raise HTTPException(
+            status_code=410,
+            detail="Local username/password registration is disabled. Use Supabase sign-in instead.",
+        )
+
     session_token, user_id, plan = await AuthService.register_and_login(
         session=session,
         username=payload.username,
@@ -65,6 +72,12 @@ async def login_user(
     session: AsyncSession = Depends(get_auth_db_session),
 ):
     """Login user and issue session cookie."""
+    if settings.auth_provider == "supabase":
+        raise HTTPException(
+            status_code=410,
+            detail="Local username/password login is disabled. Use Supabase sign-in instead.",
+        )
+
     session_token, user_id, plan = await AuthService.login(
         session=session,
         username=payload.username,
@@ -101,6 +114,14 @@ async def logout_user(
     session: AsyncSession = Depends(get_auth_db_session),
 ):
     """Logout user by deleting current v1 session token and clearing cookie."""
+    if settings.auth_provider == "supabase":
+        response.delete_cookie(
+            "session_token",
+            samesite="lax",
+            secure=_should_use_secure_cookie(request),
+        )
+        return MessageResponse(message="Logout successful")
+
     session_token = request.cookies.get("session_token")
     if session_token:
         await AuthService.logout(session, session_token)
