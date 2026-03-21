@@ -26,6 +26,10 @@ Hosted docs site (GitHub Pages): [https://adarsh9780.github.io/inquira-ce/](http
 
 ## What's New (Since v0.5.7a10)
 
+- Replaced generic LangGraph `ToolNode` execution with structured custom tool execution, so the graph now owns the tool contract (`tool`, `args`, `explanation`) instead of relying on raw bound-tool calls.
+- Added short operational tool explanations in the format "what I got, what I will do next," and stream them through trace events and the chat activity UI.
+- Routed generated Python execution through the active backend workspace kernel instead of the agent runtime process, so analysis code runs in the same environment that already bootstraps charting/runtime dependencies such as `plotly`.
+- Required business-specific figure variable names during code generation to avoid overwriting earlier chart objects in long-lived workspace kernel sessions.
 - Kept the chat composer available in both chat and code views, so follow-up questions no longer require tab switching.
 - Moved slash commands, dataset ingestion, schema reads, and artifact access onto the active workspace kernel to avoid competing DuckDB connections.
 - Improved recovery from workspace lock conflicts and kernel restarts during dataset uploads and table browsing.

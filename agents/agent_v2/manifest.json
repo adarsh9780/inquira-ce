@@ -1,20 +1,25 @@
 {
   "name": "agent_v2",
   "version": "2.1.0",
-  "description": "Externalized modular agent v2 with LangGraph routing, coding subagent, schema search, guarded code generation, and local runtime execution helpers.",
-  "last_updated": "2026-03-18",
+  "description": "Externalized modular agent v2 with LangGraph routing, structured tool planning, custom tool execution, guarded code generation, and workspace-kernel-backed runtime execution.",
+  "last_updated": "2026-03-21",
   "features": [
     "Route classification (analysis/general_chat/unsafe)",
-    "Coding subagent with structured output",
-    "Schema search and sample-data tools",
+    "Structured tool planning with short operational explanations",
+    "Custom tool execution that emits ToolMessage objects and trace-friendly tool call/result metadata",
+    "Schema search, schema chunk scan, and sample-data enrichment tools",
+    "Workspace-kernel-backed Python execution and runtime result validation",
     "Code safety guardrails and retry loop",
     "SSE-friendly status/token/tool events",
-    "Self-contained runtime config and Phoenix-compatible tracing hooks"
+    "Phoenix-compatible tracing hooks"
   ],
   "tools": [
     "search_schema",
+    "scan_schema_chunks",
     "sample_data",
-    "execute_python",
+    "sample_data_runtime",
+    "execute_python_runtime",
+    "validate_result_runtime",
     "bash",
     "pip_install",
     "finish_analysis"

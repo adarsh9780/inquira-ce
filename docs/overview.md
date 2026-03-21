@@ -6,10 +6,11 @@ In plain terms: you ask a question about data in natural language, and Inquira h
 
 ## Current product highlights
 
-- Real-time chat streaming with clearer final response presentation.
+- Real-time chat streaming with clearer final response presentation and tool-by-tool operational progress updates.
 - Unified workspace interface with collapsible navigation and dual resizable panes.
 - Built-in terminal support with persistent sessions for workspace-focused development.
-- Stronger artifact and runtime reliability (DuckDB lock handling and stable table/figure recovery).
+- Workspace-kernel-backed execution, so generated Python runs in the same environment used for schema reads, artifacts, and chart dependencies.
+- Stronger artifact and runtime reliability, including DuckDB lock recovery, stable table/figure restoration, and safer chart naming in persistent kernel sessions.
 
 Version source of truth: root `VERSION` file.
 
@@ -24,6 +25,7 @@ Version source of truth: root `VERSION` file.
 - `src-tauri/`: Desktop shell (Tauri/Rust) and app packaging.
 - `backend/`: FastAPI backend, agent/runtime services, and tests.
 - `frontend/`: Vue frontend used by the desktop app.
+- `agents/`: LangGraph agent graphs, tool routing, tracing hooks, and tool execution contracts.
 - `scripts/`: maintenance scripts used by Makefile and release workflow.
 - `docs/`: project documentation, diagrams, and release/process guides.
 

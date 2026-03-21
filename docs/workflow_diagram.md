@@ -1,77 +1,128 @@
 # Inquira Workflow Diagram
 
-This document illustrates how a user request flows through the system, from the Vue.js frontend to the FastAPI backend and into the LangGraph agent.
+This document shows the current end-to-end request flow from the desktop UI to the backend workspace kernel and the `agent_v2` LangGraph graph.
 
 ## End-to-End Request Flow
 
 ```mermaid
 sequenceDiagram
-    participant User as 👤 User
-    participant Frontend as 🖥️ Vue Frontend
-    participant API as 🌐 FastAPI (/chat)
-    participant Agent as 🤖 LangGraph Agent
-    participant LLM as 🧠 Google Gemini
+    participant User as User
+    participant Frontend as Vue Frontend
+    participant API as FastAPI V1 Chat API
+    participant Agent as LangGraph agent_v2
+    participant Planner as Planner LLM
+    participant ToolExec as CustomToolNode
+    participant Kernel as Workspace Kernel
 
-    User->>Frontend: Enters Question ("Analyze sales data")
-    Frontend->>API: POST /chat (question, context, table_name)
-    
-    Note over API: 1. Verify API Key<br/>2. Load User Settings<br/>3. Load Schema JSON
+    User->>Frontend: Ask a data question
+    Frontend->>API: POST /v1/chat
+    API->>Agent: stream(question, workspace_id, schema, context)
 
-    API->>Agent: ainvoke(InputState)
-    
-    rect rgb(240, 248, 255)
-        Note left of Agent: 🛡️ Safety Check
-        Agent->>LLM: Is this question safe? (is_safe_prompt)
-        LLM-->>Agent: { is_safe: true }
-        
-        Note left of Agent: 🎯 Relevancy Check
-        Agent->>LLM: Is this relevant to the schema? (is_relevant_prompt)
-        LLM-->>Agent: { is_relevant: true }
-        
-        Note left of Agent: ⚡ Code Requirement
-        Agent->>LLM: Does this need Python code? (require_code_prompt)
-        LLM-->>Agent: { require_code: true }
-        
-        alt Needs Code (Analysis)
-            Agent->>LLM: Create high-level plan (create_plan_prompt)
-            LLM-->>Agent: { plan: "1. Load data..." }
-            
-            Agent->>LLM: Generate Python code (codegen_prompt)
-            LLM-->>Agent: { code: "import pandas..." }
-        else No Code (General Chat)
-            Agent->>LLM: Generate text response (noncode_prompt)
-            LLM-->>Agent: { message: "Hello!" }
+    Agent->>Agent: prepare_input
+    Agent->>Agent: route
+
+    alt Analysis route
+        Agent->>Agent: analysis_collect_context
+        Agent->>Planner: analysis_enrich_context
+        Planner-->>Agent: structured plan { tools, explanation }
+
+        opt More context needed
+            Agent->>ToolExec: analysis_enrich_context_tools
+            ToolExec->>ToolExec: run search_schema / scan_schema_chunks / sample_data
+            ToolExec-->>Agent: ToolMessage + tool result metadata
+            Agent->>Planner: analysis_enrich_context
         end
+
+        Agent->>Agent: analysis_finalize_context_enrichment
+        Agent->>Agent: analysis_prepare_sample_tool
+
+        opt Runtime sample needed
+            Agent->>ToolExec: analysis_runtime_tools
+            ToolExec->>Kernel: sample_data_runtime
+            Kernel-->>ToolExec: sampled rows
+            ToolExec-->>Agent: ToolMessage + tool result metadata
+        end
+
+        Agent->>Planner: analysis_generate_code
+        Agent->>Agent: analysis_guard_code
+        Agent->>ToolExec: analysis_runtime_tools
+        ToolExec->>Kernel: execute_python_runtime
+        Kernel-->>ToolExec: stdout / stderr / artifacts / execution summary
+        ToolExec-->>Agent: ToolMessage + tool result metadata
+
+        Agent->>ToolExec: analysis_runtime_tools
+        ToolExec->>Kernel: validate_result_runtime
+        Kernel-->>ToolExec: normalized execution summary
+        ToolExec-->>Agent: ToolMessage + tool result metadata
+
+        Agent->>Agent: analysis_retry_decider
+        alt Valid result
+            Agent->>Agent: analysis_finalize_success
+        else Retry or fail
+            Agent->>Agent: analysis_enrich_context or analysis_finalize_failure
+        end
+    else General chat / unsafe
+        Agent->>Agent: chat or reject
     end
 
-    Agent-->>API: Result State (messages, code, metadata)
-    
-    Note over API: Construct DataAnalysisResponse<br/>(code, explanation, validation)
-
-    API-->>Frontend: JSON { code: "...", explanation: "..." }
-    Frontend-->>User: Displays Code & Explanations
+    Agent-->>API: streamed status, tool events, final answer
+    API-->>Frontend: SSE response
+    Frontend-->>User: tool activity + final response + artifacts
 ```
 
-## LangGraph Internal Logic
-
-The Agent decides its path dynamically based on the metadata it gathers at each step.
+## Current LangGraph Node Flow
 
 ```mermaid
 flowchart TD
-    Start([Start]) --> Safety[❓ Check Safety]
-    Safety -->|Safe| Relevancy[❓ Check Relevancy]
-    Safety -->|Unsafe| Reject[🛑 Unsafe Rejector]
-    
-    Relevancy -->|Relevant| NeedCode[❓ Require Code?]
-    Relevancy -->|Irrelevant| General[🗣️ General Purpose Chat]
-    
-    NeedCode -->|Yes| Plan[📝 Create Plan]
-    NeedCode -->|No| NonCode[💬 Non-Code Generator]
-    
-    Plan --> GenCode[⚙️ Code Generator]
-    
-    GenCode --> End([End])
-    NonCode --> End
-    General --> End
-    Reject --> End
+    Start([Start]) --> Prepare[prepare_input]
+    Prepare --> Route[route]
+
+    Route -->|analysis| Collect[analysis_collect_context]
+    Route -->|general_chat| Chat[chat]
+    Route -->|unsafe| Reject[reject]
+
+    Collect --> Enrich[analysis_enrich_context]
+    Enrich -->|pending_tools| EnrichTools[analysis_enrich_context_tools\nCustomToolNode]
+    EnrichTools --> Enrich
+    Enrich -->|enough_context| FinalizeContext[analysis_finalize_context_enrichment]
+
+    FinalizeContext --> PrepareSample[analysis_prepare_sample_tool]
+    PrepareSample -->|needs sample| RuntimeToolsA[analysis_runtime_tools\nCustomToolNode]
+    PrepareSample -->|sample already cached| Generate[analysis_generate_code]
+    RuntimeToolsA --> CaptureSample[analysis_capture_sample_tool_result]
+    CaptureSample --> Generate
+
+    Generate -->|needs more context| Enrich
+    Generate -->|code ready| Guard[analysis_guard_code]
+    Generate -->|generation failed| Retry[analysis_retry_decider]
+
+    Guard -->|execute| RequestExecute[analysis_request_execute_tool]
+    Guard -->|reject code| Retry
+    RequestExecute --> RuntimeToolsB[analysis_runtime_tools\nCustomToolNode]
+    RuntimeToolsB -->|execute stage| CaptureExecute[analysis_capture_execute_tool_result]
+
+    CaptureExecute --> RequestValidate[analysis_request_validate_result_tool]
+    RequestValidate --> RuntimeToolsC[analysis_runtime_tools\nCustomToolNode]
+    RuntimeToolsC -->|validate stage| Validate[analysis_validate_result]
+    RuntimeToolsC -->|sample stage| CaptureSample
+    RuntimeToolsC -->|tool failure| Retry
+
+    Validate -->|good result| Success[analysis_finalize_success]
+    Validate -->|retry/fail| Retry
+    Retry -->|enrich more| Enrich
+    Retry -->|regenerate code| Generate
+    Retry -->|fail| Failure[analysis_finalize_failure]
+
+    Success --> Finalize[finalize]
+    Failure --> Finalize
+    Chat --> Finalize
+    Reject --> Finalize
+    Finalize --> End([End])
 ```
+
+## Notes
+
+- The planner no longer relies on raw `model.bind_tools(...)` output for the main analysis loop. It emits structured tool plans with a short operational explanation.
+- `CustomToolNode` is the canonical executor for graph-managed tools. It emits `ToolMessage` objects into graph state and also emits tool call/result events for the UI and tracing backends.
+- Generated Python runs through the backend workspace kernel, not inside the agent process. That keeps package availability and artifact generation aligned with the active workspace.
+- Code generation now instructs the model to use meaningful figure variable names such as `strike_rate_by_batter_fig` instead of generic names like `fig`.
