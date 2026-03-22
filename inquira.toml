@@ -100,15 +100,6 @@ enabled = false
 project = "inquira-agent"
 endpoint = "http://127.0.0.1:6006/v1/traces"
 
-[llm]
-# Supported providers: "openrouter", "openai", "ollama", "anthropic"
-# - openrouter: uses OpenRouter API (default, requires OPENROUTER_API_KEY)
-# - openai: uses OpenAI API directly (requires OPENAI_API_KEY, base-url = "https://api.openai.com/v1")
-# - ollama: uses local Ollama instance (no API key needed, base-url = "http://localhost:11434/v1")
-# - anthropic: uses Anthropic API directly (requires ANTHROPIC_API_KEY, base-url is ignored)
-provider = "openrouter"
-base-url = "https://openrouter.ai/api/v1"
-
 [llm.limits]
 # Default output cap when no endpoint-specific override is used.
 default = 4096
