@@ -18,6 +18,8 @@ test('auth screen renders a dedicated progress experience for reconnect and logi
   assert.equal(source.includes('auth-status-type'), true)
   assert.equal(source.includes('auth-feature-type'), true)
   assert.equal(source.includes('auth-spinner'), true)
+  assert.equal(source.includes('auth-hero-logo'), true)
+  assert.equal(source.includes('authHeroLogoGradient'), true)
   assert.equal(source.includes('Completing secure sign-in'), true)
   assert.equal(source.includes('This usually takes a few seconds.'), true)
   assert.equal(source.includes('Login with Google'), true)

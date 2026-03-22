@@ -117,6 +117,65 @@
                       </div>
                     </div>
 
+                    <div
+                      v-else
+                      class="flex flex-1 items-center justify-center py-10 lg:py-14"
+                    >
+                      <div class="auth-hero-logo flex items-center justify-center rounded-[2rem] border border-white/80 bg-white/70 p-8 shadow-[0_28px_60px_rgba(24,24,27,0.08)]">
+                        <svg
+                          viewBox="0 0 200 200"
+                          class="h-44 w-44 sm:h-56 sm:w-56 lg:h-64 lg:w-64"
+                          aria-hidden="true"
+                        >
+                          <defs>
+                            <linearGradient id="authHeroLogoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                              <stop offset="0%" stop-color="#3B82F6" />
+                              <stop offset="100%" stop-color="#18181B" />
+                            </linearGradient>
+                            <filter id="authHeroLogoGlow">
+                              <feGaussianBlur stdDeviation="3.2" result="coloredBlur" />
+                              <feMerge>
+                                <feMergeNode in="coloredBlur" />
+                                <feMergeNode in="SourceGraphic" />
+                              </feMerge>
+                            </filter>
+                          </defs>
+
+                          <rect x="18" y="18" width="164" height="164" rx="34" fill="#18181B" />
+                          <g transform="translate(100, 100)" filter="url(#authHeroLogoGlow)">
+                            <circle r="20" fill="url(#authHeroLogoGradient)" />
+
+                            <g>
+                              <circle cx="58" cy="0" r="9" fill="#3B82F6" opacity="0.9">
+                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="10s" repeatCount="indefinite" />
+                              </circle>
+                              <line x1="20" y1="0" x2="48" y2="0" stroke="url(#authHeroLogoGradient)" stroke-width="4">
+                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="10s" repeatCount="indefinite" />
+                              </line>
+                            </g>
+
+                            <g transform="rotate(120)">
+                              <circle cx="58" cy="0" r="9" fill="#71717A" opacity="0.9">
+                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="15s" repeatCount="indefinite" />
+                              </circle>
+                              <line x1="20" y1="0" x2="48" y2="0" stroke="url(#authHeroLogoGradient)" stroke-width="4">
+                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="15s" repeatCount="indefinite" />
+                              </line>
+                            </g>
+
+                            <g transform="rotate(240)">
+                              <circle cx="58" cy="0" r="9" fill="#FDFCF8" opacity="0.95">
+                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="12s" repeatCount="indefinite" />
+                              </circle>
+                              <line x1="20" y1="0" x2="48" y2="0" stroke="url(#authHeroLogoGradient)" stroke-width="4">
+                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="12s" repeatCount="indefinite" />
+                              </line>
+                            </g>
+                          </g>
+                        </svg>
+                      </div>
+                    </div>
+
                     <ul :class="showProgressScreen ? 'mt-auto grid gap-3 text-sm sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3' : 'mt-8 grid gap-3 text-sm sm:grid-cols-3 lg:mt-auto lg:grid-cols-1 xl:grid-cols-3'">
                       <li
                         v-for="bullet in brandBullets"
