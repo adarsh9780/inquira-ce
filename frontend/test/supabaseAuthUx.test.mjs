@@ -9,15 +9,15 @@ test('auth screen focuses on Google sign-in and keeps other providers disabled a
     'utf-8',
   )
 
-  assert.equal(source.includes('Continue with Google'), true)
-  assert.equal(source.includes('Continue with Microsoft'), true)
-  assert.equal(source.includes('Continue with GitHub'), true)
+  assert.equal(source.includes('Sign in with Google'), true)
+  assert.equal(source.includes('Microsoft'), true)
+  assert.equal(source.includes('GitHub'), true)
   assert.equal(source.includes('Coming soon'), true)
   assert.equal(source.includes('Email Magic Link'), false)
   assert.equal(source.includes('Send Magic Link'), false)
   assert.equal(source.includes('Username'), false)
   assert.equal(source.includes('Create Account'), false)
-  assert.equal(source.includes('Sign in once and stay signed in.'), true)
+  assert.equal(source.includes('Welcome back. Sign in with Google to access your workspace.'), true)
 })
 
 test('account tab routes users to browser-managed account controls', () => {

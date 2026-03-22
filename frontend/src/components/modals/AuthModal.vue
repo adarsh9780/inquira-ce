@@ -1,267 +1,189 @@
 <template>
   <div
     v-if="isOpen"
-    class="fixed inset-0 z-50 overflow-y-auto bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.92),_rgba(244,239,223,0.96)_42%,_rgba(232,224,199,0.98))]"
+    class="fixed inset-0 z-50 overflow-y-auto bg-[#f6f2e8]"
   >
-    <div class="min-h-screen p-4 sm:p-6 lg:p-8">
-      <div class="mx-auto flex min-h-[calc(100vh-2rem)] max-w-7xl overflow-hidden rounded-[2rem] border border-stone-200/80 bg-[#f8f4e7] shadow-[0_24px_80px_rgba(41,37,36,0.18)] sm:min-h-[calc(100vh-3rem)]">
-        <div class="relative flex w-full flex-col lg:flex-row">
-          <section class="relative flex w-full items-center justify-center overflow-hidden border-b border-stone-200/70 bg-[#efe9d7] px-8 py-12 lg:w-[48%] lg:border-b-0 lg:border-r">
-            <div class="absolute inset-0 opacity-70">
-              <div class="absolute left-[-8%] top-[-6%] h-52 w-52 rounded-full bg-emerald-200/40 blur-3xl"></div>
-              <div class="absolute bottom-10 right-0 h-48 w-48 rounded-full bg-amber-200/50 blur-3xl"></div>
-            </div>
+    <div class="relative min-h-screen overflow-hidden px-6 py-10">
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.9),_rgba(246,242,232,0.98)_56%)]"></div>
+      <div class="absolute left-1/2 top-16 h-72 w-72 -translate-x-1/2 rounded-full bg-white/70 blur-3xl"></div>
 
-            <Transition name="auth-stage" mode="out-in">
-              <div
-                v-if="showProgressScreen"
-                key="progress"
-                class="relative z-10 mx-auto flex w-full max-w-xl flex-col gap-8"
-              >
-                <div class="space-y-4">
-                  <div class="inline-flex items-center gap-3 rounded-full border border-emerald-900/10 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-emerald-900/70 shadow-sm backdrop-blur">
-                    <span class="h-2.5 w-2.5 rounded-full bg-emerald-700 shadow-[0_0_0_5px_rgba(6,95,70,0.12)]"></span>
-                    Inquira Session
-                  </div>
-                  <h1 class="max-w-md text-4xl font-semibold tracking-[-0.04em] text-stone-950 sm:text-5xl">
-                    {{ progressHeading }}
-                  </h1>
-                  <p class="max-w-lg text-base leading-7 text-stone-600 sm:text-lg">
-                    {{ progressLead }}
-                  </p>
-                </div>
+      <div class="relative mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl flex-col">
+        <header class="pt-8 text-center">
+          <p class="font-serif text-5xl italic tracking-[-0.04em] text-stone-900">Inquira</p>
+          <p class="mt-2 font-serif text-lg italic text-stone-500">The Digital Curator</p>
+        </header>
 
-                <div class="rounded-[1.75rem] border border-stone-200/80 bg-white/85 p-6 shadow-[0_20px_60px_rgba(120,113,108,0.14)] backdrop-blur">
-                  <div class="flex items-center justify-between gap-4">
-                    <div>
-                      <p class="text-xs font-semibold uppercase tracking-[0.26em] text-stone-400">Current step</p>
-                      <p class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-stone-950">
-                        {{ progressTitle }}
-                      </p>
-                    </div>
-                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-950 text-sm font-semibold text-white shadow-lg">
-                      {{ progressPercent }}%
-                    </div>
-                  </div>
-
-                  <div class="mt-6 h-3 overflow-hidden rounded-full bg-stone-200">
-                    <div
-                      class="h-full rounded-full bg-[linear-gradient(90deg,#0f766e,#14532d)] transition-all duration-700 ease-out"
-                      :style="{ width: `${progressPercent}%` }"
-                    ></div>
-                  </div>
-
-                  <div class="mt-6 rounded-2xl bg-stone-950 px-4 py-4 text-stone-100 shadow-inner">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-200/80">
-                      Live status
-                    </p>
-                    <div class="mt-3 min-h-[1.75rem] overflow-hidden">
-                      <p
-                        :key="authStore.authFlowStage"
-                        class="auth-typewriter text-sm text-stone-100 sm:text-base"
-                        :style="{ '--type-width': `${typingWidthCh}ch` }"
-                      >
-                        {{ typingMessage }}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div class="mt-6 grid gap-3 sm:grid-cols-3">
-                    <div
-                      v-for="item in progressTimeline"
-                      :key="item.title"
-                      :class="[
-                        'rounded-2xl border px-4 py-4 transition-all duration-300',
-                        item.active
-                          ? 'border-emerald-600 bg-emerald-50 text-emerald-950 shadow-sm'
-                          : item.done
-                            ? 'border-stone-200 bg-stone-50 text-stone-700'
-                            : 'border-stone-200/80 bg-white text-stone-400',
-                      ]"
-                    >
-                      <div class="flex items-center gap-2">
-                        <span
-                          :class="[
-                            'h-2.5 w-2.5 rounded-full',
-                            item.active ? 'bg-emerald-600' : item.done ? 'bg-stone-500' : 'bg-stone-300',
-                          ]"
-                        ></span>
-                        <p class="text-sm font-medium">{{ item.title }}</p>
-                      </div>
-                      <p class="mt-2 text-xs leading-5 opacity-80">{{ item.caption }}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div
-                v-else
-                key="signin"
-                class="relative z-10 mx-auto flex w-full max-w-xl flex-col gap-8"
-              >
-                <div class="space-y-4">
-                  <div class="inline-flex items-center gap-3 rounded-full border border-stone-900/10 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-stone-700 shadow-sm backdrop-blur">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-950 text-xs font-bold text-white">I</span>
-                    Inquira Desktop
-                  </div>
-                  <h1 class="max-w-md text-4xl font-semibold tracking-[-0.04em] text-stone-950 sm:text-5xl">
-                    Sign in once and stay signed in.
-                  </h1>
-                  <p class="max-w-lg text-base leading-7 text-stone-600 sm:text-lg">
-                    Start with Google. Inquira will keep reconnecting your session automatically every time the desktop app opens.
-                  </p>
-                </div>
-
-                <div v-if="displayMessage" class="rounded-2xl border border-red-200 bg-red-50/90 px-4 py-4 text-red-800 shadow-sm">
-                  <div class="flex items-start gap-3">
-                    <ExclamationTriangleIcon class="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
-                    <div>
-                      <p class="text-sm font-semibold">Sign-in could not be completed</p>
-                      <p class="mt-1 text-sm leading-6">{{ displayMessage }}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="rounded-[1.75rem] border border-stone-200/80 bg-white/88 p-6 shadow-[0_20px_60px_rgba(120,113,108,0.14)] backdrop-blur">
-                  <div class="space-y-4">
-                    <button
-                      @click="handleProviderSignIn('google')"
-                      :disabled="authStore.isLoading"
-                      class="group flex w-full items-center justify-between rounded-2xl border border-stone-200 bg-white px-5 py-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <div class="flex items-center gap-4">
-                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-stone-50 ring-1 ring-stone-200">
-                          <span class="text-2xl font-semibold text-[#4285F4]">G</span>
-                        </div>
-                        <div>
-                          <p class="text-base font-semibold text-stone-950">Continue with Google</p>
-                          <p class="text-sm text-stone-500">Recommended for desktop sign-in</p>
-                        </div>
-                      </div>
-                      <span class="text-sm font-medium text-emerald-800 transition-transform duration-200 group-hover:translate-x-1">
-                        Open browser
-                      </span>
-                    </button>
-
-                    <button
-                      v-for="provider in comingSoonProviders"
-                      :key="provider.id"
-                      disabled
-                      class="flex w-full items-center justify-between rounded-2xl border border-dashed border-stone-300 bg-stone-100/80 px-5 py-4 text-left opacity-75 disabled:cursor-not-allowed"
-                    >
-                      <div class="flex items-center gap-4">
-                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-sm font-semibold text-stone-500 ring-1 ring-stone-200">
-                          {{ provider.badge }}
-                        </div>
-                        <div>
-                          <p class="text-base font-semibold text-stone-700">{{ provider.label }}</p>
-                          <p class="text-sm text-stone-500">Coming soon</p>
-                        </div>
-                      </div>
-                      <span class="rounded-full border border-stone-300 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-                        Coming soon
-                      </span>
-                    </button>
-                  </div>
-
-                  <div class="mt-8 space-y-3 border-t border-stone-200 pt-6">
-                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">How it works</p>
-                    <div class="grid gap-3 sm:grid-cols-3">
-                      <div class="rounded-2xl bg-stone-50 px-4 py-4">
-                        <p class="text-sm font-semibold text-stone-900">1. Browser login</p>
-                        <p class="mt-2 text-xs leading-5 text-stone-500">Google opens in your browser for the secure sign-in step.</p>
-                      </div>
-                      <div class="rounded-2xl bg-stone-50 px-4 py-4">
-                        <p class="text-sm font-semibold text-stone-900">2. Desktop verification</p>
-                        <p class="mt-2 text-xs leading-5 text-stone-500">Inquira exchanges the code, restores the session, and verifies it locally.</p>
-                      </div>
-                      <div class="rounded-2xl bg-stone-50 px-4 py-4">
-                        <p class="text-sm font-semibold text-stone-900">3. Auto reconnect</p>
-                        <p class="mt-2 text-xs leading-5 text-stone-500">On later launches you should only see the reconnect screen, not the provider list.</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p class="mt-6 text-xs leading-6 text-stone-500">
-                    By continuing, you agree to the
-                    <a
-                      href="/terms-and-conditions.html"
-                      @click.prevent="openTermsAndConditions"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="font-semibold text-emerald-800 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-900"
-                    >
-                      Terms &amp; Conditions
-                    </a>.
-                  </p>
-                </div>
-              </div>
-            </Transition>
-          </section>
-
-          <aside class="relative hidden overflow-hidden bg-[#fbf8ef] lg:flex lg:w-[52%] lg:flex-col lg:justify-between">
-            <div class="absolute inset-0">
-              <div class="absolute -left-16 top-10 h-52 w-52 rounded-full bg-amber-200/30 blur-3xl"></div>
-              <div class="absolute bottom-10 right-16 h-64 w-64 rounded-full bg-emerald-100/50 blur-3xl"></div>
-              <div class="absolute inset-x-16 bottom-0 h-[58%] rounded-t-[3rem] border border-stone-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.62),rgba(240,234,214,0.92))]"></div>
-            </div>
-
-            <div class="relative z-10 px-12 pt-14">
-              <div class="max-w-xl">
-                <p class="text-xs font-semibold uppercase tracking-[0.28em] text-stone-400">Desktop onboarding</p>
-                <h2 class="mt-4 text-5xl font-semibold tracking-[-0.045em] text-stone-950">
-                  Calm startup, clear feedback, and a faster handoff from browser to app.
-                </h2>
-                <p class="mt-6 max-w-lg text-lg leading-8 text-stone-600">
-                  Inquira should feel local the moment it opens. The auth screen now mirrors that: one focused sign-in path, then a dedicated progress page that tells you exactly what the app is doing.
+        <main class="flex flex-1 items-center justify-center py-10">
+          <Transition name="auth-shell" mode="out-in">
+            <section
+              v-if="showProgressScreen"
+              key="progress"
+              class="w-full max-w-xl rounded-[2rem] border border-stone-200/80 bg-white/88 px-8 py-9 shadow-[0_30px_80px_rgba(120,113,108,0.16)] backdrop-blur"
+            >
+              <div class="space-y-3">
+                <p class="text-xs font-semibold uppercase tracking-[0.26em] text-stone-400">Inquira startup</p>
+                <h1 class="font-serif text-5xl tracking-[-0.04em] text-stone-900">
+                  {{ progressHeading }}
+                </h1>
+                <p class="max-w-lg text-lg leading-8 text-stone-600">
+                  {{ progressLead }}
                 </p>
               </div>
-            </div>
 
-            <div class="relative z-10 px-12 pb-10">
-              <div class="rounded-[2rem] border border-stone-200/80 bg-white/80 p-8 shadow-[0_16px_48px_rgba(120,113,108,0.12)] backdrop-blur">
-                <div class="grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
+              <div class="mt-8 rounded-[1.6rem] bg-[#f7f3ea] p-5">
+                <div class="flex items-center justify-between gap-4">
                   <div>
-                    <p class="text-6xl leading-none text-amber-500">“</p>
-                    <p class="mt-4 text-3xl font-semibold leading-[1.2] tracking-[-0.04em] text-stone-950">
-                      Returning users should feel the app reconnecting, not wondering if it is stuck.
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">Current step</p>
+                    <p class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-stone-900">
+                      {{ progressTitle }}
                     </p>
-                    <div class="mt-8 flex items-center gap-4">
-                      <div class="flex h-14 w-14 items-center justify-center rounded-full bg-stone-200 text-lg font-semibold text-stone-700">
-                        I
-                      </div>
-                      <div>
-                        <p class="text-lg font-semibold text-stone-900">Inquira Desktop</p>
-                        <p class="text-sm text-stone-500">Local-first analytics workspace</p>
-                      </div>
-                    </div>
                   </div>
+                  <div class="rounded-full bg-stone-900 px-4 py-2 text-sm font-semibold text-white">
+                    {{ progressPercent }}%
+                  </div>
+                </div>
 
-                  <div class="relative min-h-[22rem] overflow-hidden rounded-[1.75rem] border border-stone-200 bg-[linear-gradient(180deg,#f7f2e3,#fffdf7)]">
-                    <div class="absolute left-8 top-8 h-24 w-16 rounded-[1.5rem] border-[6px] border-emerald-950/70 border-b-0"></div>
-                    <div class="absolute bottom-0 left-6 h-40 w-16 rounded-t-[2rem] border-[6px] border-stone-700/65 border-b-0"></div>
-                    <div class="absolute bottom-0 left-20 h-52 w-20 rounded-t-[2.5rem] border-[6px] border-stone-700/65 border-b-0"></div>
-                    <div class="absolute bottom-0 left-40 h-36 w-16 rounded-t-[2rem] border-[6px] border-stone-700/65 border-b-0"></div>
-                    <div class="absolute bottom-0 left-56 h-64 w-24 rounded-t-[2.75rem] border-[6px] border-stone-700/65 border-b-0"></div>
-                    <div class="absolute bottom-0 right-8 h-44 w-20 rounded-t-[2rem] border-[6px] border-stone-700/65 border-b-0"></div>
-                    <div class="absolute bottom-5 left-10 h-24 w-24 rounded-full border-[6px] border-stone-700/65"></div>
-                    <div class="absolute bottom-8 right-14 h-20 w-20 rounded-full border-[6px] border-stone-700/65"></div>
-                    <div class="absolute right-8 top-8 rounded-full bg-amber-100 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">
-                      Progress-first
-                    </div>
+                <div class="mt-5 h-3 overflow-hidden rounded-full bg-stone-200">
+                  <div
+                    class="h-full rounded-full bg-[linear-gradient(90deg,#57534e,#1c1917)] transition-all duration-700 ease-out"
+                    :style="{ width: `${progressPercent}%` }"
+                  ></div>
+                </div>
+
+                <div class="mt-5 rounded-[1.25rem] bg-white px-4 py-4 shadow-sm">
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-stone-400">Live status</p>
+                  <p
+                    :key="authStore.authFlowStage"
+                    class="auth-status-type mt-3 min-h-[1.75rem] text-sm text-stone-700"
+                    :style="{ '--type-width': `${statusWidthCh}ch` }"
+                  >
+                    {{ progressDescription }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="mt-8 grid gap-3 sm:grid-cols-3">
+                <div
+                  v-for="item in progressTimeline"
+                  :key="item.title"
+                  :class="[
+                    'rounded-[1.25rem] border px-4 py-4 transition-all duration-300',
+                    item.active
+                      ? 'border-stone-900 bg-stone-900 text-white'
+                      : item.done
+                        ? 'border-stone-300 bg-stone-100 text-stone-700'
+                        : 'border-stone-200 bg-white text-stone-400',
+                  ]"
+                >
+                  <p class="text-sm font-semibold">{{ item.title }}</p>
+                  <p class="mt-2 text-xs leading-5 opacity-80">{{ item.caption }}</p>
+                </div>
+              </div>
+            </section>
+
+            <section
+              v-else
+              key="signin"
+              class="w-full max-w-xl rounded-[2rem] border border-stone-200/80 bg-white/90 px-8 py-9 shadow-[0_30px_80px_rgba(120,113,108,0.16)] backdrop-blur"
+            >
+              <div class="space-y-3">
+                <h1 class="font-serif text-5xl tracking-[-0.04em] text-stone-900">Sign in</h1>
+                <p class="max-w-lg text-lg leading-8 text-stone-600">
+                  Welcome back. Sign in with Google to access your workspace.
+                </p>
+                <div class="min-h-[2rem] pt-2">
+                  <p
+                    :key="featureIndex"
+                    class="auth-feature-type font-serif text-xl italic text-stone-500"
+                    :style="{ '--type-width': `${featureWidthCh}ch` }"
+                  >
+                    {{ activeFeatureLine }}
+                  </p>
+                </div>
+              </div>
+
+              <div v-if="displayMessage" class="mt-6 rounded-[1.25rem] border border-red-200 bg-red-50 px-4 py-4 text-red-800 shadow-sm">
+                <div class="flex items-start gap-3">
+                  <ExclamationTriangleIcon class="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+                  <div>
+                    <p class="text-sm font-semibold">Sign-in could not be completed</p>
+                    <p class="mt-1 text-sm leading-6">{{ displayMessage }}</p>
                   </div>
                 </div>
               </div>
+
+              <div class="mt-8 space-y-4">
+                <button
+                  @click="handleProviderSignIn('google')"
+                  :disabled="authStore.isLoading"
+                  class="flex w-full items-center justify-between rounded-[1.15rem] bg-[#666362] px-5 py-4 text-left text-white transition-all duration-200 hover:bg-[#55514f] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <div class="flex items-center gap-4">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg font-semibold text-[#4285F4]">
+                      G
+                    </div>
+                    <div>
+                      <p class="text-lg font-semibold">Continue</p>
+                      <p class="text-sm text-stone-200">Sign in with Google</p>
+                    </div>
+                  </div>
+                  <span class="text-2xl leading-none">→</span>
+                </button>
+
+                <div class="flex items-center gap-4 py-1">
+                  <div class="h-px flex-1 bg-stone-200"></div>
+                  <span class="text-xs font-semibold uppercase tracking-[0.22em] text-stone-400">Or</span>
+                  <div class="h-px flex-1 bg-stone-200"></div>
+                </div>
+
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <button
+                    v-for="provider in comingSoonProviders"
+                    :key="provider.id"
+                    disabled
+                    class="flex items-center justify-between rounded-[1.15rem] border border-stone-200 bg-[#f4f0e6] px-4 py-4 text-left text-stone-500 disabled:cursor-not-allowed"
+                  >
+                    <div class="flex items-center gap-3">
+                      <div class="flex h-9 w-9 items-center justify-center rounded-full bg-white text-xs font-semibold text-stone-500">
+                        {{ provider.badge }}
+                      </div>
+                      <div>
+                        <p class="text-sm font-semibold text-stone-700">{{ provider.short }}</p>
+                        <p class="text-xs text-stone-400">Coming soon</p>
+                      </div>
+                    </div>
+                    <span class="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">Soon</span>
+                  </button>
+                </div>
+              </div>
+            </section>
+          </Transition>
+        </main>
+
+        <footer class="pb-3 pt-6 text-center text-sm text-stone-400">
+          <div class="flex flex-col items-center justify-between gap-4 sm:flex-row">
+            <p class="font-serif text-2xl italic text-stone-500">Inquira</p>
+            <div class="flex flex-wrap items-center justify-center gap-6 uppercase tracking-[0.18em]">
+              <a
+                href="/terms-and-conditions.html"
+                @click.prevent="openTermsAndConditions"
+                class="transition-colors hover:text-stone-700"
+              >
+                Terms of Service
+              </a>
+              <span>Privacy Policy</span>
+              <span>Help Center</span>
             </div>
-          </aside>
-        </div>
+            <p>© 2026 Inquira</p>
+          </div>
+        </footer>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '../../stores/authStore'
 import { openExternalUrl } from '../../services/externalLinkService'
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
@@ -276,15 +198,24 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const authStore = useAuthStore()
+const featureIndex = ref(0)
+let featureTimer = null
+
+const featureLines = [
+  'Talk to your data in natural language.',
+  'Run notebook-style analysis in one workspace.',
+  'Switch between chat, code, tables, and charts.',
+  'Keep desktop sessions warm between launches.',
+]
 
 const comingSoonProviders = [
-  { id: 'azure', label: 'Continue with Microsoft', badge: 'MS' },
-  { id: 'github', label: 'Continue with GitHub', badge: 'GH' },
+  { id: 'azure', short: 'Microsoft', badge: 'MS' },
+  { id: 'github', short: 'GitHub', badge: 'GH' },
 ]
 
 const progressConfig = computed(() => {
   const stage = String(authStore.authFlowStage || '').trim()
-  const fallback = authStore.authFlowMessage || ''
+  const fallback = authStore.authFlowMessage || 'Preparing your Inquira session...'
 
   switch (stage) {
     case 'browser_opening':
@@ -304,7 +235,7 @@ const progressConfig = computed(() => {
     case 'loading_account':
       return { percent: 96, title: 'Loading your account', description: fallback }
     default:
-      return { percent: 0, title: '', description: '' }
+      return { percent: 0, title: '', description: fallback }
   }
 })
 
@@ -317,27 +248,22 @@ const progressPercent = computed(() => progressConfig.value.percent)
 const progressTitle = computed(() => progressConfig.value.title)
 const progressDescription = computed(() => progressConfig.value.description)
 const displayMessage = computed(() => authStore.error || '')
+const activeFeatureLine = computed(() => featureLines[featureIndex.value] || '')
+const featureWidthCh = computed(() => Math.max(28, Math.min(72, activeFeatureLine.value.length + 2)))
+const statusWidthCh = computed(() => Math.max(28, Math.min(80, progressDescription.value.length + 2)))
 
 const progressHeading = computed(() => {
   if (authStore.authFlowStage === 'restoring_session') {
-    return 'Restoring your desktop session.'
+    return 'Welcome back'
   }
-  return 'Finishing sign-in inside Inquira.'
+  return 'Almost there'
 })
 
 const progressLead = computed(() => {
   if (authStore.authFlowStage === 'restoring_session') {
-    return 'You should only see this reconnect screen briefly while Inquira restores your saved session and reattaches to the local backend.'
+    return 'Inquira found a saved session and is reconnecting your workspace.'
   }
-  return 'The browser step is complete. Inquira is now exchanging credentials, verifying the session locally, and loading your account state.'
-})
-
-const typingMessage = computed(() => {
-  return progressDescription.value || 'Preparing your Inquira session...'
-})
-
-const typingWidthCh = computed(() => {
-  return Math.max(32, Math.min(96, typingMessage.value.length + 2))
+  return 'The browser step is complete. Inquira is finishing the secure handoff inside the app.'
 })
 
 const progressTimeline = computed(() => {
@@ -347,26 +273,38 @@ const progressTimeline = computed(() => {
   return [
     {
       title: isRestore ? 'Restore session' : 'Browser handoff',
-      caption: isRestore
-        ? 'Load the saved desktop session from persistent storage.'
-        : 'Receive the Google callback from your browser.',
+      caption: isRestore ? 'Load the saved session from desktop storage.' : 'Receive the Google callback locally.',
       active: percent < 62,
       done: percent >= 62,
     },
     {
       title: 'Verify locally',
-      caption: 'Wait for the local backend and verify the Supabase session.',
+      caption: 'Wait for the backend and validate the session.',
       active: percent >= 62 && percent < 96,
       done: percent >= 96,
     },
     {
       title: 'Load workspace',
-      caption: 'Continue into the app once your account context is ready.',
+      caption: 'Continue into the app when the account context is ready.',
       active: percent >= 96,
       done: false,
     },
   ]
 })
+
+function startFeatureRotation() {
+  stopFeatureRotation()
+  featureTimer = window.setInterval(() => {
+    featureIndex.value = (featureIndex.value + 1) % featureLines.length
+  }, 2600)
+}
+
+function stopFeatureRotation() {
+  if (featureTimer) {
+    window.clearInterval(featureTimer)
+    featureTimer = null
+  }
+}
 
 function openTermsAndConditions() {
   void openExternalUrl('https://github.com/adarsh9780/inquira-ce/blob/main/frontend/public/terms-and-conditions.html')
@@ -376,11 +314,22 @@ async function handleProviderSignIn(provider) {
   await authStore.signInWithProvider(provider)
 }
 
+onMounted(() => {
+  startFeatureRotation()
+})
+
+onBeforeUnmount(() => {
+  stopFeatureRotation()
+})
+
 watch(
   () => props.isOpen,
   (isOpen) => {
     if (isOpen) {
       authStore.clearError()
+      startFeatureRotation()
+    } else {
+      stopFeatureRotation()
     }
   },
 )
@@ -396,24 +345,25 @@ watch(
 </script>
 
 <style scoped>
-.auth-stage-enter-active,
-.auth-stage-leave-active {
-  transition: opacity 280ms ease, transform 280ms ease;
+.auth-shell-enter-active,
+.auth-shell-leave-active {
+  transition: opacity 260ms ease, transform 260ms ease;
 }
 
-.auth-stage-enter-from,
-.auth-stage-leave-to {
+.auth-shell-enter-from,
+.auth-shell-leave-to {
   opacity: 0;
-  transform: translateY(18px) scale(0.985);
+  transform: translateY(14px);
 }
 
-.auth-typewriter {
+.auth-feature-type,
+.auth-status-type {
   width: 0;
   overflow: hidden;
   white-space: nowrap;
-  border-right: 2px solid rgba(167, 243, 208, 0.9);
+  border-right: 2px solid rgba(87, 83, 78, 0.7);
   animation:
-    auth-type 1.8s steps(30, end) forwards,
+    auth-type 1.4s steps(28, end) forwards,
     auth-caret 0.9s step-end infinite;
 }
 
