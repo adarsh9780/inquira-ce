@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { openExternalUrl } from './externalLinkService'
+import { tauriSupabaseStorage } from './supabaseStorageService'
 
 function readEnv(...names) {
   for (const name of names) {
@@ -55,6 +56,8 @@ function createSupabaseClient() {
       persistSession: true,
       detectSessionInUrl: !isTauriDesktop,
       flowType: 'pkce',
+      storage: isTauriDesktop ? tauriSupabaseStorage : undefined,
+      userStorage: isTauriDesktop ? tauriSupabaseStorage : undefined,
     },
   })
 }
