@@ -23,57 +23,7 @@
                   <div class="relative flex h-full flex-col">
                     <div class="flex items-center gap-4">
                       <div class="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/70 bg-white/90 shadow-[0_16px_32px_rgba(24,24,27,0.08)]">
-                        <svg
-                          viewBox="0 0 200 200"
-                          class="h-10 w-10"
-                          aria-hidden="true"
-                        >
-                          <defs>
-                            <linearGradient id="authLogoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                              <stop offset="0%" stop-color="#3B82F6" />
-                              <stop offset="100%" stop-color="#18181B" />
-                            </linearGradient>
-                            <filter id="authLogoGlow">
-                              <feGaussianBlur stdDeviation="2.4" result="coloredBlur" />
-                              <feMerge>
-                                <feMergeNode in="coloredBlur" />
-                                <feMergeNode in="SourceGraphic" />
-                              </feMerge>
-                            </filter>
-                          </defs>
-
-                          <rect x="18" y="18" width="164" height="164" rx="34" fill="#18181B" />
-                          <g transform="translate(100, 100)" filter="url(#authLogoGlow)">
-                            <circle r="20" fill="url(#authLogoGradient)" />
-
-                            <g>
-                              <circle cx="58" cy="0" r="9" fill="#3B82F6" opacity="0.9">
-                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="10s" repeatCount="indefinite" />
-                              </circle>
-                              <line x1="20" y1="0" x2="48" y2="0" stroke="url(#authLogoGradient)" stroke-width="4">
-                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="10s" repeatCount="indefinite" />
-                              </line>
-                            </g>
-
-                            <g transform="rotate(120)">
-                              <circle cx="58" cy="0" r="9" fill="#71717A" opacity="0.9">
-                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="15s" repeatCount="indefinite" />
-                              </circle>
-                              <line x1="20" y1="0" x2="48" y2="0" stroke="url(#authLogoGradient)" stroke-width="4">
-                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="15s" repeatCount="indefinite" />
-                              </line>
-                            </g>
-
-                            <g transform="rotate(240)">
-                              <circle cx="58" cy="0" r="9" fill="#FDFCF8" opacity="0.95">
-                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="12s" repeatCount="indefinite" />
-                              </circle>
-                              <line x1="20" y1="0" x2="48" y2="0" stroke="url(#authLogoGradient)" stroke-width="4">
-                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="12s" repeatCount="indefinite" />
-                              </line>
-                            </g>
-                          </g>
-                        </svg>
+                        <img :src="logo" alt="Inquira logo" class="h-10 w-10 rounded-xl shadow-sm" />
                       </div>
 
                       <div>
@@ -122,57 +72,7 @@
                       class="flex flex-1 items-center justify-center py-10 lg:py-14"
                     >
                       <div class="auth-hero-logo flex items-center justify-center rounded-[2rem] border border-white/80 bg-white/70 p-8 shadow-[0_28px_60px_rgba(24,24,27,0.08)]">
-                        <svg
-                          viewBox="0 0 200 200"
-                          class="h-44 w-44 sm:h-56 sm:w-56 lg:h-64 lg:w-64"
-                          aria-hidden="true"
-                        >
-                          <defs>
-                            <linearGradient id="authHeroLogoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                              <stop offset="0%" stop-color="#3B82F6" />
-                              <stop offset="100%" stop-color="#18181B" />
-                            </linearGradient>
-                            <filter id="authHeroLogoGlow">
-                              <feGaussianBlur stdDeviation="3.2" result="coloredBlur" />
-                              <feMerge>
-                                <feMergeNode in="coloredBlur" />
-                                <feMergeNode in="SourceGraphic" />
-                              </feMerge>
-                            </filter>
-                          </defs>
-
-                          <rect x="18" y="18" width="164" height="164" rx="34" fill="#18181B" />
-                          <g transform="translate(100, 100)" filter="url(#authHeroLogoGlow)">
-                            <circle r="20" fill="url(#authHeroLogoGradient)" />
-
-                            <g>
-                              <circle cx="58" cy="0" r="9" fill="#3B82F6" opacity="0.9">
-                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="10s" repeatCount="indefinite" />
-                              </circle>
-                              <line x1="20" y1="0" x2="48" y2="0" stroke="url(#authHeroLogoGradient)" stroke-width="4">
-                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="10s" repeatCount="indefinite" />
-                              </line>
-                            </g>
-
-                            <g transform="rotate(120)">
-                              <circle cx="58" cy="0" r="9" fill="#71717A" opacity="0.9">
-                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="15s" repeatCount="indefinite" />
-                              </circle>
-                              <line x1="20" y1="0" x2="48" y2="0" stroke="url(#authHeroLogoGradient)" stroke-width="4">
-                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="15s" repeatCount="indefinite" />
-                              </line>
-                            </g>
-
-                            <g transform="rotate(240)">
-                              <circle cx="58" cy="0" r="9" fill="#FDFCF8" opacity="0.95">
-                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="12s" repeatCount="indefinite" />
-                              </circle>
-                              <line x1="20" y1="0" x2="48" y2="0" stroke="url(#authHeroLogoGradient)" stroke-width="4">
-                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="12s" repeatCount="indefinite" />
-                              </line>
-                            </g>
-                          </g>
-                        </svg>
+                        <img :src="logo" alt="Inquira logo" class="h-44 w-44 rounded-[2rem] shadow-[0_16px_36px_rgba(24,24,27,0.14)] sm:h-56 sm:w-56 lg:h-64 lg:w-64" />
                       </div>
                     </div>
 
@@ -240,8 +140,13 @@
                             class="group flex w-full items-center justify-between rounded-[1.25rem] border border-zinc-900 bg-zinc-900 px-5 py-4 text-left text-white transition-all duration-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             <div class="flex items-center gap-4">
-                              <div class="flex h-12 w-12 items-center justify-center rounded-full bg-white text-base font-semibold text-[#4285F4]">
-                                G
+                              <div class="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm">
+                                <svg viewBox="0 0 48 48" class="h-6 w-6" aria-hidden="true">
+                                  <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.654 32.657 29.243 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.959 3.041l5.657-5.657C34.046 6.053 29.277 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.651-.389-3.917Z"/>
+                                  <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.959 3.041l5.657-5.657C34.046 6.053 29.277 4 24 4c-7.682 0-14.347 4.337-17.694 10.691Z"/>
+                                  <path fill="#4CAF50" d="M24 44c5.176 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.143 35.091 26.715 36 24 36c-5.222 0-9.618-3.317-11.283-7.946l-6.522 5.025C9.5 39.556 16.227 44 24 44Z"/>
+                                  <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.05 12.05 0 0 1-4.084 5.57l.003-.002 6.19 5.238C36.971 39.214 44 34 44 24c0-1.341-.138-2.651-.389-3.917Z"/>
+                                </svg>
                               </div>
                               <div>
                                 <p class="text-base font-semibold text-white">Login with Google</p>
@@ -309,6 +214,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '../../stores/authStore'
 import { openExternalUrl } from '../../services/externalLinkService'
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
+import logo from '../../assets/favicon.svg'
 
 const props = defineProps({
   isOpen: {

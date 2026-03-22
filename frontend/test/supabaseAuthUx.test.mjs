@@ -9,6 +9,9 @@ test('auth screen focuses on Google sign-in and keeps other providers disabled a
     'utf-8',
   )
 
+  assert.equal(source.includes("import logo from '../../assets/favicon.svg'"), true)
+  assert.equal(source.includes('<img :src="logo" alt="Inquira logo"'), true)
+  assert.equal(source.includes('viewBox="0 0 48 48"'), true)
   assert.equal(source.includes('Sign in with Google'), true)
   assert.equal(source.includes('Microsoft'), true)
   assert.equal(source.includes('GitHub'), true)
