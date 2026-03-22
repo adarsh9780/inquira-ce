@@ -112,10 +112,12 @@ export const useAuthStore = defineStore('auth', () => {
       const accessToken = String(session?.access_token || '').trim()
       const authEvent = String(event || '').trim().toUpperCase()
       if (!accessToken) {
-        clearLocalState()
-        error.value = ''
-        pendingAuthAction.value = ''
-        clearAuthFlow()
+        if (authEvent === 'SIGNED_OUT') {
+          clearLocalState()
+          error.value = ''
+          pendingAuthAction.value = ''
+          clearAuthFlow()
+        }
         return
       }
 
@@ -185,7 +187,8 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function checkAuth() {
+  async function checkAuth(options = {}) {
+    const preserveSession = Boolean(options?.preserveSession)
     ensureAuthSubscription()
     ensureDesktopAuthProgressListener()
     const probeRevision = ++authProbeRevision
@@ -200,13 +203,19 @@ export const useAuthStore = defineStore('auth', () => {
       if (probeRevision !== authProbeRevision) return
       const accessToken = String(session?.access_token || '').trim()
       if (!accessToken) {
-        clearLocalState()
-        return
+        if (!preserveSession) {
+          clearLocalState()
+        }
+        return false
       }
       await hydrateUserFromBackend(accessToken)
+      return true
     } catch (_err) {
       if (probeRevision !== authProbeRevision) return
-      clearLocalState()
+      if (!preserveSession) {
+        clearLocalState()
+      }
+      return false
     }
   }
 

@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import json
 import os
 import uuid
 from contextlib import asynccontextmanager
@@ -21,6 +22,8 @@ if not hasattr(aiosqlite.Connection, "is_alive"):
 
 
 from .v1.api.router import router as v1_router
+from .v1.db.session import AppDataSessionLocal
+from .v1.repositories.workspace_repository import WorkspaceRepository
 from .v1.services.auth_service import AuthService
 from .v1.db.init import init_v1_database
 from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
@@ -28,6 +31,7 @@ from .v1.services.workspace_deletion_service import WorkspaceDeletionService
 from .core.config_models import AppConfig
 from .core.logger import logprint, patch_print
 from .services.code_executor import (
+    get_workspace_kernel_status,
     prune_idle_workspace_kernels,
     shutdown_workspace_kernel_manager,
 )
@@ -222,6 +226,39 @@ async def _resolve_websocket_user(websocket: WebSocket):
         return None
 
 
+async def _workspace_is_accessible_to_user(user_id: str, workspace_id: str) -> bool:
+    async with AppDataSessionLocal() as session:
+        workspace = await WorkspaceRepository.get_by_id(session, workspace_id, user_id)
+    return workspace is not None
+
+
+async def _cancel_task(task: asyncio.Task | None) -> None:
+    if task is None:
+        return
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+
+async def _stream_kernel_status_updates(user_id: str, workspace_id: str) -> None:
+    last_status: str | None = None
+    while True:
+        status_value = await get_workspace_kernel_status(workspace_id)
+        if status_value != last_status:
+            await websocket_manager.send_to_user(
+                user_id,
+                {
+                    "type": "kernel_status",
+                    "workspace_id": workspace_id,
+                    "status": status_value,
+                },
+            )
+            last_status = status_value
+        await asyncio.sleep(1)
+
+
 # WebSocket endpoint for real-time processing updates
 @app.websocket("/ws/settings/{user_id}")
 async def settings_websocket(websocket: WebSocket, user_id: str):
@@ -253,17 +290,43 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
 
     # V1 runtime keeps workspace-scoped state; legacy cache bootstrap is disabled.
 
+    kernel_status_task: asyncio.Task | None = None
     try:
         while True:
             # Keep connection alive and handle any incoming messages
             logprint(f"👂 [WebSocket] Waiting for messages from user {auth_user_id}...")
             data = await websocket.receive_text()
             logprint(f"📨 [WebSocket] Received message from user {auth_user_id}: {data}")
-            # For now, we just keep the connection alive
-            # In the future, this could handle cancellation requests, etc.
+            try:
+                message = json.loads(data)
+            except json.JSONDecodeError:
+                continue
+
+            message_type = str(message.get("type") or "").strip().lower()
+            if message_type != "subscribe_kernel_status":
+                continue
+
+            workspace_id = str(message.get("workspace_id") or "").strip()
+            await _cancel_task(kernel_status_task)
+            kernel_status_task = None
+
+            if not workspace_id:
+                continue
+
+            if not await _workspace_is_accessible_to_user(auth_user_id, workspace_id):
+                await websocket_manager.send_error(
+                    auth_user_id,
+                    "Workspace access denied for kernel status subscription.",
+                )
+                continue
+
+            kernel_status_task = asyncio.create_task(
+                _stream_kernel_status_updates(auth_user_id, workspace_id)
+            )
     except Exception as e:
         logprint(f"❌ [WebSocket] Error for user {auth_user_id}: {e}", level="error")
     finally:
+        await _cancel_task(kernel_status_task)
         logprint(f"🔌 [WebSocket] Cleaning up connection for user {auth_user_id}")
         await websocket_manager.disconnect(auth_user_id)
 

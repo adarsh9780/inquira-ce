@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import duckdb
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -1192,30 +1192,54 @@ async def get_workspace_artifact_usage(
 ):
     """Return scratchpad usage summary used by status-bar artifact pressure warning."""
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
-    try:
-        usage = get_artifact_scratchpad_store().get_workspace_artifact_usage(
-            workspace_duckdb_path=str(workspace.duckdb_path)
-        )
-    except duckdb.IOException as exc:
-        if not _is_duckdb_lock_conflict(exc):
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-        usage = await get_workspace_artifact_usage_via_kernel(workspace_id)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-    duckdb_bytes = max(0, int(usage.get("duckdb_bytes") or 0))
-    figure_count = max(0, int(usage.get("figure_count") or 0))
-    duckdb_warning = duckdb_bytes > _ARTIFACT_DUCKDB_WARNING_THRESHOLD_BYTES
-    figure_warning = figure_count > _ARTIFACT_FIGURE_WARNING_THRESHOLD_COUNT
-    return WorkspaceArtifactUsageResponse(
+    return await _read_workspace_artifact_usage_response(
         workspace_id=workspace_id,
-        duckdb_bytes=duckdb_bytes,
-        duckdb_warning_threshold_bytes=_ARTIFACT_DUCKDB_WARNING_THRESHOLD_BYTES,
-        figure_count=figure_count,
-        figure_warning_threshold_count=_ARTIFACT_FIGURE_WARNING_THRESHOLD_COUNT,
-        duckdb_warning=duckdb_warning,
-        figure_warning=figure_warning,
-        warning=duckdb_warning or figure_warning,
+        workspace_duckdb_path=str(workspace.duckdb_path),
+    )
+
+
+@router.get(
+    "/workspaces/{workspace_id}/artifacts/usage/stream",
+)
+async def stream_workspace_artifact_usage(
+    workspace_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Stream scratchpad usage snapshots for status-bar warnings."""
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+
+    async def event_stream():
+        while True:
+            if await request.is_disconnected():
+                return
+            try:
+                payload = await _read_workspace_artifact_usage_response(
+                    workspace_id=workspace_id,
+                    workspace_duckdb_path=str(workspace.duckdb_path),
+                )
+            except HTTPException as exc:
+                yield _format_sse_event(
+                    "error",
+                    {
+                        "detail": str(exc.detail),
+                        "status_code": exc.status_code,
+                    },
+                )
+                return
+
+            yield _format_sse_event("snapshot", payload.model_dump())
+            await asyncio.sleep(5)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
@@ -1930,6 +1954,41 @@ async def list_workspace_schemas(
 def _format_sse_event(event: str, payload: Any) -> str:
     data = json.dumps(payload, default=str)
     return f"event: {event}\ndata: {data}\n\n"
+
+
+async def _read_workspace_artifact_usage_response(
+    *,
+    workspace_id: str,
+    workspace_duckdb_path: str,
+) -> WorkspaceArtifactUsageResponse:
+    try:
+        usage = get_artifact_scratchpad_store().get_workspace_artifact_usage(
+            workspace_duckdb_path=str(workspace_duckdb_path)
+        )
+    except duckdb.IOException as exc:
+        if not _is_duckdb_lock_conflict(exc):
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        try:
+            usage = await get_workspace_artifact_usage_via_kernel(workspace_id)
+        except RuntimeError as inner_exc:
+            raise HTTPException(status_code=409, detail=str(inner_exc)) from inner_exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    duckdb_bytes = max(0, int(usage.get("duckdb_bytes") or 0))
+    figure_count = max(0, int(usage.get("figure_count") or 0))
+    duckdb_warning = duckdb_bytes > _ARTIFACT_DUCKDB_WARNING_THRESHOLD_BYTES
+    figure_warning = figure_count > _ARTIFACT_FIGURE_WARNING_THRESHOLD_COUNT
+    return WorkspaceArtifactUsageResponse(
+        workspace_id=workspace_id,
+        duckdb_bytes=duckdb_bytes,
+        duckdb_warning_threshold_bytes=_ARTIFACT_DUCKDB_WARNING_THRESHOLD_BYTES,
+        figure_count=figure_count,
+        figure_warning_threshold_count=_ARTIFACT_FIGURE_WARNING_THRESHOLD_COUNT,
+        duckdb_warning=duckdb_warning,
+        figure_warning=figure_warning,
+        warning=duckdb_warning or figure_warning,
+    )
 
 
 def _parse_terminal_tokens(command: str) -> list[str]:

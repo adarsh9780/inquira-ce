@@ -131,6 +131,19 @@ function withAbortSignal(promise, signal) {
   })
 }
 
+async function authorizedFetch(input, init = {}) {
+  const accessToken = await supabaseAuthService.getAccessToken().catch(() => null)
+  const headers = new Headers(init?.headers || {})
+  if (accessToken) {
+    headers.set('Authorization', `Bearer ${accessToken}`)
+  }
+  return fetch(input, {
+    ...init,
+    headers,
+    credentials: init?.credentials || 'include',
+  })
+}
+
 // Configure GLOBAL axios defaults
 axios.defaults.baseURL = apiBaseUrl
 axios.defaults.timeout = 360000 // 6 minutes
@@ -416,7 +429,7 @@ export const apiService = {
       throw new Error('Create/select a workspace before running code.')
     }
     console.debug('🚀 [API] Executing code...', { timeout })
-    const response = await fetch(
+    const response = await authorizedFetch(
       `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${activeWorkspaceId}/execute`,
       {
         method: 'POST',
@@ -474,11 +487,10 @@ export const apiService = {
         if (normalizedSearchText) {
           queryParams.set('search', normalizedSearchText)
         }
-        const response = await fetch(
+        const response = await authorizedFetch(
           `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/${artifactId}/rows?${queryParams.toString()}`,
           {
             method: 'GET',
-            credentials: 'include',
           }
         )
         if (!response.ok) {
@@ -499,7 +511,7 @@ export const apiService = {
   },
 
   async executeTerminalCommand(workspaceId, payload) {
-    const response = await fetch(
+    const response = await authorizedFetch(
       `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/terminal/execute`,
       {
         method: 'POST',
@@ -516,7 +528,7 @@ export const apiService = {
   },
 
   async executeTerminalCommandStream(workspaceId, payload, { signal = null, onEvent = null } = {}) {
-    const response = await fetch(
+    const response = await authorizedFetch(
       `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/terminal/stream`,
       {
         method: 'POST',
@@ -568,11 +580,10 @@ export const apiService = {
   },
 
   async resetTerminalSession(workspaceId) {
-    const response = await fetch(
+    const response = await authorizedFetch(
       `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/terminal/session/reset`,
       {
         method: 'POST',
-        credentials: 'include',
       },
     )
     if (!response.ok) {
@@ -843,12 +854,11 @@ export const apiService = {
 
   async v1AnalyzeStream(payload, { signal = null, onEvent = null } = {}) {
     const url = `${apiBaseUrl.replace(/\/+$/, '')}${v1Api.chat.stream}`
-    const response = await fetch(url, {
+    const response = await authorizedFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      credentials: 'include',
       body: JSON.stringify(payload),
       signal
     })
@@ -903,9 +913,8 @@ export const apiService = {
 
   async v1ListWorkspaceArtifacts(workspaceId, kind = 'dataframe', options = {}) {
     const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts?kind=${encodeURIComponent(kind)}`
-    const response = await fetch(url, {
+    const response = await authorizedFetch(url, {
       method: 'GET',
-      credentials: 'include',
       signal: options?.signal || null,
     })
     if (!response.ok) {
@@ -919,9 +928,8 @@ export const apiService = {
 
   async v1GetWorkspaceArtifactUsage(workspaceId, options = {}) {
     const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/usage`
-    const response = await fetch(url, {
+    const response = await authorizedFetch(url, {
       method: 'GET',
-      credentials: 'include',
       signal: options?.signal || null,
     })
     if (!response.ok) {
@@ -935,9 +943,8 @@ export const apiService = {
 
   async v1GetWorkspaceArtifactMetadata(workspaceId, artifactId, options = {}) {
     const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/${artifactId}`
-    const response = await fetch(url, {
+    const response = await authorizedFetch(url, {
       method: 'GET',
-      credentials: 'include',
       signal: options?.signal || null,
     })
     if (!response.ok) {
@@ -951,9 +958,8 @@ export const apiService = {
 
   async v1DeleteWorkspaceArtifact(workspaceId, artifactId, options = {}) {
     const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/${artifactId}`
-    const response = await fetch(url, {
+    const response = await authorizedFetch(url, {
       method: 'DELETE',
-      credentials: 'include',
       signal: options?.signal || null,
     })
     if (!response.ok) {
@@ -967,6 +973,48 @@ export const apiService = {
 
   async v1GetCurrentUser(options = {}) {
     return v1Api.auth.me(options)
+  },
+
+  async subscribeWorkspaceArtifactUsage(workspaceId, { signal = null, onEvent = null } = {}) {
+    const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/artifacts/usage/stream`
+    const response = await authorizedFetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'text/event-stream',
+      },
+      signal,
+    })
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}))
+      const err = new Error(detail.detail || `Artifact usage stream failed (${response.status})`)
+      err.status = response.status
+      throw err
+    }
+    if (!response.body) {
+      throw new Error('Artifact usage stream is not available in this runtime.')
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const { events, remainder } = parseSseBuffer(buffer)
+      buffer = remainder
+
+      for (const evt of events) {
+        if (onEvent) onEvent(evt)
+        if (evt.event === 'error') {
+          const detail = evt.data?.detail || 'Artifact usage stream failed.'
+          const err = new Error(detail)
+          err.status = evt.data?.status_code || 500
+          throw err
+        }
+      }
+    }
   },
 
   async v1Logout() {

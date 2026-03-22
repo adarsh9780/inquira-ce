@@ -288,12 +288,7 @@ const authStore = useAuthStore()
 
 // --- Kernel Status Management ---
 const kernelStatus = ref('missing')
-const isKernelStatusRequestInFlight = ref(false)
 const isKernelActionRunning = ref(false)
-let kernelStatusPoller = null
-let artifactUsagePoller = null
-let artifactUsageRefreshTimer = null
-let artifactUsageAbortController = null
 
 const accountMenuRef = ref(null)
 const isAccountMenuOpen = ref(false)
@@ -308,7 +303,9 @@ const isLogoutConfirmOpen = ref(false)
 const isWebSocketConnected = ref(false)
 const isWebSocketMonitoringActive = ref(false)
 let unsubscribeWebSocketConnection = null
-const isArtifactUsageRequestInFlight = ref(false)
+let unsubscribeKernelStatus = null
+let artifactUsageStreamAbortController = null
+let artifactUsageReconnectTimer = null
 const artifactUsage = ref({
   duckdbBytes: 0,
   duckdbWarningThresholdBytes: 1024 * 1024 * 1024,
@@ -485,6 +482,17 @@ function setupWebSocketMonitoring() {
   unsubscribeWebSocketConnection = settingsWebSocket.onConnection((connected) => {
     updateWebSocketStatus(connected)
   })
+  if (typeof unsubscribeKernelStatus === 'function') {
+    unsubscribeKernelStatus()
+    unsubscribeKernelStatus = null
+  }
+  unsubscribeKernelStatus = settingsWebSocket.subscribeKernelStatus(({ workspaceId, status }) => {
+    if (workspaceId !== String(appStore.activeWorkspaceId || '').trim()) return
+    kernelStatus.value = status
+    if (['ready', 'busy', 'starting'].includes(status)) {
+      appStore.setRuntimeError('')
+    }
+  })
 }
 
 function resetArtifactUsage() {
@@ -514,17 +522,29 @@ function isUnauthorizedError(error) {
 }
 
 async function handleUnauthorizedPollingError() {
-  stopKernelStatusPolling()
-  stopArtifactUsagePolling()
-  kernelStatus.value = 'missing'
-  resetArtifactUsage()
-  appStore.setRuntimeError('Session expired. Please sign in again.')
+  stopArtifactUsageStream()
+  settingsWebSocket.setKernelStatusWorkspace('')
+  kernelStatus.value = 'connecting'
+  appStore.setRuntimeError('Background auth check failed. Reconnecting your session...')
   if (authStore.isAuthenticated) {
-    await authStore.checkAuth()
+    await authStore.checkAuth({ preserveSession: true })
+  }
+  scheduleArtifactUsageReconnect()
+}
+
+function applyArtifactUsageSnapshot(payload) {
+  artifactUsage.value = {
+    duckdbBytes: Math.max(0, Number(payload?.duckdb_bytes || 0)),
+    duckdbWarningThresholdBytes: Math.max(1, Number(payload?.duckdb_warning_threshold_bytes || 1024 * 1024 * 1024)),
+    figureCount: Math.max(0, Number(payload?.figure_count || 0)),
+    figureWarningThresholdCount: Math.max(1, Number(payload?.figure_warning_threshold_count || 20)),
+    duckdbWarning: Boolean(payload?.duckdb_warning),
+    figureWarning: Boolean(payload?.figure_warning),
+    warning: Boolean(payload?.warning),
   }
 }
 
-async function refreshArtifactUsage() {
+async function startArtifactUsageStream() {
   if (!authStore.isAuthenticated) {
     resetArtifactUsage()
     return
@@ -534,23 +554,19 @@ async function refreshArtifactUsage() {
     resetArtifactUsage()
     return
   }
-  if (isArtifactUsageRequestInFlight.value) return
-
-  isArtifactUsageRequestInFlight.value = true
-  artifactUsageAbortController?.abort()
-  artifactUsageAbortController = new AbortController()
+  stopArtifactUsageStream()
+  artifactUsageStreamAbortController = new AbortController()
+  const streamController = artifactUsageStreamAbortController
   try {
-    const payload = await apiService.v1GetWorkspaceArtifactUsage(workspaceId, {
-      signal: artifactUsageAbortController.signal,
+    await apiService.subscribeWorkspaceArtifactUsage(workspaceId, {
+      signal: streamController.signal,
+      onEvent: (event) => {
+        if (event?.event !== 'snapshot') return
+        applyArtifactUsageSnapshot(event.data)
+      },
     })
-    artifactUsage.value = {
-      duckdbBytes: Math.max(0, Number(payload?.duckdb_bytes || 0)),
-      duckdbWarningThresholdBytes: Math.max(1, Number(payload?.duckdb_warning_threshold_bytes || 1024 * 1024 * 1024)),
-      figureCount: Math.max(0, Number(payload?.figure_count || 0)),
-      figureWarningThresholdCount: Math.max(1, Number(payload?.figure_warning_threshold_count || 20)),
-      duckdbWarning: Boolean(payload?.duckdb_warning),
-      figureWarning: Boolean(payload?.figure_warning),
-      warning: Boolean(payload?.warning),
+    if (!streamController.signal.aborted) {
+      scheduleArtifactUsageReconnect()
     }
   } catch (error) {
     if (error?.name === 'AbortError') return
@@ -559,40 +575,27 @@ async function refreshArtifactUsage() {
       return
     }
     resetArtifactUsage()
-  } finally {
-    isArtifactUsageRequestInFlight.value = false
+    scheduleArtifactUsageReconnect()
   }
 }
 
-function scheduleArtifactUsageRefresh(delayMs = 250) {
-  if (artifactUsageRefreshTimer) clearTimeout(artifactUsageRefreshTimer)
-  artifactUsageRefreshTimer = setTimeout(() => {
-    artifactUsageRefreshTimer = null
-    void refreshArtifactUsage()
+function scheduleArtifactUsageReconnect(delayMs = 3000) {
+  if (artifactUsageReconnectTimer) clearTimeout(artifactUsageReconnectTimer)
+  artifactUsageReconnectTimer = setTimeout(() => {
+    artifactUsageReconnectTimer = null
+    if (!document.hidden) {
+      void startArtifactUsageStream()
+    }
   }, Math.max(0, Number(delayMs || 0)))
 }
 
-function startArtifactUsagePolling() {
-  if (!authStore.isAuthenticated) return
-  stopArtifactUsagePolling()
-  void refreshArtifactUsage()
-  artifactUsagePoller = setInterval(() => {
-    if (!document.hidden && authStore.isAuthenticated) void refreshArtifactUsage()
-  }, 15000)
-}
-
-function stopArtifactUsagePolling() {
-  if (artifactUsagePoller) {
-    clearInterval(artifactUsagePoller)
-    artifactUsagePoller = null
+function stopArtifactUsageStream() {
+  if (artifactUsageReconnectTimer) {
+    clearTimeout(artifactUsageReconnectTimer)
+    artifactUsageReconnectTimer = null
   }
-  if (artifactUsageRefreshTimer) {
-    clearTimeout(artifactUsageRefreshTimer)
-    artifactUsageRefreshTimer = null
-  }
-  artifactUsageAbortController?.abort()
-  artifactUsageAbortController = null
-  isArtifactUsageRequestInFlight.value = false
+  artifactUsageStreamAbortController?.abort()
+  artifactUsageStreamAbortController = null
 }
 
 function openSettings(tab = 'api') {
@@ -653,49 +656,19 @@ async function confirmLogout() {
   }
 }
 
-async function refreshKernelStatus() {
-  if (!authStore.isAuthenticated) {
+function syncWorkspaceRealtimeSubscriptions() {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (!authStore.isAuthenticated || !workspaceId || !appStore.hasWorkspace) {
+    settingsWebSocket.setKernelStatusWorkspace('')
+    stopArtifactUsageStream()
     kernelStatus.value = 'missing'
+    resetArtifactUsage()
     return
   }
-  if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {
-    kernelStatus.value = 'missing'
-    return
-  }
-  if (isKernelStatusRequestInFlight.value) return
-  isKernelStatusRequestInFlight.value = true
-  try {
-    const status = await apiService.v1GetWorkspaceKernelStatus(appStore.activeWorkspaceId)
-    kernelStatus.value = String(status?.status || 'missing').toLowerCase()
-    if (['ready', 'busy', 'starting'].includes(kernelStatus.value)) {
-      appStore.setRuntimeError('')
-    }
-  } catch (error) {
-    if (isUnauthorizedError(error)) {
-      await handleUnauthorizedPollingError()
-      return
-    }
-    kernelStatus.value = 'error'
-    appStore.setRuntimeError(error?.response?.data?.detail || error?.message || 'Failed to fetch kernel status.')
-  } finally {
-    isKernelStatusRequestInFlight.value = false
-  }
-}
 
-function startKernelStatusPolling() {
-  if (!authStore.isAuthenticated) return
-  stopKernelStatusPolling()
-  refreshKernelStatus()
-  kernelStatusPoller = setInterval(() => {
-    if (!document.hidden && authStore.isAuthenticated) refreshKernelStatus()
-  }, 5000)
-}
-
-function stopKernelStatusPolling() {
-  if (kernelStatusPoller) {
-    clearInterval(kernelStatusPoller)
-    kernelStatusPoller = null
-  }
+  kernelStatus.value = 'connecting'
+  settingsWebSocket.setKernelStatusWorkspace(workspaceId)
+  void startArtifactUsageStream()
 }
 
 async function interruptKernel() {
@@ -705,7 +678,6 @@ async function interruptKernel() {
     const response = await apiService.v1InterruptWorkspaceKernel(appStore.activeWorkspaceId)
     if (response?.reset) toast.success('Kernel Interrupted', 'Execution interrupt signal sent.')
     else toast.error('Interrupt Failed', 'No running kernel found.')
-    await refreshKernelStatus()
   } catch (error) {
     toast.error('Interrupt Failed', error?.response?.data?.detail || error.message)
   } finally {
@@ -725,10 +697,8 @@ async function restartKernel() {
     } else {
       toast.error('Restart Failed', 'No kernel session existed.')
     }
-    await refreshKernelStatus()
   } catch (error) {
     toast.error('Restart Failed', error?.response?.data?.detail || error.message)
-    await refreshKernelStatus()
   } finally {
     isKernelActionRunning.value = false
   }
@@ -737,8 +707,7 @@ async function restartKernel() {
 // Named handler so we can remove the exact same reference on unmount
 function handleVisibilityChange() {
   if (!document.hidden && authStore.isAuthenticated && appStore.activeWorkspaceId && appStore.hasWorkspace) {
-    refreshKernelStatus()
-    void refreshArtifactUsage()
+    syncWorkspaceRealtimeSubscriptions()
   }
 }
 
@@ -772,20 +741,21 @@ function handleDocumentKeydown(event) {
 
 // Lifecycle and Watchers
 onMounted(() => {
-  if (authStore.isAuthenticated && appStore.activeWorkspaceId && appStore.hasWorkspace) {
-    startKernelStatusPolling()
-    startArtifactUsagePolling()
-  }
   setupWebSocketMonitoring()
+  syncWorkspaceRealtimeSubscriptions()
   document.addEventListener('visibilitychange', handleVisibilityChange)
   document.addEventListener('click', handleDocumentClick)
   document.addEventListener('keydown', handleDocumentKeydown)
 })
 
 onUnmounted(() => {
-  stopKernelStatusPolling()
-  stopArtifactUsagePolling()
+  settingsWebSocket.setKernelStatusWorkspace('')
+  stopArtifactUsageStream()
   resetArtifactUsage()
+  if (typeof unsubscribeKernelStatus === 'function') {
+    unsubscribeKernelStatus()
+    unsubscribeKernelStatus = null
+  }
   if (typeof unsubscribeWebSocketConnection === 'function') {
     unsubscribeWebSocketConnection()
     unsubscribeWebSocketConnection = null
@@ -797,23 +767,18 @@ onUnmounted(() => {
 
 watch([() => appStore.activeWorkspaceId, () => appStore.hasWorkspace, () => authStore.isAuthenticated], ([newId, hasWorkspace, isAuthenticated]) => {
   if (isAuthenticated && newId && hasWorkspace) {
-    startKernelStatusPolling()
-    startArtifactUsagePolling()
+    syncWorkspaceRealtimeSubscriptions()
   } else {
-    stopKernelStatusPolling()
-    stopArtifactUsagePolling()
+    settingsWebSocket.setKernelStatusWorkspace('')
+    stopArtifactUsageStream()
+    kernelStatus.value = 'missing'
     resetArtifactUsage()
   }
 })
 
-watch(
-  [() => appStore.dataframes, () => appStore.figures, () => appStore.dataframeCount, () => appStore.figureCount, () => authStore.isAuthenticated],
-  () => {
-    if (!authStore.isAuthenticated) return
-    if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) return
-    scheduleArtifactUsageRefresh()
-  }
-)
+watch(() => isWebSocketConnected.value, () => {
+  syncWorkspaceRealtimeSubscriptions()
+})
 </script>
 
 <style scoped>

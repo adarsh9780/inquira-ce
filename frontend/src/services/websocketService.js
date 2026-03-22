@@ -81,6 +81,7 @@ class SettingsWebSocket {
     this.progressListeners = new Set()
     this.errorListeners = new Set()
     this.completeListeners = new Set()
+    this.kernelStatusListeners = new Set()
     // Support multiple subscribers for connection state
     this.connectionListeners = new Set()
 
@@ -90,6 +91,7 @@ class SettingsWebSocket {
     this.reconnectTimer = null
     this.reconnectInterval = 5000 // 5 seconds
     this.lastConnectionAttempt = null
+    this.kernelStatusWorkspaceId = ''
   }
 
   connect(userId) {
@@ -112,6 +114,7 @@ class SettingsWebSocket {
         // This will make the indicator green even if backend doesn't send acknowledgment
         this.isConnected = true
         this.notifyConnectionListeners(true)
+        this.sendKernelStatusSubscription()
       }
 
       this.socket.onmessage = (event) => {
@@ -124,6 +127,7 @@ class SettingsWebSocket {
             this.isConnected = true
             this.connectionAcknowledged = true
             this.notifyConnectionListeners(true)
+            this.sendKernelStatusSubscription()
             resolve()
           }
         } catch (error) {
@@ -289,6 +293,19 @@ class SettingsWebSocket {
         })
         break
 
+      case 'kernel_status':
+        this.kernelStatusListeners.forEach((listener) => {
+          try {
+            listener({
+              workspaceId: String(data.workspace_id || '').trim(),
+              status: String(data.status || 'missing').trim().toLowerCase() || 'missing',
+            })
+          } catch (_error) {
+            // Keep processing other listeners.
+          }
+        })
+        break
+
       default:
         console.debug('Unknown message type:', data.type)
     }
@@ -329,6 +346,19 @@ class SettingsWebSocket {
     console.debug('WebSocket monitoring started for settings save')
   }
 
+  setKernelStatusWorkspace(workspaceId) {
+    this.kernelStatusWorkspaceId = String(workspaceId || '').trim()
+    this.sendKernelStatusSubscription()
+  }
+
+  sendKernelStatusSubscription() {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+    this.socket.send(JSON.stringify({
+      type: 'subscribe_kernel_status',
+      workspace_id: this.kernelStatusWorkspaceId,
+    }))
+  }
+
   onProgress(callback) {
     this.progressCallback = callback
   }
@@ -362,6 +392,14 @@ class SettingsWebSocket {
     this.errorListeners.add(callback)
     return () => {
       this.errorListeners.delete(callback)
+    }
+  }
+
+  subscribeKernelStatus(callback) {
+    if (typeof callback !== 'function') return () => { }
+    this.kernelStatusListeners.add(callback)
+    return () => {
+      this.kernelStatusListeners.delete(callback)
     }
   }
 
