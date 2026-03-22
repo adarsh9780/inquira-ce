@@ -11,6 +11,7 @@ test('auth modal renders a progress panel for multi-step desktop sign-in', () =>
 
   assert.equal(source.includes('Browser step completed'), true)
   assert.equal(source.includes('Exchanging sign-in code'), true)
+  assert.equal(source.includes('Restoring saved session'), true)
   assert.equal(source.includes('Verifying session'), true)
   assert.equal(source.includes('Loading your account'), true)
   assert.equal(source.includes('progressPercent'), true)
@@ -23,6 +24,8 @@ test('auth store tracks stepwise login progress and waits for backend readiness'
   )
 
   assert.equal(source.includes("window.addEventListener('inquira:auth-progress'"), true)
+  assert.equal(source.includes("if (authEvent === 'INITIAL_SESSION')"), true)
+  assert.equal(source.includes("setAuthFlow('restoring_session', 'Found a saved session. Reconnecting to Inquira...')"), true)
   assert.equal(source.includes("setAuthFlow('browser_complete', 'Browser sign-in finished. Completing sign-in in the app...')"), true)
   assert.equal(source.includes("setAuthFlow('verifying_session', 'Browser sign-in finished. Verifying your session with Inquira...')"), true)
   assert.equal(source.includes('await apiService.waitForBackendReady(AUTH_PROBE_TIMEOUT_MS)'), true)

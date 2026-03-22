@@ -194,6 +194,8 @@ const progressConfig = computed(() => {
       return { percent: 60, title: 'Exchanging sign-in code', description: fallback }
     case 'session_ready':
       return { percent: 72, title: 'Session received', description: fallback }
+    case 'restoring_session':
+      return { percent: 78, title: 'Restoring saved session', description: fallback }
     case 'verifying_session':
       return { percent: 84, title: 'Verifying session', description: fallback }
     case 'loading_account':

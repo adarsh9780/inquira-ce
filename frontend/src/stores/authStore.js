@@ -107,9 +107,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   function ensureAuthSubscription() {
     if (authSubscription || !supabaseAuthService.isConfigured) return
-    const { data } = supabaseAuthService.onAuthStateChange(async (_event, session) => {
+    const { data } = supabaseAuthService.onAuthStateChange(async (event, session) => {
       authProbeRevision += 1
       const accessToken = String(session?.access_token || '').trim()
+      const authEvent = String(event || '').trim().toUpperCase()
       if (!accessToken) {
         clearLocalState()
         error.value = ''
@@ -119,7 +120,11 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       try {
-        setAuthFlow('verifying_session', 'Browser sign-in finished. Verifying your session with Inquira...')
+        if (authEvent === 'INITIAL_SESSION') {
+          setAuthFlow('restoring_session', 'Found a saved session. Reconnecting to Inquira...')
+        } else {
+          setAuthFlow('verifying_session', 'Browser sign-in finished. Verifying your session with Inquira...')
+        }
         await hydrateUserFromBackendWithRetry(accessToken)
         error.value = ''
         setAuthFlow('loading_account', 'Session verified. Loading your account...')
@@ -127,7 +132,11 @@ export const useAuthStore = defineStore('auth', () => {
         console.error('❌ Failed to hydrate Supabase session from backend:', err)
         clearLocalState()
         error.value = 'Authentication succeeded, but the local backend could not verify the session.'
-        setAuthFlow('failed', 'Browser sign-in finished, but Inquira could not verify your session yet.')
+        if (authEvent === 'INITIAL_SESSION') {
+          setAuthFlow('failed', 'Found a saved session, but Inquira could not reconnect to it yet.')
+        } else {
+          setAuthFlow('failed', 'Browser sign-in finished, but Inquira could not verify your session yet.')
+        }
       } finally {
         pendingAuthAction.value = ''
       }
