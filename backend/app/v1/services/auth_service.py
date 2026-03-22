@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import certifi
 import httpx
+import time
 from fastapi import HTTPException
 
+from ...core.logger import logprint
 from ..core.settings import settings
 from ..repositories.auth_repository import AuthUserRecord
 
@@ -32,19 +34,41 @@ class AuthService:
             "apikey": settings.supabase_secret_key,
         }
 
+        start_time = time.perf_counter()
+        logprint(
+            "[AUTH PROFILE] Starting Supabase /auth/v1/user verification...",
+            level="INFO",
+        )
+
         try:
             async with httpx.AsyncClient(timeout=10.0, verify=certifi.where()) as client:
                 response = await client.get(url, headers=headers)
         except httpx.TimeoutException as exc:
+            elapsed = time.perf_counter() - start_time
+            logprint(
+                f"[AUTH PROFILE] Supabase /auth/v1/user verification EXCEPTION Timeout after {elapsed:.3f}s",
+                level="ERROR",
+            )
             raise HTTPException(
                 status_code=503,
                 detail="Supabase auth lookup timed out. Check network or TLS configuration.",
             ) from exc
         except httpx.HTTPError as exc:
+            elapsed = time.perf_counter() - start_time
+            logprint(
+                f"[AUTH PROFILE] Supabase /auth/v1/user verification EXCEPTION HTTPError after {elapsed:.3f}s",
+                level="ERROR",
+            )
             raise HTTPException(
                 status_code=503,
                 detail="Supabase auth lookup failed. Please retry.",
             ) from exc
+
+        elapsed_time = time.perf_counter() - start_time
+        logprint(
+            f"[AUTH PROFILE] Supabase /auth/v1/user verification COMPLETED with {response.status_code} in {elapsed_time:.3f}s",
+            level="INFO",
+        )
 
         if response.status_code == 401:
             raise HTTPException(status_code=401, detail="Invalid bearer token")

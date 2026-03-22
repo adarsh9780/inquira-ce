@@ -99,3 +99,52 @@ async def test_resolve_supabase_user_uses_certifi_bundle(monkeypatch):
     assert captured["headers"]["Authorization"] == "Bearer token-123"
     assert captured["headers"]["apikey"] == "secret-key"
     assert str(captured["verify"]).endswith("cacert.pem")
+
+
+@pytest.mark.asyncio
+async def test_resolve_supabase_user_logs_through_app_logger(monkeypatch):
+    captured_messages = []
+
+    class DummyResponse:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {
+                "id": "user-1",
+                "email": "alice@example.com",
+                "user_metadata": {},
+                "app_metadata": {},
+            }
+
+    class DummyClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url, headers):
+            return DummyResponse()
+
+    monkeypatch.setattr(
+        "app.v1.services.auth_service.settings",
+        SimpleNamespace(
+            supabase_url="https://example.supabase.co",
+            supabase_secret_key="secret-key",
+        ),
+    )
+    monkeypatch.setattr("app.v1.services.auth_service.httpx.AsyncClient", DummyClient)
+    monkeypatch.setattr(
+        "app.v1.services.auth_service.logprint",
+        lambda *args, **kwargs: captured_messages.append((args, kwargs)),
+    )
+
+    await AuthService.resolve_supabase_user("token-123")
+
+    messages = [" ".join(str(part) for part in args) for args, _kwargs in captured_messages]
+    assert any("Starting Supabase /auth/v1/user verification" in message for message in messages)
+    assert any("COMPLETED with 200 in" in message for message in messages)
