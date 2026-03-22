@@ -97,7 +97,9 @@
                     <div class="mt-8 rounded-[1.5rem] border border-white/70 bg-white/75 p-5 shadow-[0_20px_45px_rgba(24,24,27,0.08)]">
                       <div class="flex items-center justify-between gap-4">
                         <div>
-                          <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-text-muted)]">Why teams use it</p>
+                          <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-text-muted)]">
+                            {{ showProgressScreen ? 'Live status' : 'Why teams use it' }}
+                          </p>
                           <p
                             v-if="!showProgressScreen"
                             :key="featureIndex"
@@ -145,40 +147,14 @@
                         {{ progressDescription }}
                       </p>
 
-                      <div class="mt-8">
-                        <div class="flex items-center justify-between text-sm">
-                          <span class="font-medium text-[var(--color-text-main)]">Session progress</span>
-                          <span class="font-semibold text-[var(--color-text-main)]">{{ progressPercent }}%</span>
-                        </div>
-                        <div class="mt-3 h-3 overflow-hidden rounded-full bg-zinc-200">
-                          <div
-                            class="h-full rounded-full bg-[linear-gradient(90deg,#18181B,#3B82F6)] transition-all duration-700 ease-out"
-                            :style="{ width: `${progressPercent}%` }"
-                          ></div>
-                        </div>
-                      </div>
-
-                      <div class="mt-8 grid gap-3">
-                        <div
-                          v-for="item in progressTimeline"
-                          :key="item.title"
-                          :class="[
-                            'rounded-[1.2rem] border px-4 py-4 transition-all duration-300',
-                            item.active
-                              ? 'border-zinc-900 bg-zinc-900 text-white'
-                              : item.done
-                                ? 'border-zinc-200 bg-zinc-100 text-zinc-700'
-                                : 'border-zinc-200 bg-white text-zinc-400',
-                          ]"
-                        >
-                          <div class="flex items-start justify-between gap-3">
-                            <div>
-                              <p class="text-sm font-semibold">{{ item.title }}</p>
-                              <p class="mt-1 text-sm leading-6 opacity-80">{{ item.caption }}</p>
-                            </div>
-                            <span class="mt-0.5 text-xs font-semibold uppercase tracking-[0.18em] opacity-75">
-                              {{ item.active ? 'Now' : item.done ? 'Done' : 'Next' }}
-                            </span>
+                      <div class="mt-8 rounded-[1.4rem] border border-zinc-200 bg-[var(--color-base)] p-5">
+                        <div class="flex items-center gap-4">
+                          <div class="auth-spinner" aria-hidden="true"></div>
+                          <div>
+                            <p class="text-sm font-semibold text-[var(--color-text-main)]">Completing secure sign-in</p>
+                            <p class="mt-1 text-sm leading-6 text-[var(--color-text-muted)]">
+                              This usually takes a few seconds. Inquira will open your workspace as soon as the session is ready.
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -352,7 +328,6 @@ const showProgressScreen = computed(() => {
   return !!stage && stage !== 'failed'
 })
 
-const progressPercent = computed(() => progressConfig.value.percent)
 const progressTitle = computed(() => progressConfig.value.title)
 const progressDescription = computed(() => progressConfig.value.description)
 const displayMessage = computed(() => authStore.error || '')
@@ -372,32 +347,6 @@ const progressLead = computed(() => {
     return 'Inquira found a saved session and is reconnecting your workspace without making you repeat sign-in.'
   }
   return 'The browser step is complete. Inquira is validating the secure handoff and preparing the app for your workspace.'
-})
-
-const progressTimeline = computed(() => {
-  const percent = progressPercent.value
-  const stage = String(authStore.authFlowStage || '').trim()
-  const isRestore = stage === 'restoring_session'
-  return [
-    {
-      title: isRestore ? 'Restore session' : 'Browser handoff',
-      caption: isRestore ? 'Load the saved session from desktop storage.' : 'Receive the Google callback locally.',
-      active: percent < 62,
-      done: percent >= 62,
-    },
-    {
-      title: 'Verify locally',
-      caption: 'Wait for the backend and validate the session.',
-      active: percent >= 62 && percent < 96,
-      done: percent >= 96,
-    },
-    {
-      title: 'Load workspace',
-      caption: 'Continue into the app when the account context is ready.',
-      active: percent >= 96,
-      done: false,
-    },
-  ]
 })
 
 function startFeatureRotation() {
@@ -477,6 +426,17 @@ watch(
   background: radial-gradient(circle, rgba(24, 24, 27, 0.12), rgba(24, 24, 27, 0));
 }
 
+.auth-spinner {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 9999px;
+  border: 3px solid rgba(24, 24, 27, 0.1);
+  border-top-color: #18181b;
+  border-right-color: #3b82f6;
+  animation: auth-spin 900ms linear infinite;
+  flex-shrink: 0;
+}
+
 .auth-shell-enter-active,
 .auth-shell-leave-active {
   transition: opacity 260ms ease, transform 260ms ease;
@@ -521,6 +481,12 @@ watch(
 @keyframes auth-caret {
   50% {
     border-color: transparent;
+  }
+}
+
+@keyframes auth-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 </style>
