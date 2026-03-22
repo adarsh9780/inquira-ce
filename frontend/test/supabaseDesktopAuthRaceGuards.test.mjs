@@ -15,13 +15,16 @@ test('desktop supabase auth reuses shared runtime state to survive hot reloads',
   assert.equal(source.includes('runtime.pendingCodes.has(code) || runtime.handledCodes.has(code)'), true)
 })
 
-test('auth store retries backend hydration after auth state changes', () => {
+test('auth store retries backend hydration through a shared single-flight guard', () => {
   const source = readFileSync(
     resolve(process.cwd(), 'src/stores/authStore.js'),
     'utf-8',
   )
 
-  assert.equal(source.includes('async function hydrateUserFromBackendWithRetry(accessToken = \'\', maxAttempts = 3)'), true)
+  assert.equal(source.includes('async function hydrateUserFromBackendWithRetry(accessToken = \'\', maxAttempts = 2)'), true)
   assert.equal(source.includes('await sleep(400 * attempt)'), true)
-  assert.equal(source.includes('await hydrateUserFromBackendWithRetry(accessToken)'), true)
+  assert.equal(source.includes('let activeHydrationPromise = null'), true)
+  assert.equal(source.includes('let activeHydrationToken = \'\''), true)
+  assert.equal(source.includes('if (activeHydrationPromise && activeHydrationToken === token) {'), true)
+  assert.equal(source.includes('await ensureBackendHydration(accessToken, { retry: true })'), true)
 })

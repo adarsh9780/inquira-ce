@@ -9,6 +9,8 @@ test('auth store wraps auth requests with explicit timeout fail-safe', () => {
     'utf-8',
   )
 
+  assert.equal(source.includes('const AUTH_PROBE_TIMEOUT_MS = 5000'), true)
+  assert.equal(source.includes('const AUTH_SESSION_TIMEOUT_MS = 2500'), true)
   assert.equal(source.includes('const AUTH_ACTION_TIMEOUT_MS = 45000'), true)
   assert.equal(source.includes('async function withTimeout(promise, timeoutMs, message)'), true)
   assert.equal(source.includes('Promise.race(['), true)
@@ -36,5 +38,5 @@ test('auth store hydrates backend profile with the fresh callback bearer token',
 
   assert.equal(source.includes('async function hydrateUserFromBackend(accessToken = \'\')'), true)
   assert.equal(source.includes('Authorization: `Bearer ${token}`'), true)
-  assert.equal(source.includes('await hydrateUserFromBackend(accessToken)'), true)
+  assert.equal(source.includes('await ensureBackendHydration(accessToken)'), true)
 })

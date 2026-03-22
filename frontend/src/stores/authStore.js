@@ -5,7 +5,8 @@ import { settingsWebSocket } from '../services/websocketService'
 import { supabaseAuthService } from '../services/supabaseAuthService'
 
 export const useAuthStore = defineStore('auth', () => {
-  const AUTH_PROBE_TIMEOUT_MS = 15000
+  const AUTH_PROBE_TIMEOUT_MS = 5000
+  const AUTH_SESSION_TIMEOUT_MS = 2500
   const AUTH_ACTION_TIMEOUT_MS = 45000
 
   const user = ref(null)
@@ -19,6 +20,9 @@ export const useAuthStore = defineStore('auth', () => {
   let authProbeRevision = 0
   let authSubscription = null
   let authProgressListenerBound = false
+  let activeHydrationPromise = null
+  let activeHydrationToken = ''
+  let lastHydratedAccessToken = ''
 
   const username = computed(() => user.value?.username || '')
   const userId = computed(() => user.value?.user_id || '')
@@ -49,6 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     isAuthenticated.value = false
     plan.value = 'FREE'
+    lastHydratedAccessToken = ''
   }
 
   function setAuthFlow(stage, message = '') {
@@ -62,6 +67,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function hydrateUserFromBackend(accessToken = '') {
+    console.time('[AUTH PROFILE] hydrateUserFromBackend API Roundtrip')
     const token = String(accessToken || '').trim()
     const requestConfig = token
       ? {
@@ -72,25 +78,32 @@ export const useAuthStore = defineStore('auth', () => {
         }
       : { timeout: AUTH_PROBE_TIMEOUT_MS }
 
-    const profile = await withTimeout(
-      apiService.v1GetCurrentUser(requestConfig),
-      AUTH_PROBE_TIMEOUT_MS + 1000,
-      'Authentication check timed out.',
-    )
-    if (profile?.user_id) {
-      user.value = {
-        user_id: profile.user_id,
-        username: profile.username,
+    try {
+      const profile = await withTimeout(
+        apiService.v1GetCurrentUser(requestConfig),
+        AUTH_PROBE_TIMEOUT_MS + 1000,
+        'Authentication check timed out.',
+      )
+      console.timeEnd('[AUTH PROFILE] hydrateUserFromBackend API Roundtrip')
+      
+      if (profile?.user_id) {
+        user.value = {
+          user_id: profile.user_id,
+          username: profile.username,
+        }
+        isAuthenticated.value = true
+        plan.value = profile.plan || 'FREE'
+        return true
       }
-      isAuthenticated.value = true
-      plan.value = profile.plan || 'FREE'
-      return true
+      clearLocalState()
+      return false
+    } catch (err) {
+      console.timeEnd('[AUTH PROFILE] hydrateUserFromBackend API Roundtrip')
+      throw err
     }
-    clearLocalState()
-    return false
   }
 
-  async function hydrateUserFromBackendWithRetry(accessToken = '', maxAttempts = 3) {
+  async function hydrateUserFromBackendWithRetry(accessToken = '', maxAttempts = 2) {
     let lastError = null
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
@@ -104,9 +117,54 @@ export const useAuthStore = defineStore('auth', () => {
     throw lastError
   }
 
+  function hasHydratedCurrentToken(accessToken = '') {
+    const token = String(accessToken || '').trim()
+    return Boolean(
+      token &&
+        token === lastHydratedAccessToken &&
+        isAuthenticated.value &&
+        user.value?.user_id,
+    )
+  }
+
+  async function ensureBackendHydration(accessToken = '', options = {}) {
+    const token = String(accessToken || '').trim()
+    const retry = Boolean(options?.retry)
+
+    if (!token) return false
+    if (hasHydratedCurrentToken(token)) return true
+    if (activeHydrationPromise && activeHydrationToken === token) {
+      return activeHydrationPromise
+    }
+
+    let hydrationPromise = null
+    const runHydration = async () => {
+      const hydrated = retry
+        ? await hydrateUserFromBackendWithRetry(token)
+        : await hydrateUserFromBackend(token)
+
+      if (hydrated) {
+        lastHydratedAccessToken = token
+      }
+      return hydrated
+    }
+
+    activeHydrationToken = token
+    hydrationPromise = runHydration().finally(() => {
+      if (activeHydrationPromise === hydrationPromise) {
+        activeHydrationPromise = null
+        activeHydrationToken = ''
+      }
+    })
+    activeHydrationPromise = hydrationPromise
+    return hydrationPromise
+  }
+
   function ensureAuthSubscription() {
     if (authSubscription || !supabaseAuthService.isConfigured) return
     const { data } = supabaseAuthService.onAuthStateChange(async (event, session) => {
+      console.log(`[AUTH PROFILE] onAuthStateChange Event: ${event}. Has Session: ${!!session}`)
+      console.time(`[AUTH PROFILE] Full onAuthStateChange Event: ${event}`)
       authProbeRevision += 1
       const accessToken = String(session?.access_token || '').trim()
       const authEvent = String(event || '').trim().toUpperCase()
@@ -117,6 +175,7 @@ export const useAuthStore = defineStore('auth', () => {
           pendingAuthAction.value = ''
           clearAuthFlow()
         }
+        console.timeEnd(`[AUTH PROFILE] Full onAuthStateChange Event: ${event}`)
         return
       }
 
@@ -126,9 +185,10 @@ export const useAuthStore = defineStore('auth', () => {
         } else {
           setAuthFlow('verifying_session', 'Browser sign-in finished. Verifying your session with Inquira...')
         }
-        await hydrateUserFromBackendWithRetry(accessToken)
+        await ensureBackendHydration(accessToken, { retry: true })
         error.value = ''
         setAuthFlow('loading_account', 'Session verified. Loading your account...')
+        console.timeEnd(`[AUTH PROFILE] Full onAuthStateChange Event: ${event}`)
       } catch (err) {
         console.error('❌ Failed to hydrate Supabase session from backend:', err)
         clearLocalState()
@@ -138,6 +198,7 @@ export const useAuthStore = defineStore('auth', () => {
         } else {
           setAuthFlow('failed', 'Browser sign-in finished, but Inquira could not verify your session yet.')
         }
+        console.timeEnd(`[AUTH PROFILE] Full onAuthStateChange Event: ${event}`)
       } finally {
         pendingAuthAction.value = ''
       }
@@ -194,11 +255,13 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = ''
 
     try {
+      console.time('[AUTH PROFILE] checkAuth getSession Timeout')
       const session = await withTimeout(
         supabaseAuthService.getSession(),
-        AUTH_PROBE_TIMEOUT_MS,
+        AUTH_SESSION_TIMEOUT_MS,
         'Authentication check timed out.',
       )
+      console.timeEnd('[AUTH PROFILE] checkAuth getSession Timeout')
       if (probeRevision !== authProbeRevision) return
       const accessToken = String(session?.access_token || '').trim()
       if (!accessToken) {
@@ -207,9 +270,10 @@ export const useAuthStore = defineStore('auth', () => {
         }
         return false
       }
-      await hydrateUserFromBackend(accessToken)
+      await ensureBackendHydration(accessToken)
       return true
     } catch (_err) {
+      console.timeEnd('[AUTH PROFILE] checkAuth getSession Timeout')
       if (probeRevision !== authProbeRevision) return
       if (!preserveSession) {
         clearLocalState()
