@@ -25,8 +25,27 @@ const isBrowser = typeof window !== 'undefined'
 const isTauriDesktop = isBrowser && !!window.__TAURI_INTERNALS__
 const isConfigured = !!SUPABASE_URL && !!SUPABASE_PUBLISHABLE_KEY
 
-let client = null
-let callbackListenerPromise = null
+function getAuthRuntime() {
+  if (!isBrowser) {
+    return {
+      client: null,
+      callbackListenerPromise: null,
+      pendingCodes: new Set(),
+      handledCodes: new Set(),
+    }
+  }
+
+  const runtimeKey = '__INQUIRA_SUPABASE_AUTH_RUNTIME__'
+  if (!window[runtimeKey]) {
+    window[runtimeKey] = {
+      client: null,
+      callbackListenerPromise: null,
+      pendingCodes: new Set(),
+      handledCodes: new Set(),
+    }
+  }
+  return window[runtimeKey]
+}
 
 function createSupabaseClient() {
   if (!isConfigured) return null
@@ -41,10 +60,11 @@ function createSupabaseClient() {
 }
 
 function getClient() {
-  if (!client) {
-    client = createSupabaseClient()
+  const runtime = getAuthRuntime()
+  if (!runtime.client) {
+    runtime.client = createSupabaseClient()
   }
-  return client
+  return runtime.client
 }
 
 function normalizeManageAccountUrl() {
@@ -52,9 +72,10 @@ function normalizeManageAccountUrl() {
 }
 
 async function ensureLoopbackListener() {
-  if (!isTauriDesktop || callbackListenerPromise) return callbackListenerPromise
+  const runtime = getAuthRuntime()
+  if (!isTauriDesktop || runtime.callbackListenerPromise) return runtime.callbackListenerPromise
 
-  callbackListenerPromise = Promise.all([
+  runtime.callbackListenerPromise = Promise.all([
     import('@tauri-apps/api/event'),
   ]).then(async ([eventApi]) => {
     await eventApi.listen('auth:callback', async (event) => {
@@ -70,25 +91,34 @@ async function ensureLoopbackListener() {
         console.error('❌ Supabase auth callback did not include an authorization code.')
         return
       }
+      if (runtime.pendingCodes.has(code) || runtime.handledCodes.has(code)) {
+        return
+      }
+      runtime.pendingCodes.add(code)
       const sb = getClient()
       if (!sb) return
-      const { error } = await sb.auth.exchangeCodeForSession(code)
-      if (error) {
-        console.error('❌ Failed to exchange Supabase auth code for session:', error)
-        return
-      }
-      const { data: sessionData, error: sessionError } = await sb.auth.getSession()
-      if (sessionError) {
-        console.error('❌ Supabase session fetch failed after auth code exchange:', sessionError)
-        return
-      }
-      if (!sessionData?.session?.access_token) {
-        console.error('❌ Supabase code exchange completed without a usable session.')
+      try {
+        const { error } = await sb.auth.exchangeCodeForSession(code)
+        if (error) {
+          console.error('❌ Failed to exchange Supabase auth code for session:', error)
+          return
+        }
+        runtime.handledCodes.add(code)
+        const { data: sessionData, error: sessionError } = await sb.auth.getSession()
+        if (sessionError) {
+          console.error('❌ Supabase session fetch failed after auth code exchange:', sessionError)
+          return
+        }
+        if (!sessionData?.session?.access_token) {
+          console.error('❌ Supabase code exchange completed without a usable session.')
+        }
+      } finally {
+        runtime.pendingCodes.delete(code)
       }
     })
   })
 
-  return callbackListenerPromise
+  return runtime.callbackListenerPromise
 }
 
 async function startLoopbackRedirect() {

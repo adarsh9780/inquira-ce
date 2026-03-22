@@ -22,6 +22,12 @@ export const useAuthStore = defineStore('auth', () => {
   const planLabel = computed(() => String(plan.value || 'FREE').toUpperCase())
   const manageAccountUrl = computed(() => supabaseAuthService.getManageAccountUrl())
 
+  function sleep(ms) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, ms)
+    })
+  }
+
   async function withTimeout(promise, timeoutMs, message) {
     let timer = null
     try {
@@ -71,6 +77,20 @@ export const useAuthStore = defineStore('auth', () => {
     return false
   }
 
+  async function hydrateUserFromBackendWithRetry(accessToken = '', maxAttempts = 3) {
+    let lastError = null
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        return await hydrateUserFromBackend(accessToken)
+      } catch (err) {
+        lastError = err
+        if (attempt >= maxAttempts) break
+        await sleep(400 * attempt)
+      }
+    }
+    throw lastError
+  }
+
   function ensureAuthSubscription() {
     if (authSubscription || !supabaseAuthService.isConfigured) return
     const { data } = supabaseAuthService.onAuthStateChange(async (_event, session) => {
@@ -84,7 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       try {
-        await hydrateUserFromBackend(accessToken)
+        await hydrateUserFromBackendWithRetry(accessToken)
         error.value = ''
       } catch (err) {
         console.error('❌ Failed to hydrate Supabase session from backend:', err)
