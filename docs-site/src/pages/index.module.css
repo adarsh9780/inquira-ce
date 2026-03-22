@@ -1,0 +1,283 @@
+.page {
+  padding: 2rem 0 5rem;
+}
+
+.heroSection {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: 2rem;
+  align-items: stretch;
+}
+
+.heroCopy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.eyebrow,
+.sectionEyebrow {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: clamp(3rem, 8vw, 5.25rem);
+  line-height: 0.96;
+  letter-spacing: -0.06em;
+}
+
+.heroTagline {
+  margin: 0;
+  max-width: 42rem;
+  color: var(--ifm-color-emphasis-800);
+  font-size: 1.3rem;
+  line-height: 1.4;
+}
+
+.heroBody,
+.sectionBody {
+  margin: 0;
+  max-width: 40rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 1rem;
+}
+
+.primaryCta,
+.secondaryCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.9rem;
+  padding: 0.8rem 1.15rem;
+  border-radius: 0.9rem;
+  border: 1px solid transparent;
+  text-decoration: none;
+  font-weight: 600;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.primaryCta {
+  width: fit-content;
+  background: #18181b;
+  border-color: #18181b;
+  color: #ffffff;
+  box-shadow: 0 18px 38px rgba(24, 24, 27, 0.14);
+}
+
+.secondaryCta {
+  width: fit-content;
+  background: rgba(255, 255, 255, 0.84);
+  border-color: #e4e4e7;
+  color: #27272a;
+}
+
+.primaryCta:hover,
+.secondaryCta:hover {
+  color: inherit;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.secondaryCta:hover {
+  border-color: #d4d4d8;
+  background: #ffffff;
+}
+
+.heroPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.2rem;
+  border: 1px solid #e4e4e7;
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(253, 252, 248, 0.98));
+  box-shadow: 0 22px 50px rgba(39, 39, 42, 0.08);
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: #71717a;
+  font-size: 0.9rem;
+}
+
+.panelDot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: #3b82f6;
+  box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.08);
+}
+
+.panelLabel {
+  font-weight: 600;
+}
+
+.panelCard,
+.infoCard,
+.editionCard,
+.metricCard,
+.ctaSection {
+  border: 1px solid #e4e4e7;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 1.25rem;
+}
+
+.panelCard {
+  padding: 1.2rem;
+}
+
+.panelTitle {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.panelText {
+  margin: 0;
+  color: #71717a;
+}
+
+.panelGrid,
+.cardGrid,
+.editionGrid {
+  display: grid;
+  gap: 1rem;
+}
+
+.panelGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.metricCard {
+  padding: 1rem;
+}
+
+.metricLabel {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: #71717a;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.sectionIntro {
+  margin-bottom: 1.5rem;
+}
+
+.sectionTitle {
+  margin: 0.8rem 0;
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.cardGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.infoCard,
+.editionCard {
+  padding: 1.3rem;
+  min-height: 100%;
+}
+
+.infoCard h3,
+.editionName {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+
+.infoCard p,
+.editionSummary,
+.editionDetails {
+  margin: 0;
+  color: #71717a;
+}
+
+.editionGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.editionSummary {
+  margin-bottom: 0.85rem;
+  color: #27272a;
+  font-weight: 600;
+}
+
+.ctaSection {
+  max-width: 1200px;
+  margin: 1.5rem auto 0;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.ctaActions {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+@media screen and (max-width: 996px) {
+  .heroSection,
+  .cardGrid,
+  .editionGrid,
+  .panelGrid,
+  .ctaSection {
+    grid-template-columns: 1fr;
+  }
+
+  .heroSection {
+    padding-top: 1rem;
+  }
+
+  .ctaSection {
+    display: grid;
+  }
+}
+
+@media screen and (max-width: 680px) {
+  .page {
+    padding-top: 1rem;
+  }
+
+  .heroSection,
+  .section,
+  .ctaSection {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
