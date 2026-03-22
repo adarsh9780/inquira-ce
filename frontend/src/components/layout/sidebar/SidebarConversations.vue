@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col w-full h-full min-h-[0]">
     <div
-      class="flex items-center justify-between w-full px-3 py-2 rounded-xl transition-colors shrink-0"
+      class="flex items-center justify-between w-full py-2 transition-colors shrink-0"
       :class="!appStore.hasWorkspace ? 'opacity-50 cursor-not-allowed' : 'hover:bg-zinc-100/60'"
       @click="toggleExpanded"
     >
@@ -27,11 +27,11 @@
     </div>
 
     <Transition name="sidebar-list">
-      <div v-show="isExpanded && appStore.hasWorkspace" class="flex flex-col mt-1 space-y-1 pl-6 pr-3 pb-2 overflow-y-auto flex-1">
+      <div v-show="isExpanded && appStore.hasWorkspace" class="flex flex-col mt-1 space-y-0.5 pl-4 pb-2 overflow-y-auto flex-1">
         <div
           v-if="appStore.conversations.length === 0"
-          class="rounded-xl border px-3 py-3 text-xs"
-          style="border-color: color-mix(in srgb, var(--color-border) 78%, transparent); color: var(--color-text-muted); background-color: color-mix(in srgb, var(--color-surface) 70%, transparent);"
+          class="px-2 py-3 text-xs"
+          style="color: var(--color-text-muted);"
         >
           No conversations yet. Start one for this workspace.
         </div>
@@ -40,8 +40,8 @@
           v-for="conv in appStore.conversations"
           :key="conv.id"
           type="button"
-          class="group/item relative flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors text-xs"
-          :class="conv.id === appStore.activeConversationId ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'border-transparent text-zinc-600 hover:bg-zinc-100/60 hover:text-zinc-800'"
+          class="group/item relative flex items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors text-xs"
+          :class="conv.id === appStore.activeConversationId ? 'bg-emerald-50 text-emerald-800' : 'text-zinc-600 hover:bg-zinc-100/60 hover:text-zinc-800'"
           @click="selectConversation(conv.id)"
         >
           <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5 flex-1" @dblclick="startEditing(conv)">

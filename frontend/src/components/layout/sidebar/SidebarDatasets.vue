@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col w-full">
     <div
-      class="flex items-center justify-between w-full px-3 py-2 rounded-xl transition-colors"
+      class="flex items-center justify-between w-full py-2 transition-colors"
       :class="!appStore.hasWorkspace ? 'opacity-50 cursor-not-allowed' : 'hover:bg-zinc-100/60'"
       @click="toggleExpanded"
     >
@@ -29,7 +29,7 @@
     <Transition name="sidebar-list">
       <div
         v-show="isExpanded && appStore.hasWorkspace"
-        class="flex flex-col mt-1 space-y-1 pl-6 pr-3 pb-2"
+        class="flex flex-col mt-1 space-y-0.5 pl-4 pb-2"
         @dragenter.prevent="handleDropDragEnter"
         @dragover.prevent="handleDropDragOver"
         @dragleave.prevent="handleDropDragLeave"
@@ -37,7 +37,7 @@
       >
         <div
           v-if="isDropActive"
-          class="rounded-xl border-2 border-dashed px-3 py-4 text-center text-xs"
+          class="rounded-lg border-2 border-dashed px-3 py-4 text-center text-xs"
           style="border-color: var(--color-border-hover); color: var(--color-text-main); background-color: color-mix(in srgb, var(--color-surface) 78%, transparent);"
         >
           Drop CSV, Parquet, Excel, JSON, or TSV files to add them to this workspace.
@@ -50,8 +50,8 @@
 
         <div
           v-else-if="datasets.length === 0"
-          class="rounded-xl border px-3 py-3 text-xs"
-          style="border-color: color-mix(in srgb, var(--color-border) 78%, transparent); color: var(--color-text-muted); background-color: color-mix(in srgb, var(--color-surface) 70%, transparent);"
+          class="px-2 py-3 text-xs"
+          style="color: var(--color-text-muted);"
         >
           This workspace does not have any datasets yet.
         </div>
@@ -60,8 +60,8 @@
           v-for="ds in datasets"
           :key="ds.table_name"
           type="button"
-          class="group/item relative flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors text-xs"
-          :class="isSelectedDataset(ds) ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'border-transparent text-zinc-600 hover:bg-zinc-100/60 hover:text-zinc-800'"
+          class="group/item relative flex items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors text-xs"
+          :class="isSelectedDataset(ds) ? 'bg-emerald-50 text-emerald-800' : 'text-zinc-600 hover:bg-zinc-100/60 hover:text-zinc-800'"
           @click="selectDataset(ds)"
         >
           <CircleStackIcon class="w-3.5 h-3.5 shrink-0" :class="isSelectedDataset(ds) ? 'text-emerald-600' : 'text-zinc-400'" />

@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col w-full">
-    <div class="flex items-center justify-between px-3 py-2">
+    <div class="flex items-center justify-between py-2">
       <div class="flex items-center gap-2 min-w-0">
         <BuildingOffice2Icon class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-muted);" />
         <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">
@@ -16,7 +16,7 @@
       </button>
     </div>
 
-    <div class="px-3 pb-2">
+    <div class="pb-2">
       <div v-if="appStore.workspaceDeletionJobs.length > 0" class="mb-2 px-2.5 py-2 bg-amber-50 text-amber-800 text-[11px] flex items-center gap-1.5 rounded-xl">
         <svg class="animate-spin h-3 w-3 text-amber-700 shrink-0" viewBox="0 0 24 24" fill="none">
           <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -27,8 +27,8 @@
 
       <div
         v-if="appStore.workspaces.length === 0"
-        class="rounded-2xl border px-3 py-4 text-xs text-center"
-        style="border-color: color-mix(in srgb, var(--color-border) 82%, transparent); color: var(--color-text-muted); background-color: color-mix(in srgb, var(--color-surface) 75%, transparent);"
+        class="px-1 py-3 text-xs"
+        style="color: var(--color-text-muted);"
       >
         No workspaces yet. Create one to start organizing datasets and conversations.
       </div>
@@ -36,16 +36,12 @@
       <Listbox v-else :model-value="selectedWorkspaceId" @update:model-value="selectWorkspace">
         <div class="relative">
           <ListboxButton
-            class="w-full rounded-2xl border px-3 py-3 text-left transition-colors"
-            style="border-color: color-mix(in srgb, var(--color-border) 82%, transparent); background-color: color-mix(in srgb, var(--color-surface) 82%, transparent);"
+            class="w-full rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-zinc-100/60"
+            style="background-color: color-mix(in srgb, var(--color-surface) 62%, transparent);"
           >
             <div class="flex items-center gap-3 min-w-0">
-              <div class="flex h-9 w-9 items-center justify-center rounded-xl shrink-0" style="background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent);">
-                <BuildingOffice2Icon class="w-4 h-4" style="color: var(--color-text-main);" />
-              </div>
               <div class="min-w-0 flex-1">
-                <p class="text-[10px] uppercase tracking-[0.12em] font-semibold" style="color: var(--color-text-muted);">Selected workspace</p>
-                <p class="text-sm font-semibold truncate mt-0.5" style="color: var(--color-text-main);">
+                <p class="text-sm font-medium truncate" style="color: var(--color-text-main);">
                   {{ activeWorkspaceName }}
                 </p>
               </div>
@@ -55,8 +51,8 @@
 
           <transition name="workspace-dropdown">
             <ListboxOptions
-              class="absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-2xl border p-1 shadow-xl focus:outline-none"
-              style="border-color: color-mix(in srgb, var(--color-border) 82%, transparent); background-color: color-mix(in srgb, var(--color-base) 96%, var(--color-surface));"
+              class="absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-xl border p-1 shadow-xl focus:outline-none"
+              style="border-color: color-mix(in srgb, var(--color-border) 82%, transparent); background-color: var(--color-base);"
             >
               <ListboxOption
                 v-for="ws in appStore.workspaces"
@@ -67,7 +63,7 @@
                 :disabled="isWorkspaceDeleting(ws.id)"
               >
                 <li
-                  class="group/item flex items-center justify-between gap-2 rounded-xl px-3 py-2 transition-colors"
+                  class="group/item flex items-center justify-between gap-2 rounded-lg px-3 py-2 transition-colors"
                   :class="[
                     active ? 'bg-zinc-100/80' : '',
                     selected ? 'bg-emerald-50 text-emerald-800' : '',

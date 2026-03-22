@@ -22,43 +22,29 @@
 
     <div class="flex-1 overflow-y-auto overflow-x-hidden flex flex-col py-3 custom-scrollbar">
       <div class="px-3">
-        <div
-          class="rounded-[24px] border shadow-sm overflow-hidden"
-          style="border-color: color-mix(in srgb, var(--color-border) 82%, transparent); background: linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 92%, var(--color-base)) 0%, color-mix(in srgb, var(--color-surface) 72%, transparent) 100%);"
-        >
-          <div class="px-3 pt-3 pb-2 border-b" style="border-color: color-mix(in srgb, var(--color-border) 78%, transparent);">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.12em]" style="color: var(--color-text-muted);">Navigation</p>
-            <p class="text-sm font-semibold mt-1" style="color: var(--color-text-main);">Workspace explorer</p>
-            <p class="text-[11px] mt-1" style="color: var(--color-text-muted);">
-              Pick one workspace, then browse its datasets and conversations.
-            </p>
+        <SidebarWorkspaces
+          :is-collapsed="false"
+          @header-click="handleExplorerHeaderClick"
+          @select="handleWorkspaceSelect"
+        />
+
+        <Transition name="sidebar-section">
+          <div v-if="appStore.hasWorkspace" class="mt-2">
+            <div class="mx-0 h-px" style="background-color: color-mix(in srgb, var(--color-border) 78%, transparent);" />
+            <SidebarDatasets
+              :is-collapsed="false"
+              @header-click="handleExplorerHeaderClick"
+              @select="handleDatasetSelect"
+              @open-settings="openSettings"
+            />
+            <div class="mx-0 mt-1 h-px" style="background-color: color-mix(in srgb, var(--color-border) 78%, transparent);" />
+            <SidebarConversations
+              :is-collapsed="false"
+              @header-click="handleExplorerHeaderClick"
+              @select="handleConversationSelect"
+            />
           </div>
-
-          <SidebarWorkspaces
-            :is-collapsed="false"
-            @header-click="handleExplorerHeaderClick"
-            @select="handleWorkspaceSelect"
-          />
-
-          <Transition name="sidebar-section">
-            <div v-if="appStore.hasWorkspace" class="px-1 pb-2">
-              <div class="mx-2 rounded-2xl border px-1 py-2" style="border-color: color-mix(in srgb, var(--color-border) 78%, transparent); background-color: color-mix(in srgb, var(--color-base) 80%, transparent);">
-                <SidebarDatasets
-                  :is-collapsed="false"
-                  @header-click="handleExplorerHeaderClick"
-                  @select="handleDatasetSelect"
-                  @open-settings="openSettings"
-                />
-                <div class="mx-3 my-1 h-px" style="background-color: color-mix(in srgb, var(--color-border) 78%, transparent);" />
-                <SidebarConversations
-                  :is-collapsed="false"
-                  @header-click="handleExplorerHeaderClick"
-                  @select="handleConversationSelect"
-                />
-              </div>
-            </div>
-          </Transition>
-        </div>
+        </Transition>
       </div>
     </div>
 
