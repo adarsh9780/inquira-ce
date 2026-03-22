@@ -12,6 +12,9 @@ def test_readme_is_docs_table_of_contents():
     assert "img.shields.io" in text
     assert "## Quick Start" in text
     assert "## Documentation Map" in text
+    assert "## Current Product Highlights" in text
+    assert "## Current Focus" in text
+    assert "https://docs.inquiraai.com/download" in text
     assert "make check-version" in text
     assert "make ruff-test" in text
     assert "make mypy-test" in text
@@ -19,6 +22,9 @@ def test_readme_is_docs_table_of_contents():
     assert "./docs-site/docs/overview.md" in text
     assert "./docs-site/docs/commit-and-release.md" in text
     assert "./docs-site/docs/changelog.md" in text
+    assert "## Upcoming Changes" not in text
+    assert "**Supabase Auth**" not in text
+    assert "align the auth page styling with the main UI" not in text
 
 
 def test_docs_chain_has_next_links():

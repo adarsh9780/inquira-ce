@@ -24,37 +24,34 @@ Hosted docs site (GitHub Pages): [https://docs.inquiraai.com/](https://docs.inqu
 - Turn natural language requests into reproducible Python/data operations.
 - Package the app as a desktop experience with backend + frontend + Tauri shell.
 
-## What's New (Since v0.5.7a10)
+## Current Product Highlights
 
-- Replaced generic LangGraph `ToolNode` execution with structured custom tool execution, so the graph now owns the tool contract (`tool`, `args`, `explanation`) instead of relying on raw bound-tool calls.
-- Added short operational tool explanations in the format "what I got, what I will do next," and stream them through trace events and the chat activity UI.
-- Routed generated Python execution through the active backend workspace kernel instead of the agent runtime process, so analysis code runs in the same environment that already bootstraps charting/runtime dependencies such as `plotly`.
-- Required business-specific figure variable names during code generation to avoid overwriting earlier chart objects in long-lived workspace kernel sessions.
-- Kept the chat composer available in both chat and code views, so follow-up questions no longer require tab switching.
-- Moved slash commands, dataset ingestion, schema reads, and artifact access onto the active workspace kernel to avoid competing DuckDB connections.
-- Improved recovery from workspace lock conflicts and kernel restarts during dataset uploads and table browsing.
-- Smoothed table browsing with cached dataframe pages, lighter pagination updates, and better compact-toolbar behavior on tablet widths.
-- Fixed several right-pane UX issues, including centered figure errors, cleaner export controls, and schema editor table selection from live workspace data.
+- Local-first desktop workflow for AI-assisted data analysis.
+- Real-time chat streaming with clearer final responses and tool-by-tool progress updates.
+- Unified workspace UI with collapsible navigation and dual resizable panes.
+- Persistent built-in terminal for workspace-focused development and debugging.
+- Workspace-kernel-backed execution so generated Python runs in the same environment used for schema reads, artifacts, and charts.
+- Better runtime reliability, including DuckDB lock recovery, artifact restoration, and safer chart naming in long-lived sessions.
+- Public documentation, pricing, and download site served from [docs.inquiraai.com](https://docs.inquiraai.com/).
 
-## Upcoming Changes
+## Current Focus
 
-*   **Supabase Auth**: Migrate to Supabase for robust authentication and align the auth page styling with the main UI.
-*   **Proxy Infrastructure**: Launch `inquira-infra` as a private gateway using a LiteLLM proxy for secure key management and token analytics.
-*   **Workspace Layout**: Allow independent toggling of the left and right panels, while retaining their dual-view capability.
-*   **Secure Execution**: Sandbox code execution at the OS or Tauri app level.
-*   **State Persistence**: Store generated workflows persistently by mapping one workspace to one Python script.
-*   **Multi-Table Querying**: Drop the single-dataset constraint so agents can seamlessly query across multiple data sources in a single workspace.
-*   **Performance Optimization**: Stream large images as base64 instead of interactive payloads when size crosses a threshold.
-*   **Artifact Caching**: Smooth out table navigation (e.g., jumping between df1 and df2) by caching offsets and limits across artifact switches.
-*   **Data Sources**: Add native support for loading DuckDB database files.
-*   **Grid Options**: Restore active functionality for AG Grid sorting and filtering.
+- Secure execution hardening at the OS or Tauri app level.
+- Better workspace layout control, including independent panel toggles and narrow-window behavior.
+- Multi-dataset and multi-table analysis flows inside a single workspace.
+- Stronger artifact and table behavior, especially sorting, filtering, and cross-artifact navigation.
+- Workspace-level persistence for generated code and analysis state.
+- First-class DuckDB file support.
 
 ## Quick Start
 
 ### End Users
 
-Desktop binaries (`.dmg`, `.exe`) are available on:
-[https://github.com/adarsh9780/inquira-ce/releases/latest](https://github.com/adarsh9780/inquira-ce/releases/latest)
+Start here:
+
+- Website and docs: [https://docs.inquiraai.com/](https://docs.inquiraai.com/)
+- Direct download page: [https://docs.inquiraai.com/download](https://docs.inquiraai.com/download)
+- Latest GitHub release: [https://github.com/adarsh9780/inquira-ce/releases/latest](https://github.com/adarsh9780/inquira-ce/releases/latest)
 
 ### Contributors (Run From Source)
 
