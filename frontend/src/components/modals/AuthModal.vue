@@ -1,182 +1,275 @@
 <template>
   <div
     v-if="isOpen"
-    class="fixed inset-0 z-50 overflow-y-auto bg-[#f6f2e8]"
+    class="fixed inset-0 z-50 overflow-y-auto bg-[var(--color-base)]"
   >
-    <div class="relative min-h-screen overflow-hidden px-6 py-10">
-      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.9),_rgba(246,242,232,0.98)_56%)]"></div>
-      <div class="absolute left-1/2 top-16 h-72 w-72 -translate-x-1/2 rounded-full bg-white/70 blur-3xl"></div>
+    <div class="relative min-h-screen overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.08),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(24,24,27,0.08),_transparent_34%)]"></div>
+      <div class="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(253,252,248,0))]"></div>
 
-      <div class="relative mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl flex-col">
-        <header class="pt-8 text-center">
-          <p class="font-serif text-5xl italic tracking-[-0.04em] text-stone-900">Inquira</p>
-          <p class="mt-2 font-serif text-lg italic text-stone-500">The Digital Curator</p>
-        </header>
-
-        <main class="flex flex-1 items-center justify-center py-10">
+      <div class="relative mx-auto flex min-h-[calc(100vh-3rem)] max-w-7xl flex-col">
+        <main class="flex flex-1 items-center justify-center">
           <Transition name="auth-shell" mode="out-in">
             <section
-              v-if="showProgressScreen"
-              key="progress"
-              class="w-full max-w-xl rounded-[2rem] border border-stone-200/80 bg-white/88 px-8 py-9 shadow-[0_30px_80px_rgba(120,113,108,0.16)] backdrop-blur"
+              :key="showProgressScreen ? 'progress' : 'signin'"
+              class="w-full overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-white/88 shadow-[0_28px_90px_rgba(24,24,27,0.1)] backdrop-blur-xl"
             >
-              <div class="space-y-3">
-                <p class="text-xs font-semibold uppercase tracking-[0.26em] text-stone-400">Inquira startup</p>
-                <h1 class="font-serif text-5xl tracking-[-0.04em] text-stone-900">
-                  {{ progressHeading }}
-                </h1>
-                <p class="max-w-lg text-lg leading-8 text-stone-600">
-                  {{ progressLead }}
-                </p>
-              </div>
+              <div class="grid min-h-[700px] lg:grid-cols-[1.12fr_0.88fr]">
+                <aside class="auth-brand-panel relative overflow-hidden border-b border-[var(--color-border)] px-6 py-8 sm:px-8 lg:border-b-0 lg:border-r lg:px-10 lg:py-10">
+                  <div class="auth-grid absolute inset-0 opacity-70"></div>
+                  <div class="auth-glow absolute -left-16 top-10 h-48 w-48 rounded-full"></div>
+                  <div class="auth-glow auth-glow-secondary absolute bottom-12 right-[-3rem] h-56 w-56 rounded-full"></div>
 
-              <div class="mt-8 rounded-[1.6rem] bg-[#f7f3ea] p-5">
-                <div class="flex items-center justify-between gap-4">
-                  <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">Current step</p>
-                    <p class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-stone-900">
-                      {{ progressTitle }}
-                    </p>
-                  </div>
-                  <div class="rounded-full bg-stone-900 px-4 py-2 text-sm font-semibold text-white">
-                    {{ progressPercent }}%
-                  </div>
-                </div>
+                  <div class="relative flex h-full flex-col">
+                    <div class="flex items-center gap-4">
+                      <div class="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/70 bg-white/90 shadow-[0_16px_32px_rgba(24,24,27,0.08)]">
+                        <svg
+                          viewBox="0 0 200 200"
+                          class="h-10 w-10"
+                          aria-hidden="true"
+                        >
+                          <defs>
+                            <linearGradient id="authLogoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                              <stop offset="0%" stop-color="#3B82F6" />
+                              <stop offset="100%" stop-color="#18181B" />
+                            </linearGradient>
+                            <filter id="authLogoGlow">
+                              <feGaussianBlur stdDeviation="2.4" result="coloredBlur" />
+                              <feMerge>
+                                <feMergeNode in="coloredBlur" />
+                                <feMergeNode in="SourceGraphic" />
+                              </feMerge>
+                            </filter>
+                          </defs>
 
-                <div class="mt-5 h-3 overflow-hidden rounded-full bg-stone-200">
-                  <div
-                    class="h-full rounded-full bg-[linear-gradient(90deg,#57534e,#1c1917)] transition-all duration-700 ease-out"
-                    :style="{ width: `${progressPercent}%` }"
-                  ></div>
-                </div>
+                          <rect x="18" y="18" width="164" height="164" rx="34" fill="#18181B" />
+                          <g transform="translate(100, 100)" filter="url(#authLogoGlow)">
+                            <circle r="20" fill="url(#authLogoGradient)" />
 
-                <div class="mt-5 rounded-[1.25rem] bg-white px-4 py-4 shadow-sm">
-                  <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-stone-400">Live status</p>
-                  <p
-                    :key="authStore.authFlowStage"
-                    class="auth-status-type mt-3 min-h-[1.75rem] text-sm text-stone-700"
-                    :style="{ '--type-width': `${statusWidthCh}ch` }"
-                  >
-                    {{ progressDescription }}
-                  </p>
-                </div>
-              </div>
+                            <g>
+                              <circle cx="58" cy="0" r="9" fill="#3B82F6" opacity="0.9">
+                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="10s" repeatCount="indefinite" />
+                              </circle>
+                              <line x1="20" y1="0" x2="48" y2="0" stroke="url(#authLogoGradient)" stroke-width="4">
+                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="10s" repeatCount="indefinite" />
+                              </line>
+                            </g>
 
-              <div class="mt-8 grid gap-3 sm:grid-cols-3">
-                <div
-                  v-for="item in progressTimeline"
-                  :key="item.title"
-                  :class="[
-                    'rounded-[1.25rem] border px-4 py-4 transition-all duration-300',
-                    item.active
-                      ? 'border-stone-900 bg-stone-900 text-white'
-                      : item.done
-                        ? 'border-stone-300 bg-stone-100 text-stone-700'
-                        : 'border-stone-200 bg-white text-stone-400',
-                  ]"
-                >
-                  <p class="text-sm font-semibold">{{ item.title }}</p>
-                  <p class="mt-2 text-xs leading-5 opacity-80">{{ item.caption }}</p>
-                </div>
-              </div>
-            </section>
+                            <g transform="rotate(120)">
+                              <circle cx="58" cy="0" r="9" fill="#71717A" opacity="0.9">
+                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="15s" repeatCount="indefinite" />
+                              </circle>
+                              <line x1="20" y1="0" x2="48" y2="0" stroke="url(#authLogoGradient)" stroke-width="4">
+                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="15s" repeatCount="indefinite" />
+                              </line>
+                            </g>
 
-            <section
-              v-else
-              key="signin"
-              class="w-full max-w-xl rounded-[2rem] border border-stone-200/80 bg-white/90 px-8 py-9 shadow-[0_30px_80px_rgba(120,113,108,0.16)] backdrop-blur"
-            >
-              <div class="space-y-3">
-                <h1 class="font-serif text-5xl tracking-[-0.04em] text-stone-900">Sign in</h1>
-                <p class="max-w-lg text-lg leading-8 text-stone-600">
-                  Welcome back. Sign in with Google to access your workspace.
-                </p>
-                <div class="min-h-[2rem] pt-2">
-                  <p
-                    :key="featureIndex"
-                    class="auth-feature-type font-serif text-xl italic text-stone-500"
-                    :style="{ '--type-width': `${featureWidthCh}ch` }"
-                  >
-                    {{ activeFeatureLine }}
-                  </p>
-                </div>
-              </div>
-
-              <div v-if="displayMessage" class="mt-6 rounded-[1.25rem] border border-red-200 bg-red-50 px-4 py-4 text-red-800 shadow-sm">
-                <div class="flex items-start gap-3">
-                  <ExclamationTriangleIcon class="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
-                  <div>
-                    <p class="text-sm font-semibold">Sign-in could not be completed</p>
-                    <p class="mt-1 text-sm leading-6">{{ displayMessage }}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="mt-8 space-y-4">
-                <button
-                  @click="handleProviderSignIn('google')"
-                  :disabled="authStore.isLoading"
-                  class="flex w-full items-center justify-between rounded-[1.15rem] bg-[#666362] px-5 py-4 text-left text-white transition-all duration-200 hover:bg-[#55514f] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <div class="flex items-center gap-4">
-                    <div class="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg font-semibold text-[#4285F4]">
-                      G
-                    </div>
-                    <div>
-                      <p class="text-lg font-semibold">Continue</p>
-                      <p class="text-sm text-stone-200">Sign in with Google</p>
-                    </div>
-                  </div>
-                  <span class="text-2xl leading-none">→</span>
-                </button>
-
-                <div class="flex items-center gap-4 py-1">
-                  <div class="h-px flex-1 bg-stone-200"></div>
-                  <span class="text-xs font-semibold uppercase tracking-[0.22em] text-stone-400">Or</span>
-                  <div class="h-px flex-1 bg-stone-200"></div>
-                </div>
-
-                <div class="grid gap-3 sm:grid-cols-2">
-                  <button
-                    v-for="provider in comingSoonProviders"
-                    :key="provider.id"
-                    disabled
-                    class="flex items-center justify-between rounded-[1.15rem] border border-stone-200 bg-[#f4f0e6] px-4 py-4 text-left text-stone-500 disabled:cursor-not-allowed"
-                  >
-                    <div class="flex items-center gap-3">
-                      <div class="flex h-9 w-9 items-center justify-center rounded-full bg-white text-xs font-semibold text-stone-500">
-                        {{ provider.badge }}
+                            <g transform="rotate(240)">
+                              <circle cx="58" cy="0" r="9" fill="#FDFCF8" opacity="0.95">
+                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="12s" repeatCount="indefinite" />
+                              </circle>
+                              <line x1="20" y1="0" x2="48" y2="0" stroke="url(#authLogoGradient)" stroke-width="4">
+                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="12s" repeatCount="indefinite" />
+                              </line>
+                            </g>
+                          </g>
+                        </svg>
                       </div>
+
                       <div>
-                        <p class="text-sm font-semibold text-stone-700">{{ provider.short }}</p>
-                        <p class="text-xs text-stone-400">Coming soon</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Inquira</p>
+                        <p class="mt-1 text-sm text-[var(--color-text-muted)]">Desktop analytics workspace</p>
                       </div>
                     </div>
-                    <span class="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">Soon</span>
-                  </button>
+
+                    <div class="mt-10 max-w-xl">
+                      <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--color-text-muted)]">
+                        {{ showProgressScreen ? 'Secure handoff' : 'Your data, one workspace' }}
+                      </p>
+                      <h1 class="mt-4 text-4xl font-semibold tracking-[-0.05em] text-[var(--color-text-main)] sm:text-5xl lg:text-[3.6rem] lg:leading-[1.02]">
+                        {{ showProgressScreen ? progressHeading : 'Think clearly, analyze faster.' }}
+                      </h1>
+                      <p class="mt-5 max-w-lg text-base leading-7 text-[var(--color-text-muted)] sm:text-lg sm:leading-8">
+                        {{ showProgressScreen ? progressLead : 'Inquira keeps chat, code, tables, and charts aligned in one calm, desktop-first workflow.' }}
+                      </p>
+                    </div>
+
+                    <div class="mt-8 rounded-[1.5rem] border border-white/70 bg-white/75 p-5 shadow-[0_20px_45px_rgba(24,24,27,0.08)]">
+                      <div class="flex items-center justify-between gap-4">
+                        <div>
+                          <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-text-muted)]">Why teams use it</p>
+                          <p
+                            v-if="!showProgressScreen"
+                            :key="featureIndex"
+                            class="auth-feature-type mt-3 min-h-[1.75rem] text-base text-[var(--color-text-main)] sm:text-lg"
+                            :style="{ '--type-width': `${featureWidthCh}ch` }"
+                          >
+                            {{ activeFeatureLine }}
+                          </p>
+                          <p
+                            v-else
+                            :key="authStore.authFlowStage"
+                            class="auth-status-type mt-3 min-h-[1.75rem] text-base text-[var(--color-text-main)] sm:text-lg"
+                            :style="{ '--type-width': `${statusWidthCh}ch` }"
+                          >
+                            {{ progressDescription }}
+                          </p>
+                        </div>
+                        <div class="hidden h-12 w-12 items-center justify-center rounded-full border border-[var(--color-border)] bg-white text-sm font-semibold text-[var(--color-text-main)] sm:flex">
+                          {{ showProgressScreen ? `${progressPercent}%` : 'CE' }}
+                        </div>
+                      </div>
+                    </div>
+
+                    <ul class="mt-8 grid gap-3 text-sm sm:grid-cols-3 lg:mt-auto lg:grid-cols-1 xl:grid-cols-3">
+                      <li
+                        v-for="bullet in brandBullets"
+                        :key="bullet.title"
+                        class="rounded-[1.35rem] border border-white/75 bg-white/72 px-4 py-4 shadow-[0_14px_30px_rgba(24,24,27,0.06)]"
+                      >
+                        <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ bullet.title }}</p>
+                        <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">{{ bullet.body }}</p>
+                      </li>
+                    </ul>
+                  </div>
+                </aside>
+
+                <div class="flex items-center px-6 py-8 sm:px-8 lg:px-10 lg:py-10">
+                  <div v-if="showProgressScreen" class="w-full">
+                    <div class="mx-auto max-w-lg rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[0_18px_48px_rgba(24,24,27,0.08)] sm:p-8">
+                      <p class="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Inquira startup</p>
+                      <h2 class="mt-4 text-3xl tracking-[-0.04em] text-[var(--color-text-main)] sm:text-4xl">
+                        {{ progressTitle || 'Preparing your workspace' }}
+                      </h2>
+                      <p class="mt-4 text-base leading-7 text-[var(--color-text-muted)]">
+                        {{ progressDescription }}
+                      </p>
+
+                      <div class="mt-8">
+                        <div class="flex items-center justify-between text-sm">
+                          <span class="font-medium text-[var(--color-text-main)]">Session progress</span>
+                          <span class="font-semibold text-[var(--color-text-main)]">{{ progressPercent }}%</span>
+                        </div>
+                        <div class="mt-3 h-3 overflow-hidden rounded-full bg-zinc-200">
+                          <div
+                            class="h-full rounded-full bg-[linear-gradient(90deg,#18181B,#3B82F6)] transition-all duration-700 ease-out"
+                            :style="{ width: `${progressPercent}%` }"
+                          ></div>
+                        </div>
+                      </div>
+
+                      <div class="mt-8 grid gap-3">
+                        <div
+                          v-for="item in progressTimeline"
+                          :key="item.title"
+                          :class="[
+                            'rounded-[1.2rem] border px-4 py-4 transition-all duration-300',
+                            item.active
+                              ? 'border-zinc-900 bg-zinc-900 text-white'
+                              : item.done
+                                ? 'border-zinc-200 bg-zinc-100 text-zinc-700'
+                                : 'border-zinc-200 bg-white text-zinc-400',
+                          ]"
+                        >
+                          <div class="flex items-start justify-between gap-3">
+                            <div>
+                              <p class="text-sm font-semibold">{{ item.title }}</p>
+                              <p class="mt-1 text-sm leading-6 opacity-80">{{ item.caption }}</p>
+                            </div>
+                            <span class="mt-0.5 text-xs font-semibold uppercase tracking-[0.18em] opacity-75">
+                              {{ item.active ? 'Now' : item.done ? 'Done' : 'Next' }}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-else class="w-full">
+                    <div class="mx-auto max-w-lg">
+                      <div class="rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[0_18px_48px_rgba(24,24,27,0.08)] sm:p-8">
+                        <p class="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Sign in to continue</p>
+                        <h2 class="mt-4 text-3xl tracking-[-0.04em] text-[var(--color-text-main)] sm:text-4xl">Welcome back</h2>
+                        <p class="mt-4 text-base leading-7 text-[var(--color-text-muted)]">
+                          Welcome back. Sign in with Google to access your workspace. Microsoft and GitHub login are planned next.
+                        </p>
+
+                        <div v-if="displayMessage" class="mt-6 rounded-[1.25rem] border border-red-200 bg-red-50 px-4 py-4 text-red-800 shadow-sm">
+                          <div class="flex items-start gap-3">
+                            <ExclamationTriangleIcon class="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+                            <div>
+                              <p class="text-sm font-semibold text-red-800">Sign-in could not be completed</p>
+                              <p class="mt-1 text-sm leading-6 text-red-700">{{ displayMessage }}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="mt-8 space-y-4">
+                          <button
+                            @click="handleProviderSignIn('google')"
+                            :disabled="authStore.isLoading"
+                            class="group flex w-full items-center justify-between rounded-[1.25rem] border border-zinc-900 bg-zinc-900 px-5 py-4 text-left text-white transition-all duration-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <div class="flex items-center gap-4">
+                              <div class="flex h-12 w-12 items-center justify-center rounded-full bg-white text-base font-semibold text-[#4285F4]">
+                                G
+                              </div>
+                              <div>
+                                <p class="text-base font-semibold text-white">Login with Google</p>
+                                <p class="text-sm text-zinc-300">Sign in with Google</p>
+                              </div>
+                            </div>
+                            <span class="text-2xl leading-none transition-transform duration-200 group-hover:translate-x-1">→</span>
+                          </button>
+
+                          <div class="flex items-center gap-4 py-1">
+                            <div class="h-px flex-1 bg-[var(--color-border)]"></div>
+                            <span class="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-text-muted)]">Coming soon</span>
+                            <div class="h-px flex-1 bg-[var(--color-border)]"></div>
+                          </div>
+
+                          <div class="grid gap-3">
+                            <button
+                              v-for="provider in comingSoonProviders"
+                              :key="provider.id"
+                              disabled
+                              class="flex w-full items-center justify-between rounded-[1.25rem] border border-zinc-200 bg-[var(--color-base)] px-4 py-4 text-left text-zinc-500 transition-colors disabled:cursor-not-allowed disabled:opacity-100"
+                            >
+                              <div class="flex items-center gap-4">
+                                <div class="flex h-11 w-11 items-center justify-center rounded-full border border-white bg-white text-sm font-semibold text-[var(--color-text-main)] shadow-sm">
+                                  {{ provider.badge }}
+                                </div>
+                                <div>
+                                  <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ provider.label }}</p>
+                                  <p class="text-sm text-[var(--color-text-muted)]">Coming soon</p>
+                                </div>
+                              </div>
+                              <span class="rounded-full border border-zinc-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
+                                Disabled
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="mt-5 flex flex-col items-center justify-between gap-3 text-sm text-[var(--color-text-muted)] sm:flex-row">
+                        <a
+                          href="/terms-and-conditions.html"
+                          @click.prevent="openTermsAndConditions"
+                          class="transition-colors hover:text-[var(--color-text-main)]"
+                        >
+                          Terms of Service
+                        </a>
+                        <p class="text-center text-sm text-[var(--color-text-muted)]">Private desktop workspace for modern data analysis.</p>
+                        <p class="text-sm text-[var(--color-text-muted)]">© 2026 Inquira</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>
           </Transition>
         </main>
-
-        <footer class="pb-3 pt-6 text-center text-sm text-stone-400">
-          <div class="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <p class="font-serif text-2xl italic text-stone-500">Inquira</p>
-            <div class="flex flex-wrap items-center justify-center gap-6 uppercase tracking-[0.18em]">
-              <a
-                href="/terms-and-conditions.html"
-                @click.prevent="openTermsAndConditions"
-                class="transition-colors hover:text-stone-700"
-              >
-                Terms of Service
-              </a>
-              <span>Privacy Policy</span>
-              <span>Help Center</span>
-            </div>
-            <p>© 2026 Inquira</p>
-          </div>
-        </footer>
       </div>
     </div>
   </div>
@@ -202,15 +295,30 @@ const featureIndex = ref(0)
 let featureTimer = null
 
 const featureLines = [
-  'Talk to your data in natural language.',
-  'Run notebook-style analysis in one workspace.',
-  'Switch between chat, code, tables, and charts.',
-  'Keep desktop sessions warm between launches.',
+  'Run notebook-style analysis without leaving the conversation.',
+  'Keep datasets, tables, figures, and code in one workspace.',
+  'Switch from quick questions to deep analysis without context loss.',
+  'Stay desktop-native with local sessions that reconnect cleanly.',
+]
+
+const brandBullets = [
+  {
+    title: 'Ask and inspect',
+    body: 'Move from natural language questions into code, tables, and charts without changing tools.',
+  },
+  {
+    title: 'Stay grounded',
+    body: 'The interface keeps the same calm palette and structure you already use in the main app.',
+  },
+  {
+    title: 'Reconnect fast',
+    body: 'Saved sessions restore directly into your workspace instead of making you start over.',
+  },
 ]
 
 const comingSoonProviders = [
-  { id: 'azure', short: 'Microsoft', badge: 'MS' },
-  { id: 'github', short: 'GitHub', badge: 'GH' },
+  { id: 'microsoft', short: 'Microsoft', label: 'Login with Microsoft', badge: 'MS' },
+  { id: 'github', short: 'GitHub', label: 'Login with GitHub', badge: 'GH' },
 ]
 
 const progressConfig = computed(() => {
@@ -249,21 +357,21 @@ const progressTitle = computed(() => progressConfig.value.title)
 const progressDescription = computed(() => progressConfig.value.description)
 const displayMessage = computed(() => authStore.error || '')
 const activeFeatureLine = computed(() => featureLines[featureIndex.value] || '')
-const featureWidthCh = computed(() => Math.max(28, Math.min(72, activeFeatureLine.value.length + 2)))
+const featureWidthCh = computed(() => Math.max(34, Math.min(80, activeFeatureLine.value.length + 2)))
 const statusWidthCh = computed(() => Math.max(28, Math.min(80, progressDescription.value.length + 2)))
 
 const progressHeading = computed(() => {
   if (authStore.authFlowStage === 'restoring_session') {
     return 'Welcome back'
   }
-  return 'Almost there'
+  return 'Secure sign-in in progress'
 })
 
 const progressLead = computed(() => {
   if (authStore.authFlowStage === 'restoring_session') {
-    return 'Inquira found a saved session and is reconnecting your workspace.'
+    return 'Inquira found a saved session and is reconnecting your workspace without making you repeat sign-in.'
   }
-  return 'The browser step is complete. Inquira is finishing the secure handoff inside the app.'
+  return 'The browser step is complete. Inquira is validating the secure handoff and preparing the app for your workspace.'
 })
 
 const progressTimeline = computed(() => {
@@ -345,6 +453,30 @@ watch(
 </script>
 
 <style scoped>
+.auth-brand-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(253, 252, 248, 0.86)),
+    linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(24, 24, 27, 0.05));
+}
+
+.auth-grid {
+  background-image:
+    linear-gradient(rgba(228, 228, 231, 0.7) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(228, 228, 231, 0.7) 1px, transparent 1px);
+  background-position: center;
+  background-size: 34px 34px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), transparent 92%);
+}
+
+.auth-glow {
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.18), rgba(59, 130, 246, 0));
+  filter: blur(10px);
+}
+
+.auth-glow-secondary {
+  background: radial-gradient(circle, rgba(24, 24, 27, 0.12), rgba(24, 24, 27, 0));
+}
+
 .auth-shell-enter-active,
 .auth-shell-leave-active {
   transition: opacity 260ms ease, transform 260ms ease;
@@ -361,10 +493,20 @@ watch(
   width: 0;
   overflow: hidden;
   white-space: nowrap;
-  border-right: 2px solid rgba(87, 83, 78, 0.7);
+  border-right: 2px solid rgba(39, 39, 42, 0.45);
   animation:
     auth-type 1.4s steps(28, end) forwards,
     auth-caret 0.9s step-end infinite;
+}
+
+@media (max-width: 640px) {
+  .auth-feature-type,
+  .auth-status-type {
+    white-space: normal;
+    width: 100%;
+    border-right: 0;
+    animation: none;
+  }
 }
 
 @keyframes auth-type {

@@ -17,7 +17,12 @@ test('auth screen renders a dedicated progress experience for reconnect and logi
   assert.equal(source.includes('Loading your account'), true)
   assert.equal(source.includes('auth-status-type'), true)
   assert.equal(source.includes('auth-feature-type'), true)
-  assert.equal(source.includes('Sign in with Google'), true)
+  assert.equal(source.includes('Login with Google'), true)
+  assert.equal(source.includes('Login with Microsoft'), true)
+  assert.equal(source.includes('Login with GitHub'), true)
+  assert.equal(source.includes('Coming soon'), true)
+  assert.equal(source.includes('Think clearly, analyze faster.'), true)
+  assert.equal(source.includes('animateTransform'), true)
 })
 
 test('auth store tracks stepwise login progress and waits for backend readiness', () => {
