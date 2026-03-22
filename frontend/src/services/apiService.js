@@ -35,6 +35,10 @@ function getDefaultApiBase() {
 
 const resolvedEnvBase = (import.meta.env.VITE_API_BASE || '').trim()
 let apiBaseUrl = resolvedEnvBase || getDefaultApiBase()
+let resolveApiBaseReady = () => {}
+const apiBaseReadyPromise = new Promise((resolve) => {
+  resolveApiBaseReady = resolve
+})
 
 function normalizeApiBase(rawBase) {
   return String(rawBase || '').trim().replace(/\/+$/, '')
@@ -48,6 +52,7 @@ function setResolvedApiBase(rawBase) {
   if (typeof window !== 'undefined') {
     window.__INQUIRA_API_BASE__ = normalized
   }
+  resolveApiBaseReady(normalized)
 }
 
 function initializeTauriApiBase() {
@@ -133,6 +138,49 @@ axios.defaults.withCredentials = true
 axios.defaults.headers.common['Content-Type'] = 'application/json'
 initializeTauriApiBase()
 
+async function waitForApiBaseReady(timeoutMs = 5000) {
+  if (window?.__INQUIRA_API_BASE__) {
+    return window.__INQUIRA_API_BASE__
+  }
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('API base resolution timed out.'))
+    }, timeoutMs)
+
+    apiBaseReadyPromise
+      .then((value) => {
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((error) => {
+        clearTimeout(timer)
+        reject(error)
+      })
+  })
+}
+
+async function waitForBackendReady(timeoutMs = 30000) {
+  const baseUrl = await waitForApiBaseReady()
+  const startedAt = Date.now()
+
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const response = await fetch(`${String(baseUrl || '').replace(/\/+$/, '')}/health`, {
+        method: 'GET',
+      })
+      if (response.ok) {
+        return true
+      }
+    } catch (_error) {
+      // Keep polling while the backend is starting up.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400))
+  }
+
+  throw new Error('Backend did not become ready in time.')
+}
+
 // Request interceptor
 axios.interceptors.request.use(
   async (config) => {
@@ -193,6 +241,8 @@ axios.interceptors.response.use(
 const client = getInquira()
 
 export const apiService = {
+  waitForApiBaseReady,
+  waitForBackendReady,
   async logout() {
     return client.logoutUserAuthLogoutPost()
   },

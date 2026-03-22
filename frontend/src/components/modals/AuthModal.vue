@@ -47,6 +47,20 @@
             </div>
           </div>
 
+          <div v-if="showProgressPanel" class="mb-5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-sm font-medium text-blue-900">{{ progressTitle }}</p>
+              <span class="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">{{ progressPercent }}%</span>
+            </div>
+            <div class="mt-3 h-2 overflow-hidden rounded-full bg-blue-100">
+              <div
+                class="h-full rounded-full bg-blue-600 transition-all duration-500"
+                :style="{ width: `${progressPercent}%` }"
+              ></div>
+            </div>
+            <p class="mt-3 text-xs text-blue-800">{{ progressDescription }}</p>
+          </div>
+
           <div class="space-y-3">
             <button
               @click="handleProviderSignIn('google')"
@@ -158,12 +172,48 @@ const messageType = ref('')
 const isEmailValid = computed(() => /\S+@\S+\.\S+/.test(String(email.value || '').trim()))
 
 const displayMessage = computed(() => {
-  return message.value || authStore.error
+  return authStore.error || message.value
 })
 
 const isErrorMessage = computed(() => {
   return !!(authStore.error || (message.value && messageType.value === 'error'))
 })
+
+const progressConfig = computed(() => {
+  const stage = String(authStore.authFlowStage || '').trim()
+  const fallback = authStore.authFlowMessage || ''
+
+  switch (stage) {
+    case 'browser_opening':
+      return { percent: 15, title: 'Opening browser', description: fallback }
+    case 'browser_wait':
+      return { percent: 25, title: 'Waiting for browser sign-in', description: fallback }
+    case 'browser_complete':
+      return { percent: 45, title: 'Browser step completed', description: fallback }
+    case 'exchanging_code':
+      return { percent: 60, title: 'Exchanging sign-in code', description: fallback }
+    case 'session_ready':
+      return { percent: 72, title: 'Session received', description: fallback }
+    case 'verifying_session':
+      return { percent: 84, title: 'Verifying session', description: fallback }
+    case 'loading_account':
+      return { percent: 94, title: 'Loading your account', description: fallback }
+    case 'magic_link_sending':
+      return { percent: 20, title: 'Sending magic link', description: fallback }
+    case 'magic_link_sent':
+      return { percent: 35, title: 'Magic link sent', description: fallback }
+    default:
+      return { percent: 0, title: '', description: '' }
+  }
+})
+
+const showProgressPanel = computed(() => {
+  return !!progressConfig.value.title && !isErrorMessage.value
+})
+
+const progressPercent = computed(() => progressConfig.value.percent)
+const progressTitle = computed(() => progressConfig.value.title)
+const progressDescription = computed(() => progressConfig.value.description)
 
 function clearMessage() {
   message.value = ''
@@ -188,7 +238,7 @@ async function handleProviderSignIn(provider) {
   clearMessage()
   const success = await authStore.signInWithProvider(provider)
   if (success) {
-    showMessage('Browser opened. Finish sign-in there and Inquira will continue automatically.', 'success')
+    showMessage('', '')
   }
 }
 
@@ -197,7 +247,7 @@ async function handleMagicLink() {
   clearMessage()
   const success = await authStore.sendMagicLink(email.value.trim())
   if (success) {
-    showMessage('Magic link sent. Open it in your browser to finish sign-in.', 'success')
+    showMessage('', '')
   }
 }
 

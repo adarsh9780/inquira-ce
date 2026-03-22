@@ -14,8 +14,11 @@ export const useAuthStore = defineStore('auth', () => {
   const error = ref('')
   const plan = ref('FREE')
   const pendingAuthAction = ref('')
+  const authFlowStage = ref('')
+  const authFlowMessage = ref('')
   let authProbeRevision = 0
   let authSubscription = null
+  let authProgressListenerBound = false
 
   const username = computed(() => user.value?.username || '')
   const userId = computed(() => user.value?.user_id || '')
@@ -48,7 +51,18 @@ export const useAuthStore = defineStore('auth', () => {
     plan.value = 'FREE'
   }
 
+  function setAuthFlow(stage, message = '') {
+    authFlowStage.value = String(stage || '').trim()
+    authFlowMessage.value = String(message || '').trim()
+  }
+
+  function clearAuthFlow() {
+    authFlowStage.value = ''
+    authFlowMessage.value = ''
+  }
+
   async function hydrateUserFromBackend(accessToken = '') {
+    await apiService.waitForBackendReady(AUTH_PROBE_TIMEOUT_MS)
     const token = String(accessToken || '').trim()
     const requestConfig = token
       ? {
@@ -100,21 +114,49 @@ export const useAuthStore = defineStore('auth', () => {
         clearLocalState()
         error.value = ''
         pendingAuthAction.value = ''
+        clearAuthFlow()
         return
       }
 
       try {
+        setAuthFlow('verifying_session', 'Browser sign-in finished. Verifying your session with Inquira...')
         await hydrateUserFromBackendWithRetry(accessToken)
         error.value = ''
+        setAuthFlow('loading_account', 'Session verified. Loading your account...')
       } catch (err) {
         console.error('❌ Failed to hydrate Supabase session from backend:', err)
         clearLocalState()
         error.value = 'Authentication succeeded, but the local backend could not verify the session.'
+        setAuthFlow('failed', 'Browser sign-in finished, but Inquira could not verify your session yet.')
       } finally {
         pendingAuthAction.value = ''
       }
     })
     authSubscription = data?.subscription || null
+  }
+
+  function ensureDesktopAuthProgressListener() {
+    if (authProgressListenerBound || typeof window === 'undefined') return
+    window.addEventListener('inquira:auth-progress', (event) => {
+      const stage = String(event?.detail?.stage || '').trim()
+      const message = String(event?.detail?.message || '').trim()
+      if (stage === 'browser_complete') {
+        setAuthFlow('browser_complete', 'Browser sign-in finished. Completing sign-in in the app...')
+        return
+      }
+      if (stage === 'exchanging_code') {
+        setAuthFlow('exchanging_code', 'Received browser callback. Exchanging your sign-in code...')
+        return
+      }
+      if (stage === 'session_ready') {
+        setAuthFlow('session_ready', 'Sign-in code accepted. Waiting for Inquira backend...')
+        return
+      }
+      if (stage === 'exchange_failed') {
+        setAuthFlow('failed', message || 'Inquira could not finish the sign-in exchange.')
+      }
+    })
+    authProgressListenerBound = true
   }
 
   async function refreshPlan() {
@@ -136,6 +178,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function checkAuth() {
     ensureAuthSubscription()
+    ensureDesktopAuthProgressListener()
     const probeRevision = ++authProbeRevision
     error.value = ''
 
@@ -161,11 +204,13 @@ export const useAuthStore = defineStore('auth', () => {
   async function signInWithProvider(provider) {
     if (isLoading.value) return false
     ensureAuthSubscription()
+    ensureDesktopAuthProgressListener()
 
     authProbeRevision += 1
     isLoading.value = true
     error.value = ''
     pendingAuthAction.value = String(provider || '').trim()
+    setAuthFlow('browser_opening', 'Opening your browser for sign-in...')
 
     try {
       await withTimeout(
@@ -173,6 +218,7 @@ export const useAuthStore = defineStore('auth', () => {
         AUTH_ACTION_TIMEOUT_MS,
         'Provider sign-in request timed out.',
       )
+      setAuthFlow('browser_wait', 'Browser opened. Finish sign-in there and return to Inquira.')
       return true
     } catch (err) {
       console.error('❌ Provider sign-in failed:', err)
@@ -182,6 +228,7 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = err?.message || 'Sign-in failed. Please try again.'
       }
       pendingAuthAction.value = ''
+      setAuthFlow('failed', error.value)
       return false
     } finally {
       isLoading.value = false
@@ -196,6 +243,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading.value = true
     error.value = ''
     pendingAuthAction.value = 'magic_link'
+    setAuthFlow('magic_link_sending', 'Sending your magic link...')
 
     try {
       await withTimeout(
@@ -203,6 +251,7 @@ export const useAuthStore = defineStore('auth', () => {
         AUTH_ACTION_TIMEOUT_MS,
         'Magic link request timed out.',
       )
+      setAuthFlow('magic_link_sent', 'Magic link sent. Open it in your browser to finish sign-in.')
       return true
     } catch (err) {
       console.error('❌ Magic link request failed:', err)
@@ -212,6 +261,7 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = err?.message || 'Failed to send magic link. Please try again.'
       }
       pendingAuthAction.value = ''
+      setAuthFlow('failed', error.value)
       return false
     } finally {
       isLoading.value = false
@@ -236,6 +286,7 @@ export const useAuthStore = defineStore('auth', () => {
       clearLocalState()
       error.value = ''
       pendingAuthAction.value = ''
+      clearAuthFlow()
     } catch (err) {
       console.error('❌ Logout failed:', err)
       if (settingsWebSocket.isPersistentMode) {
@@ -243,6 +294,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
       clearLocalState()
       pendingAuthAction.value = ''
+      clearAuthFlow()
     } finally {
       isLoading.value = false
     }
@@ -261,6 +313,8 @@ export const useAuthStore = defineStore('auth', () => {
     error,
     plan,
     pendingAuthAction,
+    authFlowStage,
+    authFlowMessage,
     username,
     userId,
     planLabel,

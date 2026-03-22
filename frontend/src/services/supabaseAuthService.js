@@ -74,6 +74,18 @@ function normalizeManageAccountUrl() {
   return MANAGE_ACCOUNT_URL || SITE_URL || FALLBACK_SITE_URL
 }
 
+function emitDesktopAuthProgress(stage, detail = {}) {
+  if (!isBrowser || typeof window.dispatchEvent !== 'function') return
+  window.dispatchEvent(
+    new CustomEvent('inquira:auth-progress', {
+      detail: {
+        stage,
+        ...detail,
+      },
+    }),
+  )
+}
+
 async function ensureLoopbackListener() {
   const runtime = getAuthRuntime()
   if (!isTauriDesktop || runtime.callbackListenerPromise) return runtime.callbackListenerPromise
@@ -94,6 +106,7 @@ async function ensureLoopbackListener() {
         console.error('❌ Supabase auth callback did not include an authorization code.')
         return
       }
+      emitDesktopAuthProgress('browser_complete')
       if (runtime.pendingCodes.has(code) || runtime.handledCodes.has(code)) {
         return
       }
@@ -101,12 +114,17 @@ async function ensureLoopbackListener() {
       const sb = getClient()
       if (!sb) return
       try {
+        emitDesktopAuthProgress('exchanging_code')
         const { error } = await sb.auth.exchangeCodeForSession(code)
         if (error) {
+          emitDesktopAuthProgress('exchange_failed', {
+            message: String(error?.message || 'Sign-in code exchange failed.'),
+          })
           console.error('❌ Failed to exchange Supabase auth code for session:', error)
           return
         }
         runtime.handledCodes.add(code)
+        emitDesktopAuthProgress('session_ready')
         const { data: sessionData, error: sessionError } = await sb.auth.getSession()
         if (sessionError) {
           console.error('❌ Supabase session fetch failed after auth code exchange:', sessionError)
