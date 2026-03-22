@@ -406,7 +406,7 @@ export const useAppStore = defineStore('app', () => {
         active_dataset_path: dataFilePath.value || '',
         active_table_name: ingestedTableName.value || ''
       })
-      applyPreferencesResponse(response)
+      applyPreferencesResponse(response, { preserveLocalSchemaContext: true })
     } catch (_error) {
       // Best-effort sync. Keep UI responsive even if backend is unavailable.
     }
@@ -1796,7 +1796,8 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  function applyPreferencesResponse(prefs) {
+  function applyPreferencesResponse(prefs, options = {}) {
+    const preserveLocalSchemaContext = options?.preserveLocalSchemaContext === true
     if (typeof prefs?.llm_provider === 'string' && prefs.llm_provider.trim()) {
       llmProvider.value = prefs.llm_provider.trim().toLowerCase()
     }
@@ -1843,7 +1844,9 @@ export const useAppStore = defineStore('app', () => {
     if (!availableModels.value.includes(selectedCodingModel.value)) {
       selectedCodingModel.value = selectedModel.value
     }
-    if (typeof prefs?.schema_context === 'string') schemaContext.value = prefs.schema_context
+    if (!preserveLocalSchemaContext && typeof prefs?.schema_context === 'string') {
+      schemaContext.value = prefs.schema_context
+    }
     if (typeof prefs?.allow_schema_sample_values === 'boolean') {
       allowSchemaSampleValues.value = prefs.allow_schema_sample_values
     }

@@ -140,8 +140,10 @@
         </label>
         <textarea
           id="schema-context"
-          :value="appStore.schemaContext"
+          v-model="schemaContextDraft"
           @input="handleSchemaContextChange"
+          @focus="handleSchemaContextFocus"
+          @blur="handleSchemaContextBlur"
           :disabled="isProcessing"
           placeholder="Describe your data domain to help generate better schema descriptions (e.g., 'This dataset contains customer information for an e-commerce platform including purchase history, demographics, and behavioral data')"
           class="input-base w-full resize-none disabled:opacity-50 disabled:cursor-not-allowed"
@@ -280,6 +282,8 @@ const isRestoringFile = ref(false)
 const ingestedColumns = ref([])  // columns from DuckDB-WASM ingestion
 const ingestedTableName = ref('') // DuckDB table name
 const fileInputRef = ref(null)   // ref for the <input type="file">
+const schemaContextDraft = ref('')
+const isEditingSchemaContext = ref(false)
 
 // Computed
 const hasApiKey = computed(() => appStore.apiKeyConfigured)
@@ -495,8 +499,20 @@ function handleDataFilePathChange(event) {
 }
 
 function handleSchemaContextChange(event) {
-  appStore.setSchemaContext(event.target.value)
+  schemaContextDraft.value = event.target.value
+  appStore.setSchemaContext(schemaContextDraft.value)
   clearMessage()
+}
+
+function handleSchemaContextFocus() {
+  isEditingSchemaContext.value = true
+}
+
+function handleSchemaContextBlur() {
+  isEditingSchemaContext.value = false
+  if (schemaContextDraft.value !== appStore.schemaContext) {
+    schemaContextDraft.value = String(appStore.schemaContext || '')
+  }
 }
 
 // WebSocket progress handler
@@ -543,7 +559,7 @@ function buildSchemaColumnsFromIngestedColumns() {
 async function generateAndSaveSchema() {
   const workspaceId = appStore.activeWorkspaceId
   const tableName = (ingestedTableName.value || appStore.ingestedTableName || '').trim()
-  const schemaContext = appStore.schemaContext.trim() || ''
+  const schemaContext = schemaContextDraft.value.trim() || ''
   const isBrowserDataset = String(appStore.dataFilePath || '').toLowerCase().startsWith('browser://')
 
   if (!workspaceId || !tableName) {
@@ -640,7 +656,7 @@ async function saveDataSettings() {
   showProgress('Saving context...', 20)
 
   try {
-    await apiService.setContext(appStore.schemaContext.trim())
+    await apiService.setContext(schemaContextDraft.value.trim())
     await generateAndSaveSchema()
 
     updateProgress('Data settings saved!', 100)
@@ -697,6 +713,15 @@ watch(isProcessing, (newVal) => {
   }
 })
 
+watch(
+  () => appStore.schemaContext,
+  (nextValue) => {
+    if (isEditingSchemaContext.value) return
+    schemaContextDraft.value = String(nextValue || '')
+  },
+  { immediate: true }
+)
+
 // Run update check and auto-detect DuckDB tables when the Data tab mounts
 onMounted(async () => {
   checkForUpdate()
@@ -706,6 +731,7 @@ onMounted(async () => {
     ingestedTableName.value = appStore.ingestedTableName
     ingestedColumns.value = appStore.ingestedColumns || []
   }
+  schemaContextDraft.value = String(appStore.schemaContext || '')
 
   // Auto-fetch columns if missing but path exists (common on reload)
   if (appStore.dataFilePath && ingestedColumns.value.length === 0) {
