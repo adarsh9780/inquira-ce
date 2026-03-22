@@ -20,12 +20,14 @@ test('api service exposes v1 regenerate schema endpoint for workspace datasets',
   assert.equal(source.includes('/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema/regenerate'), true)
 })
 
-test('schema editor auto-regenerates on dataset switch/load failures with progress modal flow', () => {
+test('schema editor waits for manual regeneration when a dataset switch finds no schema yet', () => {
   const schemaEditorPath = resolve(process.cwd(), 'src/components/preview/SchemaEditorTab.vue')
   const source = readFileSync(schemaEditorPath, 'utf-8')
 
-  assert.equal(source.includes('return await regenerateSchemaForPath('), true)
-  assert.equal(source.includes('allowWhileLoading: true'), true)
+  assert.equal(source.includes('Schema has no columns yet. Click Regenerate to create descriptions manually.'), true)
+  assert.equal(source.includes('Schema is not available yet. Click Regenerate to create it manually.'), true)
+  assert.equal(source.includes('return await regenerateSchemaForPath('), false)
+  assert.equal(source.includes('allowWhileLoading: true'), false)
   assert.equal(source.includes('loadError?.status === 422 || loadError?.response?.status === 422'), true)
   assert.equal(source.includes('const newTableName = event?.detail?.tableName'), true)
   assert.equal(source.includes('apiService.v1RegenerateDatasetSchema('), true)

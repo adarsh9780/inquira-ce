@@ -295,16 +295,29 @@ function extractWorkspaceTableNames(columns) {
 
 function buildSchemaDatasetEntries(catalogItems, workspaceColumns) {
   const runtimeTables = extractWorkspaceTableNames(workspaceColumns)
-  if (runtimeTables.length === 0) return []
-
   const catalogByTable = new Map(
     normalizeDatasetEntries(catalogItems).map((item) => [item.tableName.toLowerCase(), item])
   )
+  const mergedEntries = []
+  const seen = new Set()
 
-  return runtimeTables.map((tableName) => {
+  runtimeTables.forEach((tableName) => {
     const catalogEntry = catalogByTable.get(tableName.toLowerCase())
-    return catalogEntry || { tableName, sourcePath: '' }
+    const resolved = catalogEntry || { tableName, sourcePath: '' }
+    const key = resolved.tableName.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    mergedEntries.push(resolved)
   })
+
+  normalizeDatasetEntries(catalogItems).forEach((item) => {
+    const key = item.tableName.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    mergedEntries.push(item)
+  })
+
+  return mergedEntries
 }
 
 function normalizeAliasList(value) {
@@ -441,36 +454,15 @@ async function fetchSchemaDataForPath(dataPath, tableNameOverride = null) {
       schema.value = normalizeSchemaColumns(existingSchema.columns)
       schemaContext.value = existingSchema.context || ''
       schemaEdited.value = false
-      if (schemaNeedsDescriptions.value && appStore.apiKeyConfigured) {
-        return await regenerateSchemaForPath(
-          dataPath,
-          tableName || appStore.ingestedTableName || null,
-          { allowWhileLoading: true }
-        )
-      }
       return true
     } else {
-      if (tableName && appStore.apiKeyConfigured) {
-        return await regenerateSchemaForPath(
-          dataPath,
-          tableName || appStore.ingestedTableName || null,
-          { allowWhileLoading: true }
-        )
-      } else if (appStore.ingestedTableName) {
-        return await regenerateSchemaForPath(
-          dataPath,
-          appStore.ingestedTableName || null,
-          { allowWhileLoading: true }
-        )
-      } else {
-        schemaError.value = 'Schema has no columns. Set API key and click Regenerate.'
-        return false
-      }
+      schemaError.value = 'Schema has no columns yet. Click Regenerate to create descriptions manually.'
+      return false
     }
   } catch (loadError) {
-    if ((loadError?.status === 422 || loadError?.response?.status === 422) && appStore.apiKeyConfigured) {
-      const tableName = (tableNameOverride || selectedDatasetTable.value || appStore.ingestedTableName || null)
-      return await regenerateSchemaForPath(dataPath, tableName, { allowWhileLoading: true })
+    if (loadError?.status === 422 || loadError?.response?.status === 422) {
+      schemaError.value = 'Schema is not available yet. Click Regenerate to create it manually.'
+      return false
     }
     schemaError.value = `Failed to load schema: ${loadError?.message || 'Unknown error'}`
     return false
