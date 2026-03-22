@@ -37,6 +37,26 @@ test('ApiTab supports provider model refresh from backend', () => {
   assert.equal(source.includes('syncProviderCatalog(appStore.llmProvider)'), true)
 })
 
+test('ApiTab requires saving the API key before provider model refresh', () => {
+  const path = resolve(process.cwd(), 'src/components/modals/ApiTab.vue')
+  const source = readFileSync(path, 'utf-8')
+
+  assert.equal(source.indexOf('API Key ({{ appStore.llmProvider }})') < source.indexOf('Provider'), true)
+  assert.equal(source.includes('Save Key'), true)
+  assert.equal(source.includes('saveProviderApiKey'), true)
+  assert.equal(source.includes('Save your API key to secure storage'), true)
+  assert.equal(source.includes('Save your ${appStore.llmProvider} API key first to refresh models.'), true)
+  assert.equal(source.includes(':disabled="isRefreshModelsDisabled"'), true)
+})
+
+test('ApiTab explains that models come from built-in defaults before refresh', () => {
+  const path = resolve(process.cwd(), 'src/components/modals/ApiTab.vue')
+  const source = readFileSync(path, 'utf-8')
+
+  assert.equal(source.includes('The models shown below are built-in defaults.'), true)
+  assert.equal(source.includes('Save your API key first, then refresh to load models for this provider.'), true)
+})
+
 test('ApiTab shows OpenRouter account-level guidance and settings link', () => {
   const path = resolve(process.cwd(), 'src/components/modals/ApiTab.vue')
   const source = readFileSync(path, 'utf-8')

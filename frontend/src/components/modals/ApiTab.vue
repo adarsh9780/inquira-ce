@@ -13,24 +13,104 @@
     </div>
 
     <div class="space-y-6">
+      <!-- API Key Input -->
+      <div v-if="requiresApiKey">
+        <label for="api-key-input" class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
+          API Key ({{ appStore.llmProvider }})
+        </label>
+        <div class="max-w-md">
+          <div class="relative">
+            <input
+              id="api-key-input"
+              :type="showApiKey ? 'text' : 'password'"
+              :value="appStore.apiKey"
+              @input="handleApiKeyChange"
+              :placeholder="`Enter your ${appStore.llmProvider} API key`"
+              class="input-base pr-10"
+            />
+            <button
+              @click="showApiKey = !showApiKey"
+              class="absolute inset-y-0 right-0 pr-3 flex items-center"
+              type="button"
+            >
+              <EyeIcon v-if="!showApiKey" class="w-4 h-4 text-gray-400 hover:text-gray-600" />
+              <EyeSlashIcon v-else class="w-4 h-4 text-gray-400 hover:text-gray-600" />
+            </button>
+          </div>
+          <div class="mt-2 flex items-center justify-between gap-3">
+            <p class="text-xs" style="color: var(--color-text-muted);">
+              Your API key is stored in your OS keychain.
+              <a
+                :href="providerKeyUrl"
+                @click.prevent="openLink(providerKeyUrl)"
+                target="_blank"
+                rel="noopener"
+                class="hover:underline ml-1"
+                style="color: var(--color-accent);"
+              >
+                Get a {{ appStore.llmProvider }} API key
+              </a>
+            </p>
+            <div class="flex items-center gap-2">
+              <button
+                @click="saveProviderApiKey"
+                :disabled="isSavingApiKey || !appStore.apiKey.trim()"
+                class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-secondary"
+                title="Save your API key to secure storage"
+                type="button"
+              >
+                <span v-if="!isSavingApiKey">Save Key</span>
+                <span v-else class="inline-flex items-center">
+                  <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-700 mr-2"></div>
+                  Saving...
+                </span>
+              </button>
+              <button
+                @click="testApiKey"
+                :disabled="isTestingApiKey || !appStore.apiKey.trim() || !appStore.selectedModel"
+                class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-secondary"
+                title="Test your API key with the configured provider"
+                type="button"
+              >
+                <span v-if="!isTestingApiKey">Test</span>
+                <span v-else class="inline-flex items-center">
+                  <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-700 mr-2"></div>
+                  Testing...
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p v-else class="text-xs text-green-700">
+        Ollama does not require an API key.
+      </p>
+
+      <p v-if="requiresApiKey && appStore.selectedProviderApiKeyPresent" class="text-xs text-green-700">
+        A key for {{ appStore.llmProvider }} is already configured in secure storage.
+      </p>
+
       <div>
         <div class="max-w-md mb-2 flex items-center justify-between gap-2">
           <label class="block text-sm font-medium" style="color: var(--color-text-main);">
             Provider
           </label>
-          <button
-            @click="refreshProviderModels"
-            :disabled="isRefreshingModels || isSaving"
-            class="px-2.5 py-1 text-xs rounded-md border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            style="border-color: var(--color-border); color: var(--color-text-main); background-color: var(--color-surface);"
-            type="button"
-          >
-            <span v-if="!isRefreshingModels">Refresh Models</span>
-            <span v-else class="inline-flex items-center">
-              <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-700 mr-2"></div>
-              Refreshing...
-            </span>
-          </button>
+          <div :title="refreshModelsTooltip">
+            <button
+              @click="refreshProviderModels"
+              :disabled="isRefreshModelsDisabled"
+              class="px-2.5 py-1 text-xs rounded-md border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style="border-color: var(--color-border); color: var(--color-text-main); background-color: var(--color-surface);"
+              type="button"
+            >
+              <span v-if="!isRefreshingModels">Refresh Models</span>
+              <span v-else class="inline-flex items-center">
+                <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-700 mr-2"></div>
+                Refreshing...
+              </span>
+            </button>
+          </div>
         </div>
         <HeaderDropdown
           :model-value="appStore.llmProvider"
@@ -39,6 +119,14 @@
           placeholder="Select provider"
           max-width-class="max-w-md w-full"
         />
+      </div>
+
+      <div
+        v-if="requiresApiKey && !hasSavedProviderApiKey"
+        class="max-w-md rounded-md border p-3 text-xs"
+        style="border-color: var(--color-border); background-color: var(--color-surface-subtle, #f7f7f7); color: var(--color-text-muted);"
+      >
+        The models shown below are built-in defaults. Save your API key first, then refresh to load models for this provider.
       </div>
 
       <div
@@ -109,77 +197,16 @@
         />
       </div>
 
-      <!-- API Key Input -->
-      <div v-if="requiresApiKey">
-        <label for="api-key-input" class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
-          API Key ({{ appStore.llmProvider }})
-        </label>
-        <div class="relative max-w-md">
-          <input
-            id="api-key-input"
-            :type="showApiKey ? 'text' : 'password'"
-            :value="appStore.apiKey"
-            @input="handleApiKeyChange"
-            :placeholder="`Enter your ${appStore.llmProvider} API key`"
-            class="input-base pr-10"
-          />
-          <button
-            @click="showApiKey = !showApiKey"
-            class="absolute inset-y-0 right-0 pr-3 flex items-center"
-            type="button"
-          >
-            <EyeIcon v-if="!showApiKey" class="w-4 h-4 text-gray-400 hover:text-gray-600" />
-            <EyeSlashIcon v-else class="w-4 h-4 text-gray-400 hover:text-gray-600" />
-          </button>
-        </div>
-        <div class="mt-2 flex items-center justify-between">
-          <p class="text-xs" style="color: var(--color-text-muted);">
-            Your API key is stored in your OS keychain.
-            <a
-              :href="providerKeyUrl"
-              @click.prevent="openLink(providerKeyUrl)"
-              target="_blank"
-              rel="noopener"
-              class="hover:underline ml-1"
-              style="color: var(--color-accent);"
-            >
-              Get a {{ appStore.llmProvider }} API key
-            </a>
-          </p>
-          <button
-            @click="testApiKey"
-            :disabled="isTestingApiKey || !appStore.apiKey.trim() || !appStore.selectedModel"
-            class="ml-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-secondary"
-            title="Test your API key with the configured provider"
-            type="button"
-          >
-            <span v-if="!isTestingApiKey">Test</span>
-            <span v-else class="inline-flex items-center">
-              <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-700 mr-2"></div>
-              Testing...
-            </span>
-          </button>
-        </div>
-      </div>
-
-      <p v-else class="text-xs text-green-700">
-        Ollama does not require an API key.
-      </p>
-
-      <p v-if="requiresApiKey && appStore.selectedProviderApiKeyPresent" class="text-xs text-green-700">
-        A key for {{ appStore.llmProvider }} is already configured in secure storage.
-      </p>
-
     </div>
 
     <!-- Save Button -->
     <div class="mt-8 pt-4 border-t" style="border-color: var(--color-border);">
       <button
         @click="saveApiSettings"
-        :disabled="isSaving"
+        :disabled="isSavingSettings || isSavingApiKey"
         class="w-full px-4 py-2 btn-primary"
       >
-        <span v-if="isSaving" class="inline-flex items-center">
+        <span v-if="isSavingSettings" class="inline-flex items-center">
           <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
           Saving...
         </span>
@@ -208,7 +235,8 @@ const appStore = useAppStore()
 const showApiKey = ref(false)
 const isTestingApiKey = ref(false)
 const isRefreshingModels = ref(false)
-const isSaving = ref(false)
+const isSavingApiKey = ref(false)
+const isSavingSettings = ref(false)
 const message = ref('')
 const messageType = ref('') // 'success' | 'error'
 
@@ -223,10 +251,20 @@ const messageTypeClass = computed(() => {
     : 'bg-red-50 border border-red-200 text-red-800'
 })
 const requiresApiKey = computed(() => !!appStore.providerRequiresApiKey)
+const hasSavedProviderApiKey = computed(() => !requiresApiKey.value || !!appStore.selectedProviderApiKeyPresent)
 const providerCatalog = computed(() => appStore.providerModelCatalogs?.[appStore.llmProvider] || {})
 const openrouterNeedsAccountModels = computed(() => (
   appStore.llmProvider === 'openrouter' && providerCatalog.value?.account_models_configured === false
 ))
+const isRefreshModelsDisabled = computed(() => (
+  isRefreshingModels.value || isSavingApiKey.value || isSavingSettings.value || !hasSavedProviderApiKey.value
+))
+const refreshModelsTooltip = computed(() => {
+  if (isRefreshModelsDisabled.value && requiresApiKey.value && !hasSavedProviderApiKey.value) {
+    return `Save your ${appStore.llmProvider} API key first to refresh models.`
+  }
+  return 'Refresh models from the configured provider'
+})
 const openrouterAccountModelsUrl = computed(() => (
   String(providerCatalog.value?.account_models_url || 'https://openrouter.ai/settings').trim()
 ))
@@ -332,6 +370,7 @@ function extractErrorMessage(error, fallback = 'Request failed. Please try again
 }
 
 async function refreshProviderModels() {
+  if (isRefreshModelsDisabled.value) return
   isRefreshingModels.value = true
   clearMessage()
 
@@ -379,16 +418,39 @@ async function testApiKey() {
   }
 }
 
-async function saveApiSettings() {
-  const apiKey = appStore.apiKey.trim()
+async function saveProviderApiKey() {
+  const key = appStore.apiKey.trim()
+  if (!key) {
+    message.value = 'Please enter your API key first.'
+    messageType.value = 'error'
+    return
+  }
 
+  isSavingApiKey.value = true
+  clearMessage()
+
+  try {
+    await apiService.setApiKeySettings(key, appStore.llmProvider)
+    await appStore.loadUserPreferences()
+    message.value = `API key saved for ${appStore.llmProvider}. You can refresh models now.`
+    messageType.value = 'success'
+  } catch (error) {
+    console.error('❌ Failed to save provider API key:', error)
+    message.value = extractErrorMessage(error, 'Failed to save API key.')
+    messageType.value = 'error'
+  } finally {
+    isSavingApiKey.value = false
+  }
+}
+
+async function saveApiSettings() {
   if (!appStore.availableModels.length) {
     message.value = 'Select at least one main model.'
     messageType.value = 'error'
     return
   }
 
-  isSaving.value = true
+  isSavingSettings.value = true
   clearMessage()
 
   try {
@@ -404,18 +466,6 @@ async function saveApiSettings() {
     if (typeof appStore.applyPreferencesResponse === 'function') {
       appStore.applyPreferencesResponse(response)
     }
-
-    if (requiresApiKey.value) {
-      if (!apiKey) {
-        message.value = `API key is required for ${appStore.llmProvider}.`
-        messageType.value = 'error'
-        return
-      }
-      await testApiKey()
-      if (messageType.value !== 'success') return
-      await apiService.setApiKeySettings(apiKey, appStore.llmProvider)
-      appStore.setApiKeyConfigured(true)
-    }
     await appStore.loadUserPreferences()
     message.value = 'Provider and model settings saved.'
     messageType.value = 'success'
@@ -424,7 +474,7 @@ async function saveApiSettings() {
     message.value = extractErrorMessage(error, 'Failed to save model settings. Please try again.')
     messageType.value = 'error'
   } finally {
-    isSaving.value = false
+    isSavingSettings.value = false
   }
 }
 
