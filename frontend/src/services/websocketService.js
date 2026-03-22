@@ -92,6 +92,7 @@ class SettingsWebSocket {
     this.reconnectInterval = 5000 // 5 seconds
     this.lastConnectionAttempt = null
     this.kernelStatusWorkspaceId = ''
+    this.lastKernelStatusSubscriptionWorkspaceId = ''
   }
 
   connect(userId) {
@@ -137,6 +138,7 @@ class SettingsWebSocket {
 
       this.socket.onclose = (event) => {
         this.isConnected = false
+        this.lastKernelStatusSubscriptionWorkspaceId = ''
         this.notifyConnectionListeners(false)
         this.handleReconnect()
       }
@@ -144,6 +146,7 @@ class SettingsWebSocket {
       this.socket.onerror = (error) => {
         console.error('❌ Settings WebSocket error:', error)
         this.isConnected = false
+        this.lastKernelStatusSubscriptionWorkspaceId = ''
         this.notifyConnectionListeners(false)
         reject(error)
       }
@@ -348,15 +351,23 @@ class SettingsWebSocket {
 
   setKernelStatusWorkspace(workspaceId) {
     this.kernelStatusWorkspaceId = String(workspaceId || '').trim()
+    if (!this.kernelStatusWorkspaceId) {
+      this.lastKernelStatusSubscriptionWorkspaceId = ''
+      return
+    }
     this.sendKernelStatusSubscription()
   }
 
   sendKernelStatusSubscription() {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+    const workspaceId = String(this.kernelStatusWorkspaceId || '').trim()
+    if (!workspaceId) return
+    if (workspaceId === this.lastKernelStatusSubscriptionWorkspaceId) return
     this.socket.send(JSON.stringify({
       type: 'subscribe_kernel_status',
-      workspace_id: this.kernelStatusWorkspaceId,
+      workspace_id: workspaceId,
     }))
+    this.lastKernelStatusSubscriptionWorkspaceId = workspaceId
   }
 
   onProgress(callback) {
@@ -419,6 +430,7 @@ class SettingsWebSocket {
       this.socket.close()
       this.socket = null
       this.isConnected = false
+      this.lastKernelStatusSubscriptionWorkspaceId = ''
       this.notifyConnectionListeners(false)
     }
 

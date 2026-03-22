@@ -133,6 +133,7 @@ export const useAppStore = defineStore('app', () => {
   let suppressPreferenceSync = false
   let kernelEnsureWorkspaceId = ''
   let kernelEnsurePromise = null
+  const ensuredKernelWorkspaceIds = new Set()
   const LOCAL_SNAPSHOT_VERSION = 1
   const MAX_TERMINAL_ENTRIES = 50
   const MAX_TERMINAL_STREAM_CHARS = 200000
@@ -496,6 +497,9 @@ export const useAppStore = defineStore('app', () => {
 
   function resetForAuthBoundary() {
     clearPendingSyncTimers()
+    kernelEnsureWorkspaceId = ''
+    kernelEnsurePromise = null
+    ensuredKernelWorkspaceIds.clear()
     clearInMemoryUserState()
   }
 
@@ -1000,6 +1004,18 @@ export const useAppStore = defineStore('app', () => {
     if (!targetWorkspaceId) return false
     if (!workspaces.value.some((ws) => ws.id === targetWorkspaceId)) return false
 
+    try {
+      const paths = await apiService.v1GetWorkspacePaths(targetWorkspaceId)
+      setTerminalEnabled(Boolean(paths?.terminal_enabled))
+    } catch (_error) {
+      setTerminalEnabled(false)
+    }
+
+    if (ensuredKernelWorkspaceIds.has(targetWorkspaceId)) {
+      setRuntimeError('')
+      return true
+    }
+
     if (kernelEnsurePromise && kernelEnsureWorkspaceId === targetWorkspaceId) {
       return kernelEnsurePromise
     }
@@ -1007,19 +1023,20 @@ export const useAppStore = defineStore('app', () => {
     kernelEnsureWorkspaceId = targetWorkspaceId
     kernelEnsurePromise = (async () => {
       try {
-        const paths = await apiService.v1GetWorkspacePaths(targetWorkspaceId)
-        setTerminalEnabled(Boolean(paths?.terminal_enabled))
         const bootstrapped = await apiService.v1BootstrapWorkspaceRuntime(targetWorkspaceId)
         if (bootstrapped?.reset === true) {
+          ensuredKernelWorkspaceIds.add(targetWorkspaceId)
           setRuntimeError('')
         }
         return bootstrapped?.reset === true
       } catch (error) {
+        ensuredKernelWorkspaceIds.delete(targetWorkspaceId)
         const message = error?.response?.data?.detail || error?.message || 'Workspace runtime bootstrap failed.'
         setRuntimeError(String(message))
         setTerminalEnabled(false)
         return false
       } finally {
+        kernelEnsureWorkspaceId = ''
         kernelEnsurePromise = null
       }
     })()

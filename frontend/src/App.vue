@@ -169,7 +169,6 @@ async function handleAuthenticated(userData) {
   // Load v1 workspace/chat state
   try {
     appBootstrap.message = 'Loading your account...'
-    await authStore.refreshPlan()
     await appStore.loadUserPreferences()
     appBootstrap.message = 'Selecting your workspace...'
     await appStore.fetchWorkspaces()
