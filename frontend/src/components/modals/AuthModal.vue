@@ -308,7 +308,7 @@ function stopFeatureRotation() {
 }
 
 function openTermsAndConditions() {
-  void openExternalUrl('https://github.com/adarsh9780/inquira-ce/blob/main/frontend/public/terms-and-conditions.html')
+  void openExternalUrl('https://docs.inquiraai.com/terms-of-service')
 }
 
 async function handleProviderSignIn(provider) {

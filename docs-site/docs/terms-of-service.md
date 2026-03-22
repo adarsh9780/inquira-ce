@@ -1,8 +1,8 @@
 # Terms of Service
 
-Last Updated: 2026-03-22
+Last Updated: 2026-03-23
 
-These Terms of Service explain what Inquira is, the risks involved in using it, and the rules that apply when you use the product.
+These Terms describe what Inquira is, what it does not promise, and the risks you accept when using it.
 
 By using Inquira, you agree to these Terms. If you do not agree, do not use the product.
 
@@ -10,49 +10,56 @@ By using Inquira, you agree to these Terms. If you do not agree, do not use the 
 
 Inquira is a desktop-first data analysis product that helps users generate and run Python and DuckDB workflows, with optional AI-assisted features.
 
+The public website currently provides documentation and downloads. It is not, by itself, a full hosted account portal.
+
 ## 2. Product Nature
 
-Inquira is a developer and analyst tool. It may generate code, run code, and produce outputs that are incomplete, incorrect, unsafe, or unsuitable for a user's use case.
+Inquira is a tool for developers, analysts, and technical users.
+
+It may:
+
+- generate code
+- run code locally
+- produce incomplete or incorrect output
+- rely on third-party AI providers chosen by the user
 
 ## 3. Main Risks
 
 By using Inquira, you understand and accept that:
 
 - generated code may be wrong
-- generated code may modify or delete local files
-- outputs may contain factual or analytical mistakes
+- generated code may read, modify, move, or delete local files
+- commands and code may access network resources if your environment allows it
+- outputs may contain factual, technical, or analytical mistakes
 - AI provider responses may be unreliable
-- running code with local permissions carries security and operational risk
 
-You are responsible for reviewing generated code and maintaining backups of your own data.
+You are responsible for reviewing generated code and maintaining your own backups.
 
 ## 4. Local Data And Execution
 
-Inquira is designed to work primarily with local data.
+Inquira is designed to run primarily on the user's machine.
 
 The product may store local application data such as:
 
 - configuration
 - workspace state
 - generated schemas
-- caches
 - runtime artifacts
+- cached session or UI state
 
-Execution happens on the user's machine unless a feature explicitly states otherwise.
+Execution happens locally unless the user explicitly enables a third-party service that processes part of the workflow.
 
-## 5. Accounts And Authentication
+## 5. Authentication
 
-Access to some product features may require an account.
+Some product flows may require sign-in.
 
-Authentication may be provided through third-party identity providers such as Google, Microsoft, GitHub, and Supabase.
-
-Users are responsible for maintaining the security of their own accounts and sign-in methods.
+Today, authenticated desktop flows use Supabase-backed bearer auth, and the shipped sign-in UI is centered around Google login. Other providers may be added later, but they should not be treated as current guarantees unless they are enabled in the product.
 
 ## 6. AI Providers And Third-Party Services
 
 If you enable AI-assisted features, you are responsible for:
 
-- deciding which provider to use
+- choosing which provider to use
 - reviewing that provider's terms and privacy policies
 - deciding whether your data is appropriate to send to that provider
 
@@ -65,13 +72,19 @@ You agree not to use Inquira:
 - for unlawful activity
 - to violate privacy, confidentiality, or intellectual property rights
 - to intentionally generate malicious code or abuse third-party services
-- to interfere with the service or infrastructure supporting the product
+- to interfere with service or infrastructure supporting the product
 
-## 8. No Warranty
+## 8. License Scope
+
+Use of Inquira remains subject to the repository license and any separate commercial licensing terms that may apply.
+
+These Terms do not grant rights beyond the applicable software license.
+
+## 9. No Warranty
 
 INQUIRA IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED.
 
-## 9. Limitation Of Liability
+## 10. Limitation Of Liability
 
 TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE AUTHORS, OPERATORS, AND CONTRIBUTORS OF INQUIRA ARE NOT LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR SIMILAR DAMAGES ARISING FROM USE OF THE PRODUCT.
 
@@ -83,18 +96,18 @@ This includes, without limitation:
 - incorrect model output
 - code execution side effects
 
-## 10. Changes To The Product
+## 11. Changes To The Product
 
-Features may be added, changed, limited, or removed at any time, including account, AI, support, and download functionality.
+Features may be added, changed, limited, or removed at any time, including authentication behavior, website flows, download behavior, and AI integrations.
 
-## 11. Changes To These Terms
+## 12. Changes To These Terms
 
 These Terms may be updated from time to time. Continued use of the product after updates means you accept the revised Terms.
 
-## 12. Governing Law
+## 13. Governing Law
 
 No specific governing law or jurisdiction is designated in this version of the Terms.
 
-## 13. Contact
+## 14. Contact
 
 For product or legal questions, use the project repository support channels or the official contact method published by the project.

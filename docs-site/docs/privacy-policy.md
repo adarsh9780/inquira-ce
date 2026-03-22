@@ -1,125 +1,150 @@
 # Privacy Policy
 
-Last Updated: 2026-03-22
+Last Updated: 2026-03-23
 
-This Privacy Policy explains what information Inquira collects, where it is stored, and how it is used.
+This Privacy Policy describes what Inquira processes today, where it is stored, and which parts depend on optional third-party services.
 
 ## 1. Scope
 
 This policy applies to:
 
-- the Inquira Community Edition desktop application
-- the public documentation site for Inquira
-- future account and support flows associated with Inquira
+- the Inquira desktop application
+- the public documentation and download site at `docs.inquiraai.com`
+- optional third-party services that the user explicitly enables through the product
 
-## 2. What Inquira Does
+This policy does not describe future billing, subscription, or hosted account systems that are not currently shipped.
 
-Inquira is a desktop-first data analysis product. It helps users analyze local data with Python, DuckDB, and optional AI-assisted workflows.
+## 2. What Inquira Does Today
 
-The product is designed to keep user datasets local unless the user explicitly enables features that interact with a third-party provider.
+Inquira is a desktop-first data analysis product.
 
-## 3. Information We May Collect
+Today it can:
 
-Depending on the feature being used, Inquira may process the following categories of information:
+- help users analyze data locally with Python and DuckDB
+- call third-party AI providers when the user enables those features
+- use Supabase-backed authentication for desktop flows that require sign-in
+- publish public docs and downloads through GitHub Pages and GitHub Releases
 
-- account identifiers such as email address and authentication provider user ID
-- subscription or plan information
-- support-related communications voluntarily sent by the user
-- product configuration such as selected providers and local preferences
-- local runtime metadata required for the desktop application to function
+## 3. Information Processed Today
 
-## 4. Data Stored Locally On The User's Device
+Depending on the feature in use, Inquira may process:
 
-The desktop application stores operational data locally on the user's device, which may include:
+- Supabase-backed account identifiers such as user ID, email, or display information returned by the auth provider
+- local product state such as workspaces, conversations, schemas, and runtime artifacts
+- selected LLM provider settings and API key presence state
+- prompts, schema context, and execution context sent to the user's chosen AI provider
+- standard website request information handled by GitHub Pages or GitHub Releases when the public docs/download site is visited
 
-- local configuration files
+Inquira does not currently operate its own hosted billing or subscription portal from the public docs site.
+
+## 4. Data Stored On The User's Device
+
+The desktop app stores operational data locally on the user's device. This may include:
+
+- local app configuration and runtime files
 - workspace metadata
-- generated schemas and runtime artifacts
-- local caches
-- selected provider settings
-- session information required to keep the user signed in on the device
+- conversation and artifact state
+- generated schemas and scratch outputs
+- cached UI/runtime state
+- persisted Supabase session storage used by the desktop app
 
-User datasets selected inside the application are intended to remain on the user's machine by default.
+Typical local data locations may include:
 
-## 5. Authentication Data
+- `~/.inquira/`
+- the app's Tauri application-data directory
+- per-workspace or per-user runtime folders created by the product
 
-Inquira uses third-party authentication infrastructure for account sign-in.
+## 5. Secrets And Credentials
 
-Depending on the chosen sign-in method, authentication-related information may include:
+Inquira treats different secrets differently:
 
-- email address
-- provider account identifier
-- provider metadata such as name or avatar where made available
-- session tokens necessary to keep the desktop app signed in
+- LLM API keys are stored through the host OS keychain when supported by the app's secure-storage path
+- Supabase session persistence is currently stored through the app's local desktop storage layer, not the OS keychain
 
-Authentication is handled through Supabase and upstream identity providers such as Google, Microsoft, or GitHub. Those providers process authentication data under their own terms and privacy policies.
+If these storage details change in a future release, this policy should be updated accordingly.
 
-## 6. AI Provider Data
+## 6. Authentication Data
 
-If the user enables AI-assisted features, Inquira may send limited context to the selected AI provider, such as:
+When sign-in is enabled and used:
 
-- the user's prompt
+- the current desktop flow uses Supabase-backed authentication
+- the current sign-in UI is centered around Google login
+- the backend verifies bearer tokens against Supabase before granting access to authenticated API routes
+
+The public docs/download site does not currently act as a hosted user account portal.
+
+## 7. AI Provider Data
+
+If the user enables AI-assisted features, Inquira may send the following to the selected provider:
+
+- the user's prompt or question
 - schema metadata
-- derived execution context needed to answer the request
+- execution context needed to generate or explain analysis
+- limited result data or summaries when required for follow-up explanation
 
-Inquira is not intended to upload full source datasets by default, but users are responsible for reviewing what they send through AI-assisted workflows.
+Inquira is not intended to upload full selected datasets by default, but users remain responsible for reviewing what they send to any third-party AI provider.
 
-## 7. Public Website And Documentation Site
+## 8. Public Docs And Download Site
 
-The public docs and website may process standard web request information made available by hosting providers, such as:
+The public website is currently documentation-and-download focused.
 
-- IP address
-- browser and device metadata
-- request logs
-- basic page analytics if enabled in the future
+Today that means:
 
-At the time of writing, this documentation site is hosted through GitHub Pages.
+- docs are served through GitHub Pages
+- the download experience may call the GitHub Releases API from the browser to resolve the latest installer assets
+- GitHub and other infrastructure providers may receive standard web request information such as IP address, browser metadata, and request logs
 
-## 8. How Information Is Used
+Inquira does not currently claim that the public docs site is analytics-free at the hosting-provider level, because basic hosting logs may still exist outside the app itself.
 
-Inquira may use information for the following purposes:
+## 9. Optional Observability
 
-- authentication and account access
-- keeping the desktop app signed in
-- providing support and account assistance
-- enforcing product security and abuse prevention
-- operating subscriptions, plans, or future billing features
-- improving product reliability
+The codebase includes optional Phoenix tracing configuration.
 
-## 9. Data Sharing
+That tracing is disabled by default in the checked-in configuration. If a user or operator explicitly enables it, runtime trace data may be sent to the configured tracing endpoint.
 
-Inquira does not sell user data.
+## 10. How Information Is Used
 
-Information may be shared only as needed with service providers used to operate the product, such as:
+Information may be used to:
 
-- authentication providers
-- AI model providers chosen by the user
-- hosting or support infrastructure used to run future account and support services
+- authenticate desktop users where sign-in is required
+- restore local desktop sessions
+- operate local workspaces and runtime features
+- call user-selected AI providers
+- deliver public docs and downloads
+- debug or support the product where the user has explicitly enabled or requested that behavior
 
-## 10. Retention
+## 11. Data Sharing
 
-Local desktop data is retained on the user's device until the user deletes it or removes the product's local storage.
+Inquira does not claim to sell user data.
 
-Account and support records may be retained for legitimate operational, security, legal, or billing reasons where applicable.
+Information may be disclosed to third parties only as required to operate the features the user chooses to use, such as:
 
-## 11. Security
+- Supabase for authentication
+- Google or another selected AI provider
+- GitHub Pages and GitHub Releases for the public docs/download site
+- an explicitly configured observability endpoint if tracing is enabled
 
-Reasonable measures are taken to protect account and service data, but no system can guarantee absolute security.
+## 12. Retention
+
+Local desktop data remains on the user's device until the user deletes it or removes the product's local storage.
+
+Retention behavior for third-party services depends on those providers and the user's configuration with them.
+
+## 13. Security
+
+Reasonable care can be taken in the product design, but no system is perfectly secure.
 
 Users remain responsible for:
 
-- protecting their devices
+- protecting their own devices
 - protecting local files and backups
+- choosing whether to enable third-party providers
 - reviewing generated code before execution
 
-## 12. Children's Privacy
+## 14. Changes To This Policy
 
-Inquira is not intended for use by children under the age required by applicable law to consent to these services.
+This policy may be updated as the product changes. The `Last Updated` date reflects the latest revision.
 
-## 13. Changes To This Policy
-
-This Privacy Policy may be updated from time to time. The `Last Updated` date will reflect the latest version.
-
-## 14. Contact
+## 15. Contact
 
 For privacy or product questions, use the project repository support channels or the official contact method published by the project.
