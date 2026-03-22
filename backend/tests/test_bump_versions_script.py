@@ -56,6 +56,29 @@ def test_normalize_version_input_accepts_tag_style():
     assert mod.normalize_version_input("0.5.0a6") == "0.5.0a6"
 
 
+def test_build_desktop_asset_payload_uses_tauri_release_filenames():
+    mod = _load_module()
+
+    payload = mod.build_desktop_asset_payload(
+        base_version="0.5.7a10",
+        tauri_version="0.5.7-alpha.10",
+    )
+
+    assert payload == {
+        "tag": "v0.5.7a10",
+        "macos_asset_name": "Inquira_0.5.7-alpha.10_aarch64.dmg",
+        "windows_asset_name": "Inquira_0.5.7-alpha.10_x64-setup.exe",
+        "macos_url": (
+            "https://github.com/adarsh9780/inquira-ce/releases/download/"
+            "v0.5.7a10/Inquira_0.5.7-alpha.10_aarch64.dmg"
+        ),
+        "windows_url": (
+            "https://github.com/adarsh9780/inquira-ce/releases/download/"
+            "v0.5.7a10/Inquira_0.5.7-alpha.10_x64-setup.exe"
+        ),
+    }
+
+
 def test_update_release_metadata_writes_versioned_json(
     monkeypatch, tmp_path: Path
 ):
@@ -112,6 +135,49 @@ def test_run_updates_reports_release_metadata_json_when_refreshed(
     release_source = tmp_path / "release_metadata.md"
     release_source.write_text("# Release v0.5.7a9\n\n- Notes\n", encoding="utf-8")
     release_output = tmp_path / ".github" / "release" / "metadata.json"
+    docs_download_page = tmp_path / "docs-site" / "src" / "pages" / "download.tsx"
+    docs_download_page.parent.mkdir(parents=True, exist_ok=True)
+    docs_download_page.write_text(
+        "\n".join(
+            [
+                "const RELEASE_TAG =",
+                "  'v0.5.7a8';",
+                "const MACOS_ASSET_NAME =",
+                "  'Inquira_0.5.7-alpha.8_aarch64.dmg';",
+                "const WINDOWS_ASSET_NAME =",
+                "  'Inquira_0.5.7-alpha.8_x64-setup.exe';",
+                "const MACOS_FALLBACK_URL =",
+                "  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a8/Inquira_0.5.7-alpha.8_aarch64.dmg';",
+                "const WINDOWS_FALLBACK_URL =",
+                "  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a8/Inquira_0.5.7-alpha.8_x64-setup.exe';",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    downloads_doc = tmp_path / "docs-site" / "docs" / "downloads.md"
+    downloads_doc.parent.mkdir(parents=True, exist_ok=True)
+    downloads_doc.write_text(
+        "\n".join(
+            [
+                "- [macOS direct download](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a8/Inquira_0.5.7-alpha.8_aarch64.dmg)",
+                "- [Windows direct download](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a8/Inquira_0.5.7-alpha.8_x64-setup.exe)",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    install_doc = tmp_path / "docs-site" / "docs" / "install.md"
+    install_doc.write_text(
+        "\n".join(
+            [
+                "- [macOS (`.dmg`)](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a8/Inquira_0.5.7-alpha.8_aarch64.dmg)",
+                "- [Windows (`.exe`)](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a8/Inquira_0.5.7-alpha.8_x64-setup.exe)",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
 
     monkeypatch.setattr(mod, "ROOT", tmp_path)
     monkeypatch.setattr(mod, "BACKEND_PYPROJECT", backend_pyproject)
@@ -122,9 +188,21 @@ def test_run_updates_reports_release_metadata_json_when_refreshed(
     monkeypatch.setattr(mod, "FRONTEND_LOCK", frontend_lock)
     monkeypatch.setattr(mod, "RELEASE_METADATA_SOURCE", release_source)
     monkeypatch.setattr(mod, "RELEASE_METADATA_JSON", release_output)
+    monkeypatch.setattr(mod, "DOCS_DOWNLOAD_PAGE", docs_download_page)
+    monkeypatch.setattr(mod, "DOCS_DOWNLOADS_DOC", downloads_doc)
+    monkeypatch.setattr(mod, "DOCS_INSTALL_DOC", install_doc)
 
     results = mod.run_updates(base_version="0.5.7a9")
 
     assert any(
         ".github/release/metadata.json" in line for line in results
+    )
+    assert any("docs-site/src/pages/download.tsx" in line for line in results)
+    assert any("docs-site/docs/downloads.md" in line for line in results)
+    assert any("docs-site/docs/install.md" in line for line in results)
+    assert "Inquira_0.5.7-alpha.9_aarch64.dmg" in docs_download_page.read_text(
+        encoding="utf-8"
+    )
+    assert "Inquira_0.5.7-alpha.9_x64-setup.exe" in docs_download_page.read_text(
+        encoding="utf-8"
     )

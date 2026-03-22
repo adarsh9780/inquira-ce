@@ -19,6 +19,8 @@ def test_docs_site_exists_with_inquira_branding():
     assert "Desktop AI workspace" in home_page
     assert "Free should feel open" in home_page
     assert "api.github.com/repos/adarsh9780/inquira-ce/releases/latest" in download_page
+    assert "Inquira_0.5.7-alpha.10_aarch64.dmg" in download_page
+    assert "Inquira_0.5.7-alpha.10_x64-setup.exe" in download_page
     assert "Download for macOS" in download_page
     assert "Download for Windows" in download_page
     assert "--ifm-background-color: #fdfcf8;" in custom_css

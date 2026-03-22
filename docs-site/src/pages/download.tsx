@@ -7,13 +7,22 @@ import styles from './index.module.css';
 
 const RELEASE_API =
   'https://api.github.com/repos/adarsh9780/inquira-ce/releases/latest';
-const RELEASES_PAGE =
-  'https://github.com/adarsh9780/inquira-ce/releases/latest';
+const RELEASE_TAG =
+  'v0.5.7a10';
+const MACOS_ASSET_NAME =
+  'Inquira_0.5.7-alpha.10_aarch64.dmg';
+const WINDOWS_ASSET_NAME =
+  'Inquira_0.5.7-alpha.10_x64-setup.exe';
+const MACOS_FALLBACK_URL =
+  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a10/Inquira_0.5.7-alpha.10_aarch64.dmg';
+const WINDOWS_FALLBACK_URL =
+  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a10/Inquira_0.5.7-alpha.10_x64-setup.exe';
 
 type DownloadCard = {
   title: string;
   icon: ReactNode;
-  matcher: (name: string) => boolean;
+  assetName: string;
+  fallbackUrl: string;
 };
 
 const downloadCards: DownloadCard[] = [
@@ -24,7 +33,8 @@ const downloadCards: DownloadCard[] = [
         <path d="M16.37 12.44c.02 2.46 2.16 3.28 2.18 3.29-.02.06-.34 1.17-1.12 2.32-.67 1-1.37 2-2.46 2.02-1.07.02-1.42-.64-2.65-.64-1.24 0-1.62.62-2.62.66-1.04.04-1.83-1.05-2.5-2.04-1.37-1.98-2.42-5.59-1.01-8.03.7-1.2 1.95-1.96 3.3-1.98 1.03-.02 2 .69 2.65.69.65 0 1.87-.85 3.16-.73.54.02 2.06.22 3.04 1.66-.08.05-1.82 1.06-1.8 2.78Zm-2.13-5.07c.56-.68.94-1.64.84-2.58-.81.03-1.79.54-2.37 1.22-.52.6-.98 1.57-.86 2.5.91.07 1.83-.46 2.39-1.14Z" />
       </svg>
     ),
-    matcher: name => /\.dmg$/i.test(name),
+    assetName: MACOS_ASSET_NAME,
+    fallbackUrl: MACOS_FALLBACK_URL,
   },
   {
     title: 'Windows',
@@ -33,26 +43,27 @@ const downloadCards: DownloadCard[] = [
         <path d="M3 5.5 10.5 4.4v7.1H3V5.5Zm8.5-1.22L21 3v8.5h-9.5V4.28ZM3 12.5h7.5v7.1L3 18.5v-6Zm8.5 0H21V21l-9.5-1.33V12.5Z" />
       </svg>
     ),
-    matcher: name => /\.exe$/i.test(name),
+    assetName: WINDOWS_ASSET_NAME,
+    fallbackUrl: WINDOWS_FALLBACK_URL,
   },
 ];
 
 function pickLatestAsset(
   assets: Array<{name?: string; browser_download_url?: string}>,
-  matcher: (name: string) => boolean,
+  assetName: string,
+  fallbackUrl: string,
 ): string {
-  const directAsset = assets.find(asset => {
-    const name = String(asset.name || '');
-    return matcher(name) && !/\.sig$/i.test(name);
-  });
+  const directAsset = assets.find(
+    asset => String(asset.name || '') === assetName && !/\.sig$/i.test(String(asset.name || '')),
+  );
 
-  return directAsset?.browser_download_url || RELEASES_PAGE;
+  return directAsset?.browser_download_url || fallbackUrl;
 }
 
 export default function DownloadPage(): ReactNode {
   const [downloadLinks, setDownloadLinks] = useState<Record<string, string>>({
-    macOS: RELEASES_PAGE,
-    Windows: RELEASES_PAGE,
+    macOS: MACOS_FALLBACK_URL,
+    Windows: WINDOWS_FALLBACK_URL,
   });
 
   useEffect(() => {
@@ -72,14 +83,22 @@ export default function DownloadPage(): ReactNode {
         }
 
         setDownloadLinks({
-          macOS: pickLatestAsset(assets, downloadCards[0].matcher),
-          Windows: pickLatestAsset(assets, downloadCards[1].matcher),
+          macOS: pickLatestAsset(
+            assets,
+            downloadCards[0].assetName,
+            downloadCards[0].fallbackUrl,
+          ),
+          Windows: pickLatestAsset(
+            assets,
+            downloadCards[1].assetName,
+            downloadCards[1].fallbackUrl,
+          ),
         });
       } catch {
         if (active) {
           setDownloadLinks({
-            macOS: RELEASES_PAGE,
-            Windows: RELEASES_PAGE,
+            macOS: MACOS_FALLBACK_URL,
+            Windows: WINDOWS_FALLBACK_URL,
           });
         }
       }
@@ -126,8 +145,9 @@ export default function DownloadPage(): ReactNode {
             <article className={styles.infoCard}>
               <h3>Current delivery model</h3>
               <p>
-                The page fetches the latest release metadata and extracts the
-                newest macOS `.dmg` and Windows `.exe` installers.
+                The page fetches the latest release metadata and resolves the
+                exact Tauri asset names for the current macOS `.dmg` and
+                Windows `.exe` installers.
               </p>
             </article>
             <article className={styles.infoCard}>
@@ -154,7 +174,7 @@ export default function DownloadPage(): ReactNode {
             </h2>
             <p className={styles.sectionBody}>
               If asset lookup fails, the buttons fall back to the latest GitHub
-              release page instead of breaking.
+              release assets for `{RELEASE_TAG}` instead of breaking.
             </p>
           </div>
           <div className={styles.ctaActions}>

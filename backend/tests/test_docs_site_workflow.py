@@ -41,6 +41,8 @@ def test_downloads_doc_links_release_and_api():
     text = DOWNLOADS_DOC.read_text(encoding="utf-8")
 
     assert "https://github.com/adarsh9780/inquira-ce/releases/latest" in text
+    assert "Inquira_0.5.7-alpha.10_aarch64.dmg" in text
+    assert "Inquira_0.5.7-alpha.10_x64-setup.exe" in text
     assert "pypi.org/project/inquira-ce/" not in text
     assert "https://api.github.com/repos/adarsh9780/inquira-ce/releases/latest" in text
 
@@ -66,3 +68,10 @@ def test_docs_and_readme_no_longer_use_script_install_methods():
     assert "install-inquira.sh" not in combined
     assert "install-inquira.ps1" not in combined
     assert "irm " not in combined
+
+
+def test_install_doc_points_to_versioned_desktop_assets():
+    text = INSTALL_DOC.read_text(encoding="utf-8")
+
+    assert "Inquira_0.5.7-alpha.10_aarch64.dmg" in text
+    assert "Inquira_0.5.7-alpha.10_x64-setup.exe" in text

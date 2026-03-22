@@ -8,7 +8,9 @@ This page focuses on the fastest supported install paths.
 
 Download platform-specific desktop builds (`.dmg`, `.exe`) from:
 
-- [Latest release](https://github.com/adarsh9780/inquira-ce/releases/latest)
+- [macOS (`.dmg`)](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a10/Inquira_0.5.7-alpha.10_aarch64.dmg)
+- [Windows (`.exe`)](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a10/Inquira_0.5.7-alpha.10_x64-setup.exe)
+- [Latest release page](https://github.com/adarsh9780/inquira-ce/releases/latest)
 
 Use this when you prefer a desktop-first install experience.
 

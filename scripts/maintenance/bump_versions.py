@@ -32,6 +32,9 @@ FRONTEND_PACKAGE = ROOT / "frontend" / "package.json"
 FRONTEND_LOCK = ROOT / "frontend" / "package-lock.json"
 RELEASE_METADATA_SOURCE = ROOT / "release_metadata.md"
 RELEASE_METADATA_JSON = ROOT / ".github" / "release" / "metadata.json"
+DOCS_DOWNLOAD_PAGE = ROOT / "docs-site" / "src" / "pages" / "download.tsx"
+DOCS_DOWNLOADS_DOC = ROOT / "docs-site" / "docs" / "downloads.md"
+DOCS_INSTALL_DOC = ROOT / "docs-site" / "docs" / "install.md"
 
 
 def normalize_version_input(version: str) -> str:
@@ -128,6 +131,23 @@ def build_release_metadata_payload(version: str, title: str, body: str) -> dict[
     }
 
 
+def build_desktop_asset_payload(
+    base_version: str,
+    tauri_version: str,
+) -> dict[str, str]:
+    tag = base_version if base_version.startswith("v") else f"v{base_version}"
+    macos_asset = f"Inquira_{tauri_version}_aarch64.dmg"
+    windows_asset = f"Inquira_{tauri_version}_x64-setup.exe"
+    base_url = f"https://github.com/adarsh9780/inquira-ce/releases/download/{tag}"
+    return {
+        "tag": tag,
+        "macos_asset_name": macos_asset,
+        "windows_asset_name": windows_asset,
+        "macos_url": f"{base_url}/{macos_asset}",
+        "windows_url": f"{base_url}/{windows_asset}",
+    }
+
+
 def update_release_metadata(version: str) -> bool:
     if not RELEASE_METADATA_SOURCE.exists():
         return False
@@ -219,6 +239,58 @@ def update_frontend_lock(frontend_version: str) -> bool:
     return changed
 
 
+def update_docs_download_links(base_version: str, tauri_version: str) -> list[str]:
+    payload = build_desktop_asset_payload(base_version=base_version, tauri_version=tauri_version)
+    changed: list[str] = []
+
+    page = DOCS_DOWNLOAD_PAGE.read_text(encoding="utf-8")
+    updated_page = page
+    replacements = {
+        "RELEASE_TAG": payload["tag"],
+        "MACOS_ASSET_NAME": payload["macos_asset_name"],
+        "WINDOWS_ASSET_NAME": payload["windows_asset_name"],
+        "MACOS_FALLBACK_URL": payload["macos_url"],
+        "WINDOWS_FALLBACK_URL": payload["windows_url"],
+    }
+    for key, value in replacements.items():
+        updated_page = re.sub(
+            rf"const {key} =\n\s+'[^']+';",
+            f"const {key} =\n  '{value}';",
+            updated_page,
+        )
+    if updated_page != page:
+        DOCS_DOWNLOAD_PAGE.write_text(updated_page, encoding="utf-8")
+        changed.append(str(DOCS_DOWNLOAD_PAGE.relative_to(ROOT)))
+
+    downloads_doc = DOCS_DOWNLOADS_DOC.read_text(encoding="utf-8")
+    updated_downloads_doc = re.sub(
+        r"- \[macOS direct download\]\([^)]+\)\n- \[Windows direct download\]\([^)]+\)",
+        (
+            f"- [macOS direct download]({payload['macos_url']})\n"
+            f"- [Windows direct download]({payload['windows_url']})"
+        ),
+        downloads_doc,
+    )
+    if updated_downloads_doc != downloads_doc:
+        DOCS_DOWNLOADS_DOC.write_text(updated_downloads_doc, encoding="utf-8")
+        changed.append(str(DOCS_DOWNLOADS_DOC.relative_to(ROOT)))
+
+    install_doc = DOCS_INSTALL_DOC.read_text(encoding="utf-8")
+    updated_install_doc = re.sub(
+        r"- \[macOS \(`\.dmg`\)\]\([^)]+\)\n- \[Windows \(`\.exe`\)\]\([^)]+\)",
+        (
+            f"- [macOS (`.dmg`)]({payload['macos_url']})\n"
+            f"- [Windows (`.exe`)]({payload['windows_url']})"
+        ),
+        install_doc,
+    )
+    if updated_install_doc != install_doc:
+        DOCS_INSTALL_DOC.write_text(updated_install_doc, encoding="utf-8")
+        changed.append(str(DOCS_INSTALL_DOC.relative_to(ROOT)))
+
+    return changed
+
+
 def run_updates(
     base_version: str,
     dry_run: bool = False,
@@ -256,6 +328,12 @@ def run_updates(
         changed.append("frontend/package-lock.json")
     if update_release_metadata(versions["base"]):
         changed.append(".github/release/metadata.json")
+    changed.extend(
+        update_docs_download_links(
+            base_version=versions["base"],
+            tauri_version=versions["tauri"],
+        )
+    )
 
     if changed:
         results.append("updated_files=" + ",".join(changed))
