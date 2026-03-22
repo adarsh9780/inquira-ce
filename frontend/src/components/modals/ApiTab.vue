@@ -13,45 +13,61 @@
     </div>
 
     <div class="space-y-6">
-      <!-- API Key Input -->
+      <div>
+        <div class="max-w-md mb-2 flex items-center justify-between gap-2">
+          <label class="block text-sm font-medium" style="color: var(--color-text-main);">
+            API Provider
+          </label>
+          <div :title="refreshModelsTooltip">
+            <button
+              @click="refreshProviderModels"
+              :disabled="isRefreshModelsDisabled"
+              class="px-2.5 py-1 text-xs rounded-md border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style="border-color: var(--color-border); color: var(--color-text-main); background-color: var(--color-surface);"
+              type="button"
+            >
+              <span v-if="!isRefreshingModels">Refresh Models</span>
+              <span v-else class="inline-flex items-center">
+                <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-700 mr-2"></div>
+                Refreshing...
+              </span>
+            </button>
+          </div>
+        </div>
+        <HeaderDropdown
+          :model-value="appStore.llmProvider"
+          @update:model-value="handleProviderChange"
+          :options="providerOptions"
+          placeholder="Select provider"
+          max-width-class="max-w-md w-full"
+        />
+      </div>
+
       <div v-if="requiresApiKey">
         <label for="api-key-input" class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
           API Key ({{ appStore.llmProvider }})
         </label>
         <div class="max-w-md">
-          <div class="relative">
-            <input
-              id="api-key-input"
-              :type="showApiKey ? 'text' : 'password'"
-              :value="appStore.apiKey"
-              @input="handleApiKeyChange"
-              :placeholder="`Enter your ${appStore.llmProvider} API key`"
-              class="input-base pr-10"
-            />
-            <button
-              @click="showApiKey = !showApiKey"
-              class="absolute inset-y-0 right-0 pr-3 flex items-center"
-              type="button"
-            >
-              <EyeIcon v-if="!showApiKey" class="w-4 h-4 text-gray-400 hover:text-gray-600" />
-              <EyeSlashIcon v-else class="w-4 h-4 text-gray-400 hover:text-gray-600" />
-            </button>
-          </div>
-          <div class="mt-2 flex items-center justify-between gap-3">
-            <p class="text-xs" style="color: var(--color-text-muted);">
-              Your API key is stored in your OS keychain.
-              <a
-                :href="providerKeyUrl"
-                @click.prevent="openLink(providerKeyUrl)"
-                target="_blank"
-                rel="noopener"
-                class="hover:underline ml-1"
-                style="color: var(--color-accent);"
+          <div class="flex items-center gap-2">
+            <div class="relative flex-1">
+              <input
+                id="api-key-input"
+                :type="showApiKey ? 'text' : 'password'"
+                :value="appStore.apiKey"
+                @input="handleApiKeyChange"
+                :placeholder="`Enter your ${appStore.llmProvider} API key`"
+                class="input-base pr-10"
+              />
+              <button
+                @click="showApiKey = !showApiKey"
+                class="absolute inset-y-0 right-0 pr-3 flex items-center"
+                type="button"
               >
-                Get a {{ appStore.llmProvider }} API key
-              </a>
-            </p>
-            <div class="flex items-center gap-2">
+                <EyeIcon v-if="!showApiKey" class="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                <EyeSlashIcon v-else class="w-4 h-4 text-gray-400 hover:text-gray-600" />
+              </button>
+            </div>
+            <div v-if="hasTypedApiKey" class="flex items-center gap-2">
               <button
                 @click="saveProviderApiKey"
                 :disabled="isSavingApiKey || !appStore.apiKey.trim()"
@@ -80,6 +96,19 @@
               </button>
             </div>
           </div>
+          <p class="mt-2 text-xs" style="color: var(--color-text-muted);">
+            Your API key is stored in your OS keychain.
+            <a
+              :href="providerKeyUrl"
+              @click.prevent="openLink(providerKeyUrl)"
+              target="_blank"
+              rel="noopener"
+              class="hover:underline ml-1"
+              style="color: var(--color-accent);"
+            >
+              Get a {{ appStore.llmProvider }} API key
+            </a>
+          </p>
         </div>
       </div>
 
@@ -90,36 +119,6 @@
       <p v-if="requiresApiKey && appStore.selectedProviderApiKeyPresent" class="text-xs text-green-700">
         A key for {{ appStore.llmProvider }} is already configured in secure storage.
       </p>
-
-      <div>
-        <div class="max-w-md mb-2 flex items-center justify-between gap-2">
-          <label class="block text-sm font-medium" style="color: var(--color-text-main);">
-            Provider
-          </label>
-          <div :title="refreshModelsTooltip">
-            <button
-              @click="refreshProviderModels"
-              :disabled="isRefreshModelsDisabled"
-              class="px-2.5 py-1 text-xs rounded-md border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              style="border-color: var(--color-border); color: var(--color-text-main); background-color: var(--color-surface);"
-              type="button"
-            >
-              <span v-if="!isRefreshingModels">Refresh Models</span>
-              <span v-else class="inline-flex items-center">
-                <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-700 mr-2"></div>
-                Refreshing...
-              </span>
-            </button>
-          </div>
-        </div>
-        <HeaderDropdown
-          :model-value="appStore.llmProvider"
-          @update:model-value="handleProviderChange"
-          :options="providerOptions"
-          placeholder="Select provider"
-          max-width-class="max-w-md w-full"
-        />
-      </div>
 
       <div
         v-if="requiresApiKey && !hasSavedProviderApiKey"
@@ -250,6 +249,7 @@ const messageTypeClass = computed(() => {
     ? 'bg-green-50 border border-green-200 text-green-800'
     : 'bg-red-50 border border-red-200 text-red-800'
 })
+const hasTypedApiKey = computed(() => !!appStore.apiKey.trim())
 const requiresApiKey = computed(() => !!appStore.providerRequiresApiKey)
 const hasSavedProviderApiKey = computed(() => !requiresApiKey.value || !!appStore.selectedProviderApiKeyPresent)
 const providerCatalog = computed(() => appStore.providerModelCatalogs?.[appStore.llmProvider] || {})

@@ -41,13 +41,15 @@ test('ApiTab requires saving the API key before provider model refresh', () => {
   const path = resolve(process.cwd(), 'src/components/modals/ApiTab.vue')
   const source = readFileSync(path, 'utf-8')
 
-  assert.equal(source.indexOf('API Key ({{ appStore.llmProvider }})') < source.indexOf('Provider'), true)
+  assert.equal(source.indexOf('API Provider') < source.indexOf('API Key ({{ appStore.llmProvider }})'), true)
   assert.equal(source.includes('Save Key'), true)
   assert.equal(source.includes('saveProviderApiKey'), true)
   assert.equal(source.includes('Save your API key to secure storage'), true)
   assert.equal(source.includes('Save your ${appStore.llmProvider} API key first to refresh models.'), true)
   assert.equal(source.includes(':disabled="isRefreshModelsDisabled"'), true)
   assert.equal(source.includes('inline-flex h-9 min-w-[5.5rem] items-center justify-center'), true)
+  assert.equal(source.includes('v-if="hasTypedApiKey" class="flex items-center gap-2"'), true)
+  assert.equal(source.includes("const hasTypedApiKey = computed(() => !!appStore.apiKey.trim())"), true)
 })
 
 test('ApiTab explains that models come from built-in defaults before refresh', () => {
