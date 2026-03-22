@@ -82,48 +82,42 @@
                       </div>
                     </div>
 
-                    <div class="mt-10 max-w-xl">
+                    <div v-if="!showProgressScreen" class="mt-10 max-w-xl">
                       <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--color-text-muted)]">
-                        {{ showProgressScreen ? 'Secure handoff' : 'Your data, one workspace' }}
+                        Your data, one workspace
                       </p>
                       <h1 class="mt-4 text-4xl font-semibold tracking-[-0.05em] text-[var(--color-text-main)] sm:text-5xl lg:text-[3.6rem] lg:leading-[1.02]">
-                        {{ showProgressScreen ? progressHeading : 'Think clearly, analyze faster.' }}
+                        Think clearly, analyze faster.
                       </h1>
                       <p class="mt-5 max-w-lg text-base leading-7 text-[var(--color-text-muted)] sm:text-lg sm:leading-8">
-                        {{ showProgressScreen ? progressLead : 'Inquira keeps chat, code, tables, and charts aligned in one calm, desktop-first workflow.' }}
+                        Inquira keeps chat, code, tables, and charts aligned in one calm, desktop-first workflow.
                       </p>
                     </div>
 
-                    <div class="mt-8 rounded-[1.5rem] border border-white/70 bg-white/75 p-5 shadow-[0_20px_45px_rgba(24,24,27,0.08)]">
+                    <div
+                      v-if="!showProgressScreen"
+                      class="mt-8 rounded-[1.5rem] border border-white/70 bg-white/75 p-5 shadow-[0_20px_45px_rgba(24,24,27,0.08)]"
+                    >
                       <div class="flex items-center justify-between gap-4">
                         <div>
                           <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-text-muted)]">
-                            {{ showProgressScreen ? 'Live status' : 'Why teams use it' }}
+                            Why teams use it
                           </p>
                           <p
-                            v-if="!showProgressScreen"
                             :key="featureIndex"
                             class="auth-feature-type mt-3 min-h-[1.75rem] text-base text-[var(--color-text-main)] sm:text-lg"
                             :style="{ '--type-width': `${featureWidthCh}ch` }"
                           >
                             {{ activeFeatureLine }}
                           </p>
-                          <p
-                            v-else
-                            :key="authStore.authFlowStage"
-                            class="auth-status-type mt-3 min-h-[1.75rem] text-base text-[var(--color-text-main)] sm:text-lg"
-                            :style="{ '--type-width': `${statusWidthCh}ch` }"
-                          >
-                            {{ progressDescription }}
-                          </p>
                         </div>
                         <div class="hidden h-12 w-12 items-center justify-center rounded-full border border-[var(--color-border)] bg-white text-sm font-semibold text-[var(--color-text-main)] sm:flex">
-                          {{ showProgressScreen ? `${progressPercent}%` : 'CE' }}
+                          CE
                         </div>
                       </div>
                     </div>
 
-                    <ul class="mt-8 grid gap-3 text-sm sm:grid-cols-3 lg:mt-auto lg:grid-cols-1 xl:grid-cols-3">
+                    <ul :class="showProgressScreen ? 'mt-auto grid gap-3 text-sm sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3' : 'mt-8 grid gap-3 text-sm sm:grid-cols-3 lg:mt-auto lg:grid-cols-1 xl:grid-cols-3'">
                       <li
                         v-for="bullet in brandBullets"
                         :key="bullet.title"
@@ -333,21 +327,6 @@ const progressDescription = computed(() => progressConfig.value.description)
 const displayMessage = computed(() => authStore.error || '')
 const activeFeatureLine = computed(() => featureLines[featureIndex.value] || '')
 const featureWidthCh = computed(() => Math.max(34, Math.min(80, activeFeatureLine.value.length + 2)))
-const statusWidthCh = computed(() => Math.max(28, Math.min(80, progressDescription.value.length + 2)))
-
-const progressHeading = computed(() => {
-  if (authStore.authFlowStage === 'restoring_session') {
-    return 'Welcome back'
-  }
-  return 'Secure sign-in in progress'
-})
-
-const progressLead = computed(() => {
-  if (authStore.authFlowStage === 'restoring_session') {
-    return 'Inquira found a saved session and is reconnecting your workspace without making you repeat sign-in.'
-  }
-  return 'The browser step is complete. Inquira is validating the secure handoff and preparing the app for your workspace.'
-})
 
 function startFeatureRotation() {
   stopFeatureRotation()
