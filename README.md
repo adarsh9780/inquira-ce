@@ -16,7 +16,7 @@ Local-first desktop data analysis with AI-assisted Python generation and executi
 
 Tags: `desktop`, `local-first`, `fastapi`, `vue`, `tauri`, `duckdb`, `langgraph`, `gemini`.
 
-Hosted docs site (GitHub Pages): [https://adarsh9780.github.io/inquira-ce/](https://adarsh9780.github.io/inquira-ce/)
+Hosted docs site (GitHub Pages): [https://docs.inquiraai.com/](https://docs.inquiraai.com/)
 
 ## Why Inquira
 

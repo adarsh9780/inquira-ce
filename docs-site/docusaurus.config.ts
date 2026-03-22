@@ -11,7 +11,7 @@ const config: Config = {
     v4: true,
   },
 
-  url: 'https://inquira.example.com',
+  url: 'https://docs.inquiraai.com',
   baseUrl: '/',
   organizationName: 'adarsh9780',
   projectName: 'inquira-ce',
