@@ -44,7 +44,7 @@ const config: Config = {
   ],
 
   themeConfig: {
-    image: 'img/docusaurus-social-card.jpg',
+    image: 'img/inquira-social-card.png',
     colorMode: {
       defaultMode: 'light',
       disableSwitch: true,

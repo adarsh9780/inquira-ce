@@ -15,6 +15,8 @@ def test_docs_site_exists_with_inquira_branding():
 
     assert "title: 'Inquira'" in config
     assert "blog: false" in config
+    assert "favicon: 'img/favicon.ico'" in config
+    assert "image: 'img/inquira-social-card.png'" in config
     assert "src: 'img/inquira-logo-animated.svg'" in config
     assert "Desktop AI workspace" in home_page
     assert "Free should feel open" in home_page
