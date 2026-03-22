@@ -1134,10 +1134,6 @@ export const useAppStore = defineStore('app', () => {
       saveLocalConfig()
     }
 
-    if (items.length === 1 && activeWorkspaceId.value === items[0]?.id) {
-      await ensureWorkspaceKernelConnected(activeWorkspaceId.value)
-    }
-
     // Workspace-first guard: when user has no workspace, dataset selection must be cleared.
     if (items.length === 0 && (dataFilePath.value || ingestedTableName.value || schemaFileId.value)) {
       dataFilePath.value = ''

@@ -9,12 +9,12 @@
     <!-- Authentication Modal -->
     <!-- Auth Modal -->
     <AuthModal
-      :is-open="isAuthUiReady && !authStore.isAuthenticated"
+      :is-open="isAuthUiReady && authStore.initialSessionResolved && !authStore.isAuthenticated && !appBootstrap.active"
       @close="handleAuthClose"
     />
 
     <!-- Main App (only shown when authenticated) -->
-    <div v-if="authStore.isAuthenticated" class="flex flex-col h-screen">
+    <div v-if="authStore.isAuthenticated && appBootstrap.ready" class="flex flex-col h-screen">
       <!-- Main Content Area with Sidebar -->
       <div class="flex-1 flex overflow-hidden bg-white relative">
         <Transition name="sidebar-shell">
@@ -37,7 +37,7 @@
     <Teleport to="body">
       <Transition name="fade">
         <div
-          v-if="backendStatus.active || workspaceRuntimeStatus.active"
+          v-if="backendStatus.active || workspaceRuntimeStatus.active || appBootstrap.active"
           class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm"
         >
           <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center">
@@ -46,11 +46,11 @@
               <div class="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
             </div>
             <h3 class="text-lg font-semibold text-gray-900 mb-2">
-              {{ workspaceRuntimeStatus.active ? 'Preparing Workspace Runtime' : 'Setting up Inquira' }}
+              {{ workspaceRuntimeStatus.active ? 'Preparing Workspace Runtime' : appBootstrap.active ? 'Loading Your Workspace' : 'Setting up Inquira' }}
             </h3>
-            <p class="text-sm text-gray-500 mb-4">{{ workspaceRuntimeStatus.active ? workspaceRuntimeStatus.message : backendStatus.message }}</p>
+            <p class="text-sm text-gray-500 mb-4">{{ workspaceRuntimeStatus.active ? workspaceRuntimeStatus.message : appBootstrap.active ? appBootstrap.message : backendStatus.message }}</p>
             <p class="text-xs text-gray-400">
-              {{ workspaceRuntimeStatus.active ? 'Creating virtual environment and kernel...' : 'This only happens once' }}
+              {{ workspaceRuntimeStatus.active ? 'Creating virtual environment and kernel...' : appBootstrap.active ? 'Authenticating, selecting your workspace, and starting its runtime...' : 'This only happens once' }}
             </p>
           </div>
         </div>
@@ -85,6 +85,11 @@ const backendStatus = reactive({
 })
 const workspaceRuntimeStatus = reactive({
   active: false,
+  message: '',
+})
+const appBootstrap = reactive({
+  active: false,
+  ready: false,
   message: '',
 })
 const wsUnsubscribers = ref([])
@@ -143,6 +148,10 @@ async function handleAuthenticated(userData) {
   const userId = String(userData?.user_id || '').trim()
   if (!userId) return
 
+  appBootstrap.active = true
+  appBootstrap.ready = false
+  appBootstrap.message = 'Loading your account...'
+
   if (activeSnapshotUserId.value !== userId) {
     appStore.resetForAuthBoundary()
     previewService.clearSchemaCache()
@@ -159,10 +168,15 @@ async function handleAuthenticated(userData) {
 
   // Load v1 workspace/chat state
   try {
+    appBootstrap.message = 'Loading your account...'
     await authStore.refreshPlan()
-    await appStore.fetchWorkspaces()
     await appStore.loadUserPreferences()
+    appBootstrap.message = 'Selecting your workspace...'
+    await appStore.fetchWorkspaces()
     if (appStore.activeWorkspaceId) {
+      appBootstrap.message = 'Starting your workspace runtime...'
+      await appStore.ensureWorkspaceKernelConnected(appStore.activeWorkspaceId)
+      appBootstrap.message = 'Loading workspace history...'
       await appStore.fetchConversations()
       if (appStore.activeConversationId) {
         await appStore.fetchConversationTurns({ reset: true })
@@ -172,6 +186,10 @@ async function handleAuthenticated(userData) {
     walkthroughService.startIfFirstTime()
   } catch (error) {
     console.error('Failed to load v1 workspace state:', error)
+  } finally {
+    appBootstrap.active = false
+    appBootstrap.ready = true
+    appBootstrap.message = ''
   }
 }
 
@@ -214,7 +232,6 @@ onMounted(async () => {
     await apiService.waitForBackendReady()
     backendStatus.active = false
     isAuthUiReady.value = true
-    await authStore.checkAuth()
   } catch (error) {
     console.error('❌ Error during app initialization:', error)
     backendStatus.active = true
@@ -247,6 +264,9 @@ watch(
   (isAuthenticated) => {
     if (isAuthenticated) return
     activeSnapshotUserId.value = ''
+    appBootstrap.active = false
+    appBootstrap.ready = false
+    appBootstrap.message = ''
     appStore.resetForAuthBoundary()
     previewService.clearSchemaCache()
     if (settingsWebSocket.isPersistentMode) {

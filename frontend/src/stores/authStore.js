@@ -17,6 +17,7 @@ export const useAuthStore = defineStore('auth', () => {
   const pendingAuthAction = ref('')
   const authFlowStage = ref('')
   const authFlowMessage = ref('')
+  const initialSessionResolved = ref(false)
   let authProbeRevision = 0
   let authSubscription = null
   let authProgressListenerBound = false
@@ -64,6 +65,13 @@ export const useAuthStore = defineStore('auth', () => {
   function clearAuthFlow() {
     authFlowStage.value = ''
     authFlowMessage.value = ''
+  }
+
+  function markInitialSessionResolved(event = '') {
+    const authEvent = String(event || '').trim().toUpperCase()
+    if (authEvent === 'INITIAL_SESSION' || authEvent === 'SIGNED_IN' || authEvent === 'SIGNED_OUT') {
+      initialSessionResolved.value = true
+    }
   }
 
   async function hydrateUserFromBackend(accessToken = '') {
@@ -168,6 +176,7 @@ export const useAuthStore = defineStore('auth', () => {
       authProbeRevision += 1
       const accessToken = String(session?.access_token || '').trim()
       const authEvent = String(event || '').trim().toUpperCase()
+      markInitialSessionResolved(authEvent)
       if (!accessToken) {
         if (authEvent === 'SIGNED_OUT') {
           clearLocalState()
@@ -396,6 +405,7 @@ export const useAuthStore = defineStore('auth', () => {
     pendingAuthAction,
     authFlowStage,
     authFlowMessage,
+    initialSessionResolved,
     username,
     userId,
     planLabel,
