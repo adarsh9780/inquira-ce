@@ -3,18 +3,20 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('auth modal renders a progress panel for multi-step desktop sign-in', () => {
+test('auth screen renders a dedicated progress experience for reconnect and login completion', () => {
   const source = readFileSync(
     resolve(process.cwd(), 'src/components/modals/AuthModal.vue'),
     'utf-8',
   )
 
+  assert.equal(source.includes("v-if=\"showProgressScreen\""), true)
   assert.equal(source.includes('Browser step completed'), true)
   assert.equal(source.includes('Exchanging sign-in code'), true)
   assert.equal(source.includes('Restoring saved session'), true)
   assert.equal(source.includes('Verifying session'), true)
   assert.equal(source.includes('Loading your account'), true)
-  assert.equal(source.includes('progressPercent'), true)
+  assert.equal(source.includes('auth-typewriter'), true)
+  assert.equal(source.includes('Continue with Google'), true)
 })
 
 test('auth store tracks stepwise login progress and waits for backend readiness', () => {

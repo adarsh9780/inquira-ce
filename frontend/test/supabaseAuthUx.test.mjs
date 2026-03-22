@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('auth modal offers provider sign-in and magic link instead of local username/password auth', () => {
+test('auth screen focuses on Google sign-in and keeps other providers disabled as coming soon', () => {
   const source = readFileSync(
     resolve(process.cwd(), 'src/components/modals/AuthModal.vue'),
     'utf-8',
@@ -12,11 +12,12 @@ test('auth modal offers provider sign-in and magic link instead of local usernam
   assert.equal(source.includes('Continue with Google'), true)
   assert.equal(source.includes('Continue with Microsoft'), true)
   assert.equal(source.includes('Continue with GitHub'), true)
-  assert.equal(source.includes('Email Magic Link'), true)
-  assert.equal(source.includes('Send Magic Link'), true)
+  assert.equal(source.includes('Coming soon'), true)
+  assert.equal(source.includes('Email Magic Link'), false)
+  assert.equal(source.includes('Send Magic Link'), false)
   assert.equal(source.includes('Username'), false)
   assert.equal(source.includes('Create Account'), false)
-  assert.equal(source.includes('Sign In To Inquira'), true)
+  assert.equal(source.includes('Sign in once and stay signed in.'), true)
 })
 
 test('account tab routes users to browser-managed account controls', () => {
