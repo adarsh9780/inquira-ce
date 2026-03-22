@@ -54,7 +54,7 @@ const config: Config = {
       title: 'Inquira',
       logo: {
         alt: 'Inquira logo',
-        src: 'img/logo.svg',
+        src: 'img/inquira-icon.png',
       },
       items: [
         {to: '/docs', label: 'Docs', position: 'left'},
