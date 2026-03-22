@@ -150,6 +150,17 @@ jobs:
               out.write("EOF\n")
           PY
 
+      - name: Detect release channel
+        id: release_channel
+        shell: bash
+        run: |
+          ref_name="${GITHUB_REF_NAME}"
+          if [[ "$ref_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Detect macOS signing configuration
         if: matrix.os == 'macos-latest'
         id: mac_signing
@@ -179,7 +190,7 @@ jobs:
           releaseName: ${{ steps.release_meta.outputs.release_name }}
           releaseBody: ${{ steps.release_meta.outputs.release_body }}
           releaseDraft: false
-          prerelease: true
+          prerelease: ${{ steps.release_channel.outputs.prerelease }}
 
       - name: Build and publish desktop artifacts (macOS unsigned)
         if: matrix.os == 'macos-latest' && steps.mac_signing.outputs.enabled == 'false'
@@ -191,7 +202,7 @@ jobs:
           releaseName: ${{ steps.release_meta.outputs.release_name }}
           releaseBody: ${{ steps.release_meta.outputs.release_body }}
           releaseDraft: false
-          prerelease: true
+          prerelease: ${{ steps.release_channel.outputs.prerelease }}
 
       - name: Build and publish desktop artifacts (Windows NSIS)
         if: matrix.os == 'windows-latest'
@@ -203,7 +214,7 @@ jobs:
           releaseName: ${{ steps.release_meta.outputs.release_name }}
           releaseBody: ${{ steps.release_meta.outputs.release_body }}
           releaseDraft: false
-          prerelease: true
+          prerelease: ${{ steps.release_channel.outputs.prerelease }}
           args: --bundles nsis
       - name: Upload desktop bundle artifact
         uses: actions/upload-artifact@v4

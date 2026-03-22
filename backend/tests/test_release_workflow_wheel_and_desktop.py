@@ -38,6 +38,17 @@ def test_release_workflow_windows_tauri_build_is_optional():
     assert "optional: true" in text
 
 
+def test_release_workflow_sets_prerelease_flag_from_tag_shape():
+    text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Detect release channel" in text
+    assert 'if [[ "$ref_name" =~ ^v[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then' in text
+    assert 'echo "prerelease=false" >> "$GITHUB_OUTPUT"' in text
+    assert 'echo "prerelease=true" >> "$GITHUB_OUTPUT"' in text
+    assert "prerelease: ${{ steps.release_channel.outputs.prerelease }}" in text
+    assert "prerelease: true" not in text
+
+
 def test_release_workflow_stages_bundled_uv_for_desktop_builds():
     text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
 
