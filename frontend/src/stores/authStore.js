@@ -62,7 +62,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function hydrateUserFromBackend(accessToken = '') {
-    await apiService.waitForBackendReady(AUTH_PROBE_TIMEOUT_MS)
     const token = String(accessToken || '').trim()
     const requestConfig = token
       ? {

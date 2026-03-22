@@ -44,7 +44,8 @@ test('auth store tracks stepwise login progress and waits for backend readiness'
   assert.equal(source.includes("setAuthFlow('restoring_session', 'Found a saved session. Reconnecting to Inquira...')"), true)
   assert.equal(source.includes("setAuthFlow('browser_complete', 'Browser sign-in finished. Completing sign-in in the app...')"), true)
   assert.equal(source.includes("setAuthFlow('verifying_session', 'Browser sign-in finished. Verifying your session with Inquira...')"), true)
-  assert.equal(source.includes('await apiService.waitForBackendReady(AUTH_PROBE_TIMEOUT_MS)'), true)
+  assert.equal(source.includes('await apiService.waitForBackendReady(AUTH_PROBE_TIMEOUT_MS)'), false)
+  assert.equal(source.includes('apiService.v1GetCurrentUser(requestConfig)'), true)
 })
 
 test('api service exposes backend readiness waiting for auth verification', () => {

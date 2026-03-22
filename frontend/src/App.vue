@@ -9,7 +9,7 @@
     <!-- Authentication Modal -->
     <!-- Auth Modal -->
     <AuthModal
-      :is-open="!authStore.isAuthenticated"
+      :is-open="isAuthUiReady && !authStore.isAuthenticated"
       @close="handleAuthClose"
     />
 
@@ -66,6 +66,7 @@ import { useAuthStore } from './stores/authStore'
 import { settingsWebSocket } from './services/websocketService'
 import { previewService } from './services/previewService'
 import { walkthroughService } from './services/walkthroughService'
+import { apiService } from './services/apiService'
 import { toast } from './composables/useToast'
 import AuthModal from './components/modals/AuthModal.vue'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
@@ -89,6 +90,7 @@ const workspaceRuntimeStatus = reactive({
 const wsUnsubscribers = ref([])
 const lastRuntimeErrorToast = ref('')
 const activeSnapshotUserId = ref('')
+const isAuthUiReady = ref(false)
 
 function toggleSidebarVisibility() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
@@ -181,6 +183,8 @@ function handleAuthClose() {
 
 onMounted(async () => {
   setupTauriListener()
+  backendStatus.active = true
+  backendStatus.message = 'Starting backend...'
   document.addEventListener('keydown', handleGlobalShortcuts)
   wsUnsubscribers.value.push(
     settingsWebSocket.subscribeProgress((data) => {
@@ -207,9 +211,14 @@ onMounted(async () => {
     }),
   )
   try {
+    await apiService.waitForBackendReady()
+    backendStatus.active = false
+    isAuthUiReady.value = true
     await authStore.checkAuth()
   } catch (error) {
     console.error('❌ Error during app initialization:', error)
+    backendStatus.active = true
+    backendStatus.message = 'Backend is taking longer than expected to start.'
   }
 })
 
