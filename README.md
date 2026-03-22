@@ -109,22 +109,22 @@ Run `make metadata` separately only if you edit `release_metadata.md` again afte
 
 Core docs:
 
-1. [Overview](./docs/overview.md)
-2. [Install](./docs/install.md)
-3. [Development](./docs/development.md)
-4. [Commit And Release Flow](./docs/commit-and-release.md)
-5. [CI And Release Automation](./docs/ci-and-release-automation.md)
-6. [Architecture](./docs/architecture.md)
-7. [Roadmap](./docs/roadmap.md)
-8. [Contributing](./docs/contributing.md)
-9. [Changelog](./docs/changelog.md)
+1. [Overview](./docs-site/docs/overview.md)
+2. [Install](./docs-site/docs/install.md)
+3. [Development](./docs-site/docs/development.md)
+4. [Commit And Release Flow](./docs-site/docs/commit-and-release.md)
+5. [CI And Release Automation](./docs-site/docs/ci-and-release-automation.md)
+6. [Architecture](./docs-site/docs/architecture.md)
+7. [Roadmap](./docs-site/docs/roadmap.md)
+8. [Contributing](./docs-site/docs/contributing.md)
+9. [Changelog](./docs-site/docs/changelog.md)
 
 Additional references:
 
-- [Release Process (Detailed)](./docs/release_process.md)
-- [Workflow Diagram](./docs/workflow_diagram.md)
-- [Data Pipeline Diagram](./docs/data_pipeline_diagram.md)
-- [Future Plans (Raw)](./docs/plans_for_future.md)
+- [Release Process (Detailed)](./docs-site/docs/release_process.md)
+- [Workflow Diagram](./docs-site/docs/workflow_diagram.md)
+- [Data Pipeline Diagram](./docs-site/docs/data_pipeline_diagram.md)
+- [Future Plans (Raw)](./docs-site/docs/plans_for_future.md)
 
 ## License
 

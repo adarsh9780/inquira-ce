@@ -1,3 +1,7 @@
+---
+slug: /
+---
+
 # Inquira CE
 
 Inquira CE is a local-first AI data analysis app distributed as Desktop installers (macOS/Windows) via GitHub Releases.

@@ -3,7 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 README = ROOT / "README.md"
-DOCS = ROOT / "docs"
+DOCS = ROOT / "docs-site" / "docs"
 
 
 def test_readme_is_docs_table_of_contents():
@@ -16,9 +16,9 @@ def test_readme_is_docs_table_of_contents():
     assert "make ruff-test" in text
     assert "make mypy-test" in text
     assert "create a local root `commit_message.txt` file" in text
-    assert "./docs/overview.md" in text
-    assert "./docs/commit-and-release.md" in text
-    assert "./docs/changelog.md" in text
+    assert "./docs-site/docs/overview.md" in text
+    assert "./docs-site/docs/commit-and-release.md" in text
+    assert "./docs-site/docs/changelog.md" in text
 
 
 def test_docs_chain_has_next_links():

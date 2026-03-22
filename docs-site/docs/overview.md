@@ -27,7 +27,7 @@ Version source of truth: root `VERSION` file.
 - `frontend/`: Vue frontend used by the desktop app.
 - `agents/`: LangGraph agent graphs, tool routing, tracing hooks, and tool execution contracts.
 - `scripts/`: maintenance scripts used by Makefile and release workflow.
-- `docs/`: project documentation, diagrams, and release/process guides.
+- `docs-site/`: Docusaurus website project for public docs, landing pages, and downloads.
 
 ## Distribution channels
 

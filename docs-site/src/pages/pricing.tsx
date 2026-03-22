@@ -80,7 +80,7 @@ export default function PricingPage(): ReactNode {
             <Link className={styles.primaryCta} to="/download">
               View downloads
             </Link>
-            <Link className={styles.secondaryCta} to="/docs/intro">
+            <Link className={styles.secondaryCta} to="/docs">
               Read docs
             </Link>
           </div>

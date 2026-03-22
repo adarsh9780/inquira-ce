@@ -17,10 +17,14 @@ const config: Config = {
   projectName: 'inquira-ce',
 
   onBrokenLinks: 'throw',
+  markdown: {
+    mermaid: true,
+  },
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
   },
+  themes: ['@docusaurus/theme-mermaid'],
 
   presets: [
     [
@@ -53,7 +57,7 @@ const config: Config = {
         src: 'img/logo.svg',
       },
       items: [
-        {to: '/docs/intro', label: 'Docs', position: 'left'},
+        {to: '/docs', label: 'Docs', position: 'left'},
         {to: '/pricing', label: 'Pricing', position: 'left'},
         {to: '/download', label: 'Download', position: 'left'},
         {
@@ -71,7 +75,7 @@ const config: Config = {
           items: [
             {
               label: 'Overview',
-              to: '/docs/intro',
+              to: '/docs',
             },
             {
               label: 'Pricing',
@@ -88,7 +92,7 @@ const config: Config = {
           items: [
             {
               label: 'Architecture Notes',
-              to: '/docs/intro',
+              to: '/docs/architecture',
             },
             {
               label: 'Download Strategy',
@@ -105,12 +109,15 @@ const config: Config = {
             },
             {
               label: 'Future Accounts',
-              to: '/docs/intro#why-this-site-exists',
+              to: '/docs/auth-strategy',
             },
           ],
         },
       ],
       copyright: `Copyright © ${new Date().getFullYear()} Inquira. Built with Docusaurus.`,
+    },
+    mermaid: {
+      theme: {light: 'neutral', dark: 'neutral'},
     },
     prism: {
       theme: prismThemes.github,

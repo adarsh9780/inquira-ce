@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DOCS = ROOT / "docs"
+DOCS = ROOT / "docs-site" / "docs"
 
 
 def test_release_docs_use_makefile_workflow():

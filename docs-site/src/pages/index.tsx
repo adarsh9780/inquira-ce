@@ -59,7 +59,7 @@ function HomePageContent(): ReactNode {
             <Link className={styles.primaryCta} to="/download">
               View downloads
             </Link>
-            <Link className={styles.secondaryCta} to="/docs/intro">
+            <Link className={styles.secondaryCta} to="/docs">
               Read the docs
             </Link>
           </div>

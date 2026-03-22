@@ -46,11 +46,11 @@ The current auth stack is local and app-owned:
 
 Relevant files:
 
-- [backend/app/v1/api/auth.py](/Users/adarshmaurya/Downloads/Projects/inquira-ce/backend/app/v1/api/auth.py)
-- [backend/app/v1/services/auth_service.py](/Users/adarshmaurya/Downloads/Projects/inquira-ce/backend/app/v1/services/auth_service.py)
-- [backend/app/v1/models/user.py](/Users/adarshmaurya/Downloads/Projects/inquira-ce/backend/app/v1/models/user.py)
-- [frontend/src/App.vue](/Users/adarshmaurya/Downloads/Projects/inquira-ce/frontend/src/App.vue)
-- [frontend/src/components/modals/AuthModal.vue](/Users/adarshmaurya/Downloads/Projects/inquira-ce/frontend/src/components/modals/AuthModal.vue)
+- `backend/app/v1/api/auth.py`
+- `backend/app/v1/services/auth_service.py`
+- `backend/app/v1/models/user.py`
+- `frontend/src/App.vue`
+- `frontend/src/components/modals/AuthModal.vue`
 
 ## Problems with the current setup
 

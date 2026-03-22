@@ -3,10 +3,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGES_WORKFLOW = ROOT / ".github" / "workflows" / "pages.yml"
-MKDOCS_CONFIG = ROOT / "mkdocs.yml"
-DOWNLOADS_DOC = ROOT / "docs" / "downloads.md"
-INDEX_DOC = ROOT / "docs" / "index.md"
-INSTALL_DOC = ROOT / "docs" / "install.md"
+DOCS_SITE_CONFIG = ROOT / "docs-site" / "docusaurus.config.ts"
+SIDEBARS = ROOT / "docs-site" / "sidebars.ts"
+DOWNLOADS_DOC = ROOT / "docs-site" / "docs" / "downloads.md"
+INDEX_DOC = ROOT / "docs-site" / "docs" / "index.md"
+INSTALL_DOC = ROOT / "docs-site" / "docs" / "install.md"
 README = ROOT / "README.md"
 
 
@@ -18,20 +19,22 @@ def test_pages_workflow_builds_and_deploys_docs_site():
     assert "actions/deploy-pages@v4" in text
     assert "pages: write" in text
     assert "id-token: write" in text
-    assert "mkdocs build" in text
+    assert "actions/setup-node@v4" in text
+    assert "npm ci" in text
+    assert "npm run build" in text
+    assert "docs-site/build" in text
 
 
-def test_mkdocs_config_includes_downloads_and_core_docs_nav():
-    text = MKDOCS_CONFIG.read_text(encoding="utf-8")
+def test_docusaurus_config_and_sidebar_include_core_docs():
+    config = DOCS_SITE_CONFIG.read_text(encoding="utf-8")
+    sidebar = SIDEBARS.read_text(encoding="utf-8")
 
-    assert "theme:" in text
-    assert "name: material" in text
-    assert "- Home: index.md" in text
-    assert "- Downloads: downloads.md" in text
-    assert "- CI And Release Automation: ci-and-release-automation.md" in text
-    assert "pymdownx.superfences" in text
-    assert "mermaid.min.js" in text
-    assert "js/mermaid-init.js" in text
+    assert "themes: ['@docusaurus/theme-mermaid']" in config
+    assert "markdown: {" in config
+    assert "mermaid: true" in config
+    assert "'index'" in sidebar
+    assert "'downloads'" in sidebar
+    assert "'ci-and-release-automation'" in sidebar
 
 
 def test_downloads_doc_links_release_and_api():
