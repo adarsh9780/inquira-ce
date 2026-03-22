@@ -35,7 +35,7 @@ test('status bar renders pane count from canonical table/chart counts and keeps 
   assert.equal(source.includes('showArtifactUsageWarning'), true)
   assert.equal(source.includes('artifactUsageWarningTitle'), true)
   assert.equal(source.includes('ExclamationTriangleIcon'), true)
-  assert.equal(source.includes('apiService.v1GetWorkspaceArtifactUsage'), true)
+  assert.equal(source.includes('subscribeWorkspaceArtifactUsage'), true)
 })
 
 test('figure tab header removes explicit Figure label next to dropdown', () => {

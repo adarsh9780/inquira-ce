@@ -1,74 +1,100 @@
 <template>
   <div class="flex flex-col w-full">
-    <!-- Header -->
-    <div 
-      class="flex items-center justify-between px-3 py-2 group cursor-pointer transition-colors"
-      :class="isCollapsed ? 'justify-center hover:bg-zinc-100/50 rounded-lg mx-2 mb-1' : 'hover:bg-zinc-100/50'"
-      @click="$emit('header-click')"
-      title="Workspaces"
-    >
-      <div class="flex items-center gap-2">
-        <BuildingOffice2Icon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
-        <span
-          class="section-label overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-out"
-          :class="isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[120px] opacity-100'"
-        >Workspaces</span>
+    <div class="flex items-center justify-between px-3 py-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <BuildingOffice2Icon class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-muted);" />
+        <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">
+          Workspace
+        </span>
       </div>
-      <button 
-        v-if="!isCollapsed"
-        @click.stop="openCreateDialog" 
-        class="btn-icon transition-opacity"
-        :class="appStore.workspaces.length > 0 ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'"
+      <button
+        @click.stop="openCreateDialog"
+        class="btn-icon shrink-0"
         title="New Workspace"
       >
         <PlusIcon class="w-3.5 h-3.5" />
       </button>
     </div>
 
-    <!-- List -->
-    <Transition name="sidebar-list">
-      <div v-show="!isCollapsed" class="flex flex-col mt-0.5 space-y-0.5 px-2 pb-2">
-        <div v-if="appStore.workspaceDeletionJobs.length > 0" class="px-2 py-1.5 bg-amber-50 text-amber-800 text-[11px] flex items-center gap-1.5 rounded">
-          <svg class="animate-spin h-3 w-3 text-amber-700 shrink-0" viewBox="0 0 24 24" fill="none">
-            <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-90" d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="4" />
-          </svg>
-          <span class="truncate">Deleting workspace...</span>
-        </div>
-
-        <div v-if="appStore.workspaces.length === 0" class="px-2 py-2 text-xs text-center" style="color: var(--color-text-muted);">
-          No workspaces yet
-        </div>
-        
-        <div 
-          v-for="ws in visibleWorkspaces" 
-          :key="ws.id"
-          class="group/item relative flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors border"
-          :class="[
-            'hover:bg-zinc-100/50 border-transparent',
-            isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : ''
-          ]"
-          @click="!isWorkspaceDeleting(ws.id) && selectWorkspace(ws.id)"
-        >
-          <div class="flex items-center gap-2 min-w-0 pr-2">
-            <span class="truncate text-xs" style="color: var(--color-text-muted);">
-              {{ ws.name }}
-            </span>
-          </div>
-          
-          <button
-            v-if="!isWorkspaceDeleting(ws.id)"
-            @click.stop="confirmDeleteWorkspace(ws.id)"
-            class="btn-icon p-1 text-zinc-400 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0"
-            title="Delete Workspace"
-          >
-             <TrashIcon class="w-3.5 h-3.5" />
-          </button>
-        </div>
+    <div class="px-3 pb-2">
+      <div v-if="appStore.workspaceDeletionJobs.length > 0" class="mb-2 px-2.5 py-2 bg-amber-50 text-amber-800 text-[11px] flex items-center gap-1.5 rounded-xl">
+        <svg class="animate-spin h-3 w-3 text-amber-700 shrink-0" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path class="opacity-90" d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="4" />
+        </svg>
+        <span class="truncate">Workspace deletion in progress...</span>
       </div>
-    </Transition>
 
-    <!-- Modals -->
+      <div
+        v-if="appStore.workspaces.length === 0"
+        class="rounded-2xl border px-3 py-4 text-xs text-center"
+        style="border-color: color-mix(in srgb, var(--color-border) 82%, transparent); color: var(--color-text-muted); background-color: color-mix(in srgb, var(--color-surface) 75%, transparent);"
+      >
+        No workspaces yet. Create one to start organizing datasets and conversations.
+      </div>
+
+      <Listbox v-else :model-value="selectedWorkspaceId" @update:model-value="selectWorkspace">
+        <div class="relative">
+          <ListboxButton
+            class="w-full rounded-2xl border px-3 py-3 text-left transition-colors"
+            style="border-color: color-mix(in srgb, var(--color-border) 82%, transparent); background-color: color-mix(in srgb, var(--color-surface) 82%, transparent);"
+          >
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="flex h-9 w-9 items-center justify-center rounded-xl shrink-0" style="background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent);">
+                <BuildingOffice2Icon class="w-4 h-4" style="color: var(--color-text-main);" />
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-[10px] uppercase tracking-[0.12em] font-semibold" style="color: var(--color-text-muted);">Selected workspace</p>
+                <p class="text-sm font-semibold truncate mt-0.5" style="color: var(--color-text-main);">
+                  {{ activeWorkspaceName }}
+                </p>
+              </div>
+              <ChevronUpDownIcon class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
+            </div>
+          </ListboxButton>
+
+          <transition name="workspace-dropdown">
+            <ListboxOptions
+              class="absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-2xl border p-1 shadow-xl focus:outline-none"
+              style="border-color: color-mix(in srgb, var(--color-border) 82%, transparent); background-color: color-mix(in srgb, var(--color-base) 96%, var(--color-surface));"
+            >
+              <ListboxOption
+                v-for="ws in appStore.workspaces"
+                :key="ws.id"
+                :value="ws.id"
+                as="template"
+                v-slot="{ active, selected }"
+                :disabled="isWorkspaceDeleting(ws.id)"
+              >
+                <li
+                  class="group/item flex items-center justify-between gap-2 rounded-xl px-3 py-2 transition-colors"
+                  :class="[
+                    active ? 'bg-zinc-100/80' : '',
+                    selected ? 'bg-emerald-50 text-emerald-800' : '',
+                    isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                  ]"
+                >
+                  <div class="flex items-center gap-2 min-w-0 flex-1">
+                    <CheckCircleIcon v-if="selected" class="w-4 h-4 shrink-0 text-emerald-600" />
+                    <BuildingOffice2Icon v-else class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
+                    <span class="truncate text-sm" :class="selected ? 'font-semibold' : 'font-medium'">{{ ws.name }}</span>
+                  </div>
+                  <button
+                    v-if="!isWorkspaceDeleting(ws.id)"
+                    @click.stop="confirmDeleteWorkspace(ws.id)"
+                    class="btn-icon p-1 text-zinc-400 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0"
+                    title="Delete Workspace"
+                  >
+                    <TrashIcon class="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              </ListboxOption>
+            </ListboxOptions>
+          </transition>
+        </div>
+      </Listbox>
+    </div>
+
     <WorkspaceCreateModal
       :is-open="isCreateDialogOpen"
       :is-submitting="isCreatingWorkspace"
@@ -91,19 +117,22 @@
 
 <script setup>
 import { computed, ref, onMounted } from 'vue'
+import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/vue'
 import { useAppStore } from '../../../stores/appStore'
 import { useAuthStore } from '../../../stores/authStore'
 import { toast } from '../../../composables/useToast'
 import { extractApiErrorMessage } from '../../../utils/apiError'
 import WorkspaceCreateModal from '../../modals/WorkspaceCreateModal.vue'
 import ConfirmationModal from '../../modals/ConfirmationModal.vue'
-import { 
-  BuildingOffice2Icon, 
+import {
+  BuildingOffice2Icon,
+  CheckCircleIcon,
+  ChevronUpDownIcon,
   PlusIcon,
   TrashIcon
 } from '@heroicons/vue/24/outline'
 
-const props = defineProps({
+defineProps({
   isCollapsed: { type: Boolean, default: false }
 })
 
@@ -116,14 +145,16 @@ const isCreateDialogOpen = ref(false)
 const isCreatingWorkspace = ref(false)
 const isDeleteDialogOpen = ref(false)
 const pendingDeleteWorkspaceId = ref('')
-const visibleWorkspaces = computed(() => {
-  const activeId = String(appStore.activeWorkspaceId || '').trim()
-  if (!activeId) return appStore.workspaces
-  return appStore.workspaces.filter((ws) => ws.id !== activeId)
+
+const selectedWorkspaceId = computed(() => String(appStore.activeWorkspaceId || '').trim())
+const activeWorkspaceName = computed(() => {
+  const activeId = selectedWorkspaceId.value
+  const activeWorkspace = appStore.workspaces.find((ws) => ws.id === activeId)
+  return activeWorkspace?.name || 'Choose a workspace'
 })
 
 async function selectWorkspace(id) {
-  if (id === appStore.activeWorkspaceId) {
+  if (!id || id === appStore.activeWorkspaceId) {
     emit('select')
     return
   }
@@ -140,7 +171,6 @@ async function selectWorkspace(id) {
 }
 
 function openCreateDialog() {
-  // If clicked while collapsed, it will expand the sidebar via parent.
   isCreateDialogOpen.value = true
 }
 
@@ -156,9 +186,9 @@ async function createWorkspace(name) {
     const ws = await appStore.createWorkspace(name)
     await appStore.fetchWorkspaces()
     isCreateDialogOpen.value = false
-    emit('select') // Auto collapse or just notify selection
+    emit('select')
     if (ws?.id) {
-       await selectWorkspace(ws.id)
+      await selectWorkspace(ws.id)
     }
   } catch (error) {
     toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to create workspace'))
@@ -203,20 +233,21 @@ onMounted(async () => {
   try {
     await appStore.fetchWorkspaces()
     await appStore.fetchWorkspaceDeletionJobs()
-  } catch (e) {
-    // ignore
+  } catch {
+    // Ignore bootstrap failures here. The parent app handles global state recovery.
   }
 })
 </script>
 
 <style scoped>
-.sidebar-list-enter-active,
-.sidebar-list-leave-active {
+.workspace-dropdown-enter-active,
+.workspace-dropdown-leave-active {
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
-.sidebar-list-enter-from,
-.sidebar-list-leave-to {
+
+.workspace-dropdown-enter-from,
+.workspace-dropdown-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(-6px);
 }
 </style>

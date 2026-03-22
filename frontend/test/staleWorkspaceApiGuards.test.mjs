@@ -25,10 +25,11 @@ test('workspace-driven panels guard backend calls until active workspace is vali
     'utf-8',
   )
 
-  assert.equal(statusBar.includes('if (!appStore.activeWorkspaceId || !appStore.hasWorkspace)'), true)
+  assert.equal(statusBar.includes('if (!appStore.activeWorkspaceId || !appStore.hasWorkspace || isKernelActionRunning.value) return'), true)
   assert.equal(tableTab.includes('if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) return'), true)
   assert.equal(tableTab.includes('if (!normalizedWorkspaceId || !appStore.hasWorkspace)'), true)
   assert.equal(figureTab.includes('if (!normalizedWorkspaceId || !appStore.hasWorkspace)'), true)
   assert.equal(terminalTab.includes('if (!appStore.activeWorkspaceId || !appStore.hasWorkspace)'), true)
-  assert.equal(apiService.includes('if (!appStore.activeWorkspaceId || !appStore.hasWorkspace)'), true)
+  assert.equal(apiService.includes('if (!appStore.activeWorkspaceId) {'), true)
+  assert.equal(apiService.includes('if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {'), true)
 })

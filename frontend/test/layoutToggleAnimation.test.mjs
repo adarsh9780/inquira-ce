@@ -42,10 +42,10 @@ test('sidebar and explorer sections use animated collapse transitions', () => {
   assert.equal(sidebarSource.includes(':is-collapsed="false"'), true)
   assert.equal(sidebarSource.includes('<Transition name="sidebar-brand">'), false)
   assert.equal(sidebarSource.includes('.sidebar-section-enter-active'), true)
-  assert.equal(workspacesSource.includes('<Transition name="sidebar-list">'), true)
+  assert.equal(workspacesSource.includes('transition name="workspace-dropdown"'), true)
   assert.equal(datasetsSource.includes('<Transition name="sidebar-list">'), true)
   assert.equal(conversationsSource.includes('<Transition name="sidebar-list">'), true)
-  assert.equal(workspacesSource.includes('.sidebar-list-enter-active'), true)
+  assert.equal(workspacesSource.includes('.workspace-dropdown-enter-active'), true)
   assert.equal(datasetsSource.includes('.sidebar-list-enter-active'), true)
   assert.equal(conversationsSource.includes('.sidebar-list-enter-active'), true)
 })
@@ -60,7 +60,7 @@ test('sidebar icons keep fixed size to avoid toggle jitter', () => {
     'utf-8',
   )
 
-  assert.equal(workspacesSource.includes('BuildingOffice2Icon class="w-3.5 h-3.5"'), true)
+  assert.equal(workspacesSource.includes('BuildingOffice2Icon class="w-3.5 h-3.5 shrink-0"'), true)
   assert.equal(workspacesSource.includes('scale-110'), false)
   assert.equal(sidebarSource.includes("FolderOpenIcon class=\"w-4 h-4 shrink-0\""), true)
   assert.equal(sidebarSource.includes("DocumentTextIcon class=\"w-4 h-4 shrink-0\""), true)

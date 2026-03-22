@@ -1,39 +1,35 @@
 <template>
   <div class="flex flex-col w-full">
-    <!-- Header -->
-    <div 
-      class="flex items-center justify-between px-3 py-1.5 group cursor-pointer transition-colors"
-      :class="[
-        isCollapsed ? 'justify-center hover:bg-zinc-100/50 rounded-lg mx-2 mb-1' : 'hover:bg-zinc-100/50 rounded-md',
-        !appStore.hasWorkspace ? 'opacity-50 cursor-not-allowed' : ''
-      ]"
-      @click="handleHeaderClick"
-      title="Datasets"
+    <div
+      class="flex items-center justify-between w-full px-3 py-2 rounded-xl transition-colors"
+      :class="!appStore.hasWorkspace ? 'opacity-50 cursor-not-allowed' : 'hover:bg-zinc-100/60'"
+      @click="toggleExpanded"
     >
-      <div class="flex items-center gap-2">
-        <FolderIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
-        <span
-          class="text-[11px] uppercase tracking-[0.08em] font-semibold overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-out"
-          :class="isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[120px] opacity-100'"
+      <div class="flex items-center gap-2 min-w-0">
+        <ChevronRightIcon
+          class="w-3.5 h-3.5 shrink-0 transition-transform duration-200"
+          :class="isExpanded ? 'rotate-90' : ''"
           style="color: var(--color-text-muted);"
-        >Datasets</span>
+        />
+        <FolderIcon class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-muted);" />
+        <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">
+          Datasets
+        </span>
       </div>
-      <button 
-        v-if="!isCollapsed && appStore.hasWorkspace"
-        @click.stop="openSettings" 
-        class="btn-icon transition-opacity"
-        :class="datasets.length > 0 ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'"
+      <button
+        v-if="appStore.hasWorkspace"
+        @click.stop="openSettings"
+        class="btn-icon shrink-0"
         title="Add Dataset"
       >
         <PlusIcon class="w-3.5 h-3.5" />
       </button>
     </div>
 
-    <!-- List -->
     <Transition name="sidebar-list">
       <div
-        v-show="!isCollapsed && appStore.hasWorkspace"
-        class="flex flex-col mt-0.5 space-y-0.5 pl-6 pr-2 pb-2"
+        v-show="isExpanded && appStore.hasWorkspace"
+        class="flex flex-col mt-1 space-y-1 pl-6 pr-3 pb-2"
         @dragenter.prevent="handleDropDragEnter"
         @dragover.prevent="handleDropDragOver"
         @dragleave.prevent="handleDropDragLeave"
@@ -46,29 +42,38 @@
         >
           Drop CSV, Parquet, Excel, JSON, or TSV files to add them to this workspace.
         </div>
+
         <div v-if="loading" class="px-2 py-2 text-[11px] text-center flex items-center justify-center gap-2" style="color: var(--color-text-muted);">
           <div class="animate-spin w-3 h-3 border-2 rounded-full" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);"></div>
           <span>Loading datasets...</span>
         </div>
 
-        <div v-else-if="datasets.length === 0" class="px-2 py-2 text-xs text-center" style="color: var(--color-text-muted);">
-          No datasets yet. Add in Settings.
+        <div
+          v-else-if="datasets.length === 0"
+          class="rounded-xl border px-3 py-3 text-xs"
+          style="border-color: color-mix(in srgb, var(--color-border) 78%, transparent); color: var(--color-text-muted); background-color: color-mix(in srgb, var(--color-surface) 70%, transparent);"
+        >
+          This workspace does not have any datasets yet.
         </div>
-        
-        <div 
-          v-for="ds in datasets" 
+
+        <button
+          v-for="ds in datasets"
           :key="ds.table_name"
-          class="group/item relative flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs"
-          :class="isSelectedDataset(ds) ? 'bg-green-50/50 text-green-700' : 'text-zinc-500 hover:bg-zinc-100/60 hover:text-zinc-700'"
+          type="button"
+          class="group/item relative flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors text-xs"
+          :class="isSelectedDataset(ds) ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'border-transparent text-zinc-600 hover:bg-zinc-100/60 hover:text-zinc-800'"
           @click="selectDataset(ds)"
         >
-          <CircleStackIcon class="w-3.5 h-3.5 shrink-0" :class="isSelectedDataset(ds) ? 'text-green-600' : 'text-zinc-400'" />
-          <div class="min-w-0">
+          <CircleStackIcon class="w-3.5 h-3.5 shrink-0" :class="isSelectedDataset(ds) ? 'text-emerald-600' : 'text-zinc-400'" />
+          <div class="min-w-0 flex-1">
             <p class="truncate" :class="isSelectedDataset(ds) ? 'font-semibold' : 'font-medium'">
               {{ ds.table_name }}
             </p>
+            <p v-if="ds.file_path" class="truncate text-[10px]" :class="isSelectedDataset(ds) ? 'text-emerald-700/70' : 'text-zinc-400'">
+              {{ datasetCaption(ds.file_path) }}
+            </p>
           </div>
-        </div>
+        </button>
       </div>
     </Transition>
   </div>
@@ -82,13 +87,14 @@ import { previewService } from '../../../services/previewService'
 import { inferTableNameFromDataPath } from '../../../utils/chatBootstrap'
 import { mergeDatasetSources } from '../../../utils/datasetCatalogMerge'
 import { toast } from '../../../composables/useToast'
-import { 
+import {
+  ChevronRightIcon,
   FolderIcon,
-  CircleStackIcon, 
+  CircleStackIcon,
   PlusIcon,
 } from '@heroicons/vue/24/outline'
 
-const props = defineProps({
+defineProps({
   isCollapsed: { type: Boolean, default: false }
 })
 
@@ -99,6 +105,7 @@ const loading = ref(false)
 const datasets = ref([])
 const isDropActive = ref(false)
 const dropDepth = ref(0)
+const isExpanded = ref(true)
 
 const SUPPORTED_DATASET_EXTENSIONS = new Set(['.csv', '.tsv', '.parquet', '.json', '.xlsx', '.xls'])
 
@@ -110,6 +117,13 @@ function normalizePath(path) {
     .replace(/\\/g, '/')
     .replace(/\/{2,}/g, '/')
     .toLowerCase()
+}
+
+function datasetCaption(path) {
+  const normalized = String(path || '').trim().replace(/\\/g, '/')
+  if (!normalized) return ''
+  const parts = normalized.split('/').filter(Boolean)
+  return parts.slice(-2).join('/')
 }
 
 function isSelectedDataset(ds) {
@@ -152,12 +166,12 @@ async function loadDatasets() {
   }
 }
 
-function handleHeaderClick() {
+function toggleExpanded() {
   if (!appStore.hasWorkspace) return
-  emit('header-click')
-  if (props.isCollapsed) {
-    // If it was collapsed, it just expanded, so load datasets
-    loadDatasets()
+  isExpanded.value = !isExpanded.value
+  if (isExpanded.value) {
+    emit('header-click')
+    void loadDatasets()
   }
 }
 
@@ -182,7 +196,7 @@ async function selectDataset(ds) {
     appStore.setIngestedTableName(selectedTableName)
     appStore.setIngestedColumns([])
     appStore.setSchemaFileId(selectedPath || selectedTableName)
-    
+
     appStore.setGeneratedCode('')
     appStore.setPythonFileContent('')
     appStore.setResultData(null)
@@ -190,8 +204,8 @@ async function selectDataset(ds) {
     appStore.setDataframes([])
     appStore.setFigures([])
     appStore.setTerminalOutput('')
-    
-    window.dispatchEvent(new CustomEvent('dataset-switched', { 
+
+    window.dispatchEvent(new CustomEvent('dataset-switched', {
       detail: { tableName: selectedTableName, dataPath: selectedPath }
     }))
 
@@ -206,7 +220,7 @@ function openSettings() {
 }
 
 function handleDatasetSwitched() {
-  if (!appStore.hasWorkspace || props.isCollapsed) return
+  if (!appStore.hasWorkspace || !isExpanded.value) return
   void loadDatasets()
 }
 
@@ -286,7 +300,6 @@ async function handleDatasetDrop(event) {
   }
 }
 
-// Automatically load datasets when workspace changes
 watch(
   () => appStore.hasWorkspace,
   async (hasWorkspace) => {
@@ -294,8 +307,8 @@ watch(
       datasets.value = []
       return
     }
-    if (!props.isCollapsed) {
-       await loadDatasets()
+    if (isExpanded.value) {
+      await loadDatasets()
     }
   }
 )
@@ -303,36 +316,20 @@ watch(
 watch(
   () => appStore.activeWorkspaceId,
   async () => {
-    if (!appStore.hasWorkspace || props.isCollapsed) {
+    if (!appStore.hasWorkspace) {
       datasets.value = []
       return
     }
+    isExpanded.value = true
     await loadDatasets()
   }
 )
 
-watch(
-  () => props.isCollapsed,
-  (collapsed) => {
-    if (!collapsed && appStore.hasWorkspace) {
-      loadDatasets()
-    }
-  }
-)
-
-watch(
-  () => appStore.dataFilePath,
-  () => {
-    if (!appStore.hasWorkspace || props.isCollapsed) return
+onMounted(() => {
+  if (appStore.hasWorkspace && isExpanded.value) {
     void loadDatasets()
   }
-)
-
-onMounted(() => {
   window.addEventListener('dataset-switched', handleDatasetSwitched)
-  if (!props.isCollapsed && appStore.hasWorkspace) {
-    loadDatasets()
-  }
 })
 
 onUnmounted(() => {
@@ -345,6 +342,7 @@ onUnmounted(() => {
 .sidebar-list-leave-active {
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
+
 .sidebar-list-enter-from,
 .sidebar-list-leave-to {
   opacity: 0;
