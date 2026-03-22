@@ -29,4 +29,7 @@ test('table and figure headers use shared HeaderDropdown control instead of nati
   assert.equal(dropdown.includes("maxWidth: '100%'"), true)
   assert.equal(dropdown.includes('text-[13px] font-medium'), true)
   assert.equal(dropdown.includes('ListboxButton'), true)
+  assert.equal(dropdown.includes('Portal'), true)
+  assert.equal(dropdown.includes('class="fixed z-[90] overflow-auto rounded-md py-1 shadow-md focus:outline-none"'), true)
+  assert.equal(dropdown.includes('updateFloatingPosition'), true)
 })

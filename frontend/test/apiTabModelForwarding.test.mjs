@@ -47,6 +47,7 @@ test('ApiTab requires saving the API key before provider model refresh', () => {
   assert.equal(source.includes('Save your API key to secure storage'), true)
   assert.equal(source.includes('Save your ${appStore.llmProvider} API key first to refresh models.'), true)
   assert.equal(source.includes(':disabled="isRefreshModelsDisabled"'), true)
+  assert.equal(source.includes('inline-flex h-9 min-w-[5.5rem] items-center justify-center'), true)
 })
 
 test('ApiTab explains that models come from built-in defaults before refresh', () => {

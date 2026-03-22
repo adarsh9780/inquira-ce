@@ -55,7 +55,7 @@
               <button
                 @click="saveProviderApiKey"
                 :disabled="isSavingApiKey || !appStore.apiKey.trim()"
-                class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-secondary"
+                class="inline-flex h-9 min-w-[5.5rem] items-center justify-center px-3 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-secondary"
                 title="Save your API key to secure storage"
                 type="button"
               >
@@ -68,7 +68,7 @@
               <button
                 @click="testApiKey"
                 :disabled="isTestingApiKey || !appStore.apiKey.trim() || !appStore.selectedModel"
-                class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-secondary"
+                class="inline-flex h-9 min-w-[5.5rem] items-center justify-center px-3 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-secondary"
                 title="Test your API key with the configured provider"
                 type="button"
               >
