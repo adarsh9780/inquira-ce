@@ -96,6 +96,34 @@ const wsUnsubscribers = ref([])
 const lastRuntimeErrorToast = ref('')
 const activeSnapshotUserId = ref('')
 const isAuthUiReady = ref(false)
+let backendRecoveryPromise = null
+
+function markBackendReady() {
+  backendStatus.active = false
+  backendStatus.message = ''
+  isAuthUiReady.value = true
+}
+
+async function recoverBackendReadiness() {
+  if (backendRecoveryPromise) return backendRecoveryPromise
+
+  backendRecoveryPromise = (async () => {
+    while (!isAuthUiReady.value) {
+      try {
+        await apiService.waitForBackendReady(2000)
+        markBackendReady()
+        return true
+      } catch (_error) {
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+      }
+    }
+    return true
+  })().finally(() => {
+    backendRecoveryPromise = null
+  })
+
+  return backendRecoveryPromise
+}
 
 function toggleSidebarVisibility() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
@@ -134,7 +162,7 @@ function setupTauriListener() {
     import('@tauri-apps/api/event').then(({ listen }) => {
       listen('backend-status', (event) => {
         if (event.payload === 'ready') {
-          backendStatus.active = false
+          markBackendReady()
         } else {
           backendStatus.active = true
           backendStatus.message = event.payload
@@ -229,12 +257,12 @@ onMounted(async () => {
   )
   try {
     await apiService.waitForBackendReady()
-    backendStatus.active = false
-    isAuthUiReady.value = true
+    markBackendReady()
   } catch (error) {
     console.error('❌ Error during app initialization:', error)
     backendStatus.active = true
     backendStatus.message = 'Backend is taking longer than expected to start.'
+    void recoverBackendReadiness()
   }
 })
 
