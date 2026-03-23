@@ -5,8 +5,8 @@ This page supports the public download story for the desktop app.
 ## Latest release links
 
 - [Latest release page](https://github.com/adarsh9780/inquira-ce/releases/latest)
-- [macOS direct download](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a11/Inquira_0.5.7-alpha.11_aarch64.dmg)
-- [Windows direct download](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a11/Inquira_0.5.7-alpha.11_x64-setup.exe)
+- [macOS direct download](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a12/Inquira_0.5.7-alpha.12_aarch64.dmg)
+- [Windows direct download](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a12/Inquira_0.5.7-alpha.12_x64-setup.exe)
 - [All releases](https://github.com/adarsh9780/inquira-ce/releases)
 - [Website download page](/download)
 

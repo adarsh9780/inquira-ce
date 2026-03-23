@@ -8,15 +8,15 @@ import styles from './index.module.css';
 const RELEASE_API =
   'https://api.github.com/repos/adarsh9780/inquira-ce/releases/latest';
 const RELEASE_TAG =
-  'v0.5.7a11';
+  'v0.5.7a12';
 const MACOS_ASSET_NAME =
-  'Inquira_0.5.7-alpha.11_aarch64.dmg';
+  'Inquira_0.5.7-alpha.12_aarch64.dmg';
 const WINDOWS_ASSET_NAME =
-  'Inquira_0.5.7-alpha.11_x64-setup.exe';
+  'Inquira_0.5.7-alpha.12_x64-setup.exe';
 const MACOS_FALLBACK_URL =
-  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a11/Inquira_0.5.7-alpha.11_aarch64.dmg';
+  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a12/Inquira_0.5.7-alpha.12_aarch64.dmg';
 const WINDOWS_FALLBACK_URL =
-  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a11/Inquira_0.5.7-alpha.11_x64-setup.exe';
+  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a12/Inquira_0.5.7-alpha.12_x64-setup.exe';
 
 type DownloadCard = {
   title: string;
