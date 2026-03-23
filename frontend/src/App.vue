@@ -52,6 +52,21 @@
             <p class="text-xs text-gray-400">
               {{ workspaceRuntimeStatus.active ? 'Creating virtual environment and kernel...' : appBootstrap.active ? 'Authenticating, selecting your workspace, and starting its runtime...' : 'This only happens once' }}
             </p>
+            <div class="mt-5 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4 text-left">
+              <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-500">Current process</p>
+              <p class="mt-2 text-sm font-medium text-gray-900">{{ currentStartupProcess }}</p>
+              <p class="mt-1 text-xs text-gray-500">{{ currentStartupElapsedLabel }}</p>
+              <ul v-if="startupTimelineEntries.length > 1" class="mt-3 space-y-2">
+                <li
+                  v-for="entry in startupTimelineEntries"
+                  :key="entry.key"
+                  class="flex items-start justify-between gap-4 text-xs text-gray-600"
+                >
+                  <span class="min-w-0 flex-1">{{ entry.label }}</span>
+                  <span class="shrink-0 font-medium text-gray-500">{{ entry.elapsed }}</span>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </Transition>
@@ -60,7 +75,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useAppStore } from './stores/appStore'
 import { useAuthStore } from './stores/authStore'
 import { settingsWebSocket } from './services/websocketService'
@@ -97,6 +112,111 @@ const lastRuntimeErrorToast = ref('')
 const activeSnapshotUserId = ref('')
 const isAuthUiReady = ref(false)
 let backendRecoveryPromise = null
+const startupTimeline = ref([])
+const startupClock = ref(Date.now())
+let startupClockTimer = null
+
+const BACKEND_STATUS_LABELS = {
+  'agent-starting': 'Starting agent runtime...',
+  'backend-starting': 'Starting API backend...',
+  'health-checking': 'Checking local service health...',
+  ready: 'Backend ready.',
+}
+
+const STARTUP_SCOPE_LABELS = {
+  auth: 'Auth',
+  desktop: 'Desktop',
+  workspace: 'Workspace',
+  runtime: 'Runtime',
+}
+
+function formatElapsed(ms) {
+  if (!Number.isFinite(ms) || ms < 1000) return '<1s'
+  if (ms < 60000) return `${Math.round(ms / 100) / 10}s`
+  return `${Math.round(ms / 1000)}s`
+}
+
+function describeBackendStatus(message) {
+  const normalized = String(message || '').trim()
+  if (!normalized) return 'Waiting for backend startup...'
+  return BACKEND_STATUS_LABELS[normalized] || normalized
+}
+
+function recordStartupStage(scope, message) {
+  const rendered = String(message || '').trim()
+  if (!rendered) return
+
+  const now = Date.now()
+  const current = startupTimeline.value[startupTimeline.value.length - 1]
+  if (current?.scope === scope && current?.message === rendered) {
+    return
+  }
+
+  if (current && !current.endedAt) {
+    current.endedAt = now
+  }
+
+  startupTimeline.value = [
+    ...startupTimeline.value.slice(-7),
+    {
+      key: `${scope}:${rendered}:${now}`,
+      scope,
+      message: rendered,
+      startedAt: now,
+      endedAt: 0,
+    },
+  ]
+
+  console.info(`[STARTUP TRACE] ${scope}: ${rendered}`)
+}
+
+const currentStartupStage = computed(() => {
+  if (workspaceRuntimeStatus.active) {
+    return {
+      scope: 'runtime',
+      message: String(workspaceRuntimeStatus.message || '').trim() || 'Preparing workspace runtime...',
+    }
+  }
+  if (appBootstrap.active) {
+    return {
+      scope: 'workspace',
+      message: String(appBootstrap.message || '').trim() || 'Loading your workspace...',
+    }
+  }
+  if (authStore.authFlowStage && !authStore.isAuthenticated) {
+    return {
+      scope: 'auth',
+      message: String(authStore.authFlowMessage || '').trim() || 'Completing secure sign-in...',
+    }
+  }
+  return {
+    scope: 'desktop',
+    message: describeBackendStatus(backendStatus.message),
+  }
+})
+
+const currentStartupProcess = computed(() => currentStartupStage.value.message)
+
+const currentStartupElapsedLabel = computed(() => {
+  const current = startupTimeline.value[startupTimeline.value.length - 1]
+  if (!current) return 'Waiting for first startup checkpoint...'
+  const elapsed = (current.endedAt || startupClock.value) - current.startedAt
+  return `${STARTUP_SCOPE_LABELS[current.scope] || 'Stage'} running for ${formatElapsed(elapsed)}`
+})
+
+const startupTimelineEntries = computed(() => {
+  return startupTimeline.value
+    .slice(-4)
+    .map((entry) => {
+      const endedAt = entry.endedAt || startupClock.value
+      const scope = STARTUP_SCOPE_LABELS[entry.scope] || 'Stage'
+      return {
+        key: entry.key,
+        label: `${scope}: ${entry.message}`,
+        elapsed: formatElapsed(endedAt - entry.startedAt),
+      }
+    })
+})
 
 function markBackendReady() {
   backendStatus.active = false
@@ -228,8 +348,12 @@ function handleAuthClose() {
 
 onMounted(async () => {
   setupTauriListener()
+  startupClockTimer = window.setInterval(() => {
+    startupClock.value = Date.now()
+  }, 1000)
   backendStatus.active = true
-  backendStatus.message = 'Starting backend...'
+  backendStatus.message = 'Starting local desktop services...'
+  recordStartupStage('desktop', describeBackendStatus(backendStatus.message))
   document.addEventListener('keydown', handleGlobalShortcuts)
   wsUnsubscribers.value.push(
     settingsWebSocket.subscribeProgress((data) => {
@@ -265,6 +389,38 @@ onMounted(async () => {
     void recoverBackendReadiness()
   }
 })
+
+watch(
+  () => backendStatus.message,
+  (message) => {
+    if (!backendStatus.active) return
+    recordStartupStage('desktop', describeBackendStatus(message))
+  },
+)
+
+watch(
+  () => appBootstrap.message,
+  (message) => {
+    if (!appBootstrap.active) return
+    recordStartupStage('workspace', message)
+  },
+)
+
+watch(
+  () => workspaceRuntimeStatus.message,
+  (message) => {
+    if (!workspaceRuntimeStatus.active) return
+    recordStartupStage('runtime', message)
+  },
+)
+
+watch(
+  () => [authStore.authFlowStage, authStore.authFlowMessage],
+  ([stage, message]) => {
+    if (!stage || authStore.isAuthenticated) return
+    recordStartupStage('auth', message || stage)
+  },
+)
 
 watch(
   () => authStore.userId,
@@ -317,6 +473,10 @@ window.addEventListener('beforeunload', handleBeforeUnload)
 // Cleanup on unmount
 onUnmounted(() => {
   void appStore.flushLocalConfig?.()
+  if (startupClockTimer) {
+    window.clearInterval(startupClockTimer)
+    startupClockTimer = null
+  }
   document.removeEventListener('keydown', handleGlobalShortcuts)
   window.removeEventListener('beforeunload', handleBeforeUnload)
   // Disconnect persistent WebSocket connection
