@@ -56,7 +56,11 @@ def test_tauri_bundle_resources_include_backend_project_files():
     assert "../backend/app/services" in resources
     assert "../backend/app/tools" not in resources
     assert "../backend/app/v1" in resources
-    assert "../agents" in resources
+    assert "../agents" not in resources
+    assert "../agents/agent_v2" in resources
+    assert "../agents/langgraph.json" in resources
+    assert "../agents/pyproject.toml" in resources
+    assert "../agents/uv.lock" in resources
     assert "../backend/alembic" in resources
     assert "../backend/alembic.ini" in resources
     assert "../backend/main.py" in resources
@@ -85,4 +89,18 @@ def test_tauri_bundle_resources_keep_shared_scope_tight():
         "../shared/__init__.py",
         "../shared/observability/__init__.py",
         "../shared/observability/phoenix.py",
+    ]
+
+
+def test_tauri_bundle_resources_keep_agents_scope_tight():
+    data = json.loads(TAURI_CONF.read_text(encoding="utf-8"))
+    resources = data.get("bundle", {}).get("resources", [])
+
+    agent_resources = [resource for resource in resources if resource.startswith("../agents")]
+
+    assert agent_resources == [
+        "../agents/agent_v2",
+        "../agents/langgraph.json",
+        "../agents/pyproject.toml",
+        "../agents/uv.lock",
     ]
