@@ -62,6 +62,10 @@ def test_tauri_bundle_resources_include_backend_project_files():
     assert "../backend/main.py" in resources
     assert "../backend/pyproject.toml" in resources
     assert "../backend/uv.lock" in resources
+    assert "../shared" not in resources
+    assert "../shared/__init__.py" in resources
+    assert "../shared/observability/__init__.py" in resources
+    assert "../shared/observability/phoenix.py" in resources
     assert "../src-tauri/bundled-tools" in resources
     assert "../inquira.toml" in resources
     assert "../backend/app/static" not in resources
@@ -69,3 +73,16 @@ def test_tauri_bundle_resources_include_backend_project_files():
     for resource in resources:
         resolved = (tauri_dir / resource).resolve()
         assert resolved.exists(), f"Missing tauri bundle resource path: {resource}"
+
+
+def test_tauri_bundle_resources_keep_shared_scope_tight():
+    data = json.loads(TAURI_CONF.read_text(encoding="utf-8"))
+    resources = data.get("bundle", {}).get("resources", [])
+
+    shared_resources = [resource for resource in resources if resource.startswith("../shared")]
+
+    assert shared_resources == [
+        "../shared/__init__.py",
+        "../shared/observability/__init__.py",
+        "../shared/observability/phoenix.py",
+    ]

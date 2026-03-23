@@ -43,7 +43,9 @@
       "../backend/main.py",
       "../backend/pyproject.toml",
       "../backend/uv.lock",
-      "../shared",
+      "../shared/__init__.py",
+      "../shared/observability/__init__.py",
+      "../shared/observability/phoenix.py",
       "../src-tauri/bundled-tools",
       "../inquira.toml"
     ],
