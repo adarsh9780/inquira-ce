@@ -1,95 +1,31 @@
 <template>
   <div class="h-7 w-full bg-slate-50 border-t border-slate-200 flex items-center justify-between px-3 text-[11px] text-slate-600 select-none z-50 shrink-0">
     
-    <!-- Left Section: Account, Kernel Status, and Editor Position -->
+    <!-- Left Section: Account, Sidebar Toggle, and Editor Position -->
     <div class="flex items-center gap-2 h-full">
-      <div ref="accountMenuRef" class="relative" v-if="authStore.isAuthenticated">
-        <div class="flex items-center h-full gap-0.5">
-          <button
-            @click.stop="toggleAccountMenu"
-            class="max-w-[120px] truncate px-1 text-blue-600 text-left rounded hover:bg-slate-200/70 transition-colors"
-            :title="accountMenuTitle"
-            aria-label="Toggle account menu"
-          >
-            {{ accountDisplayLabel }}
-          </button>
-          <button
-            @click.stop="toggleAccountMenu"
-            class="h-5 w-5 rounded hover:bg-slate-200/70 flex items-center justify-center transition-colors"
-            :class="isAccountMenuOpen ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'"
-            :title="accountMenuTitle"
-            aria-label="Toggle account menu"
-          >
-            <ChevronDownIcon v-if="isAccountMenuOpen" class="w-3.5 h-3.5" />
-            <ChevronUpIcon v-else class="w-3.5 h-3.5" />
-          </button>
-          <button
-            @click.stop="toggleSidebarFromStatusBar"
-            class="h-5 w-5 rounded hover:bg-slate-200/70 flex items-center justify-center transition-colors"
-            :class="appStore.isSidebarCollapsed ? 'text-slate-500 hover:text-slate-700' : 'text-blue-600'"
-            :title="sidebarToggleTitle"
-            aria-label="Toggle sidebar"
-          >
-            <ChevronRightIcon v-if="appStore.isSidebarCollapsed" class="w-3.5 h-3.5" />
-            <ChevronLeftIcon v-else class="w-3.5 h-3.5" />
-          </button>
-        </div>
+      <!-- Account Name (opens sidebar) -->
+      <button
+        v-if="authStore.isAuthenticated"
+        @click.stop="openSidebar"
+        class="max-w-[120px] truncate px-1 text-blue-600 text-left rounded hover:bg-slate-200/70 transition-colors"
+        title="Open sidebar"
+        aria-label="Open sidebar"
+      >
+        {{ accountDisplayLabel }}
+      </button>
 
-        <div
-          v-if="isAccountMenuOpen"
-          class="absolute bottom-full left-0 mb-1 w-56 rounded-lg shadow-lg z-50 overflow-hidden text-left"
-          style="background-color: var(--color-surface); border: 1px solid var(--color-border);"
-        >
-          <div class="px-3 py-2 border-b" style="border-color: var(--color-border); background-color: var(--color-base);">
-            <p class="text-[11px] font-semibold truncate" style="color: var(--color-text-main);">{{ accountDisplayLabel }}</p>
-            <p class="text-[10px] truncate" style="color: var(--color-text-muted);">{{ authStore.planLabel }}</p>
-          </div>
-          <div class="px-3 py-2 border-b text-[10px] space-y-1.5" style="border-color: var(--color-border);">
-            <div class="flex items-center justify-between gap-3">
-              <span style="color: var(--color-text-muted);">WS Connection</span>
-              <div class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full shrink-0" :class="wsConnectionMeta.dotClass"></span>
-                <span class="font-medium" :class="wsConnectionMeta.textClass">{{ wsConnectionMeta.label }}</span>
-              </div>
-            </div>
-            <div class="flex items-center justify-between gap-3">
-              <span style="color: var(--color-text-muted);">Kernel Status</span>
-              <div class="flex items-center gap-1.5">
-                <span
-                  v-if="kernelStatusMeta.showSpinner"
-                  class="inline-block w-2 h-2 rounded-full border-[1.5px] border-blue-200 border-t-blue-600 animate-spin shrink-0"
-                  aria-hidden="true"
-                ></span>
-                <span v-else class="w-2 h-2 rounded-full shrink-0" :class="kernelStatusMeta.dotClass"></span>
-                <span class="font-medium" :class="kernelStatusMeta.textClass">{{ kernelStatusMeta.label }}</span>
-              </div>
-            </div>
-          </div>
-          <div class="py-1">
-            <button
-              @click="openSettings('api')"
-              class="w-full text-left px-3 py-1.5 text-[11px] font-medium hover:bg-zinc-50 transition-colors"
-              style="color: var(--color-text-main);"
-            >
-              Settings
-            </button>
-            <button
-              @click="openTerms"
-              class="w-full text-left px-3 py-1.5 text-[11px] font-medium hover:bg-zinc-50 transition-colors"
-              style="color: var(--color-text-main);"
-            >
-              Terms &amp; Conditions
-            </button>
-            <div class="border-t my-1" style="border-color: var(--color-border);"></div>
-            <button
-              @click="promptLogout"
-              class="w-full text-left px-3 py-1.5 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </div>
+      <!-- Sidebar Toggle -->
+      <button
+        v-if="authStore.isAuthenticated"
+        @click.stop="toggleSidebarFromStatusBar"
+        class="h-5 w-5 rounded hover:bg-slate-200/70 flex items-center justify-center transition-colors"
+        :class="appStore.isSidebarCollapsed ? 'text-slate-500 hover:text-slate-700' : 'text-blue-600'"
+        :title="sidebarToggleTitle"
+        aria-label="Toggle sidebar"
+      >
+        <ChevronRightIcon v-if="appStore.isSidebarCollapsed" class="w-3.5 h-3.5" />
+        <ChevronLeftIcon v-else class="w-3.5 h-3.5" />
+      </button>
 
       <div v-if="authStore.isAuthenticated" class="w-px h-3.5 bg-slate-300"></div>
 
@@ -164,8 +100,32 @@
       </template>
     </div>
 
-    <!-- Right Section: Terminal & Version -->
+    <!-- Right Section: Editor Toggle, Data Focus, Terminal & Version -->
     <div class="flex items-center gap-2 h-full">
+      <!-- Workspace/Schema Editor Toggle -->
+      <div class="flex items-center gap-0.5 h-full">
+        <button
+          @click="switchToWorkspace"
+          class="flex items-center gap-1 h-full px-1.5 hover:bg-slate-200/50 transition-colors"
+          :class="appStore.activeTab === 'workspace' ? 'text-blue-600 font-medium' : 'text-slate-500 hover:text-slate-700'"
+          :title="'Switch to Workspace'"
+        >
+          <FolderOpenIcon class="w-3.5 h-3.5" />
+          <span>Workspace</span>
+        </button>
+        <button
+          @click="switchToSchemaEditor"
+          class="flex items-center gap-1 h-full px-1.5 hover:bg-slate-200/50 transition-colors"
+          :class="appStore.activeTab === 'schema-editor' ? 'text-blue-600 font-medium' : 'text-slate-500 hover:text-slate-700'"
+          :title="'Switch to Schema Editor'"
+        >
+          <DocumentTextIcon class="w-3.5 h-3.5" />
+          <span>Schema</span>
+        </button>
+      </div>
+
+      <div class="w-px h-3.5 bg-slate-300"></div>
+
       <!-- Data Focus Toggle -->
       <button
         @click="appStore.toggleDataFocusMode()"
@@ -204,66 +164,11 @@
       </a>
     </div>
 
-    <SettingsModal
-      :is-open="isSettingsOpen"
-      :initial-tab="settingsInitialTab"
-      @close="closeSettings"
-    />
-    <ConfirmationModal
-      :is-open="isLogoutConfirmOpen"
-      title="Confirm Logout"
-      :message="`Are you sure you want to log out, ${accountDisplayLabel}?`"
-      confirm-text="Log Out"
-      cancel-text="Cancel"
-      @close="cancelLogout"
-      @confirm="confirmLogout"
-    />
-    <div
-      v-if="isTermsDialogOpen"
-      class="fixed inset-0 z-[70] flex items-center justify-center px-4"
-      @click="closeTermsDialog"
-    >
-      <div class="absolute inset-0 bg-black/10 backdrop-blur-[1.5px]"></div>
-      <div
-        class="relative w-full max-w-3xl rounded-xl border shadow-2xl"
-        style="background-color: var(--color-surface); border-color: var(--color-border); color: var(--color-text-main);"
-        @click.stop
-      >
-        <div class="flex items-center justify-between border-b px-5 py-3" style="border-color: var(--color-border);">
-          <div>
-            <p class="text-sm font-semibold">Terms &amp; Conditions</p>
-            <p v-if="termsLastUpdated" class="text-xs" style="color: var(--color-text-muted);">Last updated: {{ termsLastUpdated }}</p>
-          </div>
-          <button
-            class="btn-icon h-7 w-7 p-1.5 border"
-            style="border-color: var(--color-border); color: var(--color-text-main); background-color: var(--color-base);"
-            title="Close terms"
-            aria-label="Close terms"
-            @click="closeTermsDialog"
-          >
-            <XMarkIcon class="h-4 w-4" />
-          </button>
-        </div>
-        <div class="max-h-[70vh] overflow-y-auto px-5 py-4 text-sm leading-6">
-          <p v-if="isTermsLoading" style="color: var(--color-text-muted);">Loading terms...</p>
-          <p v-else-if="termsError" class="rounded-md border px-3 py-2 text-xs text-red-700 bg-red-50" style="border-color: #fca5a5;">
-            {{ termsError }}
-          </p>
-          <div
-            v-else
-            class="terms-markdown-content"
-            v-html="termsHtml"
-          ></div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import MarkdownIt from 'markdown-it'
-import DOMPurify from 'dompurify'
 import { useAppStore } from '../../stores/appStore'
 import { useAuthStore } from '../../stores/authStore'
 import apiService from '../../services/apiService'
@@ -272,16 +177,13 @@ import { settingsWebSocket } from '../../services/websocketService'
 import {
   CommandLineIcon,
   ViewColumnsIcon,
-  ChevronUpIcon,
-  ChevronDownIcon,
   ChevronRightIcon,
   ChevronLeftIcon,
   ExclamationTriangleIcon,
-  XMarkIcon,
+  FolderOpenIcon,
+  DocumentTextIcon,
 } from '@heroicons/vue/24/outline'
 import { toast } from '../../composables/useToast'
-import SettingsModal from '../modals/SettingsModal.vue'
-import ConfirmationModal from '../modals/ConfirmationModal.vue'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -290,16 +192,6 @@ const authStore = useAuthStore()
 const kernelStatus = ref('missing')
 const isKernelActionRunning = ref(false)
 
-const accountMenuRef = ref(null)
-const isAccountMenuOpen = ref(false)
-const isTermsDialogOpen = ref(false)
-const isTermsLoading = ref(false)
-const termsError = ref('')
-const termsMarkdown = ref('')
-const termsLastUpdated = ref('')
-const isSettingsOpen = ref(false)
-const settingsInitialTab = ref('api')
-const isLogoutConfirmOpen = ref(false)
 const isWebSocketConnected = ref(false)
 const isWebSocketMonitoringActive = ref(false)
 let unsubscribeWebSocketConnection = null
@@ -314,18 +206,6 @@ const artifactUsage = ref({
   duckdbWarning: false,
   figureWarning: false,
   warning: false,
-})
-const termsMarkdownRenderer = new MarkdownIt({
-  html: false,
-  linkify: true,
-  breaks: true,
-})
-const termsHtml = computed(() => {
-  const raw = String(termsMarkdown.value || '').trim()
-  if (!raw) return ''
-  return DOMPurify.sanitize(termsMarkdownRenderer.render(raw), {
-    USE_PROFILES: { html: true },
-  })
 })
 
 const accountLabel = computed(() => {
@@ -345,10 +225,6 @@ const accountDisplayLabel = computed(() => {
     .filter(Boolean)
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase())
     .join(' ')
-})
-
-const accountMenuTitle = computed(() => {
-  return isAccountMenuOpen.value ? 'Close account menu' : 'Open account menu'
 })
 
 const sidebarToggleTitle = computed(() => {
@@ -462,8 +338,18 @@ function toggleSidebarFromStatusBar() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
 }
 
-function toggleAccountMenu() {
-  isAccountMenuOpen.value = !isAccountMenuOpen.value
+function openSidebar() {
+  if (appStore.isSidebarCollapsed) {
+    appStore.setSidebarCollapsed(false)
+  }
+}
+
+function switchToWorkspace() {
+  appStore.setActiveTab('workspace')
+}
+
+function switchToSchemaEditor() {
+  appStore.setActiveTab('schema-editor')
 }
 
 function updateWebSocketStatus(connected) {
@@ -598,62 +484,8 @@ function stopArtifactUsageStream() {
   artifactUsageStreamAbortController = null
 }
 
-function openSettings(tab = 'api') {
-  settingsInitialTab.value = tab
-  isSettingsOpen.value = true
-  isAccountMenuOpen.value = false
-}
-
-function closeSettings() {
-  isSettingsOpen.value = false
-  settingsInitialTab.value = 'api'
-}
-
 function openGitHubRepo() {
   void openExternalUrl('https://github.com/adarsh9780/inquira')
-}
-
-async function loadTermsAndConditions({ force = false } = {}) {
-  if (termsMarkdown.value && !force) return
-  isTermsLoading.value = true
-  termsError.value = ''
-  try {
-    const payload = await apiService.v1GetTermsAndConditions()
-    termsMarkdown.value = String(payload?.markdown || '').trim()
-    termsLastUpdated.value = String(payload?.last_updated || '').trim()
-  } catch (error) {
-    termsError.value = error?.message || 'Failed to load Terms & Conditions.'
-  } finally {
-    isTermsLoading.value = false
-  }
-}
-
-async function openTerms() {
-  isAccountMenuOpen.value = false
-  isTermsDialogOpen.value = true
-  await loadTermsAndConditions()
-}
-
-function closeTermsDialog() {
-  isTermsDialogOpen.value = false
-}
-
-function promptLogout() {
-  isLogoutConfirmOpen.value = true
-  isAccountMenuOpen.value = false
-}
-
-function cancelLogout() {
-  isLogoutConfirmOpen.value = false
-}
-
-async function confirmLogout() {
-  isLogoutConfirmOpen.value = false
-  try {
-    await authStore.logout()
-  } catch (error) {
-    toast.error('Logout Failed', error?.message || 'Failed to logout.')
-  }
 }
 
 function syncWorkspaceRealtimeSubscriptions() {
@@ -711,41 +543,11 @@ function handleVisibilityChange() {
   }
 }
 
-function handleDocumentClick(event) {
-  if (!isAccountMenuOpen.value) return
-  const root = accountMenuRef.value
-  if (!root) return
-  if (!root.contains(event.target)) {
-    isAccountMenuOpen.value = false
-  }
-}
-
-function handleDocumentKeydown(event) {
-  if (event.key !== 'Escape') return
-  if (isTermsDialogOpen.value) {
-    closeTermsDialog()
-    return
-  }
-  if (isLogoutConfirmOpen.value) {
-    cancelLogout()
-    return
-  }
-  if (isSettingsOpen.value) {
-    closeSettings()
-    return
-  }
-  if (isAccountMenuOpen.value) {
-    isAccountMenuOpen.value = false
-  }
-}
-
 // Lifecycle and Watchers
 onMounted(() => {
   setupWebSocketMonitoring()
   syncWorkspaceRealtimeSubscriptions()
   document.addEventListener('visibilitychange', handleVisibilityChange)
-  document.addEventListener('click', handleDocumentClick)
-  document.addEventListener('keydown', handleDocumentKeydown)
 })
 
 onUnmounted(() => {
@@ -761,8 +563,6 @@ onUnmounted(() => {
     unsubscribeWebSocketConnection = null
   }
   document.removeEventListener('visibilitychange', handleVisibilityChange)
-  document.removeEventListener('click', handleDocumentClick)
-  document.removeEventListener('keydown', handleDocumentKeydown)
 })
 
 watch([() => appStore.activeWorkspaceId, () => appStore.hasWorkspace, () => authStore.isAuthenticated], ([newId, hasWorkspace, isAuthenticated]) => {
@@ -780,44 +580,3 @@ watch(() => isWebSocketConnected.value, () => {
   syncWorkspaceRealtimeSubscriptions()
 })
 </script>
-
-<style scoped>
-:deep(.terms-markdown-content h1),
-:deep(.terms-markdown-content h2),
-:deep(.terms-markdown-content h3) {
-  margin-top: 1rem;
-  margin-bottom: 0.5rem;
-  font-weight: 700;
-}
-
-:deep(.terms-markdown-content h1:first-child),
-:deep(.terms-markdown-content h2:first-child),
-:deep(.terms-markdown-content h3:first-child) {
-  margin-top: 0;
-}
-
-:deep(.terms-markdown-content p) {
-  margin: 0.5rem 0;
-}
-
-:deep(.terms-markdown-content ul) {
-  margin: 0.5rem 0;
-  padding-left: 1.1rem;
-  list-style: disc;
-}
-
-:deep(.terms-markdown-content li) {
-  margin: 0.2rem 0;
-}
-
-:deep(.terms-markdown-content code) {
-  background-color: color-mix(in srgb, var(--color-text-main) 10%, transparent);
-  border-radius: 0.25rem;
-  padding: 0.05rem 0.3rem;
-}
-
-:deep(.terms-markdown-content a) {
-  color: #2563eb;
-  text-decoration: underline;
-}
-</style>
