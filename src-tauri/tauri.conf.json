@@ -43,6 +43,7 @@
       "../backend/main.py",
       "../backend/pyproject.toml",
       "../backend/uv.lock",
+      "../shared",
       "../src-tauri/bundled-tools",
       "../inquira.toml"
     ],
