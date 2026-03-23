@@ -1,7 +1,7 @@
 <template>
   <div class="h-7 w-full bg-slate-50 border-t border-slate-200 flex items-center justify-between px-3 text-[11px] text-slate-600 select-none z-50 shrink-0">
     
-    <!-- Left Section: Account, Sidebar Toggle, and Editor Position -->
+    <!-- Left Section: Account, Editor Toggle, Kernel Status, and Editor Position -->
     <div class="flex items-center gap-2 h-full">
       <!-- Account Name (opens sidebar) -->
       <button
@@ -13,6 +13,26 @@
       >
         {{ accountDisplayLabel }}
       </button>
+
+      <!-- Workspace/Schema Editor Toggle -->
+      <div v-if="authStore.isAuthenticated" class="flex items-center gap-0.5 h-full">
+        <button
+          @click="switchToWorkspace"
+          class="flex items-center gap-1 h-full px-1 rounded hover:bg-slate-200/50 transition-colors"
+          :class="appStore.activeTab === 'workspace' ? 'text-blue-600 font-medium' : 'text-slate-500 hover:text-slate-700'"
+          :title="'Switch to Workspace'"
+        >
+          <FolderOpenIcon class="w-3.5 h-3.5" />
+        </button>
+        <button
+          @click="switchToSchemaEditor"
+          class="flex items-center gap-1 h-full px-1 rounded hover:bg-slate-200/50 transition-colors"
+          :class="appStore.activeTab === 'schema-editor' ? 'text-blue-600 font-medium' : 'text-slate-500 hover:text-slate-700'"
+          :title="'Switch to Schema Editor'"
+        >
+          <DocumentTextIcon class="w-3.5 h-3.5" />
+        </button>
+      </div>
 
       <!-- Sidebar Toggle -->
       <button
@@ -100,32 +120,8 @@
       </template>
     </div>
 
-    <!-- Right Section: Editor Toggle, Data Focus, Terminal & Version -->
+    <!-- Right Section: Data Focus, Terminal & Version -->
     <div class="flex items-center gap-2 h-full">
-      <!-- Workspace/Schema Editor Toggle -->
-      <div class="flex items-center gap-0.5 h-full">
-        <button
-          @click="switchToWorkspace"
-          class="flex items-center gap-1 h-full px-1.5 hover:bg-slate-200/50 transition-colors"
-          :class="appStore.activeTab === 'workspace' ? 'text-blue-600 font-medium' : 'text-slate-500 hover:text-slate-700'"
-          :title="'Switch to Workspace'"
-        >
-          <FolderOpenIcon class="w-3.5 h-3.5" />
-          <span>Workspace</span>
-        </button>
-        <button
-          @click="switchToSchemaEditor"
-          class="flex items-center gap-1 h-full px-1.5 hover:bg-slate-200/50 transition-colors"
-          :class="appStore.activeTab === 'schema-editor' ? 'text-blue-600 font-medium' : 'text-slate-500 hover:text-slate-700'"
-          :title="'Switch to Schema Editor'"
-        >
-          <DocumentTextIcon class="w-3.5 h-3.5" />
-          <span>Schema</span>
-        </button>
-      </div>
-
-      <div class="w-px h-3.5 bg-slate-300"></div>
-
       <!-- Data Focus Toggle -->
       <button
         @click="appStore.toggleDataFocusMode()"
@@ -339,9 +335,7 @@ function toggleSidebarFromStatusBar() {
 }
 
 function openSidebar() {
-  if (appStore.isSidebarCollapsed) {
-    appStore.setSidebarCollapsed(false)
-  }
+  appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
 }
 
 function switchToWorkspace() {

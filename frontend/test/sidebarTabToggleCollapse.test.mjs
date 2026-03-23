@@ -3,15 +3,43 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('sidebar tab icons toggle collapse when clicked again on active workspace/schema tabs', () => {
+test('workspace/schema toggle is in status bar, not sidebar', () => {
   const sidebarPath = resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue')
-  const source = readFileSync(sidebarPath, 'utf-8')
+  const statusBarPath = resolve(process.cwd(), 'src/components/layout/StatusBar.vue')
+  const sidebarSource = readFileSync(sidebarPath, 'utf-8')
+  const statusBarSource = readFileSync(statusBarPath, 'utf-8')
 
-  assert.equal(source.includes("@click=\"handleTabClick('workspace')\""), true)
-  assert.equal(source.includes("@click=\"handleTabClick('schema-editor')\""), true)
-  assert.equal(source.includes("if (normalized === 'workspace')"), true)
-  assert.equal(source.includes("if (appStore.activeTab === 'workspace')"), true)
-  assert.equal(source.includes("if (normalized === 'schema-editor')"), true)
-  assert.equal(source.includes("if (appStore.activeTab === 'schema-editor')"), true)
-  assert.equal(source.includes('appStore.setSidebarCollapsed(true)'), true)
+  // Sidebar no longer has workspace/schema tab buttons
+  assert.equal(sidebarSource.includes("@click=\"handleTabClick('workspace')\""), false)
+  assert.equal(sidebarSource.includes("@click=\"handleTabClick('schema-editor')\""), false)
+  assert.equal(sidebarSource.includes("if (normalized === 'workspace')"), false)
+  assert.equal(sidebarSource.includes("if (normalized === 'schema-editor')"), false)
+
+  // Sidebar no longer has workspace/schema specific collapse logic
+  // (it still has toggleSidebar for header click, but not for tab switching)
+  assert.equal(sidebarSource.includes("if (appStore.activeTab === 'workspace')"), false)
+  assert.equal(sidebarSource.includes("if (appStore.activeTab === 'schema-editor')"), false)
+
+  // Workspace/schema toggle is now in status bar
+  assert.equal(statusBarSource.includes('switchToWorkspace'), true)
+  assert.equal(statusBarSource.includes('switchToSchemaEditor'), true)
+  assert.equal(statusBarSource.includes("appStore.activeTab === 'workspace'"), true)
+  assert.equal(statusBarSource.includes("appStore.activeTab === 'schema-editor'"), true)
+})
+
+test('sidebar has settings, terms, and logout instead of workspace/schema tabs', () => {
+  const sidebarPath = resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue')
+  const sidebarSource = readFileSync(sidebarPath, 'utf-8')
+
+  // Settings button instead of workspace/schema tabs
+  assert.equal(sidebarSource.includes('@click="openSettings'), true)
+  assert.equal(sidebarSource.includes('title="Settings"'), true)
+
+  // Terms button
+  assert.equal(sidebarSource.includes('@click="openTerms'), true)
+  assert.equal(sidebarSource.includes('title="Terms & Conditions"'), true)
+
+  // Logout button
+  assert.equal(sidebarSource.includes('@click="promptLogout'), true)
+  assert.equal(sidebarSource.includes('title="Logout"'), true)
 })

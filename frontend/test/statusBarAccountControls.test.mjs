@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('status bar keeps account controls first and uses sidebar-style drop-up menu content', () => {
+test('status bar account name opens sidebar, workspace/schema toggle is next to name', () => {
   const statusBarSource = readFileSync(
     resolve(process.cwd(), 'src/components/layout/StatusBar.vue'),
     'utf-8',
@@ -13,62 +13,127 @@ test('status bar keeps account controls first and uses sidebar-style drop-up men
     'utf-8',
   )
 
+  // Account name button toggles sidebar (not dropdown)
+  assert.equal(statusBarSource.includes('openSidebar'), true)
+  assert.equal(statusBarSource.includes('toggleAccountMenu'), false)
+  assert.equal(statusBarSource.includes('accountMenuRef'), false)
+  assert.equal(statusBarSource.includes('aria-label="Open sidebar"'), true)
+
+  // No dropdown-related elements
+  assert.equal(statusBarSource.includes('Open account menu'), false)
+  assert.equal(statusBarSource.includes('Close account menu'), false)
+  assert.equal(statusBarSource.includes('aria-label="Toggle account menu"'), false)
+  assert.equal(statusBarSource.includes('ChevronUpIcon'), false)
+  assert.equal(statusBarSource.includes('ChevronDownIcon'), false)
+
+  // Sidebar toggle still exists
   assert.equal(statusBarSource.includes('toggleSidebarFromStatusBar'), true)
-  assert.equal(statusBarSource.includes('toggleAccountMenu'), true)
-  assert.equal(statusBarSource.includes('show sidebar (cmd/ctrl+b)'), false)
   assert.equal(statusBarSource.includes('Show sidebar (Cmd/Ctrl+B)'), true)
   assert.equal(statusBarSource.includes('Hide sidebar (Cmd/Ctrl+B)'), true)
+  assert.equal(statusBarSource.includes('ChevronRightIcon'), true)
+  assert.equal(statusBarSource.includes('ChevronLeftIcon'), true)
+
+  // Workspace/Schema toggle is next to account name in left section
+  assert.equal(statusBarSource.includes('switchToWorkspace'), true)
+  assert.equal(statusBarSource.includes('switchToSchemaEditor'), true)
+  assert.equal(statusBarSource.includes('FolderOpenIcon'), true)
+  assert.equal(statusBarSource.includes('DocumentTextIcon'), true)
+
+  // Check Workspace/Schema toggle appears before Kernel Status in the left section
+  const accountNameIndex = statusBarSource.indexOf('Open sidebar')
+  const workspaceToggleIndex = statusBarSource.indexOf('switchToWorkspace')
+  const kernelStatusIndex = statusBarSource.indexOf('<!-- Kernel Status -->')
+  assert.equal(workspaceToggleIndex > accountNameIndex && workspaceToggleIndex < kernelStatusIndex, true)
+
+  // Account display label
+  assert.equal(statusBarSource.includes('accountDisplayLabel'), true)
+  assert.equal(statusBarSource.includes("if (!value.includes(' '))"), true)
+
+  // Editor position still exists
+  assert.equal(statusBarSource.includes('Ln {{ appStore.editorLine }}'), true)
+  assert.equal(statusBarSource.includes('Col {{ appStore.editorCol }}'), true)
+
+  // Data Focus and Terminal toggles
   assert.equal(statusBarSource.includes('Enter data focus mode (Cmd/Ctrl+Shift+D)'), true)
   assert.equal(statusBarSource.includes('Exit data focus mode (Cmd/Ctrl+Shift+D)'), true)
   assert.equal(statusBarSource.includes('Toggle terminal panel (Cmd/Ctrl+J)'), true)
-  assert.equal(statusBarSource.includes('Open account menu'), true)
-  assert.equal(statusBarSource.includes('Close account menu'), true)
-  assert.equal(statusBarSource.includes('aria-label="Toggle account menu"'), true)
-  assert.equal(statusBarSource.includes('ChevronUpIcon'), true)
-  assert.equal(statusBarSource.includes('ChevronDownIcon'), true)
-  assert.equal(statusBarSource.includes('ChevronUpDownIcon'), false)
-  assert.equal(statusBarSource.includes('ChevronRightIcon'), true)
-  assert.equal(statusBarSource.includes('ChevronLeftIcon'), true)
   assert.equal(statusBarSource.includes('ViewColumnsIcon'), true)
-  assert.equal(statusBarSource.includes('statusControlPillClass'), false)
-  assert.equal(statusBarSource.includes('font-medium px-1 text-slate-700'), false)
-  assert.equal(statusBarSource.includes('max-w-[120px] truncate px-1 text-blue-600'), true)
-  assert.equal(statusBarSource.includes('max-w-[120px] truncate px-1 text-blue-600 text-left rounded hover:bg-slate-200/70 transition-colors'), true)
-  assert.equal(statusBarSource.includes('accountDisplayLabel'), true)
-  assert.equal(statusBarSource.includes("if (!value.includes(' '))"), true)
-  assert.equal(statusBarSource.includes('WS Connection'), true)
-  assert.equal(statusBarSource.includes('Kernel Status'), true)
-  assert.equal(statusBarSource.includes('Ln {{ appStore.editorLine }}'), true)
-  assert.equal(statusBarSource.includes('Col {{ appStore.editorCol }}'), true)
-  assert.equal(statusBarSource.includes('Data Focus'), true)
-  assert.equal(statusBarSource.includes('Right Section: Terminal & Version'), true)
-  assert.equal(statusBarSource.includes('<SettingsModal'), true)
-  assert.equal(statusBarSource.includes('<ConfirmationModal'), true)
-  assert.equal(statusBarSource.includes('const isTermsDialogOpen = ref(false)'), true)
-  assert.equal(statusBarSource.includes("const termsMarkdown = ref('')"), true)
-  assert.equal(statusBarSource.includes('await apiService.v1GetTermsAndConditions()'), true)
-  assert.equal(statusBarSource.includes('Loading terms...'), true)
-  assert.equal(statusBarSource.includes('terms-markdown-content'), true)
-  assert.equal(statusBarSource.includes('backdrop-blur-[1.5px]'), true)
-  assert.equal(statusBarSource.includes("window.open('/terms-and-conditions.html'"), false)
-  assert.equal(statusBarSource.includes('Inquira Terms (Summary)'), false)
-  assert.equal(
-    statusBarSource.indexOf('ref="accountMenuRef"') < statusBarSource.indexOf('Toggle terminal panel (Cmd/Ctrl+J)'),
-    true,
-  )
-  assert.equal(
-    statusBarSource.indexOf('<!-- Kernel Status -->') < statusBarSource.indexOf('Ln {{ appStore.editorLine }}'),
-    true,
-  )
-  assert.equal(
-    statusBarSource.indexOf('Ln {{ appStore.editorLine }}') < statusBarSource.indexOf('Toggle terminal panel (Cmd/Ctrl+J)'),
-    true,
-  )
-  assert.equal(
-    statusBarSource.indexOf('Toggle terminal panel (Cmd/Ctrl+J)') < statusBarSource.indexOf('Inquira v0.5.7'),
-    true,
+  assert.equal(statusBarSource.includes('CommandLineIcon'), true)
+
+  // Right section doesn't have Workspace/Schema toggle anymore
+  assert.equal(statusBarSource.includes('Right Section: Editor Toggle, Data Focus, Terminal & Version'), false)
+  assert.equal(statusBarSource.includes('Right Section: Data Focus, Terminal & Version'), true)
+
+  // Terms/Settings/Logout moved to sidebar
+  assert.equal(sidebarSource.includes('CogIcon'), true)
+  assert.equal(sidebarSource.includes('DocumentIcon'), true)
+  assert.equal(sidebarSource.includes('ArrowRightOnRectangleIcon'), true)
+  assert.equal(sidebarSource.includes('openSettings'), true)
+  assert.equal(sidebarSource.includes('openTerms'), true)
+  assert.equal(sidebarSource.includes('promptLogout'), true)
+  assert.equal(sidebarSource.includes('ConfirmationModal'), true)
+  assert.equal(sidebarSource.includes('isTermsDialogOpen'), true)
+  assert.equal(sidebarSource.includes('isLogoutConfirmOpen'), true)
+
+  // StatusBar no longer has Settings/Confirmation modal directly
+  assert.equal(statusBarSource.includes('<SettingsModal'), false)
+  assert.equal(statusBarSource.includes('<ConfirmationModal'), false)
+  assert.equal(statusBarSource.includes('const isTermsDialogOpen = ref(false)'), false)
+  assert.equal(statusBarSource.includes("const termsMarkdown = ref('')"), false)
+  assert.equal(statusBarSource.includes('await apiService.v1GetTermsAndConditions()'), false)
+  assert.equal(statusBarSource.includes('Loading terms...'), false)
+  assert.equal(statusBarSource.includes('terms-markdown-content'), false)
+  assert.equal(statusBarSource.includes('backdrop-blur-[1.5px]'), false)
+
+  // Sidebar no longer has Workspace/Schema toggle
+  assert.equal(sidebarSource.includes('handleTabClick'), false)
+  assert.equal(sidebarSource.includes('FolderOpenIcon'), false) // In workspace toggle context
+  assert.equal(sidebarSource.includes('DocumentTextIcon'), false) // In schema editor toggle context
+})
+
+test('sidebar has settings, terms, and logout buttons', () => {
+  const sidebarSource = readFileSync(
+    resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'),
+    'utf-8',
   )
 
-  assert.equal(sidebarSource.includes('Account & Settings'), false)
-  assert.equal(sidebarSource.includes('toggleUserMenu'), false)
+  // Settings button in sidebar
+  assert.equal(sidebarSource.includes('@click="openSettings'), true)
+  assert.equal(sidebarSource.includes('title="Settings"'), true)
+
+  // Terms & Conditions button in sidebar
+  assert.equal(sidebarSource.includes('@click="openTerms'), true)
+  assert.equal(sidebarSource.includes('title="Terms & Conditions"'), true)
+
+  // Logout button in sidebar
+  assert.equal(sidebarSource.includes('@click="promptLogout'), true)
+  assert.equal(sidebarSource.includes('title="Logout"'), true)
+
+  // Logout confirmation modal
+  assert.equal(sidebarSource.includes('Confirm Logout'), true)
+  assert.equal(sidebarSource.includes('Are you sure you want to log out'), true)
+
+  // Terms dialog
+  assert.equal(sidebarSource.includes('Terms & Conditions'), true)
+  assert.equal(sidebarSource.includes('Last updated:'), true)
+})
+
+test('workspace/schema toggle buttons use correct icons and styling', () => {
+  const statusBarSource = readFileSync(
+    resolve(process.cwd(), 'src/components/layout/StatusBar.vue'),
+    'utf-8',
+  )
+
+  // Workspace button uses FolderOpenIcon
+  assert.ok(statusBarSource.includes('FolderOpenIcon'))
+  assert.ok(statusBarSource.includes("title=\"'Switch to Workspace'\""))
+
+  // Schema button uses DocumentTextIcon
+  assert.ok(statusBarSource.includes('DocumentTextIcon'))
+  assert.ok(statusBarSource.includes("title=\"'Switch to Schema Editor'\""))
+
+  // Active tab styling
+  assert.ok(statusBarSource.includes("appStore.activeTab === 'workspace'"))
+  assert.ok(statusBarSource.includes("appStore.activeTab === 'schema-editor'"))
+  assert.ok(statusBarSource.includes("text-blue-600 font-medium"))
 })
