@@ -38,34 +38,111 @@
       <Transition name="fade">
         <div
           v-if="backendStatus.active || workspaceRuntimeStatus.active || appBootstrap.active"
-          class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          class="fixed inset-0 z-[9999] overflow-y-auto bg-[var(--color-base)]"
         >
-          <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center">
-            <div class="relative mx-auto mb-6 w-16 h-16">
-              <div class="absolute inset-0 rounded-full border-4 border-gray-200"></div>
-              <div class="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
-            </div>
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">
-              {{ workspaceRuntimeStatus.active ? 'Preparing Workspace Runtime' : appBootstrap.active ? 'Loading Your Workspace' : 'Setting up Inquira' }}
-            </h3>
-            <p class="text-sm text-gray-500 mb-4">{{ workspaceRuntimeStatus.active ? workspaceRuntimeStatus.message : appBootstrap.active ? appBootstrap.message : backendStatus.message }}</p>
-            <p class="text-xs text-gray-400">
-              {{ workspaceRuntimeStatus.active ? 'Creating virtual environment and kernel...' : appBootstrap.active ? 'Authenticating, selecting your workspace, and starting its runtime...' : 'This only happens once' }}
-            </p>
-            <div class="mt-5 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4 text-left">
-              <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-500">Current process</p>
-              <p class="mt-2 text-sm font-medium text-gray-900">{{ currentStartupProcess }}</p>
-              <p class="mt-1 text-xs text-gray-500">{{ currentStartupElapsedLabel }}</p>
-              <ul v-if="startupTimelineEntries.length > 1" class="mt-3 space-y-2">
-                <li
-                  v-for="entry in startupTimelineEntries"
-                  :key="entry.key"
-                  class="flex items-start justify-between gap-4 text-xs text-gray-600"
-                >
-                  <span class="min-w-0 flex-1">{{ entry.label }}</span>
-                  <span class="shrink-0 font-medium text-gray-500">{{ entry.elapsed }}</span>
-                </li>
-              </ul>
+          <div class="relative min-h-screen overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.08),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(24,24,27,0.08),_transparent_34%)]"></div>
+            <div class="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(253,252,248,0))]"></div>
+            <div class="startup-grid absolute inset-0 opacity-70"></div>
+
+            <div class="relative mx-auto flex min-h-[calc(100vh-3rem)] max-w-6xl items-center justify-center">
+              <section class="w-full overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-white/88 shadow-[0_28px_90px_rgba(24,24,27,0.1)] backdrop-blur-xl">
+                <div class="grid lg:grid-cols-[1.04fr_0.96fr]">
+                  <aside class="relative overflow-hidden border-b border-[var(--color-border)] px-6 py-8 sm:px-8 lg:border-b-0 lg:border-r lg:px-10 lg:py-10">
+                    <div class="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(253,252,248,0.84)),linear-gradient(135deg,rgba(59,130,246,0.05),rgba(24,24,27,0.05))]"></div>
+                    <div class="absolute -left-16 top-10 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.18),rgba(59,130,246,0))]"></div>
+                    <div class="absolute bottom-12 right-[-3rem] h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(24,24,27,0.12),rgba(24,24,27,0))]"></div>
+
+                    <div class="relative flex h-full flex-col">
+                      <div class="flex items-center gap-4">
+                        <div class="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/70 bg-white/90 shadow-[0_16px_32px_rgba(24,24,27,0.08)]">
+                          <img :src="logo" alt="Inquira logo" class="h-10 w-10 rounded-xl shadow-sm" />
+                        </div>
+
+                        <div>
+                          <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Inquira startup</p>
+                          <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ startupOverlayPill }}</p>
+                        </div>
+                      </div>
+
+                      <div class="mt-10 max-w-xl">
+                        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--color-text-muted)]">
+                          Preparing your workspace
+                        </p>
+                        <h1 class="mt-4 text-4xl font-semibold tracking-[-0.05em] text-[var(--color-text-main)] sm:text-5xl lg:text-[3.5rem] lg:leading-[1.02]">
+                          {{ startupOverlayTitle }}
+                        </h1>
+                        <p class="mt-5 max-w-lg text-base leading-7 text-[var(--color-text-muted)] sm:text-lg sm:leading-8">
+                          {{ startupOverlayMessage }}
+                        </p>
+                      </div>
+
+                      <div class="mt-8 rounded-[1.5rem] border border-white/70 bg-white/75 p-5 shadow-[0_20px_45px_rgba(24,24,27,0.08)]">
+                        <div class="flex items-center justify-between gap-4">
+                          <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-text-muted)]">
+                              Current process
+                            </p>
+                            <p class="mt-3 text-base font-medium text-[var(--color-text-main)] sm:text-lg">
+                              {{ currentStartupProcess }}
+                            </p>
+                            <p class="mt-2 text-sm text-[var(--color-text-muted)]">
+                              {{ currentStartupElapsedLabel }}
+                            </p>
+                          </div>
+                          <div class="relative h-16 w-16 shrink-0">
+                            <div class="absolute inset-0 rounded-full border-4 border-zinc-200"></div>
+                            <div class="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <ul class="mt-8 grid gap-3 text-sm sm:grid-cols-3 lg:mt-auto lg:grid-cols-1 xl:grid-cols-3">
+                        <li class="rounded-[1.35rem] border border-white/75 bg-white/72 px-4 py-4 shadow-[0_14px_30px_rgba(24,24,27,0.06)]">
+                          <p class="text-sm font-semibold text-[var(--color-text-main)]">Visible progress</p>
+                          <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">The current stage stays on screen instead of hiding behind a generic loading dialog.</p>
+                        </li>
+                        <li class="rounded-[1.35rem] border border-white/75 bg-white/72 px-4 py-4 shadow-[0_14px_30px_rgba(24,24,27,0.06)]">
+                          <p class="text-sm font-semibold text-[var(--color-text-main)]">Real timing</p>
+                          <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">You can now see which step is actually consuming the time.</p>
+                        </li>
+                        <li class="rounded-[1.35rem] border border-white/75 bg-white/72 px-4 py-4 shadow-[0_14px_30px_rgba(24,24,27,0.06)]">
+                          <p class="text-sm font-semibold text-[var(--color-text-main)]">Fewer false starts</p>
+                          <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">{{ startupOverlayHint }}</p>
+                        </li>
+                      </ul>
+                    </div>
+                  </aside>
+
+                  <div class="flex items-center px-6 py-8 sm:px-8 lg:px-10 lg:py-10">
+                    <div class="mx-auto w-full max-w-xl rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[0_18px_48px_rgba(24,24,27,0.08)] sm:p-8">
+                      <p class="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Recent stages</p>
+                      <h2 class="mt-4 text-3xl tracking-[-0.04em] text-[var(--color-text-main)] sm:text-4xl">
+                        {{ startupOverlayPanelTitle }}
+                      </h2>
+                      <p class="mt-4 text-base leading-7 text-[var(--color-text-muted)]">
+                        {{ startupOverlayHint }}
+                      </p>
+
+                      <div class="mt-8 space-y-3">
+                        <div
+                          v-for="entry in startupTimelineEntries"
+                          :key="entry.key"
+                          class="flex items-start justify-between gap-4 rounded-[1.25rem] border border-zinc-200 bg-[var(--color-base)] px-4 py-4"
+                        >
+                          <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ entry.label }}</p>
+                            <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ entry.elapsed }}</p>
+                          </div>
+                          <span class="mt-1 inline-flex rounded-full border border-zinc-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
+                            {{ entry.scope }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
           </div>
         </div>
@@ -83,6 +160,7 @@ import { previewService } from './services/previewService'
 import { walkthroughService } from './services/walkthroughService'
 import { apiService } from './services/apiService'
 import { toast } from './composables/useToast'
+import logo from './assets/favicon.svg'
 import AuthModal from './components/modals/AuthModal.vue'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
@@ -213,9 +291,48 @@ const startupTimelineEntries = computed(() => {
       return {
         key: entry.key,
         label: `${scope}: ${entry.message}`,
+        scope,
         elapsed: formatElapsed(endedAt - entry.startedAt),
       }
     })
+})
+
+const startupOverlayTitle = computed(() => {
+  if (workspaceRuntimeStatus.active) return 'Preparing your workspace runtime.'
+  if (appBootstrap.active) return 'Loading your workspace.'
+  return 'Setting up Inquira.'
+})
+
+const startupOverlayMessage = computed(() => {
+  if (workspaceRuntimeStatus.active) {
+    return String(workspaceRuntimeStatus.message || '').trim() || 'Creating the runtime your current workspace needs.'
+  }
+  if (appBootstrap.active) {
+    return String(appBootstrap.message || '').trim() || 'Restoring your account, workspace, and runtime state.'
+  }
+  return String(backendStatus.message || '').trim() || 'Starting the local desktop services required for Inquira.'
+})
+
+const startupOverlayHint = computed(() => {
+  if (workspaceRuntimeStatus.active) {
+    return 'Kernel and environment work now stays visible inside the app shell instead of appearing as a detached dialog.'
+  }
+  if (appBootstrap.active) {
+    return 'Authentication, workspace restore, and runtime warmup now read like one continuous startup flow.'
+  }
+  return 'Desktop startup now uses the same visual language as the rest of the app so progress feels continuous.'
+})
+
+const startupOverlayPill = computed(() => {
+  if (workspaceRuntimeStatus.active) return 'Workspace runtime'
+  if (appBootstrap.active) return 'Workspace restore'
+  return 'Desktop setup'
+})
+
+const startupOverlayPanelTitle = computed(() => {
+  if (workspaceRuntimeStatus.active) return 'Workspace progress'
+  if (appBootstrap.active) return 'Workspace handoff'
+  return 'Desktop service progress'
 })
 
 function markBackendReady() {
