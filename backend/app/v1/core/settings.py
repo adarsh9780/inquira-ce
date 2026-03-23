@@ -7,6 +7,7 @@ SQLite and Postgres with environment changes only.
 from __future__ import annotations
 
 import os
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,6 +29,36 @@ def _first_env(*names: str, default: str = "") -> str:
     return default
 
 
+def _load_public_supabase_config_from_toml() -> dict[str, str]:
+    candidates: list[Path] = []
+    configured_path = str(os.getenv("INQUIRA_TOML_PATH") or "").strip()
+    if configured_path:
+        candidates.append(Path(configured_path))
+
+    repo_root = Path(__file__).resolve().parents[4]
+    candidates.append(repo_root / "inquira.toml")
+
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            data = tomllib.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        supabase = (
+            data.get("auth", {})
+            .get("supabase", {})
+        )
+        if not isinstance(supabase, dict):
+            continue
+        return {
+            "url": str(supabase.get("url") or "").strip(),
+            "publishable_key": str(supabase.get("publishable_key") or "").strip(),
+        }
+
+    return {"url": "", "publishable_key": ""}
+
+
 _load_env_files()
 
 
@@ -42,6 +73,7 @@ class V1Settings:
     allow_schema_bootstrap: bool
     auth_provider: str
     supabase_url: str
+    supabase_publishable_key: str
     supabase_secret_key: str
 
     @staticmethod
@@ -56,6 +88,7 @@ class V1Settings:
         default_dir.mkdir(parents=True, exist_ok=True)
         default_auth_db = f"sqlite+aiosqlite:///{default_dir / 'auth_v1.db'}"
         default_appdata_db = f"sqlite+aiosqlite:///{default_dir / 'appdata_v1.db'}"
+        public_supabase = _load_public_supabase_config_from_toml()
 
         return V1Settings(
             auth_db_url=os.getenv("INQUIRA_AUTH_DB_URL", default_auth_db),
@@ -64,7 +97,16 @@ class V1Settings:
             reset_token=os.getenv("INQUIRA_RESET_TOKEN", ""),
             allow_schema_bootstrap=os.getenv("INQUIRA_ALLOW_SCHEMA_BOOTSTRAP", "0") == "1",
             auth_provider=os.getenv("INQUIRA_AUTH_PROVIDER", "sqlite").strip().lower(),
-            supabase_url=_first_env("INQUIRA_SUPABASE_URL", "SB_INQUIRA_CE_URL"),
+            supabase_url=_first_env(
+                "INQUIRA_SUPABASE_URL",
+                "SB_INQUIRA_CE_URL",
+                default=public_supabase["url"],
+            ),
+            supabase_publishable_key=_first_env(
+                "INQUIRA_SUPABASE_PUBLISHABLE_KEY",
+                "SB_INQUIRA_CE_PUBLISHABLE_KEY",
+                default=public_supabase["publishable_key"],
+            ),
             supabase_secret_key=_first_env(
                 "INQUIRA_SUPABASE_SECRET_KEY",
                 "SB_INQUIRA_CE_SECRET_KEY",

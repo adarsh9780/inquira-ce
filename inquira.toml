@@ -20,6 +20,12 @@ version = "3.12"
 # https-proxy = "http://proxy.company.com:8080"
 # no-proxy = "localhost,127.0.0.1"
 
+[auth.supabase]
+# Public Supabase settings that are safe to ship in the desktop app bundle.
+# The backend uses these for local JWT verification and publishable-key fallback.
+url = "https://hboinngpzegttmrkfwny.supabase.co"
+publishable_key = "sb_publishable_UFS1NiiGW2DPifD9dCVaZw_4LffBjqC"
+
 [backend]
 # Port for the FastAPI backend server
 port = 8000
