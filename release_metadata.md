@@ -1,20 +1,19 @@
 Release
 
-### New features
+## Added
+Implemented guest sessions and removed the mandatory login wall for immediate access.
+Revamped the documentation site home page and landing pages with a premium Zinc aesthetic and 'Local-First' narrative.
+Integrated an offline-first local search engine for the documentation site.
+Added a comprehensive Editions overview page and expanded the site footer with legal links.
 
-- Added Supabase-based desktop sign-in with browser-managed authentication and session persistence across app restarts.
-- Moved agent-generated Python execution onto the workspace kernel so analysis runs in the same runtime as the active workspace.
-- Added model refresh and grouped model selection UI so provider models are easier to browse and update.
-- Launched the new docs site with branded pages, direct desktop download buttons, and the `docs.inquiraai.com` domain.
+## Changed
+Deferred session verification until the desktop backend startup is ready, making Tauri startup authoritative.
+Modernized and pivoted the public roadmap from proxy infrastructure to pure OAuth BYOK, focusing on local-first capabilities.
+Removed arbitrary workspace limits and "Free Edition" nomenclature to clarify Community Edition positioning.
+Streamlined documentation site navigation by removing redundant pages, consolidating sidebar categories, and promoting downloads.
 
-### Fixes and improvements
-
-- Made desktop login more reliable by hardening OAuth callback handling, deduplicating startup auth work, and ordering workspace bootstrap correctly after sign-in.
-- Improved agent reliability with structured tool execution, short streamed tool explanations, better schema search batching, and safer retry/recursion behavior.
-- Fixed several frontend workflow issues, including schema context text being overwritten while typing, manual schema regeneration flow, table/chart delete confirmation UX, and stable external link handling.
-- Kept release download links aligned with actual Tauri asset names so docs and download buttons point at the right installers.
-
-### Docs and product polish
-
-- Refreshed auth, privacy, and terms documentation to match current product behavior.
-- Updated site branding with the animated Inquira logo and app assets in the browser tab and social preview images.
+## Fixed
+Resolved uv path resolution issues outside of standard terminal environments during startup.
+Fixed guest fallbacks and restored App shell startup build.
+Fixed documentation site styling issues including oversized icons, missing imports, form styling, and duplicate formatting.
+Restored authentication guards and aligned stale UI assertions in the test suite.

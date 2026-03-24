@@ -37,6 +37,14 @@ DOCS_DOWNLOADS_DOC = ROOT / "docs-site" / "docs" / "downloads.md"
 DOCS_INSTALL_DOC = ROOT / "docs-site" / "docs" / "install.md"
 
 
+def warning_for_missing_path(path: Path) -> str:
+    try:
+        relative = path.relative_to(ROOT)
+    except ValueError:
+        relative = path
+    return f"warning=missing_file:{relative}"
+
+
 def normalize_version_input(version: str) -> str:
     """Accept optional leading tag marker and normalize to PEP 440 base input."""
     v = version.strip()
@@ -239,56 +247,66 @@ def update_frontend_lock(frontend_version: str) -> bool:
     return changed
 
 
-def update_docs_download_links(base_version: str, tauri_version: str) -> list[str]:
+def update_docs_download_links(base_version: str, tauri_version: str) -> tuple[list[str], list[str]]:
     payload = build_desktop_asset_payload(base_version=base_version, tauri_version=tauri_version)
     changed: list[str] = []
+    warnings: list[str] = []
 
-    page = DOCS_DOWNLOAD_PAGE.read_text(encoding="utf-8")
-    updated_page = page
-    replacements = {
-        "RELEASE_TAG": payload["tag"],
-        "MACOS_ASSET_NAME": payload["macos_asset_name"],
-        "WINDOWS_ASSET_NAME": payload["windows_asset_name"],
-        "MACOS_FALLBACK_URL": payload["macos_url"],
-        "WINDOWS_FALLBACK_URL": payload["windows_url"],
-    }
-    for key, value in replacements.items():
-        updated_page = re.sub(
-            rf"const {key} =\n\s+'[^']+';",
-            f"const {key} =\n  '{value}';",
-            updated_page,
+    if DOCS_DOWNLOAD_PAGE.exists():
+        page = DOCS_DOWNLOAD_PAGE.read_text(encoding="utf-8")
+        updated_page = page
+        replacements = {
+            "RELEASE_TAG": payload["tag"],
+            "MACOS_ASSET_NAME": payload["macos_asset_name"],
+            "WINDOWS_ASSET_NAME": payload["windows_asset_name"],
+            "MACOS_FALLBACK_URL": payload["macos_url"],
+            "WINDOWS_FALLBACK_URL": payload["windows_url"],
+        }
+        for key, value in replacements.items():
+            updated_page = re.sub(
+                rf"const {key} =\n\s+'[^']+';",
+                f"const {key} =\n  '{value}';",
+                updated_page,
+            )
+        if updated_page != page:
+            DOCS_DOWNLOAD_PAGE.write_text(updated_page, encoding="utf-8")
+            changed.append(str(DOCS_DOWNLOAD_PAGE.relative_to(ROOT)))
+    else:
+        warnings.append(warning_for_missing_path(DOCS_DOWNLOAD_PAGE))
+
+    if DOCS_DOWNLOADS_DOC.exists():
+        downloads_doc = DOCS_DOWNLOADS_DOC.read_text(encoding="utf-8")
+        updated_downloads_doc = re.sub(
+            r"- \[macOS direct download\]\([^)]+\)\n- \[Windows direct download\]\([^)]+\)",
+            (
+                f"- [macOS direct download]({payload['macos_url']})\n"
+                f"- [Windows direct download]({payload['windows_url']})"
+            ),
+            downloads_doc,
         )
-    if updated_page != page:
-        DOCS_DOWNLOAD_PAGE.write_text(updated_page, encoding="utf-8")
-        changed.append(str(DOCS_DOWNLOAD_PAGE.relative_to(ROOT)))
+        if updated_downloads_doc != downloads_doc:
+            DOCS_DOWNLOADS_DOC.write_text(updated_downloads_doc, encoding="utf-8")
+            changed.append(str(DOCS_DOWNLOADS_DOC.relative_to(ROOT)))
+    else:
+        warnings.append(warning_for_missing_path(DOCS_DOWNLOADS_DOC))
 
-    downloads_doc = DOCS_DOWNLOADS_DOC.read_text(encoding="utf-8")
-    updated_downloads_doc = re.sub(
-        r"- \[macOS direct download\]\([^)]+\)\n- \[Windows direct download\]\([^)]+\)",
-        (
-            f"- [macOS direct download]({payload['macos_url']})\n"
-            f"- [Windows direct download]({payload['windows_url']})"
-        ),
-        downloads_doc,
-    )
-    if updated_downloads_doc != downloads_doc:
-        DOCS_DOWNLOADS_DOC.write_text(updated_downloads_doc, encoding="utf-8")
-        changed.append(str(DOCS_DOWNLOADS_DOC.relative_to(ROOT)))
+    if DOCS_INSTALL_DOC.exists():
+        install_doc = DOCS_INSTALL_DOC.read_text(encoding="utf-8")
+        updated_install_doc = re.sub(
+            r"- \[macOS \(`\.dmg`\)\]\([^)]+\)\n- \[Windows \(`\.exe`\)\]\([^)]+\)",
+            (
+                f"- [macOS (`.dmg`)]({payload['macos_url']})\n"
+                f"- [Windows (`.exe`)]({payload['windows_url']})"
+            ),
+            install_doc,
+        )
+        if updated_install_doc != install_doc:
+            DOCS_INSTALL_DOC.write_text(updated_install_doc, encoding="utf-8")
+            changed.append(str(DOCS_INSTALL_DOC.relative_to(ROOT)))
+    else:
+        warnings.append(warning_for_missing_path(DOCS_INSTALL_DOC))
 
-    install_doc = DOCS_INSTALL_DOC.read_text(encoding="utf-8")
-    updated_install_doc = re.sub(
-        r"- \[macOS \(`\.dmg`\)\]\([^)]+\)\n- \[Windows \(`\.exe`\)\]\([^)]+\)",
-        (
-            f"- [macOS (`.dmg`)]({payload['macos_url']})\n"
-            f"- [Windows (`.exe`)]({payload['windows_url']})"
-        ),
-        install_doc,
-    )
-    if updated_install_doc != install_doc:
-        DOCS_INSTALL_DOC.write_text(updated_install_doc, encoding="utf-8")
-        changed.append(str(DOCS_INSTALL_DOC.relative_to(ROOT)))
-
-    return changed
+    return changed, warnings
 
 
 def run_updates(
@@ -314,31 +332,59 @@ def run_updates(
         return results
 
     changed: list[str] = []
-    if update_backend_pyproject(versions["backend"]):
-        changed.append("backend/pyproject.toml")
-    if update_backend_main(versions["backend"]):
-        changed.append("backend/app/main.py")
-    if update_tauri_cargo(versions["tauri"]):
-        changed.append("src-tauri/Cargo.toml")
-    if update_tauri_conf(versions["tauri"]):
-        changed.append("src-tauri/tauri.conf.json")
-    if update_frontend_package(versions["frontend"]):
-        changed.append("frontend/package.json")
-    if update_frontend_lock(versions["frontend"]):
-        changed.append("frontend/package-lock.json")
+    warnings: list[str] = []
+
+    if BACKEND_PYPROJECT.exists():
+        if update_backend_pyproject(versions["backend"]):
+            changed.append("backend/pyproject.toml")
+    else:
+        warnings.append(warning_for_missing_path(BACKEND_PYPROJECT))
+
+    if BACKEND_MAIN.exists():
+        if update_backend_main(versions["backend"]):
+            changed.append("backend/app/main.py")
+    else:
+        warnings.append(warning_for_missing_path(BACKEND_MAIN))
+
+    if TAURI_CARGO.exists():
+        if update_tauri_cargo(versions["tauri"]):
+            changed.append("src-tauri/Cargo.toml")
+    else:
+        warnings.append(warning_for_missing_path(TAURI_CARGO))
+
+    if TAURI_CONF.exists():
+        if update_tauri_conf(versions["tauri"]):
+            changed.append("src-tauri/tauri.conf.json")
+    else:
+        warnings.append(warning_for_missing_path(TAURI_CONF))
+
+    if FRONTEND_PACKAGE.exists():
+        if update_frontend_package(versions["frontend"]):
+            changed.append("frontend/package.json")
+    else:
+        warnings.append(warning_for_missing_path(FRONTEND_PACKAGE))
+
+    if FRONTEND_LOCK.exists():
+        if update_frontend_lock(versions["frontend"]):
+            changed.append("frontend/package-lock.json")
+    else:
+        warnings.append(warning_for_missing_path(FRONTEND_LOCK))
+
     if update_release_metadata(versions["base"]):
         changed.append(".github/release/metadata.json")
-    changed.extend(
-        update_docs_download_links(
-            base_version=versions["base"],
-            tauri_version=versions["tauri"],
-        )
+
+    docs_changed, docs_warnings = update_docs_download_links(
+        base_version=versions["base"],
+        tauri_version=versions["tauri"],
     )
+    changed.extend(docs_changed)
+    warnings.extend(docs_warnings)
 
     if changed:
         results.append("updated_files=" + ",".join(changed))
     else:
         results.append("updated_files=<none>")
+    results.extend(warnings)
     return results
 
 
