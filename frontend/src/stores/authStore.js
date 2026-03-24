@@ -18,6 +18,7 @@ export const useAuthStore = defineStore('auth', () => {
   const authFlowStage = ref('')
   const authFlowMessage = ref('')
   const initialSessionResolved = ref(false)
+  const isAuthModalVisible = ref(false)
   let authProbeRevision = 0
   let authSubscription = null
   let authProgressListenerBound = false
@@ -178,8 +179,9 @@ export const useAuthStore = defineStore('auth', () => {
       const authEvent = String(event || '').trim().toUpperCase()
       markInitialSessionResolved(authEvent)
       if (!accessToken) {
-        if (authEvent === 'SIGNED_OUT') {
-          clearLocalState()
+        if (authEvent === 'SIGNED_OUT' || authEvent === 'INITIAL_SESSION') {
+          console.log('[AUTH PROFILE] No session in onAuthStateChange, falling back to Guest.')
+          await hydrateUserFromBackend('')
           error.value = ''
           pendingAuthAction.value = ''
           clearAuthFlow()
@@ -274,10 +276,10 @@ export const useAuthStore = defineStore('auth', () => {
       if (probeRevision !== authProbeRevision) return
       const accessToken = String(session?.access_token || '').trim()
       if (!accessToken) {
-        if (!preserveSession) {
-          clearLocalState()
-        }
-        return false
+        // Inquira CE Beta: Fallback to Guest session if no Supabase session found
+        console.log('[AUTH PROFILE] No Supabase session, attempting Guest hydration...')
+        await hydrateUserFromBackend('')
+        return true
       }
       await ensureBackendHydration(accessToken)
       return true
@@ -416,5 +418,8 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     refreshPlan,
     clearError,
+    showAuthModal: () => { isAuthModalVisible.value = true },
+    hideAuthModal: () => { isAuthModalVisible.value = false },
+    isAuthModalVisible,
   }
 })

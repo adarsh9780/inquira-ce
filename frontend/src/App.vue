@@ -6,11 +6,10 @@
     <!-- Connection Status Indicator -->
     <ConnectionStatusIndicator />
 
-    <!-- Authentication Modal -->
-    <!-- Auth Modal -->
+    <!-- Auth Modal - Only shown if explicitly requested or on auth errors -->
     <AuthModal
-      :is-open="isAuthUiReady && authStore.initialSessionResolved && !authStore.isAuthenticated && !appBootstrap.active"
-      @close="handleAuthClose"
+      :is-open="authStore.isAuthModalVisible"
+      @close="authStore.hideAuthModal"
     />
 
     <!-- Main App (only shown when authenticated) -->
