@@ -8,8 +8,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'index',
         'install',
-        'downloads',
-        'overview'
+        'downloads'
       ],
     },
     {

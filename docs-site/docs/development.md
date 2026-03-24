@@ -59,4 +59,13 @@ make test
 - If you touch agent execution flow, verify both the LangGraph graph path and the backend workspace-kernel runtime path.
 - If you touch release tooling, verify docs and workflow tests in `backend/tests/`.
 
+## Repository Layout
+
+- `src-tauri/`: Desktop shell (Tauri/Rust) and app packaging.
+- `backend/`: FastAPI backend, agent/runtime services, and tests.
+- `frontend/`: Vue frontend used by the desktop app.
+- `agents/`: LangGraph agent graphs, tool routing, tracing hooks, and tool execution contracts.
+- `scripts/`: maintenance scripts used by Makefile and release workflow.
+- `docs-site/`: Docusaurus website project for public docs, landing pages, and downloads.
+
 Next: [Commit And Release Flow](./commit-and-release.md)

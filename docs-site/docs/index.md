@@ -2,30 +2,37 @@
 slug: /
 ---
 
-# Inquira CE
+# Welcome to Inquira
 
-Inquira CE is a local-first AI data analysis app distributed as Desktop installers (macOS/Windows) via GitHub Releases.
+Inquira CE is a privacy-first, local AI data analysis desktop application. By running strictly on your local machine, Inquira ensures your sensitive datasets never leave your device while still giving you the power of an AI-assisted data workflow.
 
-## Major recent updates
+## What is Inquira?
 
-- Real-time chat token streaming.
-- Unified collapsible sidebar and dual-pane workspace layout.
-- Persistent built-in terminal workflow for workspace analysis.
-- Improved runtime/artifact stability, including DuckDB lock handling.
+In plain terms: you ask a question about your data in natural language, and Inquira's agents will generate and execute Python analysis scripts autonomously, returning the results, charts, or insights directly to you. It bridges the gap between chat-based LLMs and reproducible data science pipelines.
 
-## Quick Actions
+## Coming Soon
 
-- [Open latest release](https://github.com/adarsh9780/inquira-ce/releases/latest)
-- [Browse all releases](https://github.com/adarsh9780/inquira-ce/releases)
+*A video demonstration of Inquira's workspace and analysis flow will be placed here soon.*
 
-## What this site includes
+## Core Features
+*(Drafted based on current capabilities - pending user review for accuracy)*
 
-- Download links for desktop assets
-- Setup and development guides
-- Release and CI workflow documentation
-- Project roadmap and contribution guide
-- Authentication strategy and product account direction
+- **Local Python Execution**: Comes with a bundled Jupyter kernel running locally to execute generated Python scripts seamlessly.
+- **AI-Assisted Analysis**: Translates your natural language prompts into executable data workflows.
+- **Real-Time Visibility**: Watch the agent's thought process through real-time chat token streaming and tool-by-tool operational progress updates. 
+- **Built-in Terminal**: Features a persistent terminal within the workspace for debugging or running manual commands.
+- **Robust Persistence**: Engineered with safer chart naming conventions, state preservation, and DuckDB lock handling to prevent frustrating session crashes.
+- **Unified Workspace**: An intuitive layout with an interactive dual-pane view and a collapsible sidebar to manage your tables and artifacts.
 
-If this is your first time here, start with [Downloads](./downloads.md) and then move to [Install](./install.md).
+## Who is this for?
 
-If you are evaluating product sign-in and account architecture, read [Authentication Strategy](./auth-strategy.md).
+Inquira CE is designed for:
+- Data Analysts who handle confidential IP or sensitive metrics and require a local, isolated environment.
+- Developers looking for an open, extensible, and local LangGraph-based AI agent architecture.
+- Anyone who wants an AI co-pilot for their local SQLite or DuckDB datasets without manually managing a Python environment.
+
+## Next Steps
+
+If this is your first time here, start with [Downloads](./downloads.md) and move to [Install](./install.md).
+
+If you are evaluating product sign-in and account architecture, read about our [Authentication Strategy](./auth-strategy.md) and [Editions](./editions.md).
