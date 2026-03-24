@@ -17,10 +17,10 @@ Instead of relying on fragile in-memory dataframes that crash the app when sized
 - **Purpose**: Uses **DuckDB** for lightning-fast analytics queries capable of scanning out-of-memory datasets natively.
 - **Persistence**: File ingestions and schema generations are saved to disk instantly, allowing users to close the app and perfectly resume their session states later without re-importing data.
 
-## 4. Agent Execution Layer (LangGraph + Jupyter)
+## 4. Agent Execution Layer (LangGraph API + Jupyter)
 Inquira strictly separates the "Thinking" (the Planner Agent) from the "Doing" (the Code Runner) for maximum reliability.
-- **Agent Engine**: Built on **LangGraph** (`agent_v2`), the agent autonomously routes queries, requests specific schema contexts, and generates Python execution plans.
-- **Jupyter Kernel**: Generated Python code is executed in an actively monitored, isolated Jupyter runtime—**not** inside the LangGraph agent process. This guarantees that if user-generated code crashes or memory-limits are hit, the orchestrating agent survives to report the failure.
+- **Standalone Agent Service**: Built on **LangGraph** (`agent_v2`), the agent runs entirely decoupled from the core FastAPI backend as a standalone API service. This highly modular design means the Frontend communicates with the Backend, which then streams negotiated executions with the distinct Langgraph Agent process over the local network via `AgentClient`.
+- **Jupyter Kernel**: Generated Python code is executed in an actively monitored, isolated Jupyter runtime managed by the Backend orchestrator—**not** locally inside the LangGraph agent process. This guarantees that if user-generated code crashes or memory-limits are hit, the orchestrating agent survives to report the failure.
 
 ---
 
@@ -41,6 +41,7 @@ sequenceDiagram
     participant User as User
     participant Frontend as Vue Frontend
     participant API as FastAPI V1 Chat API
+    participant AgentService as LangGraph API Server
     participant Agent as LangGraph agent_v2
     participant Planner as Planner LLM
     participant ToolExec as CustomToolNode
@@ -48,7 +49,8 @@ sequenceDiagram
 
     User->>Frontend: Ask a data question
     Frontend->>API: POST /v1/chat
-    API->>Agent: stream(question, workspace_id, schema, context)
+    API->>AgentService: AgentClient Proxy
+    AgentService->>Agent: execute_graph(question, workspace, context)
 
     Agent->>Agent: prepare_input
     Agent->>Agent: route
