@@ -2,13 +2,7 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 
 const sidebars: SidebarsConfig = {
   tutorialSidebar: [
-    {
-      type: 'category',
-      label: 'Welcome / Getting Started',
-      items: [
-        'index'
-      ],
-    },
+    'index',
     {
       type: 'category',
       label: 'Editions (Free, Pro & Enterprise)',
