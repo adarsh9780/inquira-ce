@@ -8,28 +8,26 @@ Inquira CE is a privacy-first, local AI data analysis desktop application. By ru
 
 ## What is Inquira?
 
-In plain terms: you ask a question about your data in natural language, and Inquira's agents will generate and execute Python analysis scripts autonomously, returning the results, charts, or insights directly to you. It bridges the gap between chat-based LLMs and reproducible data science pipelines.
+In plain terms: you ask a question about your data in natural language, and Inquira's agents will generate Python analysis scripts, autonomously execute them against your data locally, and return the final results, charts, or insights directly to you along with a concise natural language explanation. It bridges the gap between chat-based LLMs and reproducible data science pipelines.
 
 ## Coming Soon
 
 *A video demonstration of Inquira's workspace and analysis flow will be placed here soon.*
 
 ## Core Features
-*(Drafted based on current capabilities - pending user review for accuracy)*
 
-- **Local Python Execution**: Comes with a bundled Jupyter kernel running locally to execute generated Python scripts seamlessly.
-- **AI-Assisted Analysis**: Translates your natural language prompts into executable data workflows.
-- **Real-Time Visibility**: Watch the agent's thought process through real-time chat token streaming and tool-by-tool operational progress updates. 
-- **Built-in Terminal**: Features a persistent terminal within the workspace for debugging or running manual commands.
-- **Robust Persistence**: Engineered with safer chart naming conventions, state preservation, and DuckDB lock handling to prevent frustrating session crashes.
-- **Unified Workspace**: An intuitive layout with an interactive dual-pane view and a collapsible sidebar to manage your tables and artifacts.
+- **Autonomous AI-Assisted Analysis**: Translates your natural language prompts into Python workflows, independently executes them, and rapidly returns the final answers and charts.
+- **Local Python Execution**: Comes with a bundled Jupyter kernel running locally. For robust security, the AI cannot modify your virtual environment arbitrarily; if a new package is needed, it generates the exact `uv` installation command for you to safely run in the integrated terminal.
+- **Seamless Local Data Handling**: Inquira natively connects to your Excel, CSV, JSON, and Parquet files. It dynamically converts them into extremely fast, local DuckDB workspaces capable of analyzing data of any size that fits on your machine.
+- **Flawless Resume & Persistence**: Never lose your context. Intermediate variables, artifacts, and local results are saved continuously. You can close the app and resume exactly where you left off later without having to reconnect datasets or rerun expensive computations.
+- **Real-Time Visibility & Built-in Terminal**: Watch the agent's thought process through real-time chat token streaming, and leverage the built-in workspace terminal for manual execution and debugging.
 
 ## Who is this for?
 
 Inquira CE is designed for:
 - Data Analysts who handle confidential IP or sensitive metrics and require a local, isolated environment.
 - Developers looking for an open, extensible, and local LangGraph-based AI agent architecture.
-- Anyone who wants an AI co-pilot for their local SQLite or DuckDB datasets without manually managing a Python environment.
+- Anyone who wants an AI co-pilot for their local datasets without manually managing complicated Python dependencies or environments.
 
 ## Next Steps
 
