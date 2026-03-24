@@ -70,7 +70,7 @@ def test_tauri_bundle_resources_include_backend_project_files():
     assert "../shared/__init__.py" in resources
     assert "../shared/observability/__init__.py" in resources
     assert "../shared/observability/phoenix.py" in resources
-    assert "../src-tauri/bundled-tools" in resources
+    assert "bundled-tools" in resources
     assert "../inquira.toml" in resources
     assert "../backend/app/static" not in resources
 

@@ -50,7 +50,7 @@
       "../shared/__init__.py",
       "../shared/observability/__init__.py",
       "../shared/observability/phoenix.py",
-      "../src-tauri/bundled-tools",
+      "bundled-tools",
       "../inquira.toml"
     ],
     "icon": [

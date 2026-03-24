@@ -707,13 +707,16 @@ fn bundled_uv_candidates(resource_dir: &Path) -> Vec<PathBuf> {
     let bundled_names = vec![uv_binary_file_name(), "uv"];
     #[cfg(not(target_os = "windows"))]
     let bundled_names = vec![uv_binary_file_name()];
+    let bundled_roots = vec!["bundled-tools", "src-tauri/bundled-tools"];
 
     for candidate_name in bundled_names {
-        let bundled_relative = format!("bundled-tools/{candidate_name}");
-        candidates.push(resolve_resource_path(
-            &resource_dir.to_path_buf(),
-            &bundled_relative,
-        ));
+        for bundled_root in &bundled_roots {
+            let bundled_relative = format!("{bundled_root}/{candidate_name}");
+            candidates.push(resolve_resource_path(
+                &resource_dir.to_path_buf(),
+                &bundled_relative,
+            ));
+        }
         candidates.push(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("bundled-tools")
@@ -1662,6 +1665,16 @@ mod tests {
                 .iter()
                 .any(|path| path.ends_with(Path::new("bundled-tools").join(uv_binary_file_name()))),
             "expected bundled candidates to include the platform uv binary name"
+        );
+        assert!(
+            candidates.iter().any(|path| {
+                path.ends_with(
+                    Path::new("src-tauri")
+                        .join("bundled-tools")
+                        .join(uv_binary_file_name()),
+                )
+            }),
+            "expected bundled candidates to include the legacy src-tauri resource layout"
         );
 
         #[cfg(target_os = "windows")]
