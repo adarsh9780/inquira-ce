@@ -4,7 +4,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::net::TcpStream;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child as StdChild, Command};
 use std::sync::Mutex;
 use std::thread;
@@ -226,9 +226,7 @@ fn stop_child_process(name: &str, child: &mut StdChild) {
                             thread::sleep(GRACEFUL_SHUTDOWN_POLL_INTERVAL);
                         }
                         Err(e) => {
-                            log::warn!(
-                                "Failed while waiting for graceful {name} shutdown: {e}"
-                            );
+                            log::warn!("Failed while waiting for graceful {name} shutdown: {e}");
                             break;
                         }
                     }
@@ -379,20 +377,17 @@ fn auth_start_loopback_listener(app: tauri::AppHandle) -> Result<AuthLoopbackRes
             let read_len = stream.read(&mut buffer).unwrap_or(0);
             let request = String::from_utf8_lossy(&buffer[..read_len]);
             let request_line = request.lines().next().unwrap_or_default();
-            let target = request_line
-                .split_whitespace()
-                .nth(1)
+            let target = request_line.split_whitespace().nth(1).unwrap_or_default();
+            let query = target
+                .split_once('?')
+                .map(|(_, raw)| raw)
                 .unwrap_or_default();
-            let query = target.split_once('?').map(|(_, raw)| raw).unwrap_or_default();
             let params: HashMap<String, String> = url::form_urlencoded::parse(query.as_bytes())
                 .into_owned()
                 .collect();
             let code = params.get("code").cloned().unwrap_or_default();
             let error = params.get("error").cloned().unwrap_or_default();
-            let error_description = params
-                .get("error_description")
-                .cloned()
-                .unwrap_or_default();
+            let error_description = params.get("error_description").cloned().unwrap_or_default();
 
             let body = if code.is_empty() {
                 let _ = app_handle.emit(
@@ -647,29 +642,115 @@ fn tauri_terminal_stop(
 // UV Bootstrap Logic
 // ─────────────────────────────────────────────────────────────────────
 
-fn find_uv_binary(resource_dir: &PathBuf) -> PathBuf {
-    // In production, UV is bundled in resources/
-    let bundled_unix = resolve_resource_path(resource_dir, "bundled-tools/uv");
-    if bundled_unix.exists() {
-        return bundled_unix;
+fn uv_binary_file_name() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "uv.exe"
+    } else {
+        "uv"
     }
-    let bundled_windows = resolve_resource_path(resource_dir, "bundled-tools/uv.exe");
-    if bundled_windows.exists() {
-        return bundled_windows;
+}
+
+fn first_existing_path(candidates: &[PathBuf]) -> Option<PathBuf> {
+    candidates.iter().find(|path| path.is_file()).cloned()
+}
+
+fn find_binary_on_path(binary_name: &str) -> Option<PathBuf> {
+    let path_var = std::env::var_os("PATH")?;
+    std::env::split_paths(&path_var)
+        .map(|dir| dir.join(binary_name))
+        .find(|candidate| candidate.is_file())
+}
+
+fn default_uv_search_paths(home_dir: Option<PathBuf>) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    let binary_name = uv_binary_file_name();
+
+    #[cfg(target_os = "macos")]
+    {
+        candidates.push(PathBuf::from("/opt/homebrew/bin").join(binary_name));
+        candidates.push(PathBuf::from("/usr/local/bin").join(binary_name));
     }
 
-    // In development, try to find uv on PATH
-    if let Ok(output) = Command::new("which").arg("uv").output() {
-        if output.status.success() {
-            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !path.is_empty() {
-                return PathBuf::from(path);
-            }
+    #[cfg(target_os = "linux")]
+    {
+        candidates.push(PathBuf::from("/usr/local/bin").join(binary_name));
+        candidates.push(PathBuf::from("/usr/bin").join(binary_name));
+    }
+
+    if let Some(home) = home_dir {
+        candidates.push(home.join(".cargo").join("bin").join(binary_name));
+        candidates.push(home.join(".local").join("bin").join(binary_name));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(home) = std::env::var_os("USERPROFILE") {
+            let home = PathBuf::from(home);
+            candidates.push(home.join(".cargo").join("bin").join(binary_name));
+        }
+        if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+            candidates.push(
+                PathBuf::from(local_app_data)
+                    .join("Programs")
+                    .join("uv")
+                    .join(binary_name),
+            );
         }
     }
 
-    // Fallback: assume it's on PATH
-    PathBuf::from("uv")
+    candidates
+}
+
+fn uv_search_candidates(resource_dir: &Path) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    let binary_name = uv_binary_file_name();
+
+    if let Ok(raw) = std::env::var("INQUIRA_UV_BIN") {
+        let trimmed = raw.trim();
+        if !trimmed.is_empty() {
+            candidates.push(PathBuf::from(trimmed));
+        }
+    }
+
+    let bundled_relative = format!("bundled-tools/{binary_name}");
+    candidates.push(resolve_resource_path(
+        &resource_dir.to_path_buf(),
+        &bundled_relative,
+    ));
+    candidates.push(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("bundled-tools")
+            .join(binary_name),
+    );
+
+    if let Some(path_candidate) = find_binary_on_path(binary_name) {
+        candidates.push(path_candidate);
+    }
+
+    candidates.extend(default_uv_search_paths(dirs_next::home_dir()));
+    candidates
+}
+
+fn missing_uv_binary_error() -> String {
+    format!(
+        "Could not find the `{}` binary. Checked bundled desktop resources, {}{}, and common install locations. Install uv, set INQUIRA_UV_BIN to the full binary path, or use `make build-desktop` so src-tauri/bundled-tools/{} is staged for local desktop builds.",
+        uv_binary_file_name(),
+        "PATH",
+        if cfg!(target_os = "macos") {
+            " including /opt/homebrew/bin"
+        } else {
+            ""
+        },
+        uv_binary_file_name(),
+    )
+}
+
+fn find_uv_binary(resource_dir: &PathBuf) -> Result<PathBuf, String> {
+    if let Some(path) = first_existing_path(&uv_search_candidates(resource_dir)) {
+        return Ok(path);
+    }
+
+    Err(missing_uv_binary_error())
 }
 
 fn backend_env_fingerprint(backend_dir: &PathBuf) -> String {
@@ -837,14 +918,23 @@ fn kill_all_listeners_on_port(port: u16) -> usize {
                 );
             }
             Err(e) => {
-                log::warn!("Failed to execute kill for pid {} on port {}: {}", pid, port, e);
+                log::warn!(
+                    "Failed to execute kill for pid {} on port {}: {}",
+                    pid,
+                    port,
+                    e
+                );
             }
         }
     }
     killed
 }
 
-fn ensure_ports_available(ports: &[u16], app: &tauri::AppHandle, phase: &str) -> Result<(), String> {
+fn ensure_ports_available(
+    ports: &[u16],
+    app: &tauri::AppHandle,
+    phase: &str,
+) -> Result<(), String> {
     let mut busy_ports: Vec<(u16, Vec<String>)> = Vec::new();
     for port in ports {
         let pids = list_listening_pids_on_port(*port);
@@ -1032,7 +1122,10 @@ fn start_agent_runtime(
 
     cmd.current_dir(agent_dir)
         .env("VIRTUAL_ENV", venv_path.to_string_lossy().to_string())
-        .env("INQUIRA_TOML_PATH", inquira_toml_path.to_string_lossy().to_string())
+        .env(
+            "INQUIRA_TOML_PATH",
+            inquira_toml_path.to_string_lossy().to_string(),
+        )
         .env("LOG_LEVEL", console_log_level)
         .env("INQUIRA_AGENT_SHARED_SECRET", shared_secret)
         .env("INQUIRA_AGENT_HOST", agent_host)
@@ -1113,7 +1206,8 @@ pub fn run() {
                 });
                 fs::create_dir_all(&data_dir).ok();
 
-                let uv_bin = find_uv_binary(&resource_dir);
+                let uv_bin = find_uv_binary(&resource_dir)
+                    .map_err(|error| format!("Startup failed: {error}"))?;
                 // In dev, backend is a sibling directory; in prod, it's bundled in resources
                 let backend_dir = if cfg!(debug_assertions) {
                     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../backend")
@@ -1167,7 +1261,9 @@ pub fn run() {
                     if always_sync_backend_env {
                         log::info!("Debug mode: syncing backend Python environment...");
                     } else {
-                        log::info!("Backend dependencies changed. Re-syncing Python environment...");
+                        log::info!(
+                            "Backend dependencies changed. Re-syncing Python environment..."
+                        );
                     }
                     app.emit(
                         "backend-status",
@@ -1343,12 +1439,13 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        detect_default_shell, needs_python_bootstrap, parse_lsof_pid_lines, resolve_pty_cwd,
-        resolve_resource_path, resolve_shared_console_log_level, resolve_uv_index_url,
-        stop_child_process, InquiraConfig, LoggingConfig, PythonConfig,
+        default_uv_search_paths, detect_default_shell, missing_uv_binary_error,
+        needs_python_bootstrap, parse_lsof_pid_lines, resolve_pty_cwd, resolve_resource_path,
+        resolve_shared_console_log_level, resolve_uv_index_url, stop_child_process,
+        uv_binary_file_name, uv_search_candidates, InquiraConfig, LoggingConfig, PythonConfig,
     };
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::process::Command;
 
     #[test]
@@ -1510,6 +1607,51 @@ mod tests {
 
         let resolved = resolve_resource_path(&base, "backend");
         assert_eq!(resolved, base.join("_up_").join("backend"));
+    }
+
+    #[test]
+    fn uv_search_candidates_include_env_override_and_manifest_bundle() {
+        let base = std::env::temp_dir().join("inq_uv_candidates");
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).expect("create resource dir");
+
+        let override_path = base.join("custom").join(uv_binary_file_name());
+        std::env::set_var(
+            "INQUIRA_UV_BIN",
+            override_path.to_string_lossy().to_string(),
+        );
+
+        let candidates = uv_search_candidates(&base);
+
+        assert_eq!(candidates.first(), Some(&override_path));
+        assert!(
+            candidates
+                .iter()
+                .any(|path| path.ends_with(Path::new("bundled-tools").join(uv_binary_file_name()))),
+            "expected manifest bundled-tools fallback in uv search candidates"
+        );
+
+        std::env::remove_var("INQUIRA_UV_BIN");
+    }
+
+    #[test]
+    fn uv_search_common_paths_include_home_cargo_bin() {
+        let home = std::env::temp_dir().join("inq_uv_home");
+        let candidates = default_uv_search_paths(Some(home.clone()));
+        assert!(
+            candidates
+                .iter()
+                .any(|path| path == &home.join(".cargo").join("bin").join(uv_binary_file_name())),
+            "expected home cargo bin fallback in uv search paths"
+        );
+    }
+
+    #[test]
+    fn missing_uv_binary_error_is_actionable() {
+        let error = missing_uv_binary_error();
+        assert!(error.contains("Could not find the"));
+        assert!(error.contains("INQUIRA_UV_BIN"));
+        assert!(error.contains("make build-desktop"));
     }
 
     #[test]
