@@ -54,12 +54,12 @@ Before running `make git-commit`, create a local root `commit_message.txt` file 
 
 ## Official Documentation Map
 
-1. [Welcome & Editions](./docs-site/docs/index.md)
-2. [Getting Data In](./docs-site/docs/getting_data_in.md)
-3. [Workspace Management](./docs-site/docs/workspace_management.md)
-4. [System Architecture](./docs-site/docs/architecture.md)
-5. [Local Development Guide](./docs-site/docs/development.md)
-6. [Future Roadmap](./docs-site/docs/roadmap.md)
+1. [Welcome & Editions](https://docs.inquiraai.com/docs/)
+2. [Getting Data In](https://docs.inquiraai.com/docs/getting_data_in)
+3. [Workspace Management](https://docs.inquiraai.com/docs/workspace_management)
+4. [System Architecture](https://docs.inquiraai.com/docs/architecture)
+5. [Local Development Guide](https://docs.inquiraai.com/docs/development)
+6. [Future Roadmap](https://docs.inquiraai.com/docs/roadmap)
 
 ## License
 
