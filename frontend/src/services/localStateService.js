@@ -7,7 +7,7 @@ import {
 } from '@tauri-apps/plugin-fs'
 
 const SNAPSHOT_DIR = 'state'
-const DEFAULT_SCOPE = 'anonymous'
+const DEFAULT_SCOPE = 'default'
 
 function isTauriRuntime() {
   return typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__

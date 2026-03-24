@@ -323,7 +323,7 @@ const startupOverlayPill = computed(() => {
 const startupOverlayPanelTitle = computed(() => {
   if (workspaceRuntimeStatus.active) return 'Workspace progress'
   return 'Workspace handoff'
-}
+})
 
 function toggleSidebarVisibility() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)

@@ -50,23 +50,8 @@ def _auth_user_from_payload(payload: dict[str, Any]) -> AuthUserRecord:
         plan=plan.upper(),
     )
 
-
-ANONYMOUS_USER_ID = "00000000-0000-0000-0000-000000000000"
-
-
 class AuthService:
     """Business logic for validating Supabase access tokens."""
-
-    @staticmethod
-    def get_anonymous_user() -> AuthUserRecord:
-        """Return a persistent 'Guest' identity for local-first sessions."""
-        return AuthUserRecord(
-            id=ANONYMOUS_USER_ID,
-            username="guest",
-            password_hash="",
-            salt="",
-            plan="FREE",
-        )
 
     @staticmethod
     def _fallback_api_key() -> str:
