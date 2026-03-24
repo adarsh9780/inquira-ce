@@ -35,6 +35,6 @@ In plain terms: you ask a question about your data in natural language, and Inqu
 
 ## Next Steps
 
-If this is your first time here, you can grab the desktop application from the **Download** link in the top navigation bar.
+If this is your first time here, you can grab the desktop application from the [Download](/download) link in the top navigation bar.
 
 If you are evaluating product sign-in and account architecture, read about our [Authentication Strategy](./auth-strategy.md) and [Editions](./editions.md).
