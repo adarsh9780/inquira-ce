@@ -42,4 +42,4 @@ All notable changes should be documented in this file.
 ### Notes
 - This section intentionally lists only major, user-facing updates.
 
-Next: [Back To Overview](./overview.md)
+
