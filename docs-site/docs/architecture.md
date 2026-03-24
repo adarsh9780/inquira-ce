@@ -24,8 +24,6 @@ Inquira strictly separates the "Thinking" (the Planner Agent) from the "Doing" (
 
 ---
 
----
-
 ## Deep Dives
 Understand the specific execution sequences by exploring the diagrams below.
 *(Prefer side-by-side studying? Open the standalone [Agent Workflow](./workflow_diagram.md) or [Data Pipeline](./data_pipeline_diagram.md) pages).*
