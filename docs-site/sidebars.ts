@@ -4,11 +4,6 @@ const sidebars: SidebarsConfig = {
   tutorialSidebar: [
     {
       type: 'category',
-      label: 'Downloads',
-      items: ['downloads'],
-    },
-    {
-      type: 'category',
       label: 'Welcome / Getting Started',
       items: [
         'index'
