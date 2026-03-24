@@ -26,10 +26,12 @@ In plain terms: you ask a question about your data in natural language, and Inqu
 
 ## Who is this for?
 
-Inquira CE is designed for:
-- Data Analysts who handle confidential IP or sensitive metrics and require a local, isolated environment.
-- Developers looking for an open, extensible, and local LangGraph-based AI agent architecture.
-- Anyone who wants an AI co-pilot for their local datasets without manually managing complicated Python dependencies or environments.
+**Primary Users**
+- **Data Scientists and Data Analysts** who know Python. It supercharges your existing workflow by handling the boilerplate code generation while offering complete privacy and local control over the environment.
+
+**Secondary Users**
+- **Professionals with many Excel/CSV files** who need to find patterns or analyze data quickly. Inquira speeds up your daily processes so you don't have to depend on an analyst for every descriptive question about your data.
+  - *Note:* We strongly recommend users keep an eye on the results to ensure the AI isn't hallucinating numbers. (We will be adding a dedicated section on test results in the future to help increase trust in accuracy).
 
 ## Next Steps
 
