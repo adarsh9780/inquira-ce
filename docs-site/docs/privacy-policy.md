@@ -73,16 +73,18 @@ When sign-in is enabled and used:
 
 The public docs/download site does not currently act as a hosted user account portal.
 
-## 7. AI Provider Data
+## 7. AI Provider Data (What the LLM Actually Sees)
 
-If the user enables AI-assisted features, Inquira may send the following to the selected provider:
+Inquira CE's architecture guarantees that the bulk of your local dataset (CSV, Parquet, Excel, DuckDB files) is **never** uploaded to any cloud network.
 
-- the user's prompt or question
-- schema metadata
-- execution context needed to generate or explain analysis
-- limited result data or summaries when required for follow-up explanation
+When you ask a question, Inquira transmits **strictly the following** to your selected LLM provider (OpenAI, Anthropic, etc.):
+1. **Your prompt/question**
+2. **Schema metadata** (the names of your tables and the names/data types of your columns)
+3. **Execution context** (system prompts, code execution errors, or Python print outputs required to fix failing code)
+4. **Data Samples (Important Risk)**: Currently, the agent utilizes a tool called `sample_dataset` which retrieves a small handful of actual data rows (e.g., the top 5 rows) and sends them to the LLM to help it understand formatting or date structures. **This means tiny snippets of your real data *are* transmitted to the AI provider.**
 
-Inquira is not intended to upload full selected datasets by default, but users remain responsible for reviewing what they send to any third-party AI provider.
+> [!WARNING]  
+> **Future Update:** In an upcoming release, the **`sample_dataset` tool will be disabled by default** to guarantee strict zero-row data transmission. Users who want the LLM to 'see' row data for better accuracy will be required to explicitly opt-in.
 
 ## 8. Public Docs And Download Site
 

@@ -23,17 +23,16 @@ It may:
 - produce incomplete or incorrect output
 - rely on third-party AI providers chosen by the user
 
-## 3. Main Risks
+## 3. Radical Transparency & Main Risks
 
-By using Inquira, you understand and accept that:
+We do not over-promise the capabilities of AI. Large Language Models hallucinate, write bugs, and make confident mistakes. By using Inquira CE, you explicitly understand and accept the following risks:
 
-- generated code may be wrong
-- generated code may read, modify, move, or delete local files
-- commands and code may access network resources if your environment allows it
-- outputs may contain factual, technical, or analytical mistakes
-- AI provider responses may be unreliable
+- **The Agent makes mistakes:** The generated SQL or Python code may be completely incorrect, mathematically flawed, or logically unsound. You must verify critical calculations yourself.
+- **Local File Risk:** The agent generates code that runs locally on your machine. While it runs in an isolated Jupyter kernel, that kernel currently has access to your local filesystem. The agent could theoretically generate code that reads, modifies, or deletes your local files.
+- **Network Risk:** Python code executed by the agent can access the open internet, downloading or uploading data if your environment permits it.
+- **AI Hallucinations:** Textual outputs, statistical summaries, or chart insights may contain factual, technical, or analytical fabrications.
 
-You are responsible for reviewing generated code and maintaining your own backups.
+You are **100% responsible** for reviewing the generated code before trusting the output, answering for its local execution side-effects, and maintaining local backups of your data.
 
 ## 4. Local Data And Execution
 
