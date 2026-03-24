@@ -290,6 +290,96 @@
   line-height: 1.5;
 }
 
+/* Form Styles */
+.formShell {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  text-align: left;
+}
+
+.formLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #A1A1AA;
+}
+
+.formRow {
+  display: flex;
+  width: 100%;
+}
+
+.formInput {
+  width: 100%;
+  padding: 0.875rem 1.25rem;
+  border-radius: 12px;
+  border: 1px solid #3F3F46;
+  background: #27272A;
+  color: #FFFFFF;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.formInput:focus {
+  outline: none;
+  border-color: #71717A;
+  background: #2D2D30;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
+}
+
+.formInput::placeholder {
+  color: #71717A;
+}
+
+.formHint {
+  font-size: 0.825rem;
+  color: #A1A1AA;
+  line-height: 1.5;
+}
+
+.formStatus {
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.formStatusSuccess { color: #4ADE80; }
+.formStatusError { color: #F87171; }
+
+.formButton {
+  min-height: 3.5rem;
+}
+
+/* CTA Section Overrides */
+.ctaSection .primaryCta {
+  background: #FFFFFF;
+  color: #18181B;
+  border-color: #FFFFFF;
+}
+
+.ctaSection .primaryCta:hover {
+  background: #F4F4F5;
+  transform: translateY(-2px);
+}
+
+.ctaSection .secondaryCta {
+  background: transparent;
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.ctaSection .secondaryCta:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.eyebrowDark {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #A1A1AA !important;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .cardGrid {

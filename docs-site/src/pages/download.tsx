@@ -275,7 +275,7 @@ export default function DownloadPage(): ReactNode {
         </section>
         <section className={styles.ctaSection}>
           <div>
-            <div className={styles.sectionEyebrow}>Stay Updated</div>
+            <div className={clsx(styles.sectionEyebrow, styles.eyebrowDark)}>Stay Updated</div>
             <h2 className={styles.sectionTitle}>
               Optional product updates
             </h2>
