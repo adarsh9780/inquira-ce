@@ -14,6 +14,9 @@ describe('optinSignup', () => {
 
     const result = await submitOptinSignup({
       email: '  Person@Example.COM ',
+      platform: 'macOS',
+      source: 'docs-site-download-page',
+      version: 'v1.2.3',
       config: {
         supabaseUrl: 'https://example.supabase.co',
         supabaseAnonKey: 'public-anon-key',
@@ -26,7 +29,12 @@ describe('optinSignup', () => {
       normalizedEmail: 'person@example.com',
       skipped: false,
     });
-    expect(insertSignup).toHaveBeenCalledWith('person@example.com');
+    expect(insertSignup).toHaveBeenCalledWith({
+      email: 'person@example.com',
+      platform: 'macOS',
+      source: 'docs-site-download-page',
+      version: 'v1.2.3',
+    });
   });
 
   it('allows a blank email and skips Supabase entirely', async () => {
@@ -34,6 +42,9 @@ describe('optinSignup', () => {
 
     const result = await submitOptinSignup({
       email: '   ',
+      platform: 'Windows',
+      source: 'docs-site-download-page',
+      version: 'v1.2.3',
       config: {
         supabaseUrl: 'https://example.supabase.co',
         supabaseAnonKey: 'public-anon-key',
@@ -52,6 +63,9 @@ describe('optinSignup', () => {
   it('returns a friendly error when Supabase credentials are missing', async () => {
     const result = await submitOptinSignup({
       email: 'person@example.com',
+      platform: 'macOS',
+      source: 'docs-site-download-page',
+      version: 'v1.2.3',
       config: {},
     });
 
@@ -65,6 +79,9 @@ describe('optinSignup', () => {
   it('returns a friendly error when the insert fails', async () => {
     const result = await submitOptinSignup({
       email: 'person@example.com',
+      platform: 'Windows',
+      source: 'docs-site-download-page',
+      version: 'v1.2.3',
       config: {
         supabaseUrl: 'https://example.supabase.co',
         supabaseAnonKey: 'public-anon-key',
@@ -95,5 +112,28 @@ describe('optinSignup', () => {
     );
     expect(validateOptinEmail('')).toBeNull();
     expect(validateOptinEmail('person@example.com')).toBeNull();
+  });
+
+  it('keeps platform and version metadata per signup event', async () => {
+    const insertSignup = vi.fn().mockResolvedValue(undefined);
+
+    await submitOptinSignup({
+      email: 'person@example.com',
+      platform: 'Windows',
+      source: 'docs-site-download-page',
+      version: 'v9.9.9',
+      config: {
+        supabaseUrl: 'https://example.supabase.co',
+        supabaseAnonKey: 'public-anon-key',
+      },
+      insertSignup,
+    });
+
+    expect(insertSignup).toHaveBeenCalledWith({
+      email: 'person@example.com',
+      platform: 'Windows',
+      source: 'docs-site-download-page',
+      version: 'v9.9.9',
+    });
   });
 });

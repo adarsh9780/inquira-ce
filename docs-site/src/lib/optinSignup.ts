@@ -10,6 +10,13 @@ export type OptinSignupConfig = {
   tableName?: string;
 };
 
+export type OptinSignupPayload = {
+  email: string;
+  platform: 'macOS' | 'Windows';
+  source: string;
+  version: string;
+};
+
 export type OptinSignupResult =
   | {
       ok: true;
@@ -21,7 +28,7 @@ export type OptinSignupResult =
       message: string;
     };
 
-type InsertOptinSignup = (email: string) => Promise<void>;
+type InsertOptinSignup = (payload: OptinSignupPayload) => Promise<void>;
 
 export function normalizeOptinEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -55,8 +62,8 @@ export function createOptinSignupInserter(
   const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
   const tableName = resolveOptinSignupTableName(config.tableName);
 
-  return async (email: string) => {
-    const {error} = await supabase.from(tableName).insert({email});
+  return async (payload: OptinSignupPayload) => {
+    const {error} = await supabase.from(tableName).insert(payload);
 
     if (error) {
       throw error;
@@ -66,10 +73,16 @@ export function createOptinSignupInserter(
 
 export async function submitOptinSignup({
   email,
+  platform,
+  source,
+  version,
   config,
   insertSignup,
 }: {
   email: string;
+  platform: 'macOS' | 'Windows';
+  source: string;
+  version: string;
   config: OptinSignupConfig;
   insertSignup?: InsertOptinSignup;
 }): Promise<OptinSignupResult> {
@@ -102,7 +115,12 @@ export async function submitOptinSignup({
   }
 
   try {
-    await activeInserter(normalizedEmail);
+    await activeInserter({
+      email: normalizedEmail,
+      platform,
+      source,
+      version,
+    });
   } catch {
     return {
       ok: false,

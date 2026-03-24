@@ -21,6 +21,7 @@ const MACOS_FALLBACK_URL =
   'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a12/Inquira_0.5.7-alpha.12_aarch64.dmg';
 const WINDOWS_FALLBACK_URL =
   'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a12/Inquira_0.5.7-alpha.12_x64-setup.exe';
+const DOWNLOAD_SOURCE = 'docs-site-download-page';
 
 const MAC_ICON = (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -40,16 +41,35 @@ type DownloadPageConfig = {
   optinSignupTable?: string;
 };
 
+type DownloadPlatform = 'macOS' | 'Windows';
+
+type DownloadTarget = {
+  url: string;
+  version: string;
+};
+
 function pickLatestAsset(
   assets: Array<{name?: string; browser_download_url?: string}>,
   assetName: string,
   fallbackUrl: string,
-): string {
+  releaseVersion: string,
+  fallbackVersion: string,
+): DownloadTarget {
   const directAsset = assets.find(
     asset => String(asset.name || '') === assetName && !/\.sig$/i.test(String(asset.name || '')),
   );
 
-  return directAsset?.browser_download_url || fallbackUrl;
+  if (directAsset?.browser_download_url) {
+    return {
+      url: directAsset.browser_download_url,
+      version: releaseVersion,
+    };
+  }
+
+  return {
+    url: fallbackUrl,
+    version: fallbackVersion,
+  };
 }
 
 export default function DownloadPage(): ReactNode {
@@ -60,13 +80,19 @@ export default function DownloadPage(): ReactNode {
     supabaseAnonKey: customFields.supabaseAnonKey || '',
   };
   const signupConfigured = isSupabaseSignupConfigured(signupConfig);
-  const [downloadLinks, setDownloadLinks] = useState<Record<string, string>>({
-    macOS: MACOS_FALLBACK_URL,
-    Windows: WINDOWS_FALLBACK_URL,
+  const [downloadTargets, setDownloadTargets] = useState<Record<DownloadPlatform, DownloadTarget>>({
+    macOS: {
+      url: MACOS_FALLBACK_URL,
+      version: RELEASE_TAG,
+    },
+    Windows: {
+      url: WINDOWS_FALLBACK_URL,
+      version: RELEASE_TAG,
+    },
   });
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activePlatform, setActivePlatform] = useState<'macOS' | 'Windows' | null>(null);
+  const [activePlatform, setActivePlatform] = useState<DownloadPlatform | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
   const [statusTone, setStatusTone] = useState<'idle' | 'error' | 'success'>(
     'idle',
@@ -83,28 +109,42 @@ export default function DownloadPage(): ReactNode {
         }
         const release = await response.json();
         const assets = Array.isArray(release?.assets) ? release.assets : [];
+        const releaseVersion =
+          typeof release?.tag_name === 'string' && release.tag_name.trim()
+            ? release.tag_name.trim()
+            : RELEASE_TAG;
 
         if (!active) {
           return;
         }
 
-        setDownloadLinks({
+        setDownloadTargets({
           macOS: pickLatestAsset(
             assets,
             MACOS_ASSET_NAME,
             MACOS_FALLBACK_URL,
+            releaseVersion,
+            RELEASE_TAG,
           ),
           Windows: pickLatestAsset(
             assets,
             WINDOWS_ASSET_NAME,
             WINDOWS_FALLBACK_URL,
+            releaseVersion,
+            RELEASE_TAG,
           ),
         });
       } catch {
         if (active) {
-          setDownloadLinks({
-            macOS: MACOS_FALLBACK_URL,
-            Windows: WINDOWS_FALLBACK_URL,
+          setDownloadTargets({
+            macOS: {
+              url: MACOS_FALLBACK_URL,
+              version: RELEASE_TAG,
+            },
+            Windows: {
+              url: WINDOWS_FALLBACK_URL,
+              version: RELEASE_TAG,
+            },
           });
         }
       }
@@ -117,10 +157,12 @@ export default function DownloadPage(): ReactNode {
     };
   }, []);
 
-  async function handleDownload(platform: 'macOS' | 'Windows') {
+  async function handleDownload(platform: DownloadPlatform) {
     if (isSubmitting) {
       return;
     }
+
+    const selectedTarget = downloadTargets[platform];
 
     setIsSubmitting(true);
     setActivePlatform(platform);
@@ -134,13 +176,16 @@ export default function DownloadPage(): ReactNode {
       setActivePlatform(null);
 
       if (typeof window !== 'undefined') {
-        window.location.assign(downloadLinks[platform]);
+        window.location.assign(selectedTarget.url);
       }
       return;
     }
 
     const result = await submitOptinSignup({
       email,
+      platform,
+      source: DOWNLOAD_SOURCE,
+      version: selectedTarget.version,
       config: {
         supabaseUrl: customFields.supabaseUrl,
         supabaseAnonKey: customFields.supabaseAnonKey,
@@ -167,7 +212,7 @@ export default function DownloadPage(): ReactNode {
     setActivePlatform(null);
 
     if (typeof window !== 'undefined') {
-      window.location.assign(downloadLinks[platform]);
+      window.location.assign(selectedTarget.url);
     }
   }
 
