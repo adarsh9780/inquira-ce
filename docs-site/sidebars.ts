@@ -16,6 +16,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Editions (Free, Pro & Enterprise)',
       items: [
+        'editions',
         'auth-strategy'
       ],
     },
