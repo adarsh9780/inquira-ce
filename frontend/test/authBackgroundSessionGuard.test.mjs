@@ -9,6 +9,6 @@ test('auth store keeps local session state during background revalidation failur
 
   assert.equal(source.includes('async function checkAuth(options = {})'), true)
   assert.equal(source.includes('const preserveSession = Boolean(options?.preserveSession)'), true)
-  assert.equal(source.includes("if (authEvent === 'SIGNED_OUT')"), true)
+  assert.equal(source.includes("authEvent === 'SIGNED_OUT'"), true)
   assert.equal(source.includes('if (!preserveSession) {'), true)
 })

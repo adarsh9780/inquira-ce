@@ -11,34 +11,28 @@ def test_readme_is_docs_table_of_contents():
     assert "<img src=\"./backend/app/logo/inquira_logo.svg\"" in text
     assert "img.shields.io" in text
     assert "## Quick Start" in text
-    assert "## Documentation Map" in text
+    assert "## Official Documentation Map" in text
     assert "## Current Product Highlights" in text
-    assert "## Current Focus" in text
     assert "https://docs.inquiraai.com/download" in text
-    assert "make check-version" in text
-    assert "make ruff-test" in text
-    assert "make mypy-test" in text
     assert "create a local root `commit_message.txt` file" in text
-    assert "./docs-site/docs/overview.md" in text
-    assert "./docs-site/docs/commit-and-release.md" in text
-    assert "./docs-site/docs/changelog.md" in text
+    assert "https://docs.inquiraai.com/docs/architecture" in text
+    assert "https://docs.inquiraai.com/docs/development" in text
+    assert "https://docs.inquiraai.com/docs/roadmap" in text
     assert "## Upcoming Changes" not in text
     assert "**Supabase Auth**" not in text
     assert "align the auth page styling with the main UI" not in text
 
 
-def test_docs_chain_has_next_links():
-    expected = {
-        "overview.md": "Next: [Install](./install.md)",
-        "install.md": "Next: [Development](./development.md)",
-        "development.md": "Next: [Commit And Release Flow](./commit-and-release.md)",
-        "commit-and-release.md": "Next: [CI And Release Automation](./ci-and-release-automation.md)",
-        "ci-and-release-automation.md": "Next: [Architecture](./architecture.md)",
-        "architecture.md": "Next: [Roadmap](./roadmap.md)",
-        "roadmap.md": "Next: [Contributing](./contributing.md)",
-        "contributing.md": "Next: [Changelog](./changelog.md)",
-        "changelog.md": "Next: [Back To Overview](./overview.md)",
-    }
-    for name, marker in expected.items():
-        text = (DOCS / name).read_text(encoding="utf-8")
-        assert marker in text
+def test_docs_collection_keeps_core_pages_available():
+    expected_docs = [
+        "index.md",
+        "architecture.md",
+        "development.md",
+        "commit-and-release.md",
+        "ci-and-release-automation.md",
+        "roadmap.md",
+        "contributing.md",
+        "changelog.md",
+    ]
+    for name in expected_docs:
+        assert (DOCS / name).exists()

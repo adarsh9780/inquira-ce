@@ -22,18 +22,19 @@ def test_docs_site_exists_with_inquira_branding():
     home_page = (DOCS_SITE / "src" / "pages" / "index.tsx").read_text(encoding="utf-8")
     download_page = (DOCS_SITE / "src" / "pages" / "download.tsx").read_text(encoding="utf-8")
     custom_css = (DOCS_SITE / "src" / "css" / "custom.css").read_text(encoding="utf-8")
+    custom_css_lower = custom_css.lower()
 
     assert "title: 'Inquira'" in config
     assert "blog: false" in config
     assert "favicon: 'img/favicon.ico'" in config
     assert "image: 'img/inquira-social-card.png'" in config
     assert "src: 'img/inquira-logo-animated.svg'" in config
-    assert "Desktop AI workspace" in home_page
-    assert "Free should feel open" in home_page
+    assert "Desktop-First AI Workspace" in home_page
+    assert "Analyze data at the speed of thought." in home_page
     assert "api.github.com/repos/adarsh9780/inquira-ce/releases/latest" in download_page
     assert macos_asset in download_page
     assert windows_asset in download_page
     assert "Download for macOS" in download_page
     assert "Download for Windows" in download_page
-    assert "--ifm-background-color: #fdfcf8;" in custom_css
-    assert "--ifm-font-color-base: #27272a;" in custom_css
+    assert "--ifm-background-color: #fdfcf8;" in custom_css_lower
+    assert "--ifm-font-color-base: #27272a;" in custom_css_lower

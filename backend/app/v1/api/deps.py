@@ -8,29 +8,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db.session import get_appdata_db_session
 from ..repositories.principal_repository import PrincipalRepository
 from ..services.auth_service import AuthService
-from ...core.logger import logprint
 
 
 async def get_current_user(request: Request):
-    """Resolve authenticated user from a Supabase bearer token, or return anonymous user."""
+    """Resolve authenticated user from a Supabase bearer token."""
     auth_header = str(request.headers.get("authorization") or "").strip()
     if not auth_header.lower().startswith("bearer "):
-        # When no login is provided, we default to the 'Guest' principal
-        return AuthService.get_anonymous_user()
+        raise HTTPException(status_code=401, detail="Not authenticated")
 
     access_token = auth_header.split(" ", 1)[1].strip()
-    try:
-        return await AuthService.resolve_supabase_user(access_token)
-    except HTTPException as exc:
-        # If the token is invalid/expired in a local context, we could fallback to Guest
-        # instead of hard-rejecting, to minimize friction.
-        if exc.status_code == 401:
-            logprint(
-                "[AUTH] Invalid token provided, falling back to Guest session.",
-                level="INFO",
-            )
-            return AuthService.get_anonymous_user()
-        raise exc
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    return await AuthService.resolve_supabase_user(access_token)
 
 
 async def ensure_appdata_principal(
