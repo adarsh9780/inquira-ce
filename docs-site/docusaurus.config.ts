@@ -123,10 +123,6 @@ const config: Config = {
               label: 'GitHub',
               href: 'https://github.com/adarsh9780/inquira-ce',
             },
-            {
-              label: 'Future Accounts',
-              to: '/docs/auth-strategy',
-            },
           ],
         },
         {
