@@ -8,7 +8,23 @@ const sidebars: SidebarsConfig = {
       label: 'Editions (Free, Pro & Enterprise)',
       items: [
         'editions',
-        'auth-strategy'
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Core Concepts & Architecture',
+      items: [
+        'architecture',
+        'workflow_diagram',
+        'data_pipeline_diagram',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'User Guides & Operations',
+      items: [
+        'getting_data_in',
+        'workspace_management',
       ],
     },
     {
@@ -16,9 +32,6 @@ const sidebars: SidebarsConfig = {
       label: 'For Contributors & Developers',
       items: [
         'development',
-        'architecture',
-        'workflow_diagram',
-        'data_pipeline_diagram',
         'contributing',
         'commit-and-release',
         'ci-and-release-automation',
@@ -37,6 +50,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Legal & Admin',
       items: [
+        'auth-strategy',
         'changelog',
         'admin-policy',
         'privacy-policy',
