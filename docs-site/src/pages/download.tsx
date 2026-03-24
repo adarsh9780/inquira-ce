@@ -1,9 +1,12 @@
-import type {ReactNode} from 'react';
+import type {FormEvent, ReactNode} from 'react';
 import {useEffect, useState} from 'react';
+import clsx from 'clsx';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import styles from './index.module.css';
+import {submitOptinSignup} from '../lib/optinSignup';
 
 const RELEASE_API =
   'https://api.github.com/repos/adarsh9780/inquira-ce/releases/latest';
@@ -18,35 +21,23 @@ const MACOS_FALLBACK_URL =
 const WINDOWS_FALLBACK_URL =
   'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a12/Inquira_0.5.7-alpha.12_x64-setup.exe';
 
-type DownloadCard = {
-  title: string;
-  icon: ReactNode;
-  assetName: string;
-  fallbackUrl: string;
-};
+const MAC_ICON = (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M16.37 12.44c.02 2.46 2.16 3.28 2.18 3.29-.02.06-.34 1.17-1.12 2.32-.67 1-1.37 2-2.46 2.02-1.07.02-1.42-.64-2.65-.64-1.24 0-1.62.62-2.62.66-1.04.04-1.83-1.05-2.5-2.04-1.37-1.98-2.42-5.59-1.01-8.03.7-1.2 1.95-1.96 3.3-1.98 1.03-.02 2 .69 2.65.69.65 0 1.87-.85 3.16-.73.54.02 2.06.22 3.04 1.66-.08.05-1.82 1.06-1.8 2.78Zm-2.13-5.07c.56-.68.94-1.64.84-2.58-.81.03-1.79.54-2.37 1.22-.52.6-.98 1.57-.86 2.5.91.07 1.83-.46 2.39-1.14Z" />
+  </svg>
+);
 
-const downloadCards: DownloadCard[] = [
-  {
-    title: 'macOS',
-    icon: (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M16.37 12.44c.02 2.46 2.16 3.28 2.18 3.29-.02.06-.34 1.17-1.12 2.32-.67 1-1.37 2-2.46 2.02-1.07.02-1.42-.64-2.65-.64-1.24 0-1.62.62-2.62.66-1.04.04-1.83-1.05-2.5-2.04-1.37-1.98-2.42-5.59-1.01-8.03.7-1.2 1.95-1.96 3.3-1.98 1.03-.02 2 .69 2.65.69.65 0 1.87-.85 3.16-.73.54.02 2.06.22 3.04 1.66-.08.05-1.82 1.06-1.8 2.78Zm-2.13-5.07c.56-.68.94-1.64.84-2.58-.81.03-1.79.54-2.37 1.22-.52.6-.98 1.57-.86 2.5.91.07 1.83-.46 2.39-1.14Z" />
-      </svg>
-    ),
-    assetName: MACOS_ASSET_NAME,
-    fallbackUrl: MACOS_FALLBACK_URL,
-  },
-  {
-    title: 'Windows',
-    icon: (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M3 5.5 10.5 4.4v7.1H3V5.5Zm8.5-1.22L21 3v8.5h-9.5V4.28ZM3 12.5h7.5v7.1L3 18.5v-6Zm8.5 0H21V21l-9.5-1.33V12.5Z" />
-      </svg>
-    ),
-    assetName: WINDOWS_ASSET_NAME,
-    fallbackUrl: WINDOWS_FALLBACK_URL,
-  },
-];
+const WINDOWS_ICON = (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M3 5.5 10.5 4.4v7.1H3V5.5Zm8.5-1.22L21 3v8.5h-9.5V4.28ZM3 12.5h7.5v7.1L3 18.5v-6Zm8.5 0H21V21l-9.5-1.33V12.5Z" />
+  </svg>
+);
+
+type DownloadPageConfig = {
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
+  optinSignupTable?: string;
+};
 
 function pickLatestAsset(
   assets: Array<{name?: string; browser_download_url?: string}>,
@@ -61,10 +52,18 @@ function pickLatestAsset(
 }
 
 export default function DownloadPage(): ReactNode {
+  const {siteConfig} = useDocusaurusContext();
+  const customFields = (siteConfig.customFields || {}) as DownloadPageConfig;
   const [downloadLinks, setDownloadLinks] = useState<Record<string, string>>({
     macOS: MACOS_FALLBACK_URL,
     Windows: WINDOWS_FALLBACK_URL,
   });
+  const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [statusTone, setStatusTone] = useState<'idle' | 'error' | 'success'>(
+    'idle',
+  );
 
   useEffect(() => {
     let active = true;
@@ -85,13 +84,13 @@ export default function DownloadPage(): ReactNode {
         setDownloadLinks({
           macOS: pickLatestAsset(
             assets,
-            downloadCards[0].assetName,
-            downloadCards[0].fallbackUrl,
+            MACOS_ASSET_NAME,
+            MACOS_FALLBACK_URL,
           ),
           Windows: pickLatestAsset(
             assets,
-            downloadCards[1].assetName,
-            downloadCards[1].fallbackUrl,
+            WINDOWS_ASSET_NAME,
+            WINDOWS_FALLBACK_URL,
           ),
         });
       } catch {
@@ -111,6 +110,43 @@ export default function DownloadPage(): ReactNode {
     };
   }, []);
 
+  async function handleMacDownload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setStatusMessage('');
+    setStatusTone('idle');
+
+    const result = await submitOptinSignup({
+      email,
+      config: {
+        supabaseUrl: customFields.supabaseUrl,
+        supabaseAnonKey: customFields.supabaseAnonKey,
+        tableName: customFields.optinSignupTable,
+      },
+    });
+
+    if (result.ok === false) {
+      setStatusMessage(result.message);
+      setStatusTone('error');
+      setIsSubmitting(false);
+      return;
+    }
+
+    setEmail('');
+    setStatusMessage('Email saved. Starting the macOS download.');
+    setStatusTone('success');
+    setIsSubmitting(false);
+
+    if (typeof window !== 'undefined') {
+      window.location.assign(downloadLinks.macOS);
+    }
+  }
+
   return (
     <Layout
       title="Download"
@@ -120,71 +156,122 @@ export default function DownloadPage(): ReactNode {
           <div className={styles.sectionIntro}>
             <div className={styles.sectionEyebrow}>Download</div>
             <h1 className={styles.sectionTitle}>
-              Latest desktop release, without sending users through GitHub first
+              Capture macOS opt-ins, then send people straight to the installer
             </h1>
             <p className={styles.sectionBody}>
-              Click the platform you want and the website resolves the latest
-              installer directly from the current GitHub release assets.
+              Windows stays a direct download. macOS now collects an email
+              opt-in first, stores it in Supabase, and then redirects to the
+              latest installer URL.
             </p>
           </div>
           <div className={styles.downloadGrid}>
-            {downloadCards.map(card => (
-              <a
-                key={card.title}
-                className={styles.downloadCard}
-                href={downloadLinks[card.title]}
-                target="_blank"
-                rel="noreferrer">
-                <span className={styles.downloadIcon}>{card.icon}</span>
-                <span className={styles.downloadLabel}>{card.title}</span>
-                <span className={styles.downloadHint}>Direct latest installer</span>
-              </a>
-            ))}
+            <a className={styles.downloadCard} href="#mac-download-form">
+              <span className={styles.downloadIcon}>{MAC_ICON}</span>
+              <span className={styles.downloadLabel}>macOS</span>
+              <span className={styles.downloadHint}>
+                Email opt-in before installer download
+              </span>
+            </a>
+            <a
+              className={styles.downloadCard}
+              href={downloadLinks.Windows}
+              target="_blank"
+              rel="noreferrer">
+              <span className={styles.downloadIcon}>{WINDOWS_ICON}</span>
+              <span className={styles.downloadLabel}>Windows</span>
+              <span className={styles.downloadHint}>Direct latest installer</span>
+            </a>
           </div>
           <div className={styles.cardGrid}>
             <article className={styles.infoCard}>
-              <h3>Current delivery model</h3>
+              <h3>macOS opt-in flow</h3>
               <p>
-                The page fetches the latest release metadata and resolves the
-                exact Tauri asset names for the current macOS `.dmg` and
-                Windows `.exe` installers.
+                The macOS call to action validates the email, writes one row to
+                Supabase, and only then forwards the visitor to the `.dmg`.
               </p>
             </article>
             <article className={styles.infoCard}>
-              <h3>Future delivery model</h3>
+              <h3>Windows stays simple</h3>
               <p>
-                Serve platform-aware downloads from your own domain once version
-                management matures.
+                Windows keeps the direct latest-installer path, so the page
+                supports a mixed rollout instead of forcing every platform into
+                the same gate.
               </p>
             </article>
             <article className={styles.infoCard}>
-              <h3>Why this matters</h3>
+              <h3>Why this is safer</h3>
               <p>
-                Users get a cleaner path from your domain to the installer, and
-                you keep room for account-based entitlements later.
+                The old page could not capture any lead data at all. This flow
+                makes the macOS button do real work instead of jumping straight
+                to GitHub assets.
               </p>
             </article>
           </div>
         </section>
         <section className={styles.ctaSection}>
           <div>
-            <div className={styles.sectionEyebrow}>Release source</div>
+            <div className={styles.sectionEyebrow}>macOS opt-in</div>
             <h2 className={styles.sectionTitle}>
-              Direct installers first, release page second
+              Save the email first, then start the download
             </h2>
             <p className={styles.sectionBody}>
-              If asset lookup fails, the buttons fall back to the latest GitHub
-              release assets for `{RELEASE_TAG}` instead of breaking.
+              The form stores the email in the `optin_user_signup` table by
+              default. If release lookup fails, the download still falls back to
+              the GitHub asset URL for `{RELEASE_TAG}`.
             </p>
           </div>
-          <div className={styles.ctaActions}>
-            <Link className={styles.primaryCta} to={downloadLinks.macOS}>
-              Download for macOS
-            </Link>
-            <Link className={styles.secondaryCta} to={downloadLinks.Windows}>
-              Download for Windows
-            </Link>
-          </div>
+          <form
+            id="mac-download-form"
+            className={styles.formShell}
+            onSubmit={handleMacDownload}>
+            <label className={styles.formLabel} htmlFor="optin-email">
+              Work email
+            </label>
+            <div className={styles.formRow}>
+              <input
+                id="optin-email"
+                className={styles.formInput}
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                required
+                placeholder="you@company.com"
+                value={email}
+                onChange={event => setEmail(event.target.value)}
+                disabled={isSubmitting}
+              />
+              <button
+                type="submit"
+                className={clsx(styles.primaryCta, styles.formCta)}
+                disabled={isSubmitting}>
+                {isSubmitting ? 'Saving...' : 'Download for macOS'}
+              </button>
+            </div>
+            <p className={styles.formHint}>
+              We save the email and then redirect to the latest `.dmg`
+              installer.
+            </p>
+            <p
+              className={clsx(
+                styles.formStatus,
+                statusTone === 'error' && styles.formStatusError,
+                statusTone === 'success' && styles.formStatusSuccess,
+              )}
+              role="status"
+              aria-live="polite">
+              {statusMessage}
+            </p>
+            <div className={styles.ctaActions}>
+              <Link
+                className={styles.secondaryCta}
+                to="https://github.com/adarsh9780/inquira-ce/releases/latest">
+                Open release page
+              </Link>
+              <Link className={styles.secondaryCta} to={downloadLinks.Windows}>
+                Download for Windows
+              </Link>
+            </div>
+          </form>
         </section>
       </main>
     </Layout>

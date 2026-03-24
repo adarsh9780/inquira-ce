@@ -15,6 +15,12 @@ const config: Config = {
   baseUrl: '/',
   organizationName: 'adarsh9780',
   projectName: 'inquira-ce',
+  customFields: {
+    supabaseUrl: process.env.DOCS_SITE_SUPABASE_URL ?? '',
+    supabaseAnonKey: process.env.DOCS_SITE_SUPABASE_ANON_KEY ?? '',
+    optinSignupTable:
+      process.env.DOCS_SITE_OPTIN_SIGNUP_TABLE ?? 'optin_user_signup',
+  },
 
   onBrokenLinks: 'throw',
   markdown: {

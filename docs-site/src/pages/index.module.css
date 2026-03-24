@@ -308,6 +308,74 @@
   flex-wrap: wrap;
 }
 
+.formShell {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: min(100%, 30rem);
+}
+
+.formLabel {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #27272a;
+}
+
+.formRow {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.formInput {
+  flex: 1 1 16rem;
+  min-height: 2.9rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid #d4d4d8;
+  border-radius: 0.9rem;
+  background: #ffffff;
+  color: #18181b;
+  font: inherit;
+}
+
+.formInput:focus {
+  outline: none;
+  border-color: #18181b;
+  box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.08);
+}
+
+.formCta {
+  cursor: pointer;
+}
+
+.formCta:disabled {
+  cursor: wait;
+  opacity: 0.72;
+  transform: none;
+  box-shadow: none;
+}
+
+.formHint,
+.formStatus {
+  margin: 0;
+  font-size: 0.94rem;
+}
+
+.formHint,
+.formStatus {
+  color: #71717a;
+}
+
+.formStatusError {
+  color: #b91c1c;
+}
+
+.formStatusSuccess {
+  color: #166534;
+}
+
 @media screen and (max-width: 996px) {
   .heroSection,
   .cardGrid,
@@ -337,5 +405,14 @@
   .ctaSection {
     padding-left: 1rem;
     padding-right: 1rem;
+  }
+
+  .formRow {
+    align-items: stretch;
+  }
+
+  .formInput,
+  .formCta {
+    width: 100%;
   }
 }
