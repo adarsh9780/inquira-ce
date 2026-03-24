@@ -1,4 +1,4 @@
-import type {FormEvent, ReactNode} from 'react';
+import type {ReactNode} from 'react';
 import {useEffect, useState} from 'react';
 import clsx from 'clsx';
 import Layout from '@theme/Layout';
@@ -60,6 +60,7 @@ export default function DownloadPage(): ReactNode {
   });
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activePlatform, setActivePlatform] = useState<'macOS' | 'Windows' | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
   const [statusTone, setStatusTone] = useState<'idle' | 'error' | 'success'>(
     'idle',
@@ -110,14 +111,13 @@ export default function DownloadPage(): ReactNode {
     };
   }, []);
 
-  async function handleMacDownload(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  async function handleDownload(platform: 'macOS' | 'Windows') {
     if (isSubmitting) {
       return;
     }
 
     setIsSubmitting(true);
+    setActivePlatform(platform);
     setStatusMessage('');
     setStatusTone('idle');
 
@@ -134,16 +134,22 @@ export default function DownloadPage(): ReactNode {
       setStatusMessage(result.message);
       setStatusTone('error');
       setIsSubmitting(false);
+      setActivePlatform(null);
       return;
     }
 
     setEmail('');
-    setStatusMessage('Email saved. Starting the macOS download.');
+    setStatusMessage(
+      result.skipped
+        ? `Starting the ${platform} download without email signup.`
+        : `Email saved. Starting the ${platform} download.`,
+    );
     setStatusTone('success');
     setIsSubmitting(false);
+    setActivePlatform(null);
 
     if (typeof window !== 'undefined') {
-      window.location.assign(downloadLinks.macOS);
+      window.location.assign(downloadLinks[platform]);
     }
   }
 
@@ -156,76 +162,71 @@ export default function DownloadPage(): ReactNode {
           <div className={styles.sectionIntro}>
             <div className={styles.sectionEyebrow}>Download</div>
             <h1 className={styles.sectionTitle}>
-              Capture macOS opt-ins, then send people straight to the installer
+              Show the same optional signup flow before both desktop downloads
             </h1>
             <p className={styles.sectionBody}>
-              Windows stays a direct download. macOS now collects an email
-              opt-in first, stores it in Supabase, and then redirects to the
-              latest installer URL.
+              Enter an email if you want to opt in before downloading, or leave
+              the field blank and continue directly. The same choice now exists
+              for both macOS and Windows.
             </p>
           </div>
           <div className={styles.downloadGrid}>
-            <a className={styles.downloadCard} href="#mac-download-form">
+            <a className={styles.downloadCard} href="#download-form">
               <span className={styles.downloadIcon}>{MAC_ICON}</span>
               <span className={styles.downloadLabel}>macOS</span>
               <span className={styles.downloadHint}>
-                Email opt-in before installer download
+                Optional email before installer download
               </span>
             </a>
-            <a
-              className={styles.downloadCard}
-              href={downloadLinks.Windows}
-              target="_blank"
-              rel="noreferrer">
+            <a className={styles.downloadCard} href="#download-form">
               <span className={styles.downloadIcon}>{WINDOWS_ICON}</span>
               <span className={styles.downloadLabel}>Windows</span>
-              <span className={styles.downloadHint}>Direct latest installer</span>
+              <span className={styles.downloadHint}>
+                Same optional email flow as macOS
+              </span>
             </a>
           </div>
           <div className={styles.cardGrid}>
             <article className={styles.infoCard}>
-              <h3>macOS opt-in flow</h3>
+              <h3>One flow for both platforms</h3>
               <p>
-                The macOS call to action validates the email, writes one row to
-                Supabase, and only then forwards the visitor to the `.dmg`.
+                Both download buttons now sit behind the same optional email
+                field, so the page no longer treats Windows and macOS
+                differently.
               </p>
             </article>
             <article className={styles.infoCard}>
-              <h3>Windows stays simple</h3>
+              <h3>Optional means optional</h3>
               <p>
-                Windows keeps the direct latest-installer path, so the page
-                supports a mixed rollout instead of forcing every platform into
-                the same gate.
+                If the email field is blank, the page skips Supabase and starts
+                the installer immediately for whichever platform the user picks.
               </p>
             </article>
             <article className={styles.infoCard}>
-              <h3>Why this is safer</h3>
+              <h3>Why this fixes the bug</h3>
               <p>
-                The old page could not capture any lead data at all. This flow
-                makes the macOS button do real work instead of jumping straight
-                to GitHub assets.
+                Before this change, Windows users never even saw the signup
+                choice. Now both buttons expose the same lead-capture option.
               </p>
             </article>
           </div>
         </section>
         <section className={styles.ctaSection}>
           <div>
-            <div className={styles.sectionEyebrow}>macOS opt-in</div>
+            <div className={styles.sectionEyebrow}>Optional opt-in</div>
             <h2 className={styles.sectionTitle}>
-              Save the email first, then start the download
+              Add an email if you want, or leave it blank and download directly
             </h2>
             <p className={styles.sectionBody}>
-              The form stores the email in the `optin_user_signup` table by
-              default. If release lookup fails, the download still falls back to
-              the GitHub asset URL for `{RELEASE_TAG}`.
+              If you provide an email, the page stores it in the
+              `optin_user_signup` table by default. If release lookup fails,
+              both download buttons still fall back to the GitHub asset URLs for
+              `{RELEASE_TAG}`.
             </p>
           </div>
-          <form
-            id="mac-download-form"
-            className={styles.formShell}
-            onSubmit={handleMacDownload}>
+          <div id="download-form" className={styles.formShell}>
             <label className={styles.formLabel} htmlFor="optin-email">
-              Work email
+              Email for product updates (optional)
             </label>
             <div className={styles.formRow}>
               <input
@@ -234,22 +235,15 @@ export default function DownloadPage(): ReactNode {
                 type="email"
                 inputMode="email"
                 autoComplete="email"
-                required
                 placeholder="you@company.com"
                 value={email}
                 onChange={event => setEmail(event.target.value)}
                 disabled={isSubmitting}
               />
-              <button
-                type="submit"
-                className={clsx(styles.primaryCta, styles.formCta)}
-                disabled={isSubmitting}>
-                {isSubmitting ? 'Saving...' : 'Download for macOS'}
-              </button>
             </div>
             <p className={styles.formHint}>
-              We save the email and then redirect to the latest `.dmg`
-              installer.
+              Leave this blank to skip signup, or fill it in before downloading
+              either installer.
             </p>
             <p
               className={clsx(
@@ -262,16 +256,31 @@ export default function DownloadPage(): ReactNode {
               {statusMessage}
             </p>
             <div className={styles.ctaActions}>
+              <button
+                type="button"
+                className={clsx(styles.primaryCta, styles.formButton)}
+                disabled={isSubmitting}
+                onClick={() => void handleDownload('macOS')}>
+                {isSubmitting && activePlatform === 'macOS'
+                  ? 'Saving...'
+                  : 'Download for macOS'}
+              </button>
+              <button
+                type="button"
+                className={clsx(styles.secondaryCta, styles.formButton)}
+                disabled={isSubmitting}
+                onClick={() => void handleDownload('Windows')}>
+                {isSubmitting && activePlatform === 'Windows'
+                  ? 'Saving...'
+                  : 'Download for Windows'}
+              </button>
               <Link
                 className={styles.secondaryCta}
                 to="https://github.com/adarsh9780/inquira-ce/releases/latest">
                 Open release page
               </Link>
-              <Link className={styles.secondaryCta} to={downloadLinks.Windows}>
-                Download for Windows
-              </Link>
             </div>
-          </form>
+          </div>
         </section>
       </main>
     </Layout>

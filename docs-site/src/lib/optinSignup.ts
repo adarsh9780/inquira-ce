@@ -14,6 +14,7 @@ export type OptinSignupResult =
   | {
       ok: true;
       normalizedEmail: string;
+      skipped: boolean;
     }
   | {
       ok: false;
@@ -28,11 +29,11 @@ export function normalizeOptinEmail(email: string): string {
 
 export function validateOptinEmail(email: string): string | null {
   if (!email) {
-    return 'Enter your email before starting the macOS download.';
+    return null;
   }
 
   if (!EMAIL_PATTERN.test(email)) {
-    return 'Enter a valid email address.';
+    return 'Enter a valid email address, or leave the field blank to skip signup.';
   }
 
   return null;
@@ -82,13 +83,21 @@ export async function submitOptinSignup({
     };
   }
 
+  if (!normalizedEmail) {
+    return {
+      ok: true,
+      normalizedEmail,
+      skipped: true,
+    };
+  }
+
   const activeInserter = insertSignup ?? createOptinSignupInserter(config);
 
   if (!activeInserter) {
     return {
       ok: false,
       message:
-        'Mac download signups are not configured yet. Please try again later.',
+        'Optional download signup is not configured yet. Clear the email field to continue without it.',
     };
   }
 
@@ -104,5 +113,6 @@ export async function submitOptinSignup({
   return {
     ok: true,
     normalizedEmail,
+    skipped: false,
   };
 }

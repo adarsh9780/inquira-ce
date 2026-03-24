@@ -346,11 +346,13 @@
   box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.08);
 }
 
-.formCta {
+.formButton {
+  appearance: none;
+  font: inherit;
   cursor: pointer;
 }
 
-.formCta:disabled {
+.formButton:disabled {
   cursor: wait;
   opacity: 0.72;
   transform: none;
@@ -412,7 +414,7 @@
   }
 
   .formInput,
-  .formCta {
+  .formButton {
     width: 100%;
   }
 }

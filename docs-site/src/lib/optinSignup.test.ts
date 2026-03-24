@@ -24,11 +24,12 @@ describe('optinSignup', () => {
     expect(result).toEqual({
       ok: true,
       normalizedEmail: 'person@example.com',
+      skipped: false,
     });
     expect(insertSignup).toHaveBeenCalledWith('person@example.com');
   });
 
-  it('rejects an empty email before trying Supabase', async () => {
+  it('allows a blank email and skips Supabase entirely', async () => {
     const insertSignup = vi.fn().mockResolvedValue(undefined);
 
     const result = await submitOptinSignup({
@@ -41,8 +42,9 @@ describe('optinSignup', () => {
     });
 
     expect(result).toEqual({
-      ok: false,
-      message: 'Enter your email before starting the macOS download.',
+      ok: true,
+      normalizedEmail: '',
+      skipped: true,
     });
     expect(insertSignup).not.toHaveBeenCalled();
   });
@@ -56,7 +58,7 @@ describe('optinSignup', () => {
     expect(result).toEqual({
       ok: false,
       message:
-        'Mac download signups are not configured yet. Please try again later.',
+        'Optional download signup is not configured yet. Clear the email field to continue without it.',
     });
   });
 
@@ -89,8 +91,9 @@ describe('optinSignup', () => {
       'person@example.com',
     );
     expect(validateOptinEmail('invalid-email')).toBe(
-      'Enter a valid email address.',
+      'Enter a valid email address, or leave the field blank to skip signup.',
     );
+    expect(validateOptinEmail('')).toBeNull();
     expect(validateOptinEmail('person@example.com')).toBeNull();
   });
 });
