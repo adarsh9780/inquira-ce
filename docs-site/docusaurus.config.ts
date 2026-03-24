@@ -139,8 +139,21 @@ const config: Config = {
             },
           ],
         },
+        {
+          title: 'Legal',
+          items: [
+            {
+              label: 'Privacy Policy',
+              to: '/docs/privacy-policy',
+            },
+            {
+              label: 'Terms & Conditions',
+              to: '/docs/terms-of-service',
+            },
+          ],
+        },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Inquira. Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Inquira CE (Alpha). Built with Docusaurus.`,
     },
     mermaid: {
       theme: {light: 'neutral', dark: 'neutral'},
