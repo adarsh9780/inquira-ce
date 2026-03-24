@@ -86,7 +86,7 @@ function HomePageContent(): ReactNode {
       <section className={styles.section}>
         <div className={styles.ctaSection}>
           <div className={styles.sectionIntro}>
-            <div className={styles.sectionEyebrow}>Open Source</div>
+            <div className={clsx(styles.sectionEyebrow, styles.eyebrowDark)}>Open Source</div>
             <h2 className={styles.sectionTitle}>
               Join the local-first movement.
             </h2>
