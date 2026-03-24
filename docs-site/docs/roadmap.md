@@ -1,6 +1,5 @@
 # Roadmap
 
-- [Future Plans (Raw Checklist)](./plans_for_future.md)
 
 ## Product Direction
 
@@ -68,4 +67,15 @@ The next phase focuses on:
 - Switching artifacts currently clears table state and re-requests pages; persistent response caching is not retained across artifact switches.
 - Hidden/idle tab handling currently affects polling cadence only; chat history is not evicted due to hidden state.
 
-Next: [Contributing](./contributing.md)
+## Future Plans (Raw Checklist)
+
+- [ ] Responsive UI: remove fixed-width behavior in controls such as table/chart selector dropdown.
+- [ ] Data model: split conversation/turn tables from global users/payment-status tables.
+- [ ] Workspace code persistence: save generated code as one Python script per workspace.
+- [ ] Image payload policy: stream base64 image output when payload size exceeds threshold, instead of sending interactive image payload.
+- [ ] Agent memory scaling: add background summarize+truncate node based on token thresholds (use `tiktoken` or API token usage).
+- [ ] Agent memory scaling: ensure summarization/truncation does not block UI.
+- [ ] Artifact switching (`df1 -> df2 -> df1`): add at least offset/limit cache first; evaluate deeper backend page cache later.
+- [ ] DuckDB support: enable direct DuckDB file support where currently unsupported.
+- [ ] Runtime failure loop: evaluate optional “regenerate/fix code then retry” path, since current retries only rerun same code.
+- [ ] Lifecycle behavior: hidden/idle tab currently does not evict chat history; define and implement explicit policy if needed.

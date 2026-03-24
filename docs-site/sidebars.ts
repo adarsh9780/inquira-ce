@@ -32,14 +32,7 @@ const sidebars: SidebarsConfig = {
         'release_process'
       ],
     },
-    {
-      type: 'category',
-      label: 'Future Features & Roadmap',
-      items: [
-        'roadmap',
-        'plans_for_future'
-      ],
-    },
+    'roadmap',
     {
       type: 'category',
       label: 'Legal & Admin',
