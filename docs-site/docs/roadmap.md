@@ -13,7 +13,7 @@ Below is our active roadmap based on the current codebase state and community pr
 ### 2) Security & Architecture
 - **Sandboxed Execution:** Introduce robust OS or Tauri-level sandboxing (e.g., investigating NVIDIA Open Shell compatibility) for the Python executor to guarantee local security protocols.
 - **Settings Management:** Clean up local `inquira.toml` config dependencies and expose configuration toggles directly inside the workspace UI.
-- **Infrastructure Management:** Spin up proxy infrastructure to safely and efficiently manage BYOK and API routing logic.
+- **OAuth Integrations:** Exploring how to use existing OAuth tokens for direct model access (e.g., Codex, Antigravity). Note: Anthropic does not natively allow this flow, so it is not currently prioritized for their models.
 
 ### 3) Data & Execution Reliability
 - **Code Persistence:** Persist generated code state directly to a physical Python script (enforcing a strict `1 workspace = 1 code file` architecture).
