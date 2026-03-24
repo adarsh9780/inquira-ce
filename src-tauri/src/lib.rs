@@ -701,6 +701,29 @@ fn default_uv_search_paths(home_dir: Option<PathBuf>) -> Vec<PathBuf> {
     candidates
 }
 
+fn bundled_uv_candidates(resource_dir: &Path) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    #[cfg(target_os = "windows")]
+    let bundled_names = vec![uv_binary_file_name(), "uv"];
+    #[cfg(not(target_os = "windows"))]
+    let bundled_names = vec![uv_binary_file_name()];
+
+    for candidate_name in bundled_names {
+        let bundled_relative = format!("bundled-tools/{candidate_name}");
+        candidates.push(resolve_resource_path(
+            &resource_dir.to_path_buf(),
+            &bundled_relative,
+        ));
+        candidates.push(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("bundled-tools")
+                .join(candidate_name),
+        );
+    }
+
+    candidates
+}
+
 fn uv_search_candidates(resource_dir: &Path) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
     let binary_name = uv_binary_file_name();
@@ -712,16 +735,7 @@ fn uv_search_candidates(resource_dir: &Path) -> Vec<PathBuf> {
         }
     }
 
-    let bundled_relative = format!("bundled-tools/{binary_name}");
-    candidates.push(resolve_resource_path(
-        &resource_dir.to_path_buf(),
-        &bundled_relative,
-    ));
-    candidates.push(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("bundled-tools")
-            .join(binary_name),
-    );
+    candidates.extend(bundled_uv_candidates(resource_dir));
 
     if let Some(path_candidate) = find_binary_on_path(binary_name) {
         candidates.push(path_candidate);
@@ -1439,9 +1453,10 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        default_uv_search_paths, detect_default_shell, missing_uv_binary_error,
-        needs_python_bootstrap, parse_lsof_pid_lines, resolve_pty_cwd, resolve_resource_path,
-        resolve_shared_console_log_level, resolve_uv_index_url, stop_child_process,
+        bundled_uv_candidates, default_uv_search_paths, detect_default_shell,
+        missing_uv_binary_error, needs_python_bootstrap, parse_lsof_pid_lines,
+        resolve_pty_cwd, resolve_resource_path, resolve_shared_console_log_level,
+        resolve_uv_index_url, stop_child_process,
         uv_binary_file_name, uv_search_candidates, InquiraConfig, LoggingConfig, PythonConfig,
     };
     use std::fs;
@@ -1632,6 +1647,30 @@ mod tests {
         );
 
         std::env::remove_var("INQUIRA_UV_BIN");
+    }
+
+    #[test]
+    fn bundled_uv_candidates_include_windows_fallback_name() {
+        let base = std::env::temp_dir().join("inq_uv_bundle_candidates");
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).expect("create resource dir");
+
+        let candidates = bundled_uv_candidates(&base);
+
+        assert!(
+            candidates
+                .iter()
+                .any(|path| path.ends_with(Path::new("bundled-tools").join(uv_binary_file_name()))),
+            "expected bundled candidates to include the platform uv binary name"
+        );
+
+        #[cfg(target_os = "windows")]
+        assert!(
+            candidates
+                .iter()
+                .any(|path| path.ends_with(Path::new("bundled-tools").join("uv"))),
+            "expected bundled candidates to include a plain `uv` fallback on Windows"
+        );
     }
 
     #[test]

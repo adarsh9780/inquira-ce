@@ -66,5 +66,8 @@ def test_makefile_pins_uv_and_stages_bundled_uv_for_local_desktop_build():
     assert "check-uv-version:" in text
     assert 'actual="$$(uv --version | awk \'{print $$2}\')"' in text
     assert "stage-bundled-uv-local: check-uv-version" in text
-    assert 'cp "$$(command -v uv)" src-tauri/bundled-tools/uv' in text
+    assert 'uv_path="$$(command -v uv)"' in text
+    assert 'cp "$$uv_path" src-tauri/bundled-tools/uv;' in text
+    assert "src-tauri/bundled-tools/uv.exe" in text
+    assert "Windows_NT" in text
     assert "build-desktop: stage-bundled-uv-local" in text

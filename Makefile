@@ -144,8 +144,17 @@ check-uv-version:
 
 stage-bundled-uv-local: check-uv-version
 	@mkdir -p src-tauri/bundled-tools
-	@cp "$$(command -v uv)" src-tauri/bundled-tools/uv
-	@chmod +x src-tauri/bundled-tools/uv
+	@uv_path="$$(command -v uv)"; \
+	platform="$${OS:-}$$(uname -s 2>/dev/null || true)"; \
+	case "$$platform" in \
+		*Windows_NT*|*MINGW*|*MSYS*|*CYGWIN*) \
+			cp "$$uv_path" src-tauri/bundled-tools/uv.exe; \
+			;; \
+		*) \
+			cp "$$uv_path" src-tauri/bundled-tools/uv; \
+			chmod +x src-tauri/bundled-tools/uv; \
+			;; \
+	esac
 
 set-version: check-input-version-greater
 	uv run python scripts/maintenance/bump_versions.py --version "$(EFFECTIVE_VERSION)" --write-version-file
