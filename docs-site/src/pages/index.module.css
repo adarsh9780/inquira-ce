@@ -110,37 +110,29 @@
   background: #ffffff;
 }
 
-.heroPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  padding: 1.2rem;
-  border: 1px solid #e4e4e7;
-  border-radius: 1.5rem;
-  background:
-    radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 34%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(253, 252, 248, 0.98));
-  box-shadow: 0 22px 50px rgba(39, 39, 42, 0.08);
-}
-
-.panelHeader {
+.heroLogoContainer {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  color: #71717a;
-  font-size: 0.9rem;
+  justify-content: center;
+  padding: 2rem;
+  border-radius: 2rem;
+  background: 
+    radial-gradient(circle at center, rgba(59, 130, 246, 0.08), transparent 70%),
+    rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(228, 228, 231, 0.5);
 }
 
-.panelDot {
-  width: 0.65rem;
-  height: 0.65rem;
-  border-radius: 999px;
-  background: #3b82f6;
-  box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.08);
+.heroLogo {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.08));
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.panelLabel {
-  font-weight: 600;
+.heroLogo:hover {
+  transform: scale(1.04) rotate(-1deg);
 }
 
 .panelCard,
@@ -153,31 +145,12 @@
   border-radius: 1.25rem;
 }
 
-.panelCard {
-  padding: 1.2rem;
-}
-
-.panelTitle {
-  margin: 0 0 0.5rem;
-  font-size: 1.05rem;
-  font-weight: 700;
-}
-
-.panelText {
-  margin: 0;
-  color: #71717a;
-}
-
 .panelGrid,
 .cardGrid,
 .editionGrid,
 .downloadGrid {
   display: grid;
   gap: 1rem;
-}
-
-.panelGrid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .metricCard {

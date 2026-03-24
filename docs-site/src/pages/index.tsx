@@ -64,32 +64,12 @@ function HomePageContent(): ReactNode {
             </Link>
           </div>
         </div>
-        <div className={styles.heroPanel}>
-          <div className={styles.panelHeader}>
-            <span className={styles.panelDot} />
-            <span className={styles.panelLabel}>Inquira release channel</span>
-          </div>
-          <div className={styles.panelCard}>
-            <p className={styles.panelTitle}>Free should feel open</p>
-            <p className={styles.panelText}>
-              Remove forced login for the base desktop experience. Keep the web
-              layer for docs, downloads, and future account management.
-            </p>
-          </div>
-          <div className={styles.panelGrid}>
-            <div className={styles.metricCard}>
-              <span className={styles.metricLabel}>Docs</span>
-              <strong>Guides, setup, roadmap</strong>
-            </div>
-            <div className={styles.metricCard}>
-              <span className={styles.metricLabel}>Download</span>
-              <strong>Latest desktop build</strong>
-            </div>
-            <div className={styles.metricCard}>
-              <span className={styles.metricLabel}>Future</span>
-              <strong>Accounts, billing, workspaces</strong>
-            </div>
-          </div>
+        <div className={styles.heroLogoContainer}>
+          <img
+            src="img/inquira-logo-animated.svg"
+            alt="Inquira Logo"
+            className={styles.heroLogo}
+          />
         </div>
       </section>
 
