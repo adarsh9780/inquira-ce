@@ -1,4 +1,13 @@
 {
   "editor.linkedEditing": true,
-  "python-envs.defaultEnvManager": "ms-python.python:venv"
+  "python-envs.defaultEnvManager": "ms-python.python:venv",
+  "editor.fontFamily": "Sans, Menlo, Monaco, 'Courier New', monospace",
+  "editor.formatOnSave": true,
+  "workbench.activityBar.location": "top",
+  "workbench.colorCustomizations": {},
+  "workbench.activityBar.autoHide": false,
+  "workbench.colorTheme": "Solarized Light",
+  "workbench.preferredDarkColorTheme": "Solarized Light",
+  "extensions.gallery.serviceUrl": "https://marketplace.visualstudio.com/_apis/public/gallery",
+  "extensions.gallery.itemUrl": "https://marketplace.visualstudio.com/items"
 }
