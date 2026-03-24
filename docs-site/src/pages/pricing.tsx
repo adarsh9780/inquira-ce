@@ -44,21 +44,21 @@ export default function PricingPage(): ReactNode {
           <div className={styles.sectionIntro}>
             <div className={styles.sectionEyebrow}>Pricing</div>
             <h1 className={styles.sectionTitle}>
-              Three editions, one desktop-first product line
+              Editions for every workload
             </h1>
             <p className={styles.sectionBody}>
-              The Free tier should stay easy to try. Pro and Enterprise build on
-              top of that foundation instead of replacing it.
+              Inquira Community Edition is free forever for local analysis.
+              Pro and Enterprise editions provide advanced collaboration and RAG features.
             </p>
           </div>
-          <div className={styles.editionGrid}>
+          <div className={styles.cardGrid}>
             {editions.map(edition => (
-              <article key={edition.name} className={styles.editionCard}>
-                <div className={styles.editionName}>{edition.name}</div>
-                <p className={styles.editionSummary}>{edition.summary}</p>
-                <ul>
+              <article key={edition.name} className={styles.infoCard}>
+                <div className={styles.eyebrow} style={{ marginBottom: '1rem' }}>{edition.name}</div>
+                <p style={{ fontWeight: 600, color: 'var(--ifm-font-color-base)', marginBottom: '1rem' }}>{edition.summary}</p>
+                <ul style={{ paddingLeft: '1.25rem', color: 'var(--ifm-font-color-secondary)' }}>
                   {edition.bullets.map(bullet => (
-                    <li key={bullet}>{bullet}</li>
+                    <li key={bullet} style={{ marginBottom: '0.5rem' }}>{bullet}</li>
                   ))}
                 </ul>
               </article>
@@ -67,13 +67,13 @@ export default function PricingPage(): ReactNode {
         </section>
         <section className={styles.ctaSection}>
           <div>
-            <div className={styles.sectionEyebrow}>Next step</div>
+            <div className={styles.sectionEyebrow}>Get Started</div>
             <h2 className={styles.sectionTitle}>
-              Turn this into your public pricing page
+              Start with Community Edition
             </h2>
             <p className={styles.sectionBody}>
-              Replace the roadmap language with final packaging details once
-              billing and account flows are ready.
+              Download the latest Alpha release and experience the future of
+              local-first data analysis.
             </p>
           </div>
           <div className={styles.ctaActions}>

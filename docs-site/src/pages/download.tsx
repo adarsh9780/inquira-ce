@@ -223,67 +223,66 @@ export default function DownloadPage(): ReactNode {
       <main className={styles.page}>
         <section className={styles.section}>
           <div className={styles.sectionIntro}>
-            <div className={styles.sectionEyebrow}>Download</div>
+            <div className={styles.sectionEyebrow}>Get Inquira</div>
             <h1 className={styles.sectionTitle}>
-              Show the same optional signup flow before both desktop downloads
+              Download the desktop workspace
             </h1>
             <p className={styles.sectionBody}>
               {signupConfigured
-                ? 'Enter an email if you want to opt in before downloading, or leave the field blank and continue directly. The same choice now exists for both macOS and Windows.'
-                : 'Both buttons work as direct downloads right now. Optional email capture will appear automatically once public Supabase signup settings are available.'}
+                ? 'Choose your platform to start the download. You can optionally provide your email to receive product updates and early access to new features.'
+                : 'Direct downloads are available for macOS and Windows. Experience the full power of a local-first AI workspace today.'}
             </p>
           </div>
           <div className={styles.downloadGrid}>
             <a className={styles.downloadCard} href="#download-form">
               <span className={styles.downloadIcon}>{MAC_ICON}</span>
-              <span className={styles.downloadLabel}>macOS</span>
+              <span className={styles.downloadLabel}>macOS (Apple Silicon)</span>
               <span className={styles.downloadHint}>
-                Optional email before installer download
+                Standard DMG installer
               </span>
             </a>
             <a className={styles.downloadCard} href="#download-form">
               <span className={styles.downloadIcon}>{WINDOWS_ICON}</span>
               <span className={styles.downloadLabel}>Windows</span>
               <span className={styles.downloadHint}>
-                Same optional email flow as macOS
+                Standard Setup EXE
               </span>
             </a>
           </div>
           <div className={styles.cardGrid}>
             <article className={styles.infoCard}>
-              <h3>One flow for both platforms</h3>
+              <h3>Private by Design</h3>
               <p>
-                Both download buttons now sit behind the same optional email
-                field, so the page no longer treats Windows and macOS
-                differently.
+                Inquira runs entirely on your hardware. Your data, queries, and
+                conversations never leave your machine.
               </p>
             </article>
             <article className={styles.infoCard}>
-              <h3>Optional means optional</h3>
+              <h3>Zero Cloud Latency</h3>
               <p>
-                If the email field is blank, the page skips Supabase and starts
-                the installer immediately for whichever platform the user picks.
+                By processing everything locally, Inquira provides near-instant
+                responses for analysis and data manipulation.
               </p>
             </article>
             <article className={styles.infoCard}>
-              <h3>Why this fixes the bug</h3>
+              <h3>Full System Control</h3>
               <p>
-                Before this change, Windows users never even saw the signup
-                choice. Now both buttons expose the same lead-capture option.
+                Leverage your local Python environment and databases with 
+                direct, native speed.
               </p>
             </article>
           </div>
         </section>
         <section className={styles.ctaSection}>
           <div>
-            <div className={styles.sectionEyebrow}>Optional opt-in</div>
+            <div className={styles.sectionEyebrow}>Stay Updated</div>
             <h2 className={styles.sectionTitle}>
-              Add an email if you want, or leave it blank and download directly
+              Optional product updates
             </h2>
             <p className={styles.sectionBody}>
               {signupConfigured
-                ? 'If you provide an email, the page stores it in the `optin_user_signup` table by default. If release lookup fails, both download buttons still fall back to the GitHub asset URLs for the current release.'
-                : 'Email capture is currently unavailable on this docs site, so both buttons behave like direct downloads. If release lookup fails, they still fall back to the GitHub asset URLs for the current release.'}
+                ? 'Provide your email if you want to stay in the loop with the latest releases and community features.'
+                : 'Email updates are currently being transitioned. Follow our GitHub for the latest release notes and project news.'}
             </p>
           </div>
           <div id="download-form" className={styles.formShell}>
