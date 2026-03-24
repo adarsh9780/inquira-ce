@@ -22,6 +22,9 @@ export const useAuthStore = defineStore('auth', () => {
   let authProbeRevision = 0
   let authSubscription = null
   let authProgressListenerBound = false
+  let isBackendReady = false
+  let deferredSessionToken = ''
+  let deferredSessionEvent = ''
   let activeHydrationPromise = null
   let activeHydrationToken = ''
   let lastHydratedAccessToken = ''
@@ -55,6 +58,8 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     isAuthenticated.value = false
     plan.value = 'FREE'
+    deferredSessionToken = ''
+    deferredSessionEvent = ''
     lastHydratedAccessToken = ''
   }
 
@@ -169,6 +174,63 @@ export const useAuthStore = defineStore('auth', () => {
     return hydrationPromise
   }
 
+  function setDeferredSessionFlow(authEvent = '') {
+    const normalizedEvent = String(authEvent || '').trim().toUpperCase()
+    if (normalizedEvent === 'INITIAL_SESSION') {
+      setAuthFlow('restoring_session', 'Found a saved session. Waiting for Inquira backend...')
+      return
+    }
+    setAuthFlow('session_ready', 'Sign-in code accepted. Waiting for Inquira backend...')
+  }
+
+  async function hydrateSessionFromAuthEvent(accessToken = '', authEvent = '') {
+    const normalizedEvent = String(authEvent || '').trim().toUpperCase()
+    if (normalizedEvent === 'INITIAL_SESSION') {
+      setAuthFlow('restoring_session', 'Found a saved session. Reconnecting to Inquira...')
+    } else {
+      setAuthFlow('verifying_session', 'Browser sign-in finished. Verifying your session with Inquira...')
+    }
+    await ensureBackendHydration(accessToken, { retry: true })
+    error.value = ''
+    setAuthFlow('loading_account', 'Session verified. Loading your account...')
+  }
+
+  function setHydrationFailure(authEvent = '') {
+    const normalizedEvent = String(authEvent || '').trim().toUpperCase()
+    error.value = 'Authentication succeeded, but the local backend could not verify the session.'
+    if (normalizedEvent === 'INITIAL_SESSION') {
+      setAuthFlow('failed', 'Found a saved session, but Inquira could not reconnect to it yet.')
+      return
+    }
+    setAuthFlow('failed', 'Browser sign-in finished, but Inquira could not verify your session yet.')
+  }
+
+  async function resumeDeferredSessionHydration() {
+    const accessToken = String(deferredSessionToken || '').trim()
+    const authEvent = String(deferredSessionEvent || '').trim().toUpperCase()
+    if (!isBackendReady || !accessToken) return false
+
+    deferredSessionToken = ''
+    deferredSessionEvent = ''
+
+    try {
+      await hydrateSessionFromAuthEvent(accessToken, authEvent)
+      return true
+    } catch (err) {
+      console.error('❌ Failed to resume deferred Supabase session from backend:', err)
+      clearLocalState()
+      setHydrationFailure(authEvent)
+      return false
+    } finally {
+      pendingAuthAction.value = ''
+    }
+  }
+
+  function markBackendReady() {
+    isBackendReady = true
+    void resumeDeferredSessionHydration()
+  }
+
   function ensureAuthSubscription() {
     if (authSubscription || !supabaseAuthService.isConfigured) return
     const { data } = supabaseAuthService.onAuthStateChange(async (event, session) => {
@@ -180,8 +242,12 @@ export const useAuthStore = defineStore('auth', () => {
       markInitialSessionResolved(authEvent)
       if (!accessToken) {
         if (authEvent === 'SIGNED_OUT' || authEvent === 'INITIAL_SESSION') {
-          console.log('[AUTH PROFILE] No session in onAuthStateChange, falling back to Guest.')
-          await hydrateUserFromBackend('')
+          if (isBackendReady) {
+            console.log('[AUTH PROFILE] No session in onAuthStateChange, falling back to Guest.')
+            await hydrateUserFromBackend('')
+          } else {
+            clearLocalState()
+          }
           error.value = ''
           pendingAuthAction.value = ''
           clearAuthFlow()
@@ -191,24 +257,20 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       try {
-        if (authEvent === 'INITIAL_SESSION') {
-          setAuthFlow('restoring_session', 'Found a saved session. Reconnecting to Inquira...')
-        } else {
-          setAuthFlow('verifying_session', 'Browser sign-in finished. Verifying your session with Inquira...')
+        if (!isBackendReady) {
+          deferredSessionToken = accessToken
+          deferredSessionEvent = authEvent
+          setDeferredSessionFlow(authEvent)
+          console.log('[AUTH PROFILE] Deferred Supabase session hydration until backend startup finished.')
+          console.timeEnd(`[AUTH PROFILE] Full onAuthStateChange Event: ${event}`)
+          return
         }
-        await ensureBackendHydration(accessToken, { retry: true })
-        error.value = ''
-        setAuthFlow('loading_account', 'Session verified. Loading your account...')
+        await hydrateSessionFromAuthEvent(accessToken, authEvent)
         console.timeEnd(`[AUTH PROFILE] Full onAuthStateChange Event: ${event}`)
       } catch (err) {
         console.error('❌ Failed to hydrate Supabase session from backend:', err)
         clearLocalState()
-        error.value = 'Authentication succeeded, but the local backend could not verify the session.'
-        if (authEvent === 'INITIAL_SESSION') {
-          setAuthFlow('failed', 'Found a saved session, but Inquira could not reconnect to it yet.')
-        } else {
-          setAuthFlow('failed', 'Browser sign-in finished, but Inquira could not verify your session yet.')
-        }
+        setHydrationFailure(authEvent)
         console.timeEnd(`[AUTH PROFILE] Full onAuthStateChange Event: ${event}`)
       } finally {
         pendingAuthAction.value = ''
@@ -418,6 +480,7 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     refreshPlan,
     clearError,
+    markBackendReady,
     showAuthModal: () => { isAuthModalVisible.value = true },
     hideAuthModal: () => { isAuthModalVisible.value = false },
     isAuthModalVisible,

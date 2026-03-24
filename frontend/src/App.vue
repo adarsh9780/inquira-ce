@@ -338,6 +338,7 @@ function markBackendReady() {
   backendStatus.active = false
   backendStatus.message = ''
   isAuthUiReady.value = true
+  authStore.markBackendReady()
 }
 
 async function recoverBackendReadiness() {
