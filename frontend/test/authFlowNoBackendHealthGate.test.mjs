@@ -10,5 +10,6 @@ test('auth flow verifies the session directly without waiting for backend health
   assert.equal(source.includes('async function hydrateUserFromBackend(accessToken = \'\')'), true)
   assert.equal(source.includes('apiService.waitForBackendReady'), false)
   assert.equal(source.includes('apiService.v1GetCurrentUser(requestConfig)'), true)
-  assert.equal(source.includes('ensureBackendHydration(accessToken, { retry: true })'), true)
+  assert.equal(source.includes('async function hydrateSessionFromAuthEvent(accessToken = \'\', authEvent = \'\', options = {})'), true)
+  assert.equal(source.includes('await ensureBackendHydration(accessToken, { retry })'), true)
 })

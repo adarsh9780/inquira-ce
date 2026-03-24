@@ -280,6 +280,8 @@ const progressConfig = computed(() => {
   const fallback = authStore.authFlowMessage || 'Preparing your Inquira session...'
 
   switch (stage) {
+    case 'checking_session':
+      return { percent: 12, title: 'Checking saved session', description: fallback }
     case 'browser_opening':
       return { percent: 18, title: 'Opening browser', description: fallback }
     case 'browser_wait':

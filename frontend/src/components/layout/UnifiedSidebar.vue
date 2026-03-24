@@ -71,20 +71,7 @@
 
       <div class="border-t my-1" style="border-color: var(--color-border);"></div>
 
-      <!-- Authentication Action (Logout or Sign In) -->
       <button
-        v-if="isGuest"
-        @click="authStore.showAuthModal"
-        class="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-zinc-100/70 transition-colors"
-        style="color: var(--color-text-main);"
-        title="Sign In"
-      >
-        <ArrowLeftOnRectangleIcon class="w-4 h-4 shrink-0" />
-        <span class="text-xs font-medium">Sign In</span>
-      </button>
-
-      <button
-        v-else
         @click="promptLogout"
         class="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-red-50 transition-colors"
         style="color: #dc2626;"
@@ -169,7 +156,6 @@ import {
   CogIcon,
   DocumentIcon,
   ArrowRightOnRectangleIcon,
-  ArrowLeftOnRectangleIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -199,12 +185,7 @@ const termsHtml = computed(() => {
   })
 })
 
-const isGuest = computed(() => {
-  return String(authStore.userId || '').trim() === '00000000-0000-0000-0000-000000000000'
-})
-
 const accountDisplayLabel = computed(() => {
-  if (isGuest.value) return 'Guest'
   const value = String(authStore.username || '').trim()
   if (!value) return 'Account'
   if (value.includes('@')) return value

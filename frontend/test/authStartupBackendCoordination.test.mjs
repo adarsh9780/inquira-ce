@@ -3,29 +3,28 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('auth store defers session verification until desktop backend startup is ready', () => {
+test('auth store initializes the auth shell by checking and restoring a saved session once', () => {
   const source = readFileSync(
     resolve(process.cwd(), 'src/stores/authStore.js'),
     'utf-8',
   )
 
-  assert.equal(source.includes('let isBackendReady = false'), true)
-  assert.equal(source.includes('let deferredSessionToken = \'\''), true)
-  assert.equal(source.includes('let deferredSessionEvent = \'\''), true)
-  assert.equal(source.includes("setAuthFlow('restoring_session', 'Found a saved session. Waiting for Inquira backend...')"), true)
-  assert.equal(source.includes("setAuthFlow('session_ready', 'Sign-in code accepted. Waiting for Inquira backend...')"), true)
-  assert.equal(source.includes('if (!isBackendReady) {'), true)
-  assert.equal(source.includes('deferredSessionToken = accessToken'), true)
-  assert.equal(source.includes('async function resumeDeferredSessionHydration()'), true)
-  assert.equal(source.includes('await hydrateSessionFromAuthEvent(accessToken, authEvent)'), true)
+  assert.equal(source.includes('let activeInitializePromise = null'), true)
+  assert.equal(source.includes('async function initialize()'), true)
+  assert.equal(source.includes("setAuthFlow('checking_session', 'Checking for a saved session...')"), true)
+  assert.equal(source.includes('return await restoreSavedSession(accessToken)'), true)
+  assert.equal(source.includes('let isBackendReady = false'), false)
+  assert.equal(source.includes('let deferredSessionToken = \'\''), false)
 })
 
-test('app startup readiness handoff resumes deferred auth verification', () => {
+test('app shell reads native startup state once before initializing auth', () => {
   const source = readFileSync(
     resolve(process.cwd(), 'src/App.vue'),
     'utf-8',
   )
 
-  assert.equal(source.includes('function markBackendReady() {'), true)
-  assert.equal(source.includes('authStore.markBackendReady()'), true)
+  assert.equal(source.includes('async function readDesktopStartupState()'), true)
+  assert.equal(source.includes("invoke('get_startup_state')"), true)
+  assert.equal(source.includes('void authStore.initialize()'), true)
+  assert.equal(source.includes('markBackendReady'), false)
 })

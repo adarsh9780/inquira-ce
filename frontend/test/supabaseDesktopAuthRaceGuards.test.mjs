@@ -26,5 +26,6 @@ test('auth store retries backend hydration through a shared single-flight guard'
   assert.equal(source.includes('let activeHydrationPromise = null'), true)
   assert.equal(source.includes('let activeHydrationToken = \'\''), true)
   assert.equal(source.includes('if (activeHydrationPromise && activeHydrationToken === token) {'), true)
-  assert.equal(source.includes('await ensureBackendHydration(accessToken, { retry: true })'), true)
+  assert.equal(source.includes('async function restoreSavedSession(accessToken = \'\')'), true)
+  assert.equal(source.includes("await hydrateSessionFromAuthEvent(accessToken, 'INITIAL_SESSION', { retry: true })"), true)
 })

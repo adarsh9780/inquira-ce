@@ -10,6 +10,7 @@ test('auth screen renders a dedicated progress experience for reconnect and logi
   )
 
   assert.equal(source.includes("v-if=\"showProgressScreen\""), true)
+  assert.equal(source.includes('Checking saved session'), true)
   assert.equal(source.includes('Browser step completed'), true)
   assert.equal(source.includes('Exchanging sign-in code'), true)
   assert.equal(source.includes('Restoring saved session'), true)
@@ -38,7 +39,7 @@ test('auth screen renders a dedicated progress experience for reconnect and logi
   assert.equal(source.includes('Next'), false)
 })
 
-test('auth store tracks stepwise login progress and waits for backend readiness', () => {
+test('auth store tracks stepwise login progress without a frontend backend-ready gate', () => {
   const source = readFileSync(
     resolve(process.cwd(), 'src/stores/authStore.js'),
     'utf-8',
@@ -46,8 +47,9 @@ test('auth store tracks stepwise login progress and waits for backend readiness'
 
   assert.equal(source.includes("window.addEventListener('inquira:auth-progress'"), true)
   assert.equal(source.includes("if (normalizedEvent === 'INITIAL_SESSION')"), true)
+  assert.equal(source.includes("setAuthFlow('checking_session', 'Checking for a saved session...')"), true)
   assert.equal(source.includes("setAuthFlow('restoring_session', 'Found a saved session. Reconnecting to Inquira...')"), true)
-  assert.equal(source.includes("setAuthFlow('restoring_session', 'Found a saved session. Waiting for Inquira backend...')"), true)
+  assert.equal(source.includes("setAuthFlow('restoring_session', 'Found a saved session. Waiting for Inquira backend...')"), false)
   assert.equal(source.includes("setAuthFlow('browser_complete', 'Browser sign-in finished. Completing sign-in in the app...')"), true)
   assert.equal(source.includes("setAuthFlow('session_ready', 'Sign-in code accepted. Waiting for Inquira backend...')"), true)
   assert.equal(source.includes("setAuthFlow('verifying_session', 'Browser sign-in finished. Verifying your session with Inquira...')"), true)

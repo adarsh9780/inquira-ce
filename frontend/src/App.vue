@@ -1,42 +1,75 @@
 <template>
   <div class="min-h-screen bg-white flex flex-col">
-    <!-- Toast Notifications -->
     <ToastContainer />
 
-    <!-- Connection Status Indicator -->
-    <ConnectionStatusIndicator />
+    <ConnectionStatusIndicator v-if="authStore.isAuthenticated && appBootstrap.ready" />
 
-    <!-- Auth Modal - Only shown if explicitly requested or on auth errors -->
     <AuthModal
-      :is-open="authStore.isAuthModalVisible"
-      @close="authStore.hideAuthModal"
+      v-if="!startupFailure && !authStore.isAuthenticated"
+      :is-open="true"
+      @close="handleAuthClose"
     />
 
-    <!-- Main App (only shown when authenticated) -->
-    <div v-if="authStore.isAuthenticated && appBootstrap.ready" class="flex flex-col h-screen">
-      <!-- Main Content Area with Sidebar -->
+    <div
+      v-else-if="startupFailure"
+      class="fixed inset-0 overflow-y-auto bg-[var(--color-base)]"
+    >
+      <div class="relative min-h-screen overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.08),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(24,24,27,0.08),_transparent_34%)]"></div>
+        <div class="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(253,252,248,0))]"></div>
+        <div class="relative mx-auto flex min-h-[calc(100vh-3rem)] max-w-3xl items-center justify-center">
+          <section class="w-full overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-white/88 shadow-[0_28px_90px_rgba(24,24,27,0.1)] backdrop-blur-xl">
+            <div class="p-8 sm:p-10">
+              <div class="flex items-center gap-4">
+                <div class="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/70 bg-white/90 shadow-[0_16px_32px_rgba(24,24,27,0.08)]">
+                  <img :src="logo" alt="Inquira logo" class="h-10 w-10 rounded-xl shadow-sm" />
+                </div>
+                <div>
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Inquira startup</p>
+                  <p class="mt-1 text-sm text-[var(--color-text-muted)]">Desktop startup failed</p>
+                </div>
+              </div>
+
+              <div class="mt-10">
+                <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--color-text-muted)]">
+                  Startup blocked
+                </p>
+                <h1 class="mt-4 text-4xl font-semibold tracking-[-0.05em] text-[var(--color-text-main)] sm:text-5xl">
+                  Inquira could not finish starting.
+                </h1>
+                <p class="mt-5 text-base leading-7 text-[var(--color-text-muted)] sm:text-lg sm:leading-8">
+                  The desktop services did not reach a healthy state, so the auth shell never started.
+                </p>
+              </div>
+
+              <div class="mt-8 rounded-[1.5rem] border border-red-200 bg-red-50 px-5 py-5 text-red-800">
+                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-red-600">Startup Error</p>
+                <p class="mt-3 text-sm leading-6">{{ startupFailure }}</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div v-else-if="authStore.isAuthenticated && appBootstrap.ready" class="flex flex-col h-screen">
       <div class="flex-1 flex overflow-hidden bg-white relative">
         <Transition name="sidebar-shell">
           <div v-if="!appStore.isSidebarCollapsed" class="h-full shrink-0">
             <UnifiedSidebar />
           </div>
         </Transition>
-
-        <!-- Single Panel - Tabs include Chat -->
         <div class="flex-1 bg-white flex flex-col overflow-hidden">
           <RightPanel />
         </div>
       </div>
-      
-      <!-- Footer Status Bar -->
       <StatusBar />
     </div>
 
-    <!-- Backend Status Overlay ... -->
     <Teleport to="body">
       <Transition name="fade">
         <div
-          v-if="backendStatus.active || workspaceRuntimeStatus.active || appBootstrap.active"
+          v-if="workspaceRuntimeStatus.active || appBootstrap.active"
           class="fixed inset-0 z-[9999] overflow-y-auto bg-[var(--color-base)]"
         >
           <div class="relative min-h-screen overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
@@ -59,14 +92,14 @@
                         </div>
 
                         <div>
-                          <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Inquira startup</p>
+                          <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Inquira workspace</p>
                           <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ startupOverlayPill }}</p>
                         </div>
                       </div>
 
                       <div class="mt-10 max-w-xl">
                         <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--color-text-muted)]">
-                          Preparing your workspace
+                          Restoring your workspace
                         </p>
                         <h1 class="mt-4 text-4xl font-semibold tracking-[-0.05em] text-[var(--color-text-main)] sm:text-5xl lg:text-[3.5rem] lg:leading-[1.02]">
                           {{ startupOverlayTitle }}
@@ -99,7 +132,7 @@
                       <ul class="mt-8 grid gap-3 text-sm sm:grid-cols-3 lg:mt-auto lg:grid-cols-1 xl:grid-cols-3">
                         <li class="rounded-[1.35rem] border border-white/75 bg-white/72 px-4 py-4 shadow-[0_14px_30px_rgba(24,24,27,0.06)]">
                           <p class="text-sm font-semibold text-[var(--color-text-main)]">Visible progress</p>
-                          <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">The current stage stays on screen instead of hiding behind a generic loading dialog.</p>
+                          <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">Workspace restore stays visible until the authenticated shell is ready to render.</p>
                         </li>
                         <li class="rounded-[1.35rem] border border-white/75 bg-white/72 px-4 py-4 shadow-[0_14px_30px_rgba(24,24,27,0.06)]">
                           <p class="text-sm font-semibold text-[var(--color-text-main)]">Real timing</p>
@@ -157,7 +190,6 @@ import { useAuthStore } from './stores/authStore'
 import { settingsWebSocket } from './services/websocketService'
 import { previewService } from './services/previewService'
 import { walkthroughService } from './services/walkthroughService'
-import { apiService } from './services/apiService'
 import { toast } from './composables/useToast'
 import logo from './assets/favicon.svg'
 import AuthModal from './components/modals/AuthModal.vue'
@@ -170,11 +202,6 @@ import ConnectionStatusIndicator from './components/ui/ConnectionStatusIndicator
 const appStore = useAppStore()
 const authStore = useAuthStore()
 
-// Backend status (for Tauri first-launch setup)
-const backendStatus = reactive({
-  active: false,
-  message: 'Starting backend...'
-})
 const workspaceRuntimeStatus = reactive({
   active: false,
   message: '',
@@ -187,22 +214,12 @@ const appBootstrap = reactive({
 const wsUnsubscribers = ref([])
 const lastRuntimeErrorToast = ref('')
 const activeSnapshotUserId = ref('')
-const isAuthUiReady = ref(false)
-let backendRecoveryPromise = null
+const startupFailure = ref('')
 const startupTimeline = ref([])
 const startupClock = ref(Date.now())
 let startupClockTimer = null
 
-const BACKEND_STATUS_LABELS = {
-  'agent-starting': 'Starting agent runtime...',
-  'backend-starting': 'Starting API backend...',
-  'health-checking': 'Checking local service health...',
-  ready: 'Backend ready.',
-}
-
 const STARTUP_SCOPE_LABELS = {
-  auth: 'Auth',
-  desktop: 'Desktop',
   workspace: 'Workspace',
   runtime: 'Runtime',
 }
@@ -211,12 +228,6 @@ function formatElapsed(ms) {
   if (!Number.isFinite(ms) || ms < 1000) return '<1s'
   if (ms < 60000) return `${Math.round(ms / 100) / 10}s`
   return `${Math.round(ms / 1000)}s`
-}
-
-function describeBackendStatus(message) {
-  const normalized = String(message || '').trim()
-  if (!normalized) return 'Waiting for backend startup...'
-  return BACKEND_STATUS_LABELS[normalized] || normalized
 }
 
 function recordStartupStage(scope, message) {
@@ -254,21 +265,9 @@ const currentStartupStage = computed(() => {
       message: String(workspaceRuntimeStatus.message || '').trim() || 'Preparing workspace runtime...',
     }
   }
-  if (appBootstrap.active) {
-    return {
-      scope: 'workspace',
-      message: String(appBootstrap.message || '').trim() || 'Loading your workspace...',
-    }
-  }
-  if (authStore.authFlowStage && !authStore.isAuthenticated) {
-    return {
-      scope: 'auth',
-      message: String(authStore.authFlowMessage || '').trim() || 'Completing secure sign-in...',
-    }
-  }
   return {
-    scope: 'desktop',
-    message: describeBackendStatus(backendStatus.message),
+    scope: 'workspace',
+    message: String(appBootstrap.message || '').trim() || 'Loading your workspace...',
   }
 })
 
@@ -298,68 +297,32 @@ const startupTimelineEntries = computed(() => {
 
 const startupOverlayTitle = computed(() => {
   if (workspaceRuntimeStatus.active) return 'Preparing your workspace runtime.'
-  if (appBootstrap.active) return 'Loading your workspace.'
-  return 'Setting up Inquira.'
+  return 'Loading your workspace.'
 })
 
 const startupOverlayMessage = computed(() => {
   if (workspaceRuntimeStatus.active) {
     return String(workspaceRuntimeStatus.message || '').trim() || 'Creating the runtime your current workspace needs.'
   }
-  if (appBootstrap.active) {
-    return String(appBootstrap.message || '').trim() || 'Restoring your account, workspace, and runtime state.'
-  }
-  return String(backendStatus.message || '').trim() || 'Starting the local desktop services required for Inquira.'
+  return String(appBootstrap.message || '').trim() || 'Restoring your account, workspace, and runtime state.'
 })
 
 const startupOverlayHint = computed(() => {
   if (workspaceRuntimeStatus.active) {
     return 'Kernel and environment work now stays visible inside the app shell instead of appearing as a detached dialog.'
   }
-  if (appBootstrap.active) {
-    return 'Authentication, workspace restore, and runtime warmup now read like one continuous startup flow.'
-  }
-  return 'Desktop startup now uses the same visual language as the rest of the app so progress feels continuous.'
+  return 'Authentication finishes first, then the authenticated workspace restore runs as its own separate phase.'
 })
 
 const startupOverlayPill = computed(() => {
   if (workspaceRuntimeStatus.active) return 'Workspace runtime'
   if (appBootstrap.active) return 'Workspace restore'
-  return 'Desktop setup'
+  return 'Workspace restore'
 })
 
 const startupOverlayPanelTitle = computed(() => {
   if (workspaceRuntimeStatus.active) return 'Workspace progress'
-  if (appBootstrap.active) return 'Workspace handoff'
-  return 'Desktop service progress'
-})
-
-function markBackendReady() {
-  backendStatus.active = false
-  backendStatus.message = ''
-  isAuthUiReady.value = true
-  authStore.markBackendReady()
-}
-
-async function recoverBackendReadiness() {
-  if (backendRecoveryPromise) return backendRecoveryPromise
-
-  backendRecoveryPromise = (async () => {
-    while (!isAuthUiReady.value) {
-      try {
-        await apiService.waitForBackendReady(2000)
-        markBackendReady()
-        return true
-      } catch (_error) {
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-      }
-    }
-    return true
-  })().finally(() => {
-    backendRecoveryPromise = null
-  })
-
-  return backendRecoveryPromise
+  return 'Workspace handoff'
 }
 
 function toggleSidebarVisibility() {
@@ -393,19 +356,17 @@ function handleGlobalShortcuts(event) {
   }
 }
 
-// Listen for Tauri backend-status events (if running in Tauri)
-function setupTauriListener() {
-  if (window.__TAURI_INTERNALS__) {
-    import('@tauri-apps/api/event').then(({ listen }) => {
-      listen('backend-status', (event) => {
-        if (event.payload === 'ready') {
-          markBackendReady()
-        } else {
-          backendStatus.active = true
-          backendStatus.message = event.payload
-        }
-      })
-    })
+async function readDesktopStartupState() {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
+    return { ready: true, error: '' }
+  }
+
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    return await invoke('get_startup_state')
+  } catch (error) {
+    console.warn('⚠️ Failed to read desktop startup state from Tauri:', error)
+    return { ready: true, error: '' }
   }
 }
 
@@ -458,19 +419,13 @@ async function handleAuthenticated(userData) {
 }
 
 function handleAuthClose() {
-  // If user tries to close auth modal without authenticating,
-  // we could show a message or just keep it open
   console.debug('Auth modal closed without authentication')
 }
 
 onMounted(async () => {
-  setupTauriListener()
   startupClockTimer = window.setInterval(() => {
     startupClock.value = Date.now()
   }, 1000)
-  backendStatus.active = true
-  backendStatus.message = 'Starting local desktop services...'
-  recordStartupStage('desktop', describeBackendStatus(backendStatus.message))
   document.addEventListener('keydown', handleGlobalShortcuts)
   wsUnsubscribers.value.push(
     settingsWebSocket.subscribeProgress((data) => {
@@ -496,24 +451,16 @@ onMounted(async () => {
       workspaceRuntimeStatus.message = message || ''
     }),
   )
-  try {
-    await apiService.waitForBackendReady()
-    markBackendReady()
-  } catch (error) {
-    console.error('❌ Error during app initialization:', error)
-    backendStatus.active = true
-    backendStatus.message = 'Backend is taking longer than expected to start.'
-    void recoverBackendReadiness()
-  }
-})
 
-watch(
-  () => backendStatus.message,
-  (message) => {
-    if (!backendStatus.active) return
-    recordStartupStage('desktop', describeBackendStatus(message))
-  },
-)
+  const startupState = await readDesktopStartupState()
+  const startupError = String(startupState?.error || '').trim()
+  if (startupError) {
+    startupFailure.value = startupError
+    return
+  }
+
+  void authStore.initialize()
+})
 
 watch(
   () => appBootstrap.message,
@@ -528,14 +475,6 @@ watch(
   (message) => {
     if (!workspaceRuntimeStatus.active) return
     recordStartupStage('runtime', message)
-  },
-)
-
-watch(
-  () => [authStore.authFlowStage, authStore.authFlowMessage],
-  ([stage, message]) => {
-    if (!stage || authStore.isAuthenticated) return
-    recordStartupStage('auth', message || stage)
   },
 )
 
