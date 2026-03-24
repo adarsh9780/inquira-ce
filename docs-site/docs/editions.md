@@ -1,30 +1,36 @@
-# Inquira Editions
+# Editions & Pricing
 
-Inquira is built with flexibility in mind, catering to individual analysts, professional teams, and enterprise organizations. This page outlines the feature differences and licensing structures across our Free, Pro, and Enterprise editions.
+Inquira CE is designed to be accessible to solo analysts while packing the power needed by enterprise data teams.
+
+---
 
 ## Free Edition
+Built for solo data analysts and students who need ad-hoc local data analysis without cloud lock-in.
 
-The Free edition (Inquira CE) provides a powerful, privacy-first data analysis experience running entirely on your local machine.
+- **Cost:** $0
+- **Access:** No login or credit card required.
+- **Workspaces:** Up to **3 Active Local Workspaces** per machine, with unlimited datasets per workspace.
+- **LLM Support:** Bring Your Own Key (BYOK) for OpenAI, Anthropic (testing phase), OpenRouter (most tested), or Ollama (partially tested).
+- **Support:** Community-supported for bug tracking; no guarantees for future feature requests.
 
-- **Local-first Architecture**: All data, schema reading, and code execution happens strictly on your local device.
-- **No Login Required**: The application runs completely offline without requiring an account, ensuring absolute data privacy.
-- **Built-in Python Kernel**: Run generated Python code in a bundled Jupyter environment seamlessly.
-- **AI-Assisted Analysis**: Complete access to the AI chat interface for generating Python analysis scripts and charts from natural language.
+---
 
-## Pro Edition
+## Pro Edition *(Coming Soon)*
+Built for power-users, developers, and consultants juggling multiple data projects or unstructured documents.
 
-The Pro edition is designed for advanced power-users and professionals who require more flexibility, syncing, and cloud connectivity.
+- **Estimated Cost:** $15 — $25 / month
+- **Workspaces:** **Unlimited** Local Workspaces.
+- **RAG (Retrieval-Augmented Generation):** Capabilities to ingest and chat with PDFs, text documents, and unstructured docs alongside your SQL data.
+- **MCP (Model Context Protocol):** Allow the agent to interface dynamically with external local tools, databases, or APIs.
+- **Support:** Priority bug-fixes and email support.
 
-- **Cloud Authentication**: Seamless login and secure user account management.
-- **Workspace Syncing**: Synchronize your workspaces, generated artifacts, charts, and application settings across multiple devices.
-- **Advanced Integrations**: Connect directly to external, managed data warehouses and third-party APIs beyond local SQLite/DuckDB databases.
-- **Cloud Execution (Upcoming)**: Execute complex, resource-intensive, or long-running data pipelines in a managed cloud environment without taxing your local machine.
+---
 
-## Enterprise Edition
+## Enterprise Edition *(Coming Soon)*
+Built for data teams requiring seamless, secure connections to production architectures.
 
-The Enterprise edition equips organizations with the security, management, and deployment features needed to deploy Inquira securely across large engineering or analyst teams.
-
-- **Centralized Administration**: Manage team access, seat licensing, and role-based permissions via a dedicated enterprise admin console.
-- **Single Sign-On (SSO)**: Support for SAML, OAuth, and Active Directory integration.
-- **Custom Agent Deployments**: Connect Inquira directly to your own self-hosted LangGraph/LangChain agents securely running on your private infrastructure.
-- **Audit Logging**: Comprehensive logging for all executed queries, data connections, and user login activity for strict compliance and security monitoring.
+- **Estimated Cost:** Custom volume billing (Typically starting at $50+ / user / month)
+- **Everything in Pro, plus:**
+- **Custom Data Connectors:** Direct integrations to Data Lakes, Data Warehouses (Snowflake, BigQuery, Databricks), or internal enterprise APIs.
+- **Dedicated Setup:** Custom-designed setup, architecture review, and deployment assistance for each customer.
+- **Support:** Dedicated Slack/Teams channel and guaranteed SLAs.

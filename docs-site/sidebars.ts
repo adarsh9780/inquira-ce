@@ -3,13 +3,7 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 const sidebars: SidebarsConfig = {
   tutorialSidebar: [
     'index',
-    {
-      type: 'category',
-      label: 'Editions (Free, Pro & Enterprise)',
-      items: [
-        'editions',
-      ],
-    },
+    'editions',
     {
       type: 'category',
       label: 'Core Concepts & Architecture',
