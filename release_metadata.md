@@ -13,7 +13,8 @@ Removed arbitrary workspace limits and "Free Edition" nomenclature to clarify Co
 Streamlined documentation site navigation by removing redundant pages, consolidating sidebar categories, and promoting downloads.
 
 ## Fixed
-Resolved uv path resolution issues outside of standard terminal environments during startup.
+Resolved Windows desktop startup failures where bundled `uv` was missed because startup expected `uv.exe` while some builds staged a plain `uv` binary.
+Fixed the extracted Windows resource layout mismatch by detecting bundled `uv` under both `bundled-tools` and legacy `src-tauri/bundled-tools` paths, and aligned future installers to bundle `bundled-tools` at the top level.
 Fixed guest fallbacks and restored App shell startup build.
 Fixed documentation site styling issues including oversized icons, missing imports, form styling, and duplicate formatting.
 Restored authentication guards and aligned stale UI assertions in the test suite.
