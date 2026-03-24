@@ -9,7 +9,7 @@ Built for solo data analysts and students who need ad-hoc local data analysis wi
 
 - **Cost:** $0
 - **Access:** No login or credit card required.
-- **Workspaces:** Up to **3 Active Local Workspaces** per machine, with unlimited datasets per workspace.
+- **Workspaces:** **Unlimited Local Workspaces** per machine, with unlimited datasets per workspace.
 - **LLM Support:** Bring Your Own Key (BYOK) for OpenAI, Anthropic (testing phase), OpenRouter (most tested), or Ollama (partially tested).
 - **Support:** Community-supported for bug tracking; no guarantees for future feature requests.
 
