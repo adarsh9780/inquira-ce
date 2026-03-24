@@ -5,39 +5,18 @@ import Layout from '@theme/Layout';
 
 import styles from './index.module.css';
 
-const editions = [
+const productFeatures = [
   {
-    name: 'Free',
-    summary: 'Desktop app access without forcing users through a login wall.',
-    details:
-      'Best for single-workspace usage today, with room for future multi-workspace support.',
+    title: 'Local-First Intelligence',
+    body: 'Zero cloud latency. Zero data leakage. All analysis, code execution, and data storage happen strictly on your hardware.',
   },
   {
-    name: 'Pro',
-    summary: 'Everything in Free, plus RAG and multiple workspaces.',
-    details:
-      'For teams and power users who need more retrieval context and project separation.',
+    title: 'Integrated Python Runtime',
+    body: 'A managed Jupyter kernel built directly into your workspace. Go from raw SQL to interactive Plotly charts with one click.',
   },
   {
-    name: 'Enterprise',
-    summary: 'Everything in Pro, plus data connectors and MCP support.',
-    details:
-      'Designed for controlled environments, internal systems, and broader integrations.',
-  },
-];
-
-const productPillars = [
-  {
-    title: 'Desktop-first by design',
-    body: 'The product experience starts on the desktop, not inside a browser tab. The site supports discovery, docs, and downloads without getting in the way.',
-  },
-  {
-    title: 'Docs and downloads in one place',
-    body: 'Users can read setup docs, compare plans, and download the latest build from the same domain.',
-  },
-  {
-    title: 'Ready for future accounts',
-    body: 'This site gives you a clean public surface now, while leaving room for account and license management later.',
+    title: 'Agentic LangGraph Logic',
+    body: 'Inquira does not just write SQL; it reasons through multi-step cleaning, joins, and analysis tasks until the result is correct.',
   },
 ];
 
@@ -48,19 +27,22 @@ function HomePageContent(): ReactNode {
     <main className={styles.page}>
       <section className={styles.heroSection}>
         <div className={styles.heroCopy}>
-          <div className={styles.eyebrow}>Desktop AI workspace</div>
-          <h1 className={styles.heroTitle}>{siteConfig.title}</h1>
-          <p className={styles.heroTagline}>{siteConfig.tagline}</p>
+          <div className={styles.eyebrow}>Local-First AI Workspace</div>
+          <h1 className={styles.heroTitle}>Analyze your data at the speed of thought.</h1>
+          <p className={styles.heroTagline}>
+            The private-by-design desktop app for SQL, Python, and local files.
+          </p>
           <p className={styles.heroBody}>
-            Launch a public website for your desktop app without splitting docs,
-            pricing, and downloads into separate systems too early.
+            Inquira CE turns your local databases and spreadsheets into a 
+            powerful, agentic workbench. Zero-cloud, zero-latency, and 
+            completely free for local analysis.
           </p>
           <div className={styles.ctaActions}>
             <Link className={styles.primaryCta} to="/download">
-              View downloads
+              Download for Mac/Windows
             </Link>
             <Link className={styles.secondaryCta} to="/docs">
-              Read the docs
+              Get Started
             </Link>
           </div>
         </div>
@@ -75,42 +57,40 @@ function HomePageContent(): ReactNode {
 
       <section className={styles.section}>
         <div className={styles.sectionIntro}>
-          <div className={styles.sectionEyebrow}>Why this site exists</div>
+          <div className={styles.sectionEyebrow}>Core Capabilities</div>
           <h2 className={styles.sectionTitle}>
-            Use the website for the public surface, not the full app shell
+            Built for privacy. Optimized for speed.
           </h2>
           <p className={styles.sectionBody}>
-            That split keeps the desktop product simpler today while giving you
-            a clean domain for documentation, releases, and future user account
-            flows.
+            Experience a modern data stack that fits on your machine, not in 
+            the cloud. Designed for Analysts, Data Scientists, and Developers 
+            who demand full control over their workflows.
           </p>
         </div>
         <div className={styles.cardGrid}>
-          {productPillars.map(pillar => (
-            <article key={pillar.title} className={styles.infoCard}>
-              <h3>{pillar.title}</h3>
-              <p>{pillar.body}</p>
+          {productFeatures.map(feature => (
+            <article key={feature.title} className={styles.infoCard}>
+              <h3>{feature.title}</h3>
+              <p>{feature.body}</p>
             </article>
           ))}
         </div>
       </section>
 
-
-
       <section className={styles.ctaSection}>
         <div>
-          <div className={styles.sectionEyebrow}>Next steps</div>
+          <div className={styles.sectionEyebrow}>Community First</div>
           <h2 className={styles.sectionTitle}>
-            Ship the site now, plug in the real domain later
+            Join the local-first movement.
           </h2>
           <p className={styles.sectionBody}>
-            Before deployment, replace the placeholder production URL in the
-            Docusaurus config with your actual domain.
+            Inquira Community Edition is free and open for local use. 
+            Download the latest Alpha and start exploring your data today.
           </p>
         </div>
         <div className={styles.ctaActions}>
           <Link className={styles.primaryCta} to="/docs/editions">
-            Community Edition
+            View CE Features
           </Link>
           <Link
             className={styles.secondaryCta}
