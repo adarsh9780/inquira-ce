@@ -115,23 +115,7 @@ function HomePageContent(): ReactNode {
         </div>
       </section>
 
-      <section className={styles.section}>
-        <div className={styles.sectionIntro}>
-          <div className={styles.sectionEyebrow}>Plans</div>
-          <h2 className={styles.sectionTitle}>
-            A pricing structure that matches your roadmap
-          </h2>
-        </div>
-        <div className={styles.editionGrid}>
-          {editions.map(edition => (
-            <article key={edition.name} className={styles.editionCard}>
-              <div className={styles.editionName}>{edition.name}</div>
-              <p className={styles.editionSummary}>{edition.summary}</p>
-              <p className={styles.editionDetails}>{edition.details}</p>
-            </article>
-          ))}
-        </div>
-      </section>
+
 
       <section className={styles.ctaSection}>
         <div>
@@ -145,8 +129,8 @@ function HomePageContent(): ReactNode {
           </p>
         </div>
         <div className={styles.ctaActions}>
-          <Link className={styles.primaryCta} to="/pricing">
-            Review plans
+          <Link className={styles.primaryCta} to="/docs/editions">
+            Community Edition
           </Link>
           <Link
             className={styles.secondaryCta}

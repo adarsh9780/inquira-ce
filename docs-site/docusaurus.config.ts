@@ -77,7 +77,7 @@ const config: Config = {
       },
       items: [
         {to: '/docs', label: 'Docs', position: 'left'},
-        {to: '/pricing', label: 'Pricing', position: 'left'},
+
         {to: '/download', label: 'Download', position: 'left'},
         {
           href: 'https://github.com/adarsh9780/inquira-ce',
@@ -96,10 +96,7 @@ const config: Config = {
               label: 'Overview',
               to: '/docs',
             },
-            {
-              label: 'Pricing',
-              to: '/pricing',
-            },
+
             {
               label: 'Download',
               to: '/download',
