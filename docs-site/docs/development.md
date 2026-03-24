@@ -68,4 +68,3 @@ make test
 - `scripts/`: maintenance scripts used by Makefile and release workflow.
 - `docs-site/`: Docusaurus website project for public docs, landing pages, and downloads.
 
-Next: [Commit And Release Flow](./commit-and-release.md)

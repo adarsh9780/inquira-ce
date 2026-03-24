@@ -73,4 +73,3 @@ make git-tag
 - First non-empty line: release title (markdown heading is allowed).
 - Remaining content: release body.
 
-Next: [CI And Release Automation](./ci-and-release-automation.md)

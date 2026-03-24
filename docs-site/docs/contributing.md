@@ -78,4 +78,3 @@ This writes `.github/release/metadata.json`.
 - Keep root `commit_message.txt` updated before running `make git-commit`.
 - Append new commit messages; do not overwrite previous entries.
 
-Next: [Changelog](./changelog.md)

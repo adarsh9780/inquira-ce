@@ -31,4 +31,3 @@ It does:
 
 Detailed steps: [Release Process](./release_process.md)
 
-Next: [Architecture](./architecture.md)
