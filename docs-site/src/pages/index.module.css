@@ -352,26 +352,19 @@
 }
 
 /* CTA Section Overrides */
-.ctaSection .primaryCta {
-  background: #FFFFFF;
-  color: #18181B;
-  border-color: #FFFFFF;
-}
-
-.ctaSection .primaryCta:hover {
-  background: #F4F4F5;
-  transform: translateY(-2px);
-}
-
+.ctaSection .primaryCta,
 .ctaSection .secondaryCta {
   background: transparent;
   color: #FFFFFF;
   border-color: rgba(255, 255, 255, 0.15);
 }
 
+.ctaSection .primaryCta:hover,
 .ctaSection .secondaryCta:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: #FFFFFF;
+  color: #18181B;
+  border-color: #FFFFFF;
+  transform: translateY(-2px);
 }
 
 .eyebrowDark {
