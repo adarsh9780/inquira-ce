@@ -1,6 +1,19 @@
+import {existsSync, readFileSync} from 'node:fs';
+import path from 'node:path';
 import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
+
+import {resolveDocsSiteSupabaseConfig} from './src/lib/supabaseConfig';
+
+const inquiraTomlPath = path.resolve(__dirname, '..', 'inquira.toml');
+const inquiraTomlSource = existsSync(inquiraTomlPath)
+  ? readFileSync(inquiraTomlPath, 'utf-8')
+  : '';
+const publicSupabaseConfig = resolveDocsSiteSupabaseConfig(
+  process.env,
+  inquiraTomlSource,
+);
 
 const config: Config = {
   title: 'Inquira',
@@ -16,8 +29,8 @@ const config: Config = {
   organizationName: 'adarsh9780',
   projectName: 'inquira-ce',
   customFields: {
-    supabaseUrl: process.env.DOCS_SITE_SUPABASE_URL ?? '',
-    supabaseAnonKey: process.env.DOCS_SITE_SUPABASE_ANON_KEY ?? '',
+    supabaseUrl: publicSupabaseConfig.supabaseUrl,
+    supabaseAnonKey: publicSupabaseConfig.supabaseAnonKey,
     optinSignupTable:
       process.env.DOCS_SITE_OPTIN_SIGNUP_TABLE ?? 'optin_user_signup',
   },

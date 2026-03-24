@@ -7,6 +7,7 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import styles from './index.module.css';
 import {submitOptinSignup} from '../lib/optinSignup';
+import {isSupabaseSignupConfigured} from '../lib/supabaseConfig';
 
 const RELEASE_API =
   'https://api.github.com/repos/adarsh9780/inquira-ce/releases/latest';
@@ -54,6 +55,11 @@ function pickLatestAsset(
 export default function DownloadPage(): ReactNode {
   const {siteConfig} = useDocusaurusContext();
   const customFields = (siteConfig.customFields || {}) as DownloadPageConfig;
+  const signupConfig = {
+    supabaseUrl: customFields.supabaseUrl || '',
+    supabaseAnonKey: customFields.supabaseAnonKey || '',
+  };
+  const signupConfigured = isSupabaseSignupConfigured(signupConfig);
   const [downloadLinks, setDownloadLinks] = useState<Record<string, string>>({
     macOS: MACOS_FALLBACK_URL,
     Windows: WINDOWS_FALLBACK_URL,
@@ -121,6 +127,18 @@ export default function DownloadPage(): ReactNode {
     setStatusMessage('');
     setStatusTone('idle');
 
+    if (!signupConfigured) {
+      setStatusMessage(`Starting the ${platform} download.`);
+      setStatusTone('success');
+      setIsSubmitting(false);
+      setActivePlatform(null);
+
+      if (typeof window !== 'undefined') {
+        window.location.assign(downloadLinks[platform]);
+      }
+      return;
+    }
+
     const result = await submitOptinSignup({
       email,
       config: {
@@ -165,9 +183,9 @@ export default function DownloadPage(): ReactNode {
               Show the same optional signup flow before both desktop downloads
             </h1>
             <p className={styles.sectionBody}>
-              Enter an email if you want to opt in before downloading, or leave
-              the field blank and continue directly. The same choice now exists
-              for both macOS and Windows.
+              {signupConfigured
+                ? 'Enter an email if you want to opt in before downloading, or leave the field blank and continue directly. The same choice now exists for both macOS and Windows.'
+                : 'Both buttons work as direct downloads right now. Optional email capture will appear automatically once public Supabase signup settings are available.'}
             </p>
           </div>
           <div className={styles.downloadGrid}>
@@ -218,10 +236,9 @@ export default function DownloadPage(): ReactNode {
               Add an email if you want, or leave it blank and download directly
             </h2>
             <p className={styles.sectionBody}>
-              If you provide an email, the page stores it in the
-              `optin_user_signup` table by default. If release lookup fails,
-              both download buttons still fall back to the GitHub asset URLs for
-              `{RELEASE_TAG}`.
+              {signupConfigured
+                ? 'If you provide an email, the page stores it in the `optin_user_signup` table by default. If release lookup fails, both download buttons still fall back to the GitHub asset URLs for the current release.'
+                : 'Email capture is currently unavailable on this docs site, so both buttons behave like direct downloads. If release lookup fails, they still fall back to the GitHub asset URLs for the current release.'}
             </p>
           </div>
           <div id="download-form" className={styles.formShell}>
@@ -235,15 +252,20 @@ export default function DownloadPage(): ReactNode {
                 type="email"
                 inputMode="email"
                 autoComplete="email"
-                placeholder="you@company.com"
+                placeholder={
+                  signupConfigured
+                    ? 'you@company.com'
+                    : 'Signup unavailable on this site'
+                }
                 value={email}
                 onChange={event => setEmail(event.target.value)}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !signupConfigured}
               />
             </div>
             <p className={styles.formHint}>
-              Leave this blank to skip signup, or fill it in before downloading
-              either installer.
+              {signupConfigured
+                ? 'Leave this blank to skip signup, or fill it in before downloading either installer.'
+                : 'This input is disabled until Supabase public signup settings are configured for the docs site.'}
             </p>
             <p
               className={clsx(

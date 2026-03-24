@@ -92,8 +92,15 @@
 }
 
 .primaryCta:hover,
-.secondaryCta:hover {
-  color: inherit;
+.primaryCta:focus-visible {
+  color: #ffffff;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.secondaryCta:hover,
+.secondaryCta:focus-visible {
+  color: #18181b;
   text-decoration: none;
   transform: translateY(-1px);
 }
