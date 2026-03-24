@@ -100,34 +100,24 @@ const config: Config = {
       style: 'light',
       links: [
         {
-          title: 'Product',
+          title: 'Documentation',
           items: [
             {
               label: 'Overview',
               to: '/docs',
             },
-
             {
-              label: 'Download',
-              to: '/download',
-            },
-          ],
-        },
-        {
-          title: 'Resources',
-          items: [
-            {
-              label: 'Architecture Notes',
+              label: 'Architecture',
               to: '/docs/architecture',
             },
             {
-              label: 'Download Strategy',
-              href: 'https://github.com/adarsh9780/inquira-ce/releases/latest',
+              label: 'Roadmap',
+              to: '/docs/roadmap',
             },
           ],
         },
         {
-          title: 'Company',
+          title: 'Community',
           items: [
             {
               label: 'GitHub',
