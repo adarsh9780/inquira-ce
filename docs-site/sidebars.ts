@@ -7,7 +7,6 @@ const sidebars: SidebarsConfig = {
       label: 'Welcome / Getting Started',
       items: [
         'index',
-        'install',
         'downloads'
       ],
     },

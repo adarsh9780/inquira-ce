@@ -35,6 +35,6 @@ In plain terms: you ask a question about your data in natural language, and Inqu
 
 ## Next Steps
 
-If this is your first time here, start with [Downloads](./downloads.md) and move to [Install](./install.md).
+If this is your first time here, start with [Downloads](./downloads.md).
 
 If you are evaluating product sign-in and account architecture, read about our [Authentication Strategy](./auth-strategy.md) and [Editions](./editions.md).
