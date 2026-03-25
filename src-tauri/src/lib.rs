@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::fs;
+use std::fs::OpenOptions;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
-use std::process::{Child as StdChild, Command};
+use std::process::{Child as StdChild, Command, Stdio};
 use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -141,6 +142,64 @@ fn resolve_shared_console_log_level(config: &InquiraConfig) -> String {
     "ERROR".to_string()
 }
 
+fn startup_log_paths(data_dir: &Path) -> StartupLogPaths {
+    let log_dir = data_dir.join("logs");
+    StartupLogPaths {
+        desktop: log_dir.join("desktop-startup.log"),
+        backend: log_dir.join("backend-startup.log"),
+        agent: log_dir.join("agent-startup.log"),
+    }
+}
+
+fn append_startup_log(log_path: &Path, message: &str) {
+    if let Some(parent) = log_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_path) {
+        let _ = writeln!(file, "{}", message);
+    }
+}
+
+fn start_log_session(log_path: &Path, process_name: &str, command_summary: &str, cwd: &Path) {
+    append_startup_log(log_path, "");
+    append_startup_log(
+        log_path,
+        "============================================================",
+    );
+    append_startup_log(log_path, &format!("process={process_name}"));
+    append_startup_log(log_path, &format!("cwd={}", cwd.display()));
+    append_startup_log(log_path, &format!("command={command_summary}"));
+}
+
+fn redirect_command_output(
+    cmd: &mut Command,
+    log_path: &Path,
+    process_name: &str,
+    command_summary: &str,
+    cwd: &Path,
+) -> Result<(), String> {
+    start_log_session(log_path, process_name, command_summary, cwd);
+    let stdout_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)
+        .map_err(|e| {
+            format!(
+                "Failed to open {process_name} startup log at {}: {e}",
+                log_path.display()
+            )
+        })?;
+    let stderr_file = stdout_file.try_clone().map_err(|e| {
+        format!(
+            "Failed to clone {process_name} startup log handle at {}: {e}",
+            log_path.display()
+        )
+    })?;
+    cmd.stdout(Stdio::from(stdout_file));
+    cmd.stderr(Stdio::from(stderr_file));
+    Ok(())
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Backend Process Manager
 // ─────────────────────────────────────────────────────────────────────
@@ -163,6 +222,13 @@ struct StartupSnapshot {
 }
 
 struct StartupState(Mutex<StartupSnapshot>);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct StartupLogPaths {
+    desktop: PathBuf,
+    backend: PathBuf,
+    agent: PathBuf,
+}
 
 #[derive(Serialize)]
 struct PtyStartResponse {
@@ -996,9 +1062,15 @@ fn start_backend(
     config: &InquiraConfig,
     inquira_toml_path: &PathBuf,
     shared_secret: &str,
+    log_path: &Path,
 ) -> Result<StdChild, String> {
     let _ = uv_bin; // kept for signature compatibility with existing call sites
     let port = config.backend.as_ref().and_then(|b| b.port).unwrap_or(8000);
+    let host = config
+        .backend
+        .as_ref()
+        .and_then(|b| b.host.clone())
+        .unwrap_or_else(|| "localhost".to_string());
 
     log::info!("Starting Inquira backend on port {}...", port);
 
@@ -1021,6 +1093,7 @@ fn start_backend(
     cmd.args(["-m", "app.main"])
         .current_dir(backend_dir)
         .env("VIRTUAL_ENV", venv_path.to_str().unwrap())
+        .env("INQUIRA_HOST", host)
         .env("INQUIRA_PORT", port.to_string())
         .env("INQUIRA_DESKTOP", "1")
         .env("INQUIRA_AGENT_SHARED_SECRET", shared_secret)
@@ -1032,10 +1105,17 @@ fn start_backend(
         .env("INQUIRA_EXECUTION_PROVIDER", execution_provider);
 
     apply_proxy_env(&mut cmd, config);
+    redirect_command_output(
+        &mut cmd,
+        log_path,
+        "backend",
+        &format!("{} -m app.main", python_bin.display()),
+        backend_dir,
+    )?;
 
     let child = cmd
         .spawn()
-        .map_err(|e| format!("Failed to start backend: {}", e))?;
+        .map_err(|e| format!("Failed to start backend: {}. See {}", e, log_path.display()))?;
 
     Ok(child)
 }
@@ -1062,6 +1142,7 @@ fn start_agent_runtime(
     config: &InquiraConfig,
     inquira_toml_path: &PathBuf,
     shared_secret: &str,
+    log_path: &Path,
 ) -> Result<StdChild, String> {
     let python_bin = python_bin_from_venv(venv_path);
     if !python_bin.exists() {
@@ -1093,6 +1174,7 @@ fn start_agent_runtime(
         venv_path.join("bin").join("langgraph")
     };
 
+    let command_summary: String;
     let mut cmd = if command_override.trim().is_empty() {
         if langgraph_bin.exists() {
             let mut c = Command::new(&langgraph_bin);
@@ -1107,6 +1189,12 @@ fn start_agent_runtime(
                 "--no-browser",
                 "--no-reload",
             ]);
+            command_summary = format!(
+                "{} dev --config langgraph.json --host {} --port {} --no-browser --no-reload",
+                langgraph_bin.display(),
+                agent_host,
+                agent_port
+            );
             c
         } else {
             let mut c = Command::new(&python_bin);
@@ -1123,6 +1211,12 @@ fn start_agent_runtime(
                 "--no-browser",
                 "--no-reload",
             ]);
+            command_summary = format!(
+                "{} -m langgraph_cli.cli dev --config langgraph.json --host {} --port {} --no-browser --no-reload",
+                python_bin.display(),
+                agent_host,
+                agent_port
+            );
             c
         }
     } else {
@@ -1134,6 +1228,7 @@ fn start_agent_runtime(
         for part in parts {
             c.arg(part);
         }
+        command_summary = command_override.clone();
         c
     };
 
@@ -1149,10 +1244,15 @@ fn start_agent_runtime(
         .env("INQUIRA_AGENT_PORT", agent_port.to_string())
         .env("PYTHONPATH", agent_dir.display().to_string());
     apply_proxy_env(&mut cmd, config);
+    redirect_command_output(&mut cmd, log_path, "agent", &command_summary, agent_dir)?;
 
-    let child = cmd
-        .spawn()
-        .map_err(|e| format!("Failed to start agent runtime: {}", e))?;
+    let child = cmd.spawn().map_err(|e| {
+        format!(
+            "Failed to start agent runtime: {}. See {}",
+            e,
+            log_path.display()
+        )
+    })?;
     Ok(child)
 }
 
@@ -1222,6 +1322,11 @@ pub fn run() {
                         .join(".inquira")
                 });
                 fs::create_dir_all(&data_dir).ok();
+                let log_paths = startup_log_paths(&data_dir);
+                append_startup_log(
+                    &log_paths.desktop,
+                    &format!("Desktop startup begin. data_dir={}", data_dir.display()),
+                );
 
                 let uv_bin = find_uv_binary(&resource_dir)
                     .map_err(|error| format!("Startup failed: {error}"))?;
@@ -1305,12 +1410,17 @@ pub fn run() {
                     .map_err(|error| format!("Startup failed: {error}"))?;
 
                 app.emit("backend-status", "agent-starting").ok();
+                append_startup_log(
+                    &log_paths.desktop,
+                    &format!("Starting agent runtime. log={}", log_paths.agent.display()),
+                );
                 match start_agent_runtime(
                     &agent_dir,
                     &venv_path,
                     &config,
                     &runtime_config_path,
                     &shared_secret,
+                    &log_paths.agent,
                 ) {
                     Ok(child) => {
                         log::info!("Agent runtime started (PID: {})", child.id());
@@ -1326,6 +1436,10 @@ pub fn run() {
                 }
 
                 app.emit("backend-status", "backend-starting").ok();
+                append_startup_log(
+                    &log_paths.desktop,
+                    &format!("Starting backend. log={}", log_paths.backend.display()),
+                );
                 match start_backend(
                     &uv_bin,
                     &backend_dir,
@@ -1333,6 +1447,7 @@ pub fn run() {
                     &config,
                     &runtime_config_path,
                     &shared_secret,
+                    &log_paths.backend,
                 ) {
                     Ok(child) => {
                         log::info!("Backend process started (PID: {})", child.id());
@@ -1402,6 +1517,7 @@ pub fn run() {
                 })?;
 
                 app.emit("backend-status", "ready").ok();
+                append_startup_log(&log_paths.desktop, "Desktop startup ready.");
                 Ok(())
             })();
 
@@ -1409,7 +1525,27 @@ pub fn run() {
                 Ok(()) => update_startup_state(&app.handle(), true, ""),
                 Err(error) => {
                     log::error!("Desktop startup failed: {}", error);
-                    update_startup_state(&app.handle(), false, error);
+                    let data_dir = app.path().app_data_dir().unwrap_or_else(|_| {
+                        dirs_next::home_dir()
+                            .unwrap_or_else(|| PathBuf::from("."))
+                            .join(".inquira")
+                    });
+                    let log_paths = startup_log_paths(&data_dir);
+                    append_startup_log(
+                        &log_paths.desktop,
+                        &format!("Desktop startup failed: {}", error),
+                    );
+                    update_startup_state(
+                        &app.handle(),
+                        false,
+                        format!(
+                            "{} Desktop log: {} Backend log: {} Agent log: {}",
+                            error,
+                            log_paths.desktop.display(),
+                            log_paths.backend.display(),
+                            log_paths.agent.display()
+                        ),
+                    );
                 }
             }
 
@@ -1457,10 +1593,10 @@ pub fn run() {
 mod tests {
     use super::{
         bundled_uv_candidates, default_uv_search_paths, detect_default_shell,
-        missing_uv_binary_error, needs_python_bootstrap, parse_lsof_pid_lines,
-        resolve_pty_cwd, resolve_resource_path, resolve_shared_console_log_level,
-        resolve_uv_index_url, stop_child_process,
-        uv_binary_file_name, uv_search_candidates, InquiraConfig, LoggingConfig, PythonConfig,
+        missing_uv_binary_error, needs_python_bootstrap, parse_lsof_pid_lines, resolve_pty_cwd,
+        resolve_resource_path, resolve_shared_console_log_level, resolve_uv_index_url,
+        startup_log_paths, stop_child_process, uv_binary_file_name, uv_search_candidates,
+        InquiraConfig, LoggingConfig, PythonConfig,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -1521,6 +1657,16 @@ mod tests {
         let raw = b"1234\n\nabc\n1234\n5678\n";
         let parsed = parse_lsof_pid_lines(raw);
         assert_eq!(parsed, vec!["1234".to_string(), "5678".to_string()]);
+    }
+
+    #[test]
+    fn startup_log_paths_use_logs_subdirectory() {
+        let base = PathBuf::from("/tmp/inquira-app-data");
+        let paths = startup_log_paths(&base);
+
+        assert_eq!(paths.desktop, base.join("logs").join("desktop-startup.log"));
+        assert_eq!(paths.backend, base.join("logs").join("backend-startup.log"));
+        assert_eq!(paths.agent, base.join("logs").join("agent-startup.log"));
     }
 
     fn base_config_with_index(index_url: Option<&str>) -> InquiraConfig {

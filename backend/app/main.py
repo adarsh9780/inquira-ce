@@ -46,6 +46,21 @@ APP_VERSION = "0.5.7a14"
 _LOG_LEVELS = {"trace", "debug", "info", "warning", "error", "critical"}
 
 
+def _resolve_runtime_host(default: str = "localhost") -> str:
+    return str(os.getenv("INQUIRA_HOST") or default).strip() or default
+
+
+def _resolve_runtime_port(default: int = 8000) -> int:
+    raw_value = str(os.getenv("INQUIRA_PORT") or "").strip()
+    if not raw_value:
+        return default
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        return default
+    return parsed if parsed > 0 else default
+
+
 def _default_cors_origins() -> list[str]:
     return [
         "http://localhost:5173",  # Vue dev server
@@ -375,8 +390,8 @@ def run(argv: list[str] | None = None):
 
     app.state.allow_file_dialog = allow_file_dialog
 
-    HOST = "localhost"
-    PORT = 8000
+    HOST = _resolve_runtime_host()
+    PORT = _resolve_runtime_port()
 
     logprint(f"Launching Inquira backend (v{APP_VERSION})")
     access_log = True
