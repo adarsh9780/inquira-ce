@@ -2,10 +2,8 @@
   <div class="min-h-screen bg-white flex flex-col">
     <ToastContainer />
 
-    <ConnectionStatusIndicator v-if="authStore.isAuthenticated && appBootstrap.ready" />
-
     <div
-      v-else-if="!startupFailure && !desktopStartup.ready"
+      v-if="!startupFailure && !desktopStartup.ready"
       class="fixed inset-0 overflow-y-auto bg-[var(--color-base)]"
     >
       <div class="relative min-h-screen overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
@@ -158,6 +156,7 @@
     </div>
 
     <div v-else-if="authStore.isAuthenticated && appBootstrap.ready" class="flex flex-col h-screen">
+      <ConnectionStatusIndicator />
       <div class="flex-1 flex overflow-hidden bg-white relative">
         <Transition name="sidebar-shell">
           <div v-if="!appStore.isSidebarCollapsed" class="h-full shrink-0">
