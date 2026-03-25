@@ -4,8 +4,117 @@
 
     <ConnectionStatusIndicator v-if="authStore.isAuthenticated && appBootstrap.ready" />
 
+    <div
+      v-else-if="!startupFailure && !desktopStartup.ready"
+      class="fixed inset-0 overflow-y-auto bg-[var(--color-base)]"
+    >
+      <div class="relative min-h-screen overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.08),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(24,24,27,0.08),_transparent_34%)]"></div>
+        <div class="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(253,252,248,0))]"></div>
+        <div class="startup-grid absolute inset-0 opacity-70"></div>
+
+        <div class="relative mx-auto flex min-h-[calc(100vh-3rem)] max-w-6xl items-center justify-center">
+          <section class="w-full overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-white/88 shadow-[0_28px_90px_rgba(24,24,27,0.1)] backdrop-blur-xl">
+            <div class="grid lg:grid-cols-[1.04fr_0.96fr]">
+              <aside class="relative overflow-hidden border-b border-[var(--color-border)] px-6 py-8 sm:px-8 lg:border-b-0 lg:border-r lg:px-10 lg:py-10">
+                <div class="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(253,252,248,0.84)),linear-gradient(135deg,rgba(59,130,246,0.05),rgba(24,24,27,0.05))]"></div>
+                <div class="absolute -left-16 top-10 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.18),rgba(59,130,246,0))]"></div>
+                <div class="absolute bottom-12 right-[-3rem] h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(24,24,27,0.12),rgba(24,24,27,0))]"></div>
+
+                <div class="relative flex h-full flex-col">
+                  <div class="flex items-center gap-4">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/70 bg-white/90 shadow-[0_16px_32px_rgba(24,24,27,0.08)]">
+                      <img :src="logo" alt="Inquira logo" class="h-10 w-10 rounded-xl shadow-sm" />
+                    </div>
+
+                    <div>
+                      <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Inquira startup</p>
+                      <p class="mt-1 text-sm text-[var(--color-text-muted)]">Desktop services are booting</p>
+                    </div>
+                  </div>
+
+                  <div class="mt-10 max-w-xl">
+                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--color-text-muted)]">
+                      Preparing the app
+                    </p>
+                    <h1 class="mt-4 text-4xl font-semibold tracking-[-0.05em] text-[var(--color-text-main)] sm:text-5xl lg:text-[3.5rem] lg:leading-[1.02]">
+                      {{ desktopStartupTitle }}
+                    </h1>
+                    <p class="mt-5 max-w-lg text-base leading-7 text-[var(--color-text-muted)] sm:text-lg sm:leading-8">
+                      {{ desktopStartupMessage }}
+                    </p>
+                  </div>
+
+                  <div class="mt-8 rounded-[1.5rem] border border-white/70 bg-white/75 p-5 shadow-[0_20px_45px_rgba(24,24,27,0.08)]">
+                    <div class="flex items-center justify-between gap-4">
+                      <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-text-muted)]">
+                          Current step
+                        </p>
+                        <p class="mt-3 text-base font-medium text-[var(--color-text-main)] sm:text-lg">
+                          {{ desktopStartupMessage }}
+                        </p>
+                        <p class="mt-2 text-sm text-[var(--color-text-muted)]">
+                          This screen stays visible while the runtime installs and verifies the backend.
+                        </p>
+                      </div>
+                      <div class="relative h-16 w-16 shrink-0">
+                        <div class="absolute inset-0 rounded-full border-4 border-zinc-200"></div>
+                        <div class="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <ul class="mt-8 grid gap-3 text-sm sm:grid-cols-3 lg:mt-auto lg:grid-cols-1 xl:grid-cols-3">
+                    <li class="rounded-[1.35rem] border border-white/75 bg-white/72 px-4 py-4 shadow-[0_14px_30px_rgba(24,24,27,0.06)]">
+                      <p class="text-sm font-semibold text-[var(--color-text-main)]">Visible boot</p>
+                      <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">The window opens immediately so startup never feels frozen.</p>
+                    </li>
+                    <li class="rounded-[1.35rem] border border-white/75 bg-white/72 px-4 py-4 shadow-[0_14px_30px_rgba(24,24,27,0.06)]">
+                      <p class="text-sm font-semibold text-[var(--color-text-main)]">Live status</p>
+                      <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">You can see Python, VC++ runtime, and backend startup as it happens.</p>
+                    </li>
+                    <li class="rounded-[1.35rem] border border-white/75 bg-white/72 px-4 py-4 shadow-[0_14px_30px_rgba(24,24,27,0.06)]">
+                      <p class="text-sm font-semibold text-[var(--color-text-main)]">No guesswork</p>
+                      <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">If startup fails, the error is shown before auth begins.</p>
+                    </li>
+                  </ul>
+                </div>
+              </aside>
+
+              <div class="flex items-center px-6 py-8 sm:px-8 lg:px-10 lg:py-10">
+                <div class="mx-auto w-full max-w-xl rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[0_18px_48px_rgba(24,24,27,0.08)] sm:p-8">
+                  <p class="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Recent startup stage</p>
+                  <h2 class="mt-4 text-3xl tracking-[-0.04em] text-[var(--color-text-main)] sm:text-4xl">
+                    {{ desktopStartupPanelTitle }}
+                  </h2>
+                  <p class="mt-4 text-base leading-7 text-[var(--color-text-muted)]">
+                    {{ desktopStartupPanelHint }}
+                  </p>
+
+                  <div class="mt-8 space-y-3">
+                    <div
+                      class="flex items-start justify-between gap-4 rounded-[1.25rem] border border-zinc-200 bg-[var(--color-base)] px-4 py-4"
+                    >
+                      <div class="min-w-0 flex-1">
+                        <p class="text-sm font-semibold text-[var(--color-text-main)]">Desktop boot</p>
+                        <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ desktopStartupMessage }}</p>
+                      </div>
+                      <span class="mt-1 inline-flex rounded-full border border-zinc-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
+                        Startup
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
     <AuthModal
-      v-if="!startupFailure && !authStore.isAuthenticated"
+      v-else-if="!startupFailure && desktopStartup.ready && !authStore.isAuthenticated"
       :is-open="true"
       @close="handleAuthClose"
     />
@@ -211,6 +320,12 @@ const appBootstrap = reactive({
   ready: false,
   message: '',
 })
+const desktopStartup = reactive({
+  active: false,
+  ready: false,
+  message: '',
+  error: '',
+})
 const wsUnsubscribers = ref([])
 const lastRuntimeErrorToast = ref('')
 const activeSnapshotUserId = ref('')
@@ -325,6 +440,25 @@ const startupOverlayPanelTitle = computed(() => {
   return 'Workspace handoff'
 })
 
+const desktopStartupTitle = computed(() => {
+  if (!desktopStartup.ready) return 'Starting Inquira.'
+  return 'Preparing the app.'
+})
+
+const desktopStartupMessage = computed(() => {
+  return String(desktopStartup.message || '').trim() || 'Launching desktop services and verifying the runtime before auth begins.'
+})
+
+const desktopStartupPanelTitle = computed(() => {
+  return desktopStartup.active ? 'Desktop boot' : 'Desktop status'
+})
+
+const desktopStartupPanelHint = computed(() => {
+  return desktopStartup.active
+    ? 'This screen appears immediately and stays visible while the launcher bootstraps the backend.'
+    : 'The startup state stays available here until the auth shell is ready.'
+})
+
 function toggleSidebarVisibility() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
 }
@@ -358,7 +492,7 @@ function handleGlobalShortcuts(event) {
 
 async function readDesktopStartupState() {
   if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
-    return { ready: true, error: '' }
+    return { ready: true, error: '', message: '' }
   }
 
   try {
@@ -366,7 +500,39 @@ async function readDesktopStartupState() {
     return await invoke('get_startup_state')
   } catch (error) {
     console.warn('⚠️ Failed to read desktop startup state from Tauri:', error)
-    return { ready: true, error: '' }
+    return { ready: true, error: '', message: '' }
+  }
+}
+
+async function waitForDesktopStartupReady() {
+  desktopStartup.active = true
+  desktopStartup.ready = false
+  desktopStartup.error = ''
+  desktopStartup.message = 'Launching desktop services...'
+
+  const pollDelayMs = 250
+
+  while (true) {
+    const state = await readDesktopStartupState()
+    const message = String(state?.message || '').trim()
+    desktopStartup.message = message || 'Launching desktop services...'
+    desktopStartup.error = String(state?.error || '').trim()
+
+    if (desktopStartup.error) {
+      startupFailure.value = desktopStartup.error
+      desktopStartup.active = false
+      desktopStartup.ready = false
+      return false
+    }
+
+    if (state?.ready) {
+      desktopStartup.active = false
+      desktopStartup.ready = true
+      desktopStartup.message = ''
+      return true
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, pollDelayMs))
   }
 }
 
@@ -452,10 +618,8 @@ onMounted(async () => {
     }),
   )
 
-  const startupState = await readDesktopStartupState()
-  const startupError = String(startupState?.error || '').trim()
-  if (startupError) {
-    startupFailure.value = startupError
+  const startupOk = await waitForDesktopStartupReady()
+  if (!startupOk) {
     return
   }
 
@@ -506,6 +670,10 @@ watch(
     appBootstrap.active = false
     appBootstrap.ready = false
     appBootstrap.message = ''
+    desktopStartup.active = false
+    desktopStartup.ready = true
+    desktopStartup.message = ''
+    desktopStartup.error = ''
     appStore.resetForAuthBoundary()
     previewService.clearSchemaCache()
     if (settingsWebSocket.isPersistentMode) {

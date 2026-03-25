@@ -203,8 +203,8 @@ fn ensure_windows_vc_redist(
         })?;
     }
 
-    let _ = app.emit(
-        "backend-status",
+    emit_startup_message(
+        app,
         "Installing Microsoft Visual C++ runtime (one-time setup)...",
     );
     append_startup_log(
@@ -383,6 +383,7 @@ struct PtySessions(Mutex<HashMap<String, PtySession>>);
 struct StartupSnapshot {
     ready: bool,
     error: String,
+    message: String,
 }
 
 struct StartupState(Mutex<StartupSnapshot>);
@@ -507,15 +508,27 @@ fn stop_backend_process(app: &tauri::AppHandle) {
     }
 }
 
-fn update_startup_state(app: &tauri::AppHandle, ready: bool, error: impl Into<String>) {
+fn update_startup_state(
+    app: &tauri::AppHandle,
+    ready: bool,
+    error: impl Into<String>,
+    message: impl Into<String>,
+) {
     if let Some(state) = app.try_state::<StartupState>() {
         if let Ok(mut guard) = state.0.lock() {
             *guard = StartupSnapshot {
                 ready,
                 error: error.into(),
+                message: message.into(),
             };
         }
     }
+}
+
+fn emit_startup_message(app: &tauri::AppHandle, message: impl Into<String>) {
+    let rendered = message.into();
+    update_startup_state(app, false, "", rendered.clone());
+    let _ = app.emit("backend-status", rendered);
 }
 
 fn show_main_window(app: &tauri::AppHandle) {
@@ -1211,7 +1224,7 @@ fn ensure_ports_available(
     for port in ports {
         if !list_listening_pids_on_port(*port).is_empty() {
             let msg = format!("Port {port} is still busy after cleanup.");
-            let _ = app.emit("backend-status", msg.clone());
+            emit_startup_message(app, msg.clone());
             return Err(msg);
         }
     }
@@ -1472,250 +1485,255 @@ pub fn run() {
                 )?;
             }
 
-            update_startup_state(&app.handle(), false, "");
+            update_startup_state(
+                &app.handle(),
+                false,
+                "",
+                "Launching desktop services...",
+            );
+            show_main_window(&app.handle());
 
-            let startup_result: Result<(), String> = (|| {
-                // Resolve paths
-                let resource_dir = app
-                    .path()
-                    .resource_dir()
-                    .unwrap_or_else(|_| PathBuf::from("."));
-                let data_dir = app.path().app_data_dir().unwrap_or_else(|_| {
-                    dirs_next::home_dir()
-                        .unwrap_or_else(|| PathBuf::from("."))
-                        .join(".inquira")
-                });
-                fs::create_dir_all(&data_dir).ok();
-                let log_paths = startup_log_paths(&data_dir);
-                append_startup_log(
-                    &log_paths.desktop,
-                    &format!("Desktop startup begin. data_dir={}", data_dir.display()),
-                );
-
-                let uv_bin = find_uv_binary(&resource_dir)
-                    .map_err(|error| format!("Startup failed: {error}"))?;
-                // In dev, backend is a sibling directory; in prod, it's bundled in resources
-                let backend_dir = if cfg!(debug_assertions) {
-                    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../backend")
-                } else {
-                    resolve_resource_path(&resource_dir, "backend")
-                };
-                let config_path = resolve_resource_path(&resource_dir, "inquira.toml");
-                let runtime_config_path = if config_path.exists() {
-                    config_path.clone()
-                } else {
-                    backend_dir
-                        .parent()
-                        .unwrap_or(&backend_dir)
-                        .join("inquira.toml")
-                };
-                let config = load_config(&runtime_config_path);
-                ensure_windows_vc_redist(&data_dir, &log_paths.desktop, &config, &app.handle())
-                    .map_err(|error| format!("Startup failed: {error}"))?;
-                let managed_ports = vec![8000_u16, 8123_u16];
-                log::info!(
-                    "Runtime config path: {}",
-                    runtime_config_path.to_string_lossy()
-                );
-                log::info!(
-                    "Configured execution provider: {}",
-                    config
-                        .execution
-                        .as_ref()
-                        .and_then(|e| e.provider.clone())
-                        .unwrap_or_else(|| "local_jupyter".to_string())
-                );
-                let agent_dir = if cfg!(debug_assertions) {
-                    let configured = config
-                        .agent_service
-                        .as_ref()
-                        .and_then(|a| a.path.clone())
-                        .unwrap_or_else(|| "../agents".to_string());
-                    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(configured)
-                } else {
-                    resolve_resource_path(&resource_dir, "agents")
-                };
-                let venv_path = data_dir.join(".venv");
-                let backend_env_marker = data_dir.join(".backend-env-fingerprint");
-                let expected_backend_env_fingerprint = backend_env_fingerprint(&backend_dir);
-                let always_sync_backend_env = cfg!(debug_assertions);
-                let should_bootstrap_python = needs_python_bootstrap(
-                    &venv_path,
-                    &backend_env_marker,
-                    &expected_backend_env_fingerprint,
-                    always_sync_backend_env,
-                );
-                if should_bootstrap_python {
-                    if always_sync_backend_env {
-                        log::info!("Debug mode: syncing backend Python environment...");
-                    } else {
-                        log::info!(
-                            "Backend dependencies changed. Re-syncing Python environment..."
-                        );
-                    }
-                    app.emit(
-                        "backend-status",
-                        "Installing Python environment (one-time setup)...",
-                    )
-                    .ok();
-
-                    bootstrap_python(&uv_bin, &backend_dir, &venv_path, &config)
-                        .map_err(|error| format!("Setup failed: {error}"))?;
-
-                    if let Err(error) =
-                        fs::write(&backend_env_marker, &expected_backend_env_fingerprint)
-                    {
-                        log::warn!("Could not write backend env marker: {}", error);
-                    }
-                }
-
-                let shared_secret = load_or_create_agent_shared_secret(&data_dir)
-                    .map_err(|error| format!("Startup failed: {error}"))?;
-
-                ensure_ports_available(&managed_ports, &app.handle(), "startup preflight")
-                    .map_err(|error| format!("Startup failed: {error}"))?;
-
-                app.emit("backend-status", "agent-starting").ok();
-                append_startup_log(
-                    &log_paths.desktop,
-                    &format!("Starting agent runtime. log={}", log_paths.agent.display()),
-                );
-                match start_agent_runtime(
-                    &agent_dir,
-                    &venv_path,
-                    &config,
-                    &runtime_config_path,
-                    &shared_secret,
-                    &log_paths.agent,
-                ) {
-                    Ok(child) => {
-                        log::info!("Agent runtime started (PID: {})", child.id());
-                        let state = app.state::<AgentProcess>();
-                        *state.0.lock().unwrap() = Some(child);
-                    }
-                    Err(error) => {
-                        for port in &managed_ports {
-                            let _ = kill_all_listeners_on_port(*port);
-                        }
-                        return Err(format!("Agent failed: {error}"));
-                    }
-                }
-
-                app.emit("backend-status", "backend-starting").ok();
-                append_startup_log(
-                    &log_paths.desktop,
-                    &format!("Starting backend. log={}", log_paths.backend.display()),
-                );
-                match start_backend(
-                    &uv_bin,
-                    &backend_dir,
-                    &venv_path,
-                    &config,
-                    &runtime_config_path,
-                    &shared_secret,
-                    &log_paths.backend,
-                ) {
-                    Ok(child) => {
-                        log::info!("Backend process started (PID: {})", child.id());
-                        let state = app.state::<BackendProcess>();
-                        *state.0.lock().unwrap() = Some(child);
-                    }
-                    Err(error) => {
-                        stop_agent_process(&app.handle());
-                        for port in &managed_ports {
-                            let _ = kill_all_listeners_on_port(*port);
-                        }
-                        return Err(format!("Backend failed: {error}"));
-                    }
-                }
-
-                app.emit("backend-status", "health-checking").ok();
-                let backend_host = config
-                    .backend
-                    .as_ref()
-                    .and_then(|b| b.host.clone())
-                    .unwrap_or_else(|| "localhost".to_string());
-                let backend_port = config.backend.as_ref().and_then(|b| b.port).unwrap_or(8000);
-                let agent_host = config
-                    .agent_service
-                    .as_ref()
-                    .and_then(|a| a.host.clone())
-                    .unwrap_or_else(|| "127.0.0.1".to_string());
-                let agent_port = config
-                    .agent_service
-                    .as_ref()
-                    .and_then(|a| a.port)
-                    .unwrap_or(8123);
-                let timeout_sec = config
-                    .agent_service
-                    .as_ref()
-                    .and_then(|a| a.startup_timeout_sec)
-                    .unwrap_or(45);
-
-                wait_for_http_health(
-                    &backend_host,
-                    backend_port,
-                    "/health",
-                    Duration::from_secs(timeout_sec),
-                )
-                .map_err(|error| {
-                    stop_backend_process(&app.handle());
-                    stop_agent_process(&app.handle());
-                    for port in &managed_ports {
-                        let _ = kill_all_listeners_on_port(*port);
-                    }
-                    format!("Backend health failed: {error}")
-                })?;
-
-                wait_for_http_health(
-                    &agent_host,
-                    agent_port,
-                    "/ok",
-                    Duration::from_secs(timeout_sec),
-                )
-                .map_err(|error| {
-                    stop_backend_process(&app.handle());
-                    stop_agent_process(&app.handle());
-                    for port in &managed_ports {
-                        let _ = kill_all_listeners_on_port(*port);
-                    }
-                    format!("Agent health failed: {error}")
-                })?;
-
-                app.emit("backend-status", "ready").ok();
-                append_startup_log(&log_paths.desktop, "Desktop startup ready.");
-                Ok(())
-            })();
-
-            match startup_result {
-                Ok(()) => update_startup_state(&app.handle(), true, ""),
-                Err(error) => {
-                    log::error!("Desktop startup failed: {}", error);
-                    let data_dir = app.path().app_data_dir().unwrap_or_else(|_| {
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                let startup_result: Result<(), String> = (|| {
+                    let resource_dir = app_handle
+                        .path()
+                        .resource_dir()
+                        .unwrap_or_else(|_| PathBuf::from("."));
+                    let data_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| {
                         dirs_next::home_dir()
                             .unwrap_or_else(|| PathBuf::from("."))
                             .join(".inquira")
                     });
+                    fs::create_dir_all(&data_dir).ok();
                     let log_paths = startup_log_paths(&data_dir);
                     append_startup_log(
                         &log_paths.desktop,
-                        &format!("Desktop startup failed: {}", error),
+                        &format!("Desktop startup begin. data_dir={}", data_dir.display()),
                     );
-                    update_startup_state(
-                        &app.handle(),
-                        false,
-                        format!(
-                            "{} Desktop log: {} Backend log: {} Agent log: {}",
-                            error,
-                            log_paths.desktop.display(),
-                            log_paths.backend.display(),
-                            log_paths.agent.display()
-                        ),
-                    );
-                }
-            }
 
-            show_main_window(&app.handle());
+                    let uv_bin = find_uv_binary(&resource_dir)
+                        .map_err(|error| format!("Startup failed: {error}"))?;
+                    let backend_dir = if cfg!(debug_assertions) {
+                        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../backend")
+                    } else {
+                        resolve_resource_path(&resource_dir, "backend")
+                    };
+                    let config_path = resolve_resource_path(&resource_dir, "inquira.toml");
+                    let runtime_config_path = if config_path.exists() {
+                        config_path.clone()
+                    } else {
+                        backend_dir
+                            .parent()
+                            .unwrap_or(&backend_dir)
+                            .join("inquira.toml")
+                    };
+                    let config = load_config(&runtime_config_path);
+                    ensure_windows_vc_redist(&data_dir, &log_paths.desktop, &config, &app_handle)
+                        .map_err(|error| format!("Startup failed: {error}"))?;
+                    let managed_ports = vec![8000_u16, 8123_u16];
+                    log::info!(
+                        "Runtime config path: {}",
+                        runtime_config_path.to_string_lossy()
+                    );
+                    log::info!(
+                        "Configured execution provider: {}",
+                        config
+                            .execution
+                            .as_ref()
+                            .and_then(|e| e.provider.clone())
+                            .unwrap_or_else(|| "local_jupyter".to_string())
+                    );
+                    let agent_dir = if cfg!(debug_assertions) {
+                        let configured = config
+                            .agent_service
+                            .as_ref()
+                            .and_then(|a| a.path.clone())
+                            .unwrap_or_else(|| "../agents".to_string());
+                        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(configured)
+                    } else {
+                        resolve_resource_path(&resource_dir, "agents")
+                    };
+                    let venv_path = data_dir.join(".venv");
+                    let backend_env_marker = data_dir.join(".backend-env-fingerprint");
+                    let expected_backend_env_fingerprint = backend_env_fingerprint(&backend_dir);
+                    let always_sync_backend_env = cfg!(debug_assertions);
+                    let should_bootstrap_python = needs_python_bootstrap(
+                        &venv_path,
+                        &backend_env_marker,
+                        &expected_backend_env_fingerprint,
+                        always_sync_backend_env,
+                    );
+                    if should_bootstrap_python {
+                        if always_sync_backend_env {
+                            log::info!("Debug mode: syncing backend Python environment...");
+                        } else {
+                            log::info!(
+                                "Backend dependencies changed. Re-syncing Python environment..."
+                            );
+                        }
+                        emit_startup_message(
+                            &app_handle,
+                            "Installing Python environment (one-time setup)...",
+                        );
+
+                        bootstrap_python(&uv_bin, &backend_dir, &venv_path, &config)
+                            .map_err(|error| format!("Setup failed: {error}"))?;
+
+                        if let Err(error) =
+                            fs::write(&backend_env_marker, &expected_backend_env_fingerprint)
+                        {
+                            log::warn!("Could not write backend env marker: {}", error);
+                        }
+                    }
+
+                    let shared_secret = load_or_create_agent_shared_secret(&data_dir)
+                        .map_err(|error| format!("Startup failed: {error}"))?;
+
+                    ensure_ports_available(&managed_ports, &app_handle, "startup preflight")
+                        .map_err(|error| format!("Startup failed: {error}"))?;
+
+                    emit_startup_message(&app_handle, "Starting agent service...");
+                    append_startup_log(
+                        &log_paths.desktop,
+                        &format!("Starting agent runtime. log={}", log_paths.agent.display()),
+                    );
+                    match start_agent_runtime(
+                        &agent_dir,
+                        &venv_path,
+                        &config,
+                        &runtime_config_path,
+                        &shared_secret,
+                        &log_paths.agent,
+                    ) {
+                        Ok(child) => {
+                            log::info!("Agent runtime started (PID: {})", child.id());
+                            let state = app_handle.state::<AgentProcess>();
+                            *state.0.lock().unwrap() = Some(child);
+                        }
+                        Err(error) => {
+                            for port in &managed_ports {
+                                let _ = kill_all_listeners_on_port(*port);
+                            }
+                            return Err(format!("Agent failed: {error}"));
+                        }
+                    }
+
+                    emit_startup_message(&app_handle, "Starting backend service...");
+                    append_startup_log(
+                        &log_paths.desktop,
+                        &format!("Starting backend. log={}", log_paths.backend.display()),
+                    );
+                    match start_backend(
+                        &uv_bin,
+                        &backend_dir,
+                        &venv_path,
+                        &config,
+                        &runtime_config_path,
+                        &shared_secret,
+                        &log_paths.backend,
+                    ) {
+                        Ok(child) => {
+                            log::info!("Backend process started (PID: {})", child.id());
+                            let state = app_handle.state::<BackendProcess>();
+                            *state.0.lock().unwrap() = Some(child);
+                        }
+                        Err(error) => {
+                            stop_agent_process(&app_handle);
+                            for port in &managed_ports {
+                                let _ = kill_all_listeners_on_port(*port);
+                            }
+                            return Err(format!("Backend failed: {error}"));
+                        }
+                    }
+
+                    emit_startup_message(&app_handle, "Checking service health...");
+                    let backend_host = config
+                        .backend
+                        .as_ref()
+                        .and_then(|b| b.host.clone())
+                        .unwrap_or_else(|| "localhost".to_string());
+                    let backend_port = config.backend.as_ref().and_then(|b| b.port).unwrap_or(8000);
+                    let agent_host = config
+                        .agent_service
+                        .as_ref()
+                        .and_then(|a| a.host.clone())
+                        .unwrap_or_else(|| "127.0.0.1".to_string());
+                    let agent_port = config
+                        .agent_service
+                        .as_ref()
+                        .and_then(|a| a.port)
+                        .unwrap_or(8123);
+                    let timeout_sec = config
+                        .agent_service
+                        .as_ref()
+                        .and_then(|a| a.startup_timeout_sec)
+                        .unwrap_or(45);
+
+                    wait_for_http_health(
+                        &backend_host,
+                        backend_port,
+                        "/health",
+                        Duration::from_secs(timeout_sec),
+                    )
+                    .map_err(|error| {
+                        stop_backend_process(&app_handle);
+                        stop_agent_process(&app_handle);
+                        for port in &managed_ports {
+                            let _ = kill_all_listeners_on_port(*port);
+                        }
+                        format!("Backend health failed: {error}")
+                    })?;
+
+                    wait_for_http_health(
+                        &agent_host,
+                        agent_port,
+                        "/ok",
+                        Duration::from_secs(timeout_sec),
+                    )
+                    .map_err(|error| {
+                        stop_backend_process(&app_handle);
+                        stop_agent_process(&app_handle);
+                        for port in &managed_ports {
+                            let _ = kill_all_listeners_on_port(*port);
+                        }
+                        format!("Agent health failed: {error}")
+                    })?;
+
+                    let _ = app_handle.emit("backend-status", "ready");
+                    append_startup_log(&log_paths.desktop, "Desktop startup ready.");
+                    Ok(())
+                })();
+
+                match startup_result {
+                    Ok(()) => update_startup_state(&app_handle, true, "", ""),
+                    Err(error) => {
+                        log::error!("Desktop startup failed: {}", error);
+                        let data_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| {
+                            dirs_next::home_dir()
+                                .unwrap_or_else(|| PathBuf::from("."))
+                                .join(".inquira")
+                        });
+                        let log_paths = startup_log_paths(&data_dir);
+                        append_startup_log(
+                            &log_paths.desktop,
+                            &format!("Desktop startup failed: {}", error),
+                        );
+                        update_startup_state(
+                            &app_handle,
+                            false,
+                            format!(
+                                "{} Desktop log: {} Backend log: {} Agent log: {}",
+                                error,
+                                log_paths.desktop.display(),
+                                log_paths.backend.display(),
+                                log_paths.agent.display()
+                            ),
+                            "",
+                        );
+                    }
+                }
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
