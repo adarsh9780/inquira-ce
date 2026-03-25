@@ -24,7 +24,7 @@ if not hasattr(aiosqlite.Connection, "is_alive"):
 from .v1.api.router import router as v1_router
 from .v1.db.session import AppDataSessionLocal
 from .v1.repositories.workspace_repository import WorkspaceRepository
-from .v1.services.auth_service import AuthService
+
 from .v1.db.init import init_v1_database
 from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
 from .v1.services.workspace_deletion_service import WorkspaceDeletionService
@@ -230,22 +230,6 @@ async def health():
     return {"status": "ok", "service": "backend"}
 
 
-async def _resolve_websocket_user(websocket: WebSocket):
-    """Resolve authenticated websocket user from a Supabase bearer token."""
-    access_token = str(websocket.query_params.get("access_token") or "").strip()
-    if not access_token:
-        return None
-    try:
-        return await AuthService.resolve_supabase_user(access_token)
-    except Exception:
-        return None
-
-
-async def _workspace_is_accessible_to_user(user_id: str, workspace_id: str) -> bool:
-    async with AppDataSessionLocal() as session:
-        workspace = await WorkspaceRepository.get_by_id(session, workspace_id, user_id)
-    return workspace is not None
-
 
 async def _cancel_task(task: asyncio.Task | None) -> None:
     if task is None:
@@ -274,28 +258,13 @@ async def _stream_kernel_status_updates(user_id: str, workspace_id: str) -> None
         await asyncio.sleep(1)
 
 
-# WebSocket endpoint for real-time processing updates
 @app.websocket("/ws/settings/{user_id}")
 async def settings_websocket(websocket: WebSocket, user_id: str):
     """WebSocket endpoint for real-time settings processing updates"""
     logprint(f"🔌 [WebSocket] New WebSocket connection request for path user: {user_id}")
-    auth_user = await _resolve_websocket_user(websocket)
-    if auth_user is None:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Not authenticated")
-        return
 
-    auth_user_id = str(getattr(auth_user, "id", "")).strip()
-    if not auth_user_id:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid user")
-        return
-
-    if user_id != auth_user_id:
-        logprint(
-            f"⚠️ [WebSocket] Rejected user-id mismatch. path={user_id} session={auth_user_id}",
-            level="warning",
-        )
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="User mismatch")
-        return
+    # CE mode: accept all connections as local-user
+    auth_user_id = "local-user"
 
     await websocket_manager.connect(auth_user_id, websocket)
     logprint(f"✅ [WebSocket] Connection established for user: {auth_user_id}")
@@ -303,12 +272,9 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
         f"🔍 [WebSocket] Active connections after connect: {list(websocket_manager.active_connections.keys())}"
     )
 
-    # V1 runtime keeps workspace-scoped state; legacy cache bootstrap is disabled.
-
     kernel_status_task: asyncio.Task | None = None
     try:
         while True:
-            # Keep connection alive and handle any incoming messages
             logprint(f"👂 [WebSocket] Waiting for messages from user {auth_user_id}...")
             data = await websocket.receive_text()
             logprint(f"📨 [WebSocket] Received message from user {auth_user_id}: {data}")
@@ -326,13 +292,6 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
             kernel_status_task = None
 
             if not workspace_id:
-                continue
-
-            if not await _workspace_is_accessible_to_user(auth_user_id, workspace_id):
-                await websocket_manager.send_error(
-                    auth_user_id,
-                    "Workspace access denied for kernel status subscription.",
-                )
                 continue
 
             kernel_status_task = asyncio.create_task(
