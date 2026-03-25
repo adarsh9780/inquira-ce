@@ -17,13 +17,20 @@ def _force_local_jupyter_provider(monkeypatch):
     load_execution_runtime_config.cache_clear()
 
 
-def test_execute_endpoint_requires_bearer_auth():
-    client = TestClient(app)
+def test_execute_endpoint_does_not_require_bearer_auth():
+    """CE edition: endpoints are accessible without auth headers.
+
+    With auth removed, the request passes through to the DB layer which
+    isn't initialised in the test environment. A 500/OperationalError
+    proves auth didn't block the request (it would have been 401).
+    """
+    client = TestClient(app, raise_server_exceptions=False)
     response = client.post(
         "/api/v1/workspaces/ws-1/execute",
         json={"code": "result = 1", "timeout": 5},
     )
-    assert response.status_code == 401
+    # CE has no auth gate — should never return 401
+    assert response.status_code != 401
 
 
 @pytest.mark.asyncio

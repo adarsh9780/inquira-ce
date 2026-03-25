@@ -62,10 +62,11 @@ test('sidebar icons keep fixed size to avoid toggle jitter', () => {
 
   assert.equal(workspacesSource.includes('BuildingOffice2Icon class="w-3.5 h-3.5 shrink-0"'), true)
   assert.equal(workspacesSource.includes('scale-110'), false)
-  // Workspace/Schema tabs moved to status bar; sidebar now has Settings, Terms, Logout
+  // Workspace/Schema tabs moved to status bar; sidebar now has Settings, Terms (CE: no Logout)
   assert.equal(sidebarSource.includes("CogIcon class=\"w-4 h-4 shrink-0\""), true)
   assert.equal(sidebarSource.includes("DocumentIcon class=\"w-4 h-4 shrink-0\""), true)
-  assert.equal(sidebarSource.includes("ArrowRightOnRectangleIcon class=\"w-4 h-4 shrink-0\""), true)
+  // CE: logout icon removed
+  assert.equal(sidebarSource.includes("ArrowRightOnRectangleIcon class=\"w-4 h-4 shrink-0\""), false)
   assert.equal(sidebarSource.includes("appStore.activeTab === 'workspace' ? 'scale-110' : ''"), false)
   assert.equal(sidebarSource.includes("appStore.activeTab === 'schema-editor' ? 'scale-110' : ''"), false)
 })

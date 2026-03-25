@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import os
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 from app.services.runner_env import _resolve_uv_binary

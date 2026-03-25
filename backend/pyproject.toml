@@ -1,6 +1,6 @@
 [project]
 name = "inquira-ce"
-version = "0.5.7a15"
+version = "0.5.7a16"
 description = "Local-first desktop AI workspace for private data analysis with built-in DuckDB and LangGraph."
 readme = "README.md"
 requires-python = ">=3.12"

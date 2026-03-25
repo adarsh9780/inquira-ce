@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('external link service routes desktop links through open_external_url command', () => {
@@ -20,16 +20,15 @@ test('ApiTab uses external link handler for provider URLs', () => {
   assert.equal(source.includes('import { openExternalUrl } from \'../../services/externalLinkService\''), true)
 })
 
-test('StatusBar and AuthModal links use external link helper', () => {
+test('StatusBar uses external link helper (CE: AuthModal removed)', () => {
   const statusBarPath = resolve(process.cwd(), 'src/components/layout/StatusBar.vue')
   const statusBarSource = readFileSync(statusBarPath, 'utf-8')
   assert.equal(statusBarSource.includes('@click.prevent="openGitHubRepo"'), true)
   assert.equal(statusBarSource.includes("openExternalUrl('https://github.com/adarsh9780/inquira')"), true)
 
+  // CE: AuthModal.vue was deleted
   const authPath = resolve(process.cwd(), 'src/components/modals/AuthModal.vue')
-  const authSource = readFileSync(authPath, 'utf-8')
-  assert.equal(authSource.includes('@click.prevent="openTermsAndConditions"'), true)
-  assert.equal(authSource.includes('import { openExternalUrl } from \'../../services/externalLinkService\''), true)
+  assert.equal(existsSync(authPath), false, 'AuthModal.vue should not exist in CE')
 })
 
 test('desktop runtime exposes open_external_url command handler', () => {

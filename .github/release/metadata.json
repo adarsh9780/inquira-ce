@@ -1,6 +1,6 @@
 {
-  "version": "0.5.7a15",
-  "tag": "v0.5.7a15",
+  "version": "0.5.7a16",
+  "tag": "v0.5.7a16",
   "release_name": "Release",
-  "release_body": "## Added\nTuari level logs so if there are errors before the app starts, we can see those logs as well.\n\n## Changed\nThe app respects the port specified in the inquira.toml file.\n\n## Fixed\nNA"
+  "release_body": "## Added\n- Tuari level logs so if there are errors before the app starts, we can see those logs as well.\n\n## Changed\n- NA\n\n## Fixed\n- UV was missing from the bundle, added it back.\n- Both Rust and Python process use the bundled UV."
 }

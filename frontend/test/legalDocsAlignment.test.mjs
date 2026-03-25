@@ -3,14 +3,11 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 
-const authModalPath = path.resolve('src/components/modals/AuthModal.vue')
 const publicTermsPath = path.resolve('public/terms-and-conditions.html')
 
-test('auth modal opens published docs site terms instead of a repository blob', () => {
-  const source = fs.readFileSync(authModalPath, 'utf8')
-
-  assert.equal(source.includes("https://docs.inquiraai.com/terms-of-service"), true)
-  assert.equal(source.includes('github.com/adarsh9780/inquira-ce/blob/main/frontend/public/terms-and-conditions.html'), false)
+test('CE edition does not ship AuthModal (auth removed)', () => {
+  const authModalPath = path.resolve('src/components/modals/AuthModal.vue')
+  assert.equal(fs.existsSync(authModalPath), false, 'AuthModal.vue should not exist in CE')
 })
 
 test('bundled desktop terms reflect current auth and license boundaries', () => {

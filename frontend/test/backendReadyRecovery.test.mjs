@@ -27,5 +27,5 @@ test('desktop startup exposes one native startup-state handoff to the frontend',
   assert.equal(source.includes('struct StartupSnapshot'), true)
   assert.equal(source.includes('struct StartupState(Mutex<StartupSnapshot>);'), true)
   assert.equal(source.includes('fn get_startup_state(app: tauri::AppHandle) -> StartupSnapshot'), true)
-  assert.equal(source.includes('update_startup_state(&app.handle(), true, "")'), true)
+  assert.equal(source.includes('update_startup_state(&app_handle, true, "", "")'), true)
 })

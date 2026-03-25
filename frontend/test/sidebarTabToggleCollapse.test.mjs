@@ -27,7 +27,7 @@ test('workspace/schema toggle is in status bar, not sidebar', () => {
   assert.equal(statusBarSource.includes("appStore.activeTab === 'schema-editor'"), true)
 })
 
-test('sidebar has settings, terms, and logout instead of workspace/schema tabs', () => {
+test('sidebar has settings and terms (CE: no logout)', () => {
   const sidebarPath = resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue')
   const sidebarSource = readFileSync(sidebarPath, 'utf-8')
 
@@ -39,7 +39,7 @@ test('sidebar has settings, terms, and logout instead of workspace/schema tabs',
   assert.equal(sidebarSource.includes('@click="openTerms'), true)
   assert.equal(sidebarSource.includes('title="Terms & Conditions"'), true)
 
-  // Logout button
-  assert.equal(sidebarSource.includes('@click="promptLogout'), true)
-  assert.equal(sidebarSource.includes('title="Logout"'), true)
+  // CE: Logout removed — no auth needed
+  assert.equal(sidebarSource.includes('@click="promptLogout'), false)
+  assert.equal(sidebarSource.includes('title="Logout"'), false)
 })

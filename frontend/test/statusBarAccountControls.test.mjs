@@ -64,16 +64,23 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
   assert.equal(statusBarSource.includes('Right Section: Editor Toggle, Data Focus, Terminal & Version'), false)
   assert.equal(statusBarSource.includes('Right Section: Data Focus, Terminal & Version'), true)
 
-  // Terms/Settings/Logout moved to sidebar
+  // Settings and Terms in sidebar (CE: no logout)
   assert.equal(sidebarSource.includes('CogIcon'), true)
   assert.equal(sidebarSource.includes('DocumentIcon'), true)
-  assert.equal(sidebarSource.includes('ArrowRightOnRectangleIcon'), true)
   assert.equal(sidebarSource.includes('openSettings'), true)
   assert.equal(sidebarSource.includes('openTerms'), true)
-  assert.equal(sidebarSource.includes('promptLogout'), true)
-  assert.equal(sidebarSource.includes('ConfirmationModal'), true)
   assert.equal(sidebarSource.includes('isTermsDialogOpen'), true)
-  assert.equal(sidebarSource.includes('isLogoutConfirmOpen'), true)
+
+  // CE: auth/logout elements removed from sidebar
+  assert.equal(sidebarSource.includes('ArrowRightOnRectangleIcon'), false)
+  assert.equal(sidebarSource.includes('promptLogout'), false)
+  assert.equal(sidebarSource.includes('isLogoutConfirmOpen'), false)
+  assert.equal(sidebarSource.includes('ConfirmationModal'), false)
+
+  // Sidebar no longer has Workspace/Schema toggle
+  assert.equal(sidebarSource.includes('handleTabClick'), false)
+  assert.equal(sidebarSource.includes('FolderOpenIcon'), false) // In workspace toggle context
+  assert.equal(sidebarSource.includes('DocumentTextIcon'), false) // In schema editor toggle context
 
   // StatusBar no longer has Settings/Confirmation modal directly
   assert.equal(statusBarSource.includes('<SettingsModal'), false)
@@ -84,14 +91,9 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
   assert.equal(statusBarSource.includes('Loading terms...'), false)
   assert.equal(statusBarSource.includes('terms-markdown-content'), false)
   assert.equal(statusBarSource.includes('backdrop-blur-[1.5px]'), false)
-
-  // Sidebar no longer has Workspace/Schema toggle
-  assert.equal(sidebarSource.includes('handleTabClick'), false)
-  assert.equal(sidebarSource.includes('FolderOpenIcon'), false) // In workspace toggle context
-  assert.equal(sidebarSource.includes('DocumentTextIcon'), false) // In schema editor toggle context
 })
 
-test('sidebar has settings, terms, and logout buttons', () => {
+test('sidebar has settings and terms buttons (CE: no logout)', () => {
   const sidebarSource = readFileSync(
     resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'),
     'utf-8',
@@ -105,13 +107,10 @@ test('sidebar has settings, terms, and logout buttons', () => {
   assert.equal(sidebarSource.includes('@click="openTerms'), true)
   assert.equal(sidebarSource.includes('title="Terms & Conditions"'), true)
 
-  // Logout button in sidebar
-  assert.equal(sidebarSource.includes('@click="promptLogout'), true)
-  assert.equal(sidebarSource.includes('title="Logout"'), true)
-
-  // Logout confirmation modal
-  assert.equal(sidebarSource.includes('Confirm Logout'), true)
-  assert.equal(sidebarSource.includes('Are you sure you want to log out'), true)
+  // CE: logout removed — no auth needed
+  assert.equal(sidebarSource.includes('@click="promptLogout'), false)
+  assert.equal(sidebarSource.includes('title="Logout"'), false)
+  assert.equal(sidebarSource.includes('Confirm Logout'), false)
 
   // Terms dialog
   assert.equal(sidebarSource.includes('Terms & Conditions'), true)

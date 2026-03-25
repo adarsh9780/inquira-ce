@@ -6,8 +6,8 @@ Below is our active roadmap based on the current codebase state and community pr
 
 ## Near-Term Priorities
 
-### 1) Authentication & Onboarding
-- **Frictionless Onboarding:** Completely remove mandatory login requirements for all local workflows to ensure an open, instant-start experience.
+### 1) Telemetry
+
 - **Opt-In Telemetry:** Build a transparent, optional analytics modal during the first-time application setup to securely catch crash reports and improve execution stability.
 
 ### 2) Data & Execution Reliability
