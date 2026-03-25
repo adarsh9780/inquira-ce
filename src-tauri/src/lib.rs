@@ -8,6 +8,12 @@ use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::{Child as StdChild, Command, Stdio};
 use std::sync::Mutex;
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW_FLAG: u32 = 0x08000000;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -1283,6 +1289,10 @@ fn start_backend(
         .env("INQUIRA_EXECUTION_PROVIDER", execution_provider);
 
     apply_proxy_env(&mut cmd, config);
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW_FLAG);
+
     redirect_command_output(
         &mut cmd,
         log_path,
@@ -1422,6 +1432,10 @@ fn start_agent_runtime(
         .env("INQUIRA_AGENT_PORT", agent_port.to_string())
         .env("PYTHONPATH", agent_dir.display().to_string());
     apply_proxy_env(&mut cmd, config);
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW_FLAG);
+
     redirect_command_output(&mut cmd, log_path, "agent", &command_summary, agent_dir)?;
 
     let child = cmd.spawn().map_err(|e| {
