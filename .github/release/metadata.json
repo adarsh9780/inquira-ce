@@ -1,6 +1,6 @@
 {
-  "version": "0.5.7a14",
-  "tag": "v0.5.7a14",
+  "version": "0.5.7a15",
+  "tag": "v0.5.7a15",
   "release_name": "Release",
-  "release_body": "## Added\nImplemented guest sessions and removed the mandatory login wall for immediate access.\nRevamped the documentation site home page and landing pages with a premium Zinc aesthetic and 'Local-First' narrative.\nIntegrated an offline-first local search engine for the documentation site.\nAdded a comprehensive Editions overview page and expanded the site footer with legal links.\n\n## Changed\nDeferred session verification until the desktop backend startup is ready, making Tauri startup authoritative.\nModernized and pivoted the public roadmap from proxy infrastructure to pure OAuth BYOK, focusing on local-first capabilities.\nRemoved arbitrary workspace limits and \"Free Edition\" nomenclature to clarify Community Edition positioning.\nStreamlined documentation site navigation by removing redundant pages, consolidating sidebar categories, and promoting downloads.\n\n## Fixed\nResolved Windows desktop startup failures where bundled `uv` was missed because startup expected `uv.exe` while some builds staged a plain `uv` binary.\nFixed the extracted Windows resource layout mismatch by detecting bundled `uv` under both `bundled-tools` and legacy `src-tauri/bundled-tools` paths, and aligned future installers to bundle `bundled-tools` at the top level.\nFixed guest fallbacks and restored App shell startup build.\nFixed documentation site styling issues including oversized icons, missing imports, form styling, and duplicate formatting.\nRestored authentication guards and aligned stale UI assertions in the test suite."
+  "release_body": "## Added\nTuari level logs so if there are errors before the app starts, we can see those logs as well.\n\n## Changed\nThe app respects the port specified in the inquira.toml file.\n\n## Fixed\nNA"
 }
