@@ -5,7 +5,7 @@ import { parseSseBuffer } from '../utils/sseParser'
 import { inferTableNameFromDataPath } from '../utils/chatBootstrap'
 import { normalizeExecutionResponse } from '../utils/runtimeExecution'
 import { extractApiErrorMessage } from '../utils/apiError'
-import { supabaseAuthService } from './supabaseAuthService'
+
 
 // ------------------------------------------------------------------
 // GLOBAL AXIOS CONFIGURATION
@@ -132,11 +132,7 @@ function withAbortSignal(promise, signal) {
 }
 
 async function authorizedFetch(input, init = {}) {
-  const accessToken = await supabaseAuthService.getAccessToken().catch(() => null)
   const headers = new Headers(init?.headers || {})
-  if (accessToken) {
-    headers.set('Authorization', `Bearer ${accessToken}`)
-  }
   return fetch(input, {
     ...init,
     headers,
@@ -197,11 +193,6 @@ async function waitForBackendReady(timeoutMs = 30000) {
 // Request interceptor
 axios.interceptors.request.use(
   async (config) => {
-    const accessToken = await supabaseAuthService.getAccessToken().catch(() => null)
-    if (accessToken) {
-      config.headers = config.headers || {}
-      config.headers.Authorization = `Bearer ${accessToken}`
-    }
     return config
   },
   (error) => {

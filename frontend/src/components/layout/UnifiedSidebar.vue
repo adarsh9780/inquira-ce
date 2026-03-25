@@ -68,18 +68,6 @@
         <DocumentIcon class="w-4 h-4 shrink-0" />
         <span class="text-xs font-medium">Terms & Conditions</span>
       </button>
-
-      <div class="border-t my-1" style="border-color: var(--color-border);"></div>
-
-      <button
-        @click="promptLogout"
-        class="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-red-50 transition-colors"
-        style="color: #dc2626;"
-        title="Logout"
-      >
-        <ArrowRightOnRectangleIcon class="w-4 h-4 shrink-0" />
-        <span class="text-xs font-medium">Logout</span>
-      </button>
     </div>
 
     <SettingsModal
@@ -87,15 +75,7 @@
       :initial-tab="settingsInitialTab"
       @close="closeSettings"
     />
-    <ConfirmationModal
-      :is-open="isLogoutConfirmOpen"
-      title="Confirm Logout"
-      :message="`Are you sure you want to log out, ${accountDisplayLabel}?`"
-      confirm-text="Log Out"
-      cancel-text="Cancel"
-      @close="cancelLogout"
-      @confirm="confirmLogout"
-    />
+
     <div
       v-if="isTermsDialogOpen"
       class="fixed inset-0 z-[70] flex items-center justify-center px-4"
@@ -143,9 +123,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import { useAppStore } from '../../stores/appStore'
-import { useAuthStore } from '../../stores/authStore'
 import SettingsModal from '../modals/SettingsModal.vue'
-import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import SidebarWorkspaces from './sidebar/SidebarWorkspaces.vue'
 import SidebarDatasets from './sidebar/SidebarDatasets.vue'
 import SidebarConversations from './sidebar/SidebarConversations.vue'
@@ -155,12 +133,10 @@ import apiService from '../../services/apiService'
 import {
   CogIcon,
   DocumentIcon,
-  ArrowRightOnRectangleIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
-const authStore = useAuthStore()
 
 const isSettingsOpen = ref(false)
 const settingsInitialTab = ref('api')
@@ -169,7 +145,7 @@ const isTermsLoading = ref(false)
 const termsError = ref('')
 const termsMarkdown = ref('')
 const termsLastUpdated = ref('')
-const isLogoutConfirmOpen = ref(false)
+
 
 const termsMarkdownRenderer = new MarkdownIt({
   html: false,
@@ -185,19 +161,7 @@ const termsHtml = computed(() => {
   })
 })
 
-const accountDisplayLabel = computed(() => {
-  const value = String(authStore.username || '').trim()
-  if (!value) return 'Account'
-  if (value.includes('@')) return value
-  if (!value.includes(' ')) {
-    return value.charAt(0).toUpperCase() + value.slice(1)
-  }
-  return value
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase())
-    .join(' ')
-})
+
 
 function toggleSidebar() {
   appStore.setSidebarCollapsed(true)
@@ -253,22 +217,7 @@ function closeTermsDialog() {
   isTermsDialogOpen.value = false
 }
 
-function promptLogout() {
-  isLogoutConfirmOpen.value = true
-}
 
-function cancelLogout() {
-  isLogoutConfirmOpen.value = false
-}
-
-async function confirmLogout() {
-  isLogoutConfirmOpen.value = false
-  try {
-    await authStore.logout()
-  } catch (error) {
-    console.error('Logout failed:', error)
-  }
-}
 </script>
 
 <style scoped>

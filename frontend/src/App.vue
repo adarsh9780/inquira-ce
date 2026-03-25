@@ -113,11 +113,7 @@
       </div>
     </div>
 
-    <AuthModal
-      v-else-if="!startupFailure && desktopStartup.ready && !authStore.isAuthenticated"
-      :is-open="true"
-      @close="handleAuthClose"
-    />
+
 
     <div
       v-else-if="startupFailure"
@@ -301,7 +297,6 @@ import { previewService } from './services/previewService'
 import { walkthroughService } from './services/walkthroughService'
 import { toast } from './composables/useToast'
 import logo from './assets/favicon.svg'
-import AuthModal from './components/modals/AuthModal.vue'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
 import StatusBar from './components/layout/StatusBar.vue'

@@ -7,20 +7,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_appdata_db_session
 from ..repositories.principal_repository import PrincipalRepository
-from ..services.auth_service import AuthService
+from ..repositories.auth_repository import AuthUserRecord
 
 
 async def get_current_user(request: Request):
-    """Resolve authenticated user from a Supabase bearer token."""
-    auth_header = str(request.headers.get("authorization") or "").strip()
-    if not auth_header.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    access_token = auth_header.split(" ", 1)[1].strip()
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    return await AuthService.resolve_supabase_user(access_token)
+    """Return a fixed local user for CE (no auth required)."""
+    return AuthUserRecord(
+        id="local-user",
+        username="Local User",
+        password_hash="",
+        salt="",
+        plan="FREE",
+    )
 
 
 async def ensure_appdata_principal(

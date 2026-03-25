@@ -1,4 +1,4 @@
-import { supabaseAuthService } from './supabaseAuthService'
+
 
 let tauriWsBaseOverride = ''
 
@@ -100,11 +100,9 @@ class SettingsWebSocket {
       return Promise.resolve()
     }
 
-    return supabaseAuthService.getAccessToken().catch(() => null).then((accessToken) => new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       const wsPath = `/ws/settings/${userId}`
-      const wsUrl = accessToken
-        ? `${buildWsUrl(wsPath)}?access_token=${encodeURIComponent(accessToken)}`
-        : buildWsUrl(wsPath)
+      const wsUrl = buildWsUrl(wsPath)
       this.socket = new WebSocket(wsUrl)
       this.connectionAcknowledged = false
 
@@ -160,7 +158,7 @@ class SettingsWebSocket {
           resolve()
         }
       }, 10000)
-    }))
+    })
   }
 
   // Persistent connection management
