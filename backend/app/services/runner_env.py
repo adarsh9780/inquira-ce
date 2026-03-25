@@ -4,12 +4,31 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 from app.services.execution_config import ExecutionRuntimeConfig
+
+
+def _resolve_uv_binary() -> str:
+    """Return the path to the uv binary.
+
+    Resolution order:
+    1. INQUIRA_UV_BIN env var (set by Tauri desktop launcher)
+    2. shutil.which('uv') — finds uv on PATH
+    3. Bare 'uv' — lets subprocess raise FileNotFoundError if missing
+    """
+    env_path = os.environ.get("INQUIRA_UV_BIN", "").strip()
+    if env_path and Path(env_path).exists():
+        return env_path
+    which_path = shutil.which("uv")
+    if which_path:
+        return which_path
+    return "uv"
 
 
 @dataclass(frozen=True)
@@ -154,7 +173,8 @@ def _install_with_uv_or_pip(
     packages: list[str],
     index_url: str | None = None,
 ) -> RunnerInstallResult:
-    uv_cmd = ["uv", "pip", "install", "--python", runner_python]
+    uv_bin = _resolve_uv_binary()
+    uv_cmd = [uv_bin, "pip", "install", "--python", runner_python]
     if index_url:
         uv_cmd.extend(["--index-url", index_url])
     uv_cmd.extend(packages)
@@ -192,7 +212,8 @@ def _install_with_uv_or_pip(
 
 def _create_runner_venv(config: ExecutionRuntimeConfig, venv_path: Path) -> None:
     base_python = (config.runner_python_executable or "").strip() or sys.executable
-    uv_cmd = ["uv", "venv", str(venv_path), "--python", base_python]
+    uv_bin = _resolve_uv_binary()
+    uv_cmd = [uv_bin, "venv", str(venv_path), "--python", base_python]
     uv_proc = subprocess.run(uv_cmd, capture_output=True, text=True)
     if uv_proc.returncode == 0:
         return

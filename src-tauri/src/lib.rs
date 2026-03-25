@@ -1274,6 +1274,7 @@ fn start_backend(
         .env("INQUIRA_PORT", port.to_string())
         .env("INQUIRA_DESKTOP", "1")
         .env("INQUIRA_AGENT_SHARED_SECRET", shared_secret)
+        .env("INQUIRA_UV_BIN", uv_bin.to_string_lossy().to_string())
         .env(
             "INQUIRA_TOML_PATH",
             inquira_toml_path.to_string_lossy().to_string(),
