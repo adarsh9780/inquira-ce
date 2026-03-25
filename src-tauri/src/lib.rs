@@ -151,6 +151,26 @@ fn startup_log_paths(data_dir: &Path) -> StartupLogPaths {
     }
 }
 
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn vc_redist_marker_path(data_dir: &Path) -> PathBuf {
+    data_dir.join(".vc_redist_installed")
+}
+
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn vc_redist_installer_path(data_dir: &Path) -> PathBuf {
+    data_dir.join("bootstrap").join("vc_redist.x64.exe")
+}
+
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn vc_redist_download_url() -> &'static str {
+    "https://aka.ms/vc14/vc_redist.x64.exe"
+}
+
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn vc_redist_success_exit_code(code: i32) -> bool {
+    matches!(code, 0 | 1638 | 3010)
+}
+
 fn append_startup_log(log_path: &Path, message: &str) {
     if let Some(parent) = log_path.parent() {
         let _ = fs::create_dir_all(parent);
@@ -158,6 +178,150 @@ fn append_startup_log(log_path: &Path, message: &str) {
     if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_path) {
         let _ = writeln!(file, "{}", message);
     }
+}
+
+#[cfg(target_os = "windows")]
+fn ensure_windows_vc_redist(
+    data_dir: &Path,
+    desktop_log_path: &Path,
+    config: &InquiraConfig,
+    app: &tauri::AppHandle,
+) -> Result<(), String> {
+    let marker_path = vc_redist_marker_path(data_dir);
+    if marker_path.exists() {
+        return Ok(());
+    }
+
+    let installer_path = vc_redist_installer_path(data_dir);
+    if let Some(parent) = installer_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| {
+            format!(
+                "Failed to create VC++ bootstrap directory {}: {}",
+                parent.display(),
+                e
+            )
+        })?;
+    }
+
+    let _ = app.emit(
+        "backend-status",
+        "Installing Microsoft Visual C++ runtime (one-time setup)...",
+    );
+    append_startup_log(
+        desktop_log_path,
+        &format!(
+            "VC++ runtime missing. Downloading installer from {} to {}",
+            vc_redist_download_url(),
+            installer_path.display()
+        ),
+    );
+
+    let mut download_cmd = Command::new("powershell.exe");
+    download_cmd.args([
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        &format!(
+            "Invoke-WebRequest -Uri '{}' -OutFile '{}'",
+            vc_redist_download_url(),
+            installer_path.display()
+        ),
+    ]);
+    apply_proxy_env(&mut download_cmd, config);
+    redirect_command_output(
+        &mut download_cmd,
+        desktop_log_path,
+        "vc_redist_download",
+        &format!(
+            "powershell Invoke-WebRequest {} -> {}",
+            vc_redist_download_url(),
+            installer_path.display()
+        ),
+        data_dir,
+    )?;
+    let download_status = download_cmd.status().map_err(|e| {
+        format!(
+            "Failed to download Microsoft Visual C++ runtime installer: {}",
+            e
+        )
+    })?;
+    if !download_status.success() || !installer_path.exists() {
+        return Err(format!(
+            "Microsoft Visual C++ runtime download failed (status: {:?}). See {}",
+            download_status.code(),
+            desktop_log_path.display()
+        ));
+    }
+
+    append_startup_log(
+        desktop_log_path,
+        &format!(
+            "Running Microsoft Visual C++ runtime installer from {}",
+            installer_path.display()
+        ),
+    );
+    let mut install_cmd = Command::new(&installer_path);
+    install_cmd.args(["/install", "/quiet", "/norestart"]);
+    redirect_command_output(
+        &mut install_cmd,
+        desktop_log_path,
+        "vc_redist_install",
+        &format!("{} /install /quiet /norestart", installer_path.display()),
+        data_dir,
+    )?;
+    let install_status = install_cmd.status().map_err(|e| {
+        format!(
+            "Failed to run Microsoft Visual C++ runtime installer: {}",
+            e
+        )
+    })?;
+    let exit_code = install_status.code().unwrap_or(-1);
+    if !vc_redist_success_exit_code(exit_code) {
+        return Err(format!(
+            "Microsoft Visual C++ runtime installer failed with exit code {}. See {}",
+            exit_code,
+            desktop_log_path.display()
+        ));
+    }
+
+    let marker_contents = if exit_code == 3010 {
+        "installed=reboot_required\n"
+    } else {
+        "installed=ok\n"
+    };
+    fs::write(&marker_path, marker_contents).map_err(|e| {
+        format!(
+            "Microsoft Visual C++ runtime installed, but failed to write marker {}: {}",
+            marker_path.display(),
+            e
+        )
+    })?;
+
+    if exit_code == 3010 {
+        append_startup_log(
+            desktop_log_path,
+            "Microsoft Visual C++ runtime install completed and requested a reboot.",
+        );
+    } else {
+        append_startup_log(
+            desktop_log_path,
+            "Microsoft Visual C++ runtime install completed successfully.",
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn ensure_windows_vc_redist(
+    _data_dir: &Path,
+    _desktop_log_path: &Path,
+    _config: &InquiraConfig,
+    _app: &tauri::AppHandle,
+) -> Result<(), String> {
+    Ok(())
 }
 
 fn start_log_session(log_path: &Path, process_name: &str, command_summary: &str, cwd: &Path) {
@@ -1346,6 +1510,8 @@ pub fn run() {
                         .join("inquira.toml")
                 };
                 let config = load_config(&runtime_config_path);
+                ensure_windows_vc_redist(&data_dir, &log_paths.desktop, &config, &app.handle())
+                    .map_err(|error| format!("Startup failed: {error}"))?;
                 let managed_ports = vec![8000_u16, 8123_u16];
                 log::info!(
                     "Runtime config path: {}",
@@ -1596,7 +1762,8 @@ mod tests {
         missing_uv_binary_error, needs_python_bootstrap, parse_lsof_pid_lines, resolve_pty_cwd,
         resolve_resource_path, resolve_shared_console_log_level, resolve_uv_index_url,
         startup_log_paths, stop_child_process, uv_binary_file_name, uv_search_candidates,
-        InquiraConfig, LoggingConfig, PythonConfig,
+        vc_redist_download_url, vc_redist_installer_path, vc_redist_marker_path,
+        vc_redist_success_exit_code, InquiraConfig, LoggingConfig, PythonConfig,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -1667,6 +1834,36 @@ mod tests {
         assert_eq!(paths.desktop, base.join("logs").join("desktop-startup.log"));
         assert_eq!(paths.backend, base.join("logs").join("backend-startup.log"));
         assert_eq!(paths.agent, base.join("logs").join("agent-startup.log"));
+    }
+
+    #[test]
+    fn vc_redist_paths_live_under_app_data() {
+        let base = PathBuf::from("/tmp/inquira-app-data");
+
+        assert_eq!(
+            vc_redist_marker_path(&base),
+            base.join(".vc_redist_installed")
+        );
+        assert_eq!(
+            vc_redist_installer_path(&base),
+            base.join("bootstrap").join("vc_redist.x64.exe")
+        );
+    }
+
+    #[test]
+    fn vc_redist_download_url_uses_microsoft_permalink() {
+        assert_eq!(
+            vc_redist_download_url(),
+            "https://aka.ms/vc14/vc_redist.x64.exe"
+        );
+    }
+
+    #[test]
+    fn vc_redist_success_exit_code_accepts_known_success_variants() {
+        assert!(vc_redist_success_exit_code(0));
+        assert!(vc_redist_success_exit_code(1638));
+        assert!(vc_redist_success_exit_code(3010));
+        assert!(!vc_redist_success_exit_code(1));
     }
 
     fn base_config_with_index(index_url: Option<&str>) -> InquiraConfig {
