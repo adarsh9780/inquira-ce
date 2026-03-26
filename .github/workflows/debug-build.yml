@@ -1,9 +1,6 @@
 name: Debug Build (Windows)
 
 on:
-  push:
-    branches:
-      - "**"  # Trigger on all branches
   workflow_dispatch:  # Manual trigger from Actions tab
 
 concurrency:
