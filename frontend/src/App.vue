@@ -544,6 +544,29 @@ async function readDesktopStartupState() {
   }
 }
 
+async function subscribeDesktopStartupEvents(onMessage) {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
+    return () => {}
+  }
+
+  try {
+    const { listen } = await import('@tauri-apps/api/event')
+    const unlisten = await listen('backend-status', (event) => {
+      const payload = String(event?.payload || '').trim()
+      if (!payload || payload.toLowerCase() === 'ready') return
+      onMessage(payload)
+    })
+    return () => {
+      try {
+        unlisten()
+      } catch (_error) {}
+    }
+  } catch (error) {
+    console.warn('⚠️ Failed to subscribe to desktop startup status events:', error)
+    return () => {}
+  }
+}
+
 async function waitForDesktopStartupReady() {
   desktopStartup.active = true
   desktopStartup.ready = false
@@ -553,31 +576,41 @@ async function waitForDesktopStartupReady() {
   recordDesktopStartupStage(desktopStartup.message)
 
   const pollDelayMs = 250
+  const stopDesktopStatusListener = await subscribeDesktopStartupEvents((message) => {
+    desktopStartup.message = message
+    recordDesktopStartupStage(message)
+  })
 
-  while (true) {
-    const state = await readDesktopStartupState()
-    const message = String(state?.message || '').trim()
-    desktopStartup.message = message || 'Launching desktop services...'
-    recordDesktopStartupStage(desktopStartup.message)
-    desktopStartup.error = String(state?.error || '').trim()
+  try {
+    while (true) {
+      const state = await readDesktopStartupState()
+      const message = String(state?.message || '').trim()
+      if (message) {
+        desktopStartup.message = message
+        recordDesktopStartupStage(desktopStartup.message)
+      }
+      desktopStartup.error = String(state?.error || '').trim()
 
-    if (desktopStartup.error) {
-      closeCurrentDesktopStartupStage()
-      startupFailure.value = desktopStartup.error
-      desktopStartup.active = false
-      desktopStartup.ready = false
-      return false
+      if (desktopStartup.error) {
+        closeCurrentDesktopStartupStage()
+        startupFailure.value = desktopStartup.error
+        desktopStartup.active = false
+        desktopStartup.ready = false
+        return false
+      }
+
+      if (state?.ready) {
+        closeCurrentDesktopStartupStage()
+        desktopStartup.active = false
+        desktopStartup.ready = true
+        desktopStartup.message = ''
+        return true
+      }
+
+      await new Promise((resolve) => window.setTimeout(resolve, pollDelayMs))
     }
-
-    if (state?.ready) {
-      closeCurrentDesktopStartupStage()
-      desktopStartup.active = false
-      desktopStartup.ready = true
-      desktopStartup.message = ''
-      return true
-    }
-
-    await new Promise((resolve) => window.setTimeout(resolve, pollDelayMs))
+  } finally {
+    stopDesktopStatusListener()
   }
 }
 
