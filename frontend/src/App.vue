@@ -19,70 +19,27 @@
                 <div class="absolute -left-16 top-10 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.18),rgba(59,130,246,0))]"></div>
                 <div class="absolute bottom-12 right-[-3rem] h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(24,24,27,0.12),rgba(24,24,27,0))]"></div>
 
-                <div class="relative flex h-full flex-col">
-                  <div class="flex items-center gap-4">
-                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/70 bg-white/90 shadow-[0_16px_32px_rgba(24,24,27,0.08)]">
-                      <img :src="logo" alt="Inquira logo" class="h-10 w-10 rounded-xl shadow-sm" />
-                    </div>
-
-                    <div>
-                      <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Inquira startup</p>
-                      <p class="mt-1 text-sm text-[var(--color-text-muted)]">Desktop services are booting</p>
-                    </div>
+                <div class="relative flex h-full flex-col items-center justify-center text-center">
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Inquira startup</p>
+                  <div class="mt-6 rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_24px_48px_rgba(24,24,27,0.1)] sm:p-8">
+                    <img
+                      :src="logo"
+                      alt="Inquira logo"
+                      class="startup-brand-logo h-36 w-36 sm:h-44 sm:w-44 lg:h-52 lg:w-52"
+                    />
                   </div>
-
-                  <div class="mt-10 max-w-xl">
-                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--color-text-muted)]">
-                      Preparing the app
-                    </p>
-                    <h1 class="mt-4 text-4xl font-semibold tracking-[-0.05em] text-[var(--color-text-main)] sm:text-5xl lg:text-[3.5rem] lg:leading-[1.02]">
-                      {{ desktopStartupTitle }}
-                    </h1>
-                    <p class="mt-5 max-w-lg text-base leading-7 text-[var(--color-text-muted)] sm:text-lg sm:leading-8">
-                      {{ desktopStartupMessage }}
-                    </p>
-                  </div>
-
-                  <div class="mt-8 rounded-[1.5rem] border border-white/70 bg-white/75 p-5 shadow-[0_20px_45px_rgba(24,24,27,0.08)]">
-                    <div class="flex items-center justify-between gap-4">
-                      <div>
-                        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-text-muted)]">
-                          Current step
-                        </p>
-                        <p class="mt-3 text-base font-medium text-[var(--color-text-main)] sm:text-lg">
-                          {{ desktopStartupMessage }}
-                        </p>
-                        <p class="mt-2 text-sm text-[var(--color-text-muted)]">
-                          This screen stays visible while the runtime installs and verifies the backend.
-                        </p>
-                      </div>
-                      <div class="relative h-16 w-16 shrink-0">
-                        <div class="absolute inset-0 rounded-full border-4 border-zinc-200"></div>
-                        <div class="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <ul class="mt-8 grid gap-3 text-sm sm:grid-cols-3 lg:mt-auto lg:grid-cols-1 xl:grid-cols-3">
-                    <li class="rounded-[1.35rem] border border-white/75 bg-white/72 px-4 py-4 shadow-[0_14px_30px_rgba(24,24,27,0.06)]">
-                      <p class="text-sm font-semibold text-[var(--color-text-main)]">Visible boot</p>
-                      <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">The window opens immediately so startup never feels frozen.</p>
-                    </li>
-                    <li class="rounded-[1.35rem] border border-white/75 bg-white/72 px-4 py-4 shadow-[0_14px_30px_rgba(24,24,27,0.06)]">
-                      <p class="text-sm font-semibold text-[var(--color-text-main)]">Live status</p>
-                      <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">You can see Python, VC++ runtime, and backend startup as it happens.</p>
-                    </li>
-                    <li class="rounded-[1.35rem] border border-white/75 bg-white/72 px-4 py-4 shadow-[0_14px_30px_rgba(24,24,27,0.06)]">
-                      <p class="text-sm font-semibold text-[var(--color-text-main)]">No guesswork</p>
-                      <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">If startup fails, the error is shown before auth begins.</p>
-                    </li>
-                  </ul>
+                  <h1 class="mt-8 text-4xl font-semibold tracking-[-0.05em] text-[var(--color-text-main)] sm:text-5xl lg:text-[3.5rem] lg:leading-[1.02]">
+                    {{ desktopStartupTitle }}
+                  </h1>
+                  <p class="mt-5 max-w-lg text-base leading-7 text-[var(--color-text-muted)] sm:text-lg sm:leading-8">
+                    {{ desktopStartupMessage }}
+                  </p>
                 </div>
               </aside>
 
-              <div class="flex items-center px-6 py-8 sm:px-8 lg:px-10 lg:py-10">
-                <div class="mx-auto w-full max-w-xl rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[0_18px_48px_rgba(24,24,27,0.08)] sm:p-8">
-                  <p class="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Recent startup stage</p>
+              <div class="flex items-stretch px-6 py-8 sm:px-8 lg:px-10 lg:py-10">
+                <div class="mx-auto flex h-[34rem] w-full max-w-xl flex-col rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[0_18px_48px_rgba(24,24,27,0.08)] sm:p-8">
+                  <p class="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Startup progress</p>
                   <h2 class="mt-4 text-3xl tracking-[-0.04em] text-[var(--color-text-main)] sm:text-4xl">
                     {{ desktopStartupPanelTitle }}
                   </h2>
@@ -90,13 +47,27 @@
                     {{ desktopStartupPanelHint }}
                   </p>
 
-                  <div class="mt-8 space-y-3">
+                  <div
+                    class="mt-6 flex items-start justify-between gap-4 rounded-[1.25rem] border border-zinc-200 bg-[var(--color-base)] px-4 py-4"
+                  >
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-semibold text-[var(--color-text-main)]">Current step</p>
+                      <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ desktopStartupMessage }}</p>
+                    </div>
+                    <span class="mt-1 inline-flex rounded-full border border-zinc-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
+                      Live
+                    </span>
+                  </div>
+
+                  <div class="desktop-startup-progress-scroll mt-6 flex-1 space-y-3 overflow-y-auto pr-1">
                     <div
+                      v-for="entry in desktopStartupTimelineEntries"
+                      :key="entry.key"
                       class="flex items-start justify-between gap-4 rounded-[1.25rem] border border-zinc-200 bg-[var(--color-base)] px-4 py-4"
                     >
                       <div class="min-w-0 flex-1">
-                        <p class="text-sm font-semibold text-[var(--color-text-main)]">Desktop boot</p>
-                        <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ desktopStartupMessage }}</p>
+                        <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ entry.label }}</p>
+                        <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ entry.elapsed }}</p>
                       </div>
                       <span class="mt-1 inline-flex rounded-full border border-zinc-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
                         Startup
@@ -190,18 +161,22 @@
                     <div class="absolute bottom-12 right-[-3rem] h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(24,24,27,0.12),rgba(24,24,27,0))]"></div>
 
                     <div class="relative flex h-full flex-col">
-                      <div class="flex items-center gap-4">
-                        <div class="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/70 bg-white/90 shadow-[0_16px_32px_rgba(24,24,27,0.08)]">
-                          <img :src="logo" alt="Inquira logo" class="h-10 w-10 rounded-xl shadow-sm" />
-                        </div>
+                      <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Inquira workspace</p>
+                        <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ startupOverlayPill }}</p>
+                      </div>
 
-                        <div>
-                          <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Inquira workspace</p>
-                          <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ startupOverlayPill }}</p>
+                      <div class="mt-7 flex justify-center lg:justify-start">
+                        <div class="rounded-[1.75rem] border border-white/75 bg-white/80 p-5 shadow-[0_20px_40px_rgba(24,24,27,0.08)]">
+                          <img
+                            :src="logo"
+                            alt="Inquira logo"
+                            class="startup-brand-logo h-28 w-28 sm:h-32 sm:w-32"
+                          />
                         </div>
                       </div>
 
-                      <div class="mt-10 max-w-xl">
+                      <div class="mt-8 max-w-xl">
                         <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--color-text-muted)]">
                           Restoring your workspace
                         </p>
@@ -250,8 +225,8 @@
                     </div>
                   </aside>
 
-                  <div class="flex items-center px-6 py-8 sm:px-8 lg:px-10 lg:py-10">
-                    <div class="mx-auto w-full max-w-xl rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[0_18px_48px_rgba(24,24,27,0.08)] sm:p-8">
+                  <div class="flex items-stretch px-6 py-8 sm:px-8 lg:px-10 lg:py-10">
+                    <div class="mx-auto flex h-[34rem] w-full max-w-xl flex-col rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[0_18px_48px_rgba(24,24,27,0.08)] sm:p-8">
                       <p class="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Recent stages</p>
                       <h2 class="mt-4 text-3xl tracking-[-0.04em] text-[var(--color-text-main)] sm:text-4xl">
                         {{ startupOverlayPanelTitle }}
@@ -260,19 +235,21 @@
                         {{ startupOverlayHint }}
                       </p>
 
-                      <div class="mt-8 space-y-3">
-                        <div
-                          v-for="entry in startupTimelineEntries"
-                          :key="entry.key"
-                          class="flex items-start justify-between gap-4 rounded-[1.25rem] border border-zinc-200 bg-[var(--color-base)] px-4 py-4"
-                        >
-                          <div class="min-w-0 flex-1">
-                            <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ entry.label }}</p>
-                            <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ entry.elapsed }}</p>
+                      <div class="startup-progress-scroll mt-8 flex-1 overflow-y-auto pr-1">
+                        <div class="space-y-3">
+                          <div
+                            v-for="entry in startupTimelineEntries"
+                            :key="entry.key"
+                            class="flex items-start justify-between gap-4 rounded-[1.25rem] border border-zinc-200 bg-[var(--color-base)] px-4 py-4"
+                          >
+                            <div class="min-w-0 flex-1">
+                              <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ entry.label }}</p>
+                              <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ entry.elapsed }}</p>
+                            </div>
+                            <span class="mt-1 inline-flex rounded-full border border-zinc-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
+                              {{ entry.scope }}
+                            </span>
                           </div>
-                          <span class="mt-1 inline-flex rounded-full border border-zinc-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
-                            {{ entry.scope }}
-                          </span>
                         </div>
                       </div>
                     </div>
@@ -325,6 +302,7 @@ const lastRuntimeErrorToast = ref('')
 const activeSnapshotUserId = ref('')
 const startupFailure = ref('')
 const startupTimeline = ref([])
+const desktopStartupTimeline = ref([])
 const startupClock = ref(Date.now())
 let startupClockTimer = null
 
@@ -339,13 +317,27 @@ function formatElapsed(ms) {
   return `${Math.round(ms / 1000)}s`
 }
 
+function normalizeStartupMessage(message) {
+  return String(message || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
 function recordStartupStage(scope, message) {
   const rendered = String(message || '').trim()
   if (!rendered) return
 
   const now = Date.now()
+  const canonicalMessage = normalizeStartupMessage(rendered)
   const current = startupTimeline.value[startupTimeline.value.length - 1]
-  if (current?.scope === scope && current?.message === rendered) {
+  if (current?.scope === scope && current?.canonicalMessage === canonicalMessage) {
+    return
+  }
+
+  const recentDuplicate = startupTimeline.value
+    .slice(-4)
+    .some((entry) => entry.scope === scope && entry.canonicalMessage === canonicalMessage)
+  if (recentDuplicate) {
     return
   }
 
@@ -359,12 +351,52 @@ function recordStartupStage(scope, message) {
       key: `${scope}:${rendered}:${now}`,
       scope,
       message: rendered,
+      canonicalMessage,
       startedAt: now,
       endedAt: 0,
     },
   ]
 
   console.info(`[STARTUP TRACE] ${scope}: ${rendered}`)
+}
+
+function recordDesktopStartupStage(message) {
+  const rendered = String(message || '').trim()
+  if (!rendered) return
+
+  const now = Date.now()
+  const current = desktopStartupTimeline.value[desktopStartupTimeline.value.length - 1]
+  if (current?.message === rendered) {
+    return
+  }
+
+  const recentDuplicate = desktopStartupTimeline.value
+    .slice(-4)
+    .some((entry) => entry.message === rendered)
+  if (recentDuplicate) {
+    return
+  }
+
+  if (current && !current.endedAt) {
+    current.endedAt = now
+  }
+
+  desktopStartupTimeline.value = [
+    ...desktopStartupTimeline.value.slice(-11),
+    {
+      key: `desktop:${rendered}:${now}`,
+      message: rendered,
+      startedAt: now,
+      endedAt: 0,
+    },
+  ]
+}
+
+function closeCurrentDesktopStartupStage() {
+  const current = desktopStartupTimeline.value[desktopStartupTimeline.value.length - 1]
+  if (current && !current.endedAt) {
+    current.endedAt = Date.now()
+  }
 }
 
 const currentStartupStage = computed(() => {
@@ -399,6 +431,20 @@ const startupTimelineEntries = computed(() => {
         key: entry.key,
         label: `${scope}: ${entry.message}`,
         scope,
+        elapsed: formatElapsed(endedAt - entry.startedAt),
+      }
+    })
+})
+
+const desktopStartupTimelineEntries = computed(() => {
+  return desktopStartupTimeline.value
+    .slice(-6)
+    .reverse()
+    .map((entry) => {
+      const endedAt = entry.endedAt || startupClock.value
+      return {
+        key: entry.key,
+        label: entry.message,
         elapsed: formatElapsed(endedAt - entry.startedAt),
       }
     })
@@ -503,6 +549,8 @@ async function waitForDesktopStartupReady() {
   desktopStartup.ready = false
   desktopStartup.error = ''
   desktopStartup.message = 'Launching desktop services...'
+  desktopStartupTimeline.value = []
+  recordDesktopStartupStage(desktopStartup.message)
 
   const pollDelayMs = 250
 
@@ -510,9 +558,11 @@ async function waitForDesktopStartupReady() {
     const state = await readDesktopStartupState()
     const message = String(state?.message || '').trim()
     desktopStartup.message = message || 'Launching desktop services...'
+    recordDesktopStartupStage(desktopStartup.message)
     desktopStartup.error = String(state?.error || '').trim()
 
     if (desktopStartup.error) {
+      closeCurrentDesktopStartupStage()
       startupFailure.value = desktopStartup.error
       desktopStartup.active = false
       desktopStartup.ready = false
@@ -520,6 +570,7 @@ async function waitForDesktopStartupReady() {
     }
 
     if (state?.ready) {
+      closeCurrentDesktopStartupStage()
       desktopStartup.active = false
       desktopStartup.ready = true
       desktopStartup.message = ''
@@ -624,6 +675,7 @@ watch(
   () => appBootstrap.message,
   (message) => {
     if (!appBootstrap.active) return
+    if (workspaceRuntimeStatus.active) return
     recordStartupStage('workspace', message)
   },
 )
@@ -668,6 +720,7 @@ watch(
     desktopStartup.ready = true
     desktopStartup.message = ''
     desktopStartup.error = ''
+    desktopStartupTimeline.value = []
     appStore.resetForAuthBoundary()
     previewService.clearSchemaCache()
     if (settingsWebSocket.isPersistentMode) {
@@ -738,5 +791,37 @@ onUnmounted(() => {
 .sidebar-shell-leave-from {
   width: 16rem;
   opacity: 1;
+}
+
+.startup-brand-logo {
+  animation: startup-logo-float 7s ease-in-out infinite;
+  filter: drop-shadow(0 20px 32px rgba(24, 24, 27, 0.2));
+}
+
+.startup-progress-scroll,
+.desktop-startup-progress-scroll {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.startup-progress-scroll::-webkit-scrollbar,
+.desktop-startup-progress-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.startup-progress-scroll::-webkit-scrollbar-thumb,
+.desktop-startup-progress-scroll::-webkit-scrollbar-thumb {
+  background: rgba(113, 113, 122, 0.35);
+  border-radius: 999px;
+}
+
+@keyframes startup-logo-float {
+  0%,
+  100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.02);
+  }
 }
 </style>
