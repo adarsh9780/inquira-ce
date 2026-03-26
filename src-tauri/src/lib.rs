@@ -119,6 +119,22 @@ fn resolve_resource_path(resource_dir: &PathBuf, relative: &str) -> PathBuf {
     resource_dir.join("_up_").join(relative)
 }
 
+fn resolve_runtime_state_dir(resource_dir: &Path, fallback_data_dir: &Path) -> PathBuf {
+    let updater_segment = resource_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| matches!(name, "_up_" | "__up__"))
+        .unwrap_or(false);
+
+    if updater_segment {
+        if let Some(parent) = resource_dir.parent() {
+            return parent.to_path_buf();
+        }
+    }
+
+    fallback_data_dir.to_path_buf()
+}
+
 fn normalize_console_level(raw: &str) -> String {
     match raw.trim().to_uppercase().as_str() {
         "TRACE" => "TRACE".to_string(),
@@ -1515,16 +1531,21 @@ pub fn run() {
                         .path()
                         .resource_dir()
                         .unwrap_or_else(|_| PathBuf::from("."));
-                    let data_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| {
+                    let fallback_data_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| {
                         dirs_next::home_dir()
                             .unwrap_or_else(|| PathBuf::from("."))
                             .join(".inquira")
                     });
+                    let data_dir = resolve_runtime_state_dir(&resource_dir, &fallback_data_dir);
                     fs::create_dir_all(&data_dir).ok();
                     let log_paths = startup_log_paths(&data_dir);
                     append_startup_log(
                         &log_paths.desktop,
-                        &format!("Desktop startup begin. data_dir={}", data_dir.display()),
+                        &format!(
+                            "Desktop startup begin. data_dir={} resource_dir={}",
+                            data_dir.display(),
+                            resource_dir.display()
+                        ),
                     );
 
                     let uv_bin = find_uv_binary(&resource_dir)
@@ -1724,11 +1745,17 @@ pub fn run() {
                     Ok(()) => update_startup_state(&app_handle, true, "", ""),
                     Err(error) => {
                         log::error!("Desktop startup failed: {}", error);
-                        let data_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| {
+                        let resource_dir = app_handle
+                            .path()
+                            .resource_dir()
+                            .unwrap_or_else(|_| PathBuf::from("."));
+                        let fallback_data_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| {
                             dirs_next::home_dir()
                                 .unwrap_or_else(|| PathBuf::from("."))
                                 .join(".inquira")
                         });
+                        let data_dir =
+                            resolve_runtime_state_dir(&resource_dir, &fallback_data_dir);
                         let log_paths = startup_log_paths(&data_dir);
                         append_startup_log(
                             &log_paths.desktop,
@@ -1793,10 +1820,11 @@ mod tests {
     use super::{
         bundled_uv_candidates, default_uv_search_paths, detect_default_shell,
         missing_uv_binary_error, needs_python_bootstrap, parse_lsof_pid_lines, resolve_pty_cwd,
-        resolve_resource_path, resolve_shared_console_log_level, resolve_uv_index_url,
-        startup_log_paths, stop_child_process, uv_binary_file_name, uv_search_candidates,
-        vc_redist_download_url, vc_redist_installer_path, vc_redist_marker_path,
-        vc_redist_success_exit_code, InquiraConfig, LoggingConfig, PythonConfig,
+        resolve_resource_path, resolve_runtime_state_dir, resolve_shared_console_log_level,
+        resolve_uv_index_url, startup_log_paths, stop_child_process, uv_binary_file_name,
+        uv_search_candidates, vc_redist_download_url, vc_redist_installer_path,
+        vc_redist_marker_path, vc_redist_success_exit_code, InquiraConfig, LoggingConfig,
+        PythonConfig,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -2001,6 +2029,26 @@ mod tests {
 
         let resolved = resolve_resource_path(&base, "backend");
         assert_eq!(resolved, base.join("_up_").join("backend"));
+    }
+
+    #[test]
+    fn resolve_runtime_state_dir_uses_updater_parent_when_running_in_up_directory() {
+        let base = std::env::temp_dir().join("inq_runtime_state_dir_up");
+        let resource_dir = base.join("_up_");
+        let fallback = base.join("fallback-data");
+
+        let resolved = resolve_runtime_state_dir(&resource_dir, &fallback);
+        assert_eq!(resolved, base);
+    }
+
+    #[test]
+    fn resolve_runtime_state_dir_uses_fallback_when_not_running_in_up_directory() {
+        let base = std::env::temp_dir().join("inq_runtime_state_dir_fallback");
+        let resource_dir = base.join("resources");
+        let fallback = base.join("fallback-data");
+
+        let resolved = resolve_runtime_state_dir(&resource_dir, &fallback);
+        assert_eq!(resolved, fallback);
     }
 
     #[test]
