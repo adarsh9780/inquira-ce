@@ -1,11 +1,13 @@
 Release
 
 ## Added
-- Tuari level logs so if there are errors before the app starts, we can see those logs as well.
 
-## Changed
 - NA
 
+## Changed
+
+- use 127.0.0.1 instead of localhost for backend host to avoid issues with IPv6 on Windows.
+
 ## Fixed
-- UV was missing from the bundle, added it back.
-- Both Rust and Python process use the bundled UV.
+
+- NA
