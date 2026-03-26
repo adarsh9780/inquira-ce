@@ -135,6 +135,26 @@ fn resolve_runtime_state_dir(resource_dir: &Path, fallback_data_dir: &Path) -> P
     fallback_data_dir.to_path_buf()
 }
 
+fn default_backend_host() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "127.0.0.1"
+    } else {
+        "localhost"
+    }
+}
+
+fn resolve_runtime_config_path(resource_dir: &PathBuf, backend_dir: &Path) -> PathBuf {
+    let config_path = resolve_resource_path(resource_dir, "inquira.toml");
+    if config_path.exists() {
+        return config_path;
+    }
+
+    backend_dir
+        .parent()
+        .unwrap_or(backend_dir)
+        .join("inquira.toml")
+}
+
 fn normalize_console_level(raw: &str) -> String {
     match raw.trim().to_uppercase().as_str() {
         "TRACE" => "TRACE".to_string(),
@@ -570,14 +590,19 @@ fn get_backend_url(app: tauri::AppHandle) -> String {
         .path()
         .resource_dir()
         .unwrap_or_else(|_| PathBuf::from("."));
-    let config_path = resolve_resource_path(&resource_dir, "inquira.toml");
-    let config = load_config(&config_path);
+    let backend_dir = if cfg!(debug_assertions) {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../backend")
+    } else {
+        resolve_resource_path(&resource_dir, "backend")
+    };
+    let runtime_config_path = resolve_runtime_config_path(&resource_dir, &backend_dir);
+    let config = load_config(&runtime_config_path);
     let port = config.backend.as_ref().and_then(|b| b.port).unwrap_or(8000);
     let host = config
         .backend
         .as_ref()
         .and_then(|b| b.host.clone())
-        .unwrap_or_else(|| "localhost".to_string());
+        .unwrap_or_else(|| default_backend_host().to_string());
     format!("http://{}:{}", host, port)
 }
 
@@ -1269,7 +1294,7 @@ fn start_backend(
         .backend
         .as_ref()
         .and_then(|b| b.host.clone())
-        .unwrap_or_else(|| "localhost".to_string());
+        .unwrap_or_else(|| default_backend_host().to_string());
 
     log::info!("Starting Inquira backend on port {}...", port);
 
@@ -1555,15 +1580,8 @@ pub fn run() {
                     } else {
                         resolve_resource_path(&resource_dir, "backend")
                     };
-                    let config_path = resolve_resource_path(&resource_dir, "inquira.toml");
-                    let runtime_config_path = if config_path.exists() {
-                        config_path.clone()
-                    } else {
-                        backend_dir
-                            .parent()
-                            .unwrap_or(&backend_dir)
-                            .join("inquira.toml")
-                    };
+                    let runtime_config_path =
+                        resolve_runtime_config_path(&resource_dir, &backend_dir);
                     let config = load_config(&runtime_config_path);
                     ensure_windows_vc_redist(&data_dir, &log_paths.desktop, &config, &app_handle)
                         .map_err(|error| format!("Startup failed: {error}"))?;
@@ -1688,7 +1706,7 @@ pub fn run() {
                         .backend
                         .as_ref()
                         .and_then(|b| b.host.clone())
-                        .unwrap_or_else(|| "localhost".to_string());
+                        .unwrap_or_else(|| default_backend_host().to_string());
                     let backend_port = config.backend.as_ref().and_then(|b| b.port).unwrap_or(8000);
                     let agent_host = config
                         .agent_service
@@ -1819,12 +1837,12 @@ pub fn run() {
 mod tests {
     use super::{
         bundled_uv_candidates, default_uv_search_paths, detect_default_shell,
-        missing_uv_binary_error, needs_python_bootstrap, parse_lsof_pid_lines, resolve_pty_cwd,
-        resolve_resource_path, resolve_runtime_state_dir, resolve_shared_console_log_level,
-        resolve_uv_index_url, startup_log_paths, stop_child_process, uv_binary_file_name,
-        uv_search_candidates, vc_redist_download_url, vc_redist_installer_path,
-        vc_redist_marker_path, vc_redist_success_exit_code, InquiraConfig, LoggingConfig,
-        PythonConfig,
+        default_backend_host, missing_uv_binary_error, needs_python_bootstrap,
+        parse_lsof_pid_lines, resolve_pty_cwd, resolve_resource_path, resolve_runtime_config_path,
+        resolve_runtime_state_dir, resolve_shared_console_log_level, resolve_uv_index_url,
+        startup_log_paths, stop_child_process, uv_binary_file_name, uv_search_candidates,
+        vc_redist_download_url, vc_redist_installer_path, vc_redist_marker_path,
+        vc_redist_success_exit_code, InquiraConfig, LoggingConfig, PythonConfig,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -2029,6 +2047,41 @@ mod tests {
 
         let resolved = resolve_resource_path(&base, "backend");
         assert_eq!(resolved, base.join("_up_").join("backend"));
+    }
+
+    #[test]
+    fn resolve_runtime_config_path_prefers_bundle_config_when_present() {
+        let base = std::env::temp_dir().join("inq_runtime_config_bundle");
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(base.join("backend")).expect("create backend dir");
+        fs::write(base.join("inquira.toml"), "title='bundle'").expect("write bundle config");
+
+        let backend_dir = base.join("backend");
+        let resolved = resolve_runtime_config_path(&base, &backend_dir);
+        assert_eq!(resolved, base.join("inquira.toml"));
+    }
+
+    #[test]
+    fn resolve_runtime_config_path_falls_back_to_backend_parent() {
+        let base = std::env::temp_dir().join("inq_runtime_config_fallback");
+        let _ = fs::remove_dir_all(&base);
+        let resource_dir = base.join("resources");
+        let backend_dir = base.join("runtime").join("backend");
+        fs::create_dir_all(&resource_dir).expect("create resource dir");
+        fs::create_dir_all(&backend_dir).expect("create backend dir");
+        let fallback = base.join("runtime").join("inquira.toml");
+        fs::write(&fallback, "title='fallback'").expect("write fallback config");
+
+        let resolved = resolve_runtime_config_path(&resource_dir, &backend_dir);
+        assert_eq!(resolved, fallback);
+    }
+
+    #[test]
+    fn default_backend_host_matches_platform_expectation() {
+        #[cfg(target_os = "windows")]
+        assert_eq!(default_backend_host(), "127.0.0.1");
+        #[cfg(not(target_os = "windows"))]
+        assert_eq!(default_backend_host(), "localhost");
     }
 
     #[test]
