@@ -30,7 +30,8 @@ publishable_key = "sb_publishable_UFS1NiiGW2DPifD9dCVaZw_4LffBjqC"
 # Port for the FastAPI backend server
 port = 8000
 # Host to bind the backend server to
-host = "localhost"
+# Use 127.0.0.1 (not localhost) for consistent IPv4 binding on Windows
+host = "127.0.0.1"
 
 [execution]
 # Switch execution backend without code changes.
