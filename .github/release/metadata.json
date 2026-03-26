@@ -1,6 +1,6 @@
 {
-  "version": "0.5.7a20",
-  "tag": "v0.5.7a20",
+  "version": "0.5.7a21",
+  "tag": "v0.5.7a21",
   "release_name": "Release",
   "release_body": "## Added\n\n- NA\n\n## Changed\n\n- use 127.0.0.1 instead of localhost for backend host to avoid issues with IPv6 on Windows.\n\n## Fixed\n\n- NA"
 }

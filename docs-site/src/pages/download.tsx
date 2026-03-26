@@ -12,15 +12,15 @@ import {isSupabaseSignupConfigured} from '../lib/supabaseConfig';
 const RELEASE_API =
   'https://api.github.com/repos/adarsh9780/inquira-ce/releases/latest';
 const RELEASE_TAG =
-  'v0.5.7a20';
+  'v0.5.7a21';
 const MACOS_ASSET_NAME =
-  'Inquira_0.5.7-alpha.20_aarch64.dmg';
+  'Inquira_0.5.7-alpha.21_aarch64.dmg';
 const WINDOWS_ASSET_NAME =
-  'Inquira_0.5.7-alpha.20_x64-setup.exe';
+  'Inquira_0.5.7-alpha.21_x64-setup.exe';
 const MACOS_FALLBACK_URL =
-  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a20/Inquira_0.5.7-alpha.20_aarch64.dmg';
+  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a21/Inquira_0.5.7-alpha.21_aarch64.dmg';
 const WINDOWS_FALLBACK_URL =
-  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a20/Inquira_0.5.7-alpha.20_x64-setup.exe';
+  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a21/Inquira_0.5.7-alpha.21_x64-setup.exe';
 const DOWNLOAD_SOURCE = 'docs-site-download-page';
 
 const MAC_ICON = (

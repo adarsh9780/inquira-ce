@@ -1,6 +1,6 @@
 [package]
 name = "inquira"
-version = "0.5.7-alpha.20"
+version = "0.5.7-alpha.21"
 description = "AI-Powered Data Analysis Tool"
 authors = ["Adarsh Maurya"]
 license = "LicenseRef-SUL-1.0"

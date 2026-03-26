@@ -1,7 +1,7 @@
 {
   "name": "inquira",
   "private": true,
-  "version": "0.5.7-alpha.20",
+  "version": "0.5.7-alpha.21",
   "type": "module",
   "scripts": {
     "dev": "vite",
