@@ -62,7 +62,7 @@
           <div class="group flex items-center justify-between px-2 py-1">
             <div class="flex items-center gap-2 min-w-0">
               <CircleStackIcon class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
-              <p class="text-[14px] font-normal truncate" style="color: var(--color-text-main);">Datasets</p>
+              <p class="text-[12px] font-normal truncate" style="color: var(--color-text-muted);">Datasets</p>
             </div>
             <button
               v-if="appStore.hasWorkspace"
@@ -75,7 +75,7 @@
           </div>
 
           <!-- Section Content -->
-          <div v-show="datasetsExpanded">
+          <div v-show="datasetsExpanded" class="pl-4">
             <div v-if="isLoadingDatasets" class="px-2 py-2 text-xs text-center flex items-center justify-center gap-2" style="color: var(--color-text-muted);">
               <div class="animate-spin w-3 h-3 border-2 rounded-full" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);"></div>
               <span>Loading datasets...</span>
@@ -123,7 +123,7 @@
           <div class="group flex items-center justify-between px-2 py-1">
             <div class="flex items-center gap-2 min-w-0">
               <ChatBubbleLeftRightIcon class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
-              <p class="text-[14px] font-normal truncate" style="color: var(--color-text-main);">Conversations</p>
+              <p class="text-[12px] font-normal truncate" style="color: var(--color-text-muted);">Conversations</p>
             </div>
             <button
               v-if="appStore.hasWorkspace"
@@ -136,7 +136,7 @@
           </div>
 
           <!-- Section Content -->
-          <div v-show="conversationsExpanded">
+          <div v-show="conversationsExpanded" class="pl-4">
             <div v-if="filteredConversations.length === 0 && appStore.conversations.length > 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
               No matches found
             </div>
