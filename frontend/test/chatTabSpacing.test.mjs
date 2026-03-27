@@ -7,5 +7,5 @@ test('chat tab uses slightly tighter content padding around chat history', () =>
   const componentPath = resolve(process.cwd(), 'src/components/chat/ChatTab.vue')
   const source = readFileSync(componentPath, 'utf-8')
 
-  assert.equal(source.includes('px-2.5 sm:px-3.5 pt-2.5 sm:pt-3.5 pb-2 sm:pb-2.5'), true)
+  assert.equal(source.includes('class="px-2 sm:px-2 pt-2 pb-1 space-y-2"'), true)
 })

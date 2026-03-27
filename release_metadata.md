@@ -1,47 +1,29 @@
-# Release v0.5.7a23
+# Release v0.5.25 — 2026-03-27
 
-This release introduces a comprehensive **Frontend UI/UX Redesign**, moving toward a "minimal elegant" aesthetic. We’ve overhauled the sidebar, modals, and notification systems to improve visual consistency and layout fluidity while resolving several regressions from the `v0.5.7a22` cycle.
+**29 commits · 44 files changed**
 
-## 🗒️ Changelog
+## Sidebar Redesign
 
-### ✨ Features & UI Redesign
+The sidebar has been completely overhauled with a folder-tree layout built around a workspace-first mental model. Workspaces now expand into datasets and conversations directly, replacing the old dropdown. Section headers are compact and explorer-style, count badges and step labels are gone, and hover/selection states now share the chat bubble color token (`--color-chat-user-bubble`) for visual consistency. Conversation renaming is also now supported inline.
 
-* **UnifiedSidebar:** Complete overhaul featuring a new search/filter bar, collapsible sections (Workspace, Datasets, Conversations), item count badges, and a new delete confirmation flow. (`58a8034`)
-* **Settings & Modals:** Applied a modern aesthetic to the Settings Modal including backdrop blur, softer corners, and a new active-tab accent bar. (`56963e6`)
-* **Toast Notifications:**
-  * Relocated to bottom-center for better visibility. (`07ce371`)
-  * Redesigned with CSS variables for semantic coloring and smoother stacking animations. (`3ca1678`)
-* **Layout Enhancements:**
-  * **StatusBar:** Refined minimal design using CSS variables. (`a55ec93`)
-  * **Startup & Overlays:** Redesigned Workspace and Startup screens with centered layouts, staggered animations, and subtle fade-ins. (`a108aac`, `71968db`)
-* **Interactive Search:** The search icon has been moved to the footer and now triggers a reveal animation for the search bar. (`ffb9ca4`)
+## Visual Polish
 
-### 🐛 Bug Fixes
+Separator lines, redundant borders, and descriptive helper text have been stripped throughout the UI. The chat input area sits closer to messages, secondary buttons adopt the bubble tint globally, and the overall sidebar density is tighter and cleaner.
 
-* **Sidebar:** Restored the "Add Dataset" button and fixed the missing right border. (`dda284c`, `1e975d7`)
-* **Data Handling:** Resolved `appStore.datasets` errors by transitioning to local state management via `apiService.v1ListDatasets()`. (`0640a91`)
-* **Assets & Icons:**
-  * Restored logo visibility by removing a breaking gradient overlay. (`856043d`)
-  * Fixed broken icon references (replaced `DatabaseIcon` with `CircleStackIcon`). (`69a4d92`)
-* **UX Polish:**
-  * Adjusted sidebar chevron positioning within the StatusBar. (`abbbc90`)
-  * Restored circular spinner animations in the workspace overlay. (`0b382d7`)
-  * Switched to `v-show` for key UI elements to prevent DOM flicker during state changes. (`98d8237`)
+## Kernel & Runtime Stability
 
-### 🔄 Refactoring
+- Stale "kernel required" banners in the figure pane now clear on recovery
+- Bootstrap gating restored to prevent 409 startup conflicts
+- Kernel state unified across StatusBar, TableTab, and FigureTab — no more stale readiness caches
+- Noisy transient error logging during startup races reduced
 
-* **Sidebar Footer:** Simplified the footer to an icons-only layout with descriptive hover tooltips. (`83d0800`)
+## Windows / Desktop Fixes
 
------
+- `uv` binary selection now skips non-executable bundled fallbacks (fixes OS error 193)
+- `beforeBuildCommand` is deterministic for Windows Tauri builds
+- Versioning enforced as stable-only to avoid MSI prerelease failures
+- Dead code warnings from Unix-only shutdown constants no longer appear in Windows builds
 
-## 🛠️ Internal & Dependency Changes
+## Testing
 
-* **CSS Architecture:** Migration toward CSS variables for layout components (`StatusBar`, `Toast`, `Sidebar`) to support easier theme maintenance.
-* **Performance:** Optimization of DOM rendering in `App.vue` to reduce layout shifts.
-
------
-
-## ⚠️ Breaking Changes
-* **None.** This release is fully backward compatible with `v0.5.7` configurations.
-
-**Full Changelog**: [v0.5.7a22...v0.5.8](https://www.google.com/search?q=https://github.com/your-repo/compare/v0.5.7a22...v0.5.8)
+16 new or updated tests covering sidebar behavior, kernel state, UI theming, and build determinism.
