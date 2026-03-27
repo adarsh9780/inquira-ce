@@ -171,11 +171,11 @@
               <CircleStackIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
               <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Datasets</span>
               <span
-                v-if="appStore.datasets.length > 0"
+                v-if="localDatasets.length > 0"
                 class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
                 style="background-color: var(--color-surface); color: var(--color-text-muted);"
               >
-                {{ appStore.datasets.length }}
+                {{ localDatasets.length }}
               </span>
             </div>
             <ChevronRightIcon
@@ -187,28 +187,36 @@
 
           <!-- Section Content -->
           <div v-show="datasetsExpanded" class="pl-2">
-            <div v-if="filteredDatasets.length === 0 && appStore.datasets.length > 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
+            <div v-if="isLoadingDatasets" class="px-2 py-2 text-xs text-center flex items-center justify-center gap-2" style="color: var(--color-text-muted);">
+              <div class="animate-spin w-3 h-3 border-2 rounded-full" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);"></div>
+              <span>Loading datasets...</span>
+            </div>
+
+            <div v-else-if="filteredDatasets.length === 0 && localDatasets.length > 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
               No matches found
             </div>
 
-            <div v-if="appStore.datasets.length === 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
+            <div v-else-if="localDatasets.length === 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
               No datasets yet
             </div>
 
             <div v-else class="space-y-0.5 pb-1">
               <div
                 v-for="ds in filteredDatasets"
-                :key="ds.id"
+                :key="ds.table_name"
                 class="group flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface)]"
-                :class="{ 'bg-[var(--color-surface)]': appStore.activeDatasetId === ds.id }"
-                @click="selectDataset(ds.id)"
+                :class="{ 'bg-[var(--color-surface)]': appStore.activeDatasetId === ds.table_name }"
+                @click="selectDataset(ds)"
               >
                 <div class="flex items-center gap-2 min-w-0 flex-1">
-                  <FolderIcon class="w-3.5 h-3.5 shrink-0" :class="appStore.activeDatasetId === ds.id ? 'text-emerald-600' : ''" style="color: var(--color-text-muted);" />
-                  <span class="truncate text-xs font-medium" :class="appStore.activeDatasetId === ds.id ? 'text-emerald-700' : ''" style="color: var(--color-text-main);">{{ ds.name }}</span>
+                  <CircleStackIcon class="w-3.5 h-3.5 shrink-0" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-600' : ''" style="color: var(--color-text-muted);" />
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-xs font-medium" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-700' : ''" style="color: var(--color-text-main);">{{ ds.table_name }}</p>
+                    <p v-if="ds.file_path" class="truncate text-[10px]" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-700/70' : ''" style="color: var(--color-text-muted);">{{ ds.file_path }}</p>
+                  </div>
                 </div>
                 <button
-                  @click.stop="confirmDeleteDataset(ds.id)"
+                  @click.stop="confirmDeleteDataset(ds.table_name)"
                   class="btn-icon p-1 rounded transition-all duration-150 opacity-0 group-hover:opacity-100 shrink-0"
                   style="color: var(--color-text-muted);"
                   title="Delete Dataset"
@@ -400,7 +408,6 @@ import {
   XMarkIcon,
   MagnifyingGlassIcon,
   CircleStackIcon,
-  FolderIcon,
   ChatBubbleLeftEllipsisIcon,
   ChatBubbleLeftRightIcon,
 } from '@heroicons/vue/24/outline'
@@ -415,6 +422,10 @@ const searchQuery = ref('')
 const workspacesExpanded = ref(true)
 const datasetsExpanded = ref(true)
 const conversationsExpanded = ref(true)
+
+// Local datasets state (fetched via API, not in appStore)
+const localDatasets = ref([])
+const isLoadingDatasets = ref(false)
 
 // Settings dialog
 const isSettingsOpen = ref(false)
@@ -460,9 +471,9 @@ const filteredWorkspaces = computed(() => {
 })
 
 const filteredDatasets = computed(() => {
-  if (!searchQuery.value) return appStore.datasets
+  if (!searchQuery.value) return localDatasets.value
   const query = searchQuery.value.toLowerCase()
-  return appStore.datasets.filter(ds => ds.name?.toLowerCase().includes(query))
+  return localDatasets.value.filter(ds => ds.table_name?.toLowerCase().includes(query))
 })
 
 const filteredConversations = computed(() => {
@@ -478,6 +489,30 @@ const activeWorkspaceName = computed(() => {
   const activeWorkspace = appStore.workspaces.find((ws) => ws.id === activeId)
   return activeWorkspace?.name || 'Choose a workspace'
 })
+
+// Fetch datasets from API
+async function fetchDatasets() {
+  const activeWorkspace = appStore.workspaces.find((ws) => ws.id === appStore.activeWorkspaceId)
+  if (!activeWorkspace) {
+    localDatasets.value = []
+    return
+  }
+  isLoadingDatasets.value = true
+  try {
+    const response = await apiService.v1ListDatasets(activeWorkspace.id)
+    const workspaceDatasets = response?.datasets || []
+    const catalogDatasets = workspaceDatasets.map((item) => ({
+      table_name: item.table_name,
+      file_path: item.file_path,
+    }))
+    localDatasets.value = catalogDatasets
+  } catch (error) {
+    console.error('Failed to load datasets:', error)
+    localDatasets.value = []
+  } finally {
+    isLoadingDatasets.value = false
+  }
+}
 
 function isWorkspaceDeleting(workspaceId) {
   return appStore.workspaceDeletionJobs.some((job) => job.workspace_id === workspaceId)
@@ -498,8 +533,12 @@ async function selectWorkspace(id) {
   }
 }
 
-function selectDataset(id) {
-  appStore.setActiveDataset(id)
+function selectDataset(ds) {
+  if (!ds || !ds.table_name) return
+  appStore.setActiveDataset(ds.table_name)
+  if (ds.file_path) {
+    appStore.setActiveDatasetPath(ds.file_path)
+  }
 }
 
 function selectConversation(id) {
@@ -584,12 +623,12 @@ function confirmDeleteWorkspace(workspaceId) {
   isDeleteDialogOpen.value = true
 }
 
-function confirmDeleteDataset(datasetId) {
-  const target = appStore.datasets.find((ds) => ds.id === datasetId)
+function confirmDeleteDataset(tableName) {
+  const target = localDatasets.value.find((ds) => ds.table_name === tableName)
   pendingDeleteType.value = 'dataset'
-  pendingDeleteId.value = datasetId
+  pendingDeleteId.value = tableName
   deleteDialogTitle.value = 'Delete Dataset'
-  deleteDialogMessage.value = `Are you sure you want to delete "${target?.name || 'this dataset'}"? This action cannot be undone.`
+  deleteDialogMessage.value = `Are you sure you want to delete "${target?.table_name || 'this dataset'}"? This action cannot be undone.`
   isDeleteDialogOpen.value = true
 }
 
@@ -618,10 +657,15 @@ async function confirmDelete() {
       const job = await appStore.deleteWorkspaceAsync(pendingDeleteId.value)
       toast.info('Workspace Deletion Started', `Deleting workspace in background (job: ${job.job_id.slice(0, 8)}...).`)
     } else if (pendingDeleteType.value === 'dataset') {
-      await appStore.deleteDataset(pendingDeleteId.value)
-      toast.success('Dataset Deleted', 'Dataset has been removed.')
+      const workspaceId = appStore.activeWorkspaceId
+      if (workspaceId) {
+        await apiService.v1DeleteDataset(workspaceId, pendingDeleteId.value)
+        toast.success('Dataset Deleted', 'Dataset has been removed.')
+        await fetchDatasets()
+      }
     } else if (pendingDeleteType.value === 'conversation') {
-      await appStore.deleteConversation(pendingDeleteId.value)
+      await apiService.v1DeleteConversation(pendingDeleteId.value)
+      await appStore.fetchConversations()
       toast.success('Conversation Deleted', 'Conversation has been removed.')
     }
     closeDeleteDialog()
@@ -643,8 +687,10 @@ onMounted(async () => {
 // Watch for workspace changes to fetch datasets and conversations
 watch(() => appStore.activeWorkspaceId, async (newId) => {
   if (newId) {
-    await appStore.fetchDatasets()
+    await fetchDatasets()
     await appStore.fetchConversations()
+  } else {
+    localDatasets.value = []
   }
 })
 </script>
