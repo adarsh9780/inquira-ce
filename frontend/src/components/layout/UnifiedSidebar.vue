@@ -5,8 +5,7 @@
   >
     <!-- Header with Logo -->
     <div
-      class="h-14 flex items-center px-4 border-b shrink-0 cursor-pointer transition-all duration-200 hover:brightness-98 active:brightness-95"
-      style="border-color: var(--color-border);"
+      class="h-14 flex items-center px-4 shrink-0 cursor-pointer transition-all duration-200 hover:brightness-98 active:brightness-95"
       @click="toggleSidebar"
       title="Click to collapse/expand"
     >

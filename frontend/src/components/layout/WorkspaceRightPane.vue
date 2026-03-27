@@ -1,6 +1,6 @@
 <template>
   <div class="flex h-full flex-col" style="background-color: var(--color-surface);">
-    <div ref="headerRef" class="flex-shrink-0 h-16 border-b px-4 flex items-center gap-4" style="background-color: var(--color-base); border-color: var(--color-border);">
+    <div ref="headerRef" class="flex-shrink-0 h-16 px-4 flex items-center gap-4" style="background-color: var(--color-base);">
       <div class="flex-shrink-0">
         <HeaderDropdown
           v-if="useCompactPaneSwitcher"
