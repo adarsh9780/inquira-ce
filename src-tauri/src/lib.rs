@@ -466,7 +466,9 @@ struct AuthLoopbackResponse {
 }
 
 fn stop_child_process(name: &str, child: &mut StdChild) {
+    #[cfg(unix)]
     const GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(3);
+    #[cfg(unix)]
     const GRACEFUL_SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
     match child.try_wait() {
