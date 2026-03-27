@@ -12,7 +12,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from .schema import AnalysisOutput
 
 _CODING_PROMPT = (
-    Path(__file__).resolve().parent / "prompts" / "coding_system.yaml"
+    Path(__file__).parent / "prompts" / "coding_system.yaml"
 ).read_text(encoding="utf-8")
 
 StructuredInvoker = Callable[[Any, dict[str, Any]], Any]

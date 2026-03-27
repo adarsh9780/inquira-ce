@@ -22,7 +22,7 @@ def _log(message: str, level: str = "info", **kwargs: Any) -> None:
 
 
 def _ensure_repo_root_on_path() -> None:
-    repo_root = Path(__file__).resolve().parents[3]
+    repo_root = Path(__file__).parent.parent.parent
     root_str = str(repo_root)
     if root_str not in sys.path:
         sys.path.insert(0, root_str)
@@ -57,4 +57,3 @@ def init_phoenix_tracing() -> bool:
 def reset_phoenix_tracing_state() -> None:
     shared_reset = _load_shared_reset()
     shared_reset()
-

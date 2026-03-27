@@ -72,7 +72,21 @@ async def run_bash(
         )
         return payload
 
-    workspace_dir = str(Path(data_path).resolve().parent)
+    workspace_path = Path(data_path).expanduser()
+    if not workspace_path.is_absolute():
+        payload = {
+            "error": "Workspace data path must be absolute.",
+            "stdout": "",
+            "stderr": "Invalid data path",
+            "exit_code": 1,
+        }
+        emit_agent_event(
+            "tool_result",
+            {"call_id": call_id, "output": payload, "status": "error", "duration_ms": 1},
+        )
+        return payload
+
+    workspace_dir = str(workspace_path.parent)
     proc = await asyncio.create_subprocess_shell(
         command,
         cwd=workspace_dir,

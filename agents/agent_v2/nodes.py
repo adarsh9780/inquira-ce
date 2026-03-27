@@ -35,10 +35,10 @@ from .tools import new_tool_call_id
 from .tools.validate_result import validate_and_summarize_result
 
 _GENERAL_CHAT_PROMPT = (
-    Path(__file__).resolve().parent / "prompts" / "general_chat_system.yaml"
+    Path(__file__).parent / "prompts" / "general_chat_system.yaml"
 ).read_text(encoding="utf-8")
 _RESULT_EXPLANATION_PROMPT = (
-    Path(__file__).resolve().parent / "prompts" / "result_explanation_system.yaml"
+    Path(__file__).parent / "prompts" / "result_explanation_system.yaml"
 ).read_text(encoding="utf-8")
 _ASSESS_CONTEXT_PROMPT = (
     "You decide whether the agent has enough schema/data context to generate executable analysis code.\n"
@@ -554,7 +554,10 @@ def _schema_memory_md_path(data_path: str | None) -> Path | None:
     base = str(data_path or "").strip()
     if not base:
         return None
-    return Path(base).expanduser().resolve().parent / "context" / "schema_analysis_memory.md"
+    candidate = Path(base).expanduser()
+    if not candidate.is_absolute():
+        return None
+    return candidate.parent / "context" / "schema_analysis_memory.md"
 
 
 def _load_schema_memory_markdown(data_path: str | None) -> str:
