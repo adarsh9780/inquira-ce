@@ -163,11 +163,16 @@
           <div class="h-px my-2" style="background-color: color-mix(in srgb, var(--color-border) 50%, transparent);" />
 
           <!-- Section Header -->
-          <button
-            @click="datasetsExpanded = !datasetsExpanded"
-            class="w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
-          >
-            <div class="flex items-center gap-2">
+          <div class="flex items-center justify-between px-2 py-1.5">
+            <button
+              @click="datasetsExpanded = !datasetsExpanded"
+              class="flex items-center gap-2 rounded-lg transition-colors hover:bg-[var(--color-surface)] px-1 py-0.5"
+            >
+              <ChevronRightIcon
+                class="w-3.5 h-3.5 transition-transform duration-200"
+                :class="datasetsExpanded ? 'rotate-90' : ''"
+                style="color: var(--color-text-muted);"
+              />
               <CircleStackIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
               <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Datasets</span>
               <span
@@ -177,13 +182,16 @@
               >
                 {{ localDatasets.length }}
               </span>
-            </div>
-            <ChevronRightIcon
-              class="w-3.5 h-3.5 transition-transform duration-200"
-              :class="datasetsExpanded ? 'rotate-90' : ''"
-              style="color: var(--color-text-muted);"
-            />
-          </button>
+            </button>
+            <button
+              v-if="appStore.hasWorkspace"
+              @click.stop="openSettings('data')"
+              class="btn-icon shrink-0"
+              title="Add Dataset"
+            >
+              <PlusIcon class="w-3.5 h-3.5" />
+            </button>
+          </div>
 
           <!-- Section Content -->
           <div v-show="datasetsExpanded" class="pl-2">
