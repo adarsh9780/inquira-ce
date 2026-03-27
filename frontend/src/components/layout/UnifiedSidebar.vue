@@ -1,7 +1,7 @@
 <template>
   <div
-    class="flex flex-col w-72 h-full shrink-0 z-40 relative overflow-visible"
-    style="background-color: var(--color-base);"
+    class="flex flex-col w-72 h-full shrink-0 z-40 relative overflow-visible border-r"
+    style="background-color: var(--color-base); border-color: var(--color-border);"
   >
     <!-- Header with Logo -->
     <div
