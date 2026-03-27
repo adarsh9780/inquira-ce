@@ -32,7 +32,7 @@
           >
             <div class="flex items-center gap-2">
               <BuildingOffice2Icon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
-              <span class="text-[10px] uppercase tracking-[0.1em] font-semibold" style="color: var(--color-text-muted);">Step 1</span>
+
               <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Workspace</span>
               <span
                 v-if="appStore.workspaces.length > 0"
@@ -169,7 +169,7 @@
             >
               <div class="flex items-center gap-2">
                 <CircleStackIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
-                <span class="text-[10px] uppercase tracking-[0.1em] font-semibold" style="color: var(--color-text-muted);">Step 2</span>
+
                 <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Datasets</span>
                 <span
                   v-if="localDatasets.length > 0"
@@ -252,7 +252,7 @@
           >
             <div class="flex items-center gap-2">
               <ChatBubbleLeftEllipsisIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
-              <span class="text-[10px] uppercase tracking-[0.1em] font-semibold" style="color: var(--color-text-muted);">Step 3</span>
+
               <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Conversations</span>
               <span
                 v-if="appStore.conversations.length > 0"
