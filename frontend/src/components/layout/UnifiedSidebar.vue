@@ -169,15 +169,7 @@
             >
               <div class="flex items-center gap-2">
                 <CircleStackIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
-
                 <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Datasets</span>
-                <span
-                  v-if="localDatasets.length > 0"
-                  class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-                  style="background-color: var(--color-surface); color: var(--color-text-muted);"
-                >
-                  {{ localDatasets.length }}
-                </span>
               </div>
               <ChevronRightIcon
                 class="w-3.5 h-3.5 transition-transform duration-200"
@@ -252,15 +244,7 @@
           >
             <div class="flex items-center gap-2">
               <ChatBubbleLeftEllipsisIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
-
               <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Conversations</span>
-              <span
-                v-if="appStore.conversations.length > 0"
-                class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-                style="background-color: var(--color-surface); color: var(--color-text-muted);"
-              >
-                {{ appStore.conversations.length }}
-              </span>
             </div>
             <ChevronRightIcon
               class="w-3.5 h-3.5 transition-transform duration-200"
