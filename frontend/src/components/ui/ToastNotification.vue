@@ -1,35 +1,29 @@
 <template>
   <div
     v-if="isVisible"
-    class="fixed top-4 right-4 z-50 max-w-sm w-full"
+    class="fixed top-4 right-4 z-50 max-w-sm w-full animate-toast-in"
   >
     <div
-      class="bg-white border rounded-lg shadow-lg p-4 flex items-start space-x-3"
-      :class="{
-        'border-green-200 bg-green-50': type === 'success',
-        'border-red-200 bg-red-50': type === 'error',
-        'border-yellow-200 bg-yellow-50': type === 'warning',
-        'border-blue-200 bg-blue-50': type === 'info'
-      }"
+      class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-[0_8px_30px_rgba(0,0,0,0.08)] p-4 flex items-start gap-3"
     >
       <!-- Icon -->
-      <div class="flex-shrink-0">
-        <CheckCircleIcon v-if="type === 'success'" class="h-5 w-5 text-green-600" />
-        <ExclamationTriangleIcon v-else-if="type === 'error'" class="h-5 w-5 text-red-600" />
-        <ExclamationCircleIcon v-else-if="type === 'warning'" class="h-5 w-5 text-yellow-600" />
-        <InformationCircleIcon v-else class="h-5 w-5 text-blue-600" />
+      <div class="flex-shrink-0 mt-0.5">
+        <CheckCircleIcon v-if="type === 'success'" class="h-5 w-5 text-[var(--color-success)]" />
+        <ExclamationTriangleIcon v-else-if="type === 'error'" class="h-5 w-5 text-[var(--color-error)]" />
+        <ExclamationCircleIcon v-else-if="type === 'warning'" class="h-5 w-5 text-[var(--color-warning)]" />
+        <InformationCircleIcon v-else class="h-5 w-5 text-[var(--color-accent)]" />
       </div>
 
       <!-- Message -->
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium text-gray-900">{{ title }}</p>
-        <p v-if="message" class="text-sm text-gray-700 mt-1">{{ message }}</p>
+        <p class="text-sm font-medium text-[var(--color-text-main)]">{{ title }}</p>
+        <p v-if="message" class="text-sm text-[var(--color-text-muted)] mt-0.5">{{ message }}</p>
       </div>
 
       <!-- Close button -->
       <button
         @click="close"
-        class="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+        class="flex-shrink-0 text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] transition-colors p-0.5 -mr-1"
       >
         <XMarkIcon class="h-4 w-4" />
       </button>
@@ -112,3 +106,20 @@ onUnmounted(() => {
   clearTimer()
 })
 </script>
+
+<style scoped>
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 0.2s ease-out forwards;
+}
+</style>
