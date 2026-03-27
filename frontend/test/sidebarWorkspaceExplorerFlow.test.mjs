@@ -22,8 +22,8 @@ test('sidebar nests collapsible datasets and conversations under the selected wo
   assert.equal(unifiedSource.includes('const datasetsExpanded = ref(true)'), true)
   assert.equal(unifiedSource.includes('const conversationsExpanded = ref(true)'), true)
   
-  // Chevron rotation for collapse indicators
-  assert.equal(unifiedSource.includes(':class="workspacesExpanded ? \'rotate-90\' : \'\'"'), true)
-  assert.equal(unifiedSource.includes(':class="datasetsExpanded ? \'rotate-90\' : \'\'"'), true)
-  assert.equal(unifiedSource.includes(':class="conversationsExpanded ? \'rotate-90\' : \'\'"'), true)
+  // Folder open/closed states drive expansion visuals
+  assert.equal(unifiedSource.includes('FolderOpenIcon v-if="workspacesExpanded"'), true)
+  assert.equal(unifiedSource.includes('FolderOpenIcon v-if="datasetsExpanded"'), true)
+  assert.equal(unifiedSource.includes('FolderOpenIcon v-if="conversationsExpanded"'), true)
 })

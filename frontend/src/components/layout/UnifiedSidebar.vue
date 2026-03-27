@@ -28,36 +28,17 @@
           <!-- Section Header -->
           <button
             @click="workspacesExpanded = !workspacesExpanded"
-            class="w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
+            class="w-full flex items-center justify-between px-2 py-2 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
           >
             <div class="flex items-center gap-2 min-w-0">
-              <ChevronRightIcon
-                class="w-3.5 h-3.5 transition-transform duration-200 shrink-0"
-                :class="workspacesExpanded ? 'rotate-90' : ''"
-                style="color: var(--color-text-muted);"
-              />
-              <FolderOpenIcon v-if="workspacesExpanded" class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-main);" />
-              <FolderIcon v-else class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-muted);" />
-              <span class="text-[11px] uppercase tracking-[0.08em] font-semibold truncate" style="color: var(--color-text-muted);">Workspaces</span>
+              <FolderOpenIcon v-if="workspacesExpanded" class="w-4 h-4 shrink-0" style="color: var(--color-text-main);" />
+              <FolderIcon v-else class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
+              <span class="text-[15px] font-medium truncate" style="color: var(--color-text-main);">Workspaces</span>
             </div>
-            <span
-              v-if="appStore.workspaces.length > 0"
-              class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-              style="background-color: var(--color-surface); color: var(--color-text-muted);"
-            >
-              {{ appStore.workspaces.length }}
-            </span>
           </button>
 
           <!-- Section Content -->
           <div v-show="workspacesExpanded" class="pl-2">
-            <div
-              class="mb-2 rounded-lg px-2.5 py-2 text-[11px] leading-relaxed border"
-              style="background-color: color-mix(in srgb, var(--color-surface) 80%, transparent); color: var(--color-text-muted); border-color: color-mix(in srgb, var(--color-border) 72%, transparent);"
-            >
-              Create/select a workspace first. This workspace is a real local folder that stores conversations and datasets (documents coming soon).
-            </div>
-
             <div v-if="appStore.workspaceDeletionJobs.length > 0" class="mb-2 px-2.5 py-2 rounded-lg text-[11px] flex items-center gap-2" style="background-color: color-mix(in srgb, var(--color-warning) 15%, transparent); color: var(--color-warning);">
               <svg class="animate-spin h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none">
                 <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -77,28 +58,17 @@
             <Listbox v-else :model-value="selectedWorkspaceId" @update:model-value="selectWorkspace">
               <div class="relative">
                 <ListboxButton
-                  class="w-full rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-[var(--color-surface)] border"
+                  class="w-full rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-[var(--color-surface)] border"
                   style="background-color: color-mix(in srgb, var(--color-surface) 62%, transparent); border-color: color-mix(in srgb, var(--color-border) 72%, transparent);"
                 >
                   <div class="flex items-center gap-3 min-w-0">
                     <FolderOpenIcon class="w-4 h-4 shrink-0" style="color: var(--color-text-main);" />
                     <div class="min-w-0 flex-1">
-                      <p class="text-[10px] uppercase tracking-[0.09em] font-semibold" style="color: var(--color-text-muted);">
-                        Active Folder
-                      </p>
-                      <p class="text-sm font-medium truncate" style="color: var(--color-text-main);">
+                      <p class="text-[15px] font-medium truncate" style="color: var(--color-text-main);">
                         {{ activeWorkspaceName }}
                       </p>
-                      <p
-                        v-if="activeWorkspaceFolderLabel"
-                        class="text-[10px] truncate mt-0.5"
-                        style="color: var(--color-text-muted);"
-                        :title="activeWorkspaceFolderLabel"
-                      >
-                        {{ activeWorkspaceFolderLabel }}
-                      </p>
                     </div>
-                    <ChevronUpDownIcon class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
+                    <ChevronUpDownIcon class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-muted);" />
                   </div>
                 </ListboxButton>
 
@@ -158,14 +128,9 @@
               @click="datasetsExpanded = !datasetsExpanded"
               class="flex items-center gap-2 rounded-lg transition-colors hover:bg-[var(--color-surface)] px-1 py-0.5 min-w-0"
             >
-              <ChevronRightIcon
-                class="w-3.5 h-3.5 transition-transform duration-200"
-                :class="datasetsExpanded ? 'rotate-90' : ''"
-                style="color: var(--color-text-muted);"
-              />
-              <FolderOpenIcon v-if="datasetsExpanded" class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-main);" />
-              <FolderIcon v-else class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-muted);" />
-              <span class="text-[11px] tracking-[0.02em] font-semibold truncate" style="color: var(--color-text-main);">datasets</span>
+              <FolderOpenIcon v-if="datasetsExpanded" class="w-4 h-4 shrink-0" style="color: var(--color-text-main);" />
+              <FolderIcon v-else class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
+              <span class="text-[15px] font-medium truncate" style="color: var(--color-text-main);">datasets</span>
             </button>
             <button
               v-if="appStore.hasWorkspace"
@@ -179,9 +144,6 @@
 
           <!-- Section Content -->
           <div v-show="datasetsExpanded" class="pl-2">
-            <p class="px-2 pb-1 text-[10px] uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">
-              Multiple datasets per workspace.
-            </p>
             <div v-if="isLoadingDatasets" class="px-2 py-2 text-xs text-center flex items-center justify-center gap-2" style="color: var(--color-text-muted);">
               <div class="animate-spin w-3 h-3 border-2 rounded-full" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);"></div>
               <span>Loading datasets...</span>
@@ -199,14 +161,14 @@
               <div
                 v-for="ds in filteredDatasets"
                 :key="ds.table_name"
-                class="group flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface)]"
+                class="group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface)]"
                 :class="{ 'bg-[var(--color-surface)]': appStore.activeDatasetId === ds.table_name }"
                 @click="selectDataset(ds)"
               >
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                   <CircleStackIcon class="w-3.5 h-3.5 shrink-0" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-600' : ''" style="color: var(--color-text-muted);" />
                   <div class="min-w-0 flex-1">
-                    <p class="truncate text-xs font-medium" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-700' : ''" style="color: var(--color-text-main);">{{ ds.table_name }}</p>
+                    <p class="truncate text-[14px] font-medium" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-700' : ''" style="color: var(--color-text-main);">{{ ds.table_name }}</p>
                     <p v-if="ds.file_path" class="truncate text-[10px]" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-700/70' : ''" style="color: var(--color-text-muted);">{{ ds.file_path }}</p>
                   </div>
                 </div>
@@ -233,29 +195,14 @@
             class="w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
           >
             <div class="flex items-center gap-2 min-w-0">
-              <ChevronRightIcon
-                class="w-3.5 h-3.5 transition-transform duration-200 shrink-0"
-                :class="conversationsExpanded ? 'rotate-90' : ''"
-                style="color: var(--color-text-muted);"
-              />
-              <FolderOpenIcon v-if="conversationsExpanded" class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-main);" />
-              <FolderIcon v-else class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-muted);" />
-              <span class="text-[11px] tracking-[0.02em] font-semibold truncate" style="color: var(--color-text-main);">conversations</span>
+              <FolderOpenIcon v-if="conversationsExpanded" class="w-4 h-4 shrink-0" style="color: var(--color-text-main);" />
+              <FolderIcon v-else class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
+              <span class="text-[15px] font-medium truncate" style="color: var(--color-text-main);">conversations</span>
             </div>
-            <span
-              v-if="appStore.conversations.length > 0"
-              class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-              style="background-color: var(--color-surface); color: var(--color-text-muted);"
-            >
-              {{ appStore.conversations.length }}
-            </span>
           </button>
 
           <!-- Section Content -->
           <div v-show="conversationsExpanded" class="pl-2">
-            <p class="px-2 pb-1 text-[10px] uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">
-              Multiple conversations per workspace.
-            </p>
             <div v-if="filteredConversations.length === 0 && appStore.conversations.length > 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
               No matches found
             </div>
@@ -268,7 +215,7 @@
               <div
                 v-for="conv in filteredConversations"
                 :key="conv.id"
-                class="group flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface)]"
+                class="group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface)]"
                 :class="{ 'bg-[var(--color-surface)]': appStore.activeConversationId === conv.id }"
                 @click="selectConversation(conv.id)"
               >
@@ -288,7 +235,7 @@
                     </div>
                     <template v-else>
                       <p
-                        class="truncate"
+                        class="truncate text-[14px]"
                         :class="conv.id === appStore.activeConversationId ? 'font-semibold' : 'font-medium'"
                         :title="conv.title || 'Untitled'"
                       >
@@ -481,7 +428,6 @@ import apiService from '../../services/apiService'
 import {
   CheckCircleIcon,
   ChevronUpDownIcon,
-  ChevronRightIcon,
   FolderIcon,
   FolderOpenIcon,
   FolderPlusIcon,
@@ -590,15 +536,6 @@ const activeWorkspaceName = computed(() => {
   const activeId = selectedWorkspaceId.value
   const activeWorkspace = appStore.workspaces.find((ws) => ws.id === activeId)
   return activeWorkspace?.name || 'Choose a workspace'
-})
-const activeWorkspaceFolderLabel = computed(() => {
-  const activeId = selectedWorkspaceId.value
-  const activeWorkspace = appStore.workspaces.find((ws) => ws.id === activeId)
-  const folder = String(activeWorkspace?.workspace_dir || '').trim()
-  if (!folder) return ''
-  const normalized = folder.replace(/\\/g, '/')
-  const pieces = normalized.split('/').filter(Boolean)
-  return pieces.slice(-2).join('/') || normalized
 })
 
 // Fetch datasets from API

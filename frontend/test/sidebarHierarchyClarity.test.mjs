@@ -9,14 +9,15 @@ test('sidebar communicates workspace-first hierarchy and parallel dataset/conver
     'utf-8',
   )
 
-  assert.equal(source.includes('Create/select a workspace first.'), true)
-  assert.equal(source.includes('real local folder that stores conversations and datasets'), true)
-  assert.equal(source.includes('Multiple datasets per workspace.'), true)
-  assert.equal(source.includes('Multiple conversations per workspace.'), true)
+  assert.equal(source.includes('Create/select a workspace first.'), false)
+  assert.equal(source.includes('Multiple datasets per workspace.'), false)
+  assert.equal(source.includes('Multiple conversations per workspace.'), false)
   assert.equal(source.includes('FolderOpenIcon v-if="workspacesExpanded"'), true)
   assert.equal(source.includes('FolderOpenIcon v-if="datasetsExpanded"'), true)
   assert.equal(source.includes('FolderOpenIcon v-if="conversationsExpanded"'), true)
   assert.equal(source.includes('title="Create Workspace"'), true)
+  assert.equal(source.includes('{{ appStore.workspaces.length }}'), false)
+  assert.equal(source.includes('{{ appStore.conversations.length }}'), false)
 })
 
 test('global typography uses shared font tokens for consistent UI text styling', () => {
