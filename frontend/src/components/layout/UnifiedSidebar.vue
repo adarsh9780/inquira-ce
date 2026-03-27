@@ -93,8 +93,8 @@
               <div
                 v-for="ds in filteredDatasets"
                 :key="ds.table_name"
-                class="group flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface)]"
-                :class="{ 'bg-[var(--color-surface)]': appStore.activeDatasetId === ds.table_name }"
+                class="group sidebar-item-row"
+                :class="{ 'sidebar-item-row-active': appStore.activeDatasetId === ds.table_name }"
                 @click="selectDataset(ds)"
               >
                 <div class="min-w-0 flex-1">
@@ -149,17 +149,17 @@
               <div
                 v-for="conv in filteredConversations"
                 :key="conv.id"
-                class="group flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface)]"
-                :class="{ 'bg-[var(--color-surface)]': appStore.activeConversationId === conv.id }"
+                class="group sidebar-item-row"
+                :class="{ 'sidebar-item-row-active': appStore.activeConversationId === conv.id }"
                 @click="selectConversation(conv.id)"
               >
-                <div class="flex items-start min-w-0 pr-2 pt-0.5 flex-1" @dblclick="startEditing(conv)">
+                <div class="flex items-center min-w-0 pr-2 flex-1" @dblclick="startEditing(conv)">
                   <div class="flex-1 min-w-0">
                     <div v-if="editingId === conv.id" class="flex items-center gap-1 w-full relative z-10">
                       <input
                         :ref="(el) => { if (el) editInputs[conv.id] = el }"
                         v-model="editingTitleValue"
-                        class="input-base py-0.5 px-1 text-xs font-semibold"
+                        class="input-base py-0.5 px-1 text-xs font-normal"
                         @keydown.enter.prevent="saveTitle(conv.id)"
                         @keydown.esc.prevent="cancelEditing"
                         @blur="saveTitle(conv.id)"
@@ -752,6 +752,25 @@ watch(() => appStore.activeWorkspaceId, async (newId) => {
 
 .custom-scrollbar:hover::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--color-border) 80%, transparent);
+}
+
+.sidebar-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.sidebar-item-row:hover {
+  background-color: color-mix(in srgb, var(--color-base) 86%, var(--color-text-main) 14%);
+}
+
+.sidebar-item-row-active {
+  background-color: color-mix(in srgb, var(--color-base) 80%, var(--color-text-main) 20%);
 }
 
 :deep(.terms-markdown-content h1),
