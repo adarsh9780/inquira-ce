@@ -56,13 +56,13 @@
         <!-- Datasets Section -->
         <div
           v-if="appStore.hasWorkspace && workspacesExpanded"
-          class="space-y-0.5"
+          class="space-y-0.5 pl-2"
         >
           <!-- Section Header -->
           <div class="group flex items-center justify-between px-2 py-1">
             <div class="flex items-center gap-2 min-w-0">
               <CircleStackIcon class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
-              <p class="text-[12px] font-normal truncate" style="color: var(--color-text-muted);">Datasets</p>
+              <p class="text-[11px] font-normal truncate" style="color: var(--color-text-muted);">Datasets</p>
             </div>
             <button
               v-if="appStore.hasWorkspace"
@@ -117,13 +117,13 @@
         <!-- Conversations Section -->
         <div
           v-if="appStore.hasWorkspace && workspacesExpanded"
-          class="space-y-0.5"
+          class="space-y-0.5 pl-2"
         >
           <!-- Section Header -->
           <div class="group flex items-center justify-between px-2 py-1">
             <div class="flex items-center gap-2 min-w-0">
               <ChatBubbleLeftRightIcon class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
-              <p class="text-[12px] font-normal truncate" style="color: var(--color-text-muted);">Conversations</p>
+              <p class="text-[11px] font-normal truncate" style="color: var(--color-text-muted);">Conversations</p>
             </div>
             <button
               v-if="appStore.hasWorkspace"
