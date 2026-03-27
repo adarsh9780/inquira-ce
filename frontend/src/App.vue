@@ -88,7 +88,7 @@
       >
         <div class="w-full max-w-md px-6 text-center">
           <!-- Logo -->
-          <div class="flex justify-center mb-8">
+          <div class="flex justify-center mb-6">
             <img
               :src="logo"
               alt="Inquira logo"
@@ -107,20 +107,20 @@
             {{ startupOverlayMessage }}
           </p>
 
-          <!-- Current process -->
-          <div class="mt-10">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs text-[var(--color-text-muted)]">Current</span>
-              <span class="text-xs text-[var(--color-text-muted)]">{{ currentStartupElapsedLabel }}</span>
+          <!-- Current process with spinner -->
+          <div class="mt-8 flex items-center justify-center gap-4">
+            <div class="relative h-8 w-8 shrink-0">
+              <div class="absolute inset-0 rounded-full border-2 border-[var(--color-border)]"></div>
+              <div class="absolute inset-0 rounded-full border-2 border-t-[var(--color-text-main)] border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
             </div>
-            <div class="h-px w-full bg-[var(--color-border)]">
-              <div
-                class="h-full bg-[var(--color-text-main)] animate-pulse"
-              ></div>
+            <div class="text-left">
+              <p class="text-sm font-medium text-[var(--color-text-main)]">
+                {{ currentStartupProcess }}
+              </p>
+              <p class="text-xs text-[var(--color-text-muted)]">
+                {{ currentStartupElapsedLabel }}
+              </p>
             </div>
-            <p class="mt-3 text-sm font-medium text-[var(--color-text-main)]">
-              {{ currentStartupProcess }}
-            </p>
           </div>
         </div>
       </div>
