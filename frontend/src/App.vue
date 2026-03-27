@@ -87,117 +87,43 @@
       <Transition name="fade">
         <div
           v-if="workspaceRuntimeStatus.active || appBootstrap.active"
-          class="fixed inset-0 z-[9999] overflow-y-auto bg-[var(--color-base)]"
+          class="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--color-base)]"
         >
-          <div class="relative min-h-screen overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
-            <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.08),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(24,24,27,0.08),_transparent_34%)]"></div>
-            <div class="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(253,252,248,0))]"></div>
-            <div class="startup-grid absolute inset-0 opacity-70"></div>
+          <div class="w-full max-w-md px-6 text-center startup-enter">
+            <!-- Logo -->
+            <div class="flex justify-center mb-8">
+              <img
+                :src="logo"
+                alt="Inquira logo"
+                class="h-16 w-16 opacity-0 startup-logo"
+              />
+            </div>
 
-            <div class="relative mx-auto flex min-h-[calc(100vh-3rem)] max-w-6xl items-center justify-center">
-              <section class="w-full overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-white/88 shadow-[0_28px_90px_rgba(24,24,27,0.1)] backdrop-blur-xl">
-                <div class="grid lg:grid-cols-[1.04fr_0.96fr]">
-                  <aside class="relative overflow-hidden border-b border-[var(--color-border)] px-6 py-8 sm:px-8 lg:border-b-0 lg:border-r lg:px-10 lg:py-10">
-                    <div class="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(253,252,248,0.84)),linear-gradient(135deg,rgba(59,130,246,0.05),rgba(24,24,27,0.05))]"></div>
-                    <div class="absolute -left-16 top-10 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.18),rgba(59,130,246,0))]"></div>
-                    <div class="absolute bottom-12 right-[-3rem] h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(24,24,27,0.12),rgba(24,24,27,0))]"></div>
+            <!-- Status -->
+            <p class="text-xs font-medium uppercase tracking-widest text-[var(--color-text-muted)] startup-text">
+              {{ startupOverlayPill }}
+            </p>
+            <h1 class="mt-4 text-2xl font-semibold tracking-tight text-[var(--color-text-main)] startup-text-delay">
+              {{ startupOverlayTitle }}
+            </h1>
+            <p class="mt-3 text-sm text-[var(--color-text-muted)] startup-text-delay-2">
+              {{ startupOverlayMessage }}
+            </p>
 
-                    <div class="relative flex h-full flex-col">
-                      <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Inquira workspace</p>
-                        <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ startupOverlayPill }}</p>
-                      </div>
-
-                      <div class="mt-7 flex justify-center lg:justify-start">
-                        <div class="rounded-[1.75rem] border border-white/75 bg-white/80 p-5 shadow-[0_20px_40px_rgba(24,24,27,0.08)]">
-                          <img
-                            :src="logo"
-                            alt="Inquira logo"
-                            class="startup-brand-logo h-28 w-28 sm:h-32 sm:w-32"
-                          />
-                        </div>
-                      </div>
-
-                      <div class="mt-8 max-w-xl">
-                        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--color-text-muted)]">
-                          Restoring your workspace
-                        </p>
-                        <h1 class="mt-4 text-4xl font-semibold tracking-[-0.05em] text-[var(--color-text-main)] sm:text-5xl lg:text-[3.5rem] lg:leading-[1.02]">
-                          {{ startupOverlayTitle }}
-                        </h1>
-                        <p class="mt-5 max-w-lg text-base leading-7 text-[var(--color-text-muted)] sm:text-lg sm:leading-8">
-                          {{ startupOverlayMessage }}
-                        </p>
-                      </div>
-
-                      <div class="mt-8 rounded-[1.5rem] border border-white/70 bg-white/75 p-5 shadow-[0_20px_45px_rgba(24,24,27,0.08)]">
-                        <div class="flex items-center justify-between gap-4">
-                          <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-text-muted)]">
-                              Current process
-                            </p>
-                            <p class="mt-3 text-base font-medium text-[var(--color-text-main)] sm:text-lg">
-                              {{ currentStartupProcess }}
-                            </p>
-                            <p class="mt-2 text-sm text-[var(--color-text-muted)]">
-                              {{ currentStartupElapsedLabel }}
-                            </p>
-                          </div>
-                          <div class="relative h-16 w-16 shrink-0">
-                            <div class="absolute inset-0 rounded-full border-4 border-zinc-200"></div>
-                            <div class="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <ul class="mt-8 grid gap-3 text-sm sm:grid-cols-3 lg:mt-auto lg:grid-cols-1 xl:grid-cols-3">
-                        <li class="rounded-[1.35rem] border border-white/75 bg-white/72 px-4 py-4 shadow-[0_14px_30px_rgba(24,24,27,0.06)]">
-                          <p class="text-sm font-semibold text-[var(--color-text-main)]">Visible progress</p>
-                          <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">Workspace restore stays visible until the authenticated shell is ready to render.</p>
-                        </li>
-                        <li class="rounded-[1.35rem] border border-white/75 bg-white/72 px-4 py-4 shadow-[0_14px_30px_rgba(24,24,27,0.06)]">
-                          <p class="text-sm font-semibold text-[var(--color-text-main)]">Real timing</p>
-                          <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">You can now see which step is actually consuming the time.</p>
-                        </li>
-                        <li class="rounded-[1.35rem] border border-white/75 bg-white/72 px-4 py-4 shadow-[0_14px_30px_rgba(24,24,27,0.06)]">
-                          <p class="text-sm font-semibold text-[var(--color-text-main)]">Fewer false starts</p>
-                          <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">{{ startupOverlayHint }}</p>
-                        </li>
-                      </ul>
-                    </div>
-                  </aside>
-
-                  <div class="flex items-stretch px-6 py-8 sm:px-8 lg:px-10 lg:py-10">
-                    <div class="mx-auto flex h-[34rem] w-full max-w-xl flex-col rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[0_18px_48px_rgba(24,24,27,0.08)] sm:p-8">
-                      <p class="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Recent stages</p>
-                      <h2 class="mt-4 text-3xl tracking-[-0.04em] text-[var(--color-text-main)] sm:text-4xl">
-                        {{ startupOverlayPanelTitle }}
-                      </h2>
-                      <p class="mt-4 text-base leading-7 text-[var(--color-text-muted)]">
-                        {{ startupOverlayHint }}
-                      </p>
-
-                      <div class="startup-progress-scroll mt-8 flex-1 overflow-y-auto pr-1">
-                        <div class="space-y-3">
-                          <div
-                            v-for="entry in startupTimelineEntries"
-                            :key="entry.key"
-                            class="flex items-start justify-between gap-4 rounded-[1.25rem] border border-zinc-200 bg-[var(--color-base)] px-4 py-4"
-                          >
-                            <div class="min-w-0 flex-1">
-                              <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ entry.label }}</p>
-                              <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ entry.elapsed }}</p>
-                            </div>
-                            <span class="mt-1 inline-flex rounded-full border border-zinc-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
-                              {{ entry.scope }}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
+            <!-- Current process -->
+            <div class="mt-10 startup-progress">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs text-[var(--color-text-muted)]">Current</span>
+                <span class="text-xs text-[var(--color-text-muted)]">{{ currentStartupElapsedLabel }}</span>
+              </div>
+              <div class="h-px w-full bg-[var(--color-border)]">
+                <div
+                  class="h-full bg-[var(--color-text-main)] transition-all duration-500 ease-out animate-pulse"
+                ></div>
+              </div>
+              <p class="mt-3 text-sm font-medium text-[var(--color-text-main)]">
+                {{ currentStartupProcess }}
+              </p>
             </div>
           </div>
         </div>
@@ -802,6 +728,11 @@ onUnmounted(() => {
 .startup-progress {
   opacity: 0;
   animation: startup-progress-reveal 0.6s ease-out 0.7s forwards;
+}
+
+.startup-text-delay-2 {
+  opacity: 0;
+  animation: startup-text-reveal 0.6s ease-out 0.65s forwards;
 }
 
 @keyframes startup-fade-in {
