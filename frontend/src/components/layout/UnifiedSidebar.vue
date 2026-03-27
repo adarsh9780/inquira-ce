@@ -33,7 +33,7 @@
             <div class="flex items-center gap-2 min-w-0">
               <FolderOpenIcon v-if="workspacesExpanded" class="w-4 h-4 shrink-0" style="color: var(--color-text-main);" />
               <FolderIcon v-else class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
-              <span class="text-[15px] font-medium truncate" style="color: var(--color-text-main);">Workspaces</span>
+              <span class="text-[15px] font-medium truncate" style="color: var(--color-text-main);">{{ workspaceHeaderLabel }}</span>
             </div>
           </button>
 
@@ -55,66 +55,46 @@
               No workspaces yet
             </div>
 
-            <Listbox v-else :model-value="selectedWorkspaceId" @update:model-value="selectWorkspace">
-              <div class="relative">
-                <ListboxButton
-                  class="w-full rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-[var(--color-surface)] border"
-                  style="background-color: color-mix(in srgb, var(--color-surface) 62%, transparent); border-color: color-mix(in srgb, var(--color-border) 72%, transparent);"
-                >
-                  <div class="flex items-center gap-3 min-w-0">
-                    <FolderOpenIcon class="w-4 h-4 shrink-0" style="color: var(--color-text-main);" />
-                    <div class="min-w-0 flex-1">
-                      <p class="text-[15px] font-medium truncate" style="color: var(--color-text-main);">
-                        {{ activeWorkspaceName }}
-                      </p>
-                    </div>
-                    <ChevronUpDownIcon class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-muted);" />
-                  </div>
-                </ListboxButton>
-
-                <transition name="workspace-dropdown">
-                  <ListboxOptions
-                    class="absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-xl border p-1 shadow-xl focus:outline-none"
-                    style="border-color: color-mix(in srgb, var(--color-border) 82%, transparent); background-color: var(--color-base);"
+            <div v-else class="space-y-0.5 pb-1">
+              <div
+                v-for="ws in filteredWorkspaces"
+                :key="ws.id"
+                class="group/item w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors"
+                :class="[
+                  ws.id === appStore.activeWorkspaceId ? 'bg-[var(--color-surface)]' : 'hover:bg-[var(--color-surface)]',
+                  isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                ]"
+                @click="selectWorkspace(ws.id)"
+              >
+                <div class="flex items-center gap-2 min-w-0 flex-1">
+                  <FolderOpenIcon
+                    v-if="ws.id === appStore.activeWorkspaceId"
+                    class="w-4 h-4 shrink-0 text-emerald-600"
+                  />
+                  <FolderIcon
+                    v-else
+                    class="w-4 h-4 shrink-0"
+                    style="color: var(--color-text-muted);"
+                  />
+                  <p
+                    class="text-[15px] font-medium truncate"
+                    :class="ws.id === appStore.activeWorkspaceId ? 'text-emerald-700' : ''"
+                    style="color: var(--color-text-main);"
                   >
-                    <ListboxOption
-                      v-for="ws in filteredWorkspaces"
-                      :key="ws.id"
-                      :value="ws.id"
-                      as="template"
-                      v-slot="{ active, selected }"
-                      :disabled="isWorkspaceDeleting(ws.id)"
-                    >
-                      <li
-                        class="group/item flex items-center justify-between gap-2 rounded-lg px-3 py-2 transition-colors relative"
-                        :class="[
-                          active ? 'bg-[var(--color-surface)]' : '',
-                          selected ? 'bg-emerald-50 text-emerald-800' : '',
-                          isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
-                        ]"
-                      >
-                        <div class="flex items-center gap-2 min-w-0 flex-1">
-                          <CheckCircleIcon v-if="selected" class="w-4 h-4 shrink-0 text-emerald-600" />
-                          <FolderIcon v-else class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
-                          <span class="truncate text-sm" :class="selected ? 'font-semibold' : 'font-medium'">{{ ws.name }}</span>
-                        </div>
-                        <div class="flex items-center gap-1">
-                          <button
-                            v-if="!isWorkspaceDeleting(ws.id)"
-                            @click.stop="confirmDeleteWorkspace(ws.id)"
-                            class="btn-icon p-1 rounded transition-all duration-150 opacity-0 group-hover/item:opacity-100"
-                            style="color: var(--color-text-muted);"
-                            title="Delete Workspace"
-                          >
-                            <TrashIcon class="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </li>
-                    </ListboxOption>
-                  </ListboxOptions>
-                </transition>
+                    {{ ws.name }}
+                  </p>
+                </div>
+                <button
+                  v-if="!isWorkspaceDeleting(ws.id)"
+                  @click.stop="confirmDeleteWorkspace(ws.id)"
+                  class="btn-icon p-1 rounded transition-all duration-150 opacity-0 group-hover/item:opacity-100 shrink-0"
+                  style="color: var(--color-text-muted);"
+                  title="Delete Workspace"
+                >
+                  <TrashIcon class="w-3.5 h-3.5" />
+                </button>
               </div>
-            </Listbox>
+            </div>
           </div>
         </div>
 
@@ -414,7 +394,6 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
-import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/vue'
 import { useAppStore } from '../../stores/appStore'
 import { useAuthStore } from '../../stores/authStore'
 import { toast } from '../../composables/useToast'
@@ -426,8 +405,6 @@ import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 
 import {
-  CheckCircleIcon,
-  ChevronUpDownIcon,
   FolderIcon,
   FolderOpenIcon,
   FolderPlusIcon,
@@ -531,11 +508,14 @@ const filteredConversations = computed(() => {
 })
 
 // Selected workspace
-const selectedWorkspaceId = computed(() => String(appStore.activeWorkspaceId || '').trim())
 const activeWorkspaceName = computed(() => {
-  const activeId = selectedWorkspaceId.value
+  const activeId = String(appStore.activeWorkspaceId || '').trim()
   const activeWorkspace = appStore.workspaces.find((ws) => ws.id === activeId)
   return activeWorkspace?.name || 'Choose a workspace'
+})
+const workspaceHeaderLabel = computed(() => {
+  if (appStore.hasWorkspace) return activeWorkspaceName.value
+  return 'Workspaces'
 })
 
 // Fetch datasets from API
