@@ -167,21 +167,23 @@
               @click="datasetsExpanded = !datasetsExpanded"
               class="flex items-center gap-2 rounded-lg transition-colors hover:bg-[var(--color-surface)] px-1 py-0.5"
             >
+              <div class="flex items-center gap-2">
+                <CircleStackIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
+                <span class="text-[10px] uppercase tracking-[0.1em] font-semibold" style="color: var(--color-text-muted);">Step 2</span>
+                <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Datasets</span>
+                <span
+                  v-if="localDatasets.length > 0"
+                  class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                  style="background-color: var(--color-surface); color: var(--color-text-muted);"
+                >
+                  {{ localDatasets.length }}
+                </span>
+              </div>
               <ChevronRightIcon
                 class="w-3.5 h-3.5 transition-transform duration-200"
                 :class="datasetsExpanded ? 'rotate-90' : ''"
                 style="color: var(--color-text-muted);"
               />
-              <CircleStackIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
-              <span class="text-[10px] uppercase tracking-[0.1em] font-semibold" style="color: var(--color-text-muted);">Step 2</span>
-              <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Datasets</span>
-              <span
-                v-if="localDatasets.length > 0"
-                class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-                style="background-color: var(--color-surface); color: var(--color-text-muted);"
-              >
-                {{ localDatasets.length }}
-              </span>
             </button>
             <button
               v-if="appStore.hasWorkspace"
