@@ -22,8 +22,9 @@ test('sidebar nests collapsible datasets and conversations under the selected wo
   assert.equal(unifiedSource.includes('const datasetsExpanded = ref(true)'), true)
   assert.equal(unifiedSource.includes('const conversationsExpanded = ref(true)'), true)
   
-  // Folder open/closed states drive expansion visuals
+  // Only outer workspace uses folder open/closed icon state
   assert.equal(unifiedSource.includes('FolderOpenIcon v-if="workspacesExpanded"'), true)
-  assert.equal(unifiedSource.includes('FolderOpenIcon v-if="datasetsExpanded"'), true)
-  assert.equal(unifiedSource.includes('FolderOpenIcon v-if="conversationsExpanded"'), true)
+  assert.equal(unifiedSource.includes('FolderOpenIcon v-if="datasetsExpanded"'), false)
+  assert.equal(unifiedSource.includes('FolderOpenIcon v-if="conversationsExpanded"'), false)
+  assert.equal(unifiedSource.includes("v-if=\"appStore.hasWorkspace && workspacesExpanded\""), true)
 })

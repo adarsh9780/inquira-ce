@@ -13,13 +13,16 @@ test('sidebar communicates workspace-first hierarchy and parallel dataset/conver
   assert.equal(source.includes('Multiple datasets per workspace.'), false)
   assert.equal(source.includes('Multiple conversations per workspace.'), false)
   assert.equal(source.includes('FolderOpenIcon v-if="workspacesExpanded"'), true)
-  assert.equal(source.includes('FolderOpenIcon v-if="datasetsExpanded"'), true)
-  assert.equal(source.includes('FolderOpenIcon v-if="conversationsExpanded"'), true)
+  assert.equal(source.includes('FolderOpenIcon v-if="datasetsExpanded"'), false)
+  assert.equal(source.includes('FolderOpenIcon v-if="conversationsExpanded"'), false)
   assert.equal(source.includes('title="Create Workspace"'), true)
   assert.equal(source.includes('ListboxButton'), false)
   assert.equal(source.includes('ListboxOptions'), false)
   assert.equal(source.includes('{{ appStore.workspaces.length }}'), false)
   assert.equal(source.includes('{{ appStore.conversations.length }}'), false)
+  assert.equal(source.includes('group-hover:opacity-100'), true)
+  assert.equal(source.includes('Datasets</p>'), true)
+  assert.equal(source.includes('Conversations</p>'), true)
 })
 
 test('global typography uses shared font tokens for consistent UI text styling', () => {

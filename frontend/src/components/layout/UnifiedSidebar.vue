@@ -54,21 +54,18 @@
         </div>
 
         <!-- Datasets Section -->
-        <div v-if="appStore.hasWorkspace" class="space-y-0.5 ml-3 pl-3 border-l" style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent);">
+        <div
+          v-if="appStore.hasWorkspace && workspacesExpanded"
+          class="space-y-0.5 ml-3 pl-3 border-l"
+          style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent);"
+        >
           <!-- Section Header -->
-          <div class="flex items-center justify-between px-2 py-1">
-            <button
-              @click="datasetsExpanded = !datasetsExpanded"
-              class="flex items-center gap-2 rounded-lg transition-colors hover:bg-[var(--color-surface)] px-1 py-0.5 min-w-0"
-            >
-              <FolderOpenIcon v-if="datasetsExpanded" class="w-4 h-4 shrink-0" style="color: var(--color-text-main);" />
-              <FolderIcon v-else class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
-              <span class="text-[14px] font-normal truncate" style="color: var(--color-text-main);">Datasets</span>
-            </button>
+          <div class="group flex items-center justify-between px-2 py-1">
+            <p class="text-[12px] font-normal" style="color: var(--color-text-muted);">Datasets</p>
             <button
               v-if="appStore.hasWorkspace"
               @click.stop="openSettings('data')"
-              class="btn-icon shrink-0"
+              class="btn-icon shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
               title="Add Dataset"
             >
               <PlusIcon class="w-3.5 h-3.5" />
@@ -119,18 +116,23 @@
         </div>
 
         <!-- Conversations Section -->
-        <div v-if="appStore.hasWorkspace" class="space-y-0.5 ml-3 pl-3 border-l" style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent);">
+        <div
+          v-if="appStore.hasWorkspace && workspacesExpanded"
+          class="space-y-0.5 ml-3 pl-3 border-l"
+          style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent);"
+        >
           <!-- Section Header -->
-          <button
-            @click="conversationsExpanded = !conversationsExpanded"
-            class="w-full flex items-center justify-between px-2 py-1 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
-          >
-            <div class="flex items-center gap-2 min-w-0">
-              <FolderOpenIcon v-if="conversationsExpanded" class="w-4 h-4 shrink-0" style="color: var(--color-text-main);" />
-              <FolderIcon v-else class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
-              <span class="text-[14px] font-normal truncate" style="color: var(--color-text-main);">Conversations</span>
-            </div>
-          </button>
+          <div class="group flex items-center justify-between px-2 py-1">
+            <p class="text-[12px] font-normal" style="color: var(--color-text-muted);">Conversations</p>
+            <button
+              v-if="appStore.hasWorkspace"
+              @click.stop="createConversation"
+              class="btn-icon shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="New Conversation"
+            >
+              <PlusIcon class="w-3.5 h-3.5" />
+            </button>
+          </div>
 
           <!-- Section Content -->
           <div v-show="conversationsExpanded" class="pl-2">

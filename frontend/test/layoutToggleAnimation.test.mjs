@@ -33,8 +33,8 @@ test('sidebar and explorer sections use animated collapse transitions', () => {
   assert.equal(sidebarSource.includes('v-show="conversationsExpanded"'), true)
   // Folder open/closed icon states are used for collapse indicator
   assert.equal(sidebarSource.includes('FolderOpenIcon v-if="workspacesExpanded"'), true)
-  assert.equal(sidebarSource.includes('FolderOpenIcon v-if="datasetsExpanded"'), true)
-  assert.equal(sidebarSource.includes('FolderOpenIcon v-if="conversationsExpanded"'), true)
+  assert.equal(sidebarSource.includes('FolderOpenIcon v-if="datasetsExpanded"'), false)
+  assert.equal(sidebarSource.includes('FolderOpenIcon v-if="conversationsExpanded"'), false)
   // No old transition patterns
   assert.equal(sidebarSource.includes('<Transition name="sidebar-section">'), false)
   assert.equal(sidebarSource.includes('<Transition name="sidebar-brand">'), false)
@@ -48,6 +48,7 @@ test('sidebar icons keep fixed size to avoid toggle jitter', () => {
   )
   // New design uses shrink-0 on icons
   assert.equal(sidebarSource.includes('FolderOpenIcon v-if="workspacesExpanded"'), true)
+  assert.equal(sidebarSource.includes('text-[12px] font-normal'), true)
   assert.equal(sidebarSource.includes('FolderIcon v-else class="w-4 h-4 shrink-0"'), true)
   // No scale animations on workspace/schema tabs
   assert.equal(sidebarSource.includes("appStore.activeTab === 'workspace' ? 'scale-110' : ''"), false)
