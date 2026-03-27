@@ -7,11 +7,10 @@
     <style>
       :root {
         color-scheme: light;
-        --bg: #f5f6f8;
-        --surface: #ffffff;
-        --text: #101828;
-        --muted: #667085;
-        --border: #e4e7ec;
+        --color-base: #f8fafc;
+        --color-text-main: #0f172a;
+        --color-text-muted: #64748b;
+        --color-border: #e2e8f0;
       }
 
       * {
@@ -24,99 +23,122 @@
         height: 100%;
         margin: 0;
         font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-        background: radial-gradient(160% 140% at 80% 20%, #eef1f5 0%, var(--bg) 60%);
-        color: var(--text);
+        background: var(--color-base);
+        color: var(--color-text-main);
       }
 
       .shell {
         width: 100%;
         height: 100%;
-        display: grid;
-        place-items: center;
-        padding: 28px;
-      }
-
-      .panel {
-        width: 100%;
-        max-width: 420px;
-        border: 1px solid var(--border);
-        border-radius: 20px;
-        background: var(--surface);
-        box-shadow: 0 18px 40px rgba(16, 24, 40, 0.08);
-        padding: 28px 28px 24px;
-      }
-
-      .brand {
         display: flex;
+        flex-direction: column;
         align-items: center;
-        gap: 12px;
+        justify-content: center;
+        text-align: center;
+        padding: 24px;
       }
 
       .logo {
-        width: 36px;
-        height: 36px;
-        border-radius: 10px;
-        background: linear-gradient(135deg, #101828, #344054);
-        display: grid;
-        place-items: center;
-        color: #fff;
-        font-weight: 600;
-        letter-spacing: 0.04em;
+        width: 64px;
+        height: 64px;
+        margin-bottom: 30px;
       }
 
-      h1 {
+      .title {
         margin: 0;
-        font-size: 18px;
+        font-size: 30px;
         font-weight: 600;
         letter-spacing: -0.01em;
       }
 
-      p {
-        margin: 10px 0 0;
-        font-size: 13px;
+      .subtitle {
+        margin: 12px 0 0;
+        max-width: 560px;
+        font-size: 14px;
         line-height: 1.45;
-        color: var(--muted);
+        color: var(--color-text-muted);
       }
 
-      .bar {
-        margin-top: 20px;
-        height: 6px;
-        border-radius: 999px;
+      .progress {
+        margin-top: 40px;
+        width: min(100%, 448px);
+      }
+
+      .progress-track {
+        height: 1px;
+        width: 100%;
         overflow: hidden;
-        background: #eef2f6;
+        background: var(--color-border);
       }
 
-      .bar > span {
+      .progress-fill {
         display: block;
         height: 100%;
-        width: 28%;
-        border-radius: inherit;
-        background: linear-gradient(90deg, #101828 0%, #475467 100%);
-        animation: slide 1.15s ease-in-out infinite;
+        width: 38%;
+        background: var(--color-text-main);
+        animation: sweep 1.35s ease-in-out infinite;
       }
 
-      @keyframes slide {
+      .status {
+        margin-top: 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--color-text-muted);
+        animation: pulse 1s ease-in-out infinite;
+      }
+
+      .status-label {
+        font-size: 11px;
+        color: var(--color-text-muted);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      @keyframes sweep {
         0% {
-          transform: translateX(-80%);
+          transform: translateX(-110%);
         }
         100% {
-          transform: translateX(380%);
+          transform: translateX(280%);
+        }
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 0.4;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.08);
         }
       }
     </style>
   </head>
   <body>
     <main class="shell">
-      <section class="panel">
-        <div class="brand">
-          <div class="logo">IQ</div>
-          <h1>Starting Inquira</h1>
+      <img class="logo" src="/favicon.svg" alt="Inquira logo" />
+      <h1 class="title">Starting Inquira.</h1>
+      <p class="subtitle">
+        Launching desktop services and verifying backend APIs are healthy before opening the app shell.
+      </p>
+      <section class="progress" aria-hidden="true">
+        <div class="progress-track">
+          <span class="progress-fill"></span>
         </div>
-        <p>
-          Desktop services are booting first so the primary app shell opens only
-          after backend APIs are healthy.
-        </p>
-        <div class="bar" aria-hidden="true"><span></span></div>
+        <div class="status">
+          <span class="dot"></span>
+          <span class="status-label">Starting</span>
+        </div>
       </section>
     </main>
   </body>

@@ -15,7 +15,9 @@ test('desktop startup hides the main window until native startup finishes', () =
 
   assert.equal(tauriConfig.includes('"visible": false'), true)
   assert.equal(source.includes('fn show_main_window(app: &tauri::AppHandle)'), true)
-  assert.equal(source.includes('show_main_window(&app.handle());'), true)
+  assert.equal(source.includes('show_main_window(&app.handle());'), false)
+  assert.equal(source.includes('fn handoff_from_splash_to_main(app: &tauri::AppHandle)'), true)
+  assert.equal(source.includes('handoff_from_splash_to_main(&app_handle);'), true)
 })
 
 test('desktop startup exposes one native startup-state handoff to the frontend', () => {
