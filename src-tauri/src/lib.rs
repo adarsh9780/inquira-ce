@@ -1437,9 +1437,10 @@ fn start_agent_runtime(
                 &agent_port.to_string(),
                 "--no-browser",
                 "--no-reload",
+                "--allow-blocking",
             ]);
             command_summary = format!(
-                "{} dev --config langgraph.json --host {} --port {} --no-browser --no-reload",
+                "{} dev --config langgraph.json --host {} --port {} --no-browser --no-reload --allow-blocking",
                 langgraph_bin.display(),
                 agent_host,
                 agent_port
@@ -1459,9 +1460,10 @@ fn start_agent_runtime(
                 &agent_port.to_string(),
                 "--no-browser",
                 "--no-reload",
+                "--allow-blocking",
             ]);
             command_summary = format!(
-                "{} -m langgraph_cli.cli dev --config langgraph.json --host {} --port {} --no-browser --no-reload",
+                "{} -m langgraph_cli.cli dev --config langgraph.json --host {} --port {} --no-browser --no-reload --allow-blocking",
                 python_bin.display(),
                 agent_host,
                 agent_port
@@ -1493,7 +1495,7 @@ fn start_agent_runtime(
         .env("INQUIRA_AGENT_PORT", agent_port.to_string())
         // LangGraph can reject synchronous helpers (for example os.getcwd)
         // when running behind ASGI unless isolated loops are enabled.
-        .env("BG_JOB_ISOLATED_LOOPS", "true")
+        .env("BG_JOB_ISOLATED_LOOPS", "True")
         .env("PYTHONPATH", agent_dir.display().to_string());
     apply_proxy_env(&mut cmd, config);
 
