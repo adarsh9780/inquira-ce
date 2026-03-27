@@ -47,7 +47,8 @@ test('sidebar icons keep fixed size to avoid toggle jitter', () => {
     'utf-8',
   )
   // New design uses shrink-0 on icons
-  assert.equal(sidebarSource.includes('BuildingOffice2Icon class="w-3.5 h-3.5"'), true)
+  assert.equal(sidebarSource.includes('FolderOpenIcon v-if="workspacesExpanded"'), true)
+  assert.equal(sidebarSource.includes('FolderIcon v-else class="w-3.5 h-3.5 shrink-0"'), true)
   // No scale animations on workspace/schema tabs
   assert.equal(sidebarSource.includes("appStore.activeTab === 'workspace' ? 'scale-110' : ''"), false)
   assert.equal(sidebarSource.includes("appStore.activeTab === 'schema-editor' ? 'scale-110' : ''"), false)

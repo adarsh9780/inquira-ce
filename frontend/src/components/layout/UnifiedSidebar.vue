@@ -30,24 +30,32 @@
             @click="workspacesExpanded = !workspacesExpanded"
             class="w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
           >
-            <div class="flex items-center gap-2">
-              <BuildingOffice2Icon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
-              <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Workspace</span>
+            <div class="flex items-center gap-2 min-w-0">
+              <ChevronRightIcon
+                class="w-3.5 h-3.5 transition-transform duration-200 shrink-0"
+                :class="workspacesExpanded ? 'rotate-90' : ''"
+                style="color: var(--color-text-muted);"
+              />
+              <FolderOpenIcon v-if="workspacesExpanded" class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-main);" />
+              <FolderIcon v-else class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-muted);" />
+              <span class="text-[11px] uppercase tracking-[0.08em] font-semibold truncate" style="color: var(--color-text-muted);">Workspaces</span>
             </div>
-            <ChevronRightIcon
-              class="w-3.5 h-3.5 transition-transform duration-200"
-              :class="workspacesExpanded ? 'rotate-90' : ''"
-              style="color: var(--color-text-muted);"
-            />
+            <span
+              v-if="appStore.workspaces.length > 0"
+              class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+              style="background-color: var(--color-surface); color: var(--color-text-muted);"
+            >
+              {{ appStore.workspaces.length }}
+            </span>
           </button>
 
           <!-- Section Content -->
           <div v-show="workspacesExpanded" class="pl-2">
             <div
-              class="mb-2 rounded-lg px-2.5 py-2 text-[11px] leading-relaxed"
-              style="background-color: color-mix(in srgb, var(--color-surface) 80%, transparent); color: var(--color-text-muted);"
+              class="mb-2 rounded-lg px-2.5 py-2 text-[11px] leading-relaxed border"
+              style="background-color: color-mix(in srgb, var(--color-surface) 80%, transparent); color: var(--color-text-muted); border-color: color-mix(in srgb, var(--color-border) 72%, transparent);"
             >
-              Create or choose one workspace first. Each workspace contains its own datasets and conversations.
+              Create/select a workspace first. This workspace is a real local folder that stores conversations and datasets (documents coming soon).
             </div>
 
             <div v-if="appStore.workspaceDeletionJobs.length > 0" class="mb-2 px-2.5 py-2 rounded-lg text-[11px] flex items-center gap-2" style="background-color: color-mix(in srgb, var(--color-warning) 15%, transparent); color: var(--color-warning);">
@@ -73,9 +81,10 @@
                   style="background-color: color-mix(in srgb, var(--color-surface) 62%, transparent); border-color: color-mix(in srgb, var(--color-border) 72%, transparent);"
                 >
                   <div class="flex items-center gap-3 min-w-0">
+                    <FolderOpenIcon class="w-4 h-4 shrink-0" style="color: var(--color-text-main);" />
                     <div class="min-w-0 flex-1">
                       <p class="text-[10px] uppercase tracking-[0.09em] font-semibold" style="color: var(--color-text-muted);">
-                        Current Workspace
+                        Active Folder
                       </p>
                       <p class="text-sm font-medium truncate" style="color: var(--color-text-main);">
                         {{ activeWorkspaceName }}
@@ -116,7 +125,7 @@
                       >
                         <div class="flex items-center gap-2 min-w-0 flex-1">
                           <CheckCircleIcon v-if="selected" class="w-4 h-4 shrink-0 text-emerald-600" />
-                          <BuildingOffice2Icon v-else class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
+                          <FolderIcon v-else class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
                           <span class="truncate text-sm" :class="selected ? 'font-semibold' : 'font-medium'">{{ ws.name }}</span>
                         </div>
                         <div class="flex items-center gap-1">
@@ -136,38 +145,27 @@
                 </transition>
               </div>
             </Listbox>
-
-            <!-- Add Workspace Button -->
-            <button
-              @click="openCreateDialog"
-              class="w-full flex items-center gap-2 px-3 py-2 mt-1 rounded-lg text-xs transition-colors hover:bg-[var(--color-surface)] border border-transparent hover:border-[var(--color-border)]"
-              style="color: var(--color-text-muted);"
-            >
-              <PlusIcon class="w-3.5 h-3.5" />
-              <span>New Workspace</span>
-            </button>
           </div>
         </div>
 
         <!-- Datasets Section -->
-        <div v-if="appStore.hasWorkspace" class="space-y-0.5">
+        <div v-if="appStore.hasWorkspace" class="space-y-0.5 ml-3 pl-3 border-l" style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent);">
           <div class="h-px my-2" style="background-color: color-mix(in srgb, var(--color-border) 50%, transparent);" />
 
           <!-- Section Header -->
           <div class="flex items-center justify-between px-2 py-1.5">
             <button
               @click="datasetsExpanded = !datasetsExpanded"
-              class="flex items-center gap-2 rounded-lg transition-colors hover:bg-[var(--color-surface)] px-1 py-0.5"
+              class="flex items-center gap-2 rounded-lg transition-colors hover:bg-[var(--color-surface)] px-1 py-0.5 min-w-0"
             >
-              <div class="flex items-center gap-2">
-                <CircleStackIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
-                <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Datasets</span>
-              </div>
               <ChevronRightIcon
                 class="w-3.5 h-3.5 transition-transform duration-200"
                 :class="datasetsExpanded ? 'rotate-90' : ''"
                 style="color: var(--color-text-muted);"
               />
+              <FolderOpenIcon v-if="datasetsExpanded" class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-main);" />
+              <FolderIcon v-else class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-muted);" />
+              <span class="text-[11px] tracking-[0.02em] font-semibold truncate" style="color: var(--color-text-main);">datasets</span>
             </button>
             <button
               v-if="appStore.hasWorkspace"
@@ -181,6 +179,9 @@
 
           <!-- Section Content -->
           <div v-show="datasetsExpanded" class="pl-2">
+            <p class="px-2 pb-1 text-[10px] uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">
+              Multiple datasets per workspace.
+            </p>
             <div v-if="isLoadingDatasets" class="px-2 py-2 text-xs text-center flex items-center justify-center gap-2" style="color: var(--color-text-muted);">
               <div class="animate-spin w-3 h-3 border-2 rounded-full" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);"></div>
               <span>Loading datasets...</span>
@@ -223,7 +224,7 @@
         </div>
 
         <!-- Conversations Section -->
-        <div v-if="appStore.hasWorkspace" class="space-y-0.5">
+        <div v-if="appStore.hasWorkspace" class="space-y-0.5 ml-3 pl-3 border-l" style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent);">
           <div class="h-px my-2" style="background-color: color-mix(in srgb, var(--color-border) 50%, transparent);" />
 
           <!-- Section Header -->
@@ -231,19 +232,30 @@
             @click="conversationsExpanded = !conversationsExpanded"
             class="w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
           >
-            <div class="flex items-center gap-2">
-              <ChatBubbleLeftEllipsisIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
-              <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Conversations</span>
+            <div class="flex items-center gap-2 min-w-0">
+              <ChevronRightIcon
+                class="w-3.5 h-3.5 transition-transform duration-200 shrink-0"
+                :class="conversationsExpanded ? 'rotate-90' : ''"
+                style="color: var(--color-text-muted);"
+              />
+              <FolderOpenIcon v-if="conversationsExpanded" class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-main);" />
+              <FolderIcon v-else class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-muted);" />
+              <span class="text-[11px] tracking-[0.02em] font-semibold truncate" style="color: var(--color-text-main);">conversations</span>
             </div>
-            <ChevronRightIcon
-              class="w-3.5 h-3.5 transition-transform duration-200"
-              :class="conversationsExpanded ? 'rotate-90' : ''"
-              style="color: var(--color-text-muted);"
-            />
+            <span
+              v-if="appStore.conversations.length > 0"
+              class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+              style="background-color: var(--color-surface); color: var(--color-text-muted);"
+            >
+              {{ appStore.conversations.length }}
+            </span>
           </button>
 
           <!-- Section Content -->
           <div v-show="conversationsExpanded" class="pl-2">
+            <p class="px-2 pb-1 text-[10px] uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">
+              Multiple conversations per workspace.
+            </p>
             <div v-if="filteredConversations.length === 0 && appStore.conversations.length > 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
               No matches found
             </div>
@@ -336,6 +348,18 @@
 
     <!-- Footer Icons -->
     <div class="border-t p-3 shrink-0 flex items-center justify-center gap-4" style="border-color: var(--color-border); background-color: var(--color-base);">
+      <button
+        @click="openCreateDialog"
+        class="relative group flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
+        style="color: var(--color-text-main);"
+        title="Create Workspace"
+      >
+        <FolderPlusIcon class="w-4 h-4" />
+        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style="background-color: var(--color-surface); color: var(--color-text-main);">
+          Create Workspace
+        </span>
+      </button>
+
       <button
         @click="openSettings('api')"
         class="relative group flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
@@ -455,10 +479,12 @@ import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 
 import {
-  BuildingOffice2Icon,
   CheckCircleIcon,
   ChevronUpDownIcon,
   ChevronRightIcon,
+  FolderIcon,
+  FolderOpenIcon,
+  FolderPlusIcon,
   PlusIcon,
   PencilIcon,
   TrashIcon,
@@ -467,7 +493,6 @@ import {
   XMarkIcon,
   MagnifyingGlassIcon,
   CircleStackIcon,
-  ChatBubbleLeftEllipsisIcon,
   ChatBubbleLeftRightIcon,
 } from '@heroicons/vue/24/outline'
 

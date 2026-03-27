@@ -81,7 +81,6 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
 
   // Sidebar no longer has Workspace/Schema toggle
   assert.equal(sidebarSource.includes('handleTabClick'), false)
-  assert.equal(sidebarSource.includes('FolderOpenIcon'), false) // In workspace toggle context
   assert.equal(sidebarSource.includes('DocumentTextIcon'), false) // In schema editor toggle context
 
   // StatusBar no longer has Settings/Confirmation modal directly

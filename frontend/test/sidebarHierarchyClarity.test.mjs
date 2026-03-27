@@ -9,13 +9,14 @@ test('sidebar communicates workspace-first hierarchy and parallel dataset/conver
     'utf-8',
   )
 
-  assert.equal(source.includes('Create or choose one workspace first.'), true)
-  assert.equal(source.includes('Each workspace contains its own datasets and conversations.'), true)
-  assert.equal(source.includes('Multiple datasets can exist in one workspace.'), true)
-  assert.equal(source.includes('Conversations are separate from datasets in this workspace.'), true)
-  assert.equal(source.includes('Step 1'), true)
-  assert.equal(source.includes('Step 2'), true)
-  assert.equal(source.includes('Step 3'), true)
+  assert.equal(source.includes('Create/select a workspace first.'), true)
+  assert.equal(source.includes('real local folder that stores conversations and datasets'), true)
+  assert.equal(source.includes('Multiple datasets per workspace.'), true)
+  assert.equal(source.includes('Multiple conversations per workspace.'), true)
+  assert.equal(source.includes('FolderOpenIcon v-if="workspacesExpanded"'), true)
+  assert.equal(source.includes('FolderOpenIcon v-if="datasetsExpanded"'), true)
+  assert.equal(source.includes('FolderOpenIcon v-if="conversationsExpanded"'), true)
+  assert.equal(source.includes('title="Create Workspace"'), true)
 })
 
 test('global typography uses shared font tokens for consistent UI text styling', () => {
