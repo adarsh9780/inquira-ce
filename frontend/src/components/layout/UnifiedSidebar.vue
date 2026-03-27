@@ -22,18 +22,18 @@
 
     <!-- Scrollable Content -->
     <div class="flex-1 overflow-y-auto overflow-x-hidden flex flex-col custom-scrollbar">
-      <div class="px-3 py-3 space-y-1">
+      <div class="px-3 py-2 space-y-0.5">
         <!-- Workspaces Section -->
         <div class="space-y-0.5">
           <!-- Section Header -->
           <button
             @click="workspacesExpanded = !workspacesExpanded"
-            class="w-full flex items-center justify-between px-2 py-2 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
+            class="w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
           >
             <div class="flex items-center gap-2 min-w-0">
               <FolderOpenIcon v-if="workspacesExpanded" class="w-4 h-4 shrink-0" style="color: var(--color-text-main);" />
               <FolderIcon v-else class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
-              <span class="text-[15px] font-medium truncate" style="color: var(--color-text-main);">{{ workspaceHeaderLabel }}</span>
+              <span class="text-[14px] font-normal truncate" style="color: var(--color-text-main);">{{ workspaceHeaderLabel }}</span>
             </div>
           </button>
 
@@ -55,17 +55,15 @@
 
         <!-- Datasets Section -->
         <div v-if="appStore.hasWorkspace" class="space-y-0.5 ml-3 pl-3 border-l" style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent);">
-          <div class="h-px my-2" style="background-color: color-mix(in srgb, var(--color-border) 50%, transparent);" />
-
           <!-- Section Header -->
-          <div class="flex items-center justify-between px-2 py-1.5">
+          <div class="flex items-center justify-between px-2 py-1">
             <button
               @click="datasetsExpanded = !datasetsExpanded"
               class="flex items-center gap-2 rounded-lg transition-colors hover:bg-[var(--color-surface)] px-1 py-0.5 min-w-0"
             >
               <FolderOpenIcon v-if="datasetsExpanded" class="w-4 h-4 shrink-0" style="color: var(--color-text-main);" />
               <FolderIcon v-else class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
-              <span class="text-[15px] font-medium truncate" style="color: var(--color-text-main);">datasets</span>
+              <span class="text-[14px] font-normal truncate" style="color: var(--color-text-main);">Datasets</span>
             </button>
             <button
               v-if="appStore.hasWorkspace"
@@ -92,18 +90,18 @@
               No datasets yet
             </div>
 
-            <div v-else class="space-y-0.5 pb-1">
+            <div v-else class="space-y-0.5 pb-0.5">
               <div
                 v-for="ds in filteredDatasets"
                 :key="ds.table_name"
-                class="group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface)]"
+                class="group flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface)]"
                 :class="{ 'bg-[var(--color-surface)]': appStore.activeDatasetId === ds.table_name }"
                 @click="selectDataset(ds)"
               >
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                   <CircleStackIcon class="w-3.5 h-3.5 shrink-0" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-600' : ''" style="color: var(--color-text-muted);" />
                   <div class="min-w-0 flex-1">
-                    <p class="truncate text-[14px] font-medium" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-700' : ''" style="color: var(--color-text-main);">{{ ds.table_name }}</p>
+                    <p class="truncate text-[13px] font-normal" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-700' : ''" style="color: var(--color-text-main);">{{ ds.table_name }}</p>
                     <p v-if="ds.file_path" class="truncate text-[10px]" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-700/70' : ''" style="color: var(--color-text-muted);">{{ ds.file_path }}</p>
                   </div>
                 </div>
@@ -122,17 +120,15 @@
 
         <!-- Conversations Section -->
         <div v-if="appStore.hasWorkspace" class="space-y-0.5 ml-3 pl-3 border-l" style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent);">
-          <div class="h-px my-2" style="background-color: color-mix(in srgb, var(--color-border) 50%, transparent);" />
-
           <!-- Section Header -->
           <button
             @click="conversationsExpanded = !conversationsExpanded"
-            class="w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
+            class="w-full flex items-center justify-between px-2 py-1 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
           >
             <div class="flex items-center gap-2 min-w-0">
               <FolderOpenIcon v-if="conversationsExpanded" class="w-4 h-4 shrink-0" style="color: var(--color-text-main);" />
               <FolderIcon v-else class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
-              <span class="text-[15px] font-medium truncate" style="color: var(--color-text-main);">conversations</span>
+              <span class="text-[14px] font-normal truncate" style="color: var(--color-text-main);">Conversations</span>
             </div>
           </button>
 
@@ -146,11 +142,11 @@
               No conversations yet
             </div>
 
-            <div v-else class="space-y-0.5 pb-1">
+            <div v-else class="space-y-0.5 pb-0.5">
               <div
                 v-for="conv in filteredConversations"
                 :key="conv.id"
-                class="group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface)]"
+                class="group flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface)]"
                 :class="{ 'bg-[var(--color-surface)]': appStore.activeConversationId === conv.id }"
                 @click="selectConversation(conv.id)"
               >
@@ -170,8 +166,8 @@
                     </div>
                     <template v-else>
                       <p
-                        class="truncate text-[14px]"
-                        :class="conv.id === appStore.activeConversationId ? 'font-semibold' : 'font-medium'"
+                        class="truncate text-[13px] font-normal"
+                        :class="conv.id === appStore.activeConversationId ? 'text-emerald-700' : ''"
                         :title="conv.title || 'Untitled'"
                       >
                         {{ conv.title || 'Untitled' }}
