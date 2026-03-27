@@ -63,6 +63,7 @@ export const useAppStore = defineStore('app', () => {
   const conversations = ref([])
   const activeConversationId = ref('')
   const turnsNextCursor = ref(null)
+  const workspaceKernelStatusById = ref({})
 
   // Wasm Execution State
   const historicalCodeBlocks = ref([]) // Tracks successfully executed code snippets
@@ -127,6 +128,7 @@ export const useAppStore = defineStore('app', () => {
     if (!hasProviderAccess) return false
     return hasWorkspace.value
   })
+  const activeWorkspaceKernelStatus = computed(() => getWorkspaceKernelStatus())
 
   let preferenceSyncTimer = null
   let localStateSyncTimer = null
@@ -458,6 +460,7 @@ export const useAppStore = defineStore('app', () => {
     conversations.value = []
     activeConversationId.value = ''
     turnsNextCursor.value = null
+    workspaceKernelStatusById.value = {}
 
     generatedCode.value = ''
     resultData.value = null
@@ -500,6 +503,7 @@ export const useAppStore = defineStore('app', () => {
     kernelEnsureWorkspaceId = ''
     kernelEnsurePromise = null
     ensuredKernelWorkspaceIds.clear()
+    workspaceKernelStatusById.value = {}
     clearInMemoryUserState()
   }
 
@@ -960,6 +964,25 @@ export const useAppStore = defineStore('app', () => {
 
   function setWorkspaces(items) {
     workspaces.value = Array.isArray(items) ? items : []
+    const validWorkspaceIds = new Set(
+      workspaces.value
+        .map((workspace) => String(workspace?.id || '').trim())
+        .filter(Boolean),
+    )
+    if (validWorkspaceIds.size === 0) {
+      workspaceKernelStatusById.value = {}
+      ensuredKernelWorkspaceIds.clear()
+      return
+    }
+    const nextStatuses = {}
+    Object.entries(workspaceKernelStatusById.value || {}).forEach(([workspaceId, status]) => {
+      if (!validWorkspaceIds.has(workspaceId)) {
+        ensuredKernelWorkspaceIds.delete(workspaceId)
+        return
+      }
+      nextStatuses[workspaceId] = normalizeKernelStatus(status)
+    })
+    workspaceKernelStatusById.value = nextStatuses
   }
 
   function setWorkspaceDeletionJobs(items) {
@@ -1011,6 +1034,13 @@ export const useAppStore = defineStore('app', () => {
       setTerminalEnabled(false)
     }
 
+    const cachedKernelStatus = getWorkspaceKernelStatus(targetWorkspaceId)
+    if (cachedKernelStatus === 'ready' || cachedKernelStatus === 'busy') {
+      ensuredKernelWorkspaceIds.add(targetWorkspaceId)
+      setRuntimeError('')
+      return true
+    }
+
     if (ensuredKernelWorkspaceIds.has(targetWorkspaceId)) {
       setRuntimeError('')
       return true
@@ -1023,14 +1053,15 @@ export const useAppStore = defineStore('app', () => {
     kernelEnsureWorkspaceId = targetWorkspaceId
     kernelEnsurePromise = (async () => {
       try {
+        setWorkspaceKernelStatus(targetWorkspaceId, 'starting')
         const bootstrapped = await apiService.v1BootstrapWorkspaceRuntime(targetWorkspaceId)
         if (bootstrapped?.reset === true) {
-          ensuredKernelWorkspaceIds.add(targetWorkspaceId)
+          setWorkspaceKernelStatus(targetWorkspaceId, 'starting')
           setRuntimeError('')
         }
         return bootstrapped?.reset === true
       } catch (error) {
-        ensuredKernelWorkspaceIds.delete(targetWorkspaceId)
+        setWorkspaceKernelStatus(targetWorkspaceId, 'error')
         const message = error?.response?.data?.detail || error?.message || 'Workspace runtime bootstrap failed.'
         setRuntimeError(String(message))
         setTerminalEnabled(false)
@@ -1534,6 +1565,67 @@ export const useAppStore = defineStore('app', () => {
     runtimeError.value = String(message || '')
   }
 
+  function normalizeKernelStatus(status) {
+    const normalized = String(status || '').trim().toLowerCase()
+    if (['ready', 'busy', 'starting', 'connecting', 'error', 'missing'].includes(normalized)) {
+      return normalized
+    }
+    return 'missing'
+  }
+
+  function setWorkspaceKernelStatus(workspaceId, status) {
+    const normalizedWorkspaceId = String(workspaceId || '').trim()
+    if (!normalizedWorkspaceId) return
+    const normalizedStatus = normalizeKernelStatus(status)
+
+    const currentStatus = String(workspaceKernelStatusById.value?.[normalizedWorkspaceId] || '').trim()
+    if (currentStatus === normalizedStatus) {
+      if (normalizedStatus === 'error' || normalizedStatus === 'missing') {
+        ensuredKernelWorkspaceIds.delete(normalizedWorkspaceId)
+      } else {
+        ensuredKernelWorkspaceIds.add(normalizedWorkspaceId)
+      }
+      return
+    }
+
+    workspaceKernelStatusById.value = {
+      ...workspaceKernelStatusById.value,
+      [normalizedWorkspaceId]: normalizedStatus
+    }
+
+    if (['ready', 'busy', 'starting', 'connecting'].includes(normalizedStatus)) {
+      ensuredKernelWorkspaceIds.add(normalizedWorkspaceId)
+      if (
+        ['ready', 'busy'].includes(normalizedStatus) &&
+        normalizedWorkspaceId === String(activeWorkspaceId.value || '').trim()
+      ) {
+        setRuntimeError('')
+      }
+      return
+    }
+
+    ensuredKernelWorkspaceIds.delete(normalizedWorkspaceId)
+  }
+
+  function getWorkspaceKernelStatus(workspaceId = activeWorkspaceId.value) {
+    const normalizedWorkspaceId = String(workspaceId || '').trim()
+    if (!normalizedWorkspaceId) return 'missing'
+    return normalizeKernelStatus(workspaceKernelStatusById.value?.[normalizedWorkspaceId] || 'missing')
+  }
+
+  function clearWorkspaceKernelStatus(workspaceId) {
+    const normalizedWorkspaceId = String(workspaceId || '').trim()
+    if (!normalizedWorkspaceId) return
+    if (!Object.prototype.hasOwnProperty.call(workspaceKernelStatusById.value, normalizedWorkspaceId)) {
+      ensuredKernelWorkspaceIds.delete(normalizedWorkspaceId)
+      return
+    }
+    const nextStatusByWorkspace = { ...workspaceKernelStatusById.value }
+    delete nextStatusByWorkspace[normalizedWorkspaceId]
+    workspaceKernelStatusById.value = nextStatusByWorkspace
+    ensuredKernelWorkspaceIds.delete(normalizedWorkspaceId)
+  }
+
   function trimTerminalStream(text, maxChars = MAX_TERMINAL_STREAM_CHARS) {
     const normalized = String(text || '')
     if (normalized.length <= maxChars) return normalized
@@ -1799,6 +1891,8 @@ export const useAppStore = defineStore('app', () => {
     columnCatalog.value = []
     profileData.value = null
     historicalCodeBlocks.value = []
+    workspaceKernelStatusById.value = {}
+    ensuredKernelWorkspaceIds.clear()
     saveLocalConfig()
   }
 
@@ -1953,6 +2047,7 @@ export const useAppStore = defineStore('app', () => {
     conversations,
     activeConversationId,
     turnsNextCursor,
+    workspaceKernelStatusById,
     generatedCode,
     resultData,
     plotlyFigure,
@@ -1997,6 +2092,7 @@ export const useAppStore = defineStore('app', () => {
     hasSchemaFile,
     canAnalyze,
     hasWorkspace,
+    activeWorkspaceKernelStatus,
 
     // Actions
     saveLocalConfig,
@@ -2078,6 +2174,9 @@ export const useAppStore = defineStore('app', () => {
     setTerminalOutput,
     setTerminalEnabled,
     setRuntimeError,
+    setWorkspaceKernelStatus,
+    getWorkspaceKernelStatus,
+    clearWorkspaceKernelStatus,
     appendTerminalEntry,
     updateTerminalEntry,
     clearTerminalEntries,

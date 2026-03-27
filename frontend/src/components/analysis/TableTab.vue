@@ -271,7 +271,6 @@ const artifactListError = ref('')
 const pendingControllers = new Set()
 let gridApi = null
 let listAbortController = null
-let kernelReadyWorkspaceId = ''
 let serializedRequestQueue = Promise.resolve()
 let selectedArtifactLoadToken = 0
 let currentDatasourceToken = 0
@@ -516,7 +515,7 @@ async function waitForKernelReady(workspaceId, signal) {
   if (!normalizedWorkspaceId) {
     throw new Error('No active workspace selected.')
   }
-  if (kernelReadyWorkspaceId === normalizedWorkspaceId) {
+  if (appStore.getWorkspaceKernelStatus(normalizedWorkspaceId) === 'ready') {
     return
   }
 
@@ -530,16 +529,17 @@ async function waitForKernelReady(workspaceId, signal) {
 
     const statusPayload = await apiService.v1GetWorkspaceKernelStatus(normalizedWorkspaceId)
     const status = String(statusPayload?.status || '').trim().toLowerCase()
+    appStore.setWorkspaceKernelStatus(normalizedWorkspaceId, status)
     lastStatus = status || lastStatus
 
     if (status === 'ready') {
-      kernelReadyWorkspaceId = normalizedWorkspaceId
       return
     }
 
     await waitMs(pollIntervalMs, signal)
   }
 
+  appStore.setWorkspaceKernelStatus(normalizedWorkspaceId, lastStatus === 'unknown' ? 'error' : lastStatus)
   throw new Error(`Kernel did not become ready in 120 seconds (last status: ${lastStatus}).`)
 }
 
@@ -555,12 +555,15 @@ async function recoverTableStateAfterKernelReady() {
   if (!workspaceId || !appStore.hasWorkspace || appStore.dataPane !== 'table') return
 
   try {
-    const statusPayload = await apiService.v1GetWorkspaceKernelStatus(workspaceId)
-    const status = String(statusPayload?.status || '').trim().toLowerCase()
+    let status = appStore.getWorkspaceKernelStatus(workspaceId)
+    if (status !== 'ready') {
+      const statusPayload = await apiService.v1GetWorkspaceKernelStatus(workspaceId)
+      status = String(statusPayload?.status || '').trim().toLowerCase() || status
+      appStore.setWorkspaceKernelStatus(workspaceId, status)
+    }
     if (status !== 'ready') return
 
     stopKernelRecoveryPolling()
-    kernelReadyWorkspaceId = workspaceId
     artifactListError.value = ''
     tableError.value = ''
     appStore.clearDataPaneError()
@@ -678,7 +681,6 @@ async function recoverFromMissingArtifact(artifactId) {
 }
 
 watch(() => appStore.activeWorkspaceId, (id) => {
-  kernelReadyWorkspaceId = ''
   stopKernelRecoveryPolling()
   tableSearch.value = ''
   pendingRestorePageByArtifact.clear()
@@ -688,6 +690,15 @@ watch(() => appStore.activeWorkspaceId, (id) => {
   resetTableState()
   loadWorkspaceArtifacts(id)
 }, { immediate: true })
+
+watch(
+  () => appStore.getWorkspaceKernelStatus(appStore.activeWorkspaceId),
+  (status) => {
+    if (status === 'ready' && kernelRecoveryPoller) {
+      void recoverTableStateAfterKernelReady()
+    }
+  },
+)
 
 // ---------------------------------------------------------------------------
 // React to user selecting an artifact in the dropdown

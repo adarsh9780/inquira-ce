@@ -176,7 +176,7 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 
 // --- Kernel Status Management ---
-const kernelStatus = ref('missing')
+const kernelStatus = computed(() => appStore.activeWorkspaceKernelStatus)
 const isKernelActionRunning = ref(false)
 
 const isWebSocketConnected = ref(false)
@@ -358,8 +358,10 @@ function setupWebSocketMonitoring() {
     unsubscribeKernelStatus = null
   }
   unsubscribeKernelStatus = settingsWebSocket.subscribeKernelStatus(({ workspaceId, status }) => {
-    if (workspaceId !== String(appStore.activeWorkspaceId || '').trim()) return
-    kernelStatus.value = status
+    const normalizedWorkspaceId = String(workspaceId || '').trim()
+    if (!normalizedWorkspaceId) return
+    appStore.setWorkspaceKernelStatus(normalizedWorkspaceId, status)
+    if (normalizedWorkspaceId !== String(appStore.activeWorkspaceId || '').trim()) return
     if (['ready', 'busy', 'starting'].includes(status)) {
       appStore.setRuntimeError('')
     }
@@ -395,7 +397,7 @@ function isUnauthorizedError(error) {
 async function handleUnauthorizedPollingError() {
   stopArtifactUsageStream()
   settingsWebSocket.setKernelStatusWorkspace('')
-  kernelStatus.value = 'connecting'
+  appStore.setWorkspaceKernelStatus(appStore.activeWorkspaceId, 'connecting')
   appStore.setRuntimeError('Background auth check failed. Reconnecting your session...')
   if (authStore.isAuthenticated) {
     await authStore.checkAuth({ preserveSession: true })
@@ -478,12 +480,12 @@ function syncWorkspaceRealtimeSubscriptions() {
   if (!authStore.isAuthenticated || !workspaceId || !appStore.hasWorkspace) {
     settingsWebSocket.setKernelStatusWorkspace('')
     stopArtifactUsageStream()
-    kernelStatus.value = 'missing'
+    appStore.setWorkspaceKernelStatus(workspaceId, 'missing')
     resetArtifactUsage()
     return
   }
 
-  kernelStatus.value = 'connecting'
+  appStore.setWorkspaceKernelStatus(workspaceId, 'connecting')
   settingsWebSocket.setKernelStatusWorkspace(workspaceId)
   void startArtifactUsageStream()
 }
@@ -505,7 +507,7 @@ async function interruptKernel() {
 async function restartKernel() {
   if (!appStore.activeWorkspaceId || !appStore.hasWorkspace || isKernelActionRunning.value) return
   isKernelActionRunning.value = true
-  kernelStatus.value = 'connecting'
+  appStore.setWorkspaceKernelStatus(appStore.activeWorkspaceId, 'connecting')
   try {
     const response = await apiService.v1RestartWorkspaceKernel(appStore.activeWorkspaceId)
     if (response?.reset) {
@@ -551,12 +553,13 @@ onUnmounted(() => {
 })
 
 watch([() => appStore.activeWorkspaceId, () => appStore.hasWorkspace, () => authStore.isAuthenticated], ([newId, hasWorkspace, isAuthenticated]) => {
+  const normalizedWorkspaceId = String(newId || '').trim()
   if (isAuthenticated && newId && hasWorkspace) {
     syncWorkspaceRealtimeSubscriptions()
   } else {
     settingsWebSocket.setKernelStatusWorkspace('')
     stopArtifactUsageStream()
-    kernelStatus.value = 'missing'
+    appStore.setWorkspaceKernelStatus(normalizedWorkspaceId, 'missing')
     resetArtifactUsage()
   }
 })
