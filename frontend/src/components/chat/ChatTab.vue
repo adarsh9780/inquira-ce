@@ -61,7 +61,7 @@
           </div>
         </div>
 
-        <div v-else class="px-2.5 sm:px-3.5 pt-2.5 sm:pt-3.5 pb-2 sm:pb-2.5 space-y-3 sm:space-y-4">
+        <div v-else class="px-2 sm:px-2 pt-2 pb-1 space-y-2">
           <ChatHistory />
         </div>
       </div>

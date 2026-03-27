@@ -1,5 +1,5 @@
 <template>
-  <div ref="chatContainer" class="space-y-6" style="min-height: 200px;" role="log" aria-live="polite" aria-relevant="additions" :aria-busy="appStore.isLoading">
+  <div ref="chatContainer" class="space-y-4" style="min-height: 200px;" role="log" aria-live="polite" aria-relevant="additions" :aria-busy="appStore.isLoading">
     <div v-if="appStore.activeConversationId && appStore.turnsNextCursor" class="flex justify-center">
       <button
         type="button"
@@ -25,8 +25,8 @@
       class="group"
     >
       <!-- User Message -->
-      <div class="w-full mb-2">
-        <div class="px-4 py-3 rounded-2xl rounded-tl-sm" style="background-color: #EDE9DE;">
+      <div class="w-full mb-1">
+        <div class="px-3 py-2.5 rounded-2xl rounded-tl-sm" style="background-color: #EDE9DE;">
           <div v-if="message.attachments && message.attachments.length" class="mb-3 grid grid-cols-2 gap-2">
             <img
               v-for="attachment in message.attachments"
@@ -61,7 +61,7 @@
 
       <!-- Assistant Response -->
       <div v-if="hasAssistantContent(message)" class="w-full group">
-        <div class="px-4 py-3 rounded-2xl rounded-tl-sm" style="background-color: transparent">
+        <div class="px-3 py-2.5 rounded-2xl rounded-tl-sm" style="background-color: transparent">
           <div v-if="SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length" class="space-y-3">
             <div v-for="row in ephemeralRows(message)" :key="row.id">
               <button
