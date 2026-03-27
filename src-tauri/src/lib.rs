@@ -14,6 +14,8 @@ use std::os::windows::process::CommandExt;
 
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW_FLAG: u32 = 0x08000000;
+const MAIN_WINDOW_LABEL: &str = "main";
+const SPLASH_WINDOW_LABEL: &str = "splash";
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -576,10 +578,29 @@ fn emit_startup_message(app: &tauri::AppHandle, message: impl Into<String>) {
 }
 
 fn show_main_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
         let _ = window.show();
         let _ = window.set_focus();
     }
+}
+
+fn close_splash_window(app: &tauri::AppHandle) {
+    // We always close the native splash before revealing the main window so users
+    // never see two shells fighting for attention during critical startup moments.
+    // This keeps startup deterministic and avoids visual noise while we transition
+    // from "services booting" to "interactive app ready".
+    if let Some(window) = app.get_webview_window(SPLASH_WINDOW_LABEL) {
+        let _ = window.close();
+    }
+}
+
+fn handoff_from_splash_to_main(app: &tauri::AppHandle) {
+    // The main window hosts the full frontend runtime; by deferring it until the
+    // backend bootstrap path has finished (success or structured failure), we avoid
+    // early frontend requests racing a cold backend and surfacing transient
+    // NETWORK_ERROR states to users.
+    close_splash_window(app);
+    show_main_window(app);
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -1546,7 +1567,6 @@ pub fn run() {
                 "",
                 "Launching desktop services...",
             );
-            show_main_window(&app.handle());
 
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -1759,7 +1779,10 @@ pub fn run() {
                 })();
 
                 match startup_result {
-                    Ok(()) => update_startup_state(&app_handle, true, "", ""),
+                    Ok(()) => {
+                        update_startup_state(&app_handle, true, "", "");
+                        handoff_from_splash_to_main(&app_handle);
+                    }
                     Err(error) => {
                         log::error!("Desktop startup failed: {}", error);
                         let resource_dir = app_handle
@@ -1790,6 +1813,7 @@ pub fn run() {
                             ),
                             "",
                         );
+                        handoff_from_splash_to_main(&app_handle);
                     }
                 }
             });
@@ -1837,6 +1861,7 @@ mod tests {
     use super::{
         bundled_uv_candidates, default_uv_search_paths, detect_default_shell,
         default_backend_host, missing_uv_binary_error, needs_python_bootstrap,
+        MAIN_WINDOW_LABEL, SPLASH_WINDOW_LABEL,
         parse_lsof_pid_lines, resolve_pty_cwd, resolve_resource_path, resolve_runtime_config_path,
         resolve_runtime_state_dir, resolve_shared_console_log_level, resolve_uv_index_url,
         startup_log_paths, stop_child_process, uv_binary_file_name, uv_search_candidates,
@@ -2186,5 +2211,22 @@ mod tests {
         let dir = std::env::temp_dir();
         let resolved = resolve_pty_cwd(Some(dir.to_string_lossy().to_string()));
         assert_eq!(resolved, dir.to_string_lossy().to_string());
+    }
+
+    #[test]
+    fn startup_window_labels_match_tauri_configuration() {
+        assert_eq!(MAIN_WINDOW_LABEL, "main");
+        assert_eq!(SPLASH_WINDOW_LABEL, "splash");
+    }
+
+    #[test]
+    fn splash_asset_describes_backend_first_bootstrap_contract() {
+        let splash = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../frontend/public/splash.html");
+        let content = fs::read_to_string(&splash).expect("read splash html");
+        assert!(
+            content.contains("backend APIs are healthy"),
+            "splash copy should explain why frontend is delayed until backend readiness"
+        );
     }
 }

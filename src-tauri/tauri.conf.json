@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Inquira",
         "width": 1400,
         "height": 900,
@@ -20,6 +21,20 @@
         "visible": false,
         "resizable": true,
         "fullscreen": false
+      },
+      {
+        "label": "splash",
+        "title": "Starting Inquira",
+        "url": "splash.html",
+        "width": 560,
+        "height": 380,
+        "minWidth": 560,
+        "minHeight": 380,
+        "visible": true,
+        "resizable": false,
+        "fullscreen": false,
+        "decorations": false,
+        "alwaysOnTop": true
       }
     ],
     "security": {
