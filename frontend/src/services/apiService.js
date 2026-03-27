@@ -106,6 +106,20 @@ function createAbortError(message = 'Request aborted') {
   return error
 }
 
+function isSseTransportError(error) {
+  if (!error) return false
+  const name = String(error?.name || '').toLowerCase()
+  const message = String(error?.message || '').toLowerCase()
+  if (name === 'aborterror') return false
+  return (
+    message.includes('stream ended without final analysis payload') ||
+    message.includes('network error') ||
+    message.includes('failed to fetch') ||
+    message.includes('incomplete_chunked_encoding') ||
+    name === 'typeerror'
+  )
+}
+
 function withAbortSignal(promise, signal) {
   if (!signal) return promise
   if (signal.aborted) return Promise.reject(createAbortError())
@@ -888,30 +902,45 @@ export const apiService = {
     let buffer = ''
     let finalPayload = null
 
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const { events, remainder } = parseSseBuffer(buffer)
-      buffer = remainder
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const { events, remainder } = parseSseBuffer(buffer)
+        buffer = remainder
 
-      for (const evt of events) {
-        if (onEvent) onEvent(evt)
-        if (evt.event === 'final') {
-          finalPayload = evt.data
-        } else if (evt.event === 'error') {
-          const detail = evt.data?.detail || 'Streaming analysis failed.'
-          const err = new Error(detail)
-          err.status = evt.data?.status_code || 500
-          throw err
+        for (const evt of events) {
+          if (onEvent) onEvent(evt)
+          if (evt.event === 'final') {
+            finalPayload = evt.data
+          } else if (evt.event === 'error') {
+            const detail = evt.data?.detail || 'Streaming analysis failed.'
+            const err = new Error(detail)
+            err.status = evt.data?.status_code || 500
+            throw err
+          }
         }
       }
+      if (!finalPayload) {
+        throw new Error('Stream ended without final analysis payload.')
+      }
+      return finalPayload
+    } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError' || !isSseTransportError(error)) {
+        throw error
+      }
+      if (onEvent) {
+        onEvent({
+          event: 'status',
+          data: {
+            stage: 'stream_recovery',
+            message: 'Streaming connection dropped. Retrying without stream.',
+          },
+        })
+      }
+      return v1Api.chat.analyze(payload)
     }
-
-    if (!finalPayload) {
-      throw new Error('Stream ended without final analysis payload.')
-    }
-    return finalPayload
   },
 
   async v1ListWorkspaceArtifacts(workspaceId, kind = 'dataframe', options = {}) {

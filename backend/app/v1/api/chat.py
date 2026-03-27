@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends
-from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Any
+import asyncio
 import json
 import math
 import traceback
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_appdata_db_session
 from ..schemas.chat import (
@@ -41,6 +43,22 @@ def _to_sse(event: str, payload: dict[str, Any]) -> str:
     normalized_payload = _normalize_sse_payload(payload)
     serialized_payload = json.dumps(normalized_payload, default=str, allow_nan=False)
     return f"event: {event}\ndata: {serialized_payload}\n\n"
+
+
+def _error_event_payload(exc: BaseException) -> dict[str, Any]:
+    if isinstance(exc, HTTPException):
+        status = int(getattr(exc, "status_code", 500) or 500)
+        raw_detail = getattr(exc, "detail", None)
+        if isinstance(raw_detail, str) and raw_detail.strip():
+            detail = raw_detail.strip()
+        elif raw_detail is None:
+            detail = "Streaming analysis failed."
+        else:
+            detail = str(raw_detail)
+        return {"detail": detail, "status_code": status}
+
+    detail = str(exc).strip() or exc.__class__.__name__
+    return {"detail": detail, "status_code": 500}
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)
@@ -113,9 +131,29 @@ async def stream_analyze(
                 api_key=payload.api_key,
             ):
                 yield _to_sse(event["event"], event["data"])
-        except Exception as e:
-            logprint(f"❌ [V1 Chat] Stream error:\n{traceback.format_exc()}", level="error")
-            yield _to_sse("error", {"detail": str(e), "status_code": 500})
+        except BaseException as exc:
+            if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+                raise
+            if isinstance(exc, asyncio.CancelledError):
+                # Client-side aborts can cancel the server coroutine; avoid noisy
+                # tracebacks because there is no live consumer to receive events.
+                logprint("⚠️ [V1 Chat] Stream cancelled before completion.", level="warning")
+                return
+
+            payload = _error_event_payload(exc)
+            logprint(
+                (
+                    "❌ [V1 Chat] Stream error "
+                    f"(type={exc.__class__.__name__}, status={payload.get('status_code')}):\n"
+                    f"{traceback.format_exc()}"
+                ),
+                level="error",
+            )
+            try:
+                yield _to_sse("error", payload)
+            except Exception:
+                # If transport is already broken we still prefer a graceful exit.
+                return
 
     return StreamingResponse(
         event_generator(),
