@@ -25,7 +25,7 @@ help:
 	@echo "  make git-add"
 	@echo "  make git-commit"
 	@echo "  make git-push"
-	@echo "  make set-version 0.5.0a7"
+	@echo "  make set-version 0.5.24"
 	@echo "  make check-version"
 	@echo "  make check-uv-version"
 	@echo "  make metadata"
@@ -77,7 +77,7 @@ help-push:
 
 help-release:
 	@echo "Release flow:"
-	@echo "1) make set-version X.Y.Z[a|b|rc]N"
+	@echo "1) make set-version X.Y.Z"
 	@echo "2) make metadata"
 	@echo "3) make test"
 	@echo "4) make git-add"
@@ -104,17 +104,14 @@ check-message:
 	fi
 
 check-input-version:
-	@test -n "$(EFFECTIVE_VERSION)" || (echo "Usage: make set-version 0.5.0a7"; exit 1)
-	@echo "$(EFFECTIVE_VERSION)" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$$' || (echo "Version must match PEP 440 core/prerelease, e.g. 0.5.0, 0.5.0a1, 0.5.0b1, 0.5.0rc1"; exit 1)
+	@test -n "$(EFFECTIVE_VERSION)" || (echo "Usage: make set-version 0.5.24"; exit 1)
+	@uv run python scripts/maintenance/version_guard.py validate --version "$(EFFECTIVE_VERSION)"
 
 check-input-version-greater: check-input-version check-version-file
-	@current="$$(tr -d '[:space:]' < VERSION)"; \
-	uv run python -c $$'import re,sys\ncurrent=sys.argv[1]\nnew=sys.argv[2]\npattern=re.compile(r"^([0-9]+)\\.([0-9]+)\\.([0-9]+)(?:(a|b|rc)([0-9]+))?$$")\norder={"a":0,"b":1,"rc":2,None:3}\nm1=pattern.fullmatch(current)\nm2=pattern.fullmatch(new)\nif not m1 or not m2:\n    raise SystemExit("Invalid version format for comparison.")\nt1=(int(m1.group(1)),int(m1.group(2)),int(m1.group(3)),order[m1.group(4)],int(m1.group(5)) if m1.group(5) else 999999999)\nt2=(int(m2.group(1)),int(m2.group(2)),int(m2.group(3)),order[m2.group(4)],int(m2.group(5)) if m2.group(5) else 999999999)\nif t2<=t1:\n    raise SystemExit(f"New version {new} must be greater than current VERSION {current}.")\nprint(f"Version check passed: {new} > {current}")' "$$current" "$(EFFECTIVE_VERSION)"
+	@uv run python scripts/maintenance/version_guard.py greater --current-file VERSION --new-version "$(EFFECTIVE_VERSION)"
 
 check-version-file:
-	@test -s VERSION || (echo "VERSION file is missing or empty."; exit 1)
-	@file_version="$$(tr -d '[:space:]' < VERSION)"; \
-	echo "$$file_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$$' || (echo "VERSION must match PEP 440 core/prerelease, found: $$file_version"; exit 1)
+	@uv run python scripts/maintenance/version_guard.py validate-file --path VERSION
 
 check-no-version-arg:
 	@test -z "$(VERSION)" && test -z "$(POS_VERSION)" || (echo "Do not pass a version to this target. Version is read from VERSION."; exit 1)
@@ -135,26 +132,10 @@ check-tag-not-latest: check-no-version-arg check-version-file
 	fi
 
 check-uv-version:
-	@actual="$$(uv --version | awk '{print $$2}')"; \
-	if [ "$$actual" != "$(UV_VERSION)" ]; then \
-		echo "uv version mismatch: expected $(UV_VERSION), found $$actual."; \
-		echo "Please install or switch to uv $(UV_VERSION) to keep local builds aligned with GitHub releases."; \
-		exit 1; \
-	fi
+	@uv run python scripts/maintenance/check_uv_version.py --expected "$(UV_VERSION)"
 
 stage-bundled-uv-local: check-uv-version
-	@mkdir -p src-tauri/bundled-tools
-	@uv_path="$$(command -v uv)"; \
-	platform="$${OS:-}$$(uname -s 2>/dev/null || true)"; \
-	case "$$platform" in \
-		*Windows_NT*|*MINGW*|*MSYS*|*CYGWIN*) \
-			cp "$$uv_path" src-tauri/bundled-tools/uv.exe; \
-			;; \
-		*) \
-			cp "$$uv_path" src-tauri/bundled-tools/uv; \
-			chmod +x src-tauri/bundled-tools/uv; \
-			;; \
-	esac
+	@uv run python scripts/maintenance/stage_bundled_uv.py
 
 set-version: check-input-version-greater
 	uv run python scripts/maintenance/bump_versions.py --version "$(EFFECTIVE_VERSION)" --write-version-file
@@ -242,6 +223,6 @@ push:
 
 release: check-no-version-arg check-version-file metadata test git-add git-commit git-push git-tag
 
-# Allow positional version args, e.g. `make set-version 0.5.0a7`.
+# Allow positional version args, e.g. `make set-version 0.5.24`.
 %:
 	@:

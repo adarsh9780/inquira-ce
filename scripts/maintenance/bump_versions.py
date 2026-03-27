@@ -2,13 +2,13 @@
 """Bump project versions from a single source of truth.
 
 Single source:
-- VERSION (PEP 440, e.g. 0.5.0a1)
+- VERSION (stable SemVer core, e.g. 0.5.0)
 
 Targets:
-- backend/pyproject.toml (PEP 440)
-- backend/app/main.py APP_VERSION (PEP 440)
-- src-tauri/Cargo.toml package.version (SemVer-compatible)
-- src-tauri/tauri.conf.json version (SemVer-compatible)
+- backend/pyproject.toml
+- backend/app/main.py APP_VERSION
+- src-tauri/Cargo.toml package.version
+- src-tauri/tauri.conf.json version
 - frontend/package.json version
 - frontend/package-lock.json top-level version + packages[""].version
 - .github/release/metadata.json version/tag/name/body when release_metadata.md exists
@@ -35,6 +35,7 @@ RELEASE_METADATA_JSON = ROOT / ".github" / "release" / "metadata.json"
 DOCS_DOWNLOAD_PAGE = ROOT / "docs-site" / "src" / "pages" / "download.tsx"
 DOCS_DOWNLOADS_DOC = ROOT / "docs-site" / "docs" / "downloads.md"
 DOCS_INSTALL_DOC = ROOT / "docs-site" / "docs" / "install.md"
+STABLE_VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 
 def warning_for_missing_path(path: Path) -> str:
@@ -46,33 +47,21 @@ def warning_for_missing_path(path: Path) -> str:
 
 
 def normalize_version_input(version: str) -> str:
-    """Accept optional leading tag marker and normalize to PEP 440 base input."""
+    """Accept optional leading tag marker and normalize to base version input."""
     v = version.strip()
     if v.startswith("v"):
         return v[1:]
     return v
 
 
-def pep440_to_tauri_semver(version: str) -> str:
-    """Convert common PEP 440 prereleases to SemVer prerelease style.
-
-    Examples:
-    - 0.5.0a1 -> 0.5.0-alpha.1
-    - 0.5.0b2 -> 0.5.0-beta.2
-    - 0.5.0rc3 -> 0.5.0-rc.3
-    - 0.5.0 -> 0.5.0
-    """
+def validate_stable_version(version: str, *, field: str = "version") -> str:
+    """Validate and normalize a stable version in Major.Minor.Patch format."""
     v = normalize_version_input(version)
-    m = re.fullmatch(r"(\d+\.\d+\.\d+)(?:(a|b|rc)(\d+))?", v)
-    if not m:
+    if not STABLE_VERSION_RE.fullmatch(v):
         raise ValueError(
-            "Unsupported VERSION format. Use PEP 440 like 0.5.0, 0.5.0a1, 0.5.0b1, 0.5.0rc1"
+            f"Unsupported {field} format: {version!r}. Use stable Major.Minor.Patch only, e.g. 0.5.24"
         )
-    base, label, num = m.groups()
-    if not label:
-        return base
-    mapped = {"a": "alpha", "b": "beta", "rc": "rc"}[label]
-    return f"{base}-{mapped}.{num}"
+    return v
 
 
 def read_version(cli_version: str | None) -> str:
@@ -87,17 +76,19 @@ def resolve_target_versions(
     tauri_version: str | None = None,
     frontend_version: str | None = None,
 ) -> dict[str, str]:
-    effective_backend = (backend_version or base_version).strip()
-
-    # Backend is Python, so validate as PEP 440-like.
-    pep440_to_tauri_semver(effective_backend)
-
-    effective_tauri = (tauri_version or pep440_to_tauri_semver(effective_backend)).strip()
-    # Frontend/package.json should stay SemVer compatible by default.
-    effective_frontend = (frontend_version or effective_tauri).strip()
+    effective_base = validate_stable_version(base_version, field="base version")
+    effective_backend = validate_stable_version(
+        backend_version or effective_base, field="backend version"
+    )
+    effective_tauri = validate_stable_version(
+        tauri_version or effective_backend, field="tauri version"
+    )
+    effective_frontend = validate_stable_version(
+        frontend_version or effective_tauri, field="frontend version"
+    )
 
     return {
-        "base": base_version.strip(),
+        "base": effective_base,
         "backend": effective_backend,
         "tauri": effective_tauri,
         "frontend": effective_frontend,
@@ -395,31 +386,31 @@ def main() -> int:
         epilog=(
             "Examples:\n"
             "  uv run python scripts/maintenance/bump_versions.py --help\n"
-            "  uv run python scripts/maintenance/bump_versions.py --version 0.5.0a1 --dry-run\n"
-            "  uv run python scripts/maintenance/bump_versions.py --version 0.5.0a1 --write-version-file\n"
+            "  uv run python scripts/maintenance/bump_versions.py --version 0.5.24 --dry-run\n"
+            "  uv run python scripts/maintenance/bump_versions.py --version 0.5.24 --write-version-file\n"
             "  uv run python scripts/maintenance/bump_versions.py \\\n"
-            "    --version 0.5.0a1 \\\n"
-            "    --backend-version 0.5.0a1 \\\n"
-            "    --tauri-version 0.5.0-alpha.1 \\\n"
-            "    --frontend-version 0.5.0-alpha.1 \\\n"
+            "    --version 0.5.24 \\\n"
+            "    --backend-version 0.5.24 \\\n"
+            "    --tauri-version 0.5.24 \\\n"
+            "    --frontend-version 0.5.24 \\\n"
             "    --write-version-file\n"
         ),
     )
     parser.add_argument(
         "--version",
-        help="Optional base PEP 440 version (overrides VERSION file), e.g. 0.5.0a1",
+        help="Optional base stable version (overrides VERSION file), e.g. 0.5.24",
     )
     parser.add_argument(
         "--backend-version",
-        help="Optional backend-specific PEP 440 version (defaults to --version/VERSION)",
+        help="Optional backend-specific stable version (defaults to --version/VERSION)",
     )
     parser.add_argument(
         "--tauri-version",
-        help="Optional Tauri-specific version (defaults to SemVer mapping of backend version)",
+        help="Optional Tauri-specific stable version (defaults to backend version)",
     )
     parser.add_argument(
         "--frontend-version",
-        help="Optional frontend-specific version (defaults to Tauri version for npm SemVer compatibility)",
+        help="Optional frontend-specific stable version (defaults to Tauri version)",
     )
     parser.add_argument("--dry-run", action="store_true", help="Print derived versions only")
     parser.add_argument(
@@ -430,7 +421,7 @@ def main() -> int:
     args = parser.parse_args()
 
     version = read_version(args.version)
-    pep440_to_tauri_semver(version)  # Validate early
+    validate_stable_version(version, field="base version")
 
     if args.version and args.write_version_file:
         VERSION_FILE.write_text(version + "\n", encoding="utf-8")

@@ -16,7 +16,7 @@ def test_makefile_set_version_requires_greater_version_than_current():
     text = MAKEFILE.read_text(encoding="utf-8")
     assert "check-input-version-greater: check-input-version check-version-file" in text
     assert "must be greater than current VERSION" in text
-    assert "Version check passed:" in text
+    assert "scripts/maintenance/version_guard.py greater" in text
 
 
 def test_makefile_metadata_uses_release_metadata_script():
@@ -64,10 +64,7 @@ def test_makefile_pins_uv_and_stages_bundled_uv_for_local_desktop_build():
     text = MAKEFILE.read_text(encoding="utf-8")
     assert "UV_VERSION := 0.6.3" in text
     assert "check-uv-version:" in text
-    assert 'actual="$$(uv --version | awk \'{print $$2}\')"' in text
+    assert "scripts/maintenance/check_uv_version.py --expected" in text
     assert "stage-bundled-uv-local: check-uv-version" in text
-    assert 'uv_path="$$(command -v uv)"' in text
-    assert 'cp "$$uv_path" src-tauri/bundled-tools/uv;' in text
-    assert "src-tauri/bundled-tools/uv.exe" in text
-    assert "Windows_NT" in text
+    assert "scripts/maintenance/stage_bundled_uv.py" in text
     assert "build-desktop: stage-bundled-uv-local" in text

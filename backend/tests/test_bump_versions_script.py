@@ -15,66 +15,72 @@ def _load_module():
     return mod
 
 
-def test_pep440_to_tauri_semver_prerelease_mapping():
+def test_validate_stable_version_accepts_release_and_v_prefix():
     mod = _load_module()
-    assert mod.pep440_to_tauri_semver("0.5.0a1") == "0.5.0-alpha.1"
-    assert mod.pep440_to_tauri_semver("0.5.0b2") == "0.5.0-beta.2"
-    assert mod.pep440_to_tauri_semver("0.5.0rc3") == "0.5.0-rc.3"
-    assert mod.pep440_to_tauri_semver("0.5.0") == "0.5.0"
+    assert mod.validate_stable_version("0.5.24") == "0.5.24"
+    assert mod.validate_stable_version("v0.5.24") == "0.5.24"
 
 
 def test_resolve_target_versions_allows_per_target_overrides():
     mod = _load_module()
     out = mod.resolve_target_versions(
-        base_version="0.5.0a1",
-        backend_version="0.5.1a2",
-        tauri_version="0.5.1-alpha.2",
-        frontend_version="0.5.0a1",
+        base_version="0.5.24",
+        backend_version="0.5.25",
+        tauri_version="0.5.26",
+        frontend_version="0.5.27",
     )
     assert out == {
-        "base": "0.5.0a1",
-        "backend": "0.5.1a2",
-        "tauri": "0.5.1-alpha.2",
-        "frontend": "0.5.0a1",
+        "base": "0.5.24",
+        "backend": "0.5.25",
+        "tauri": "0.5.26",
+        "frontend": "0.5.27",
     }
 
 
 def test_run_updates_dry_run_reports_all_effective_versions():
     mod = _load_module()
-    lines = mod.run_updates(base_version="0.6.0a1", dry_run=True)
+    lines = mod.run_updates(base_version="0.6.0", dry_run=True)
     joined = "\n".join(lines)
-    assert "base_version=0.6.0a1" in joined
-    assert "backend_version=0.6.0a1" in joined
-    assert "tauri_version=0.6.0-alpha.1" in joined
-    assert "frontend_version=0.6.0-alpha.1" in joined
+    assert "base_version=0.6.0" in joined
+    assert "backend_version=0.6.0" in joined
+    assert "tauri_version=0.6.0" in joined
+    assert "frontend_version=0.6.0" in joined
     assert "wheel_url=" not in joined
 
 
-def test_normalize_version_input_accepts_tag_style():
+def test_stable_validation_rejects_prerelease_versions():
     mod = _load_module()
-    assert mod.normalize_version_input("v0.5.0a6") == "0.5.0a6"
-    assert mod.normalize_version_input("0.5.0a6") == "0.5.0a6"
+    try:
+        mod.validate_stable_version("0.5.7a23")
+        assert False, "Expected ValueError for prerelease format"
+    except ValueError as exc:
+        assert "Major.Minor.Patch" in str(exc)
+    try:
+        mod.validate_stable_version("0.5.7-alpha.23")
+        assert False, "Expected ValueError for prerelease format"
+    except ValueError as exc:
+        assert "Major.Minor.Patch" in str(exc)
 
 
 def test_build_desktop_asset_payload_uses_tauri_release_filenames():
     mod = _load_module()
 
     payload = mod.build_desktop_asset_payload(
-        base_version="0.5.7a10",
-        tauri_version="0.5.7-alpha.10",
+        base_version="0.5.24",
+        tauri_version="0.5.24",
     )
 
     assert payload == {
-        "tag": "v0.5.7a10",
-        "macos_asset_name": "Inquira_0.5.7-alpha.10_aarch64.dmg",
-        "windows_asset_name": "Inquira_0.5.7-alpha.10_x64-setup.exe",
+        "tag": "v0.5.24",
+        "macos_asset_name": "Inquira_0.5.24_aarch64.dmg",
+        "windows_asset_name": "Inquira_0.5.24_x64-setup.exe",
         "macos_url": (
             "https://github.com/adarsh9780/inquira-ce/releases/download/"
-            "v0.5.7a10/Inquira_0.5.7-alpha.10_aarch64.dmg"
+            "v0.5.24/Inquira_0.5.24_aarch64.dmg"
         ),
         "windows_url": (
             "https://github.com/adarsh9780/inquira-ce/releases/download/"
-            "v0.5.7a10/Inquira_0.5.7-alpha.10_x64-setup.exe"
+            "v0.5.24/Inquira_0.5.24_x64-setup.exe"
         ),
     }
 
@@ -85,7 +91,7 @@ def test_update_release_metadata_writes_versioned_json(
     mod = _load_module()
     source = tmp_path / "release_metadata.md"
     source.write_text(
-        "# Release v0.5.7a9\n\n- Fix workspace kernel release notes drift.\n",
+        "# Release v0.5.24\n\n- Fix workspace kernel release notes drift.\n",
         encoding="utf-8",
     )
     output = tmp_path / ".github" / "release" / "metadata.json"
@@ -93,13 +99,13 @@ def test_update_release_metadata_writes_versioned_json(
     monkeypatch.setattr(mod, "RELEASE_METADATA_SOURCE", source)
     monkeypatch.setattr(mod, "RELEASE_METADATA_JSON", output)
 
-    changed = mod.update_release_metadata("0.5.7a9")
+    changed = mod.update_release_metadata("0.5.24")
 
     assert changed is True
     payload = output.read_text(encoding="utf-8")
-    assert '"version": "0.5.7a9"' in payload
-    assert '"tag": "v0.5.7a9"' in payload
-    assert '"release_name": "Release v0.5.7a9"' in payload
+    assert '"version": "0.5.24"' in payload
+    assert '"tag": "v0.5.24"' in payload
+    assert '"release_name": "Release v0.5.24"' in payload
 
 
 def test_run_updates_reports_release_metadata_json_when_refreshed(
@@ -109,31 +115,31 @@ def test_run_updates_reports_release_metadata_json_when_refreshed(
 
     backend_pyproject = tmp_path / "backend" / "pyproject.toml"
     backend_pyproject.parent.mkdir(parents=True, exist_ok=True)
-    backend_pyproject.write_text('version = "0.5.7a8"\n', encoding="utf-8")
+    backend_pyproject.write_text('version = "0.5.23"\n', encoding="utf-8")
 
     backend_main = tmp_path / "backend" / "app" / "main.py"
     backend_main.parent.mkdir(parents=True, exist_ok=True)
-    backend_main.write_text('APP_VERSION = "0.5.7a8"\n', encoding="utf-8")
+    backend_main.write_text('APP_VERSION = "0.5.23"\n', encoding="utf-8")
 
     tauri_cargo = tmp_path / "src-tauri" / "Cargo.toml"
     tauri_cargo.parent.mkdir(parents=True, exist_ok=True)
-    tauri_cargo.write_text('version = "0.5.7-alpha.8"\n', encoding="utf-8")
+    tauri_cargo.write_text('version = "0.5.23"\n', encoding="utf-8")
 
     tauri_conf = tmp_path / "src-tauri" / "tauri.conf.json"
-    tauri_conf.write_text('{\n  "version": "0.5.7-alpha.8"\n}\n', encoding="utf-8")
+    tauri_conf.write_text('{\n  "version": "0.5.23"\n}\n', encoding="utf-8")
 
     frontend_package = tmp_path / "frontend" / "package.json"
     frontend_package.parent.mkdir(parents=True, exist_ok=True)
-    frontend_package.write_text('{\n  "version": "0.5.7-alpha.8"\n}\n', encoding="utf-8")
+    frontend_package.write_text('{\n  "version": "0.5.23"\n}\n', encoding="utf-8")
 
     frontend_lock = tmp_path / "frontend" / "package-lock.json"
     frontend_lock.write_text(
-        '{\n  "version": "0.5.7-alpha.8",\n  "packages": {\n    "": {\n      "version": "0.5.7-alpha.8"\n    }\n  }\n}\n',
+        '{\n  "version": "0.5.23",\n  "packages": {\n    "": {\n      "version": "0.5.23"\n    }\n  }\n}\n',
         encoding="utf-8",
     )
 
     release_source = tmp_path / "release_metadata.md"
-    release_source.write_text("# Release v0.5.7a9\n\n- Notes\n", encoding="utf-8")
+    release_source.write_text("# Release v0.5.24\n\n- Notes\n", encoding="utf-8")
     release_output = tmp_path / ".github" / "release" / "metadata.json"
     docs_download_page = tmp_path / "docs-site" / "src" / "pages" / "download.tsx"
     docs_download_page.parent.mkdir(parents=True, exist_ok=True)
@@ -141,15 +147,15 @@ def test_run_updates_reports_release_metadata_json_when_refreshed(
         "\n".join(
             [
                 "const RELEASE_TAG =",
-                "  'v0.5.7a8';",
+                "  'v0.5.23';",
                 "const MACOS_ASSET_NAME =",
-                "  'Inquira_0.5.7-alpha.8_aarch64.dmg';",
+                "  'Inquira_0.5.23_aarch64.dmg';",
                 "const WINDOWS_ASSET_NAME =",
-                "  'Inquira_0.5.7-alpha.8_x64-setup.exe';",
+                "  'Inquira_0.5.23_x64-setup.exe';",
                 "const MACOS_FALLBACK_URL =",
-                "  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a8/Inquira_0.5.7-alpha.8_aarch64.dmg';",
+                "  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.23/Inquira_0.5.23_aarch64.dmg';",
                 "const WINDOWS_FALLBACK_URL =",
-                "  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a8/Inquira_0.5.7-alpha.8_x64-setup.exe';",
+                "  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.23/Inquira_0.5.23_x64-setup.exe';",
                 "",
             ]
         ),
@@ -160,8 +166,8 @@ def test_run_updates_reports_release_metadata_json_when_refreshed(
     downloads_doc.write_text(
         "\n".join(
             [
-                "- [macOS direct download](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a8/Inquira_0.5.7-alpha.8_aarch64.dmg)",
-                "- [Windows direct download](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a8/Inquira_0.5.7-alpha.8_x64-setup.exe)",
+                "- [macOS direct download](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.23/Inquira_0.5.23_aarch64.dmg)",
+                "- [Windows direct download](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.23/Inquira_0.5.23_x64-setup.exe)",
                 "",
             ]
         ),
@@ -171,8 +177,8 @@ def test_run_updates_reports_release_metadata_json_when_refreshed(
     install_doc.write_text(
         "\n".join(
             [
-                "- [macOS (`.dmg`)](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a8/Inquira_0.5.7-alpha.8_aarch64.dmg)",
-                "- [Windows (`.exe`)](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a8/Inquira_0.5.7-alpha.8_x64-setup.exe)",
+                "- [macOS (`.dmg`)](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.23/Inquira_0.5.23_aarch64.dmg)",
+                "- [Windows (`.exe`)](https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.23/Inquira_0.5.23_x64-setup.exe)",
                 "",
             ]
         ),
@@ -192,7 +198,7 @@ def test_run_updates_reports_release_metadata_json_when_refreshed(
     monkeypatch.setattr(mod, "DOCS_DOWNLOADS_DOC", downloads_doc)
     monkeypatch.setattr(mod, "DOCS_INSTALL_DOC", install_doc)
 
-    results = mod.run_updates(base_version="0.5.7a9")
+    results = mod.run_updates(base_version="0.5.24")
 
     assert any(
         ".github/release/metadata.json" in line for line in results
@@ -200,10 +206,10 @@ def test_run_updates_reports_release_metadata_json_when_refreshed(
     assert any("docs-site/src/pages/download.tsx" in line for line in results)
     assert any("docs-site/docs/downloads.md" in line for line in results)
     assert any("docs-site/docs/install.md" in line for line in results)
-    assert "Inquira_0.5.7-alpha.9_aarch64.dmg" in docs_download_page.read_text(
+    assert "Inquira_0.5.24_aarch64.dmg" in docs_download_page.read_text(
         encoding="utf-8"
     )
-    assert "Inquira_0.5.7-alpha.9_x64-setup.exe" in docs_download_page.read_text(
+    assert "Inquira_0.5.24_x64-setup.exe" in docs_download_page.read_text(
         encoding="utf-8"
     )
 
@@ -215,27 +221,27 @@ def test_run_updates_warns_for_missing_targets_instead_of_failing(
 
     backend_pyproject = tmp_path / "backend" / "pyproject.toml"
     backend_pyproject.parent.mkdir(parents=True, exist_ok=True)
-    backend_pyproject.write_text('version = "0.5.7a12"\n', encoding="utf-8")
+    backend_pyproject.write_text('version = "0.5.23"\n', encoding="utf-8")
 
     tauri_cargo = tmp_path / "src-tauri" / "Cargo.toml"
     tauri_cargo.parent.mkdir(parents=True, exist_ok=True)
-    tauri_cargo.write_text('version = "0.5.7-alpha.12"\n', encoding="utf-8")
+    tauri_cargo.write_text('version = "0.5.23"\n', encoding="utf-8")
 
     tauri_conf = tmp_path / "src-tauri" / "tauri.conf.json"
-    tauri_conf.write_text('{\n  "version": "0.5.7-alpha.12"\n}\n', encoding="utf-8")
+    tauri_conf.write_text('{\n  "version": "0.5.23"\n}\n', encoding="utf-8")
 
     frontend_package = tmp_path / "frontend" / "package.json"
     frontend_package.parent.mkdir(parents=True, exist_ok=True)
-    frontend_package.write_text('{\n  "version": "0.5.7-alpha.12"\n}\n', encoding="utf-8")
+    frontend_package.write_text('{\n  "version": "0.5.23"\n}\n', encoding="utf-8")
 
     frontend_lock = tmp_path / "frontend" / "package-lock.json"
     frontend_lock.write_text(
-        '{\n  "version": "0.5.7-alpha.12",\n  "packages": {\n    "": {\n      "version": "0.5.7-alpha.12"\n    }\n  }\n}\n',
+        '{\n  "version": "0.5.23",\n  "packages": {\n    "": {\n      "version": "0.5.23"\n    }\n  }\n}\n',
         encoding="utf-8",
     )
 
     release_source = tmp_path / "release_metadata.md"
-    release_source.write_text("# Release v0.5.7a13\n\n- Notes\n", encoding="utf-8")
+    release_source.write_text("# Release v0.5.24\n\n- Notes\n", encoding="utf-8")
     release_output = tmp_path / ".github" / "release" / "metadata.json"
     docs_download_page = tmp_path / "docs-site" / "src" / "pages" / "download.tsx"
     docs_download_page.parent.mkdir(parents=True, exist_ok=True)
@@ -243,15 +249,15 @@ def test_run_updates_warns_for_missing_targets_instead_of_failing(
         "\n".join(
             [
                 "const RELEASE_TAG =",
-                "  'v0.5.7a12';",
+                "  'v0.5.23';",
                 "const MACOS_ASSET_NAME =",
-                "  'Inquira_0.5.7-alpha.12_aarch64.dmg';",
+                "  'Inquira_0.5.23_aarch64.dmg';",
                 "const WINDOWS_ASSET_NAME =",
-                "  'Inquira_0.5.7-alpha.12_x64-setup.exe';",
+                "  'Inquira_0.5.23_x64-setup.exe';",
                 "const MACOS_FALLBACK_URL =",
-                "  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a12/Inquira_0.5.7-alpha.12_aarch64.dmg';",
+                "  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.23/Inquira_0.5.23_aarch64.dmg';",
                 "const WINDOWS_FALLBACK_URL =",
-                "  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.7a12/Inquira_0.5.7-alpha.12_x64-setup.exe';",
+                "  'https://github.com/adarsh9780/inquira-ce/releases/download/v0.5.23/Inquira_0.5.23_x64-setup.exe';",
                 "",
             ]
         ),
@@ -275,13 +281,13 @@ def test_run_updates_warns_for_missing_targets_instead_of_failing(
     monkeypatch.setattr(mod, "DOCS_DOWNLOADS_DOC", missing_downloads_doc)
     monkeypatch.setattr(mod, "DOCS_INSTALL_DOC", missing_install_doc)
 
-    results = mod.run_updates(base_version="0.5.7a13")
+    results = mod.run_updates(base_version="0.5.24")
     joined = "\n".join(results)
 
     assert "updated_files=" in joined
     assert "warning=missing_file:backend/app/main.py" in joined
     assert "warning=missing_file:docs-site/docs/downloads.md" in joined
     assert "warning=missing_file:docs-site/docs/install.md" in joined
-    assert "Inquira_0.5.7-alpha.13_aarch64.dmg" in docs_download_page.read_text(
+    assert "Inquira_0.5.24_aarch64.dmg" in docs_download_page.read_text(
         encoding="utf-8"
     )
