@@ -8,6 +8,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from agent_v2.services import tracing as agent_tracing
 from shared.observability import phoenix
 
 
@@ -54,6 +55,18 @@ def _build_fake_otel_setup(called: dict) -> dict:
         "TracerProvider": FakeTracerProvider,
         "BatchSpanProcessor": FakeBatchSpanProcessor,
     }
+
+
+def test_agent_tracing_adds_repo_root_to_sys_path():
+    repo_root_str = str(REPO_ROOT)
+    original_sys_path = list(sys.path)
+    sys.path[:] = [entry for entry in sys.path if entry != repo_root_str]
+
+    try:
+        agent_tracing._ensure_repo_root_on_path()
+        assert sys.path[0] == repo_root_str
+    finally:
+        sys.path[:] = original_sys_path
 
 
 def test_shared_phoenix_uses_agent_service_section(monkeypatch, tmp_path):

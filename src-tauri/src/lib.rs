@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::env;
+use std::ffi::OsString;
 use std::fs;
 use std::fs::OpenOptions;
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -1256,6 +1258,38 @@ fn python_bin_from_venv(venv_path: &PathBuf) -> PathBuf {
     }
 }
 
+fn build_pythonpath_entries(
+    additions: &[PathBuf],
+    inherited: Option<OsString>,
+) -> Result<OsString, String> {
+    let mut ordered_paths: Vec<PathBuf> = Vec::new();
+
+    for path in additions {
+        if path.as_os_str().is_empty() || ordered_paths.iter().any(|existing| existing == path) {
+            continue;
+        }
+        ordered_paths.push(path.clone());
+    }
+
+    if let Some(existing_pythonpath) = inherited {
+        for inherited_path in env::split_paths(&existing_pythonpath) {
+            if ordered_paths
+                .iter()
+                .any(|existing| existing == &inherited_path)
+            {
+                continue;
+            }
+            ordered_paths.push(inherited_path);
+        }
+    }
+
+    env::join_paths(ordered_paths).map_err(|error| format!("Failed to build PYTHONPATH: {error}"))
+}
+
+fn build_pythonpath(additions: &[PathBuf]) -> Result<OsString, String> {
+    build_pythonpath_entries(additions, env::var_os("PYTHONPATH"))
+}
+
 fn parse_lsof_pid_lines(raw: &[u8]) -> Vec<String> {
     let mut pids: Vec<String> = Vec::new();
     for line in String::from_utf8_lossy(raw).lines() {
@@ -1536,6 +1570,11 @@ fn start_agent_runtime(
         .and_then(|a| a.command.clone())
         .unwrap_or_default();
     let console_log_level = resolve_shared_console_log_level(config);
+    let agent_repo_root = agent_dir
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| agent_dir.clone());
+    let pythonpath = build_pythonpath(&[agent_dir.clone(), agent_repo_root])?;
     let langgraph_bin = if cfg!(target_os = "windows") {
         venv_path.join("Scripts").join("langgraph.exe")
     } else {
@@ -1618,7 +1657,7 @@ fn start_agent_runtime(
         // LangGraph can reject synchronous helpers (for example os.getcwd)
         // when running behind ASGI unless isolated loops are enabled.
         .env("BG_JOB_ISOLATED_LOOPS", "True")
-        .env("PYTHONPATH", agent_dir.display().to_string());
+        .env("PYTHONPATH", pythonpath);
     apply_proxy_env(&mut cmd, config);
 
     #[cfg(target_os = "windows")]
@@ -1990,15 +2029,18 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        bundled_uv_candidates, default_backend_host, default_uv_search_paths, detect_default_shell,
-        missing_uv_binary_error, needs_python_bootstrap, parse_lsof_pid_lines,
-        parse_netstat_listening_pids, resolve_pty_cwd, resolve_resource_path,
-        resolve_runtime_config_path, resolve_runtime_state_dir, resolve_shared_console_log_level,
-        resolve_uv_index_url, startup_log_paths, stop_child_process, uv_binary_file_name,
-        uv_search_candidates, vc_redist_download_url, vc_redist_installer_path,
-        vc_redist_marker_path, vc_redist_success_exit_code, InquiraConfig, LoggingConfig,
-        PythonConfig, MAIN_WINDOW_LABEL, SPLASH_WINDOW_LABEL,
+        build_pythonpath_entries, bundled_uv_candidates, default_backend_host,
+        default_uv_search_paths, detect_default_shell, missing_uv_binary_error,
+        needs_python_bootstrap, parse_lsof_pid_lines, parse_netstat_listening_pids,
+        resolve_pty_cwd, resolve_resource_path, resolve_runtime_config_path,
+        resolve_runtime_state_dir, resolve_shared_console_log_level, resolve_uv_index_url,
+        startup_log_paths, stop_child_process, uv_binary_file_name, uv_search_candidates,
+        vc_redist_download_url, vc_redist_installer_path, vc_redist_marker_path,
+        vc_redist_success_exit_code, InquiraConfig, LoggingConfig, PythonConfig, MAIN_WINDOW_LABEL,
+        SPLASH_WINDOW_LABEL,
     };
+    use std::env;
+    use std::ffi::OsString;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::process::Command;
@@ -2119,6 +2161,25 @@ mod tests {
 ";
         let parsed = parse_netstat_listening_pids(raw, 8000);
         assert_eq!(parsed, vec!["4172".to_string()]);
+    }
+
+    #[test]
+    fn build_pythonpath_entries_prepends_agent_and_repo_root_once() {
+        let base = std::env::temp_dir().join("inquira_pythonpath_test");
+        let repo_root = base.join("repo");
+        let agent_dir = repo_root.join("agents");
+        let existing_only = base.join("existing-only");
+        let inherited = env::join_paths([existing_only.clone(), repo_root.clone()])
+            .expect("join inherited pythonpath");
+
+        let built = build_pythonpath_entries(
+            &[agent_dir.clone(), repo_root.clone()],
+            Some(OsString::from(inherited)),
+        )
+        .expect("build pythonpath");
+        let rendered: Vec<PathBuf> = env::split_paths(&built).collect();
+
+        assert_eq!(rendered, vec![agent_dir, repo_root, existing_only]);
     }
 
     #[test]
