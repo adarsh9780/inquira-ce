@@ -301,25 +301,29 @@
     </div>
 
     <!-- Footer -->
-    <div class="border-t p-2 shrink-0 flex flex-col gap-1" style="border-color: var(--color-border); background-color: var(--color-base);">
+    <div class="border-t p-3 shrink-0 flex items-center justify-center gap-4" style="border-color: var(--color-border); background-color: var(--color-base);">
       <button
         @click="openSettings('api')"
-        class="w-full flex items-center gap-2 p-2 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
+        class="relative group flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
         style="color: var(--color-text-main);"
         title="Settings"
       >
-        <CogIcon class="w-4 h-4 shrink-0" />
-        <span class="text-xs font-medium">Settings</span>
+        <CogIcon class="w-4 h-4" />
+        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style="background-color: var(--color-surface); color: var(--color-text-main);">
+          Settings
+        </span>
       </button>
 
       <button
         @click="openTerms"
-        class="w-full flex items-center gap-2 p-2 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
+        class="relative group flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
         style="color: var(--color-text-main);"
         title="Terms & Conditions"
       >
-        <DocumentIcon class="w-4 h-4 shrink-0" />
-        <span class="text-xs font-medium">Terms & Conditions</span>
+        <ScaleIcon class="w-4 h-4" />
+        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style="background-color: var(--color-surface); color: var(--color-text-main);">
+          Terms & Conditions
+        </span>
       </button>
     </div>
 
@@ -412,7 +416,7 @@ import {
   PlusIcon,
   TrashIcon,
   CogIcon,
-  DocumentIcon,
+  ScaleIcon,
   XMarkIcon,
   MagnifyingGlassIcon,
   CircleStackIcon,
