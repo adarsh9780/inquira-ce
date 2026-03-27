@@ -3,16 +3,20 @@
 
     <!-- Left Section: Account, Editor Toggle, Kernel Status, and Editor Position -->
     <div class="flex items-center gap-3 h-full">
-      <!-- Account Name (opens sidebar) -->
+      <!-- Account Name with Sidebar Toggle (chevron beside username) -->
       <button
         v-if="authStore.isAuthenticated"
         @click.stop="openSidebar"
-        class="max-w-[120px] truncate px-1 text-[var(--color-accent)] text-left rounded hover:bg-[var(--color-base)] transition-colors"
+        class="flex items-center gap-1 max-w-[150px] truncate px-1 text-[var(--color-accent)] text-left rounded hover:bg-[var(--color-base)] transition-colors"
         title="Open sidebar"
         aria-label="Open sidebar"
       >
-        {{ accountDisplayLabel }}
+        <span class="truncate">{{ accountDisplayLabel }}</span>
+        <ChevronLeftIcon v-if="!appStore.isSidebarCollapsed" class="w-3.5 h-3.5 shrink-0" />
+        <ChevronRightIcon v-else class="w-3.5 h-3.5 shrink-0" />
       </button>
+
+      <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
 
       <!-- Workspace/Schema Editor Toggle -->
       <div v-if="authStore.isAuthenticated" class="flex items-center gap-0.5 h-full">
@@ -33,19 +37,6 @@
           <DocumentTextIcon class="w-3.5 h-3.5" />
         </button>
       </div>
-
-      <!-- Sidebar Toggle -->
-      <button
-        v-if="authStore.isAuthenticated"
-        @click.stop="toggleSidebarFromStatusBar"
-        class="h-5 w-5 rounded hover:bg-[var(--color-base)] flex items-center justify-center transition-colors"
-        :class="appStore.isSidebarCollapsed ? 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]' : 'text-[var(--color-accent)]'"
-        :title="sidebarToggleTitle"
-        aria-label="Toggle sidebar"
-      >
-        <ChevronRightIcon v-if="appStore.isSidebarCollapsed" class="w-3.5 h-3.5" />
-        <ChevronLeftIcon v-else class="w-3.5 h-3.5" />
-      </button>
 
       <div v-if="authStore.isAuthenticated" class="w-px h-3.5 bg-[var(--color-border)]"></div>
 
