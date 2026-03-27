@@ -770,7 +770,7 @@ watch(() => appStore.activeWorkspaceId, async (newId) => {
 }
 
 .sidebar-item-row-active {
-  background-color: color-mix(in srgb, var(--color-base) 80%, var(--color-text-main) 20%);
+  background-color: var(--color-chat-user-bubble);
 }
 
 :deep(.terms-markdown-content h1),
