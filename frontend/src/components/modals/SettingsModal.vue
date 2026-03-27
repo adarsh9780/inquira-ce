@@ -9,22 +9,22 @@
   >
     <!-- Background overlay -->
     <div
-      class="modal-overlay"
+      class="fixed inset-0 bg-black/20 backdrop-blur-sm transition-opacity"
       @click="closeModal"
     ></div>
 
     <!-- Modal container -->
     <div class="flex min-h-full items-center justify-center p-4">
       <div
-        class="relative transform overflow-hidden rounded-lg text-left shadow-xl transition-all mx-auto w-full max-w-4xl max-h-[90vh] flex flex-col"
-        style="background-color: var(--color-base);"
+        class="relative transform overflow-hidden rounded-xl text-left transition-all mx-auto w-full max-w-4xl max-h-[90vh] flex flex-col animate-modal-in"
+        style="background-color: var(--color-surface);"
         @click.stop
       >
         <!-- Modal Header -->
-        <div class="modal-header">
+        <div class="px-6 py-4 border-b" style="border-color: var(--color-border);">
           <div class="flex items-center justify-between w-full">
             <h3 class="text-base font-semibold" id="modal-title" style="color: var(--color-text-main);">
-              Application Settings
+              Settings
             </h3>
             <button
               @click="closeModal"
@@ -37,14 +37,15 @@
         </div>
 
         <!-- Modal Body -->
-        <div class="flex flex-1 overflow-hidden" style="background-color: var(--color-base);">
+        <div class="flex flex-1 overflow-hidden" style="background-color: var(--color-surface);">
           <!-- Sidebar Tabs -->
-          <div class="w-56 shrink-0 border-r flex flex-col" style="background-color: var(--color-base); border-color: var(--color-border);">
+          <div class="w-48 shrink-0 border-r flex flex-col" style="background-color: var(--color-base); border-color: var(--color-border);">
             <!-- Tab Navigation -->
-            <nav class="flex-1 px-3 py-4 space-y-1">
+            <nav class="flex-1 px-3 py-4 space-y-0.5">
               <button
                 @click="activeTab = 'api'"
-                :class="activeTab === 'api' ? 'nav-tab-active' : 'nav-tab'"
+                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg transition-all relative"
+                :class="activeTab === 'api' ? 'text-[var(--color-text-main)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] hover:bg-[var(--color-border)]'"
               >
                 <KeyIcon class="w-4 h-4 shrink-0" />
                 <span class="flex-1 text-left">Models</span>
@@ -54,11 +55,18 @@
                   style="color: var(--color-warning);"
                   title="API key is required"
                 />
+                <!-- Active indicator -->
+                <div
+                  v-if="activeTab === 'api'"
+                  class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
+                  style="background-color: var(--color-accent);"
+                ></div>
               </button>
 
               <button
                 @click="activeTab = 'data'"
-                :class="activeTab === 'data' ? 'nav-tab-active' : 'nav-tab'"
+                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg transition-all relative"
+                :class="activeTab === 'data' ? 'text-[var(--color-text-main)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] hover:bg-[var(--color-border)]'"
               >
                 <DocumentArrowUpIcon class="w-4 h-4 shrink-0" />
                 <span class="flex-1 text-left">Data</span>
@@ -68,22 +76,42 @@
                   style="color: var(--color-warning);"
                   title="API key is required for data configuration"
                 />
+                <!-- Active indicator -->
+                <div
+                  v-if="activeTab === 'data'"
+                  class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
+                  style="background-color: var(--color-accent);"
+                ></div>
               </button>
 
               <button
                 @click="activeTab = 'packages'"
-                :class="activeTab === 'packages' ? 'nav-tab-active' : 'nav-tab'"
+                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg transition-all relative"
+                :class="activeTab === 'packages' ? 'text-[var(--color-text-main)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] hover:bg-[var(--color-border)]'"
               >
                 <CubeIcon class="w-4 h-4 shrink-0" />
                 <span class="flex-1 text-left">Packages</span>
+                <!-- Active indicator -->
+                <div
+                  v-if="activeTab === 'packages'"
+                  class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
+                  style="background-color: var(--color-accent);"
+                ></div>
               </button>
 
               <button
                 @click="activeTab = 'account'"
-                :class="activeTab === 'account' ? 'nav-tab-active' : 'nav-tab'"
+                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg transition-all relative"
+                :class="activeTab === 'account' ? 'text-[var(--color-text-main)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] hover:bg-[var(--color-border)]'"
               >
                 <UserIcon class="w-4 h-4 shrink-0" />
                 <span class="flex-1 text-left">Account</span>
+                <!-- Active indicator -->
+                <div
+                  v-if="activeTab === 'account'"
+                  class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
+                  style="background-color: var(--color-accent);"
+                ></div>
               </button>
             </nav>
 
@@ -127,7 +155,7 @@
           </div>
         </div>
 
-        <!-- Modal Footer intentionally removed (Close via X in header) -->
+
       </div>
     </div>
     
