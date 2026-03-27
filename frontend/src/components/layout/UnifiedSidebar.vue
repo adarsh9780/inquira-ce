@@ -344,7 +344,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import { useAppStore } from '../../stores/appStore'
@@ -487,6 +487,14 @@ async function fetchDatasets() {
   } finally {
     isLoadingDatasets.value = false
   }
+}
+
+function handleDatasetCatalogChanged() {
+  // Data uploads can happen inside modal flows that keep the same workspace id.
+  // Without this listener, UnifiedSidebar only refreshes on workspace switches,
+  // leaving users with a stale dataset list until restart or manual context hop.
+  if (!appStore.hasWorkspace || !appStore.activeWorkspaceId) return
+  void fetchDatasets()
 }
 
 async function selectWorkspace(id) {
@@ -699,6 +707,11 @@ onMounted(async () => {
   } catch {
     // Ignore bootstrap failures here. The parent app handles global state recovery.
   }
+  window.addEventListener('dataset-switched', handleDatasetCatalogChanged)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('dataset-switched', handleDatasetCatalogChanged)
 })
 
 // Watch for workspace changes to fetch datasets and conversations
