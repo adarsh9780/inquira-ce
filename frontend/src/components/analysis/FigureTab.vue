@@ -301,6 +301,45 @@ watch(() => appStore.activeWorkspaceId, (workspaceId) => {
   }
 }, { immediate: true })
 
+function isKernelAvailabilityErrorMessage(message) {
+  const normalized = String(message || '').toLowerCase()
+  return (
+    normalized.includes('requires an active workspace kernel')
+    || normalized.includes('wait for kernel ready')
+    || normalized.includes('workspace kernel to finish starting')
+  )
+}
+
+async function recoverFigureStateAfterKernelReady() {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (!workspaceId || !appStore.hasWorkspace) return
+  if (!isKernelAvailabilityErrorMessage(artifactListError.value)) return
+
+  try {
+    const statusPayload = await apiService.v1GetWorkspaceKernelStatus(workspaceId)
+    const status = String(statusPayload?.status || '').trim().toLowerCase()
+    appStore.setWorkspaceKernelStatus(workspaceId, status || 'missing')
+    if (status !== 'ready') return
+    const latestFigureHint = resolveLatestFigureHint()
+    await loadWorkspaceFigureArtifacts(workspaceId, {
+      preferredArtifactId: latestFigureHint.artifactId,
+      preferredLogicalName: latestFigureHint.logicalName,
+    })
+  } catch (_error) {
+    // Keep existing error state until the next successful kernel-ready refresh.
+  }
+}
+
+watch(
+  () => appStore.getWorkspaceKernelStatus(appStore.activeWorkspaceId),
+  (status) => {
+    if (status === 'ready' && appStore.dataPane === 'figure') {
+      void recoverFigureStateAfterKernelReady()
+    }
+  },
+  { immediate: true },
+)
+
 watch(orderedFigures, (figures) => {
   appStore.setFigureCount(Array.isArray(figures) ? figures.length : 0)
   if (selectedArtifactId.value && !orderedFigures.value.some((fig) => fig.artifact_id === selectedArtifactId.value)) {
