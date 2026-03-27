@@ -170,7 +170,7 @@
             class="w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
           >
             <div class="flex items-center gap-2">
-              <DatabaseIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
+              <CircleStackIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
               <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Datasets</span>
               <span
                 v-if="appStore.datasets.length > 0"
@@ -401,7 +401,7 @@ import {
   DocumentIcon,
   XMarkIcon,
   MagnifyingGlassIcon,
-  DatabaseIcon,
+  CircleStackIcon,
   FolderIcon,
   ChatBubbleLeftEllipsisIcon,
   ChatBubbleLeftRightIcon,
