@@ -137,13 +137,13 @@ async def stream_analyze(
             if isinstance(exc, asyncio.CancelledError):
                 # Client-side aborts can cancel the server coroutine; avoid noisy
                 # tracebacks because there is no live consumer to receive events.
-                logprint("⚠️ [V1 Chat] Stream cancelled before completion.", level="warning")
+                logprint("[V1 Chat] Stream cancelled before completion.", level="warning")
                 return
 
             error_payload = _error_event_payload(exc)
             logprint(
                 (
-                    "❌ [V1 Chat] Stream error "
+                    "[V1 Chat] Stream error "
                     f"(type={exc.__class__.__name__}, status={error_payload.get('status_code')}):\n"
                     f"{traceback.format_exc()}"
                 ),

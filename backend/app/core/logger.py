@@ -80,6 +80,32 @@ def _format_fallback_console(message: str, level: str) -> str:
         return message
 
 
+def _encode_console_safe(text: str, encoding: str | None) -> str:
+    target_encoding = str(encoding or "").strip() or "utf-8"
+    return str(text).encode(target_encoding, errors="backslashreplace").decode(
+        target_encoding, errors="replace"
+    )
+
+
+def _write_fallback_console(line: str, level: str) -> None:
+    rendered = _format_fallback_console(line, level)
+    try:
+        sys.stdout.write(rendered + "\n")
+    except UnicodeEncodeError:
+        safe_rendered = _encode_console_safe(rendered, getattr(sys.stdout, "encoding", None))
+        try:
+            sys.stdout.write(safe_rendered + "\n")
+        except Exception:
+            return
+    except Exception:
+        return
+
+    try:
+        sys.stdout.flush()
+    except Exception:
+        pass
+
+
 def _write_fallback_file(message: str, level: str, extra: dict[str, Any]) -> None:
     try:
         payload = {
@@ -206,8 +232,7 @@ def logprint(
             _write_fallback_file(message=line, level=level_upper, extra=extra)
 
         if _should_emit(level_upper, _fallback_console_level):
-            sys.stdout.write(_format_fallback_console(line, level_upper) + "\n")
-            sys.stdout.flush()
+            _write_fallback_console(line, level_upper)
 
 
 def patch_print() -> None:
