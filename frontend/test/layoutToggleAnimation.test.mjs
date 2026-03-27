@@ -48,7 +48,7 @@ test('sidebar icons keep fixed size to avoid toggle jitter', () => {
   )
   // New design uses shrink-0 on icons
   assert.equal(sidebarSource.includes('FolderOpenIcon v-if="workspacesExpanded"'), true)
-  assert.equal(sidebarSource.includes('text-[12px] font-normal'), true)
+  assert.equal(sidebarSource.includes('text-[14px] font-normal'), true)
   assert.equal(sidebarSource.includes('FolderIcon v-else class="w-4 h-4 shrink-0"'), true)
   // No scale animations on workspace/schema tabs
   assert.equal(sidebarSource.includes("appStore.activeTab === 'workspace' ? 'scale-110' : ''"), false)

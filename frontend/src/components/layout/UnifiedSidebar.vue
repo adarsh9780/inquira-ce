@@ -56,12 +56,14 @@
         <!-- Datasets Section -->
         <div
           v-if="appStore.hasWorkspace && workspacesExpanded"
-          class="space-y-0.5 ml-3 pl-3 border-l"
-          style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent);"
+          class="space-y-0.5"
         >
           <!-- Section Header -->
           <div class="group flex items-center justify-between px-2 py-1">
-            <p class="text-[12px] font-normal" style="color: var(--color-text-muted);">Datasets</p>
+            <div class="flex items-center gap-2 min-w-0">
+              <CircleStackIcon class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
+              <p class="text-[14px] font-normal truncate" style="color: var(--color-text-main);">Datasets</p>
+            </div>
             <button
               v-if="appStore.hasWorkspace"
               @click.stop="openSettings('data')"
@@ -73,7 +75,7 @@
           </div>
 
           <!-- Section Content -->
-          <div v-show="datasetsExpanded" class="pl-2">
+          <div v-show="datasetsExpanded">
             <div v-if="isLoadingDatasets" class="px-2 py-2 text-xs text-center flex items-center justify-center gap-2" style="color: var(--color-text-muted);">
               <div class="animate-spin w-3 h-3 border-2 rounded-full" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);"></div>
               <span>Loading datasets...</span>
@@ -95,12 +97,9 @@
                 :class="{ 'bg-[var(--color-surface)]': appStore.activeDatasetId === ds.table_name }"
                 @click="selectDataset(ds)"
               >
-                <div class="flex items-center gap-2 min-w-0 flex-1">
-                  <CircleStackIcon class="w-3.5 h-3.5 shrink-0" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-600' : ''" style="color: var(--color-text-muted);" />
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-[13px] font-normal" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-700' : ''" style="color: var(--color-text-main);">{{ ds.table_name }}</p>
-                    <p v-if="ds.file_path" class="truncate text-[10px]" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-700/70' : ''" style="color: var(--color-text-muted);">{{ ds.file_path }}</p>
-                  </div>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-[13px] font-normal" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-700' : ''" style="color: var(--color-text-main);">{{ ds.table_name }}</p>
+                  <p v-if="ds.file_path" class="truncate text-[10px]" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-700/70' : ''" style="color: var(--color-text-muted);">{{ ds.file_path }}</p>
                 </div>
                 <button
                   @click.stop="confirmDeleteDataset(ds.table_name)"
@@ -118,12 +117,14 @@
         <!-- Conversations Section -->
         <div
           v-if="appStore.hasWorkspace && workspacesExpanded"
-          class="space-y-0.5 ml-3 pl-3 border-l"
-          style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent);"
+          class="space-y-0.5"
         >
           <!-- Section Header -->
           <div class="group flex items-center justify-between px-2 py-1">
-            <p class="text-[12px] font-normal" style="color: var(--color-text-muted);">Conversations</p>
+            <div class="flex items-center gap-2 min-w-0">
+              <ChatBubbleLeftRightIcon class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
+              <p class="text-[14px] font-normal truncate" style="color: var(--color-text-main);">Conversations</p>
+            </div>
             <button
               v-if="appStore.hasWorkspace"
               @click.stop="createConversation"
@@ -135,7 +136,7 @@
           </div>
 
           <!-- Section Content -->
-          <div v-show="conversationsExpanded" class="pl-2">
+          <div v-show="conversationsExpanded">
             <div v-if="filteredConversations.length === 0 && appStore.conversations.length > 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
               No matches found
             </div>
@@ -152,8 +153,7 @@
                 :class="{ 'bg-[var(--color-surface)]': appStore.activeConversationId === conv.id }"
                 @click="selectConversation(conv.id)"
               >
-                <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5 flex-1" @dblclick="startEditing(conv)">
-                  <ChatBubbleLeftRightIcon class="w-3.5 h-3.5 shrink-0 mt-0.5" :class="appStore.activeConversationId === conv.id ? 'text-emerald-600' : ''" style="color: var(--color-text-muted);" />
+                <div class="flex items-start min-w-0 pr-2 pt-0.5 flex-1" @dblclick="startEditing(conv)">
                   <div class="flex-1 min-w-0">
                     <div v-if="editingId === conv.id" class="flex items-center gap-1 w-full relative z-10">
                       <input
