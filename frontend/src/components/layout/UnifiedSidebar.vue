@@ -262,18 +262,49 @@
                 :class="{ 'bg-[var(--color-surface)]': appStore.activeConversationId === conv.id }"
                 @click="selectConversation(conv.id)"
               >
-                <div class="flex items-center gap-2 min-w-0 flex-1">
-                  <ChatBubbleLeftRightIcon class="w-3.5 h-3.5 shrink-0" :class="appStore.activeConversationId === conv.id ? 'text-emerald-600' : ''" style="color: var(--color-text-muted);" />
-                  <span class="truncate text-xs font-medium" :class="appStore.activeConversationId === conv.id ? 'text-emerald-700' : ''" style="color: var(--color-text-main);">{{ conv.title || 'Untitled' }}</span>
+                <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5 flex-1" @dblclick="startEditing(conv)">
+                  <ChatBubbleLeftRightIcon class="w-3.5 h-3.5 shrink-0 mt-0.5" :class="appStore.activeConversationId === conv.id ? 'text-emerald-600' : ''" style="color: var(--color-text-muted);" />
+                  <div class="flex-1 min-w-0">
+                    <div v-if="editingId === conv.id" class="flex items-center gap-1 w-full relative z-10">
+                      <input
+                        :ref="(el) => { if (el) editInputs[conv.id] = el }"
+                        v-model="editingTitleValue"
+                        class="input-base py-0.5 px-1 text-xs font-semibold"
+                        @keydown.enter.prevent="saveTitle(conv.id)"
+                        @keydown.esc.prevent="cancelEditing"
+                        @blur="saveTitle(conv.id)"
+                        @click.stop
+                      />
+                    </div>
+                    <template v-else>
+                      <p
+                        class="truncate"
+                        :class="conv.id === appStore.activeConversationId ? 'font-semibold' : 'font-medium'"
+                        :title="conv.title || 'Untitled'"
+                      >
+                        {{ conv.title || 'Untitled' }}
+                      </p>
+                    </template>
+                  </div>
                 </div>
-                <button
-                  @click.stop="confirmDeleteConversation(conv.id)"
-                  class="btn-icon p-1 rounded transition-all duration-150 opacity-0 group-hover:opacity-100 shrink-0"
-                  style="color: var(--color-text-muted);"
-                  title="Delete Conversation"
-                >
-                  <TrashIcon class="w-3.5 h-3.5" />
-                </button>
+                <div v-if="editingId !== conv.id" class="flex-shrink-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    @click.stop="startEditing(conv)"
+                    class="btn-icon p-1 rounded hover:text-blue-600"
+                    style="color: var(--color-text-muted);"
+                    title="Rename Conversation"
+                  >
+                    <PencilIcon class="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    @click.stop="confirmDeleteConversation(conv.id)"
+                    class="btn-icon p-1 rounded hover:text-red-500"
+                    style="color: var(--color-text-muted);"
+                    title="Delete Conversation"
+                  >
+                    <TrashIcon class="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -431,6 +462,7 @@ import {
   ChevronUpDownIcon,
   ChevronRightIcon,
   PlusIcon,
+  PencilIcon,
   TrashIcon,
   CogIcon,
   ScaleIcon,
@@ -447,6 +479,11 @@ const authStore = useAuthStore()
 // Search
 const searchQuery = ref('')
 const isSearchOpen = ref(false)
+
+// Conversation editing
+const editingId = ref(null)
+const editingTitleValue = ref('')
+const editInputs = ref({})
 const searchInputRef = ref(null)
 
 function toggleSearch() {
@@ -585,6 +622,52 @@ function selectDataset(ds) {
 
 function selectConversation(id) {
   appStore.setActiveConversation(id)
+}
+
+function startEditing(conv) {
+  editingId.value = conv.id
+  editingTitleValue.value = conv.title || 'Untitled'
+  setTimeout(() => {
+    const inputEl = editInputs.value[conv.id]
+    if (inputEl) {
+      inputEl.focus()
+      inputEl.select()
+    }
+  }, 50)
+}
+
+function cancelEditing() {
+  editingId.value = null
+  editingTitleValue.value = ''
+}
+
+async function saveTitle(id) {
+  if (editingId.value !== id) return
+
+  const newTitle = editingTitleValue.value.trim()
+  const conv = appStore.conversations.find((c) => c.id === id)
+
+  if (!newTitle || newTitle === (conv?.title || 'Untitled')) {
+    cancelEditing()
+    return
+  }
+
+  try {
+    if (id === appStore.activeConversationId) {
+      await appStore.updateConversationTitle(newTitle)
+    } else {
+      const updated = await apiService.v1UpdateConversation(id, newTitle)
+      const idx = appStore.conversations.findIndex((c) => c.id === id)
+      if (idx !== -1) {
+        appStore.conversations[idx] = { ...appStore.conversations[idx], title: updated.title }
+      }
+    }
+    toast.success('Renamed', 'Conversation title updated')
+  } catch (error) {
+    toast.error('Rename Failed', extractApiErrorMessage(error, 'Failed to update title'))
+  } finally {
+    cancelEditing()
+  }
 }
 
 // Toggle sidebar
