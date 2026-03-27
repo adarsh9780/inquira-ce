@@ -472,6 +472,10 @@ fn stop_child_process(name: &str, child: &mut StdChild) {
     const GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(3);
     #[cfg(unix)]
     const GRACEFUL_SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_millis(100);
+    #[cfg(target_os = "windows")]
+    const GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(3);
+    #[cfg(target_os = "windows")]
+    const GRACEFUL_SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
     match child.try_wait() {
         Ok(Some(status)) => {
@@ -522,6 +526,66 @@ fn stop_child_process(name: &str, child: &mut StdChild) {
                 log::warn!("Failed to send SIGTERM to {name} process: {e}; force-killing.");
             }
         }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let pid = child.id().to_string();
+        match Command::new("taskkill").args(["/PID", &pid, "/T"]).status() {
+            Ok(status) if status.success() => {
+                let started = Instant::now();
+                loop {
+                    match child.try_wait() {
+                        Ok(Some(status)) => {
+                            log::info!("{name} process tree exited cleanly with status: {status}");
+                            return;
+                        }
+                        Ok(None) => {
+                            if started.elapsed() >= GRACEFUL_SHUTDOWN_TIMEOUT {
+                                break;
+                            }
+                            thread::sleep(GRACEFUL_SHUTDOWN_POLL_INTERVAL);
+                        }
+                        Err(e) => {
+                            log::warn!("Failed while waiting for graceful {name} shutdown: {e}");
+                            break;
+                        }
+                    }
+                }
+                log::warn!(
+                    "{name} process tree did not exit after taskkill within {:?}; force-killing.",
+                    GRACEFUL_SHUTDOWN_TIMEOUT
+                );
+            }
+            Ok(status) => {
+                log::warn!(
+                    "Failed to stop {name} process tree via taskkill (exit status: {status}); force-killing."
+                );
+            }
+            Err(e) => {
+                log::warn!(
+                    "Failed to invoke taskkill for {name} process tree: {e}; force-killing."
+                );
+            }
+        }
+
+        match Command::new("taskkill")
+            .args(["/PID", &pid, "/T", "/F"])
+            .status()
+        {
+            Ok(status) if status.success() => {}
+            Ok(status) => {
+                log::warn!("Failed to force-kill {name} process tree (exit status: {status}).");
+            }
+            Err(e) => {
+                log::warn!("Failed to invoke forced taskkill for {name} process tree: {e}");
+            }
+        }
+
+        if let Err(e) = child.wait() {
+            log::warn!("Failed to wait for {name} process exit: {e}");
+        }
+        return;
     }
 
     if let Err(e) = child.kill() {
@@ -1210,7 +1274,49 @@ fn parse_lsof_pid_lines(raw: &[u8]) -> Vec<String> {
     pids
 }
 
+#[cfg(any(target_os = "windows", test))]
+fn socket_address_matches_port(address: &str, port: u16) -> bool {
+    address
+        .rsplit(':')
+        .next()
+        .and_then(|candidate| candidate.parse::<u16>().ok())
+        == Some(port)
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn parse_netstat_listening_pids(raw: &[u8], port: u16) -> Vec<String> {
+    let mut pids: Vec<String> = Vec::new();
+    for line in String::from_utf8_lossy(raw).lines() {
+        let columns: Vec<&str> = line.split_whitespace().collect();
+        if columns.len() < 5 {
+            continue;
+        }
+        if !columns[0].eq_ignore_ascii_case("TCP") {
+            continue;
+        }
+        if !socket_address_matches_port(columns[1], port) {
+            continue;
+        }
+        if !columns[3].eq_ignore_ascii_case("LISTENING") {
+            continue;
+        }
+        let pid = columns[4].trim();
+        if pid.is_empty() || !pid.chars().all(|ch| ch.is_ascii_digit()) {
+            continue;
+        }
+        if pids.iter().any(|existing| existing == pid) {
+            continue;
+        }
+        pids.push(pid.to_string());
+    }
+    pids
+}
+
 fn list_listening_pids_on_port(port: u16) -> Vec<String> {
+    #[cfg(target_os = "windows")]
+    let output = Command::new("netstat").args(["-ano", "-p", "tcp"]).output();
+
+    #[cfg(not(target_os = "windows"))]
     let output = Command::new("lsof")
         .args(["-t", "-nP", "-iTCP"])
         .arg(format!("{port}"))
@@ -1223,6 +1329,13 @@ fn list_listening_pids_on_port(port: u16) -> Vec<String> {
     if !output.status.success() {
         return Vec::new();
     }
+
+    #[cfg(target_os = "windows")]
+    {
+        return parse_netstat_listening_pids(&output.stdout, port);
+    }
+
+    #[cfg(not(target_os = "windows"))]
     parse_lsof_pid_lines(&output.stdout)
 }
 
@@ -1230,6 +1343,12 @@ fn kill_all_listeners_on_port(port: u16) -> usize {
     let pids = list_listening_pids_on_port(port);
     let mut killed = 0usize;
     for pid in pids {
+        #[cfg(target_os = "windows")]
+        let status = Command::new("taskkill")
+            .args(["/PID", &pid, "/T", "/F"])
+            .status();
+
+        #[cfg(not(target_os = "windows"))]
         let status = Command::new("kill").args(["-9", &pid]).status();
         match status {
             Ok(s) if s.success() => {
@@ -1569,12 +1688,7 @@ pub fn run() {
                 )?;
             }
 
-            update_startup_state(
-                &app.handle(),
-                false,
-                "",
-                "Launching desktop services...",
-            );
+            update_startup_state(&app.handle(), false, "", "Launching desktop services...");
             // We intentionally do not reveal the main window here.
             // Showing it this early allows frontend modules to initialize while
             // backend bootstrap is still in-flight, which is exactly the race that
@@ -1803,13 +1917,13 @@ pub fn run() {
                             .path()
                             .resource_dir()
                             .unwrap_or_else(|_| PathBuf::from("."));
-                        let fallback_data_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| {
-                            dirs_next::home_dir()
-                                .unwrap_or_else(|| PathBuf::from("."))
-                                .join(".inquira")
-                        });
-                        let data_dir =
-                            resolve_runtime_state_dir(&resource_dir, &fallback_data_dir);
+                        let fallback_data_dir =
+                            app_handle.path().app_data_dir().unwrap_or_else(|_| {
+                                dirs_next::home_dir()
+                                    .unwrap_or_else(|| PathBuf::from("."))
+                                    .join(".inquira")
+                            });
+                        let data_dir = resolve_runtime_state_dir(&resource_dir, &fallback_data_dir);
                         let log_paths = startup_log_paths(&data_dir);
                         append_startup_log(
                             &log_paths.desktop,
@@ -1876,18 +1990,20 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        bundled_uv_candidates, default_uv_search_paths, detect_default_shell,
-        default_backend_host, missing_uv_binary_error, needs_python_bootstrap,
-        MAIN_WINDOW_LABEL, SPLASH_WINDOW_LABEL,
-        parse_lsof_pid_lines, resolve_pty_cwd, resolve_resource_path, resolve_runtime_config_path,
-        resolve_runtime_state_dir, resolve_shared_console_log_level, resolve_uv_index_url,
-        startup_log_paths, stop_child_process, uv_binary_file_name, uv_search_candidates,
-        vc_redist_download_url, vc_redist_installer_path, vc_redist_marker_path,
-        vc_redist_success_exit_code, InquiraConfig, LoggingConfig, PythonConfig,
+        bundled_uv_candidates, default_backend_host, default_uv_search_paths, detect_default_shell,
+        missing_uv_binary_error, needs_python_bootstrap, parse_lsof_pid_lines,
+        parse_netstat_listening_pids, resolve_pty_cwd, resolve_resource_path,
+        resolve_runtime_config_path, resolve_runtime_state_dir, resolve_shared_console_log_level,
+        resolve_uv_index_url, startup_log_paths, stop_child_process, uv_binary_file_name,
+        uv_search_candidates, vc_redist_download_url, vc_redist_installer_path,
+        vc_redist_marker_path, vc_redist_success_exit_code, InquiraConfig, LoggingConfig,
+        PythonConfig, MAIN_WINDOW_LABEL, SPLASH_WINDOW_LABEL,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::process::Command;
+    #[cfg(target_os = "windows")]
+    use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     #[test]
     fn bootstrap_required_when_venv_missing() {
@@ -1939,11 +2055,70 @@ mod tests {
         assert!(status.is_some(), "child should be terminated");
     }
 
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn stop_child_process_terminates_windows_process_tree() {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("current time")
+            .as_nanos();
+        let pid_file = std::env::temp_dir().join(format!(
+            "inquira_windows_child_pid_{}_{}.txt",
+            std::process::id(),
+            now
+        ));
+        let pid_file_for_script = pid_file.to_string_lossy().replace('\'', "''");
+        let script = format!(
+            "$child = Start-Process cmd -WindowStyle Hidden -ArgumentList '/C','timeout /T 30 /NOBREAK >NUL' -PassThru; Set-Content -Path '{pid_file_for_script}' -Value $child.Id; Start-Sleep -Seconds 30"
+        );
+        let mut parent = Command::new("powershell")
+            .args(["-NoLogo", "-NoProfile", "-Command", &script])
+            .spawn()
+            .expect("spawn windows parent");
+
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !pid_file.exists() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(pid_file.exists(), "expected child pid file to be created");
+        let child_pid = fs::read_to_string(&pid_file)
+            .expect("read child pid")
+            .trim()
+            .to_string();
+        assert!(!child_pid.is_empty(), "expected a child pid");
+
+        stop_child_process("windows tree", &mut parent);
+
+        let output = Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {child_pid}"), "/FO", "CSV", "/NH"])
+            .output()
+            .expect("query tasklist");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains("No tasks are running")
+                || !stdout.contains(&format!(",\"{child_pid}\"")),
+            "child pid {child_pid} should be terminated, tasklist output: {stdout}"
+        );
+        let _ = fs::remove_file(pid_file);
+    }
+
     #[test]
     fn parse_lsof_pid_lines_keeps_numeric_unique_pids() {
         let raw = b"1234\n\nabc\n1234\n5678\n";
         let parsed = parse_lsof_pid_lines(raw);
         assert_eq!(parsed, vec!["1234".to_string(), "5678".to_string()]);
+    }
+
+    #[test]
+    fn parse_netstat_listening_pids_keeps_only_matching_listeners() {
+        let raw = br"
+  TCP    127.0.0.1:8000         0.0.0.0:0              LISTENING       4172
+  TCP    127.0.0.1:8000         127.0.0.1:58187        TIME_WAIT       0
+  TCP    127.0.0.1:8123         0.0.0.0:0              LISTENING       9764
+  TCP    [::]:8000              [::]:0                 LISTENING       4172
+";
+        let parsed = parse_netstat_listening_pids(raw, 8000);
+        assert_eq!(parsed, vec!["4172".to_string()]);
     }
 
     #[test]
@@ -2194,7 +2369,6 @@ mod tests {
             }),
             "expected bundled candidates to include the legacy src-tauri resource layout"
         );
-
     }
 
     #[test]
@@ -2238,8 +2412,8 @@ mod tests {
 
     #[test]
     fn splash_asset_describes_backend_first_bootstrap_contract() {
-        let splash = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../frontend/public/splash.html");
+        let splash =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../frontend/public/splash.html");
         let content = fs::read_to_string(&splash).expect("read splash html");
         assert!(
             content.contains("backend APIs are healthy"),
