@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="isVisible"
-    class="fixed top-4 right-4 z-50 max-w-sm w-full animate-toast-in"
+    class="max-w-sm w-full animate-toast-in"
   >
     <div
       class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-[0_8px_30px_rgba(0,0,0,0.08)] p-4 flex items-start gap-3"
@@ -111,11 +111,11 @@ onUnmounted(() => {
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateX(16px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
   }
 }
 
