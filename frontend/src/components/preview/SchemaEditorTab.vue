@@ -622,7 +622,7 @@ async function handleDatasetSelection(value) {
   await fetchSchemaData()
 }
 
-function handleDatasetSwitch(event) {
+async function handleDatasetSwitch(event) {
   const newDataPath = event?.detail?.dataPath
   const newTableName = event?.detail?.tableName
 
@@ -632,8 +632,15 @@ function handleDatasetSwitch(event) {
   schemaError.value = ''
   previewService.clearSchemaCache()
 
+  // Dataset uploads can happen outside this tab while keeping the same workspace.
+  // Reloading catalog options first prevents the schema dropdown from lagging
+  // behind newly ingested tables until users manually switch tabs/reopen views.
+  await loadSchemaDatasets()
+
   if (event?.detail === null) {
-    void loadSchemaDatasets()
+    if (selectedDatasetTable.value) {
+      await fetchSchemaData()
+    }
     return
   }
 
@@ -645,7 +652,12 @@ function handleDatasetSwitch(event) {
     if (newTableName) {
       appStore.setIngestedTableName(newTableName)
     }
-    void fetchSchemaDataForPath(newDataPath, newTableName || selectedDatasetTable.value || null)
+    await fetchSchemaDataForPath(newDataPath, newTableName || selectedDatasetTable.value || null)
+    return
+  }
+
+  if (selectedDatasetTable.value) {
+    await fetchSchemaData()
   }
 }
 

@@ -30,6 +30,8 @@ test('schema editor waits for manual regeneration when a dataset switch finds no
   assert.equal(source.includes('allowWhileLoading: true'), false)
   assert.equal(source.includes('loadError?.status === 422 || loadError?.response?.status === 422'), true)
   assert.equal(source.includes('const newTableName = event?.detail?.tableName'), true)
+  assert.equal(source.includes('await loadSchemaDatasets()'), true)
+  assert.equal(source.includes('if (selectedDatasetTable.value) {\n      await fetchSchemaData()\n    }'), true)
   assert.equal(source.includes('apiService.v1RegenerateDatasetSchema('), true)
 })
 
