@@ -471,6 +471,20 @@ function stopArtifactUsageStream() {
   artifactUsageStreamAbortController = null
 }
 
+async function refreshKernelStatusFromApi(workspaceId, fallbackStatus = 'missing') {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId) return 'missing'
+  try {
+    const payload = await apiService.v1GetWorkspaceKernelStatus(normalizedWorkspaceId)
+    const status = String(payload?.status || '').trim().toLowerCase() || fallbackStatus
+    appStore.setWorkspaceKernelStatus(normalizedWorkspaceId, status)
+    return status
+  } catch (_error) {
+    appStore.setWorkspaceKernelStatus(normalizedWorkspaceId, fallbackStatus)
+    return fallbackStatus
+  }
+}
+
 function openGitHubRepo() {
   void openExternalUrl('https://github.com/adarsh9780/inquira')
 }
@@ -487,18 +501,23 @@ function syncWorkspaceRealtimeSubscriptions() {
 
   appStore.setWorkspaceKernelStatus(workspaceId, 'connecting')
   settingsWebSocket.setKernelStatusWorkspace(workspaceId)
+  void refreshKernelStatusFromApi(workspaceId, 'connecting')
   void startArtifactUsageStream()
 }
 
 async function interruptKernel() {
   if (!appStore.activeWorkspaceId || !appStore.hasWorkspace || isKernelActionRunning.value) return
   isKernelActionRunning.value = true
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  appStore.setWorkspaceKernelStatus(workspaceId, 'busy')
   try {
-    const response = await apiService.v1InterruptWorkspaceKernel(appStore.activeWorkspaceId)
+    const response = await apiService.v1InterruptWorkspaceKernel(workspaceId)
     if (response?.reset) toast.success('Kernel Interrupted', 'Execution interrupt signal sent.')
     else toast.error('Interrupt Failed', 'No running kernel found.')
+    await refreshKernelStatusFromApi(workspaceId, response?.reset ? 'ready' : 'missing')
   } catch (error) {
     toast.error('Interrupt Failed', error?.response?.data?.detail || error.message)
+    await refreshKernelStatusFromApi(workspaceId, 'error')
   } finally {
     isKernelActionRunning.value = false
   }
@@ -507,17 +526,20 @@ async function interruptKernel() {
 async function restartKernel() {
   if (!appStore.activeWorkspaceId || !appStore.hasWorkspace || isKernelActionRunning.value) return
   isKernelActionRunning.value = true
-  appStore.setWorkspaceKernelStatus(appStore.activeWorkspaceId, 'connecting')
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  appStore.setWorkspaceKernelStatus(workspaceId, 'connecting')
   try {
-    const response = await apiService.v1RestartWorkspaceKernel(appStore.activeWorkspaceId)
+    const response = await apiService.v1RestartWorkspaceKernel(workspaceId)
     if (response?.reset) {
       appStore.setCodeRunning(false)
       toast.success('Kernel Restarted', 'Workspace kernel has been restarted.')
     } else {
       toast.error('Restart Failed', 'No kernel session existed.')
     }
+    await refreshKernelStatusFromApi(workspaceId, response?.reset ? 'starting' : 'missing')
   } catch (error) {
     toast.error('Restart Failed', error?.response?.data?.detail || error.message)
+    await refreshKernelStatusFromApi(workspaceId, 'error')
   } finally {
     isKernelActionRunning.value = false
   }

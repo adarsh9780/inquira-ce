@@ -1041,11 +1041,6 @@ export const useAppStore = defineStore('app', () => {
       return true
     }
 
-    if (ensuredKernelWorkspaceIds.has(targetWorkspaceId)) {
-      setRuntimeError('')
-      return true
-    }
-
     if (kernelEnsurePromise && kernelEnsureWorkspaceId === targetWorkspaceId) {
       return kernelEnsurePromise
     }
@@ -1056,7 +1051,7 @@ export const useAppStore = defineStore('app', () => {
         setWorkspaceKernelStatus(targetWorkspaceId, 'starting')
         const bootstrapped = await apiService.v1BootstrapWorkspaceRuntime(targetWorkspaceId)
         if (bootstrapped?.reset === true) {
-          setWorkspaceKernelStatus(targetWorkspaceId, 'starting')
+          setWorkspaceKernelStatus(targetWorkspaceId, 'ready')
           setRuntimeError('')
         }
         return bootstrapped?.reset === true
@@ -1580,10 +1575,10 @@ export const useAppStore = defineStore('app', () => {
 
     const currentStatus = String(workspaceKernelStatusById.value?.[normalizedWorkspaceId] || '').trim()
     if (currentStatus === normalizedStatus) {
-      if (normalizedStatus === 'error' || normalizedStatus === 'missing') {
-        ensuredKernelWorkspaceIds.delete(normalizedWorkspaceId)
-      } else {
+      if (normalizedStatus === 'ready' || normalizedStatus === 'busy') {
         ensuredKernelWorkspaceIds.add(normalizedWorkspaceId)
+      } else {
+        ensuredKernelWorkspaceIds.delete(normalizedWorkspaceId)
       }
       return
     }
@@ -1593,7 +1588,7 @@ export const useAppStore = defineStore('app', () => {
       [normalizedWorkspaceId]: normalizedStatus
     }
 
-    if (['ready', 'busy', 'starting', 'connecting'].includes(normalizedStatus)) {
+    if (normalizedStatus === 'ready' || normalizedStatus === 'busy') {
       ensuredKernelWorkspaceIds.add(normalizedWorkspaceId)
       if (
         ['ready', 'busy'].includes(normalizedStatus) &&
