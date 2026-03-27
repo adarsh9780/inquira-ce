@@ -1,57 +1,296 @@
 <template>
   <div
-    class="flex flex-col w-72 border-r h-full shrink-0 z-40 shadow-sm relative overflow-visible"
-    style="background-color: var(--color-base); border-color: var(--color-border);"
+    class="flex flex-col w-72 h-full shrink-0 z-40 relative overflow-visible"
+    style="background-color: var(--color-base);"
   >
+    <!-- Header with Logo -->
     <div
-      class="h-16 flex items-center px-3 border-b shrink-0 cursor-pointer hover:bg-zinc-100/70 transition-colors"
-      @click="toggleSidebar"
+      class="h-14 flex items-center px-4 border-b shrink-0 cursor-pointer transition-all duration-200 hover:brightness-98 active:brightness-95"
       style="border-color: var(--color-border);"
+      @click="toggleSidebar"
       title="Click to collapse/expand"
     >
-      <div class="flex items-center justify-center w-full">
-        <div class="flex items-center justify-start w-full min-w-0">
-          <img :src="logo" alt="Inquira Logo" class="w-8 h-8 rounded shrink-0 shadow-sm" />
-          <div class="ml-3 min-w-0">
-            <h1 class="text-sm font-bold tracking-tight leading-none truncate" style="color: var(--color-text-main);">Inquira</h1>
-            <p class="text-[10px] font-medium mt-0.5 truncate" style="color: var(--color-text-muted);">LLM-Powered Analysis</p>
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm" style="background: linear-gradient(135deg, var(--color-accent) 0%, color-mix(in srgb, var(--color-accent) 80%, black) 100%);">
+          <img :src="logo" alt="Inquira" class="w-5 h-5 brightness-0 invert" />
+        </div>
+        <div>
+          <h1 class="text-sm font-bold tracking-tight leading-none" style="color: var(--color-text-main);">Inquira</h1>
+          <p class="text-[10px] font-medium mt-0.5" style="color: var(--color-text-muted);">LLM-Powered Analysis</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="px-3 py-3 border-b" style="border-color: var(--color-border);">
+      <div class="relative">
+        <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style="color: var(--color-text-muted);" />
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search..."
+          class="w-full pl-9 pr-3 py-2 text-xs rounded-lg border transition-all duration-150 placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2"
+          style="background-color: var(--color-surface); border-color: var(--color-border); color: var(--color-text-main); --tw-ring-color: var(--color-accent);"
+        />
+        <button
+          v-if="searchQuery"
+          @click="searchQuery = ''"
+          class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-[var(--color-border)] transition-colors"
+        >
+          <XMarkIcon class="w-3 h-3" style="color: var(--color-text-muted);" />
+        </button>
+      </div>
+    </div>
+
+    <!-- Scrollable Content -->
+    <div class="flex-1 overflow-y-auto overflow-x-hidden flex flex-col custom-scrollbar">
+      <div class="px-3 py-3 space-y-1">
+        <!-- Workspaces Section -->
+        <div class="space-y-0.5">
+          <!-- Section Header -->
+          <button
+            @click="workspacesExpanded = !workspacesExpanded"
+            class="w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
+          >
+            <div class="flex items-center gap-2">
+              <BuildingOffice2Icon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
+              <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Workspace</span>
+              <span
+                v-if="appStore.workspaces.length > 0"
+                class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                style="background-color: var(--color-surface); color: var(--color-text-muted);"
+              >
+                {{ appStore.workspaces.length }}
+              </span>
+            </div>
+            <ChevronRightIcon
+              class="w-3.5 h-3.5 transition-transform duration-200"
+              :class="workspacesExpanded ? 'rotate-90' : ''"
+              style="color: var(--color-text-muted);"
+            />
+          </button>
+
+          <!-- Section Content -->
+          <div v-show="workspacesExpanded" class="pl-2">
+            <div v-if="appStore.workspaceDeletionJobs.length > 0" class="mb-2 px-2.5 py-2 rounded-lg text-[11px] flex items-center gap-2" style="background-color: color-mix(in srgb, var(--color-warning) 15%, transparent); color: var(--color-warning);">
+              <svg class="animate-spin h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-90" d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="4" />
+              </svg>
+              <span class="truncate">Deleting workspace...</span>
+            </div>
+
+            <div v-if="filteredWorkspaces.length === 0 && appStore.workspaces.length > 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
+              No matches found
+            </div>
+
+            <div v-if="appStore.workspaces.length === 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
+              No workspaces yet
+            </div>
+
+            <Listbox v-else :model-value="selectedWorkspaceId" @update:model-value="selectWorkspace">
+              <div class="relative">
+                <ListboxButton
+                  class="w-full rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-[var(--color-surface)]"
+                  style="background-color: color-mix(in srgb, var(--color-surface) 62%, transparent);"
+                >
+                  <div class="flex items-center gap-3 min-w-0">
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-medium truncate" style="color: var(--color-text-main);">
+                        {{ activeWorkspaceName }}
+                      </p>
+                    </div>
+                    <ChevronUpDownIcon class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
+                  </div>
+                </ListboxButton>
+
+                <transition name="workspace-dropdown">
+                  <ListboxOptions
+                    class="absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-xl border p-1 shadow-xl focus:outline-none"
+                    style="border-color: color-mix(in srgb, var(--color-border) 82%, transparent); background-color: var(--color-base);"
+                  >
+                    <ListboxOption
+                      v-for="ws in filteredWorkspaces"
+                      :key="ws.id"
+                      :value="ws.id"
+                      as="template"
+                      v-slot="{ active, selected }"
+                      :disabled="isWorkspaceDeleting(ws.id)"
+                    >
+                      <li
+                        class="group/item flex items-center justify-between gap-2 rounded-lg px-3 py-2 transition-colors relative"
+                        :class="[
+                          active ? 'bg-[var(--color-surface)]' : '',
+                          selected ? 'bg-emerald-50 text-emerald-800' : '',
+                          isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                        ]"
+                      >
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                          <CheckCircleIcon v-if="selected" class="w-4 h-4 shrink-0 text-emerald-600" />
+                          <BuildingOffice2Icon v-else class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
+                          <span class="truncate text-sm" :class="selected ? 'font-semibold' : 'font-medium'">{{ ws.name }}</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                          <button
+                            v-if="!isWorkspaceDeleting(ws.id)"
+                            @click.stop="confirmDeleteWorkspace(ws.id)"
+                            class="btn-icon p-1 rounded transition-all duration-150 opacity-0 group-hover/item:opacity-100"
+                            style="color: var(--color-text-muted);"
+                            title="Delete Workspace"
+                          >
+                            <TrashIcon class="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </li>
+                    </ListboxOption>
+                  </ListboxOptions>
+                </transition>
+              </div>
+            </Listbox>
+
+            <!-- Add Workspace Button -->
+            <button
+              @click="openCreateDialog"
+              class="w-full flex items-center gap-2 px-3 py-2 mt-1 rounded-lg text-xs transition-colors hover:bg-[var(--color-surface)]"
+              style="color: var(--color-text-muted);"
+            >
+              <PlusIcon class="w-3.5 h-3.5" />
+              <span>New Workspace</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Datasets Section -->
+        <div v-if="appStore.hasWorkspace" class="space-y-0.5">
+          <div class="h-px my-2" style="background-color: color-mix(in srgb, var(--color-border) 50%, transparent);" />
+
+          <!-- Section Header -->
+          <button
+            @click="datasetsExpanded = !datasetsExpanded"
+            class="w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
+          >
+            <div class="flex items-center gap-2">
+              <DatabaseIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
+              <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Datasets</span>
+              <span
+                v-if="appStore.datasets.length > 0"
+                class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                style="background-color: var(--color-surface); color: var(--color-text-muted);"
+              >
+                {{ appStore.datasets.length }}
+              </span>
+            </div>
+            <ChevronRightIcon
+              class="w-3.5 h-3.5 transition-transform duration-200"
+              :class="datasetsExpanded ? 'rotate-90' : ''"
+              style="color: var(--color-text-muted);"
+            />
+          </button>
+
+          <!-- Section Content -->
+          <div v-show="datasetsExpanded" class="pl-2">
+            <div v-if="filteredDatasets.length === 0 && appStore.datasets.length > 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
+              No matches found
+            </div>
+
+            <div v-if="appStore.datasets.length === 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
+              No datasets yet
+            </div>
+
+            <div v-else class="space-y-0.5 pb-1">
+              <div
+                v-for="ds in filteredDatasets"
+                :key="ds.id"
+                class="group flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface)]"
+                :class="{ 'bg-[var(--color-surface)]': appStore.activeDatasetId === ds.id }"
+                @click="selectDataset(ds.id)"
+              >
+                <div class="flex items-center gap-2 min-w-0 flex-1">
+                  <FolderIcon class="w-3.5 h-3.5 shrink-0" :class="appStore.activeDatasetId === ds.id ? 'text-emerald-600' : ''" style="color: var(--color-text-muted);" />
+                  <span class="truncate text-xs font-medium" :class="appStore.activeDatasetId === ds.id ? 'text-emerald-700' : ''" style="color: var(--color-text-main);">{{ ds.name }}</span>
+                </div>
+                <button
+                  @click.stop="confirmDeleteDataset(ds.id)"
+                  class="btn-icon p-1 rounded transition-all duration-150 opacity-0 group-hover:opacity-100 shrink-0"
+                  style="color: var(--color-text-muted);"
+                  title="Delete Dataset"
+                >
+                  <TrashIcon class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conversations Section -->
+        <div v-if="appStore.hasWorkspace" class="space-y-0.5">
+          <div class="h-px my-2" style="background-color: color-mix(in srgb, var(--color-border) 50%, transparent);" />
+
+          <!-- Section Header -->
+          <button
+            @click="conversationsExpanded = !conversationsExpanded"
+            class="w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
+          >
+            <div class="flex items-center gap-2">
+              <ChatBubbleLeftEllipsisIcon class="w-3.5 h-3.5" style="color: var(--color-text-muted);" />
+              <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Conversations</span>
+              <span
+                v-if="appStore.conversations.length > 0"
+                class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                style="background-color: var(--color-surface); color: var(--color-text-muted);"
+              >
+                {{ appStore.conversations.length }}
+              </span>
+            </div>
+            <ChevronRightIcon
+              class="w-3.5 h-3.5 transition-transform duration-200"
+              :class="conversationsExpanded ? 'rotate-90' : ''"
+              style="color: var(--color-text-muted);"
+            />
+          </button>
+
+          <!-- Section Content -->
+          <div v-show="conversationsExpanded" class="pl-2">
+            <div v-if="filteredConversations.length === 0 && appStore.conversations.length > 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
+              No matches found
+            </div>
+
+            <div v-if="appStore.conversations.length === 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
+              No conversations yet
+            </div>
+
+            <div v-else class="space-y-0.5 pb-1">
+              <div
+                v-for="conv in filteredConversations"
+                :key="conv.id"
+                class="group flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface)]"
+                :class="{ 'bg-[var(--color-surface)]': appStore.activeConversationId === conv.id }"
+                @click="selectConversation(conv.id)"
+              >
+                <div class="flex items-center gap-2 min-w-0 flex-1">
+                  <ChatBubbleLeftRightIcon class="w-3.5 h-3.5 shrink-0" :class="appStore.activeConversationId === conv.id ? 'text-emerald-600' : ''" style="color: var(--color-text-muted);" />
+                  <span class="truncate text-xs font-medium" :class="appStore.activeConversationId === conv.id ? 'text-emerald-700' : ''" style="color: var(--color-text-main);">{{ conv.title || 'Untitled' }}</span>
+                </div>
+                <button
+                  @click.stop="confirmDeleteConversation(conv.id)"
+                  class="btn-icon p-1 rounded transition-all duration-150 opacity-0 group-hover:opacity-100 shrink-0"
+                  style="color: var(--color-text-muted);"
+                  title="Delete Conversation"
+                >
+                  <TrashIcon class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto overflow-x-hidden flex flex-col py-3 custom-scrollbar">
-      <div class="px-3">
-        <SidebarWorkspaces
-          :is-collapsed="false"
-          @header-click="handleExplorerHeaderClick"
-          @select="handleWorkspaceSelect"
-        />
-
-        <Transition name="sidebar-section">
-          <div v-if="appStore.hasWorkspace" class="mt-2">
-            <div class="mx-0 h-px" style="background-color: color-mix(in srgb, var(--color-border) 78%, transparent);" />
-            <SidebarDatasets
-              :is-collapsed="false"
-              @header-click="handleExplorerHeaderClick"
-              @select="handleDatasetSelect"
-              @open-settings="openSettings"
-            />
-            <div class="mx-0 mt-1 h-px" style="background-color: color-mix(in srgb, var(--color-border) 78%, transparent);" />
-            <SidebarConversations
-              :is-collapsed="false"
-              @header-click="handleExplorerHeaderClick"
-              @select="handleConversationSelect"
-            />
-          </div>
-        </Transition>
-      </div>
-    </div>
-
+    <!-- Footer -->
     <div class="border-t p-2 shrink-0 flex flex-col gap-1" style="border-color: var(--color-border); background-color: var(--color-base);">
       <button
         @click="openSettings('api')"
-        class="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-zinc-100/70 transition-colors"
+        class="w-full flex items-center gap-2 p-2 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
         style="color: var(--color-text-main);"
         title="Settings"
       >
@@ -61,7 +300,7 @@
 
       <button
         @click="openTerms"
-        class="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-zinc-100/70 transition-colors"
+        class="w-full flex items-center gap-2 p-2 rounded-lg transition-colors hover:bg-[var(--color-surface)]"
         style="color: var(--color-text-main);"
         title="Terms & Conditions"
       >
@@ -74,6 +313,24 @@
       :is-open="isSettingsOpen"
       :initial-tab="settingsInitialTab"
       @close="closeSettings"
+    />
+
+    <WorkspaceCreateModal
+      :is-open="isCreateDialogOpen"
+      :is-submitting="isCreatingWorkspace"
+      :plan="authStore.planLabel"
+      @close="closeCreateDialog"
+      @submit="createWorkspace"
+    />
+
+    <ConfirmationModal
+      :is-open="isDeleteDialogOpen"
+      :title="deleteDialogTitle"
+      :message="deleteDialogMessage"
+      confirm-text="Delete"
+      cancel-text="Cancel"
+      @close="closeDeleteDialog"
+      @confirm="confirmDelete"
     />
 
     <div
@@ -89,7 +346,7 @@
       >
         <div class="flex items-center justify-between border-b px-5 py-3" style="border-color: var(--color-border);">
           <div>
-            <p class="text-sm font-semibold">Terms &amp; Conditions</p>
+            <p class="text-sm font-semibold">Terms & Conditions</p>
             <p v-if="termsLastUpdated" class="text-xs" style="color: var(--color-text-muted);">Last updated: {{ termsLastUpdated }}</p>
           </div>
           <button
@@ -119,33 +376,69 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
+import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/vue'
 import { useAppStore } from '../../stores/appStore'
+import { useAuthStore } from '../../stores/authStore'
+import { toast } from '../../composables/useToast'
+import { extractApiErrorMessage } from '../../utils/apiError'
 import SettingsModal from '../modals/SettingsModal.vue'
-import SidebarWorkspaces from './sidebar/SidebarWorkspaces.vue'
-import SidebarDatasets from './sidebar/SidebarDatasets.vue'
-import SidebarConversations from './sidebar/SidebarConversations.vue'
+import WorkspaceCreateModal from '../modals/WorkspaceCreateModal.vue'
+import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 
 import {
+  BuildingOffice2Icon,
+  CheckCircleIcon,
+  ChevronUpDownIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  TrashIcon,
   CogIcon,
   DocumentIcon,
   XMarkIcon,
+  MagnifyingGlassIcon,
+  DatabaseIcon,
+  FolderIcon,
+  ChatBubbleLeftEllipsisIcon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 
+// Search
+const searchQuery = ref('')
+
+// Section expansion states
+const workspacesExpanded = ref(true)
+const datasetsExpanded = ref(true)
+const conversationsExpanded = ref(true)
+
+// Settings dialog
 const isSettingsOpen = ref(false)
 const settingsInitialTab = ref('api')
+
+// Terms dialog
 const isTermsDialogOpen = ref(false)
 const isTermsLoading = ref(false)
 const termsError = ref('')
 const termsMarkdown = ref('')
 const termsLastUpdated = ref('')
 
+// Create workspace
+const isCreateDialogOpen = ref(false)
+const isCreatingWorkspace = ref(false)
+
+// Delete confirmation
+const isDeleteDialogOpen = ref(false)
+const deleteDialogTitle = ref('')
+const deleteDialogMessage = ref('')
+const pendingDeleteType = ref('')
+const pendingDeleteId = ref('')
 
 const termsMarkdownRenderer = new MarkdownIt({
   html: false,
@@ -161,28 +454,66 @@ const termsHtml = computed(() => {
   })
 })
 
+// Filtered lists
+const filteredWorkspaces = computed(() => {
+  if (!searchQuery.value) return appStore.workspaces
+  const query = searchQuery.value.toLowerCase()
+  return appStore.workspaces.filter(ws => ws.name?.toLowerCase().includes(query))
+})
 
+const filteredDatasets = computed(() => {
+  if (!searchQuery.value) return appStore.datasets
+  const query = searchQuery.value.toLowerCase()
+  return appStore.datasets.filter(ds => ds.name?.toLowerCase().includes(query))
+})
 
+const filteredConversations = computed(() => {
+  if (!searchQuery.value) return appStore.conversations
+  const query = searchQuery.value.toLowerCase()
+  return appStore.conversations.filter(conv => conv.title?.toLowerCase().includes(query))
+})
+
+// Selected workspace
+const selectedWorkspaceId = computed(() => String(appStore.activeWorkspaceId || '').trim())
+const activeWorkspaceName = computed(() => {
+  const activeId = selectedWorkspaceId.value
+  const activeWorkspace = appStore.workspaces.find((ws) => ws.id === activeId)
+  return activeWorkspace?.name || 'Choose a workspace'
+})
+
+function isWorkspaceDeleting(workspaceId) {
+  return appStore.workspaceDeletionJobs.some((job) => job.workspace_id === workspaceId)
+}
+
+async function selectWorkspace(id) {
+  if (!id || id === appStore.activeWorkspaceId) {
+    return
+  }
+  try {
+    await appStore.activateWorkspace(id)
+    await appStore.fetchConversations()
+    if (appStore.activeConversationId) {
+      await appStore.fetchConversationTurns({ reset: true })
+    }
+  } catch (error) {
+    toast.error('Workspace Error', error.message || 'Failed to activate workspace')
+  }
+}
+
+function selectDataset(id) {
+  appStore.setActiveDataset(id)
+}
+
+function selectConversation(id) {
+  appStore.setActiveConversation(id)
+}
+
+// Toggle sidebar
 function toggleSidebar() {
   appStore.setSidebarCollapsed(true)
 }
 
-function handleExplorerHeaderClick() {
-  // Explorer sections manage their own expanded state.
-}
-
-function handleWorkspaceSelect() {
-  appStore.setActiveTab('workspace')
-}
-
-function handleDatasetSelect() {
-  appStore.setActiveTab('workspace')
-}
-
-function handleConversationSelect() {
-  appStore.setActiveTab('workspace')
-}
-
+// Settings
 function openSettings(tab = 'api') {
   settingsInitialTab.value = tab
   isSettingsOpen.value = true
@@ -193,6 +524,7 @@ function closeSettings() {
   settingsInitialTab.value = 'api'
 }
 
+// Terms
 async function loadTermsAndConditions({ force = false } = {}) {
   if (termsMarkdown.value && !force) return
   isTermsLoading.value = true
@@ -217,24 +549,123 @@ function closeTermsDialog() {
   isTermsDialogOpen.value = false
 }
 
+// Create workspace
+function openCreateDialog() {
+  isCreateDialogOpen.value = true
+}
 
+function closeCreateDialog() {
+  if (isCreatingWorkspace.value) return
+  isCreateDialogOpen.value = false
+}
+
+async function createWorkspace(name) {
+  if (!name) return
+  isCreatingWorkspace.value = true
+  try {
+    const ws = await appStore.createWorkspace(name)
+    await appStore.fetchWorkspaces()
+    isCreateDialogOpen.value = false
+    if (ws?.id) {
+      await selectWorkspace(ws.id)
+    }
+  } catch (error) {
+    toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to create workspace'))
+  } finally {
+    isCreatingWorkspace.value = false
+  }
+}
+
+// Delete confirmations
+function confirmDeleteWorkspace(workspaceId) {
+  const target = appStore.workspaces.find((ws) => ws.id === workspaceId)
+  pendingDeleteType.value = 'workspace'
+  pendingDeleteId.value = workspaceId
+  deleteDialogTitle.value = 'Delete Workspace'
+  deleteDialogMessage.value = `Are you sure you want to delete "${target?.name || 'this workspace'}"? Cleanup will run in the background and cannot be undone.`
+  isDeleteDialogOpen.value = true
+}
+
+function confirmDeleteDataset(datasetId) {
+  const target = appStore.datasets.find((ds) => ds.id === datasetId)
+  pendingDeleteType.value = 'dataset'
+  pendingDeleteId.value = datasetId
+  deleteDialogTitle.value = 'Delete Dataset'
+  deleteDialogMessage.value = `Are you sure you want to delete "${target?.name || 'this dataset'}"? This action cannot be undone.`
+  isDeleteDialogOpen.value = true
+}
+
+function confirmDeleteConversation(conversationId) {
+  const target = appStore.conversations.find((c) => c.id === conversationId)
+  pendingDeleteType.value = 'conversation'
+  pendingDeleteId.value = conversationId
+  deleteDialogTitle.value = 'Delete Conversation'
+  deleteDialogMessage.value = `Are you sure you want to delete "${target?.title || 'Untitled'}"? This action cannot be undone.`
+  isDeleteDialogOpen.value = true
+}
+
+function closeDeleteDialog() {
+  isDeleteDialogOpen.value = false
+  pendingDeleteType.value = ''
+  pendingDeleteId.value = ''
+  deleteDialogTitle.value = ''
+  deleteDialogMessage.value = ''
+}
+
+async function confirmDelete() {
+  if (!pendingDeleteId.value) return
+
+  try {
+    if (pendingDeleteType.value === 'workspace') {
+      const job = await appStore.deleteWorkspaceAsync(pendingDeleteId.value)
+      toast.info('Workspace Deletion Started', `Deleting workspace in background (job: ${job.job_id.slice(0, 8)}...).`)
+    } else if (pendingDeleteType.value === 'dataset') {
+      await appStore.deleteDataset(pendingDeleteId.value)
+      toast.success('Dataset Deleted', 'Dataset has been removed.')
+    } else if (pendingDeleteType.value === 'conversation') {
+      await appStore.deleteConversation(pendingDeleteId.value)
+      toast.success('Conversation Deleted', 'Conversation has been removed.')
+    }
+    closeDeleteDialog()
+  } catch (error) {
+    toast.error('Delete Error', extractApiErrorMessage(error, 'Failed to delete'))
+  }
+}
+
+// Bootstrap
+onMounted(async () => {
+  try {
+    await appStore.fetchWorkspaces()
+    await appStore.fetchWorkspaceDeletionJobs()
+  } catch {
+    // Ignore bootstrap failures here. The parent app handles global state recovery.
+  }
+})
+
+// Watch for workspace changes to fetch datasets and conversations
+watch(() => appStore.activeWorkspaceId, async (newId) => {
+  if (newId) {
+    await appStore.fetchDatasets()
+    await appStore.fetchConversations()
+  }
+})
 </script>
 
 <style scoped>
-.sidebar-section-enter-active,
-.sidebar-section-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+.workspace-dropdown-enter-active,
+.workspace-dropdown-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
-.sidebar-section-enter-from,
-.sidebar-section-leave-to {
+.workspace-dropdown-enter-from,
+.workspace-dropdown-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(-6px);
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -242,12 +673,12 @@ function closeTermsDialog() {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
+  background: color-mix(in srgb, var(--color-border) 60%, transparent);
   border-radius: 4px;
 }
 
 .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: color-mix(in srgb, var(--color-border) 80%, transparent);
 }
 
 :deep(.terms-markdown-content h1),
