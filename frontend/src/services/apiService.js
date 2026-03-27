@@ -208,13 +208,25 @@ axios.interceptors.response.use(
   (error) => {
     const status = error?.response?.status
     const url = String(error?.config?.url || '')
+    const detailText = String(error?.response?.data?.detail || '')
     const isAuthProbe = url.includes('/api/v1/auth/me')
     const isExpectedAuthCheckFailure =
       (status === 401 || !status) &&
       (isAuthProbe || url.includes('/api/v1/auth/logout'))
+    const isWorkspaceKernelPending409 =
+      status === 409 &&
+      url.includes('/api/v1/workspaces/') &&
+      (
+        url.includes('/columns') ||
+        url.includes('/artifacts') ||
+        url.includes('/commands')
+      ) &&
+      detailText.toLowerCase().includes('workspace kernel')
 
-    if (!isExpectedAuthCheckFailure) {
+    if (!isExpectedAuthCheckFailure && !isWorkspaceKernelPending409) {
       console.error('API Error:', error)
+    } else if (isWorkspaceKernelPending409) {
+      console.debug('Runtime pending while kernel starts:', url, detailText)
     }
 
     // Add more specific error information

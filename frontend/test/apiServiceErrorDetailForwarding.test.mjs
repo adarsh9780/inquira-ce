@@ -13,4 +13,7 @@ test('axios response interceptor forwards backend detail into the thrown error m
     source.includes("error.message || `Request failed with status ${error.response.status}`"),
     true,
   )
+  assert.equal(source.includes('const isWorkspaceKernelPending409 ='), true)
+  assert.equal(source.includes("detailText.toLowerCase().includes('workspace kernel')"), true)
+  assert.equal(source.includes("console.debug('Runtime pending while kernel starts:'"), true)
 })

@@ -380,7 +380,7 @@ async function loadSchemaDatasets() {
   try {
     const [datasetResponse, columnsResponse] = await Promise.all([
       apiService.v1ListDatasets(workspaceId).catch(() => ({ datasets: [] })),
-      apiService.v1GetWorkspaceColumns(workspaceId).catch(() => ({ columns: [] }))
+      apiService.getWorkspaceColumns(workspaceId).catch(() => ({ columns: [] }))
     ])
     datasetOptions.value = buildSchemaDatasetEntries(
       datasetResponse?.datasets || [],

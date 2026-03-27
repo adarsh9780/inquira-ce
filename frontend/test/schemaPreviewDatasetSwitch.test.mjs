@@ -39,7 +39,8 @@ test('schema editor derives dataset options from workspace tables and does not r
 
   assert.equal(source.includes('function extractWorkspaceTableNames(columns)'), true)
   assert.equal(source.includes('function buildSchemaDatasetEntries(catalogItems, workspaceColumns)'), true)
-  assert.equal(source.includes('apiService.v1GetWorkspaceColumns(workspaceId)'), true)
+  assert.equal(source.includes('apiService.getWorkspaceColumns(workspaceId)'), true)
+  assert.equal(source.includes('apiService.v1GetWorkspaceColumns(workspaceId)'), false)
   assert.equal(source.includes('if (!normalizedPath && !(saveTableName && appStore.activeWorkspaceId)) {'), true)
   assert.equal(source.includes('if (!selected?.sourcePath) return'), false)
 })
