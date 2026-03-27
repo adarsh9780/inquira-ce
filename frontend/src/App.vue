@@ -3,29 +3,29 @@
     <ToastContainer />
 
     <div
-      v-if="!startupFailure && !desktopStartup.ready"
+      v-show="!startupFailure && !desktopStartup.ready"
       class="fixed inset-0 flex items-center justify-center bg-[var(--color-base)]"
     >
-      <div class="w-full max-w-md px-6 text-center startup-enter">
+      <div class="w-full max-w-md px-6 text-center">
         <!-- Logo -->
         <div class="flex justify-center mb-8">
           <img
             :src="logo"
             alt="Inquira logo"
-            class="h-16 w-16 opacity-0 startup-logo"
+            class="h-16 w-16"
           />
         </div>
 
         <!-- Brand -->
-        <h1 class="text-2xl font-semibold tracking-tight text-[var(--color-text-main)] startup-text">
+        <h1 class="text-2xl font-semibold tracking-tight text-[var(--color-text-main)]">
           {{ desktopStartupTitle }}
         </h1>
-        <p class="mt-3 text-sm text-[var(--color-text-muted)] startup-text-delay">
+        <p class="mt-3 text-sm text-[var(--color-text-muted)]">
           {{ desktopStartupMessage }}
         </p>
 
         <!-- Progress -->
-        <div class="mt-10 startup-progress">
+        <div class="mt-10">
           <div class="h-px w-full bg-[var(--color-border)]">
             <div
               class="h-full bg-[var(--color-text-main)] transition-all duration-500 ease-out"
@@ -40,10 +40,8 @@
       </div>
     </div>
 
-
-
     <div
-      v-else-if="startupFailure"
+      v-show="startupFailure"
       class="fixed inset-0 flex items-center justify-center bg-[var(--color-base)]"
     >
       <div class="w-full max-w-md px-6 text-center">
@@ -68,7 +66,7 @@
       </div>
     </div>
 
-    <div v-else-if="authStore.isAuthenticated && appBootstrap.ready" class="flex flex-col h-screen">
+    <div v-show="authStore.isAuthenticated && appBootstrap.ready" class="flex flex-col h-screen">
       <ConnectionStatusIndicator />
       <div class="flex-1 flex overflow-hidden bg-white relative">
         <Transition name="sidebar-shell">
@@ -84,50 +82,48 @@
     </div>
 
     <Teleport to="body">
-      <Transition name="fade">
-        <div
-          v-if="workspaceRuntimeStatus.active || appBootstrap.active"
-          class="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--color-base)]"
-        >
-          <div class="w-full max-w-md px-6 text-center startup-enter">
-            <!-- Logo -->
-            <div class="flex justify-center mb-8">
-              <img
-                :src="logo"
-                alt="Inquira logo"
-                class="h-16 w-16 opacity-0 startup-logo"
-              />
-            </div>
+      <div
+        class="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--color-base)] transition-opacity duration-300"
+        :class="(workspaceRuntimeStatus.active || appBootstrap.active) ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
+      >
+        <div class="w-full max-w-md px-6 text-center">
+          <!-- Logo -->
+          <div class="flex justify-center mb-8">
+            <img
+              :src="logo"
+              alt="Inquira logo"
+              class="h-16 w-16"
+            />
+          </div>
 
-            <!-- Status -->
-            <p class="text-xs font-medium uppercase tracking-widest text-[var(--color-text-muted)] startup-text">
-              {{ startupOverlayPill }}
-            </p>
-            <h1 class="mt-4 text-2xl font-semibold tracking-tight text-[var(--color-text-main)] startup-text-delay">
-              {{ startupOverlayTitle }}
-            </h1>
-            <p class="mt-3 text-sm text-[var(--color-text-muted)] startup-text-delay-2">
-              {{ startupOverlayMessage }}
-            </p>
+          <!-- Status -->
+          <p class="text-xs font-medium uppercase tracking-widest text-[var(--color-text-muted)]">
+            {{ startupOverlayPill }}
+          </p>
+          <h1 class="mt-4 text-2xl font-semibold tracking-tight text-[var(--color-text-main)]">
+            {{ startupOverlayTitle }}
+          </h1>
+          <p class="mt-3 text-sm text-[var(--color-text-muted)]">
+            {{ startupOverlayMessage }}
+          </p>
 
-            <!-- Current process -->
-            <div class="mt-10 startup-progress">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-xs text-[var(--color-text-muted)]">Current</span>
-                <span class="text-xs text-[var(--color-text-muted)]">{{ currentStartupElapsedLabel }}</span>
-              </div>
-              <div class="h-px w-full bg-[var(--color-border)]">
-                <div
-                  class="h-full bg-[var(--color-text-main)] transition-all duration-500 ease-out animate-pulse"
-                ></div>
-              </div>
-              <p class="mt-3 text-sm font-medium text-[var(--color-text-main)]">
-                {{ currentStartupProcess }}
-              </p>
+          <!-- Current process -->
+          <div class="mt-10">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs text-[var(--color-text-muted)]">Current</span>
+              <span class="text-xs text-[var(--color-text-muted)]">{{ currentStartupElapsedLabel }}</span>
             </div>
+            <div class="h-px w-full bg-[var(--color-border)]">
+              <div
+                class="h-full bg-[var(--color-text-main)] animate-pulse"
+              ></div>
+            </div>
+            <p class="mt-3 text-sm font-medium text-[var(--color-text-main)]">
+              {{ currentStartupProcess }}
+            </p>
           </div>
         </div>
-      </Transition>
+      </div>
     </Teleport>
   </div>
 </template>
