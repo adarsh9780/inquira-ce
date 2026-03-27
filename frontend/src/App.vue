@@ -4,80 +4,38 @@
 
     <div
       v-if="!startupFailure && !desktopStartup.ready"
-      class="fixed inset-0 overflow-y-auto bg-[var(--color-base)]"
+      class="fixed inset-0 flex items-center justify-center bg-[var(--color-base)]"
     >
-      <div class="relative min-h-screen overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
-        <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.08),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(24,24,27,0.08),_transparent_34%)]"></div>
-        <div class="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(253,252,248,0))]"></div>
-        <div class="startup-grid absolute inset-0 opacity-70"></div>
+      <div class="w-full max-w-md px-6 text-center startup-enter">
+        <!-- Logo -->
+        <div class="flex justify-center mb-8">
+          <img
+            :src="logo"
+            alt="Inquira logo"
+            class="h-16 w-16 opacity-0 startup-logo"
+          />
+        </div>
 
-        <div class="relative mx-auto flex min-h-[calc(100vh-3rem)] max-w-6xl items-center justify-center">
-          <section class="w-full overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-white/88 shadow-[0_28px_90px_rgba(24,24,27,0.1)] backdrop-blur-xl">
-            <div class="grid lg:grid-cols-[1.04fr_0.96fr]">
-              <aside class="relative overflow-hidden border-b border-[var(--color-border)] px-6 py-8 sm:px-8 lg:border-b-0 lg:border-r lg:px-10 lg:py-10">
-                <div class="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(253,252,248,0.84)),linear-gradient(135deg,rgba(59,130,246,0.05),rgba(24,24,27,0.05))]"></div>
-                <div class="absolute -left-16 top-10 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.18),rgba(59,130,246,0))]"></div>
-                <div class="absolute bottom-12 right-[-3rem] h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(24,24,27,0.12),rgba(24,24,27,0))]"></div>
+        <!-- Brand -->
+        <h1 class="text-2xl font-semibold tracking-tight text-[var(--color-text-main)] startup-text">
+          {{ desktopStartupTitle }}
+        </h1>
+        <p class="mt-3 text-sm text-[var(--color-text-muted)] startup-text-delay">
+          {{ desktopStartupMessage }}
+        </p>
 
-                <div class="relative flex h-full flex-col items-center justify-center text-center">
-                  <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Inquira startup</p>
-                  <div class="mt-6 rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_24px_48px_rgba(24,24,27,0.1)] sm:p-8">
-                    <img
-                      :src="logo"
-                      alt="Inquira logo"
-                      class="startup-brand-logo h-36 w-36 sm:h-44 sm:w-44 lg:h-52 lg:w-52"
-                    />
-                  </div>
-                  <h1 class="mt-8 text-4xl font-semibold tracking-[-0.05em] text-[var(--color-text-main)] sm:text-5xl lg:text-[3.5rem] lg:leading-[1.02]">
-                    {{ desktopStartupTitle }}
-                  </h1>
-                  <p class="mt-5 max-w-lg text-base leading-7 text-[var(--color-text-muted)] sm:text-lg sm:leading-8">
-                    {{ desktopStartupMessage }}
-                  </p>
-                </div>
-              </aside>
-
-              <div class="flex items-stretch px-6 py-8 sm:px-8 lg:px-10 lg:py-10">
-                <div class="mx-auto flex h-[34rem] w-full max-w-xl flex-col rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[0_18px_48px_rgba(24,24,27,0.08)] sm:p-8">
-                  <p class="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Startup progress</p>
-                  <h2 class="mt-4 text-3xl tracking-[-0.04em] text-[var(--color-text-main)] sm:text-4xl">
-                    {{ desktopStartupPanelTitle }}
-                  </h2>
-                  <p class="mt-4 text-base leading-7 text-[var(--color-text-muted)]">
-                    {{ desktopStartupPanelHint }}
-                  </p>
-
-                  <div
-                    class="mt-6 flex items-start justify-between gap-4 rounded-[1.25rem] border border-zinc-200 bg-[var(--color-base)] px-4 py-4"
-                  >
-                    <div class="min-w-0 flex-1">
-                      <p class="text-sm font-semibold text-[var(--color-text-main)]">Current step</p>
-                      <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ desktopStartupMessage }}</p>
-                    </div>
-                    <span class="mt-1 inline-flex rounded-full border border-zinc-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
-                      Live
-                    </span>
-                  </div>
-
-                  <div class="desktop-startup-progress-scroll mt-6 flex-1 space-y-3 overflow-y-auto pr-1">
-                    <div
-                      v-for="entry in desktopStartupTimelineEntries"
-                      :key="entry.key"
-                      class="flex items-start justify-between gap-4 rounded-[1.25rem] border border-zinc-200 bg-[var(--color-base)] px-4 py-4"
-                    >
-                      <div class="min-w-0 flex-1">
-                        <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ entry.label }}</p>
-                        <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ entry.elapsed }}</p>
-                      </div>
-                      <span class="mt-1 inline-flex rounded-full border border-zinc-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
-                        Startup
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+        <!-- Progress -->
+        <div class="mt-10 startup-progress">
+          <div class="h-px w-full bg-[var(--color-border)]">
+            <div
+              class="h-full bg-[var(--color-text-main)] transition-all duration-500 ease-out"
+              :style="{ width: progressPercent + '%' }"
+            ></div>
+          </div>
+          <div class="mt-4 flex items-center justify-center gap-2">
+            <div class="h-1.5 w-1.5 rounded-full bg-[var(--color-text-muted)] animate-pulse"></div>
+            <span class="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">Starting</span>
+          </div>
         </div>
       </div>
     </div>
@@ -86,42 +44,26 @@
 
     <div
       v-else-if="startupFailure"
-      class="fixed inset-0 overflow-y-auto bg-[var(--color-base)]"
+      class="fixed inset-0 flex items-center justify-center bg-[var(--color-base)]"
     >
-      <div class="relative min-h-screen overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
-        <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.08),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(24,24,27,0.08),_transparent_34%)]"></div>
-        <div class="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(253,252,248,0))]"></div>
-        <div class="relative mx-auto flex min-h-[calc(100vh-3rem)] max-w-3xl items-center justify-center">
-          <section class="w-full overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-white/88 shadow-[0_28px_90px_rgba(24,24,27,0.1)] backdrop-blur-xl">
-            <div class="p-8 sm:p-10">
-              <div class="flex items-center gap-4">
-                <div class="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/70 bg-white/90 shadow-[0_16px_32px_rgba(24,24,27,0.08)]">
-                  <img :src="logo" alt="Inquira logo" class="h-10 w-10 rounded-xl shadow-sm" />
-                </div>
-                <div>
-                  <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--color-text-muted)]">Inquira startup</p>
-                  <p class="mt-1 text-sm text-[var(--color-text-muted)]">Desktop startup failed</p>
-                </div>
-              </div>
+      <div class="w-full max-w-md px-6 text-center">
+        <!-- Logo -->
+        <div class="flex justify-center mb-8">
+          <img :src="logo" alt="Inquira logo" class="h-16 w-16" />
+        </div>
 
-              <div class="mt-10">
-                <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--color-text-muted)]">
-                  Startup blocked
-                </p>
-                <h1 class="mt-4 text-4xl font-semibold tracking-[-0.05em] text-[var(--color-text-main)] sm:text-5xl">
-                  Inquira could not finish starting.
-                </h1>
-                <p class="mt-5 text-base leading-7 text-[var(--color-text-muted)] sm:text-lg sm:leading-8">
-                  The desktop services did not reach a healthy state, so the auth shell never started.
-                </p>
-              </div>
+        <!-- Error -->
+        <h1 class="text-xl font-semibold tracking-tight text-[var(--color-text-main)]">
+          Startup Failed
+        </h1>
+        <p class="mt-3 text-sm text-[var(--color-text-muted)]">
+          The desktop services could not reach a healthy state.
+        </p>
 
-              <div class="mt-8 rounded-[1.5rem] border border-red-200 bg-red-50 px-5 py-5 text-red-800">
-                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-red-600">Startup Error</p>
-                <p class="mt-3 text-sm leading-6">{{ startupFailure }}</p>
-              </div>
-            </div>
-          </section>
+        <!-- Error details -->
+        <div class="mt-8 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-left">
+          <p class="text-xs font-medium uppercase tracking-wider text-red-600">Error</p>
+          <p class="mt-2 text-sm text-red-800">{{ startupFailure }}</p>
         </div>
       </div>
     </div>
@@ -499,6 +441,13 @@ const desktopStartupPanelHint = computed(() => {
     : 'The startup state stays available here until the auth shell is ready.'
 })
 
+const progressPercent = computed(() => {
+  const total = desktopStartupTimeline.value.length
+  if (total === 0) return 0
+  const completed = desktopStartupTimeline.value.filter(e => e.status === 'completed').length
+  return Math.round((completed / total) * 100)
+})
+
 function toggleSidebarVisibility() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
 }
@@ -829,6 +778,70 @@ onUnmounted(() => {
 .startup-brand-logo {
   animation: startup-logo-float 7s ease-in-out infinite;
   filter: drop-shadow(0 20px 32px rgba(24, 24, 27, 0.2));
+}
+
+/* Minimal startup screen animations */
+.startup-enter {
+  animation: startup-fade-in 0.6s ease-out forwards;
+}
+
+.startup-logo {
+  animation: startup-logo-reveal 0.8s ease-out 0.2s forwards;
+}
+
+.startup-text {
+  opacity: 0;
+  animation: startup-text-reveal 0.6s ease-out 0.4s forwards;
+}
+
+.startup-text-delay {
+  opacity: 0;
+  animation: startup-text-reveal 0.6s ease-out 0.55s forwards;
+}
+
+.startup-progress {
+  opacity: 0;
+  animation: startup-progress-reveal 0.6s ease-out 0.7s forwards;
+}
+
+@keyframes startup-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes startup-logo-reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes startup-text-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes startup-progress-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .startup-progress-scroll,
