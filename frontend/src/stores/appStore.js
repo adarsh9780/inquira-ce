@@ -1021,6 +1021,32 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  async function waitForWorkspaceKernelReady(workspaceId, { timeoutMs = 15000, pollMs = 250 } = {}) {
+    const targetWorkspaceId = String(workspaceId || '').trim()
+    if (!targetWorkspaceId) return false
+
+    const startedAt = Date.now()
+    while (Date.now() - startedAt < timeoutMs) {
+      try {
+        const payload = await apiService.v1GetWorkspaceKernelStatus(targetWorkspaceId)
+        const status = normalizeKernelStatus(payload?.status)
+        setWorkspaceKernelStatus(targetWorkspaceId, status)
+        if (status === 'ready' || status === 'busy') {
+          return true
+        }
+        if (status === 'error') {
+          return false
+        }
+      } catch (_error) {
+        // Keep polling while the runtime finishes binding the workspace kernel.
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, pollMs))
+    }
+
+    return false
+  }
+
   async function ensureWorkspaceKernelConnected(workspaceId = activeWorkspaceId.value) {
     if (!authStore.isAuthenticated) return false
     const targetWorkspaceId = (workspaceId || '').trim()
@@ -1051,10 +1077,22 @@ export const useAppStore = defineStore('app', () => {
         setWorkspaceKernelStatus(targetWorkspaceId, 'starting')
         const bootstrapped = await apiService.v1BootstrapWorkspaceRuntime(targetWorkspaceId)
         if (bootstrapped?.reset === true) {
-          setWorkspaceKernelStatus(targetWorkspaceId, 'ready')
-          setRuntimeError('')
+          setWorkspaceKernelStatus(targetWorkspaceId, 'connecting')
+          const kernelReady = await waitForWorkspaceKernelReady(targetWorkspaceId)
+          if (kernelReady) {
+            setRuntimeError('')
+            return true
+          }
+          setWorkspaceKernelStatus(targetWorkspaceId, 'error')
+          setRuntimeError('Workspace runtime is still starting. Wait for Kernel Ready, then try again.')
+          setTerminalEnabled(false)
+          return false
         }
-        return bootstrapped?.reset === true
+
+        setWorkspaceKernelStatus(targetWorkspaceId, 'error')
+        setRuntimeError('Workspace runtime bootstrap did not complete.')
+        setTerminalEnabled(false)
+        return false
       } catch (error) {
         setWorkspaceKernelStatus(targetWorkspaceId, 'error')
         const message = error?.response?.data?.detail || error?.message || 'Workspace runtime bootstrap failed.'

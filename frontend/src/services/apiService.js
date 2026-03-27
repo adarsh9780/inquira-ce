@@ -434,6 +434,10 @@ export const apiService = {
     if (!targetWorkspaceId) {
       return { columns: [] }
     }
+    const kernelReady = await appStore.ensureWorkspaceKernelConnected(targetWorkspaceId)
+    if (!kernelReady) {
+      return { columns: [] }
+    }
     return this.v1GetWorkspaceColumns(targetWorkspaceId)
   },
 

@@ -130,6 +130,7 @@ import { useAuthStore } from './stores/authStore'
 import { settingsWebSocket } from './services/websocketService'
 import { previewService } from './services/previewService'
 import { walkthroughService } from './services/walkthroughService'
+import { apiService } from './services/apiService'
 import { toast } from './composables/useToast'
 import logo from './assets/favicon.svg'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
@@ -464,6 +465,19 @@ async function waitForDesktopStartupReady() {
       }
 
       if (state?.ready) {
+        desktopStartup.message = 'Waiting for backend API...'
+        recordDesktopStartupStage(desktopStartup.message)
+        try {
+          await apiService.waitForBackendReady()
+        } catch (error) {
+          const detail = String(error?.message || 'Backend did not become ready in time.').trim()
+          desktopStartup.error = detail
+          closeCurrentDesktopStartupStage()
+          startupFailure.value = detail
+          desktopStartup.active = false
+          desktopStartup.ready = false
+          return false
+        }
         closeCurrentDesktopStartupStage()
         desktopStartup.active = false
         desktopStartup.ready = true
