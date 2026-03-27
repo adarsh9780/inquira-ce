@@ -766,7 +766,7 @@ watch(() => appStore.activeWorkspaceId, async (newId) => {
 }
 
 .sidebar-item-row:hover {
-  background-color: color-mix(in srgb, var(--color-base) 86%, var(--color-text-main) 14%);
+  background-color: var(--color-chat-user-bubble);
 }
 
 .sidebar-item-row-active {

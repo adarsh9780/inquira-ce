@@ -26,7 +26,7 @@
     >
       <!-- User Message -->
       <div class="w-full mb-1">
-        <div class="px-3 py-2.5 rounded-2xl rounded-tl-sm" style="background-color: #EDE9DE;">
+        <div class="px-3 py-2.5 rounded-2xl rounded-tl-sm" style="background-color: var(--color-chat-user-bubble);">
           <div v-if="message.attachments && message.attachments.length" class="mb-3 grid grid-cols-2 gap-2">
             <img
               v-for="attachment in message.attachments"

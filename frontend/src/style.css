@@ -32,6 +32,8 @@
   /* Red 600 */
   --color-warning: #D97706;
   /* Amber 600 */
+  --color-chat-user-bubble: #EDE9DE;
+  /* User chat bubble and matched hover affordance */
 
   /* Typography */
   --font-ui: "Plus Jakarta Sans", "Inter", "Avenir Next", "Segoe UI", sans-serif;
