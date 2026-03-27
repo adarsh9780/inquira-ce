@@ -181,9 +181,6 @@
 
           <!-- Section Content -->
           <div v-show="datasetsExpanded" class="pl-2">
-            <p class="px-2 pb-1 text-[10px] uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">
-              Multiple datasets can exist in one workspace.
-            </p>
             <div v-if="isLoadingDatasets" class="px-2 py-2 text-xs text-center flex items-center justify-center gap-2" style="color: var(--color-text-muted);">
               <div class="animate-spin w-3 h-3 border-2 rounded-full" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);"></div>
               <span>Loading datasets...</span>
@@ -247,9 +244,6 @@
 
           <!-- Section Content -->
           <div v-show="conversationsExpanded" class="pl-2">
-            <p class="px-2 pb-1 text-[10px] uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">
-              Conversations are separate from datasets in this workspace.
-            </p>
             <div v-if="filteredConversations.length === 0 && appStore.conversations.length > 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
               No matches found
             </div>
