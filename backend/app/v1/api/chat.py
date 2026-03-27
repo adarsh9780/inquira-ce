@@ -140,17 +140,17 @@ async def stream_analyze(
                 logprint("⚠️ [V1 Chat] Stream cancelled before completion.", level="warning")
                 return
 
-            payload = _error_event_payload(exc)
+            error_payload = _error_event_payload(exc)
             logprint(
                 (
                     "❌ [V1 Chat] Stream error "
-                    f"(type={exc.__class__.__name__}, status={payload.get('status_code')}):\n"
+                    f"(type={exc.__class__.__name__}, status={error_payload.get('status_code')}):\n"
                     f"{traceback.format_exc()}"
                 ),
                 level="error",
             )
             try:
-                yield _to_sse("error", payload)
+                yield _to_sse("error", error_payload)
             except Exception:
                 # If transport is already broken we still prefer a graceful exit.
                 return

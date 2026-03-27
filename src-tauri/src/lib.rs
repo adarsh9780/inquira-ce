@@ -1491,6 +1491,9 @@ fn start_agent_runtime(
         .env("INQUIRA_AGENT_SHARED_SECRET", shared_secret)
         .env("INQUIRA_AGENT_HOST", agent_host)
         .env("INQUIRA_AGENT_PORT", agent_port.to_string())
+        // LangGraph can reject synchronous helpers (for example os.getcwd)
+        // when running behind ASGI unless isolated loops are enabled.
+        .env("BG_JOB_ISOLATED_LOOPS", "true")
         .env("PYTHONPATH", agent_dir.display().to_string());
     apply_proxy_env(&mut cmd, config);
 
