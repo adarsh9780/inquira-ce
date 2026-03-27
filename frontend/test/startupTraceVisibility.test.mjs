@@ -3,12 +3,12 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('startup overlay shows current process and recent timing entries', () => {
+test('startup overlay shows a single status message and elapsed timing hint', () => {
   const appPath = resolve(process.cwd(), 'src/App.vue')
   const source = readFileSync(appPath, 'utf-8')
 
-  assert.equal(source.includes('Current process'), true)
-  assert.equal(source.includes('currentStartupProcess'), true)
+  assert.equal(source.includes('currentStartupProcess'), false)
+  assert.equal(source.includes('{{ startupOverlayMessage }}'), true)
   assert.equal(source.includes('startupTimelineEntries'), true)
   assert.equal(source.includes('currentStartupElapsedLabel'), true)
 })

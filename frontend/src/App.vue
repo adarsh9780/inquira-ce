@@ -107,20 +107,15 @@
             {{ startupOverlayMessage }}
           </p>
 
-          <!-- Current process with spinner -->
-          <div class="mt-8 flex items-center justify-center gap-4">
+          <!-- Spinner + elapsed only; keep a single status message above -->
+          <div class="mt-8 flex items-center justify-center gap-3">
             <div class="relative h-8 w-8 shrink-0">
               <div class="absolute inset-0 rounded-full border-2 border-[var(--color-border)]"></div>
               <div class="absolute inset-0 rounded-full border-2 border-t-[var(--color-text-main)] border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
             </div>
-            <div class="text-left">
-              <p class="text-sm font-medium text-[var(--color-text-main)]">
-                {{ currentStartupProcess }}
-              </p>
-              <p class="text-xs text-[var(--color-text-muted)]">
-                {{ currentStartupElapsedLabel }}
-              </p>
-            </div>
+            <p class="text-xs text-[var(--color-text-muted)]">
+              {{ currentStartupElapsedLabel }}
+            </p>
           </div>
         </div>
       </div>
@@ -275,8 +270,6 @@ const currentStartupStage = computed(() => {
     message: String(appBootstrap.message || '').trim() || 'Loading your workspace...',
   }
 })
-
-const currentStartupProcess = computed(() => currentStartupStage.value.message)
 
 const currentStartupElapsedLabel = computed(() => {
   const current = startupTimeline.value[startupTimeline.value.length - 1]
