@@ -1,4 +1,5 @@
 import importlib
+import re
 import sys
 from pathlib import Path
 
@@ -22,6 +23,7 @@ def test_load_cors_origins_defaults_when_env_missing(monkeypatch):
     main = _load_main_module()
     origins = main._load_cors_origins()
     assert "http://localhost:5173" in origins
+    assert "http://tauri.localhost" in origins
     assert "https://tauri.localhost" in origins
 
 
@@ -37,3 +39,13 @@ def test_cors_allows_patch_method():
     cors_kwargs = _get_cors_kwargs(main)
     methods = cors_kwargs.get("allow_methods", [])
     assert "PATCH" in methods
+
+
+def test_cors_origin_regex_accepts_tauri_localhost_http_and_https():
+    main = _load_main_module()
+    cors_kwargs = _get_cors_kwargs(main)
+    origin_regex = cors_kwargs.get("allow_origin_regex", "")
+
+    assert re.match(origin_regex, "http://tauri.localhost")
+    assert re.match(origin_regex, "https://tauri.localhost")
+    assert re.match(origin_regex, "http://tauri.localhost:1420")

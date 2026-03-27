@@ -69,6 +69,7 @@ def _default_cors_origins() -> list[str]:
         "http://127.0.0.1:3000",  # Alternative dev port
         "http://127.0.0.1:8000",
         "http://localhost:8000",
+        "http://tauri.localhost",  # Tauri webview in packaged desktop runs
         "https://tauri.localhost",  # Tauri webview
         "tauri://localhost",  # Tauri webview (custom protocol)
     ]
@@ -214,7 +215,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_load_cors_origins(),
     # Keep local-dev origins resilient across Vite/Tauri port changes.
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$|^https://tauri\.localhost$|^tauri://localhost$",
+    allow_origin_regex=(
+        r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+        r"|^https?://tauri\.localhost(:\d+)?$"
+        r"|^tauri://localhost$"
+    ),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
