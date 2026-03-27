@@ -7,7 +7,7 @@
     "frontendDist": "../frontend/dist",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "",
-    "beforeBuildCommand": "npm --prefix . run build -- --outDir dist || npm --prefix frontend run build -- --outDir dist || npm --prefix ../frontend run build -- --outDir dist"
+    "beforeBuildCommand": "npm --prefix ../frontend ci && npm --prefix ../frontend run build -- --outDir dist"
   },
   "app": {
     "windows": [

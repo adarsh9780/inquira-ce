@@ -20,13 +20,13 @@ def test_release_workflow_does_not_publish_python_wheels_or_pypi_artifacts():
 
 
 def test_tauri_before_build_command_is_shell_portable():
-    text = TAURI_CONF.read_text(encoding="utf-8")
+    data = json.loads(TAURI_CONF.read_text(encoding="utf-8"))
+    command = data.get("build", {}).get("beforeBuildCommand", "")
 
-    assert '"beforeBuildCommand": "npm --prefix . run build -- --outDir dist' in text
-    assert "npm --prefix frontend run build -- --outDir dist" in text
-    assert "npm --prefix ../frontend run build -- --outDir dist" in text
-    assert "||" in text
-    assert "[ -d frontend ]" not in text
+    assert command == "npm --prefix ../frontend ci && npm --prefix ../frontend run build -- --outDir dist"
+    assert "npm --prefix . run build" not in command
+    assert "npm --prefix frontend run build" not in command
+    assert "||" not in command
 
 
 def test_backend_pyproject_avoids_vcs_direct_dependency_for_runtime_stability():
