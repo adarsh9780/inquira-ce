@@ -47,53 +47,8 @@
               <span class="truncate">Deleting workspace...</span>
             </div>
 
-            <div v-if="filteredWorkspaces.length === 0 && appStore.workspaces.length > 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
-              No matches found
-            </div>
-
             <div v-if="appStore.workspaces.length === 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
               No workspaces yet
-            </div>
-
-            <div v-else class="space-y-0.5 pb-1">
-              <div
-                v-for="ws in filteredWorkspaces"
-                :key="ws.id"
-                class="group/item w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors"
-                :class="[
-                  ws.id === appStore.activeWorkspaceId ? 'bg-[var(--color-surface)]' : 'hover:bg-[var(--color-surface)]',
-                  isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
-                ]"
-                @click="selectWorkspace(ws.id)"
-              >
-                <div class="flex items-center gap-2 min-w-0 flex-1">
-                  <FolderOpenIcon
-                    v-if="ws.id === appStore.activeWorkspaceId"
-                    class="w-4 h-4 shrink-0 text-emerald-600"
-                  />
-                  <FolderIcon
-                    v-else
-                    class="w-4 h-4 shrink-0"
-                    style="color: var(--color-text-muted);"
-                  />
-                  <p
-                    class="text-[15px] font-medium truncate"
-                    :class="ws.id === appStore.activeWorkspaceId ? 'text-emerald-700' : ''"
-                    style="color: var(--color-text-main);"
-                  >
-                    {{ ws.name }}
-                  </p>
-                </div>
-                <button
-                  v-if="!isWorkspaceDeleting(ws.id)"
-                  @click.stop="confirmDeleteWorkspace(ws.id)"
-                  class="btn-icon p-1 rounded transition-all duration-150 opacity-0 group-hover/item:opacity-100 shrink-0"
-                  style="color: var(--color-text-muted);"
-                  title="Delete Workspace"
-                >
-                  <TrashIcon class="w-3.5 h-3.5" />
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -489,12 +444,6 @@ const termsHtml = computed(() => {
 })
 
 // Filtered lists
-const filteredWorkspaces = computed(() => {
-  if (!searchQuery.value) return appStore.workspaces
-  const query = searchQuery.value.toLowerCase()
-  return appStore.workspaces.filter(ws => ws.name?.toLowerCase().includes(query))
-})
-
 const filteredDatasets = computed(() => {
   if (!searchQuery.value) return localDatasets.value
   const query = searchQuery.value.toLowerCase()
@@ -515,7 +464,7 @@ const activeWorkspaceName = computed(() => {
 })
 const workspaceHeaderLabel = computed(() => {
   if (appStore.hasWorkspace) return activeWorkspaceName.value
-  return 'Workspaces'
+  return 'Workspace'
 })
 
 // Fetch datasets from API
@@ -540,10 +489,6 @@ async function fetchDatasets() {
   } finally {
     isLoadingDatasets.value = false
   }
-}
-
-function isWorkspaceDeleting(workspaceId) {
-  return appStore.workspaceDeletionJobs.some((job) => job.workspace_id === workspaceId)
 }
 
 async function selectWorkspace(id) {
