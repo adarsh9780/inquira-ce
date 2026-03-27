@@ -995,9 +995,6 @@ fn default_uv_search_paths(home_dir: Option<PathBuf>) -> Vec<PathBuf> {
 
 fn bundled_uv_candidates(resource_dir: &Path) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
-    #[cfg(target_os = "windows")]
-    let bundled_names = vec![uv_binary_file_name(), "uv"];
-    #[cfg(not(target_os = "windows"))]
     let bundled_names = vec![uv_binary_file_name()];
     let bundled_roots = vec!["bundled-tools", "src-tauri/bundled-tools"];
 
@@ -2132,7 +2129,7 @@ mod tests {
     }
 
     #[test]
-    fn bundled_uv_candidates_include_windows_fallback_name() {
+    fn bundled_uv_candidates_include_platform_binary_name() {
         let base = std::env::temp_dir().join("inq_uv_bundle_candidates");
         let _ = fs::remove_dir_all(&base);
         fs::create_dir_all(&base).expect("create resource dir");
@@ -2156,13 +2153,6 @@ mod tests {
             "expected bundled candidates to include the legacy src-tauri resource layout"
         );
 
-        #[cfg(target_os = "windows")]
-        assert!(
-            candidates
-                .iter()
-                .any(|path| path.ends_with(Path::new("bundled-tools").join("uv"))),
-            "expected bundled candidates to include a plain `uv` fallback on Windows"
-        );
     }
 
     #[test]
