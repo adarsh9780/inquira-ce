@@ -25,29 +25,20 @@ test('sidebar and explorer sections use animated collapse transitions', () => {
     resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'),
     'utf-8',
   )
-  const workspacesSource = readFileSync(
-    resolve(process.cwd(), 'src/components/layout/sidebar/SidebarWorkspaces.vue'),
-    'utf-8',
-  )
-  const datasetsSource = readFileSync(
-    resolve(process.cwd(), 'src/components/layout/sidebar/SidebarDatasets.vue'),
-    'utf-8',
-  )
-  const conversationsSource = readFileSync(
-    resolve(process.cwd(), 'src/components/layout/sidebar/SidebarConversations.vue'),
-    'utf-8',
-  )
-
-  assert.equal(sidebarSource.includes('<Transition name="sidebar-section">'), true)
-  assert.equal(sidebarSource.includes(':is-collapsed="false"'), true)
+  // New redesign uses v-show with workspacesExpanded/datasetsExpanded/conversationsExpanded
+  // instead of <Transition> components for collapse animations
+  assert.equal(sidebarSource.includes('workspacesExpanded = ref(true)'), true)
+  assert.equal(sidebarSource.includes('v-show="workspacesExpanded"'), true)
+  assert.equal(sidebarSource.includes('v-show="datasetsExpanded"'), true)
+  assert.equal(sidebarSource.includes('v-show="conversationsExpanded"'), true)
+  // Chevron rotation for collapse indicator
+  assert.equal(sidebarSource.includes(':class="workspacesExpanded ? \'rotate-90\' : \'\'"'), true)
+  assert.equal(sidebarSource.includes(':class="datasetsExpanded ? \'rotate-90\' : \'\'"'), true)
+  assert.equal(sidebarSource.includes(':class="conversationsExpanded ? \'rotate-90\' : \'\'"'), true)
+  // No old transition patterns
+  assert.equal(sidebarSource.includes('<Transition name="sidebar-section">'), false)
   assert.equal(sidebarSource.includes('<Transition name="sidebar-brand">'), false)
-  assert.equal(sidebarSource.includes('.sidebar-section-enter-active'), true)
-  assert.equal(workspacesSource.includes('transition name="workspace-dropdown"'), true)
-  assert.equal(datasetsSource.includes('<Transition name="sidebar-list">'), true)
-  assert.equal(conversationsSource.includes('<Transition name="sidebar-list">'), true)
-  assert.equal(workspacesSource.includes('.workspace-dropdown-enter-active'), true)
-  assert.equal(datasetsSource.includes('.sidebar-list-enter-active'), true)
-  assert.equal(conversationsSource.includes('.sidebar-list-enter-active'), true)
+  assert.equal(sidebarSource.includes('.sidebar-section-enter-active'), false)
 })
 
 test('sidebar icons keep fixed size to avoid toggle jitter', () => {
@@ -55,18 +46,11 @@ test('sidebar icons keep fixed size to avoid toggle jitter', () => {
     resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'),
     'utf-8',
   )
-  const workspacesSource = readFileSync(
-    resolve(process.cwd(), 'src/components/layout/sidebar/SidebarWorkspaces.vue'),
-    'utf-8',
-  )
-
-  assert.equal(workspacesSource.includes('BuildingOffice2Icon class="w-3.5 h-3.5 shrink-0"'), true)
-  assert.equal(workspacesSource.includes('scale-110'), false)
-  // Workspace/Schema tabs moved to status bar; sidebar now has Settings, Terms (CE: no Logout)
-  assert.equal(sidebarSource.includes("CogIcon class=\"w-4 h-4 shrink-0\""), true)
-  assert.equal(sidebarSource.includes("DocumentIcon class=\"w-4 h-4 shrink-0\""), true)
-  // CE: logout icon removed
-  assert.equal(sidebarSource.includes("ArrowRightOnRectangleIcon class=\"w-4 h-4 shrink-0\""), false)
+  // New design uses shrink-0 on icons
+  assert.equal(sidebarSource.includes('BuildingOffice2Icon class="w-3.5 h-3.5"'), true)
+  // No scale animations on workspace/schema tabs
   assert.equal(sidebarSource.includes("appStore.activeTab === 'workspace' ? 'scale-110' : ''"), false)
   assert.equal(sidebarSource.includes("appStore.activeTab === 'schema-editor' ? 'scale-110' : ''"), false)
+  // CE: logout icon removed
+  assert.equal(sidebarSource.includes("ArrowRightOnRectangleIcon"), false)
 })

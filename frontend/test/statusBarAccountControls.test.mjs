@@ -26,7 +26,7 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
   assert.equal(statusBarSource.includes('ChevronUpIcon'), false)
   assert.equal(statusBarSource.includes('ChevronDownIcon'), false)
 
-  // Sidebar toggle still exists
+  // Sidebar toggle still exists via status bar
   assert.equal(statusBarSource.includes('toggleSidebarFromStatusBar'), true)
   assert.equal(statusBarSource.includes('Show sidebar (Cmd/Ctrl+B)'), true)
   assert.equal(statusBarSource.includes('Hide sidebar (Cmd/Ctrl+B)'), true)
@@ -66,7 +66,8 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
 
   // Settings and Terms in sidebar (CE: no logout)
   assert.equal(sidebarSource.includes('CogIcon'), true)
-  assert.equal(sidebarSource.includes('DocumentIcon'), true)
+  // Terms uses ScaleIcon (balance/legal icon), not DocumentIcon
+  assert.equal(sidebarSource.includes('ScaleIcon'), true)
   assert.equal(sidebarSource.includes('openSettings'), true)
   assert.equal(sidebarSource.includes('openTerms'), true)
   assert.equal(sidebarSource.includes('isTermsDialogOpen'), true)
@@ -75,7 +76,8 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
   assert.equal(sidebarSource.includes('ArrowRightOnRectangleIcon'), false)
   assert.equal(sidebarSource.includes('promptLogout'), false)
   assert.equal(sidebarSource.includes('isLogoutConfirmOpen'), false)
-  assert.equal(sidebarSource.includes('ConfirmationModal'), false)
+  // ConfirmationModal is used for delete confirmations (new feature in redesign)
+  assert.equal(sidebarSource.includes('ConfirmationModal'), true)
 
   // Sidebar no longer has Workspace/Schema toggle
   assert.equal(sidebarSource.includes('handleTabClick'), false)
@@ -131,8 +133,9 @@ test('workspace/schema toggle buttons use correct icons and styling', () => {
   assert.ok(statusBarSource.includes('DocumentTextIcon'))
   assert.ok(statusBarSource.includes("title=\"'Switch to Schema Editor'\""))
 
-  // Active tab styling
+  // Active tab styling now uses CSS variables
   assert.ok(statusBarSource.includes("appStore.activeTab === 'workspace'"))
   assert.ok(statusBarSource.includes("appStore.activeTab === 'schema-editor'"))
-  assert.ok(statusBarSource.includes("text-blue-600 font-medium"))
+  // New design uses CSS variables instead of hardcoded blue
+  assert.ok(statusBarSource.includes("text-[var(--color-accent)] font-medium"))
 })
