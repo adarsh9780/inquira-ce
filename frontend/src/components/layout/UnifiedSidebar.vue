@@ -11,9 +11,7 @@
       title="Click to collapse/expand"
     >
       <div class="flex items-center gap-3">
-        <div class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm" style="background: linear-gradient(135deg, var(--color-accent) 0%, color-mix(in srgb, var(--color-accent) 80%, black) 100%);">
-          <img :src="logo" alt="Inquira" class="w-5 h-5 brightness-0 invert" />
-        </div>
+        <img :src="logo" alt="Inquira" class="w-8 h-8 rounded-lg shadow-sm" />
         <div>
           <h1 class="text-sm font-bold tracking-tight leading-none" style="color: var(--color-text-main);">Inquira</h1>
           <p class="text-[10px] font-medium mt-0.5" style="color: var(--color-text-muted);">LLM-Powered Analysis</p>
