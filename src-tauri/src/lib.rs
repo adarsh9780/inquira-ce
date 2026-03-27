@@ -1567,6 +1567,10 @@ pub fn run() {
                 "",
                 "Launching desktop services...",
             );
+            // We intentionally do not reveal the main window here.
+            // Showing it this early allows frontend modules to initialize while
+            // backend bootstrap is still in-flight, which is exactly the race that
+            // can surface transient startup NETWORK_ERROR states on cold boots.
 
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -1781,6 +1785,8 @@ pub fn run() {
                 match startup_result {
                     Ok(()) => {
                         update_startup_state(&app_handle, true, "", "");
+                        // Success path: switch away from splash only after both
+                        // backend and agent health checks have completed.
                         handoff_from_splash_to_main(&app_handle);
                     }
                     Err(error) => {
@@ -1813,6 +1819,9 @@ pub fn run() {
                             ),
                             "",
                         );
+                        // Failure path still reveals the main shell so users get
+                        // actionable error details from the existing startup-failure
+                        // UI instead of being trapped on an indefinite splash.
                         handoff_from_splash_to_main(&app_handle);
                     }
                 }
