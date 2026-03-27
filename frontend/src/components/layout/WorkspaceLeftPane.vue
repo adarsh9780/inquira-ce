@@ -34,7 +34,7 @@
       </div>
       </div>
 
-      <div class="flex-shrink-0 border-t pt-2 sm:pt-3" style="background-color: var(--color-base); border-color: var(--color-border);">
+      <div class="flex-shrink-0 pt-2 sm:pt-3" style="background-color: var(--color-base);">
         <ChatInput />
       </div>
     </div>
