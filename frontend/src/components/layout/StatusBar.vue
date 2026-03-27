@@ -1,13 +1,13 @@
 <template>
-  <div class="h-7 w-full bg-slate-50 border-t border-slate-200 flex items-center justify-between px-3 text-[11px] text-slate-600 select-none z-50 shrink-0">
-    
+  <div class="h-7 w-full bg-[var(--color-surface)] border-t border-[var(--color-border)] flex items-center justify-between px-3 text-[11px] text-[var(--color-text-muted)] select-none z-50 shrink-0">
+
     <!-- Left Section: Account, Editor Toggle, Kernel Status, and Editor Position -->
-    <div class="flex items-center gap-2 h-full">
+    <div class="flex items-center gap-3 h-full">
       <!-- Account Name (opens sidebar) -->
       <button
         v-if="authStore.isAuthenticated"
         @click.stop="openSidebar"
-        class="max-w-[120px] truncate px-1 text-blue-600 text-left rounded hover:bg-slate-200/70 transition-colors"
+        class="max-w-[120px] truncate px-1 text-[var(--color-accent)] text-left rounded hover:bg-[var(--color-base)] transition-colors"
         title="Open sidebar"
         aria-label="Open sidebar"
       >
@@ -18,16 +18,16 @@
       <div v-if="authStore.isAuthenticated" class="flex items-center gap-0.5 h-full">
         <button
           @click="switchToWorkspace"
-          class="flex items-center gap-1 h-full px-1 rounded hover:bg-slate-200/50 transition-colors"
-          :class="appStore.activeTab === 'workspace' ? 'text-blue-600 font-medium' : 'text-slate-500 hover:text-slate-700'"
+          class="flex items-center gap-1 h-full px-1 rounded hover:bg-[var(--color-base)] transition-colors"
+          :class="appStore.activeTab === 'workspace' ? 'text-[var(--color-accent)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
           :title="'Switch to Workspace'"
         >
           <FolderOpenIcon class="w-3.5 h-3.5" />
         </button>
         <button
           @click="switchToSchemaEditor"
-          class="flex items-center gap-1 h-full px-1 rounded hover:bg-slate-200/50 transition-colors"
-          :class="appStore.activeTab === 'schema-editor' ? 'text-blue-600 font-medium' : 'text-slate-500 hover:text-slate-700'"
+          class="flex items-center gap-1 h-full px-1 rounded hover:bg-[var(--color-base)] transition-colors"
+          :class="appStore.activeTab === 'schema-editor' ? 'text-[var(--color-accent)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
           :title="'Switch to Schema Editor'"
         >
           <DocumentTextIcon class="w-3.5 h-3.5" />
@@ -38,8 +38,8 @@
       <button
         v-if="authStore.isAuthenticated"
         @click.stop="toggleSidebarFromStatusBar"
-        class="h-5 w-5 rounded hover:bg-slate-200/70 flex items-center justify-center transition-colors"
-        :class="appStore.isSidebarCollapsed ? 'text-slate-500 hover:text-slate-700' : 'text-blue-600'"
+        class="h-5 w-5 rounded hover:bg-[var(--color-base)] flex items-center justify-center transition-colors"
+        :class="appStore.isSidebarCollapsed ? 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]' : 'text-[var(--color-accent)]'"
         :title="sidebarToggleTitle"
         aria-label="Toggle sidebar"
       >
@@ -47,13 +47,13 @@
         <ChevronLeftIcon v-else class="w-3.5 h-3.5" />
       </button>
 
-      <div v-if="authStore.isAuthenticated" class="w-px h-3.5 bg-slate-300"></div>
+      <div v-if="authStore.isAuthenticated" class="w-px h-3.5 bg-[var(--color-border)]"></div>
 
       <!-- Kernel Status -->
       <div class="flex items-center gap-1.5 h-full px-1">
         <span
           v-if="kernelStatusMeta.showSpinner"
-          class="inline-block w-2 h-2 rounded-full border-[1.5px] border-blue-200 border-t-blue-600 animate-spin shrink-0"
+          class="inline-block w-2 h-2 rounded-full border-[1.5px] border-[var(--color-border)] border-t-[var(--color-text-main)] animate-spin shrink-0"
           aria-hidden="true"
         ></span>
         <span v-else class="w-2 h-2 rounded-full shrink-0" :class="kernelStatusMeta.dotClass"></span>
@@ -66,7 +66,7 @@
           <button
             @click="interruptKernel"
             :disabled="!appStore.activeWorkspaceId || isKernelActionRunning || kernelStatus === 'missing'"
-            class="p-0.5 rounded hover:bg-slate-200 hover:text-amber-600 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            class="p-0.5 rounded hover:bg-[var(--color-warning)]/10 text-[var(--color-text-muted)] hover:text-[var(--color-warning)] disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
             title="Interrupt Kernel"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path d="M5.25 3A2.25 2.25 0 003 5.25v9.5A2.25 2.25 0 005.25 17h9.5A2.25 2.25 0 0017 14.75v-9.5A2.25 2.25 0 0014.75 3h-9.5zM6 6.75a.75.75 0 01.75-.75h6.5a.75.75 0 01.75.75v6.5a.75.75 0 01-.75.75h-6.5a.75.75 0 01-.75-.75v-6.5z" /></svg>
@@ -74,7 +74,7 @@
           <button
             @click="restartKernel"
             :disabled="!appStore.activeWorkspaceId || isKernelActionRunning"
-            class="p-0.5 rounded hover:bg-slate-200 hover:text-red-500 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            class="p-0.5 rounded hover:bg-[var(--color-error)]/10 text-[var(--color-text-muted)] hover:text-[var(--color-error)] disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
             title="Restart Kernel"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clip-rule="evenodd" /></svg>
@@ -83,8 +83,8 @@
       </div>
 
       <template v-if="appStore.isEditorFocused">
-        <div class="w-px h-3.5 bg-slate-300"></div>
-        <div class="flex items-center text-slate-500 font-mono tracking-tight gap-1 px-1">
+        <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
+        <div class="flex items-center text-[var(--color-text-muted)] font-mono tracking-tight gap-1 px-1">
           <span>Ln {{ appStore.editorLine }},</span>
           <span>Col {{ appStore.editorCol }}</span>
         </div>
@@ -95,9 +95,9 @@
     <div class="flex items-center gap-2 h-full">
       <!-- Data pane error takes priority -->
       <template v-if="appStore.dataPaneError">
-        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-600 max-w-[280px] truncate"
+        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-[var(--color-error)]/10 text-[var(--color-error)] max-w-[280px] truncate"
              :title="appStore.dataPaneError">
-          <span class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-error)] shrink-0"></span>
           <span class="truncate">{{ appStore.dataPaneError }}</span>
         </div>
       </template>
@@ -106,12 +106,12 @@
              :class="artifactCountClass">
           <span>{{ paneArtifactCountLabel }}</span>
         </div>
-        <div v-if="appStore.activeWorkspaceId && tableViewportLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700">
+        <div v-if="appStore.activeWorkspaceId && tableViewportLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-[var(--color-accent)]/10 text-[var(--color-accent)]">
           <span>{{ tableViewportLabel }}</span>
         </div>
         <div
           v-if="showArtifactUsageWarning"
-          class="flex items-center px-1.5 py-0.5 text-amber-600"
+          class="flex items-center px-1.5 py-0.5 text-[var(--color-warning)]"
           :title="artifactUsageWarningTitle"
           aria-label="Artifact usage warning"
         >
@@ -121,39 +121,39 @@
     </div>
 
     <!-- Right Section: Data Focus, Terminal & Version -->
-    <div class="flex items-center gap-2 h-full">
+    <div class="flex items-center gap-3 h-full">
       <!-- Data Focus Toggle -->
       <button
         @click="appStore.toggleDataFocusMode()"
-        class="flex items-center gap-1.5 h-full px-1.5 hover:bg-slate-200/50 hover:text-slate-900 transition-colors"
-        :class="appStore.isDataFocusMode ? 'text-blue-600 font-medium' : ''"
+        class="flex items-center gap-1.5 h-full px-1.5 hover:bg-[var(--color-base)] transition-colors"
+        :class="appStore.isDataFocusMode ? 'text-[var(--color-accent)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
         :title="dataFocusToggleTitle"
       >
         <ViewColumnsIcon class="w-3.5 h-3.5" />
         <span>Data Focus</span>
       </button>
 
-      <div class="w-px h-3.5 bg-slate-300"></div>
+      <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
 
       <!-- Terminal Toggle -->
-      <button 
+      <button
         @click="appStore.toggleTerminal()"
-        class="flex items-center gap-1.5 h-full px-1.5 hover:bg-slate-200/50 hover:text-slate-900 transition-colors"
-        :class="appStore.isTerminalOpen ? 'text-blue-600 font-medium' : ''"
+        class="flex items-center gap-1.5 h-full px-1.5 hover:bg-[var(--color-base)] transition-colors"
+        :class="appStore.isTerminalOpen ? 'text-[var(--color-accent)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
         title="Toggle terminal panel (Cmd/Ctrl+J)"
       >
         <CommandLineIcon class="w-3.5 h-3.5" />
         <span>Terminal</span>
       </button>
 
-      <div class="w-px h-3.5 bg-slate-300"></div>
+      <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
 
       <!-- Version -->
-      <a 
-        href="https://github.com/adarsh9780/inquira" 
+      <a
+        href="https://github.com/adarsh9780/inquira"
         @click.prevent="openGitHubRepo"
-        target="_blank" 
-        class="text-slate-400 hover:text-slate-600 transition-colors font-mono"
+        target="_blank"
+        class="text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] transition-colors font-mono"
         title="View on GitHub"
       >
         Inquira v0.5.7
@@ -236,21 +236,21 @@ const dataFocusToggleTitle = computed(() => {
 const wsConnectionMeta = computed(() => {
   if (!isWebSocketMonitoringActive.value) {
     return {
-      dotClass: 'bg-slate-300',
-      textClass: 'text-slate-500',
+      dotClass: 'bg-[var(--color-border-hover)]',
+      textClass: 'text-[var(--color-text-muted)]',
       label: 'Inactive'
     }
   }
   if (isWebSocketConnected.value) {
     return {
-      dotClass: 'bg-green-500',
-      textClass: 'text-green-700',
+      dotClass: 'bg-[var(--color-success)]',
+      textClass: 'text-[var(--color-success)]',
       label: 'Connected'
     }
   }
   return {
-    dotClass: 'bg-red-500',
-    textClass: 'text-red-600',
+    dotClass: 'bg-[var(--color-error)]',
+    textClass: 'text-[var(--color-error)]',
     label: 'Disconnected'
   }
 })
@@ -258,17 +258,17 @@ const wsConnectionMeta = computed(() => {
 const kernelStatusMeta = computed(() => {
   switch (kernelStatus.value) {
     case 'ready':
-      return { dotClass: 'bg-green-500', textClass: 'text-green-700', label: 'Kernel Ready', showSpinner: false }
+      return { dotClass: 'bg-[var(--color-success)]', textClass: 'text-[var(--color-success)]', label: 'Kernel Ready', showSpinner: false }
     case 'busy':
-      return { dotClass: 'bg-amber-500', textClass: 'text-amber-700', label: 'Kernel Busy', showSpinner: true }
+      return { dotClass: 'bg-[var(--color-warning)]', textClass: 'text-[var(--color-warning)]', label: 'Kernel Busy', showSpinner: true }
     case 'starting':
     case 'connecting':
-      return { dotClass: 'bg-blue-400', textClass: 'text-blue-600', label: 'Kernel Starting', showSpinner: true }
+      return { dotClass: 'bg-[var(--color-accent)]', textClass: 'text-[var(--color-accent)]', label: 'Kernel Starting', showSpinner: true }
     case 'error':
-      return { dotClass: 'bg-red-500', textClass: 'text-red-700', label: 'Kernel Error', showSpinner: false }
+      return { dotClass: 'bg-[var(--color-error)]', textClass: 'text-[var(--color-error)]', label: 'Kernel Error', showSpinner: false }
     case 'missing':
     default:
-      return { dotClass: 'bg-gray-400', textClass: 'text-gray-500', label: 'No Kernel', showSpinner: false }
+      return { dotClass: 'bg-[var(--color-text-muted)]', textClass: 'text-[var(--color-text-muted)]', label: 'No Kernel', showSpinner: false }
   }
 })
 
@@ -307,7 +307,7 @@ const paneArtifactCountLabel = computed(() => {
 
 const artifactCountClass = computed(() => {
   // Subtle muted pill — informational, not actionable
-  return 'bg-slate-100 text-slate-500'
+  return 'bg-[var(--color-base)] text-[var(--color-text-muted)]'
 })
 
 const showArtifactUsageWarning = computed(() => {
