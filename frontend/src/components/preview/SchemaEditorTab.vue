@@ -133,18 +133,36 @@
         </div>
 
         <div class="pb-2">
-          <label class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">LLM Context Hint (Recommended)</label>
-          <p class="mb-1 text-xs" style="color: var(--color-text-muted);">
+          <div class="mb-1 flex items-center justify-between">
+            <label class="text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">LLM Context Hint (Recommended)</label>
+            <button
+              @click="openEditDialog(-1, 'context')"
+              class="opacity-60 hover:opacity-100 p-1 rounded transition-opacity duration-150"
+              style="color: var(--color-text-muted);"
+              title="Edit context"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+              </svg>
+            </button>
+          </div>
+          <p class="mb-2 text-xs" style="color: var(--color-text-muted);">
             Briefly describe business meaning, domain terms, and how this dataset should be interpreted. This helps the LLM generate better analysis.
           </p>
-          <textarea
-            v-model="schemaContext"
-            @input="schemaEdited = true"
-            rows="3"
-            class="w-full resize-y rounded-md border px-2 py-2 text-sm leading-5 outline-none"
-            style="border-color: color-mix(in srgb, var(--color-border) 45%, transparent); color: var(--color-text-main); background-color: color-mix(in srgb, var(--color-surface) 72%, var(--color-base));"
-            placeholder="Example: Daily transaction-level sales data for retail stores. Revenue is in USD. 'channel' means online vs in-store."
-          ></textarea>
+          <div
+            v-if="schemaContext && schemaContext.trim()"
+            class="rounded-lg px-4 py-3"
+            style="background-color: color-mix(in srgb, var(--color-surface) 60%, var(--color-base)); border: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);"
+          >
+            <div class="text-sm leading-relaxed prose prose-sm max-w-none" style="color: var(--color-text-main);" v-html="renderedContext"></div>
+          </div>
+          <div
+            v-else
+            class="rounded-lg px-4 py-3 italic text-sm"
+            style="color: var(--color-text-muted); background-color: color-mix(in srgb, var(--color-surface) 60%, var(--color-base)); border: 1px dashed color-mix(in srgb, var(--color-border) 50%, transparent);"
+          >
+            Click the edit icon above to add context for this dataset...
+          </div>
         </div>
 
         <div class="overflow-x-auto rounded-lg" style="border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);">
@@ -268,7 +286,7 @@
                       Describe the business meaning, format, and any relevant details about this column.
                     </p>
                   </div>
-                  <div v-else>
+                  <div v-else-if="editDialog.field === 'aliases'">
                     <label class="mb-2 block text-xs font-medium" style="color: var(--color-text-muted);">Aliases</label>
                     <textarea
                       v-model="editDialog.value"
@@ -279,6 +297,19 @@
                     ></textarea>
                     <p class="mt-2 text-[11px]" style="color: var(--color-text-muted);">
                       Search hints for schema lookup. Enter comma-separated values.
+                    </p>
+                  </div>
+                  <div v-else-if="editDialog.field === 'context'">
+                    <label class="mb-2 block text-xs font-medium" style="color: var(--color-text-muted);">Context Description</label>
+                    <textarea
+                      v-model="editDialog.value"
+                      rows="6"
+                      class="w-full resize-y rounded-lg px-3 py-2.5 text-sm leading-relaxed outline-none transition-shadow font-mono"
+                      style="border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-main); background-color: var(--color-base);"
+                      placeholder="Example: Daily transaction-level sales data for retail stores. Revenue is in USD. 'channel' means online vs in-store."
+                    ></textarea>
+                    <p class="mt-2 text-[11px]" style="color: var(--color-text-muted);">
+                      Supports markdown formatting. Describe the business meaning, domain terms, and how this dataset should be interpreted.
                     </p>
                   </div>
                 </div>
@@ -318,6 +349,9 @@ import { apiService } from '../../services/apiService'
 import { useAppStore } from '../../stores/appStore'
 import { toast } from '../../composables/useToast'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
+import MarkdownIt from 'markdown-it'
+
+const md = new MarkdownIt({ breaks: true, linkify: true })
 
 const appStore = useAppStore()
 
@@ -335,9 +369,15 @@ const selectedDatasetPath = ref('')
 const editDialog = ref({
   isOpen: false,
   index: -1,
-  field: '', // 'description' or 'aliases'
+  field: '', // 'description', 'aliases', or 'context'
   columnName: '',
   value: ''
+})
+
+// Computed property for rendering context as markdown
+const renderedContext = computed(() => {
+  if (!schemaContext.value || schemaContext.value.trim() === '') return ''
+  return md.render(schemaContext.value)
 })
 
 const hasActiveDataset = computed(() => selectedDatasetTable.value.trim() !== '')
@@ -469,6 +509,16 @@ function formatAliasesForDisplay(value) {
 }
 
 function openEditDialog(index, field) {
+  if (field === 'context') {
+    editDialog.value = {
+      isOpen: true,
+      index: -1,
+      field: 'context',
+      columnName: 'LLM Context Hint',
+      value: schemaContext.value || ''
+    }
+    return
+  }
   const col = schema.value[index]
   if (!col) return
   editDialog.value = {
@@ -488,6 +538,14 @@ function closeEditDialog() {
 
 function saveEditDialog() {
   const { index, field, value } = editDialog.value
+  
+  if (field === 'context') {
+    schemaContext.value = value
+    schemaEdited.value = true
+    closeEditDialog()
+    return
+  }
+  
   if (index < 0 || !schema.value[index]) return
   
   if (field === 'description') {
@@ -921,3 +979,52 @@ async function exportSchema() {
   }
 }
 </script>
+
+<style scoped>
+/* Markdown rendered content styling */
+.prose {
+  color: var(--color-text-main);
+}
+
+.prose :deep(p) {
+  margin: 0 0 0.5em 0;
+}
+
+.prose :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.prose :deep(strong) {
+  font-weight: 600;
+}
+
+.prose :deep(code) {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  padding: 0.125em 0.375em;
+  border-radius: 0.25rem;
+  background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent);
+}
+
+.prose :deep(ul),
+.prose :deep(ol) {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.prose :deep(li) {
+  margin: 0.25em 0;
+}
+
+.prose :deep(a) {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.prose :deep(blockquote) {
+  margin: 0.5em 0;
+  padding-left: 1em;
+  border-left: 3px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+</style>
