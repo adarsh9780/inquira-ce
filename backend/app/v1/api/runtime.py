@@ -1097,6 +1097,8 @@ async def get_workspace_dataframe_artifact_rows(
         expected_kind=dict,
     )
     search_text = _normalize_search_query(search)
+    # Keep live artifact reads inside the workspace kernel so the API process
+    # never contends for the scratchpad DuckDB file lock.
     try:
         rows = await get_workspace_dataframe_rows(
             workspace_id=workspace_id,

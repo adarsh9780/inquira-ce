@@ -667,6 +667,7 @@ async def test_workspace_artifact_usage_endpoint_uses_kernel_path_only(monkeypat
         runtime_api,
         "get_artifact_scratchpad_store",
         lambda: (_ for _ in ()).throw(AssertionError("direct scratchpad store access is no longer allowed")),
+        raising=False,
     )
     monkeypatch.setattr(runtime_api, "get_workspace_artifact_usage_via_kernel", fake_usage_via_kernel)
 
