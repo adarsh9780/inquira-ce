@@ -1,236 +1,368 @@
 <template>
-  <div class="h-full flex flex-col relative overflow-hidden">
+  <div class="schema-editor h-full flex flex-col relative overflow-hidden">
+    <!-- Subtle background texture -->
+    <div class="absolute inset-0 opacity-[0.015] pointer-events-none" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E');"></div>
+
     <Teleport to="body">
-      <div
-        v-if="isRegenerating"
-        class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
-        style="background-color: color-mix(in srgb, var(--color-text-main) 26%, transparent);"
+      <!-- Regeneration Overlay -->
+      <Transition
+        enter-active-class="transition duration-300 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-200 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
       >
         <div
-          class="w-full max-w-md rounded-xl border px-5 py-4 shadow-xl"
-          style="background-color: var(--color-surface); border-color: var(--color-border);"
+          v-if="isRegenerating"
+          class="fixed inset-0 z-50 flex items-center justify-center"
+          style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.75) 0%, rgba(30, 41, 59, 0.85) 100%); backdrop-filter: blur(8px);"
         >
-          <div class="mb-3 flex items-start justify-between gap-3">
-            <div>
-              <h3 class="text-sm font-semibold" style="color: var(--color-text-main);">Generating Schema</h3>
-              <p class="mt-0.5 text-xs" style="color: var(--color-text-muted);">{{ regenerationStatus }}</p>
+          <div class="relative overflow-hidden rounded-2xl shadow-2xl border w-full max-w-md mx-4" style="background: linear-gradient(180deg, var(--color-surface) 0%, color-mix(in srgb, var(--color-surface) 95%, var(--color-base)) 100%); border-color: color-mix(in srgb, var(--color-border) 50%, transparent);">
+            <!-- Accent line -->
+            <div class="absolute top-0 left-0 right-0 h-1" style="background: linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 60%, #8b5cf6), var(--color-accent));"></div>
+            
+            <div class="px-6 py-6">
+              <div class="flex items-start justify-between gap-4 mb-5">
+                <div>
+                  <h3 class="text-base font-semibold tracking-tight" style="color: var(--color-text-main);">Generating Schema</h3>
+                  <p class="mt-1.5 text-sm" style="color: var(--color-text-muted);">{{ regenerationStatus }}</p>
+                </div>
+                <!-- Spinning loader -->
+                <div class="relative w-10 h-10 flex-shrink-0">
+                  <div class="absolute inset-0 rounded-full border-2" style="border-color: color-mix(in srgb, var(--color-border) 30%, transparent);"></div>
+                  <div class="absolute inset-0 rounded-full border-2 border-t-current animate-spin" style="color: var(--color-accent); border-color: color-mix(in srgb, var(--color-accent) 30%, transparent); border-top-color: var(--color-accent);"></div>
+                </div>
+              </div>
+
+              <div class="mb-4 h-2 w-full overflow-hidden rounded-full" style="background-color: color-mix(in srgb, var(--color-border) 40%, transparent);">
+                <div
+                  class="h-full rounded-full transition-all duration-500 ease-out"
+                  :style="{
+                    width: `${regenerationProgress}%`,
+                    background: 'linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 70%, #8b5cf6))',
+                    boxShadow: '0 0 12px color-mix(in srgb, var(--color-accent) 50%, transparent)',
+                  }"
+                ></div>
+              </div>
+
+              <div class="flex items-center justify-between">
+                <div class="text-xs font-medium" style="color: var(--color-text-muted);">
+                  {{ regenerationProgress }}% complete
+                </div>
+                <div class="text-xs tabular-nums font-mono" style="color: var(--color-text-muted);">
+                  {{ formatElapsedTime(elapsedTime) }}
+                </div>
+              </div>
             </div>
-            <div class="h-5 w-5 animate-spin rounded-full border-2 border-transparent border-t-current" style="color: var(--color-accent);"></div>
-          </div>
-
-          <div class="mb-2 h-2 w-full rounded-full" style="background-color: color-mix(in srgb, var(--color-border) 45%, transparent);">
-            <div
-              class="h-2 rounded-full transition-all duration-300"
-              :style="{
-                width: `${regenerationProgress}%`,
-                backgroundColor: 'var(--color-accent)',
-              }"
-            ></div>
-          </div>
-
-          <div class="text-right text-[11px] tabular-nums" style="color: var(--color-text-muted);">
-            {{ formatElapsedTime(elapsedTime) }}
           </div>
         </div>
-      </div>
+      </Transition>
     </Teleport>
 
-    <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
-      <div class="flex min-w-0 flex-wrap items-center gap-2">
-        <div class="text-sm font-semibold" style="color: var(--color-text-main);">Schema Editor</div>
-        <div class="w-[220px] max-w-[46vw] min-w-[170px]">
-          <HeaderDropdown
-            v-model="selectedDatasetTable"
-            :options="datasetDropdownOptions"
-            placeholder="Select dataset"
-            aria-label="Select dataset for schema editor"
-            :fit-to-longest-label="true"
-            :min-chars="12"
-            :max-chars="34"
-            max-width-class="w-full"
-            @update:model-value="handleDatasetSelection"
-          />
+    <!-- Header -->
+    <div class="relative z-10 mb-5">
+      <div class="flex flex-wrap items-end justify-between gap-4 pb-4 border-b" style="border-color: color-mix(in srgb, var(--color-border) 30%, transparent);">
+        <div class="flex min-w-0 flex-wrap items-center gap-3">
+          <div class="flex items-center gap-2">
+            <!-- Database icon -->
+            <div class="flex h-9 w-9 items-center justify-center rounded-xl" style="background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 15%, transparent), color-mix(in srgb, var(--color-accent) 5%, transparent)); border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);">
+              <svg class="w-4.5 h-4.5" style="color: var(--color-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-base font-semibold tracking-tight" style="color: var(--color-text-main);">Schema Editor</h2>
+              <p class="text-xs" style="color: var(--color-text-muted);">Manage column metadata</p>
+            </div>
+          </div>
+          
+          <div class="w-[240px] max-w-[50vw] min-w-[180px]">
+            <HeaderDropdown
+              v-model="selectedDatasetTable"
+              :options="datasetDropdownOptions"
+              placeholder="Select dataset"
+              aria-label="Select dataset for schema editor"
+              :fit-to-longest-label="true"
+              :min-chars="12"
+              :max-chars="34"
+              max-width-class="w-full"
+              @update:model-value="handleDatasetSelection"
+            />
+          </div>
         </div>
-      </div>
 
-      <div class="flex flex-wrap items-center justify-end gap-2">
-        <button
-          @click="refreshSchema"
-          :disabled="schemaLoading || !hasActiveDataset"
-          class="inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-          style="border-color: var(--color-border); color: var(--color-text-main);"
-        >
-          Refresh
-        </button>
-        <button
-          @click="regenerateSchema"
-          :disabled="schemaLoading || !hasActiveDataset"
-          class="inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-          style="border-color: var(--color-border); color: var(--color-text-main);"
-          title="Regenerate schema with AI descriptions"
-        >
-          Regenerate
-        </button>
-        <button
-          @click="clearCache"
-          class="inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
-          style="border-color: var(--color-border); color: var(--color-text-main);"
-        >
-          Clear Cache
-        </button>
-        <button
-          @click="exportSchema"
-          :disabled="schema.length === 0"
-          class="inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-          style="border-color: var(--color-border); color: var(--color-text-main);"
-        >
-          Export
-        </button>
-        <button
-          @click="saveSchema"
-          :disabled="schemaLoading || !schemaEdited || !hasActiveDataset"
-          class="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-          style="background-color: var(--color-accent); color: white;"
-        >
-          Save
-        </button>
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            @click="refreshSchema"
+            :disabled="schemaLoading || !hasActiveDataset"
+            class="group inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+            style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-main); background: transparent;"
+            :class="{ 'hover:border-color: color-mix(in srgb, var(--color-accent) 40%, transparent); hover:bg-color-mix(in srgb, var(--color-accent) 5%, transparent, 50%)': !schemaLoading && hasActiveDataset }"
+          >
+            <svg class="w-4 h-4 transition-transform duration-200 group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            Refresh
+          </button>
+          <button
+            @click="regenerateSchema"
+            :disabled="schemaLoading || !hasActiveDataset"
+            class="group inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+            style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-main); background: transparent;"
+            :class="{ 'hover:border-color: color-mix(in srgb, var(--color-accent) 40%, transparent); hover:bg-color-mix(in srgb, var(--color-accent) 5%, transparent, 50%)': !schemaLoading && hasActiveDataset }"
+            title="Regenerate schema with AI descriptions"
+          >
+            <svg class="w-4 h-4 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+            Regenerate
+          </button>
+          <button
+            @click="clearCache"
+            class="inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-medium transition-all duration-200"
+            style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-muted); background: transparent;"
+            title="Clear cached schema data"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
+            Clear Cache
+          </button>
+          <div class="w-px h-6 mx-1" style="background-color: color-mix(in srgb, var(--color-border) 40%, transparent);"></div>
+          <button
+            @click="exportSchema"
+            :disabled="schema.length === 0"
+            class="inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+            style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-main); background: transparent;"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+            </svg>
+            Export
+          </button>
+          <button
+            @click="saveSchema"
+            :disabled="schemaLoading || !schemaEdited || !hasActiveDataset"
+            class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
+            :class="schemaEdited && hasActiveDataset && !schemaLoading ? 'hover:shadow-md hover:-translate-y-0.5' : ''"
+            style="background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 85%, #8b5cf6)); color: white; box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 30%, transparent);"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            Save
+          </button>
+        </div>
       </div>
     </div>
 
-    <div
-      class="min-h-0 flex-1 overflow-auto rounded-lg border p-3"
-      style="background-color: var(--color-base); border-color: var(--color-border);"
-    >
+    <!-- Main Content -->
+    <div class="relative z-10 min-h-0 flex-1 overflow-hidden">
+      <!-- Empty State -->
       <div
         v-if="!hasActiveDataset && !schemaLoading"
-        class="flex h-full flex-col items-center justify-center py-12 text-center"
+        class="flex h-full flex-col items-center justify-center py-16 text-center"
       >
-        <div class="mb-3 h-12 w-12 rounded-full border" style="border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-surface) 65%, var(--color-base));"></div>
-        <h3 class="text-sm font-semibold" style="color: var(--color-text-main);">No Dataset Selected</h3>
-        <p class="mt-1 max-w-xs text-xs" style="color: var(--color-text-muted);">
-          Select a dataset from the dropdown above to view and edit schema for any table directly from this tab.
-        </p>
-      </div>
-
-      <div v-else-if="schemaLoading && !isRegenerating" class="text-xs" style="color: var(--color-text-muted);">
-        Loading schema...
-      </div>
-
-      <div v-else-if="schemaError" class="rounded-md border px-3 py-2 text-xs" style="border-color: color-mix(in srgb, #fca5a5 70%, var(--color-border)); color: #b42318; background-color: color-mix(in srgb, #fef2f2 75%, var(--color-base));">
-        {{ schemaError }}
-      </div>
-
-      <div v-else-if="hasActiveDataset" class="space-y-4">
-        <div
-          v-if="schemaNeedsDescriptions && !isRegenerating"
-          class="rounded-lg border px-3 py-2"
-          style="border-color: color-mix(in srgb, #facc15 55%, var(--color-border)); background-color: color-mix(in srgb, #fefce8 70%, var(--color-base));"
-        >
-          <h4 class="text-xs font-semibold" style="color: #854d0e;">Schema Descriptions Not Generated Yet</h4>
-          <p class="mt-0.5 text-xs" style="color: #a16207;">
-            Descriptions are blank. Click <strong>Regenerate</strong> to generate AI descriptions.
-          </p>
-        </div>
-
-        <div class="pb-2">
-          <div class="mb-1 flex items-center justify-between">
-            <label class="text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">LLM Context Hint (Recommended)</label>
-            <button
-              @click="openEditDialog(-1, 'context')"
-              class="opacity-60 hover:opacity-100 p-1 rounded transition-opacity duration-150"
-              style="color: var(--color-text-muted);"
-              title="Edit context"
-            >
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+          <!-- Database illustration -->
+          <div class="relative mb-6">
+            <div class="flex h-20 w-20 items-center justify-center rounded-2xl" style="background: linear-gradient(135deg, color-mix(in srgb, var(--color-surface) 80%, var(--color-base)), color-mix(in srgb, var(--color-surface) 40%, var(--color-base))); border: 1px solid color-mix(in srgb, var(--color-border) 40%, transparent); box-shadow: 0 8px 32px color-mix(in srgb, var(--color-border) 20%, transparent);">
+              <svg class="w-10 h-10" style="color: var(--color-text-muted); opacity: 0.5;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
               </svg>
-            </button>
+            </div>
+            <!-- Decorative ring -->
+            <div class="absolute -inset-3 rounded-full border border-dashed opacity-30" style="border-color: var(--color-border);"></div>
           </div>
-          <p class="mb-2 text-xs" style="color: var(--color-text-muted);">
-            Briefly describe business meaning, domain terms, and how this dataset should be interpreted. This helps the LLM generate better analysis.
+          
+          <h3 class="text-lg font-semibold mb-2" style="color: var(--color-text-main);">No Dataset Selected</h3>
+          <p class="mt-1 max-w-sm text-sm leading-relaxed" style="color: var(--color-text-muted);">
+            Select a dataset from the dropdown above to view and edit schema metadata.
           </p>
-          <div
-            v-if="schemaContext && schemaContext.trim()"
-            class="rounded-lg px-4 py-3"
-            style="background-color: color-mix(in srgb, var(--color-surface) 60%, var(--color-base)); border: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);"
-          >
-            <div class="text-sm leading-relaxed prose prose-sm max-w-none" style="color: var(--color-text-main);" v-html="renderedContext"></div>
-          </div>
-          <div
-            v-else
-            class="rounded-lg px-4 py-3 italic text-sm"
-            style="color: var(--color-text-muted); background-color: color-mix(in srgb, var(--color-surface) 60%, var(--color-base)); border: 1px dashed color-mix(in srgb, var(--color-border) 50%, transparent);"
-          >
-            Click the edit icon above to add context for this dataset...
+      </div>
+
+      <!-- Loading State -->
+      <div v-else-if="schemaLoading && !isRegenerating" class="flex h-full flex-col items-center justify-center py-16">
+        <div class="relative mb-6">
+          <div class="h-16 w-16 rounded-full border-2" style="border-color: color-mix(in srgb, var(--color-border) 20%, transparent);"></div>
+          <div class="absolute inset-0 h-16 w-16 rounded-full border-2 border-t-current animate-spin" style="color: var(--color-accent); border-color: color-mix(in srgb, var(--color-accent) 20%, transparent); border-top-color: var(--color-accent);"></div>
+        </div>
+        <p class="text-sm font-medium" style="color: var(--color-text-muted);">Loading schema...</p>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="schemaError" class="mx-4 mt-4">
+        <div class="rounded-xl border px-4 py-3.5" style="border-color: color-mix(in srgb, #ef4444 40%, var(--color-border)); background: linear-gradient(135deg, color-mix(in srgb, #fef2f2 80%, var(--color-base)), color-mix(in srgb, #fef2f2 40%, var(--color-base)));">
+          <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 mt-0.5 flex-shrink-0" style="color: #dc2626;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p class="text-sm" style="color: #991b1b;">{{ schemaError }}</p>
           </div>
         </div>
+      </div>
 
-        <div class="overflow-x-auto rounded-lg" style="border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);">
-          <table class="min-w-full table-fixed">
-            <thead style="background-color: color-mix(in srgb, var(--color-surface) 82%, var(--color-base));">
-              <tr>
-                <th class="w-[22%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted); border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);">Column</th>
-                <th class="w-[48%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted); border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);">Description</th>
-                <th class="w-[30%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted); border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);">Aliases</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="(col, i) in schema"
-                :key="i"
-                class="group align-top transition-colors duration-150"
-                style="border-bottom: 1px solid color-mix(in srgb, var(--color-border) 40%, transparent);"
+      <!-- Schema Content -->
+      <div v-else-if="hasActiveDataset" class="h-full overflow-auto">
+        <div class="px-4 pb-4 space-y-4">
+          <!-- Warning Banner -->
+          <Transition
+            enter-active-class="transition duration-300 ease-out"
+            enter-from-class="opacity-0 -translate-y-2"
+            enter-to-class="opacity-100 translate-y-0"
+            leave-active-class="transition duration-200 ease-in"
+            leave-from-class="opacity-100 translate-y-0"
+            leave-to-class="opacity-0 -translate-y-2"
+          >
+            <div
+              v-if="schemaNeedsDescriptions && !isRegenerating"
+              class="rounded-xl border px-4 py-3.5"
+              style="border-color: color-mix(in srgb, #f59e0b 40%, var(--color-border)); background: linear-gradient(135deg, color-mix(in srgb, #fffbeb 80%, var(--color-base)), color-mix(in srgb, #fef3c7 40%, var(--color-base)));"
+            >
+              <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 mt-0.5 flex-shrink-0" style="color: #d97706;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div>
+                  <h4 class="text-sm font-semibold" style="color: #92400e;">Schema Descriptions Not Generated Yet</h4>
+                  <p class="mt-0.5 text-sm" style="color: #b45309;">
+                    Descriptions are blank. Click <strong>Regenerate</strong> to generate AI descriptions.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Transition>
+
+          <!-- Context Section -->
+          <div class="rounded-xl border p-4" style="border-color: color-mix(in srgb, var(--color-border) 40%, transparent); background: linear-gradient(135deg, var(--color-surface) 0%, color-mix(in srgb, var(--color-surface) 70%, var(--color-base)));">
+            <div class="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">LLM Context Hint</label>
+                <p class="text-xs mt-0.5" style="color: var(--color-text-muted); opacity: 0.7;">Helps AI understand business meaning</p>
+              </div>
+              <button
+                @click="openEditDialog(-1, 'context')"
+                class="group inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all duration-200"
+                style="border-color: color-mix(in srgb, var(--color-border) 50%, transparent); color: var(--color-text-muted);"
               >
-                <td class="px-4 py-3">
-                  <span class="text-sm font-medium" style="color: var(--color-text-main);">{{ col.name }}</span>
-                </td>
-                <td class="px-4 py-3 relative">
-                  <div class="min-h-[20px] pr-8">
-                    <span
-                      v-if="col.description"
-                      class="text-sm leading-relaxed"
-                      style="color: var(--color-text-main); white-space: pre-wrap;"
-                    >{{ col.description }}</span>
-                    <span v-else class="text-sm italic" style="color: var(--color-text-muted);">No description</span>
-                  </div>
-                  <button
-                    @click="openEditDialog(i, 'description')"
-                    class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 rounded-md transition-all duration-150"
-                    style="color: var(--color-text-muted);"
-                    title="Edit description"
-                  >
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-                    </svg>
-                  </button>
-                </td>
-                <td class="px-4 py-3 relative">
-                  <div class="min-h-[20px] pr-8">
-                    <span
-                      v-if="col.aliases && col.aliases.length > 0"
-                      class="text-sm leading-relaxed"
-                      style="color: var(--color-text-main); white-space: pre-wrap;"
-                    >{{ formatAliasesForDisplay(col.aliases) }}</span>
-                    <span v-else class="text-sm italic" style="color: var(--color-text-muted);">No aliases</span>
-                  </div>
-                  <button
-                    @click="openEditDialog(i, 'aliases')"
-                    class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 rounded-md transition-all duration-150"
-                    style="color: var(--color-text-muted);"
-                    title="Edit aliases"
-                  >
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                <svg class="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                </svg>
+                Edit
+              </button>
+            </div>
+            
+            <div
+              v-if="schemaContext && schemaContext.trim()"
+              class="rounded-lg px-4 py-3 prose prose-sm max-w-none"
+              style="background-color: color-mix(in srgb, var(--color-base) 80%, transparent); border: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);"
+            >
+              <div class="text-sm leading-relaxed" style="color: var(--color-text-main);" v-html="renderedContext"></div>
+            </div>
+            <div
+              v-else
+              class="rounded-lg px-4 py-4 text-sm text-center italic"
+              style="color: var(--color-text-muted); opacity: 0.6; background-color: color-mix(in srgb, var(--color-base) 60%, transparent); border: 1px dashed color-mix(in srgb, var(--color-border) 30%, transparent);"
+            >
+              Click edit to add context for this dataset...
+            </div>
+          </div>
 
-        <!-- Edit Dialog Modal -->
-        <Teleport to="body">
+          <!-- Schema Table -->
+          <div class="rounded-xl border overflow-hidden" style="border-color: color-mix(in srgb, var(--color-border) 40%, transparent); background: linear-gradient(135deg, var(--color-surface) 0%, color-mix(in srgb, var(--color-surface) 70%, var(--color-base)));">
+            <table class="min-w-full">
+              <thead>
+                <tr style="background: linear-gradient(180deg, color-mix(in srgb, var(--color-base) 60%, var(--color-surface)) 0%, color-mix(in srgb, var(--color-base) 80%, var(--color-surface)) 100%);">
+                  <th class="w-[24%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Column</th>
+                  <th class="w-[46%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Description</th>
+                  <th class="w-[30%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Aliases</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y" style="--tw-divide-opacity: 0.08; border-top: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);">
+                <tr
+                  v-for="(col, i) in schema"
+                  :key="i"
+                  class="group align-top transition-colors duration-150"
+                  style="border-bottom: 1px solid color-mix(in srgb, var(--color-border) 20%, transparent);"
+                >
+                  <td class="px-5 py-4">
+                    <div class="flex items-center gap-2">
+                      <span class="inline-flex items-center justify-center w-6 h-6 rounded-lg text-xs font-mono font-semibold" style="background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 12%, transparent), color-mix(in srgb, var(--color-accent) 5%, transparent)); color: var(--color-accent);">
+                        {{ i + 1 }}
+                      </span>
+                      <span class="text-sm font-medium font-mono" style="color: var(--color-text-main);">{{ col.name }}</span>
+                    </div>
+                  </td>
+                  <td class="px-5 py-4 relative">
+                    <div class="min-h-[24px] pr-10">
+                      <span
+                        v-if="col.description"
+                        class="text-sm leading-relaxed"
+                        style="color: var(--color-text-main); white-space: pre-wrap;"
+                      >{{ col.description }}</span>
+                      <span v-else class="text-sm italic" style="color: var(--color-text-muted); opacity: 0.5;">No description</span>
+                    </div>
+                    <button
+                      @click="openEditDialog(i, 'description')"
+                      class="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2 rounded-lg transition-all duration-200"
+                      style="color: var(--color-text-muted);"
+                      title="Edit description"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                      </svg>
+                    </button>
+                  </td>
+                  <td class="px-5 py-4 relative">
+                    <div class="min-h-[24px] pr-10">
+                      <div v-if="col.aliases && col.aliases.length > 0" class="flex flex-wrap gap-1.5">
+                        <span
+                          v-for="(alias, ai) in col.aliases"
+                          :key="ai"
+                          class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium"
+                          style="border-color: color-mix(in srgb, var(--color-border) 50%, transparent); color: var(--color-text-muted); background: color-mix(in srgb, var(--color-base) 60%, transparent);"
+                        >
+                          {{ alias }}
+                        </span>
+                      </div>
+                      <span v-else class="text-sm italic" style="color: var(--color-text-muted); opacity: 0.5;">No aliases</span>
+                    </div>
+                    <button
+                      @click="openEditDialog(i, 'aliases')"
+                      class="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2 rounded-lg transition-all duration-200"
+                      style="color: var(--color-text-muted);"
+                      title="Edit aliases"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Footer hint -->
+          <div class="flex items-center justify-center gap-2 py-2 text-xs" style="color: var(--color-text-muted); opacity: 0.6;">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Aliases are search hints for schema lookup. Enter comma-separated values per column.
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit Dialog Modal -->
+      <Teleport to="body">
+        <Transition
+          enter-active-class="transition duration-300 ease-out"
+          enter-from-class="opacity-0"
+          enter-to-class="opacity-100"
+          leave-active-class="transition duration-200 ease-in"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
+        >
           <div
             v-if="editDialog.isOpen"
             class="fixed inset-0 z-[70] overflow-y-auto"
@@ -238,106 +370,128 @@
             role="dialog"
             aria-modal="true"
           >
+            <!-- Backdrop -->
             <div
-              class="fixed inset-0 transition-opacity"
-              style="background-color: color-mix(in srgb, var(--color-text-main) 30%, transparent);"
+              class="fixed inset-0 transition-opacity duration-300"
+              style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.6) 0%, rgba(30, 41, 59, 0.75) 100%); backdrop-filter: blur(4px);"
               @click="closeEditDialog"
             ></div>
 
-            <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-              <div
-                class="relative overflow-hidden rounded-xl shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg"
-                style="background-color: var(--color-surface);"
-                @click.stop
+            <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-6">
+              <!-- Dialog Panel -->
+              <Transition
+                enter-active-class="transition duration-300 ease-out"
+                enter-from-class="opacity-0 scale-95 translate-y-4"
+                enter-to-class="opacity-100 scale-100 translate-y-0"
+                leave-active-class="transition duration-200 ease-in"
+                leave-from-class="opacity-100 scale-100 translate-y-0"
+                leave-to-class="opacity-0 scale-95 translate-y-4"
               >
-                <div class="px-6 py-5" style="border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);">
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <h3 class="text-base font-semibold" id="edit-dialog-title" style="color: var(--color-text-main);">
-                        Edit {{ editDialog.field === 'description' ? 'Description' : 'Aliases' }}
-                      </h3>
-                      <p class="mt-1 text-xs" style="color: var(--color-text-muted);">
-                        Column: <span class="font-medium">{{ editDialog.columnName }}</span>
+                <div
+                  v-if="editDialog.isOpen"
+                  class="relative overflow-hidden rounded-2xl shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg"
+                  style="background: linear-gradient(180deg, var(--color-surface) 0%, color-mix(in srgb, var(--color-surface) 95%, var(--color-base)) 100%); border: 1px solid color-mix(in srgb, var(--color-border) 40%, transparent);"
+                  @click.stop
+                >
+                  <!-- Accent gradient top bar -->
+                  <div class="absolute top-0 left-0 right-0 h-1" style="background: linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 60%, #8b5cf6), var(--color-accent));"></div>
+                  
+                  <!-- Header -->
+                  <div class="px-6 pt-6 pb-5" style="border-bottom: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);">
+                    <div class="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 class="text-lg font-semibold tracking-tight" id="edit-dialog-title" style="color: var(--color-text-main);">
+                          Edit {{ editDialog.field === 'description' ? 'Description' : editDialog.field === 'aliases' ? 'Aliases' : 'Context' }}
+                        </h3>
+                        <div class="mt-2 inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-xs font-medium" style="border-color: color-mix(in srgb, var(--color-border) 40%, transparent); color: var(--color-text-muted); background: color-mix(in srgb, var(--color-base) 50%, transparent);">
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+                          </svg>
+                          {{ editDialog.columnName }}
+                        </div>
+                      </div>
+                      <button
+                        @click="closeEditDialog"
+                        class="p-2 rounded-xl transition-all duration-200"
+                        style="color: var(--color-text-muted);"
+                        title="Close"
+                      >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Body -->
+                  <div class="px-6 py-5">
+                    <div v-if="editDialog.field === 'description'">
+                      <label class="mb-2.5 block text-sm font-medium" style="color: var(--color-text-muted);">Description</label>
+                      <textarea
+                        v-model="editDialog.value"
+                        rows="4"
+                        class="w-full resize-y rounded-xl px-4 py-3 text-sm leading-relaxed outline-none transition-all duration-200"
+                        style="border: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent); color: var(--color-text-main); background-color: var(--color-base);"
+                        placeholder="Enter a description for this column..."
+                        autofocus
+                      ></textarea>
+                      <p class="mt-2.5 text-xs" style="color: var(--color-text-muted); opacity: 0.7;">
+                        Describe the business meaning, format, and any relevant details about this column.
                       </p>
                     </div>
+                    <div v-else-if="editDialog.field === 'aliases'">
+                      <label class="mb-2.5 block text-sm font-medium" style="color: var(--color-text-muted);">Aliases</label>
+                      <textarea
+                        v-model="editDialog.value"
+                        rows="3"
+                        class="w-full resize-y rounded-xl px-4 py-3 text-sm leading-relaxed outline-none transition-all duration-200 font-mono"
+                        style="border: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent); color: var(--color-text-main); background-color: var(--color-base);"
+                        placeholder="id, identifier, key"
+                        autofocus
+                      ></textarea>
+                      <p class="mt-2.5 text-xs" style="color: var(--color-text-muted); opacity: 0.7;">
+                        Search hints for schema lookup. Enter comma-separated values.
+                      </p>
+                    </div>
+                    <div v-else-if="editDialog.field === 'context'">
+                      <label class="mb-2.5 block text-sm font-medium" style="color: var(--color-text-muted);">Context Description</label>
+                      <textarea
+                        v-model="editDialog.value"
+                        rows="6"
+                        class="w-full resize-y rounded-xl px-4 py-3 text-sm leading-relaxed outline-none transition-all duration-200 font-mono"
+                        style="border: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent); color: var(--color-text-main); background-color: var(--color-base);"
+                        placeholder="Example: Daily transaction-level sales data for retail stores. Revenue is in USD. 'channel' means online vs in-store."
+                        autofocus
+                      ></textarea>
+                      <p class="mt-2.5 text-xs" style="color: var(--color-text-muted); opacity: 0.7;">
+                        Supports markdown formatting. Describe the business meaning, domain terms, and how this dataset should be interpreted.
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Footer -->
+                  <div class="px-6 py-4 flex items-center justify-end gap-3" style="border-top: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent); background: linear-gradient(180deg, color-mix(in srgb, var(--color-base) 40%, transparent) 0%, color-mix(in srgb, var(--color-base) 60%, transparent) 100%);">
                     <button
                       @click="closeEditDialog"
-                      class="p-1.5 rounded-lg transition-colors"
-                      style="color: var(--color-text-muted);"
+                      class="rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200"
+                      style="color: var(--color-text-muted); background: transparent;"
                     >
-                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                      </svg>
+                      Cancel
+                    </button>
+                    <button
+                      @click="saveEditDialog"
+                      class="rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                      style="background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 85%, #8b5cf6)); color: white; box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 30%, transparent);"
+                    >
+                      Save Changes
                     </button>
                   </div>
                 </div>
-
-                <div class="px-6 py-5">
-                  <div v-if="editDialog.field === 'description'">
-                    <label class="mb-2 block text-xs font-medium" style="color: var(--color-text-muted);">Description</label>
-                    <textarea
-                      v-model="editDialog.value"
-                      rows="4"
-                      class="w-full resize-y rounded-lg px-3 py-2.5 text-sm leading-relaxed outline-none transition-shadow"
-                      style="border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-main); background-color: var(--color-base);"
-                      placeholder="Enter a description for this column..."
-                    ></textarea>
-                    <p class="mt-2 text-[11px]" style="color: var(--color-text-muted);">
-                      Describe the business meaning, format, and any relevant details about this column.
-                    </p>
-                  </div>
-                  <div v-else-if="editDialog.field === 'aliases'">
-                    <label class="mb-2 block text-xs font-medium" style="color: var(--color-text-muted);">Aliases</label>
-                    <textarea
-                      v-model="editDialog.value"
-                      rows="3"
-                      class="w-full resize-y rounded-lg px-3 py-2.5 text-sm leading-relaxed outline-none transition-shadow"
-                      style="border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-main); background-color: var(--color-base);"
-                      placeholder="Comma-separated aliases (e.g., id, identifier, key)"
-                    ></textarea>
-                    <p class="mt-2 text-[11px]" style="color: var(--color-text-muted);">
-                      Search hints for schema lookup. Enter comma-separated values.
-                    </p>
-                  </div>
-                  <div v-else-if="editDialog.field === 'context'">
-                    <label class="mb-2 block text-xs font-medium" style="color: var(--color-text-muted);">Context Description</label>
-                    <textarea
-                      v-model="editDialog.value"
-                      rows="6"
-                      class="w-full resize-y rounded-lg px-3 py-2.5 text-sm leading-relaxed outline-none transition-shadow font-mono"
-                      style="border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-main); background-color: var(--color-base);"
-                      placeholder="Example: Daily transaction-level sales data for retail stores. Revenue is in USD. 'channel' means online vs in-store."
-                    ></textarea>
-                    <p class="mt-2 text-[11px]" style="color: var(--color-text-muted);">
-                      Supports markdown formatting. Describe the business meaning, domain terms, and how this dataset should be interpreted.
-                    </p>
-                  </div>
-                </div>
-
-                <div class="px-6 py-4 flex items-center justify-end gap-3" style="border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); background-color: var(--color-base);">
-                  <button
-                    @click="closeEditDialog"
-                    class="rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-                    style="color: var(--color-text-muted); background-color: transparent;"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    @click="saveEditDialog"
-                    class="rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
-                    style="background-color: var(--color-accent); color: white;"
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </div>
+              </Transition>
             </div>
           </div>
-        </Teleport>
-        <p class="text-[11px]" style="color: var(--color-text-muted);">
-          Aliases are search hints for schema lookup. Enter comma-separated values per column.
-        </p>
-      </div>
+        </Transition>
+      </Teleport>
     </div>
   </div>
 </template>
@@ -981,6 +1135,20 @@ async function exportSchema() {
 </script>
 
 <style scoped>
+.schema-editor {
+  position: relative;
+}
+
+/* Subtle noise texture overlay */
+.schema-editor::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='2200 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
 /* Markdown rendered content styling */
 .prose {
   color: var(--color-text-main);
@@ -1026,5 +1194,49 @@ async function exportSchema() {
   padding-left: 1em;
   border-left: 3px solid var(--color-border);
   color: var(--color-text-muted);
+}
+
+/* Custom scrollbar styling */
+.overflow-auto::-webkit-scrollbar,
+.overflow-auto::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.overflow-auto::-webkit-scrollbar-track,
+.overflow-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb,
+.overflow-auto::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-border) 50%, transparent);
+  border-radius: 4px;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb:hover,
+.overflow-auto::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+/* Focus styles */
+textarea:focus,
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+/* Animation utilities */
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
 }
 </style>
