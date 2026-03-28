@@ -279,79 +279,6 @@ async def test_workspace_dataframe_artifact_rows_endpoint(monkeypatch, tmp_path)
         _ = (session, user_id, workspace_id)
         return workspace
 
-    class _FakeStore:
-        def get_dataframe_rows(
-            self,
-            *,
-            workspace_duckdb_path: str,
-            artifact_id: str,
-            offset: int,
-            limit: int,
-            sort_model=None,
-            filter_model=None,
-            search_text=None,
-        ):
-            assert workspace_duckdb_path == str(duckdb_path)
-            assert artifact_id == "art-1"
-            assert offset == 0
-            assert limit == 1000
-            assert sort_model == []
-            assert filter_model == {}
-            assert search_text is None
-            return {
-                "artifact_id": "art-1",
-                "name": "summary",
-                "row_count": 2000,
-                "columns": ["a"],
-                "rows": [{"a": 1}],
-                "offset": 0,
-                "limit": 1000,
-            }
-
-    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _FakeStore())
-
-    response = await runtime_api.get_workspace_dataframe_artifact_rows(
-        workspace_id="ws-5",
-        artifact_id="art-1",
-        offset=0,
-        limit=1000,
-        session=object(),
-        current_user=SimpleNamespace(id="user-1"),
-    )
-
-    assert response.artifact_id == "art-1"
-    assert response.row_count == 2000
-    assert response.rows == [{"a": 1}]
-
-
-@pytest.mark.asyncio
-async def test_workspace_dataframe_artifact_rows_endpoint_falls_back_on_duckdb_lock(monkeypatch, tmp_path):
-    workspace_dir = tmp_path / "ws5-lock"
-    workspace_dir.mkdir(parents=True, exist_ok=True)
-    duckdb_path = workspace_dir / "workspace.duckdb"
-    duckdb_path.touch()
-    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
-
-    async def fake_require_workspace_access(session, user_id, workspace_id):
-        _ = (session, user_id, workspace_id)
-        return workspace
-
-    class _LockedStore:
-        def get_dataframe_rows(
-            self,
-            *,
-            workspace_duckdb_path: str,
-            artifact_id: str,
-            offset: int,
-            limit: int,
-            sort_model=None,
-            filter_model=None,
-            search_text=None,
-        ):
-            _ = (workspace_duckdb_path, artifact_id, offset, limit, sort_model, filter_model, search_text)
-            raise runtime_api.duckdb.IOException("Conflicting lock is held")
-
     async def fake_get_rows(
         workspace_id: str,
         artifact_id: str,
@@ -379,7 +306,12 @@ async def test_workspace_dataframe_artifact_rows_endpoint_falls_back_on_duckdb_l
         }
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _LockedStore())
+    monkeypatch.setattr(
+        runtime_api,
+        "get_artifact_scratchpad_store",
+        lambda: (_ for _ in ()).throw(AssertionError("direct scratchpad store access is no longer allowed")),
+        raising=False,
+    )
     monkeypatch.setattr(runtime_api, "get_workspace_dataframe_rows", fake_get_rows)
 
     response = await runtime_api.get_workspace_dataframe_artifact_rows(
@@ -398,7 +330,7 @@ async def test_workspace_dataframe_artifact_rows_endpoint_falls_back_on_duckdb_l
 
 @pytest.mark.asyncio
 async def test_workspace_dataframe_artifact_rows_endpoint_forwards_sort_filter_and_search(monkeypatch, tmp_path):
-    workspace_dir = tmp_path / "ws5-grid-models"
+    workspace_dir = tmp_path / "ws5-lock"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     duckdb_path = workspace_dir / "workspace.duckdb"
     duckdb_path.touch()
@@ -409,38 +341,40 @@ async def test_workspace_dataframe_artifact_rows_endpoint_forwards_sort_filter_a
         return workspace
 
     captured = {}
-
-    class _FakeStore:
-        def get_dataframe_rows(
-            self,
-            *,
-            workspace_duckdb_path: str,
-            artifact_id: str,
-            offset: int,
-            limit: int,
-            sort_model=None,
-            filter_model=None,
-            search_text=None,
-        ):
-            captured["workspace_duckdb_path"] = workspace_duckdb_path
-            captured["artifact_id"] = artifact_id
-            captured["offset"] = offset
-            captured["limit"] = limit
-            captured["sort_model"] = sort_model
-            captured["filter_model"] = filter_model
-            captured["search_text"] = search_text
-            return {
-                "artifact_id": artifact_id,
-                "name": "summary",
-                "row_count": 1,
-                "columns": ["city"],
-                "rows": [{"city": "New York"}],
-                "offset": offset,
-                "limit": limit,
-            }
+    async def fake_get_rows(
+        workspace_id: str,
+        artifact_id: str,
+        offset: int,
+        limit: int,
+        sort_model=None,
+        filter_model=None,
+        search_text=None,
+    ):
+        captured["workspace_id"] = workspace_id
+        captured["artifact_id"] = artifact_id
+        captured["offset"] = offset
+        captured["limit"] = limit
+        captured["sort_model"] = sort_model
+        captured["filter_model"] = filter_model
+        captured["search_text"] = search_text
+        return {
+            "artifact_id": artifact_id,
+            "name": "summary",
+            "row_count": 1,
+            "columns": ["city"],
+            "rows": [{"city": "New York"}],
+            "offset": offset,
+            "limit": limit,
+        }
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _FakeStore())
+    monkeypatch.setattr(
+        runtime_api,
+        "get_artifact_scratchpad_store",
+        lambda: (_ for _ in ()).throw(AssertionError("direct scratchpad store access is no longer allowed")),
+        raising=False,
+    )
+    monkeypatch.setattr(runtime_api, "get_workspace_dataframe_rows", fake_get_rows)
 
     response = await runtime_api.get_workspace_dataframe_artifact_rows(
         workspace_id="ws-5",
@@ -455,7 +389,7 @@ async def test_workspace_dataframe_artifact_rows_endpoint_forwards_sort_filter_a
     )
 
     assert response.artifact_id == "art-1"
-    assert captured["workspace_duckdb_path"] == str(duckdb_path)
+    assert captured["workspace_id"] == "ws-5"
     assert captured["artifact_id"] == "art-1"
     assert captured["offset"] == 0
     assert captured["limit"] == 100
@@ -466,7 +400,7 @@ async def test_workspace_dataframe_artifact_rows_endpoint_forwards_sort_filter_a
 
 @pytest.mark.asyncio
 async def test_workspace_artifact_metadata_endpoint(monkeypatch, tmp_path):
-    workspace_dir = tmp_path / "ws5-meta"
+    workspace_dir = tmp_path / "ws5-grid-models"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     duckdb_path = workspace_dir / "workspace.duckdb"
     duckdb_path.touch()
@@ -475,60 +409,6 @@ async def test_workspace_artifact_metadata_endpoint(monkeypatch, tmp_path):
     async def fake_require_workspace_access(session, user_id, workspace_id):
         _ = (session, user_id, workspace_id)
         return workspace
-
-    class _FakeStore:
-        def get_artifact(self, *, workspace_duckdb_path: str, artifact_id: str):
-            assert workspace_duckdb_path == str(duckdb_path)
-            assert artifact_id == "fig-1"
-            return {
-                "artifact_id": "fig-1",
-                "run_id": "run-1",
-                "workspace_id": "ws-5",
-                "logical_name": "chart_one",
-                "kind": "figure",
-                "pointer": "duckdb://scratchpad/artifacts.duckdb#artifact=fig-1",
-                "table_name": None,
-                "schema": None,
-                "row_count": None,
-                "payload": {"figure": {"data": [], "layout": {}}},
-                "created_at": "2026-03-03T00:00:00+00:00",
-                "expires_at": "2026-03-04T00:00:00+00:00",
-                "status": "ready",
-                "error": None,
-            }
-
-    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _FakeStore())
-
-    response = await runtime_api.get_workspace_artifact_metadata(
-        workspace_id="ws-5",
-        artifact_id="fig-1",
-        session=object(),
-        current_user=SimpleNamespace(id="user-1"),
-    )
-
-    assert response.artifact_id == "fig-1"
-    assert response.kind == "figure"
-    assert response.logical_name == "chart_one"
-    assert response.payload == {"figure": {"data": [], "layout": {}}}
-
-
-@pytest.mark.asyncio
-async def test_workspace_artifact_metadata_endpoint_falls_back_on_duckdb_lock(monkeypatch, tmp_path):
-    workspace_dir = tmp_path / "ws5-meta-lock"
-    workspace_dir.mkdir(parents=True, exist_ok=True)
-    duckdb_path = workspace_dir / "workspace.duckdb"
-    duckdb_path.touch()
-    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
-
-    async def fake_require_workspace_access(session, user_id, workspace_id):
-        _ = (session, user_id, workspace_id)
-        return workspace
-
-    class _LockedStore:
-        def get_artifact(self, *, workspace_duckdb_path: str, artifact_id: str):
-            _ = (workspace_duckdb_path, artifact_id)
-            raise runtime_api.duckdb.IOException("Conflicting lock is held")
 
     async def fake_get_meta(workspace_id: str, artifact_id: str):
         assert workspace_id == "ws-5"
@@ -551,7 +431,12 @@ async def test_workspace_artifact_metadata_endpoint_falls_back_on_duckdb_lock(mo
         }
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _LockedStore())
+    monkeypatch.setattr(
+        runtime_api,
+        "get_artifact_scratchpad_store",
+        lambda: (_ for _ in ()).throw(AssertionError("direct scratchpad store access is no longer allowed")),
+        raising=False,
+    )
     monkeypatch.setattr(runtime_api, "get_workspace_artifact_metadata_via_kernel", fake_get_meta)
 
     response = await runtime_api.get_workspace_artifact_metadata(
@@ -564,11 +449,12 @@ async def test_workspace_artifact_metadata_endpoint_falls_back_on_duckdb_lock(mo
     assert response.artifact_id == "fig-1"
     assert response.kind == "figure"
     assert response.logical_name == "chart_one"
+    assert response.payload == {"figure": {"data": [], "layout": {}}}
 
 
 @pytest.mark.asyncio
 async def test_workspace_artifact_delete_endpoint(monkeypatch, tmp_path):
-    workspace_dir = tmp_path / "ws5-del"
+    workspace_dir = tmp_path / "ws5-meta"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     duckdb_path = workspace_dir / "workspace.duckdb"
     duckdb_path.touch()
@@ -577,43 +463,6 @@ async def test_workspace_artifact_delete_endpoint(monkeypatch, tmp_path):
     async def fake_require_workspace_access(session, user_id, workspace_id):
         _ = (session, user_id, workspace_id)
         return workspace
-
-    class _FakeStore:
-        def delete_artifact(self, *, workspace_duckdb_path: str, artifact_id: str) -> bool:
-            assert workspace_duckdb_path == str(duckdb_path)
-            assert artifact_id == "fig-1"
-            return True
-
-    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _FakeStore())
-
-    response = await runtime_api.delete_workspace_artifact(
-        workspace_id="ws-5",
-        artifact_id="fig-1",
-        session=object(),
-        current_user=SimpleNamespace(id="user-1"),
-    )
-
-    assert response.artifact_id == "fig-1"
-    assert response.deleted is True
-
-
-@pytest.mark.asyncio
-async def test_workspace_artifact_delete_endpoint_falls_back_on_duckdb_lock(monkeypatch, tmp_path):
-    workspace_dir = tmp_path / "ws5-del-lock"
-    workspace_dir.mkdir(parents=True, exist_ok=True)
-    duckdb_path = workspace_dir / "workspace.duckdb"
-    duckdb_path.touch()
-    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
-
-    async def fake_require_workspace_access(session, user_id, workspace_id):
-        _ = (session, user_id, workspace_id)
-        return workspace
-
-    class _LockedStore:
-        def delete_artifact(self, *, workspace_duckdb_path: str, artifact_id: str) -> bool:
-            _ = (workspace_duckdb_path, artifact_id)
-            raise runtime_api.duckdb.IOException("Conflicting lock is held")
 
     async def fake_delete_artifact_via_kernel(workspace_id: str, artifact_id: str) -> bool:
         assert workspace_id == "ws-5"
@@ -621,7 +470,12 @@ async def test_workspace_artifact_delete_endpoint_falls_back_on_duckdb_lock(monk
         return True
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _LockedStore())
+    monkeypatch.setattr(
+        runtime_api,
+        "get_artifact_scratchpad_store",
+        lambda: (_ for _ in ()).throw(AssertionError("direct scratchpad store access is no longer allowed")),
+        raising=False,
+    )
     monkeypatch.setattr(runtime_api, "delete_workspace_artifact_via_kernel", fake_delete_artifact_via_kernel)
 
     response = await runtime_api.delete_workspace_artifact(
@@ -636,8 +490,8 @@ async def test_workspace_artifact_delete_endpoint_falls_back_on_duckdb_lock(monk
 
 
 @pytest.mark.asyncio
-async def test_workspace_artifact_delete_endpoint_returns_404_when_missing(monkeypatch, tmp_path):
-    workspace_dir = tmp_path / "ws5-del-missing"
+async def test_workspace_artifact_metadata_endpoint_returns_404_when_missing(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws5-meta-lock"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     duckdb_path = workspace_dir / "workspace.duckdb"
     duckdb_path.touch()
@@ -647,18 +501,60 @@ async def test_workspace_artifact_delete_endpoint_returns_404_when_missing(monke
         _ = (session, user_id, workspace_id)
         return workspace
 
-    class _FakeStore:
-        def delete_artifact(self, *, workspace_duckdb_path: str, artifact_id: str) -> bool:
-            _ = (workspace_duckdb_path, artifact_id)
-            return False
+    async def fake_get_meta(workspace_id: str, artifact_id: str):
+        _ = (workspace_id, artifact_id)
+        return None
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _FakeStore())
+    monkeypatch.setattr(
+        runtime_api,
+        "get_artifact_scratchpad_store",
+        lambda: (_ for _ in ()).throw(AssertionError("direct scratchpad store access is no longer allowed")),
+        raising=False,
+    )
+    monkeypatch.setattr(runtime_api, "get_workspace_artifact_metadata_via_kernel", fake_get_meta)
+
+    with pytest.raises(runtime_api.HTTPException) as exc:
+        await runtime_api.get_workspace_artifact_metadata(
+            workspace_id="ws-5",
+            artifact_id="fig-1",
+            session=object(),
+            current_user=SimpleNamespace(id="user-1"),
+        )
+
+    assert exc.value.status_code == 404
+    assert "Artifact not found" in str(exc.value.detail)
+
+
+@pytest.mark.asyncio
+async def test_workspace_artifact_delete_endpoint_returns_404_when_missing(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws5-del"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    async def fake_delete_artifact_via_kernel(workspace_id: str, artifact_id: str) -> bool:
+        _ = (workspace_id, artifact_id)
+        return False
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(
+        runtime_api,
+        "get_artifact_scratchpad_store",
+        lambda: (_ for _ in ()).throw(AssertionError("direct scratchpad store access is no longer allowed")),
+        raising=False,
+    )
+    monkeypatch.setattr(runtime_api, "delete_workspace_artifact_via_kernel", fake_delete_artifact_via_kernel)
 
     with pytest.raises(runtime_api.HTTPException) as exc:
         await runtime_api.delete_workspace_artifact(
             workspace_id="ws-5",
-            artifact_id="missing",
+            artifact_id="fig-1",
             session=object(),
             current_user=SimpleNamespace(id="user-1"),
         )
@@ -669,7 +565,7 @@ async def test_workspace_artifact_delete_endpoint_returns_404_when_missing(monke
 
 @pytest.mark.asyncio
 async def test_workspace_artifact_usage_endpoint_returns_threshold_warnings(monkeypatch, tmp_path):
-    workspace_dir = tmp_path / "ws-usage"
+    workspace_dir = tmp_path / "ws5-del-lock"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     duckdb_path = workspace_dir / "workspace.duckdb"
     duckdb_path.touch()
@@ -679,16 +575,21 @@ async def test_workspace_artifact_usage_endpoint_returns_threshold_warnings(monk
         _ = (session, user_id, workspace_id)
         return workspace
 
-    class _FakeStore:
-        def get_workspace_artifact_usage(self, *, workspace_duckdb_path: str):
-            assert workspace_duckdb_path == str(duckdb_path)
-            return {
-                "duckdb_bytes": (2 * 1024 * 1024 * 1024),
-                "figure_count": 24,
-            }
+    async def fake_usage_via_kernel(workspace_id: str):
+        assert workspace_id == "ws-usage"
+        return {
+            "duckdb_bytes": (2 * 1024 * 1024 * 1024),
+            "figure_count": 24,
+        }
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _FakeStore())
+    monkeypatch.setattr(
+        runtime_api,
+        "get_artifact_scratchpad_store",
+        lambda: (_ for _ in ()).throw(AssertionError("direct scratchpad store access is no longer allowed")),
+        raising=False,
+    )
+    monkeypatch.setattr(runtime_api, "get_workspace_artifact_usage_via_kernel", fake_usage_via_kernel)
 
     response = await runtime_api.get_workspace_artifact_usage(
         workspace_id="ws-usage",
@@ -707,7 +608,7 @@ async def test_workspace_artifact_usage_endpoint_returns_threshold_warnings(monk
 
 
 @pytest.mark.asyncio
-async def test_workspace_artifact_usage_endpoint_uses_kernel_fallback_on_lock(monkeypatch, tmp_path):
+async def test_workspace_artifact_usage_endpoint_wraps_kernel_errors(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws-usage-lock"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     duckdb_path = workspace_dir / "workspace.duckdb"
@@ -718,29 +619,64 @@ async def test_workspace_artifact_usage_endpoint_uses_kernel_fallback_on_lock(mo
         _ = (session, user_id, workspace_id)
         return workspace
 
-    class _LockedStore:
-        def get_workspace_artifact_usage(self, *, workspace_duckdb_path: str):
-            _ = workspace_duckdb_path
-            raise runtime_api.duckdb.IOException("Conflicting lock is held")
-
     async def fake_usage_via_kernel(workspace_id: str):
         assert workspace_id == "ws-usage-lock"
+        raise RuntimeError("Kernel is restarting")
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(
+        runtime_api,
+        "get_artifact_scratchpad_store",
+        lambda: (_ for _ in ()).throw(AssertionError("direct scratchpad store access is no longer allowed")),
+        raising=False,
+    )
+    monkeypatch.setattr(runtime_api, "get_workspace_artifact_usage_via_kernel", fake_usage_via_kernel)
+
+    with pytest.raises(runtime_api.HTTPException) as exc:
+        await runtime_api.get_workspace_artifact_usage(
+            workspace_id="ws-usage-lock",
+            session=object(),
+            current_user=SimpleNamespace(id="user-1"),
+        )
+
+    assert exc.value.status_code == 409
+    assert "Kernel is restarting" in str(exc.value.detail)
+
+
+@pytest.mark.asyncio
+async def test_workspace_artifact_usage_endpoint_uses_kernel_path_only(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws-usage-direct-guard"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    async def fake_usage_via_kernel(workspace_id: str):
+        assert workspace_id == "ws-usage-direct-guard"
         return {
             "duckdb_bytes": 512 * 1024 * 1024,
             "figure_count": 7,
         }
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    monkeypatch.setattr(runtime_api, "get_artifact_scratchpad_store", lambda: _LockedStore())
+    monkeypatch.setattr(
+        runtime_api,
+        "get_artifact_scratchpad_store",
+        lambda: (_ for _ in ()).throw(AssertionError("direct scratchpad store access is no longer allowed")),
+    )
     monkeypatch.setattr(runtime_api, "get_workspace_artifact_usage_via_kernel", fake_usage_via_kernel)
 
     response = await runtime_api.get_workspace_artifact_usage(
-        workspace_id="ws-usage-lock",
+        workspace_id="ws-usage-direct-guard",
         session=object(),
         current_user=SimpleNamespace(id="user-1"),
     )
 
-    assert response.workspace_id == "ws-usage-lock"
+    assert response.workspace_id == "ws-usage-direct-guard"
     assert response.duckdb_bytes == 512 * 1024 * 1024
     assert response.figure_count == 7
     assert response.duckdb_warning is False

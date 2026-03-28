@@ -105,8 +105,8 @@ async function copyOutput() {
 .shell-card {
   border-radius: 10px;
   overflow: hidden;
-  border: 1px solid #e4e4e7;
-  background: #fafafa;
+  background: color-mix(in srgb, var(--color-surface) 50%, var(--color-base) 50%);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--color-text-main) 8%, transparent);
 }
 
 .shell-header {

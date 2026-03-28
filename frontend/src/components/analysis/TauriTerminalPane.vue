@@ -7,8 +7,8 @@
         <span class="hidden md:inline font-mono truncate max-w-[150px]" :title="displayCwd">cwd: {{ displayCwd }}</span>
         <div class="flex items-center gap-1">
           <button 
-            class="btn-icon h-5 w-5 p-1 border" 
-            style="border-color: var(--color-border); color: var(--color-text-main); background-color: var(--color-surface);"
+            class="btn-icon h-5 w-5 p-1 rounded-md" 
+            style="color: var(--color-text-muted);"
             @click="resetSession"
             title="Reset terminal session"
             aria-label="Reset terminal session"
@@ -16,8 +16,8 @@
             <ArrowPathIcon class="h-3.5 w-3.5" />
           </button>
           <button 
-            class="btn-icon h-5 w-5 p-1 border" 
-            style="border-color: var(--color-border); color: var(--color-text-main); background-color: var(--color-surface);"
+            class="btn-icon h-5 w-5 p-1 rounded-md" 
+            style="color: var(--color-text-muted);"
             @click="clearScreen"
             title="Clear terminal output"
             aria-label="Clear terminal output"

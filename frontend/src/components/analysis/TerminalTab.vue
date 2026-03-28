@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-full flex-col overflow-hidden rounded-lg border" style="background-color: var(--color-base); border-color: var(--color-border);">
+  <div class="flex h-full flex-col overflow-hidden" style="background-color: var(--color-base);">
     <!-- Terminal Header (Teleported to RightPanel) -->
     <Teleport to="#terminal-toolbar" v-if="isMounted && !(useTauriPty && appStore.terminalConsentGranted)">
       <div class="flex items-center gap-1.5 text-[10px]" style="color: var(--color-text-muted);">
@@ -69,7 +69,7 @@
           <div class="text-xs text-amber-700">running...</div>
         </div>
 
-        <form class="mt-2 border-t pt-3" style="border-color: var(--color-border);" @submit.prevent="runCommand">
+        <form class="mt-2 pt-3" style="border-top: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);" @submit.prevent="runCommand">
           <div class="flex items-center gap-2">
             <span class="text-emerald-700">{{ promptPrefix }}</span>
             <input
@@ -88,13 +88,13 @@
         </form>
       </div>
 
-      <div class="border-t px-3 py-2" style="border-color: var(--color-border); background-color: var(--color-base);">
+      <div class="px-3 py-2" style="background-color: color-mix(in srgb, var(--color-surface) 60%, var(--color-base) 40%);">
         <div class="flex items-center justify-between text-xs" style="color: var(--color-text-muted);">
           <span>Shell: {{ shellLabel }}</span>
           <div class="flex items-center gap-2">
             <button
-              class="btn-icon h-7 w-7 p-1.5 border"
-              style="border-color: var(--color-border); color: var(--color-text-main); background-color: var(--color-surface);"
+              class="btn-icon h-7 w-7 p-1.5 rounded-md"
+              style="color: var(--color-text-muted);"
               title="Reset terminal session"
               aria-label="Reset terminal session"
               @click="resetSession"
@@ -102,8 +102,8 @@
               <ArrowPathIcon class="h-4 w-4" />
             </button>
             <button
-              class="btn-icon h-7 w-7 p-1.5 border"
-              style="border-color: var(--color-border); color: var(--color-text-main); background-color: var(--color-surface);"
+              class="btn-icon h-7 w-7 p-1.5 rounded-md"
+              style="color: var(--color-text-muted);"
               title="Clear terminal output"
               aria-label="Clear terminal output"
               @click="clearTerminal"
