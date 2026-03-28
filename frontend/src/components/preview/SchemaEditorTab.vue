@@ -147,49 +147,162 @@
           ></textarea>
         </div>
 
-        <div class="overflow-x-auto rounded-lg border" style="border-color: var(--color-border);">
+        <div class="overflow-x-auto rounded-lg" style="border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);">
           <table class="min-w-full table-fixed">
-            <thead style="background-color: color-mix(in srgb, var(--color-surface) 78%, var(--color-base));">
+            <thead style="background-color: color-mix(in srgb, var(--color-surface) 82%, var(--color-base));">
               <tr>
-                <th class="w-[24%] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Column</th>
-                <th class="w-[50%] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Description</th>
-                <th class="w-[26%] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Aliases</th>
+                <th class="w-[22%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted); border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);">Column</th>
+                <th class="w-[48%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted); border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);">Description</th>
+                <th class="w-[30%] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted); border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);">Aliases</th>
               </tr>
             </thead>
             <tbody>
               <tr
                 v-for="(col, i) in schema"
                 :key="i"
-                class="align-top"
-                style="border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);"
+                class="group align-top transition-colors duration-150"
+                style="border-bottom: 1px solid color-mix(in srgb, var(--color-border) 40%, transparent);"
               >
-                <td class="px-3 py-2 text-sm font-medium break-words" style="color: var(--color-text-main);">
-                  {{ col.name }}
+                <td class="px-4 py-3">
+                  <span class="text-sm font-medium" style="color: var(--color-text-main);">{{ col.name }}</span>
                 </td>
-                <td class="px-3 py-2">
-                  <textarea
-                    rows="2"
-                    class="w-full resize-y rounded-md px-2 py-1.5 text-sm leading-5 outline-none"
-                    style="border: none; color: var(--color-text-main); background-color: transparent; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;"
-                    :value="col.description"
-                    @input="e => updateSchemaDescription(i, e.target.value)"
-                    placeholder="Enter one or more lines to describe this column..."
-                  ></textarea>
+                <td class="px-4 py-3 relative">
+                  <div class="min-h-[20px] pr-8">
+                    <span
+                      v-if="col.description"
+                      class="text-sm leading-relaxed"
+                      style="color: var(--color-text-main); white-space: pre-wrap;"
+                    >{{ col.description }}</span>
+                    <span v-else class="text-sm italic" style="color: var(--color-text-muted);">No description</span>
+                  </div>
+                  <button
+                    @click="openEditDialog(i, 'description')"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 rounded-md transition-all duration-150"
+                    style="color: var(--color-text-muted);"
+                    title="Edit description"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                    </svg>
+                  </button>
                 </td>
-                <td class="px-3 py-2">
-                  <textarea
-                    rows="2"
-                    class="w-full rounded-md px-2 py-1.5 text-sm leading-5 outline-none"
-                    style="border: none; color: var(--color-text-main); background-color: transparent; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;"
-                    :value="formatAliasesForInput(col.aliases)"
-                    @input="e => updateSchemaAliases(i, e.target.value)"
-                    placeholder="Comma-separated aliases..."
-                  ></textarea>
+                <td class="px-4 py-3 relative">
+                  <div class="min-h-[20px] pr-8">
+                    <span
+                      v-if="col.aliases && col.aliases.length > 0"
+                      class="text-sm leading-relaxed"
+                      style="color: var(--color-text-main); white-space: pre-wrap;"
+                    >{{ formatAliasesForDisplay(col.aliases) }}</span>
+                    <span v-else class="text-sm italic" style="color: var(--color-text-muted);">No aliases</span>
+                  </div>
+                  <button
+                    @click="openEditDialog(i, 'aliases')"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 rounded-md transition-all duration-150"
+                    style="color: var(--color-text-muted);"
+                    title="Edit aliases"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                    </svg>
+                  </button>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+
+        <!-- Edit Dialog Modal -->
+        <Teleport to="body">
+          <div
+            v-if="editDialog.isOpen"
+            class="fixed inset-0 z-[70] overflow-y-auto"
+            aria-labelledby="edit-dialog-title"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div
+              class="fixed inset-0 transition-opacity"
+              style="background-color: color-mix(in srgb, var(--color-text-main) 30%, transparent);"
+              @click="closeEditDialog"
+            ></div>
+
+            <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+              <div
+                class="relative overflow-hidden rounded-xl shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg"
+                style="background-color: var(--color-surface);"
+                @click.stop
+              >
+                <div class="px-6 py-5" style="border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <h3 class="text-base font-semibold" id="edit-dialog-title" style="color: var(--color-text-main);">
+                        Edit {{ editDialog.field === 'description' ? 'Description' : 'Aliases' }}
+                      </h3>
+                      <p class="mt-1 text-xs" style="color: var(--color-text-muted);">
+                        Column: <span class="font-medium">{{ editDialog.columnName }}</span>
+                      </p>
+                    </div>
+                    <button
+                      @click="closeEditDialog"
+                      class="p-1.5 rounded-lg transition-colors"
+                      style="color: var(--color-text-muted);"
+                    >
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="px-6 py-5">
+                  <div v-if="editDialog.field === 'description'">
+                    <label class="mb-2 block text-xs font-medium" style="color: var(--color-text-muted);">Description</label>
+                    <textarea
+                      v-model="editDialog.value"
+                      rows="4"
+                      class="w-full resize-y rounded-lg px-3 py-2.5 text-sm leading-relaxed outline-none transition-shadow"
+                      style="border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-main); background-color: var(--color-base);"
+                      placeholder="Enter a description for this column..."
+                    ></textarea>
+                    <p class="mt-2 text-[11px]" style="color: var(--color-text-muted);">
+                      Describe the business meaning, format, and any relevant details about this column.
+                    </p>
+                  </div>
+                  <div v-else>
+                    <label class="mb-2 block text-xs font-medium" style="color: var(--color-text-muted);">Aliases</label>
+                    <textarea
+                      v-model="editDialog.value"
+                      rows="3"
+                      class="w-full resize-y rounded-lg px-3 py-2.5 text-sm leading-relaxed outline-none transition-shadow"
+                      style="border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-main); background-color: var(--color-base);"
+                      placeholder="Comma-separated aliases (e.g., id, identifier, key)"
+                    ></textarea>
+                    <p class="mt-2 text-[11px]" style="color: var(--color-text-muted);">
+                      Search hints for schema lookup. Enter comma-separated values.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="px-6 py-4 flex items-center justify-end gap-3" style="border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); background-color: var(--color-base);">
+                  <button
+                    @click="closeEditDialog"
+                    class="rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                    style="color: var(--color-text-muted); background-color: transparent;"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    @click="saveEditDialog"
+                    class="rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
+                    style="background-color: var(--color-accent); color: white;"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Teleport>
         <p class="text-[11px]" style="color: var(--color-text-muted);">
           Aliases are search hints for schema lookup. Enter comma-separated values per column.
         </p>
@@ -217,6 +330,15 @@ const isRegenerating = ref(false)
 const datasetOptions = ref([])
 const selectedDatasetTable = ref('')
 const selectedDatasetPath = ref('')
+
+// Edit dialog state
+const editDialog = ref({
+  isOpen: false,
+  index: -1,
+  field: '', // 'description' or 'aliases'
+  columnName: '',
+  value: ''
+})
 
 const hasActiveDataset = computed(() => selectedDatasetTable.value.trim() !== '')
 
@@ -339,6 +461,42 @@ function normalizeAliasList(value) {
 
 function formatAliasesForInput(value) {
   return normalizeAliasList(value).join(', ')
+}
+
+function formatAliasesForDisplay(value) {
+  const list = normalizeAliasList(value)
+  return list.length > 0 ? list.join(', ') : ''
+}
+
+function openEditDialog(index, field) {
+  const col = schema.value[index]
+  if (!col) return
+  editDialog.value = {
+    isOpen: true,
+    index,
+    field,
+    columnName: col.name,
+    value: field === 'description'
+      ? (col.description || '')
+      : formatAliasesForInput(col.aliases)
+  }
+}
+
+function closeEditDialog() {
+  editDialog.value.isOpen = false
+}
+
+function saveEditDialog() {
+  const { index, field, value } = editDialog.value
+  if (index < 0 || !schema.value[index]) return
+  
+  if (field === 'description') {
+    updateSchemaDescription(index, value)
+  } else if (field === 'aliases') {
+    updateSchemaAliases(index, value)
+  }
+  
+  closeEditDialog()
 }
 
 function normalizeSchemaColumns(columns) {
