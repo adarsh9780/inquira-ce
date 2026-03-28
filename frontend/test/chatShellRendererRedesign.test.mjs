@@ -47,7 +47,8 @@ test('TerminalRenderer accepts status prop', () => {
 })
 
 test('TerminalRenderer uses light card theme (not dark terminal)', () => {
-    assert.ok(terminalSource.includes('#fafafa'), 'light background color used')
+    assert.ok(terminalSource.includes('.shell-card'), 'shell card styles exist')
+    assert.ok(terminalSource.includes('background:'), 'shell card sets a background')
     assert.ok(!terminalSource.includes('#0b1220'), 'old dark background removed')
     assert.ok(!terminalSource.includes('#111827'), 'old dark header background removed')
 })

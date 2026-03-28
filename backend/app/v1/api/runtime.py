@@ -835,7 +835,7 @@ async def get_workspace_paths(
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
-    await _require_workspace_access(session, current_user.id, workspace_id)
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     workspace_path = Path(workspace.duckdb_path).parent
     runtime = load_execution_runtime_config()
     return WorkspacePathsResponse(
@@ -1085,7 +1085,7 @@ async def get_workspace_dataframe_artifact_rows(
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
-    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    await _require_workspace_access(session, current_user.id, workspace_id)
     parsed_sort_model = _parse_grid_query_model(
         raw_value=sort_model,
         field_name="sort_model",
