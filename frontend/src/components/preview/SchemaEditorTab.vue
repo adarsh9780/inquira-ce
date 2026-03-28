@@ -65,10 +65,10 @@
       <div class="flex flex-wrap items-end justify-between gap-4 pb-4 border-b" style="border-color: color-mix(in srgb, var(--color-border) 30%, transparent);">
         <div class="flex min-w-0 flex-wrap items-center gap-3">
           <div class="flex items-center gap-2">
-            <!-- Database icon -->
+            <!-- Schema icon -->
             <div class="flex h-9 w-9 items-center justify-center rounded-xl" style="background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 15%, transparent), color-mix(in srgb, var(--color-accent) 5%, transparent)); border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);">
-              <svg class="w-4.5 h-4.5" style="color: var(--color-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+              <svg class="w-5 h-5" style="color: var(--color-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
               </svg>
             </div>
             <div>
@@ -164,11 +164,11 @@
         v-if="!hasActiveDataset && !schemaLoading"
         class="flex h-full flex-col items-center justify-center py-16 text-center"
       >
-          <!-- Database illustration -->
+          <!-- Schema illustration -->
           <div class="relative mb-6">
             <div class="flex h-20 w-20 items-center justify-center rounded-2xl" style="background: linear-gradient(135deg, color-mix(in srgb, var(--color-surface) 80%, var(--color-base)), color-mix(in srgb, var(--color-surface) 40%, var(--color-base))); border: 1px solid color-mix(in srgb, var(--color-border) 40%, transparent); box-shadow: 0 8px 32px color-mix(in srgb, var(--color-border) 20%, transparent);">
               <svg class="w-10 h-10" style="color: var(--color-text-muted); opacity: 0.5;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
               </svg>
             </div>
             <!-- Decorative ring -->
@@ -236,10 +236,7 @@
           <!-- Context Section -->
           <div class="rounded-xl border p-4" style="border-color: color-mix(in srgb, var(--color-border) 40%, transparent); background: linear-gradient(135deg, var(--color-surface) 0%, color-mix(in srgb, var(--color-surface) 70%, var(--color-base)));">
             <div class="flex items-start justify-between gap-3 mb-3">
-              <div>
-                <label class="text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">LLM Context Hint</label>
-                <p class="text-xs mt-0.5" style="color: var(--color-text-muted); opacity: 0.7;">Helps AI understand business meaning</p>
-              </div>
+              <label class="text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Context</label>
               <button
                 @click="openEditDialog(-1, 'context')"
                 class="group inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all duration-200"
@@ -273,9 +270,10 @@
             <table class="min-w-full">
               <thead>
                 <tr style="background: linear-gradient(180deg, color-mix(in srgb, var(--color-base) 60%, var(--color-surface)) 0%, color-mix(in srgb, var(--color-base) 80%, var(--color-surface)) 100%);">
-                  <th class="w-[24%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Column</th>
-                  <th class="w-[46%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Description</th>
-                  <th class="w-[30%] px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Aliases</th>
+                  <th class="w-12 px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">#</th>
+                  <th class="w-[24%] px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Column</th>
+                  <th class="w-[46%] px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Description</th>
+                  <th class="w-[30%] px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Aliases</th>
                 </tr>
               </thead>
               <tbody class="divide-y" style="--tw-divide-opacity: 0.08; border-top: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);">
@@ -285,35 +283,35 @@
                   class="group align-top transition-colors duration-150"
                   style="border-bottom: 1px solid color-mix(in srgb, var(--color-border) 20%, transparent);"
                 >
-                  <td class="px-5 py-4">
-                    <div class="flex items-center gap-2">
-                      <span class="inline-flex items-center justify-center w-6 h-6 rounded-lg text-xs font-mono font-semibold" style="background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 12%, transparent), color-mix(in srgb, var(--color-accent) 5%, transparent)); color: var(--color-accent);">
-                        {{ i + 1 }}
-                      </span>
-                      <span class="text-sm font-medium font-mono" style="color: var(--color-text-main);">{{ col.name }}</span>
-                    </div>
+                  <td class="px-4 py-3.5">
+                    <span class="text-xs font-mono font-medium" style="color: var(--color-text-muted);">
+                      {{ i + 1 }}
+                    </span>
                   </td>
-                  <td class="px-5 py-4 relative">
+                  <td class="px-4 py-3.5">
+                    <span class="text-sm font-medium font-mono" style="color: var(--color-text-main);">{{ col.name }}</span>
+                  </td>
+                  <td class="px-4 py-3.5 relative">
                     <div class="min-h-[24px] pr-10">
                       <span
                         v-if="col.description"
                         class="text-sm leading-relaxed"
                         style="color: var(--color-text-main); white-space: pre-wrap;"
                       >{{ col.description }}</span>
-                      <span v-else class="text-sm italic" style="color: var(--color-text-muted); opacity: 0.5;">No description</span>
+                      <span v-else class="text-sm" style="color: var(--color-text-muted);">No description</span>
                     </div>
                     <button
                       @click="openEditDialog(i, 'description')"
-                      class="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2 rounded-lg transition-all duration-200"
+                      class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 rounded-md transition-all duration-150"
                       style="color: var(--color-text-muted);"
                       title="Edit description"
                     >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
                       </svg>
                     </button>
                   </td>
-                  <td class="px-5 py-4 relative">
+                  <td class="px-4 py-3.5 relative">
                     <div class="min-h-[24px] pr-10">
                       <div v-if="col.aliases && col.aliases.length > 0" class="flex flex-wrap gap-1.5">
                         <span
@@ -325,15 +323,15 @@
                           {{ alias }}
                         </span>
                       </div>
-                      <span v-else class="text-sm italic" style="color: var(--color-text-muted); opacity: 0.5;">No aliases</span>
+                      <span v-else class="text-sm" style="color: var(--color-text-muted);">No aliases</span>
                     </div>
                     <button
                       @click="openEditDialog(i, 'aliases')"
-                      class="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2 rounded-lg transition-all duration-200"
+                      class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 rounded-md transition-all duration-150"
                       style="color: var(--color-text-muted);"
                       title="Edit aliases"
                     >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
                       </svg>
                     </button>
@@ -426,46 +424,37 @@
                   <!-- Body -->
                   <div class="px-6 py-5">
                     <div v-if="editDialog.field === 'description'">
-                      <label class="mb-2.5 block text-sm font-medium" style="color: var(--color-text-muted);">Description</label>
+                      <label class="mb-2 block text-xs font-medium" style="color: var(--color-text-muted);">Description</label>
                       <textarea
                         v-model="editDialog.value"
                         rows="4"
-                        class="w-full resize-y rounded-xl px-4 py-3 text-sm leading-relaxed outline-none transition-all duration-200"
-                        style="border: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent); color: var(--color-text-main); background-color: var(--color-base);"
+                        class="w-full resize-y rounded-lg px-3 py-2.5 text-sm leading-relaxed outline-none transition-shadow"
+                        style="border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-main); background-color: var(--color-base);"
                         placeholder="Enter a description for this column..."
                         autofocus
                       ></textarea>
-                      <p class="mt-2.5 text-xs" style="color: var(--color-text-muted); opacity: 0.7;">
-                        Describe the business meaning, format, and any relevant details about this column.
-                      </p>
                     </div>
                     <div v-else-if="editDialog.field === 'aliases'">
-                      <label class="mb-2.5 block text-sm font-medium" style="color: var(--color-text-muted);">Aliases</label>
+                      <label class="mb-2 block text-xs font-medium" style="color: var(--color-text-muted);">Aliases</label>
                       <textarea
                         v-model="editDialog.value"
                         rows="3"
-                        class="w-full resize-y rounded-xl px-4 py-3 text-sm leading-relaxed outline-none transition-all duration-200 font-mono"
-                        style="border: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent); color: var(--color-text-main); background-color: var(--color-base);"
+                        class="w-full resize-y rounded-lg px-3 py-2.5 text-sm leading-relaxed outline-none transition-shadow"
+                        style="border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-main); background-color: var(--color-base);"
                         placeholder="id, identifier, key"
                         autofocus
                       ></textarea>
-                      <p class="mt-2.5 text-xs" style="color: var(--color-text-muted); opacity: 0.7;">
-                        Search hints for schema lookup. Enter comma-separated values.
-                      </p>
                     </div>
                     <div v-else-if="editDialog.field === 'context'">
-                      <label class="mb-2.5 block text-sm font-medium" style="color: var(--color-text-muted);">Context Description</label>
+                      <label class="mb-2 block text-xs font-medium" style="color: var(--color-text-muted);">Context Description</label>
                       <textarea
                         v-model="editDialog.value"
                         rows="6"
-                        class="w-full resize-y rounded-xl px-4 py-3 text-sm leading-relaxed outline-none transition-all duration-200 font-mono"
-                        style="border: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent); color: var(--color-text-main); background-color: var(--color-base);"
+                        class="w-full resize-y rounded-lg px-3 py-2.5 text-sm leading-relaxed outline-none transition-shadow"
+                        style="border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-main); background-color: var(--color-base);"
                         placeholder="Example: Daily transaction-level sales data for retail stores. Revenue is in USD. 'channel' means online vs in-store."
                         autofocus
                       ></textarea>
-                      <p class="mt-2.5 text-xs" style="color: var(--color-text-muted); opacity: 0.7;">
-                        Supports markdown formatting. Describe the business meaning, domain terms, and how this dataset should be interpreted.
-                      </p>
                     </div>
                   </div>
 
