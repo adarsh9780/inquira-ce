@@ -4,6 +4,7 @@ VERSION ?=
 POS_VERSION := $(word 2,$(MAKECMDGOALS))
 EFFECTIVE_VERSION := $(if $(VERSION),$(VERSION),$(POS_VERSION))
 UV_VERSION := 0.6.3
+INLINE_GIT_COMMIT_MESSAGE := $(strip $(filter-out git-commit,$(MAKECMDGOALS)))
 
 .PHONY: help help-release help-push help-tag check-version check-version-pretty check-message check-input-version check-input-version-greater check-version-file check-no-version-arg check-tag-not-latest check-uv-version stage-bundled-uv-local set-version metadata test test-pretty ruff-test ruff-test-pretty mypy-test mypy-test-pretty test-backend test-backend-pretty test-frontend test-frontend-pretty test-e2e build-frontend sync-frontend-dist build-wheel build-desktop git-add git-commit git-push git-tag push release
 
@@ -200,9 +201,30 @@ build-desktop: stage-bundled-uv-local
 git-add:
 	git add .
 
-git-commit: check-message
-	git commit -F commit_message.txt
-	: > commit_message.txt
+git-commit:
+	@inline_msg='$(INLINE_GIT_COMMIT_MESSAGE)'; \
+	explicit_msg='$(MESSAGE)'; \
+	commit_msg="$$explicit_msg"; \
+	if [ -z "$$commit_msg" ]; then \
+		commit_msg="$$inline_msg"; \
+	fi; \
+	last_msg="$$(git log -1 --pretty=%B 2>/dev/null || true)"; \
+	if [ -n "$$commit_msg" ]; then \
+		if [ -n "$$last_msg" ] && [ "$$commit_msg" = "$$last_msg" ]; then \
+			echo "Inline commit message matches the latest commit message. Please write a new message."; \
+			exit 1; \
+		fi; \
+		git commit -m "$$commit_msg"; \
+	else \
+		test -s commit_message.txt || (echo "commit_message.txt is missing or empty."; exit 1); \
+		current_msg="$$(cat commit_message.txt)"; \
+		if [ -n "$$last_msg" ] && [ "$$current_msg" = "$$last_msg" ]; then \
+			echo "commit_message.txt matches the latest commit message. Please write a new message."; \
+			exit 1; \
+		fi; \
+		git commit -F commit_message.txt; \
+		: > commit_message.txt; \
+	fi
 
 git-push:
 	@branch="$$(git rev-parse --abbrev-ref HEAD)"; \
