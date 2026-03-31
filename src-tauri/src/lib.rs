@@ -1205,7 +1205,7 @@ fn bootstrap_python(
 
     log::info!("Syncing Python environment...");
     let mut cmd = Command::new(uv_bin);
-    cmd.args(["sync", "--project", backend_dir.to_str().unwrap()])
+    cmd.args(["sync", "--no-dev", "--project", backend_dir.to_str().unwrap()])
         .env("UV_PROJECT_ENVIRONMENT", venv_path.to_str().unwrap());
     apply_uv_package_env(&mut cmd, config);
     let status = cmd.status().map_err(|e| format!("uv sync failed: {}", e))?;
