@@ -5,7 +5,7 @@ POS_VERSION := $(word 2,$(MAKECMDGOALS))
 EFFECTIVE_VERSION := $(if $(VERSION),$(VERSION),$(POS_VERSION))
 UV_VERSION := 0.6.3
 
-.PHONY: help help-release help-push help-tag check-version check-version-pretty check-message check-input-version check-input-version-greater check-version-file check-no-version-arg check-tag-not-latest check-uv-version stage-bundled-uv-local set-version metadata test test-pretty ruff-test ruff-test-pretty mypy-test mypy-test-pretty test-backend test-backend-pretty test-frontend test-frontend-pretty build-frontend sync-frontend-dist build-wheel build-desktop git-add git-commit git-push git-tag push release
+.PHONY: help help-release help-push help-tag check-version check-version-pretty check-message check-input-version check-input-version-greater check-version-file check-no-version-arg check-tag-not-latest check-uv-version stage-bundled-uv-local set-version metadata test test-pretty ruff-test ruff-test-pretty mypy-test mypy-test-pretty test-backend test-backend-pretty test-frontend test-frontend-pretty test-e2e build-frontend sync-frontend-dist build-wheel build-desktop git-add git-commit git-push git-tag push release
 
 help:
 	@echo "Usage:"
@@ -17,6 +17,7 @@ help:
 	@echo "  make mypy-test-pretty"
 	@echo "  make test-backend-pretty"
 	@echo "  make test-frontend-pretty"
+	@echo "  make test-e2e"
 	@echo "  make check-version-pretty"
 	@echo "  make build-frontend"
 	@echo "  make sync-frontend-dist"
@@ -53,6 +54,7 @@ help:
 	@echo "  test-backend-pretty Rich-formatted backend pytest run"
 	@echo "  test-frontend Run frontend npm test suite"
 	@echo "  test-frontend-pretty Rich-formatted frontend test run"
+	@echo "  test-e2e      Run frontend Playwright end-to-end tests"
 	@echo "  build-frontend Build frontend assets into src/inquira/frontend/dist"
 	@echo "  sync-frontend-dist Copy frontend assets to backend/app/frontend/dist for wheel packaging"
 	@echo "  build-wheel   Build backend Python wheel with bundled frontend assets"
@@ -175,6 +177,9 @@ test-frontend:
 
 test-frontend-pretty:
 	uv run --with rich python scripts/maintenance/pretty_make.py test-frontend-pretty
+
+test-e2e:
+	cd frontend && npm ci && npx playwright install chromium webkit && npm run e2e
 
 build-frontend:
 	cd frontend && npm ci && npm run build
