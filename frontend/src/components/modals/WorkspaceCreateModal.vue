@@ -122,27 +122,6 @@
                   Open Workspace
                 </button>
               </div>
-
-              <div class="max-h-44 overflow-y-auto space-y-2 pr-1">
-                <button
-                  v-for="workspace in workspaceOptions"
-                  :key="`${workspace.id}-row`"
-                  type="button"
-                  class="w-full rounded-xl border px-3 py-2 text-left transition-colors"
-                  :style="workspaceRowStyle(workspace)"
-                  @click="selectedWorkspaceId = workspace.id"
-                >
-                  <div class="flex items-center justify-between gap-2">
-                    <span class="truncate text-sm font-medium" style="color: var(--color-text-main);">{{ workspace.name }}</span>
-                    <span class="text-[11px]" style="color: var(--color-text-muted);">
-                      {{ isWorkspaceCurrentlyActive(workspace) ? 'Active now' : `Updated ${formatWorkspaceDate(workspace.updated_at)}` }}
-                    </span>
-                  </div>
-                  <p class="mt-1 text-xs" style="color: var(--color-text-muted);">
-                    Created {{ formatWorkspaceDate(workspace.created_at) }}
-                  </p>
-                </button>
-              </div>
             </div>
 
             <div
@@ -252,13 +231,6 @@ function selectedWorkspaceBadgeStyle(workspace) {
     return 'background-color: #ecfdf3; color: #027a48;'
   }
   return 'background-color: color-mix(in srgb, var(--color-surface) 84%, transparent); color: var(--color-text-muted);'
-}
-
-function workspaceRowStyle(workspace) {
-  if (String(workspace?.id || '').trim() === String(selectedWorkspaceId.value || '').trim()) {
-    return 'border-color: color-mix(in srgb, var(--color-border) 92%, transparent); background-color: color-mix(in srgb, var(--color-surface) 72%, transparent);'
-  }
-  return 'border-color: color-mix(in srgb, var(--color-border) 72%, transparent); background-color: transparent;'
 }
 
 function resetWorkspaceSelection() {

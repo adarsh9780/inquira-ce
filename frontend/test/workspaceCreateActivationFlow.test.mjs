@@ -45,6 +45,8 @@ test('workspace create modal warns that creating a workspace switches active con
   assert.equal(source.includes('Workspace names must be unique.'), true)
   assert.equal(source.includes('emit(\'open-workspace\''), true)
   assert.equal(source.includes('const duplicateWorkspace = computed(() => {'), true)
+  assert.equal(source.includes('max-h-44 overflow-y-auto space-y-2 pr-1'), false)
+  assert.equal(source.includes('workspaceRowStyle('), false)
 })
 
 test('workspace launchers pass existing workspaces into the create modal', () => {
