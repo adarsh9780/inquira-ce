@@ -27,7 +27,8 @@ def test_pages_workflow_builds_and_deploys_docs_site():
     assert "actions/deploy-pages@v4" in text
     assert "pages: write" in text
     assert "id-token: write" in text
-    assert "actions/setup-node@v4" in text
+    assert "actions/checkout@v6" in text
+    assert "actions/setup-node@v6" in text
     assert "npm ci" in text
     assert "npm run build" in text
     assert "docs-site/build" in text
