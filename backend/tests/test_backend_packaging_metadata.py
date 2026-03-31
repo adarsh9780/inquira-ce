@@ -24,6 +24,7 @@ def test_backend_runtime_dependencies_exclude_optional_tracing_and_stale_package
     data = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
     runtime_deps = set(data.get("project", {}).get("dependencies", []))
     dev_deps = set(data.get("dependency-groups", {}).get("dev", []))
+    debug_deps = set(data.get("dependency-groups", {}).get("debug", []))
 
     assert "arize-phoenix>=13.3.0" not in runtime_deps
     assert "openinference-instrumentation-langchain>=0.1.59" not in runtime_deps
@@ -36,9 +37,25 @@ def test_backend_runtime_dependencies_exclude_optional_tracing_and_stale_package
     assert "langgraph-cli[inmem]>=0.4.4" not in runtime_deps
     assert "sse-starlette>=2.1.3" not in runtime_deps
 
-    assert "arize-phoenix>=13.3.0" in dev_deps
-    assert "openinference-instrumentation-langchain>=0.1.59" in dev_deps
-    assert "rich>=14.3.3" in dev_deps
+    assert "arize-phoenix>=13.3.0" not in dev_deps
+    assert "openinference-instrumentation-langchain>=0.1.59" not in dev_deps
+    assert "rich>=14.3.3" not in dev_deps
+
+    assert "arize-phoenix>=13.3.0" in debug_deps
+    assert "openinference-instrumentation-langchain>=0.1.59" in debug_deps
+    assert "rich>=14.3.3" in debug_deps
+
+
+def test_backend_dev_group_stays_focused_on_test_and_lint_tooling():
+    data = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
+    dev_deps = set(data.get("dependency-groups", {}).get("dev", []))
+
+    assert dev_deps == {
+        "mypy>=1.18.2",
+        "pytest>=9.0.2",
+        "pytest-asyncio>=1.3.0",
+        "ruff>=0.13.1",
+    }
 
 
 def test_backend_runtime_dependencies_keep_greenlet_for_sqlalchemy_async_sessions():

@@ -840,13 +840,15 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-dev = [
+debug = [
     { name = "arize-phoenix" },
-    { name = "mypy" },
     { name = "openinference-instrumentation-langchain" },
+    { name = "rich" },
+]
+dev = [
+    { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
-    { name = "rich" },
     { name = "ruff" },
 ]
 
@@ -876,13 +878,15 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [
+debug = [
     { name = "arize-phoenix", specifier = ">=13.3.0" },
-    { name = "mypy", specifier = ">=1.18.2" },
     { name = "openinference-instrumentation-langchain", specifier = ">=0.1.59" },
+    { name = "rich", specifier = ">=14.3.3" },
+]
+dev = [
+    { name = "mypy", specifier = ">=1.18.2" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-asyncio", specifier = ">=1.3.0" },
-    { name = "rich", specifier = ">=14.3.3" },
     { name = "ruff", specifier = ">=0.13.1" },
 ]
 
