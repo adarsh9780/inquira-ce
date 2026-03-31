@@ -33,6 +33,7 @@ notebooks/*
 .venv
 backend/.venv/
 .vscode
+.kilocode
 .idea/
 *.log
 *.tmp
