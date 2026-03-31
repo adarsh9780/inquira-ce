@@ -41,4 +41,23 @@ test('workspace create modal warns that creating a workspace switches active con
     source.includes('You can switch back later from the workspace picker.'),
     true,
   )
+  assert.equal(source.includes('Open Existing Workspace'), true)
+  assert.equal(source.includes('Workspace names must be unique.'), true)
+  assert.equal(source.includes('emit(\'open-workspace\''), true)
+  assert.equal(source.includes('const duplicateWorkspace = computed(() => {'), true)
+})
+
+test('workspace launchers pass existing workspaces into the create modal', () => {
+  const launcherPaths = [
+    resolve(process.cwd(), 'src/components/WorkspaceSwitcher.vue'),
+    resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'),
+    resolve(process.cwd(), 'src/components/layout/sidebar/SidebarWorkspaces.vue'),
+  ]
+
+  for (const filePath of launcherPaths) {
+    const source = readFileSync(filePath, 'utf-8')
+    assert.equal(source.includes(':workspaces="appStore.workspaces"'), true)
+    assert.equal(source.includes(':active-workspace-id="appStore.activeWorkspaceId"'), true)
+    assert.equal(source.includes('@open-workspace="openWorkspaceFromDialog"'), true)
+  }
 })

@@ -287,7 +287,10 @@
       :is-open="isCreateDialogOpen"
       :is-submitting="isCreatingWorkspace"
       :plan="authStore.planLabel"
+      :workspaces="appStore.workspaces"
+      :active-workspace-id="appStore.activeWorkspaceId"
       @close="closeCreateDialog"
+      @open-workspace="openWorkspaceFromDialog"
       @submit="createWorkspace"
     />
 
@@ -629,6 +632,17 @@ async function createWorkspace(name) {
     isCreateDialogOpen.value = false
   } catch (error) {
     toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to create workspace'))
+  } finally {
+    isCreatingWorkspace.value = false
+  }
+}
+
+async function openWorkspaceFromDialog(workspaceId) {
+  if (!workspaceId) return
+  isCreatingWorkspace.value = true
+  try {
+    await selectWorkspace(workspaceId)
+    isCreateDialogOpen.value = false
   } finally {
     isCreatingWorkspace.value = false
   }
