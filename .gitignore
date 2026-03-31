@@ -34,6 +34,7 @@ notebooks/*
 backend/.venv/
 .vscode
 .kilocode
+.playwright
 .idea/
 *.log
 *.tmp
