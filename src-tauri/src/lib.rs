@@ -1267,12 +1267,27 @@ fn apply_uv_package_env(cmd: &mut Command, config: &InquiraConfig) {
     cmd.env("UV_INDEX_URL", resolve_uv_index_url(config));
 }
 
-fn python_bin_from_venv(venv_path: &PathBuf) -> PathBuf {
-    if cfg!(target_os = "windows") {
-        venv_path.join("Scripts").join("python.exe")
+fn venv_executable_path(venv_path: &Path, executable_name: &str, windows: bool) -> PathBuf {
+    if windows {
+        let binary_name = if executable_name.eq_ignore_ascii_case("python") {
+            "python.exe".to_string()
+        } else if executable_name.to_ascii_lowercase().ends_with(".exe") {
+            executable_name.to_string()
+        } else {
+            format!("{executable_name}.exe")
+        };
+        venv_path.join("Scripts").join(binary_name)
     } else {
-        venv_path.join("bin").join("python")
+        venv_path.join("bin").join(executable_name)
     }
+}
+
+fn python_bin_from_venv(venv_path: &Path) -> PathBuf {
+    venv_executable_path(venv_path, "python", cfg!(target_os = "windows"))
+}
+
+fn langgraph_bin_from_venv(venv_path: &Path) -> PathBuf {
+    venv_executable_path(venv_path, "langgraph", cfg!(target_os = "windows"))
 }
 
 fn build_pythonpath_entries(
@@ -1592,11 +1607,7 @@ fn start_agent_runtime(
         .map(Path::to_path_buf)
         .unwrap_or_else(|| agent_dir.clone());
     let pythonpath = build_pythonpath(&[agent_dir.clone(), agent_repo_root])?;
-    let langgraph_bin = if cfg!(target_os = "windows") {
-        venv_path.join("Scripts").join("langgraph.exe")
-    } else {
-        venv_path.join("bin").join("langgraph")
-    };
+    let langgraph_bin = langgraph_bin_from_venv(venv_path);
 
     let command_summary: String;
     let mut cmd = if command_override.trim().is_empty() {
@@ -2086,12 +2097,13 @@ mod tests {
     use super::{
         build_pythonpath_entries, bundled_uv_candidates, default_backend_host,
         default_uv_search_paths, desktop_python_env_paths, detect_default_shell,
-        missing_uv_binary_error, needs_python_bootstrap, parse_lsof_pid_lines,
-        parse_netstat_listening_pids, resolve_pty_cwd, resolve_resource_path,
-        resolve_runtime_config_path, resolve_runtime_state_dir, resolve_shared_console_log_level,
-        resolve_uv_index_url, startup_log_paths, stop_child_process, uv_binary_file_name,
-        uv_search_candidates, vc_redist_download_url, vc_redist_installer_path,
-        vc_redist_marker_path, vc_redist_success_exit_code, InquiraConfig, LoggingConfig,
+        langgraph_bin_from_venv, missing_uv_binary_error, needs_python_bootstrap,
+        parse_lsof_pid_lines, parse_netstat_listening_pids, python_bin_from_venv,
+        resolve_pty_cwd, resolve_resource_path, resolve_runtime_config_path,
+        resolve_runtime_state_dir, resolve_shared_console_log_level, resolve_uv_index_url,
+        startup_log_paths, stop_child_process, uv_binary_file_name, uv_search_candidates,
+        vc_redist_download_url, vc_redist_installer_path, vc_redist_marker_path,
+        vc_redist_success_exit_code, venv_executable_path, InquiraConfig, LoggingConfig,
         PythonConfig, MAIN_WINDOW_LABEL, SPLASH_WINDOW_LABEL,
     };
     use std::env;
@@ -2144,6 +2156,53 @@ mod tests {
         assert_eq!(paths.agent_marker, base.join(".agent-env-fingerprint"));
         assert_ne!(paths.backend_venv, paths.agent_venv);
         assert_ne!(paths.backend_marker, paths.agent_marker);
+    }
+
+    #[test]
+    fn venv_executable_path_uses_windows_scripts_layout() {
+        let base = PathBuf::from(r"C:\inq\.backend-venv");
+
+        assert_eq!(
+            venv_executable_path(&base, "python", true),
+            base.join("Scripts").join("python.exe")
+        );
+        assert_eq!(
+            venv_executable_path(&base, "langgraph", true),
+            base.join("Scripts").join("langgraph.exe")
+        );
+    }
+
+    #[test]
+    fn venv_executable_path_uses_unix_bin_layout() {
+        let base = PathBuf::from("/tmp/inq/.backend-venv");
+
+        assert_eq!(
+            venv_executable_path(&base, "python", false),
+            base.join("bin").join("python")
+        );
+        assert_eq!(
+            venv_executable_path(&base, "langgraph", false),
+            base.join("bin").join("langgraph")
+        );
+    }
+
+    #[test]
+    fn platform_helpers_match_current_target_layout() {
+        let base = PathBuf::from("/tmp/inq-platform-venv");
+
+        let expected_python = if cfg!(target_os = "windows") {
+            base.join("Scripts").join("python.exe")
+        } else {
+            base.join("bin").join("python")
+        };
+        let expected_langgraph = if cfg!(target_os = "windows") {
+            base.join("Scripts").join("langgraph.exe")
+        } else {
+            base.join("bin").join("langgraph")
+        };
+
+        assert_eq!(python_bin_from_venv(&base), expected_python);
+        assert_eq!(langgraph_bin_from_venv(&base), expected_langgraph);
     }
 
     #[test]
