@@ -34,6 +34,19 @@ class WorkspaceListResponse(BaseModel):
     workspaces: list[WorkspaceResponse]
 
 
+class WorkspaceSummaryResponse(BaseModel):
+    """On-demand workspace summary payload for lightweight UI details."""
+
+    id: str
+    name: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    table_count: int
+    table_names: list[str]
+    conversation_count: int
+
+
 class WorkspaceDeletionJobResponse(BaseModel):
     """Workspace deletion job status payload."""
 

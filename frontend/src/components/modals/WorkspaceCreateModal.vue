@@ -102,25 +102,93 @@
                   </span>
                 </div>
 
-                <dl class="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <dt style="color: var(--color-text-muted);">Created</dt>
-                    <dd style="color: var(--color-text-main);">{{ formatWorkspaceDate(selectedWorkspace.created_at) }}</dd>
-                  </div>
-                  <div>
-                    <dt style="color: var(--color-text-muted);">Updated</dt>
-                    <dd style="color: var(--color-text-main);">{{ formatWorkspaceDate(selectedWorkspace.updated_at) }}</dd>
-                  </div>
-                </dl>
+                <div class="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    class="btn-secondary text-sm px-4 py-2 w-full"
+                    :disabled="isSubmitting || !selectedWorkspaceId"
+                    @click="toggleWorkspaceDetails"
+                  >
+                    {{ workspaceSummaryVisible ? 'Hide details' : 'View details' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-secondary text-sm px-4 py-2 w-full"
+                    :disabled="isSubmitting || !selectedWorkspaceId"
+                    @click="openWorkspace"
+                  >
+                    Open Workspace
+                  </button>
+                </div>
 
-                <button
-                  type="button"
-                  class="btn-secondary text-sm px-4 py-2 w-full"
-                  :disabled="isSubmitting || !selectedWorkspaceId"
-                  @click="openWorkspace"
+                <div
+                  v-if="workspaceSummaryVisible"
+                  class="rounded-lg border px-3 py-3 space-y-3"
+                  style="border-color: color-mix(in srgb, var(--color-border) 70%, transparent); background-color: color-mix(in srgb, var(--color-base) 88%, transparent);"
                 >
-                  Open Workspace
-                </button>
+                  <p
+                    v-if="workspaceSummaryLoadingId === selectedWorkspaceId"
+                    class="text-xs"
+                    style="color: var(--color-text-muted);"
+                  >
+                    Loading workspace details…
+                  </p>
+                  <p
+                    v-else-if="workspaceSummaryError"
+                    class="text-xs"
+                    style="color: #b42318;"
+                  >
+                    {{ workspaceSummaryError }}
+                  </p>
+                  <template v-else-if="selectedWorkspaceSummary">
+                    <dl class="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <dt style="color: var(--color-text-muted);">Created</dt>
+                        <dd style="color: var(--color-text-main);">{{ formatWorkspaceDate(selectedWorkspaceSummary.created_at) }}</dd>
+                      </div>
+                      <div>
+                        <dt style="color: var(--color-text-muted);">Updated</dt>
+                        <dd style="color: var(--color-text-main);">{{ formatWorkspaceDate(selectedWorkspaceSummary.updated_at) }}</dd>
+                      </div>
+                      <div>
+                        <dt style="color: var(--color-text-muted);">Tables</dt>
+                        <dd style="color: var(--color-text-main);">{{ selectedWorkspaceSummary.table_count }}</dd>
+                      </div>
+                      <div>
+                        <dt style="color: var(--color-text-muted);">Conversations</dt>
+                        <dd style="color: var(--color-text-main);">{{ selectedWorkspaceSummary.conversation_count }}</dd>
+                      </div>
+                    </dl>
+
+                    <div class="space-y-2">
+                      <p class="text-xs font-medium" style="color: var(--color-text-main);">Table names</p>
+                      <div v-if="visibleTableNames.length > 0" class="flex flex-wrap gap-2">
+                        <span
+                          v-for="tableName in visibleTableNames"
+                          :key="tableName"
+                          class="rounded-full px-2 py-1 text-[11px]"
+                          style="background-color: color-mix(in srgb, var(--color-surface) 84%, transparent); color: var(--color-text-main);"
+                        >
+                          {{ tableName }}
+                        </span>
+                        <span
+                          v-if="hiddenTableCount > 0"
+                          class="rounded-full px-2 py-1 text-[11px]"
+                          style="background-color: color-mix(in srgb, var(--color-surface) 84%, transparent); color: var(--color-text-muted);"
+                        >
+                          +{{ hiddenTableCount }} more
+                        </span>
+                      </div>
+                      <p
+                        v-else
+                        class="text-xs"
+                        style="color: var(--color-text-muted);"
+                      >
+                        No tables imported yet.
+                      </p>
+                    </div>
+                  </template>
+                </div>
               </div>
             </div>
 
@@ -147,6 +215,7 @@
 
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
+import apiService from '../../services/apiService'
 
 const props = defineProps({
   isOpen: {
@@ -176,6 +245,10 @@ const emit = defineEmits(['close', 'submit', 'open-workspace'])
 const name = ref('')
 const nameInputRef = ref(null)
 const selectedWorkspaceId = ref('')
+const workspaceSummaryCache = ref({})
+const workspaceSummaryVisible = ref(false)
+const workspaceSummaryLoadingId = ref('')
+const workspaceSummaryError = ref('')
 
 const planLabel = computed(() => `${String(props.plan || 'FREE').toUpperCase()}`)
 const workspaceOptions = computed(() => Array.isArray(props.workspaces) ? props.workspaces : [])
@@ -189,6 +262,21 @@ const selectedWorkspace = computed(() => {
   return workspaceOptions.value.find((workspace) => workspace?.id === selectedId) || null
 })
 const createButtonDisabled = computed(() => props.isSubmitting || !name.value.trim() || Boolean(duplicateWorkspace.value))
+const selectedWorkspaceSummary = computed(() => {
+  const selectedId = String(selectedWorkspaceId.value || '').trim()
+  if (!selectedId) return null
+  return workspaceSummaryCache.value?.[selectedId] || null
+})
+const visibleTableNames = computed(() => {
+  const tableNames = Array.isArray(selectedWorkspaceSummary.value?.table_names)
+    ? selectedWorkspaceSummary.value.table_names
+    : []
+  return tableNames.slice(0, 6)
+})
+const hiddenTableCount = computed(() => {
+  const total = Number(selectedWorkspaceSummary.value?.table_count || 0)
+  return Math.max(0, total - visibleTableNames.value.length)
+})
 
 function closeModal() {
   emit('close')
@@ -203,6 +291,39 @@ function openWorkspace() {
   const workspaceId = String(selectedWorkspaceId.value || '').trim()
   if (!workspaceId || props.isSubmitting) return
   emit('open-workspace', workspaceId)
+}
+
+async function toggleWorkspaceDetails() {
+  const workspaceId = String(selectedWorkspaceId.value || '').trim()
+  if (!workspaceId || props.isSubmitting) return
+
+  if (workspaceSummaryVisible.value) {
+    workspaceSummaryVisible.value = false
+    workspaceSummaryError.value = ''
+    return
+  }
+
+  workspaceSummaryVisible.value = true
+  workspaceSummaryError.value = ''
+
+  if (workspaceSummaryCache.value?.[workspaceId]) {
+    return
+  }
+
+  workspaceSummaryLoadingId.value = workspaceId
+  try {
+    const summary = await apiService.v1GetWorkspaceSummary(workspaceId)
+    workspaceSummaryCache.value = {
+      ...workspaceSummaryCache.value,
+      [workspaceId]: summary,
+    }
+  } catch (error) {
+    workspaceSummaryError.value = error?.message || 'Failed to load workspace details.'
+  } finally {
+    if (workspaceSummaryLoadingId.value === workspaceId) {
+      workspaceSummaryLoadingId.value = ''
+    }
+  }
 }
 
 function normalizeWorkspaceName(value) {
@@ -247,6 +368,9 @@ watch(
   async (open) => {
     if (open) {
       name.value = ''
+      workspaceSummaryVisible.value = false
+      workspaceSummaryLoadingId.value = ''
+      workspaceSummaryError.value = ''
       resetWorkspaceSelection()
       await nextTick()
       nameInputRef.value?.focus()
@@ -263,6 +387,15 @@ watch(
       return
     }
     resetWorkspaceSelection()
+  },
+)
+
+watch(
+  () => selectedWorkspaceId.value,
+  () => {
+    workspaceSummaryVisible.value = false
+    workspaceSummaryLoadingId.value = ''
+    workspaceSummaryError.value = ''
   },
 )
 

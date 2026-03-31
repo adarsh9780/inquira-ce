@@ -726,6 +726,10 @@ export const apiService = {
     return v1Api.workspaces.activate(workspaceId)
   },
 
+  async v1GetWorkspaceSummary(workspaceId) {
+    return v1Api.workspaces.summary(workspaceId)
+  },
+
   async v1RenameWorkspace(workspaceId, name) {
     return v1Api.workspaces.rename(workspaceId, name)
   },

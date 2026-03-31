@@ -14,6 +14,7 @@ from ..schemas.workspace import (
     WorkspaceListResponse,
     WorkspaceRenameRequest,
     WorkspaceResponse,
+    WorkspaceSummaryResponse,
 )
 from ..services.workspace_deletion_service import WorkspaceDeletionService
 from ..services.workspace_service import WorkspaceService
@@ -87,6 +88,17 @@ async def activate_workspace(
         created_at=ws.created_at,
         updated_at=ws.updated_at,
     )
+
+
+@router.get("/{workspace_id}/summary", response_model=WorkspaceSummaryResponse)
+async def get_workspace_summary(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Return lightweight workspace metadata for on-demand UI details."""
+    summary = await WorkspaceService.get_workspace_summary(session, current_user, workspace_id)
+    return WorkspaceSummaryResponse(**summary)
 
 
 @router.patch("/{workspace_id}", response_model=WorkspaceResponse)

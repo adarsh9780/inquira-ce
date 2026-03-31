@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
-from sqlalchemy import delete, desc, select
+from sqlalchemy import delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Conversation, Turn
@@ -41,6 +41,14 @@ class ConversationRepository:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    @staticmethod
+    async def count_for_workspace(session: AsyncSession, workspace_id: str) -> int:
+        """Count conversations stored for one workspace."""
+        result = await session.execute(
+            select(func.count()).select_from(Conversation).where(Conversation.workspace_id == workspace_id)
+        )
+        return int(result.scalar_one() or 0)
 
     @staticmethod
     async def get_conversation(session: AsyncSession, conversation_id: str) -> Conversation | None:

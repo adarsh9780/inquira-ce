@@ -13,6 +13,7 @@ export const v1Api = {
     list: () => axios.get('/api/v1/workspaces'),
     create: (name) => axios.post('/api/v1/workspaces', { name }),
     activate: (workspaceId) => axios.put(`/api/v1/workspaces/${workspaceId}/activate`),
+    summary: (workspaceId) => axios.get(`/api/v1/workspaces/${workspaceId}/summary`),
     rename: (workspaceId, name) => axios.patch(`/api/v1/workspaces/${workspaceId}`, { name }),
     clearDatabase: (workspaceId) => axios.post(`/api/v1/workspaces/${workspaceId}/database/clear`),
     remove: (workspaceId) => axios.delete(`/api/v1/workspaces/${workspaceId}`),

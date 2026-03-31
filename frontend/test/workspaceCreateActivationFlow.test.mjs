@@ -45,8 +45,9 @@ test('workspace create modal warns that creating a workspace switches active con
   assert.equal(source.includes('Workspace names must be unique.'), true)
   assert.equal(source.includes('emit(\'open-workspace\''), true)
   assert.equal(source.includes('const duplicateWorkspace = computed(() => {'), true)
-  assert.equal(source.includes('max-h-44 overflow-y-auto space-y-2 pr-1'), false)
-  assert.equal(source.includes('workspaceRowStyle('), false)
+  assert.equal(source.includes('View details'), true)
+  assert.equal(source.includes('const workspaceSummaryVisible = ref(false)'), true)
+  assert.equal(source.includes('await apiService.v1GetWorkspaceSummary(workspaceId)'), true)
 })
 
 test('workspace launchers pass existing workspaces into the create modal', () => {
@@ -62,4 +63,11 @@ test('workspace launchers pass existing workspaces into the create modal', () =>
     assert.equal(source.includes(':active-workspace-id="appStore.activeWorkspaceId"'), true)
     assert.equal(source.includes('@open-workspace="openWorkspaceFromDialog"'), true)
   }
+})
+
+test('apiService exposes workspace summary route for lazy workspace detail loading', () => {
+  const source = readFileSync(resolve(process.cwd(), 'src/services/apiService.js'), 'utf-8')
+
+  assert.equal(source.includes('async v1GetWorkspaceSummary(workspaceId) {'), true)
+  assert.equal(source.includes('return v1Api.workspaces.summary(workspaceId)'), true)
 })

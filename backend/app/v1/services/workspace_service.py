@@ -13,6 +13,7 @@ from ...core.logger import logprint
 from ...services.code_executor import reset_workspace_kernel
 from ...services.terminal_executor import stop_workspace_terminal_session
 from ..models import Workspace
+from ..repositories.conversation_repository import ConversationRepository
 from ..repositories.dataset_repository import DatasetRepository
 from ..repositories.workspace_deletion_repository import WorkspaceDeletionRepository
 from ..repositories.workspace_repository import WorkspaceRepository
@@ -34,6 +35,27 @@ class WorkspaceService:
         active_jobs = await WorkspaceDeletionRepository.list_active_for_principal(session, principal_id)
         deleting_workspace_ids = {job.workspace_id for job in active_jobs}
         return [ws for ws in workspaces if ws.id not in deleting_workspace_ids]
+
+    @staticmethod
+    async def get_workspace_summary(session: AsyncSession, user, workspace_id: str) -> dict:
+        """Return lightweight workspace metadata for on-demand UI details."""
+        workspace = await WorkspaceRepository.get_by_id(session, workspace_id, user.id)
+        if workspace is None:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        datasets = await DatasetRepository.list_for_workspace(session, workspace_id)
+        conversation_count = await ConversationRepository.count_for_workspace(session, workspace_id)
+
+        return {
+            "id": workspace.id,
+            "name": workspace.name,
+            "is_active": bool(workspace.is_active),
+            "created_at": workspace.created_at,
+            "updated_at": workspace.updated_at,
+            "table_count": len(datasets),
+            "table_names": [str(dataset.table_name) for dataset in datasets if str(dataset.table_name or "").strip()],
+            "conversation_count": int(conversation_count),
+        }
 
     @staticmethod
     async def create_workspace(session: AsyncSession, user, name: str) -> Workspace:
