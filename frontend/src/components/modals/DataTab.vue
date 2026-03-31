@@ -284,6 +284,7 @@ const ingestedTableName = ref('') // DuckDB table name
 const fileInputRef = ref(null)   // ref for the <input type="file">
 const schemaContextDraft = ref('')
 const isEditingSchemaContext = ref(false)
+const E2E_DATA_PATH_EVENT = 'inquira:e2e-select-data-path'
 
 // Computed
 const hasApiKey = computed(() => appStore.apiKeyConfigured)
@@ -437,6 +438,18 @@ async function processSelectedPath(filePath) {
   }
 }
 
+async function handleE2ESelectDataPath(event) {
+  if (import.meta.env.VITE_E2E !== '1') return
+  const detail = event?.detail || {}
+  if (Array.isArray(detail?.columns) && detail?.tableName) {
+    await processE2EBrowserDataset(detail)
+    return
+  }
+  const filePath = String(detail?.path || '').trim()
+  if (!filePath) return
+  await processSelectedPath(filePath)
+}
+
 // Browser fallback: upload the File object to backend
 async function processSelectedFileUpload(file) {
   clearMessage()
@@ -453,6 +466,60 @@ async function processSelectedFileUpload(file) {
     showMessage(`Loaded "${file.name}" → table "${ingestedTableName.value}" (${result.row_count || '?'} rows, ${ingestedColumns.value.length} columns)`, 'success')
   } catch (error) {
     console.error('File upload failed:', error)
+    showMessage(`Failed to load file: ${error.message}`, 'error')
+  } finally {
+    isPickingFile.value = false
+  }
+}
+
+async function processE2EBrowserDataset(detail) {
+  clearMessage()
+  isPickingFile.value = true
+  try {
+    const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+    const tableName = String(detail?.tableName || '').trim()
+    const fileName = String(detail?.fileName || tableName || 'dataset').trim()
+    const rowCount = Number.isFinite(Number(detail?.rowCount)) ? Number(detail.rowCount) : null
+    const normalizedColumns = (Array.isArray(detail?.columns) ? detail.columns : [])
+      .map((col) => ({
+        name: String(col?.name || '').trim(),
+        type: String(col?.dtype || col?.type || 'VARCHAR').trim() || 'VARCHAR',
+        dtype: String(col?.dtype || col?.type || 'VARCHAR').trim() || 'VARCHAR',
+        description: String(col?.description || ''),
+        samples: Array.isArray(col?.samples) ? col.samples : [],
+      }))
+      .filter((col) => col.name)
+
+    if (!workspaceId) {
+      throw new Error('Create/select a workspace before loading a dataset.')
+    }
+    if (!tableName) {
+      throw new Error('Dataset table name is required for E2E browser sync.')
+    }
+    if (normalizedColumns.length === 0) {
+      throw new Error('At least one dataset column is required for E2E browser sync.')
+    }
+
+    await apiService.v1SyncBrowserDataset(workspaceId, {
+      table_name: tableName,
+      columns: normalizedColumns,
+      row_count: rowCount,
+      allow_sample_values: appStore.allowSchemaSampleValues,
+    })
+
+    ingestedTableName.value = tableName
+    ingestedColumns.value = normalizedColumns
+    applyDatasetSelection({
+      dataPath: `browser://${tableName}`,
+      tableName,
+      columns: normalizedColumns,
+    })
+    showMessage(
+      `Loaded "${fileName}" → table "${tableName}" (${rowCount || '?'} rows, ${normalizedColumns.length} columns)`,
+      'success',
+    )
+  } catch (error) {
+    console.error('E2E browser dataset sync failed:', error)
     showMessage(`Failed to load file: ${error.message}`, 'error')
   } finally {
     isPickingFile.value = false
@@ -691,6 +758,7 @@ onUnmounted(() => {
   if (settingsWebSocket) {
     settingsWebSocket.onProgress(null)
   }
+  window.removeEventListener(E2E_DATA_PATH_EVENT, handleE2ESelectDataPath)
   // Remove beforeunload handler
   window.removeEventListener('beforeunload', handleBeforeUnload)
 })
@@ -724,6 +792,7 @@ watch(
 
 // Run update check and auto-detect DuckDB tables when the Data tab mounts
 onMounted(async () => {
+  window.addEventListener(E2E_DATA_PATH_EVENT, handleE2ESelectDataPath)
   checkForUpdate()
 
   // Pre-populate from existing appStore state

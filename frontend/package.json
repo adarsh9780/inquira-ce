@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "export-openapi": "uv run --project ../backend python ../backend/scripts/export_openapi.py ./openapi.json",
     "generate-client": "npm run export-openapi && orval",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "e2e": "playwright test",
+    "e2e:list": "playwright test --list"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",
@@ -43,6 +45,7 @@
     "vue": "^3.5.17"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@vitejs/plugin-vue": "^6.0.0",
     "orval": "^7.17.2",
     "vite": "^7.0.4"

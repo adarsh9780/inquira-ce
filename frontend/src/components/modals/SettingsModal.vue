@@ -30,6 +30,8 @@
               @click="closeModal"
               :disabled="isSavingSettings || isProgressModalVisible"
               class="btn-icon disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Close settings"
+              title="Close settings"
             >
               <XMarkIcon class="h-5 w-5" />
             </button>

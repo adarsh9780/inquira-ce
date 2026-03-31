@@ -526,10 +526,21 @@ const renderedContext = computed(() => {
 const hasActiveDataset = computed(() => selectedDatasetTable.value.trim() !== '')
 
 const datasetDropdownOptions = computed(() => {
-  if (!Array.isArray(datasetOptions.value) || datasetOptions.value.length === 0) {
+  const fallbackTableName = String(selectedDatasetTable.value || appStore.ingestedTableName || '').trim()
+  const fallbackSourcePath = String(selectedDatasetPath.value || appStore.dataFilePath || '').trim()
+  const options = Array.isArray(datasetOptions.value) ? [...datasetOptions.value] : []
+
+  if (fallbackTableName && !options.some((item) => item.tableName === fallbackTableName)) {
+    options.push({
+      tableName: fallbackTableName,
+      sourcePath: fallbackSourcePath,
+    })
+  }
+
+  if (options.length === 0) {
     return [{ value: '', label: 'No datasets' }]
   }
-  return datasetOptions.value.map((item) => ({
+  return options.map((item) => ({
     value: item.tableName,
     label: item.tableName,
     key: item.tableName,
@@ -713,14 +724,34 @@ function getSelectedDatasetEntry() {
   return datasetOptions.value.find((item) => item.tableName === tableName) || null
 }
 
-function applyDatasetSelection(tableName) {
+function ensureDatasetOption(tableName, sourcePath = '') {
+  const normalizedTableName = String(tableName || '').trim()
+  if (!normalizedTableName) return null
+
+  const existing = datasetOptions.value.find((item) => item.tableName === normalizedTableName) || null
+  if (existing) {
+    if (!existing.sourcePath && sourcePath) {
+      existing.sourcePath = sourcePath
+    }
+    return existing
+  }
+
+  const fallbackEntry = {
+    tableName: normalizedTableName,
+    sourcePath: String(sourcePath || '').trim(),
+  }
+  datasetOptions.value = [...datasetOptions.value, fallbackEntry]
+  return fallbackEntry
+}
+
+function applyDatasetSelection(tableName, sourcePath = '') {
   const normalized = String(tableName || '').trim()
   if (!normalized) {
     selectedDatasetTable.value = ''
     selectedDatasetPath.value = ''
     return null
   }
-  const found = datasetOptions.value.find((item) => item.tableName === normalized) || null
+  const found = ensureDatasetOption(normalized, sourcePath)
   if (!found) return null
   selectedDatasetTable.value = found.tableName
   selectedDatasetPath.value = found.sourcePath
@@ -756,11 +787,18 @@ async function loadSchemaDatasets() {
   }
 
   const activeTable = String(appStore.ingestedTableName || '').trim()
+  const activePath = String(appStore.dataFilePath || '').trim()
   const keepCurrent = applyDatasetSelection(selectedDatasetTable.value)
   if (keepCurrent) return
 
   const fromActive = applyDatasetSelection(activeTable)
   if (fromActive) return
+
+  const ensuredActive = ensureDatasetOption(activeTable, activePath)
+  if (ensuredActive) {
+    applyDatasetSelection(ensuredActive.tableName, ensuredActive.sourcePath)
+    return
+  }
 
   applyDatasetSelection(datasetOptions.value[0].tableName)
 }
@@ -981,6 +1019,13 @@ async function handleDatasetSelection(value) {
   await fetchSchemaData()
 }
 
+function syncSelectionFromStore() {
+  const activeTable = String(appStore.ingestedTableName || '').trim()
+  const activePath = String(appStore.dataFilePath || '').trim()
+  if (!activeTable) return null
+  return applyDatasetSelection(activeTable, activePath)
+}
+
 async function handleDatasetSwitch(event) {
   const newDataPath = event?.detail?.dataPath
   const newTableName = event?.detail?.tableName
@@ -1004,7 +1049,7 @@ async function handleDatasetSwitch(event) {
   }
 
   if (newTableName) {
-    applyDatasetSelection(newTableName)
+    applyDatasetSelection(newTableName, newDataPath || appStore.dataFilePath || '')
   }
   if (newDataPath) {
     selectedDatasetPath.value = newDataPath
@@ -1044,6 +1089,38 @@ watch(
     if (selectedDatasetTable.value) {
       await fetchSchemaData()
     }
+  }
+)
+
+watch(
+  () => [appStore.ingestedTableName, appStore.dataFilePath],
+  ([nextTableName, nextDataPath]) => {
+    const normalizedTableName = String(nextTableName || '').trim()
+    if (!normalizedTableName || !String(appStore.activeWorkspaceId || '').trim()) return
+    applyDatasetSelection(normalizedTableName, String(nextDataPath || '').trim())
+  }
+)
+
+watch(
+  () => appStore.activeTab,
+  async (nextTab) => {
+    if (nextTab !== 'schema-editor') return
+
+    if (!selectedDatasetTable.value) {
+      syncSelectionFromStore()
+    }
+
+    if (!selectedDatasetTable.value || schemaLoading.value || schema.value.length > 0) {
+      return
+    }
+
+    const dataPath = String(selectedDatasetPath.value || appStore.dataFilePath || '').trim()
+    if (dataPath) {
+      await fetchSchemaDataForPath(dataPath, selectedDatasetTable.value)
+      return
+    }
+
+    await fetchSchemaData()
   }
 )
 

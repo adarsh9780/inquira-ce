@@ -165,6 +165,7 @@ const startupTimeline = ref([])
 const desktopStartupTimeline = ref([])
 const startupClock = ref(Date.now())
 let startupClockTimer = null
+const isE2EMode = import.meta.env.VITE_E2E === '1'
 
 const STARTUP_SCOPE_LABELS = {
   workspace: 'Workspace',
@@ -508,10 +509,16 @@ async function handleAuthenticated(userData) {
   }
 
   // Establish persistent WebSocket connection
-  try {
-    await settingsWebSocket.connectPersistent(userId)
-  } catch (wsError) {
-    console.error('❌ Failed to establish persistent WebSocket connection:', wsError)
+  if (isE2EMode) {
+    void settingsWebSocket.connectPersistent(userId).catch((wsError) => {
+      console.error('❌ Failed to establish persistent WebSocket connection:', wsError)
+    })
+  } else {
+    try {
+      await settingsWebSocket.connectPersistent(userId)
+    } catch (wsError) {
+      console.error('❌ Failed to establish persistent WebSocket connection:', wsError)
+    }
   }
 
   // Load v1 workspace/chat state
@@ -530,7 +537,9 @@ async function handleAuthenticated(userData) {
       }
     }
     console.debug('Loaded v1 workspace state for authenticated user')
-    walkthroughService.startIfFirstTime()
+    if (!isE2EMode) {
+      walkthroughService.startIfFirstTime()
+    }
   } catch (error) {
     console.error('Failed to load v1 workspace state:', error)
   } finally {

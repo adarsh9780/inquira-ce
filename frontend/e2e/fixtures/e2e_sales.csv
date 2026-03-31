@@ -1,0 +1,4 @@
+order_id,customer_name,revenue,region
+1001,Alice,1200.50,North
+1002,Bob,875.00,South
+1003,Carla,1640.25,West
