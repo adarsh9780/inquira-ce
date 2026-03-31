@@ -19,7 +19,7 @@ from .workspace_storage_service import WorkspaceStorageService
 
 
 class WorkspaceService:
-    """Create/manage workspaces with plan limits and filesystem provisioning."""
+    """Create/manage workspaces and filesystem provisioning."""
 
     @staticmethod
     def normalize_name(name: str) -> str:
@@ -36,7 +36,7 @@ class WorkspaceService:
 
     @staticmethod
     async def create_workspace(session: AsyncSession, user, name: str) -> Workspace:
-        """Create workspace while enforcing unique-name and plan limits."""
+        """Create workspace while enforcing unique-name rules."""
         normalized = WorkspaceService.normalize_name(name)
         if not normalized:
             raise HTTPException(status_code=400, detail="Workspace name cannot be empty")
@@ -46,13 +46,6 @@ class WorkspaceService:
             raise HTTPException(status_code=409, detail="Workspace name already exists")
 
         count = await WorkspaceRepository.count_for_principal(session, user.id)
-        user_plan = user.plan.value if hasattr(user.plan, "value") else str(user.plan)
-        if user_plan == "FREE" and count >= 1:
-            raise HTTPException(
-                status_code=403,
-                detail="You are on the Free plan and can create only 1 workspace. Upgrade your plan to create more.",
-            )
-
         is_active = 1 if count == 0 else 0
         placeholder_id = "temp"
         duckdb_path = str(WorkspaceStorageService.build_duckdb_path(user.username, placeholder_id))
