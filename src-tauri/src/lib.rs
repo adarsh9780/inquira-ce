@@ -1146,9 +1146,25 @@ fn find_uv_binary(resource_dir: &PathBuf) -> Result<PathBuf, String> {
     Err(missing_uv_binary_error())
 }
 
-fn backend_env_fingerprint(backend_dir: &PathBuf) -> String {
-    let pyproject_path = backend_dir.join("pyproject.toml");
-    let lock_path = backend_dir.join("uv.lock");
+struct DesktopPythonEnvPaths {
+    backend_venv: PathBuf,
+    backend_marker: PathBuf,
+    agent_venv: PathBuf,
+    agent_marker: PathBuf,
+}
+
+fn desktop_python_env_paths(data_dir: &Path) -> DesktopPythonEnvPaths {
+    DesktopPythonEnvPaths {
+        backend_venv: data_dir.join(".backend-venv"),
+        backend_marker: data_dir.join(".backend-env-fingerprint"),
+        agent_venv: data_dir.join(".agent-venv"),
+        agent_marker: data_dir.join(".agent-env-fingerprint"),
+    }
+}
+
+fn project_env_fingerprint(project_dir: &Path) -> String {
+    let pyproject_path = project_dir.join("pyproject.toml");
+    let lock_path = project_dir.join("uv.lock");
 
     let pyproject_content = fs::read_to_string(pyproject_path).unwrap_or_default();
     let lock_content = fs::read_to_string(lock_path).unwrap_or_default();
@@ -1177,9 +1193,10 @@ fn needs_python_bootstrap(
 
 fn bootstrap_python(
     uv_bin: &PathBuf,
-    backend_dir: &PathBuf,
-    venv_path: &PathBuf,
+    project_dir: &Path,
+    venv_path: &Path,
     config: &InquiraConfig,
+    project_label: &str,
 ) -> Result<(), String> {
     let python_version = config
         .python
@@ -1203,9 +1220,9 @@ fn bootstrap_python(
         }
     }
 
-    log::info!("Syncing Python environment...");
+    log::info!("Syncing {project_label} Python environment...");
     let mut cmd = Command::new(uv_bin);
-    cmd.args(["sync", "--no-dev", "--project", backend_dir.to_str().unwrap()])
+    cmd.args(["sync", "--no-dev", "--project", project_dir.to_str().unwrap()])
         .env("UV_PROJECT_ENVIRONMENT", venv_path.to_str().unwrap());
     apply_uv_package_env(&mut cmd, config);
     let status = cmd.status().map_err(|e| format!("uv sync failed: {}", e))?;
@@ -1792,17 +1809,23 @@ pub fn run() {
                     } else {
                         resolve_resource_path(&resource_dir, "agents")
                     };
-                    let venv_path = data_dir.join(".venv");
-                    let backend_env_marker = data_dir.join(".backend-env-fingerprint");
-                    let expected_backend_env_fingerprint = backend_env_fingerprint(&backend_dir);
+                    let env_paths = desktop_python_env_paths(&data_dir);
+                    let expected_backend_env_fingerprint = project_env_fingerprint(&backend_dir);
+                    let expected_agent_env_fingerprint = project_env_fingerprint(&agent_dir);
                     let always_sync_backend_env = cfg!(debug_assertions);
-                    let should_bootstrap_python = needs_python_bootstrap(
-                        &venv_path,
-                        &backend_env_marker,
+                    let should_bootstrap_backend = needs_python_bootstrap(
+                        &env_paths.backend_venv,
+                        &env_paths.backend_marker,
                         &expected_backend_env_fingerprint,
                         always_sync_backend_env,
                     );
-                    if should_bootstrap_python {
+                    let should_bootstrap_agent = needs_python_bootstrap(
+                        &env_paths.agent_venv,
+                        &env_paths.agent_marker,
+                        &expected_agent_env_fingerprint,
+                        always_sync_backend_env,
+                    );
+                    if should_bootstrap_backend {
                         if always_sync_backend_env {
                             log::info!("Debug mode: syncing backend Python environment...");
                         } else {
@@ -1812,16 +1835,48 @@ pub fn run() {
                         }
                         emit_startup_message(
                             &app_handle,
-                            "Installing Python environment (one-time setup)...",
+                            "Installing backend Python environment (one-time setup)...",
                         );
 
-                        bootstrap_python(&uv_bin, &backend_dir, &venv_path, &config)
+                        bootstrap_python(
+                            &uv_bin,
+                            &backend_dir,
+                            &env_paths.backend_venv,
+                            &config,
+                            "backend",
+                        )
                             .map_err(|error| format!("Setup failed: {error}"))?;
 
                         if let Err(error) =
-                            fs::write(&backend_env_marker, &expected_backend_env_fingerprint)
+                            fs::write(&env_paths.backend_marker, &expected_backend_env_fingerprint)
                         {
                             log::warn!("Could not write backend env marker: {}", error);
+                        }
+                    }
+                    if should_bootstrap_agent {
+                        if always_sync_backend_env {
+                            log::info!("Debug mode: syncing agent Python environment...");
+                        } else {
+                            log::info!("Agent dependencies changed. Re-syncing Python environment...");
+                        }
+                        emit_startup_message(
+                            &app_handle,
+                            "Installing agent Python environment (one-time setup)...",
+                        );
+
+                        bootstrap_python(
+                            &uv_bin,
+                            &agent_dir,
+                            &env_paths.agent_venv,
+                            &config,
+                            "agent",
+                        )
+                        .map_err(|error| format!("Setup failed: {error}"))?;
+
+                        if let Err(error) =
+                            fs::write(&env_paths.agent_marker, &expected_agent_env_fingerprint)
+                        {
+                            log::warn!("Could not write agent env marker: {}", error);
                         }
                     }
 
@@ -1838,7 +1893,7 @@ pub fn run() {
                     );
                     match start_agent_runtime(
                         &agent_dir,
-                        &venv_path,
+                        &env_paths.agent_venv,
                         &config,
                         &runtime_config_path,
                         &shared_secret,
@@ -1865,7 +1920,7 @@ pub fn run() {
                     match start_backend(
                         &uv_bin,
                         &backend_dir,
-                        &venv_path,
+                        &env_paths.backend_venv,
                         &config,
                         &runtime_config_path,
                         &shared_secret,
@@ -2030,14 +2085,14 @@ pub fn run() {
 mod tests {
     use super::{
         build_pythonpath_entries, bundled_uv_candidates, default_backend_host,
-        default_uv_search_paths, detect_default_shell, missing_uv_binary_error,
-        needs_python_bootstrap, parse_lsof_pid_lines, parse_netstat_listening_pids,
-        resolve_pty_cwd, resolve_resource_path, resolve_runtime_config_path,
-        resolve_runtime_state_dir, resolve_shared_console_log_level, resolve_uv_index_url,
-        startup_log_paths, stop_child_process, uv_binary_file_name, uv_search_candidates,
-        vc_redist_download_url, vc_redist_installer_path, vc_redist_marker_path,
-        vc_redist_success_exit_code, InquiraConfig, LoggingConfig, PythonConfig, MAIN_WINDOW_LABEL,
-        SPLASH_WINDOW_LABEL,
+        default_uv_search_paths, desktop_python_env_paths, detect_default_shell,
+        missing_uv_binary_error, needs_python_bootstrap, parse_lsof_pid_lines,
+        parse_netstat_listening_pids, resolve_pty_cwd, resolve_resource_path,
+        resolve_runtime_config_path, resolve_runtime_state_dir, resolve_shared_console_log_level,
+        resolve_uv_index_url, startup_log_paths, stop_child_process, uv_binary_file_name,
+        uv_search_candidates, vc_redist_download_url, vc_redist_installer_path,
+        vc_redist_marker_path, vc_redist_success_exit_code, InquiraConfig, LoggingConfig,
+        PythonConfig, MAIN_WINDOW_LABEL, SPLASH_WINDOW_LABEL,
     };
     use std::env;
     use std::ffi::OsString;
@@ -2076,6 +2131,19 @@ mod tests {
         fs::write(&marker, "same").expect("write marker");
 
         assert!(!needs_python_bootstrap(&venv, &marker, "same", false));
+    }
+
+    #[test]
+    fn desktop_python_env_paths_keep_backend_and_agent_isolated() {
+        let base = std::env::temp_dir().join("inq_python_env_paths");
+        let paths = desktop_python_env_paths(&base);
+
+        assert_eq!(paths.backend_venv, base.join(".backend-venv"));
+        assert_eq!(paths.backend_marker, base.join(".backend-env-fingerprint"));
+        assert_eq!(paths.agent_venv, base.join(".agent-venv"));
+        assert_eq!(paths.agent_marker, base.join(".agent-env-fingerprint"));
+        assert_ne!(paths.backend_venv, paths.agent_venv);
+        assert_ne!(paths.backend_marker, paths.agent_marker);
     }
 
     #[test]
