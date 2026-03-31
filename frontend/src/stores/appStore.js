@@ -1232,6 +1232,9 @@ export const useAppStore = defineStore('app', () => {
 
   async function createWorkspace(name) {
     const ws = await apiService.v1CreateWorkspace(name)
+    if (ws?.id) {
+      await activateWorkspace(ws.id)
+    }
     await fetchWorkspaces()
     return ws
   }

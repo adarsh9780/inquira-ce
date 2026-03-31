@@ -124,6 +124,7 @@ async def test_create_workspace_writes_manifest(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_activate_workspace_refreshes_manifest(monkeypatch):
+    previous_workspace = SimpleNamespace(id="ws-1", is_active=1)
     workspace = SimpleNamespace(
         id="ws-9",
         name="Operations",
@@ -139,8 +140,20 @@ async def test_activate_workspace_refreshes_manifest(monkeypatch):
         calls["workspace_lookup"] = (workspace_id, principal_id)
         return workspace
 
+    async def fake_get_active_for_principal(_session, principal_id):
+        calls["previous_active_lookup"] = principal_id
+        return previous_workspace
+
     async def fake_deactivate_all(_session, principal_id):
         calls["deactivate"] = principal_id
+
+    async def fake_stop_terminal_session(*, user_id, workspace_id):
+        calls["terminal_cleanup"] = (user_id, workspace_id)
+        return True
+
+    async def fake_reset_workspace_kernel(workspace_id):
+        calls["kernel_cleanup"] = workspace_id
+        return True
 
     async def fake_write_manifest(
         username,
@@ -164,8 +177,20 @@ async def test_activate_workspace_refreshes_manifest(monkeypatch):
         fake_get_by_id,
     )
     monkeypatch.setattr(
+        "app.v1.services.workspace_service.WorkspaceRepository.get_active_for_principal",
+        fake_get_active_for_principal,
+    )
+    monkeypatch.setattr(
         "app.v1.services.workspace_service.WorkspaceRepository.deactivate_all_for_principal",
         fake_deactivate_all,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.workspace_service.stop_workspace_terminal_session",
+        fake_stop_terminal_session,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.workspace_service.reset_workspace_kernel",
+        fake_reset_workspace_kernel,
     )
     monkeypatch.setattr(
         "app.v1.services.workspace_service.WorkspaceStorageService.write_workspace_manifest",
@@ -188,6 +213,9 @@ async def test_activate_workspace_refreshes_manifest(monkeypatch):
     assert activated is workspace
     assert workspace.is_active == 1
     assert calls["workspace_lookup"] == ("ws-9", "user-1")
+    assert calls["previous_active_lookup"] == "user-1"
     assert calls["deactivate"] == "user-1"
+    assert calls["terminal_cleanup"] == ("user-1", "ws-1")
+    assert calls["kernel_cleanup"] == "ws-1"
     assert calls["manifest"][0] == "alice"
     assert calls["manifest"][1] == "ws-9"

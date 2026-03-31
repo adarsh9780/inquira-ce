@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...core.logger import logprint
 from ...services.code_executor import reset_workspace_kernel
 from ...services.terminal_executor import stop_workspace_terminal_session
 from ..models import Workspace
@@ -80,10 +81,38 @@ class WorkspaceService:
         if workspace is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
 
+        previous_active = await WorkspaceRepository.get_active_for_principal(session, user.id)
         await WorkspaceRepository.deactivate_all_for_principal(session, user.id)
         workspace.is_active = 1
         await session.commit()
         await session.refresh(workspace)
+
+        previous_workspace_id = str(getattr(previous_active, "id", "") or "").strip()
+        if previous_workspace_id and previous_workspace_id != str(workspace.id):
+            try:
+                await stop_workspace_terminal_session(
+                    user_id=str(user.id),
+                    workspace_id=previous_workspace_id,
+                )
+            except Exception as exc:
+                logprint(
+                    "Failed to stop previous workspace terminal session during activation switch.",
+                    level="WARNING",
+                    user_id=str(user.id),
+                    previous_workspace_id=previous_workspace_id,
+                    error=str(exc),
+                )
+            try:
+                await reset_workspace_kernel(previous_workspace_id)
+            except Exception as exc:
+                logprint(
+                    "Failed to reset previous workspace kernel during activation switch.",
+                    level="WARNING",
+                    user_id=str(user.id),
+                    previous_workspace_id=previous_workspace_id,
+                    error=str(exc),
+                )
+
         await WorkspaceStorageService.write_workspace_manifest(
             username=user.username,
             workspace_id=workspace.id,

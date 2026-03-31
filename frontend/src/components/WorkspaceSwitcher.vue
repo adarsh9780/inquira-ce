@@ -182,7 +182,6 @@ async function createWorkspace(name) {
   isCreatingWorkspace.value = true
   try {
     await appStore.createWorkspace(name)
-    await appStore.fetchWorkspaces()
     isCreateDialogOpen.value = false
     isOpen.value = false
   } catch (error) {

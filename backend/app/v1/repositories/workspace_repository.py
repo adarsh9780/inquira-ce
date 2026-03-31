@@ -62,6 +62,17 @@ class WorkspaceRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_active_for_principal(session: AsyncSession, principal_id: str) -> Workspace | None:
+        """Return the currently active workspace for a principal, if any."""
+        result = await session.execute(
+            select(Workspace).where(
+                Workspace.owner_principal_id == principal_id,
+                Workspace.is_active == 1,
+            )
+        )
+        return result.scalars().first()
+
+    @staticmethod
     async def create(
         session: AsyncSession,
         principal_id: str,

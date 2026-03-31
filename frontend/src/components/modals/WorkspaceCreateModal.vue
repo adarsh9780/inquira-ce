@@ -29,6 +29,9 @@
             @keydown.enter.prevent="submit"
           />
           <p class="text-xs" style="color: var(--color-text-muted);">{{ planLabel }} plan</p>
+          <p class="text-xs leading-5 rounded-lg px-3 py-2" style="color: var(--color-text-muted); background-color: color-mix(in srgb, var(--color-surface) 82%, transparent);">
+            Your new workspace will become the active workspace right away. If another workspace is active, we will clean up its running resources first. You can switch back later from the workspace picker.
+          </p>
         </div>
 
         <div class="modal-footer">

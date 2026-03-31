@@ -179,13 +179,9 @@ async function createWorkspace(name) {
   if (!name) return
   isCreatingWorkspace.value = true
   try {
-    const ws = await appStore.createWorkspace(name)
-    await appStore.fetchWorkspaces()
+    await appStore.createWorkspace(name)
     isCreateDialogOpen.value = false
     emit('select')
-    if (ws?.id) {
-      await selectWorkspace(ws.id)
-    }
   } catch (error) {
     toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to create workspace'))
   } finally {
