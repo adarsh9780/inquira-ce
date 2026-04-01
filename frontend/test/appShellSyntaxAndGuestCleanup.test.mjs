@@ -12,6 +12,17 @@ test('App shell SFC script compiles cleanly for startup/auth orchestration', () 
   assert.doesNotThrow(() => {
     compileScript(parsed.descriptor, { id: 'app-shell-startup-test' })
   })
+
+  assert.equal(
+    source.includes('if (authStore.isAuthenticated && !appBootstrap.ready && !appBootstrap.active) {'),
+    true,
+    'App startup should explicitly bootstrap the shell even when guest mode keeps the same local-user id',
+  )
+  assert.equal(
+    source.includes('await handleAuthenticated(authStore.user)'),
+    true,
+    'App startup should call the shared authenticated bootstrap after auth initialization completes',
+  )
 })
 
 test('CE edition keeps guest-first auth without restoring the old auth_service module', () => {

@@ -588,7 +588,10 @@ onMounted(async () => {
     return
   }
 
-  void authStore.initialize()
+  await authStore.initialize()
+  if (authStore.isAuthenticated && !appBootstrap.ready && !appBootstrap.active) {
+    await handleAuthenticated(authStore.user)
+  }
 })
 
 watch(
