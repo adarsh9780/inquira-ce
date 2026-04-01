@@ -1,6 +1,0 @@
-{
-  "version": "0.5.26",
-  "tag": "v0.5.26",
-  "release_name": "Release vX.Y.Z \u2014 2026-03-29",
-  "release_body": "## Better Startup Reliability\n\nThe app now waits more cleanly for the backend and kernel to be ready before showing the main UI. The startup and loading experience is more consistent, with fewer confusing or duplicate loading states.\n\n## Improved Schema Editing\n\nSchema editing has been refreshed to feel cleaner and easier to use. Context, descriptions, and aliases are easier to review and edit, and dataset/schema lists now refresh more reliably after uploads.\n\n## More Stable Chat And Desktop Runtime\n\nChat streaming is more resilient, especially when responses are interrupted or arrive in incomplete chunks. This release also includes several desktop and Windows-focused fixes that improve runtime stability and reduce startup and execution failures."
-}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print current version values from all version-bearing project files."""
+"""Print current version values from all version-bearing source files."""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ TAURI_CARGO = ROOT / "src-tauri" / "Cargo.toml"
 TAURI_CONF = ROOT / "src-tauri" / "tauri.conf.json"
 FRONTEND_PACKAGE = ROOT / "frontend" / "package.json"
 FRONTEND_LOCK = ROOT / "frontend" / "package-lock.json"
-RELEASE_METADATA = ROOT / ".github" / "release" / "metadata.json"
 
 
 def _read_regex(path: Path, pattern: str) -> str | None:
@@ -73,13 +72,6 @@ def collect_versions() -> dict[str, str]:
     values["frontend/package-lock.json.packages[''].version"] = (
         _read_frontend_lock_root_version(FRONTEND_LOCK) or "<missing>"
     )
-    if RELEASE_METADATA.exists():
-        values[".github/release/metadata.json.version"] = (
-            _read_json_key(RELEASE_METADATA, "version") or "<missing>"
-        )
-        values[".github/release/metadata.json.tag"] = (
-            _read_json_key(RELEASE_METADATA, "tag") or "<missing>"
-        )
     return values
 
 

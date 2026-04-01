@@ -15,15 +15,7 @@ def test_makefile_set_version_updates_version_file_and_targets():
 def test_makefile_set_version_requires_greater_version_than_current():
     text = MAKEFILE.read_text(encoding="utf-8")
     assert "check-input-version-greater: check-input-version check-version-file" in text
-    assert "must be greater than current VERSION" in text
     assert "scripts/maintenance/version_guard.py greater" in text
-
-
-def test_makefile_metadata_uses_release_metadata_script():
-    text = MAKEFILE.read_text(encoding="utf-8")
-    assert "metadata: check-version-file" in text
-    assert "scripts/maintenance/generate_release_metadata.py" in text
-    assert ".github/release/metadata.json" in text
 
 
 def test_makefile_check_version_target_prints_all_versions():
@@ -45,13 +37,6 @@ def test_makefile_test_target_runs_backend_and_frontend_tests():
     assert "cd frontend && npm ci && npm test" in text
 
 
-def test_makefile_git_tag_reads_version_file():
-    text = MAKEFILE.read_text(encoding="utf-8")
-    assert "git-tag: check-no-version-arg check-version-file check-tag-not-latest" in text
-    assert 'file_version="$$(tr -d' in text
-    assert 'tag="v$$file_version"' in text
-
-
 def test_makefile_git_commit_uses_commit_message_txt():
     text = MAKEFILE.read_text(encoding="utf-8")
     assert "commit_message.txt is missing or empty" in text
@@ -60,11 +45,10 @@ def test_makefile_git_commit_uses_commit_message_txt():
     assert ": > commit_message.txt" in text
 
 
-def test_makefile_pins_uv_and_stages_bundled_uv_for_local_desktop_build():
+def test_makefile_no_longer_owns_desktop_release_or_tag_workflows():
     text = MAKEFILE.read_text(encoding="utf-8")
-    assert "UV_VERSION := 0.6.3" in text
-    assert "check-uv-version:" in text
-    assert "scripts/maintenance/check_uv_version.py --expected" in text
-    assert "stage-bundled-uv-local: check-uv-version" in text
-    assert "scripts/maintenance/stage_bundled_uv.py" in text
-    assert "build-desktop: stage-bundled-uv-local" in text
+    assert "build-desktop" not in text
+    assert "metadata:" not in text
+    assert "git-tag:" not in text
+    assert "help-release:" not in text
+    assert "release:" not in text

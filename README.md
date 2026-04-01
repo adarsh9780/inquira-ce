@@ -6,7 +6,6 @@
 
 <p align="center">
   <a href="https://github.com/adarsh9780/inquira-ce/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/adarsh9780/inquira-ce/ci.yml?branch=master&label=CI" alt="CI Status"></a>
-  <a href="https://github.com/adarsh9780/inquira-ce/releases"><img src="https://img.shields.io/github/v/tag/adarsh9780/inquira-ce?label=release" alt="Latest Release Tag"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-SUL-blue.svg" alt="License SUL"></a>
   <img src="https://img.shields.io/badge/python-3.12%2B-blue.svg" alt="Python 3.12+">
   <img src="https://img.shields.io/badge/stage-alpha-orange.svg" alt="Alpha">
@@ -17,6 +16,10 @@ Local-first desktop data analysis with AI-assisted Python generation and executi
 Tags: `desktop`, `local-first`, `fastapi`, `vue`, `tauri`, `duckdb`, `langgraph`, `gemini`.
 
 Hosted docs site (GitHub Pages): [https://docs.inquiraai.com/](https://docs.inquiraai.com/)
+
+Desktop packaging, release automation, and product docs now live in
+[`inquira-ee`](https://github.com/adarsh9780/inquira-ee). This repository keeps the
+core application code, source-level tests, and assets consumed by EE via a Git submodule.
 
 ## Why Inquira Community Edition (CE)
 
@@ -33,13 +36,6 @@ Hosted docs site (GitHub Pages): [https://docs.inquiraai.com/](https://docs.inqu
 - **Real-time Agent Workflow**: Watch the LangGraph planner logically trace, test, and correct its own Python/SQL code locally.
 
 ## Quick Start
-
-### End Users
-
-Download and start right away:
-- Website and docs: [https://docs.inquiraai.com/](https://docs.inquiraai.com/)
-- Direct download: [https://docs.inquiraai.com/download](https://docs.inquiraai.com/download)
-- Latest GitHub release: [https://github.com/adarsh9780/inquira-ce/releases/latest](https://github.com/adarsh9780/inquira-ce/releases/latest)
 
 ### Contributors (Run From Source)
 
