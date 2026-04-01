@@ -32,6 +32,7 @@ notebooks/*
 .langgraph_api
 .venv
 backend/.venv/
+backend/.nuitka-build/
 .vscode
 .kilocode
 .playwright
@@ -53,3 +54,5 @@ frontend/dist/
 src/inquira/frontend/dist/
 backend/app/frontend/dist/
 span.txt
+src-tauri/bundled-backend/
+src-tauri/tauri.ee.conf.json

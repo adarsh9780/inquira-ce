@@ -35,6 +35,7 @@ function getDefaultApiBase() {
 
 const resolvedEnvBase = (import.meta.env.VITE_API_BASE || '').trim()
 let apiBaseUrl = resolvedEnvBase || getDefaultApiBase()
+let authBearerToken = ''
 let resolveApiBaseReady = () => {}
 const apiBaseReadyPromise = new Promise((resolve) => {
   resolveApiBaseReady = resolve
@@ -147,11 +148,22 @@ function withAbortSignal(promise, signal) {
 
 async function authorizedFetch(input, init = {}) {
   const headers = new Headers(init?.headers || {})
+  if (authBearerToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${authBearerToken}`)
+  }
   return fetch(input, {
     ...init,
     headers,
     credentials: init?.credentials || 'include',
   })
+}
+
+export function setAuthToken(token) {
+  authBearerToken = String(token || '').trim()
+}
+
+export function getAuthToken() {
+  return authBearerToken
 }
 
 // Configure GLOBAL axios defaults
@@ -207,6 +219,10 @@ async function waitForBackendReady(timeoutMs = 30000) {
 // Request interceptor
 axios.interceptors.request.use(
   async (config) => {
+    if (authBearerToken) {
+      config.headers = config.headers || {}
+      config.headers.Authorization = `Bearer ${authBearerToken}`
+    }
     return config
   },
   (error) => {
@@ -271,6 +287,8 @@ axios.interceptors.response.use(
 const client = getInquira()
 
 export const apiService = {
+  setAuthToken,
+  getAuthToken,
   waitForApiBaseReady,
   waitForBackendReady,
   async logout() {
@@ -289,12 +307,15 @@ export const apiService = {
       // In development, if backend is not available, allow the app to continue
       if (import.meta.env.DEV && error.code === 'NETWORK_ERROR') {
         console.warn('⚠️ Backend not available in development mode. Continuing without authentication.')
-        // Return a mock authenticated user for development
         return {
-          user: {
-            user_id: 'dev-user',
-            username: 'dev-user'
-          }
+          user_id: 'local-user',
+          username: 'Local User',
+          email: '',
+          plan: 'FREE',
+          is_authenticated: false,
+          is_guest: true,
+          auth_provider: 'local',
+          manage_account_url: '',
         }
       }
 

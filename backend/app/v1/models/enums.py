@@ -7,4 +7,5 @@ class UserPlan(StrEnum):
     """Commercial plan tiers attached to a user record."""
 
     FREE = "FREE"
-    PAID = "PAID"
+    PRO = "PRO"
+    ENTERPRISE = "ENTERPRISE"

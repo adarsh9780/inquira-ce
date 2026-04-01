@@ -6,6 +6,7 @@ import axios from 'axios'
  */
 export const v1Api = {
   auth: {
+    config: () => axios.get('/api/v1/auth/config'),
     me: (config = {}) => axios.get('/api/v1/auth/me', config),
     logout: () => axios.post('/api/v1/auth/logout')
   },

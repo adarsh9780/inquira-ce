@@ -14,10 +14,11 @@ test('App shell SFC script compiles cleanly for startup/auth orchestration', () 
   })
 })
 
-test('CE edition does not ship Supabase auth service or guest fallbacks', () => {
-  // auth_service.py was deleted as part of the CE auth removal
+test('CE edition keeps guest-first auth without restoring the old auth_service module', () => {
   const authServicePath = resolve(process.cwd(), '../backend/app/v1/services/auth_service.py')
-  assert.equal(existsSync(authServicePath), false, 'auth_service.py should not exist in CE')
+  const supabaseAuthServicePath = resolve(process.cwd(), '../backend/app/v1/services/supabase_auth_service.py')
+  assert.equal(existsSync(authServicePath), false, 'legacy auth_service.py should not exist in CE')
+  assert.equal(existsSync(supabaseAuthServicePath), true, 'guest-first Supabase auth service should exist in CE')
 
   const localStatePath = resolve(process.cwd(), 'src/services/localStateService.js')
   const localStateSource = readFileSync(localStatePath, 'utf-8')

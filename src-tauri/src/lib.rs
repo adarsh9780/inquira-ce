@@ -1103,6 +1103,41 @@ fn bundled_uv_candidates(resource_dir: &Path) -> Vec<PathBuf> {
     candidates
 }
 
+fn bundled_backend_binary_file_name() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "inquira-backend.exe"
+    } else {
+        "inquira-backend"
+    }
+}
+
+fn bundled_backend_candidates(resource_dir: &Path) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    let bundled_names = vec![bundled_backend_binary_file_name()];
+    let bundled_roots = vec!["bundled-backend", "src-tauri/bundled-backend"];
+
+    for candidate_name in bundled_names {
+        for bundled_root in &bundled_roots {
+            let bundled_relative = format!("{bundled_root}/{candidate_name}");
+            candidates.push(resolve_resource_path(
+                &resource_dir.to_path_buf(),
+                &bundled_relative,
+            ));
+        }
+        candidates.push(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("bundled-backend")
+                .join(candidate_name),
+        );
+    }
+
+    candidates
+}
+
+fn find_bundled_backend_binary(resource_dir: &PathBuf) -> Option<PathBuf> {
+    first_existing_path(&bundled_backend_candidates(resource_dir))
+}
+
 fn uv_search_candidates(resource_dir: &Path) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
     let binary_name = uv_binary_file_name();
@@ -1222,8 +1257,13 @@ fn bootstrap_python(
 
     log::info!("Syncing {project_label} Python environment...");
     let mut cmd = Command::new(uv_bin);
-    cmd.args(["sync", "--no-dev", "--project", project_dir.to_str().unwrap()])
-        .env("UV_PROJECT_ENVIRONMENT", venv_path.to_str().unwrap());
+    cmd.args([
+        "sync",
+        "--no-dev",
+        "--project",
+        project_dir.to_str().unwrap(),
+    ])
+    .env("UV_PROJECT_ENVIRONMENT", venv_path.to_str().unwrap());
     apply_uv_package_env(&mut cmd, config);
     let status = cmd.status().map_err(|e| format!("uv sync failed: {}", e))?;
     if !status.success() {
@@ -1488,12 +1528,12 @@ fn start_backend(
     uv_bin: &PathBuf,
     backend_dir: &PathBuf,
     venv_path: &PathBuf,
+    bundled_backend_bin: Option<&PathBuf>,
     config: &InquiraConfig,
     inquira_toml_path: &PathBuf,
     shared_secret: &str,
     log_path: &Path,
 ) -> Result<StdChild, String> {
-    let _ = uv_bin; // kept for signature compatibility with existing call sites
     let port = config.backend.as_ref().and_then(|b| b.port).unwrap_or(8000);
     let host = config
         .backend
@@ -1502,27 +1542,37 @@ fn start_backend(
         .unwrap_or_else(|| default_backend_host().to_string());
 
     log::info!("Starting Inquira backend on port {}...", port);
-
-    let python_bin = python_bin_from_venv(venv_path);
-    if !python_bin.exists() {
-        return Err(format!(
-            "Python executable not found in venv: {}",
-            python_bin.display()
-        ));
-    }
-
-    let mut cmd = Command::new(&python_bin);
     let console_log_level = resolve_shared_console_log_level(config);
     let execution_provider = config
         .execution
         .as_ref()
         .and_then(|e| e.provider.clone())
         .unwrap_or_else(|| "local_jupyter".to_string());
+    let mut cmd = if let Some(compiled_backend_bin) = bundled_backend_bin {
+        let mut command = Command::new(compiled_backend_bin);
+        command.current_dir(
+            compiled_backend_bin
+                .parent()
+                .unwrap_or_else(|| backend_dir.as_path()),
+        );
+        command
+    } else {
+        let python_bin = python_bin_from_venv(venv_path);
+        if !python_bin.exists() {
+            return Err(format!(
+                "Python executable not found in venv: {}",
+                python_bin.display()
+            ));
+        }
+        let mut command = Command::new(&python_bin);
+        command
+            .args(["-m", "app.main"])
+            .current_dir(backend_dir)
+            .env("VIRTUAL_ENV", venv_path.to_str().unwrap());
+        command
+    };
 
-    cmd.args(["-m", "app.main"])
-        .current_dir(backend_dir)
-        .env("VIRTUAL_ENV", venv_path.to_str().unwrap())
-        .env("INQUIRA_HOST", host)
+    cmd.env("INQUIRA_HOST", host)
         .env("INQUIRA_PORT", port.to_string())
         .env("INQUIRA_DESKTOP", "1")
         .env("INQUIRA_AGENT_SHARED_SECRET", shared_secret)
@@ -1543,8 +1593,18 @@ fn start_backend(
         &mut cmd,
         log_path,
         "backend",
-        &format!("{} -m app.main", python_bin.display()),
-        backend_dir,
+        if let Some(compiled_backend_bin) = bundled_backend_bin {
+            &compiled_backend_bin.display().to_string()
+        } else {
+            &format!("{} -m app.main", python_bin_from_venv(venv_path).display())
+        },
+        if let Some(compiled_backend_bin) = bundled_backend_bin {
+            compiled_backend_bin
+                .parent()
+                .unwrap_or_else(|| backend_dir.as_path())
+        } else {
+            backend_dir.as_path()
+        },
     )?;
 
     let child = cmd
@@ -1787,6 +1847,11 @@ pub fn run() {
 
                     let uv_bin = find_uv_binary(&resource_dir)
                         .map_err(|error| format!("Startup failed: {error}"))?;
+                    let bundled_backend_bin = if cfg!(debug_assertions) {
+                        None
+                    } else {
+                        find_bundled_backend_binary(&resource_dir)
+                    };
                     let backend_dir = if cfg!(debug_assertions) {
                         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../backend")
                     } else {
@@ -1821,15 +1886,23 @@ pub fn run() {
                         resolve_resource_path(&resource_dir, "agents")
                     };
                     let env_paths = desktop_python_env_paths(&data_dir);
-                    let expected_backend_env_fingerprint = project_env_fingerprint(&backend_dir);
+                    let expected_backend_env_fingerprint = if bundled_backend_bin.is_some() {
+                        String::new()
+                    } else {
+                        project_env_fingerprint(&backend_dir)
+                    };
                     let expected_agent_env_fingerprint = project_env_fingerprint(&agent_dir);
                     let always_sync_backend_env = cfg!(debug_assertions);
-                    let should_bootstrap_backend = needs_python_bootstrap(
-                        &env_paths.backend_venv,
-                        &env_paths.backend_marker,
-                        &expected_backend_env_fingerprint,
-                        always_sync_backend_env,
-                    );
+                    let should_bootstrap_backend = if bundled_backend_bin.is_some() {
+                        false
+                    } else {
+                        needs_python_bootstrap(
+                            &env_paths.backend_venv,
+                            &env_paths.backend_marker,
+                            &expected_backend_env_fingerprint,
+                            always_sync_backend_env,
+                        )
+                    };
                     let should_bootstrap_agent = needs_python_bootstrap(
                         &env_paths.agent_venv,
                         &env_paths.agent_marker,
@@ -1856,7 +1929,7 @@ pub fn run() {
                             &config,
                             "backend",
                         )
-                            .map_err(|error| format!("Setup failed: {error}"))?;
+                        .map_err(|error| format!("Setup failed: {error}"))?;
 
                         if let Err(error) =
                             fs::write(&env_paths.backend_marker, &expected_backend_env_fingerprint)
@@ -1868,7 +1941,9 @@ pub fn run() {
                         if always_sync_backend_env {
                             log::info!("Debug mode: syncing agent Python environment...");
                         } else {
-                            log::info!("Agent dependencies changed. Re-syncing Python environment...");
+                            log::info!(
+                                "Agent dependencies changed. Re-syncing Python environment..."
+                            );
                         }
                         emit_startup_message(
                             &app_handle,
@@ -1932,6 +2007,7 @@ pub fn run() {
                         &uv_bin,
                         &backend_dir,
                         &env_paths.backend_venv,
+                        bundled_backend_bin.as_ref(),
                         &config,
                         &runtime_config_path,
                         &shared_secret,
@@ -2098,13 +2174,13 @@ mod tests {
         build_pythonpath_entries, bundled_uv_candidates, default_backend_host,
         default_uv_search_paths, desktop_python_env_paths, detect_default_shell,
         langgraph_bin_from_venv, missing_uv_binary_error, needs_python_bootstrap,
-        parse_lsof_pid_lines, parse_netstat_listening_pids, python_bin_from_venv,
-        resolve_pty_cwd, resolve_resource_path, resolve_runtime_config_path,
-        resolve_runtime_state_dir, resolve_shared_console_log_level, resolve_uv_index_url,
-        startup_log_paths, stop_child_process, uv_binary_file_name, uv_search_candidates,
-        vc_redist_download_url, vc_redist_installer_path, vc_redist_marker_path,
-        vc_redist_success_exit_code, venv_executable_path, InquiraConfig, LoggingConfig,
-        PythonConfig, MAIN_WINDOW_LABEL, SPLASH_WINDOW_LABEL,
+        parse_lsof_pid_lines, parse_netstat_listening_pids, python_bin_from_venv, resolve_pty_cwd,
+        resolve_resource_path, resolve_runtime_config_path, resolve_runtime_state_dir,
+        resolve_shared_console_log_level, resolve_uv_index_url, startup_log_paths,
+        stop_child_process, uv_binary_file_name, uv_search_candidates, vc_redist_download_url,
+        vc_redist_installer_path, vc_redist_marker_path, vc_redist_success_exit_code,
+        venv_executable_path, InquiraConfig, LoggingConfig, PythonConfig, MAIN_WINDOW_LABEL,
+        SPLASH_WINDOW_LABEL,
     };
     use std::env;
     use std::ffi::OsString;
