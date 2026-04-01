@@ -1589,22 +1589,25 @@ fn start_backend(
     #[cfg(target_os = "windows")]
     cmd.creation_flags(CREATE_NO_WINDOW_FLAG);
 
+    let backend_command_summary = if let Some(compiled_backend_bin) = bundled_backend_bin {
+        compiled_backend_bin.display().to_string()
+    } else {
+        format!("{} -m app.main", python_bin_from_venv(venv_path).display())
+    };
+    let backend_log_cwd = if let Some(compiled_backend_bin) = bundled_backend_bin {
+        compiled_backend_bin
+            .parent()
+            .unwrap_or_else(|| backend_dir.as_path())
+    } else {
+        backend_dir.as_path()
+    };
+
     redirect_command_output(
         &mut cmd,
         log_path,
         "backend",
-        if let Some(compiled_backend_bin) = bundled_backend_bin {
-            &compiled_backend_bin.display().to_string()
-        } else {
-            &format!("{} -m app.main", python_bin_from_venv(venv_path).display())
-        },
-        if let Some(compiled_backend_bin) = bundled_backend_bin {
-            compiled_backend_bin
-                .parent()
-                .unwrap_or_else(|| backend_dir.as_path())
-        } else {
-            backend_dir.as_path()
-        },
+        &backend_command_summary,
+        backend_log_cwd,
     )?;
 
     let child = cmd
