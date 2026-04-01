@@ -32,19 +32,20 @@ function initializeTauriWsBase() {
 
 function getDefaultWsBase() {
   if (typeof window === 'undefined') {
-    return 'ws://localhost:8000'
+    return 'ws://127.0.0.1:8000'
   }
 
   if (window.__TAURI_INTERNALS__) {
     if (tauriWsBaseOverride) return tauriWsBaseOverride
-    return 'ws://localhost:8000'
+    return 'ws://127.0.0.1:8000'
   }
 
   const isSecure = window.location.protocol === 'https:'
   const scheme = isSecure ? 'wss:' : 'ws:'
 
   if (import.meta.env.DEV) {
-    const host = `${window.location.hostname}:8000`
+    const resolvedHost = window.location.hostname === 'localhost' ? '127.0.0.1' : (window.location.hostname || '127.0.0.1')
+    const host = `${resolvedHost}:8000`
     return `${scheme}//${host}`
   }
 

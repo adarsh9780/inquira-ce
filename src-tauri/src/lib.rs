@@ -140,11 +140,7 @@ fn resolve_runtime_state_dir(resource_dir: &Path, fallback_data_dir: &Path) -> P
 }
 
 fn default_backend_host() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "127.0.0.1"
-    } else {
-        "localhost"
-    }
+    "127.0.0.1"
 }
 
 fn resolve_runtime_config_path(resource_dir: &PathBuf, backend_dir: &Path) -> PathBuf {
@@ -2561,10 +2557,7 @@ mod tests {
 
     #[test]
     fn default_backend_host_matches_platform_expectation() {
-        #[cfg(target_os = "windows")]
         assert_eq!(default_backend_host(), "127.0.0.1");
-        #[cfg(not(target_os = "windows"))]
-        assert_eq!(default_backend_host(), "localhost");
     }
 
     #[test]

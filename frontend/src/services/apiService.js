@@ -15,22 +15,23 @@ import { extractApiErrorMessage } from '../utils/apiError'
 
 function getDefaultApiBase() {
   if (typeof window === 'undefined') {
-    return 'http://localhost:8000'
+    return 'http://127.0.0.1:8000'
   }
 
   if (window.__TAURI_INTERNALS__) {
-    // Keep a localhost fallback until the Tauri backend URL command resolves.
-    return 'http://localhost:8000'
+    // Use a numeric loopback address so desktop startup does not depend on localhost IPv6 resolution.
+    return 'http://127.0.0.1:8000'
   }
 
   if (import.meta.env.DEV) {
     const { hostname } = window.location
     const port = '8000'
     // Force http protocol for backend as tauri:// won't reach Python server
-    return `http://${hostname || 'localhost'}:${port}`
+    const resolvedHost = hostname === 'localhost' ? '127.0.0.1' : (hostname || '127.0.0.1')
+    return `http://${resolvedHost}:${port}`
   }
 
-  return 'http://localhost:8000'
+  return 'http://127.0.0.1:8000'
 }
 
 const resolvedEnvBase = (import.meta.env.VITE_API_BASE || '').trim()

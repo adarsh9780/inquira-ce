@@ -44,12 +44,12 @@ export default defineConfig({
       'Cross-Origin-Resource-Policy': 'cross-origin'
     },
     proxy: {
-      '/upload': 'http://localhost:8000',
-      '/analyze': 'http://localhost:8000',
-      '/execute': 'http://localhost:8000',
-      '/export': 'http://localhost:8000',
-      '/log': 'http://localhost:8000',
-      '/health': 'http://localhost:8000'
+      '/upload': 'http://127.0.0.1:8000',
+      '/analyze': 'http://127.0.0.1:8000',
+      '/execute': 'http://127.0.0.1:8000',
+      '/export': 'http://127.0.0.1:8000',
+      '/log': 'http://127.0.0.1:8000',
+      '/health': 'http://127.0.0.1:8000'
     }
   },
   preview: {
