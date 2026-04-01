@@ -23,16 +23,7 @@ def test_readme_is_docs_table_of_contents():
     assert "align the auth page styling with the main UI" not in text
 
 
-def test_docs_collection_keeps_core_pages_available():
-    expected_docs = [
-        "index.md",
-        "architecture.md",
-        "development.md",
-        "commit-and-release.md",
-        "ci-and-release-automation.md",
-        "roadmap.md",
-        "contributing.md",
-        "changelog.md",
-    ]
-    for name in expected_docs:
-        assert (DOCS / name).exists()
+def test_ce_readme_links_to_hosted_docs_not_local_docs_site():
+    text = README.read_text(encoding="utf-8")
+    assert "https://docs.inquiraai.com/docs/" in text
+    assert "./docs-site" not in text

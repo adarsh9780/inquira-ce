@@ -2,24 +2,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DOCS = ROOT / "docs-site" / "docs"
 
 
-def test_release_docs_use_makefile_workflow():
-    release_doc = (DOCS / "release_process.md").read_text(encoding="utf-8")
-    assert "make set-version" in release_doc
-    assert "make metadata" in release_doc
-    assert "make git-tag" in release_doc
-
-    contrib_doc = (DOCS / "contributing.md").read_text(encoding="utf-8")
-    assert "make set-version" in contrib_doc
-    assert "make metadata" in contrib_doc
-
-
-def test_docs_do_not_contain_obvious_secret_placeholders():
-    for path in DOCS.glob("*.md"):
-        text = path.read_text(encoding="utf-8")
-        assert "AIza" not in text
+def test_ce_repo_no_longer_owns_docs_site():
+    assert not (ROOT / "docs-site").exists()
 
 
 def test_readme_omits_internal_misc_links_from_primary_map():
