@@ -9,7 +9,7 @@ import asyncio
 import json
 import time
 import uuid
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 from typing import cast
 
@@ -254,9 +254,9 @@ class ChatService:
             "model": model,
             "context": context,
             "table_names": normalized_table_names,
-            "data_path": data_path,
+            "data_path": ChatService._normalize_remote_path(data_path),
             "workspace_schema": workspace_schema if isinstance(workspace_schema, dict) else {},
-            "scratchpad_path": str(scratchpad_path or "").strip() or None,
+            "scratchpad_path": ChatService._normalize_remote_path(scratchpad_path) or None,
             "agent_profile": str(agent_profile or "").strip(),
             "attachments": attachments,
             "llm": {
@@ -268,6 +268,15 @@ class ChatService:
                 "coding_model": llm_prefs.get("selected_coding_model") or llm_prefs["selected_main_model"],
             },
         }
+
+    @staticmethod
+    def _normalize_remote_path(path: str | None) -> str:
+        raw = str(path or "").strip()
+        if not raw:
+            return ""
+        if "\\" in raw:
+            return PureWindowsPath(raw).as_posix()
+        return Path(raw).as_posix()
 
     @staticmethod
     def _extract_schema_table_names(schema: dict[str, Any]) -> list[str]:

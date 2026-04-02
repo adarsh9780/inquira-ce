@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from app.services.terminal_executor import (
+    TerminalSessionManager,
     detect_shell_command,
     normalize_workspace_cwd,
     run_workspace_terminal_command,
@@ -17,6 +18,38 @@ async def _cleanup_terminal_sessions():
     await shutdown_terminal_sessions()
     yield
     await shutdown_terminal_sessions()
+
+
+def _shell_mode() -> str:
+    _shell, _args, mode = TerminalSessionManager.detect_shell_command()
+    return mode
+
+
+def _print_cwd_command() -> str:
+    mode = _shell_mode()
+    if mode == "powershell":
+        return "Write-Output $PWD.Path"
+    if mode == "cmd":
+        return "echo %CD%"
+    return "pwd"
+
+
+def _set_env_command(name: str, value: str) -> str:
+    mode = _shell_mode()
+    if mode == "powershell":
+        return f"$env:{name} = '{value}'"
+    if mode == "cmd":
+        return f"set {name}={value}"
+    return f"export {name}={value}"
+
+
+def _print_env_command(name: str) -> str:
+    mode = _shell_mode()
+    if mode == "powershell":
+        return f"Write-Output $env:{name}"
+    if mode == "cmd":
+        return f"echo %{name}%"
+    return f"printf '%s\\n' \"${name}\""
 
 
 def test_detect_shell_command_returns_executable_and_args():
@@ -41,14 +74,15 @@ async def test_run_workspace_terminal_command_executes_in_workspace_dir(tmp_path
     result = await run_workspace_terminal_command(
         user_id="user-1",
         workspace_id="ws-1",
-        command="echo inquira_terminal_test",
+        command=_print_cwd_command(),
         workspace_dir=str(workspace_dir),
         timeout=30,
     )
 
     assert result["exit_code"] == 0
-    assert "inquira_terminal_test" in result["stdout"]
-    assert result["cwd"] == str(Path(workspace_dir).resolve())
+    expected_cwd = str(Path(workspace_dir).resolve())
+    assert expected_cwd in result["stdout"]
+    assert result["cwd"] == expected_cwd
 
 
 @pytest.mark.asyncio
@@ -59,14 +93,14 @@ async def test_run_workspace_terminal_command_persists_shell_session_state(tmp_p
     first = await run_workspace_terminal_command(
         user_id="user-1",
         workspace_id="ws-persist",
-        command="export INQ_TEST_VAR=12345",
+        command=_set_env_command("INQ_TEST_VAR", "12345"),
         workspace_dir=str(workspace_dir),
         timeout=30,
     )
     second = await run_workspace_terminal_command(
         user_id="user-1",
         workspace_id="ws-persist",
-        command="echo $INQ_TEST_VAR",
+        command=_print_env_command("INQ_TEST_VAR"),
         workspace_dir=str(workspace_dir),
         timeout=30,
     )

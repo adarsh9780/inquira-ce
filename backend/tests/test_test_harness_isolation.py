@@ -5,6 +5,10 @@ from pathlib import Path
 def test_pytest_harness_uses_temporary_home_and_databases():
     test_home = Path(os.environ["INQUIRA_TEST_HOME"]).resolve()
     assert Path.home().resolve() == test_home
+    assert os.environ["HOME"] == str(test_home)
+    assert os.environ["USERPROFILE"] == str(test_home)
+    if os.name == "nt":
+        assert os.environ["HOMEDRIVE"] + os.environ["HOMEPATH"] == str(test_home)
 
     auth_url = os.environ["INQUIRA_AUTH_DB_URL"]
     appdata_url = os.environ["INQUIRA_APPDATA_DB_URL"]

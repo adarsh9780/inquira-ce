@@ -73,3 +73,33 @@ async def test_analyze_and_persist_turn_uses_remote_agent_client(monkeypatch):
     assert "active_schema" not in captured_payload
     assert captured_payload["agent_profile"] == "agent_v2"
     assert captured_payload["llm"]["api_key"] == "key"
+
+
+def test_build_remote_agent_payload_normalizes_windows_paths():
+    payload = ChatService._build_remote_agent_payload(
+        request_id="req-1",
+        user_id="user-1",
+        workspace_id="ws-1",
+        conversation_id="conv-1",
+        question="show profitability trend",
+        current_code="",
+        model="google/gemini-2.5-flash",
+        context="",
+        table_names=["orders"],
+        data_path=r"C:\tmp\ws.db",
+        workspace_schema={},
+        scratchpad_path=r"C:\tmp\scratchpad\artifacts.duckdb",
+        attachments=[],
+        llm_prefs={
+            "provider": "openrouter",
+            "base_url": "https://openrouter.ai/api/v1",
+            "selected_lite_model": "openai/gpt-4.1-mini",
+            "selected_main_model": "google/gemini-2.5-flash",
+            "selected_coding_model": "google/gemini-2.5-flash",
+        },
+        resolved_api_key="key",
+        agent_profile="agent_v2",
+    )
+
+    assert payload["data_path"] == "C:/tmp/ws.db"
+    assert payload["scratchpad_path"] == "C:/tmp/scratchpad/artifacts.duckdb"

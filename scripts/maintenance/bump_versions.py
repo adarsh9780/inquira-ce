@@ -18,7 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from pathlib import Path
+from pathlib import Path, PurePath
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -32,12 +32,12 @@ FRONTEND_LOCK = ROOT / "frontend" / "package-lock.json"
 STABLE_VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 
-def warning_for_missing_path(path: Path) -> str:
+def warning_for_missing_path(path: PurePath) -> str:
     try:
         relative = path.relative_to(ROOT)
     except ValueError:
         relative = path
-    return f"warning=missing_file:{relative}"
+    return f"warning=missing_file:{relative.as_posix()}"
 
 
 def normalize_version_input(version: str) -> str:

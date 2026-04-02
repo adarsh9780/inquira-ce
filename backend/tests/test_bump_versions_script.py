@@ -1,5 +1,5 @@
 from importlib.util import module_from_spec, spec_from_file_location
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -145,3 +145,12 @@ def test_run_updates_warns_for_missing_targets_instead_of_failing(monkeypatch, t
     assert any("warning=missing_file:backend/app/main.py" in line for line in results)
     assert not any("release/metadata.json" in line for line in results)
     assert not any("docs-site" in line for line in results)
+
+
+def test_warning_for_missing_path_normalizes_windows_separators(monkeypatch):
+    mod = _load_module()
+    monkeypatch.setattr(mod, "ROOT", PureWindowsPath("C:/repo"))
+
+    warning = mod.warning_for_missing_path(PureWindowsPath("C:/repo/backend/app/main.py"))
+
+    assert warning == "warning=missing_file:backend/app/main.py"

@@ -206,6 +206,14 @@ def test_prune_workspace_ignores_duckdb_lock_conflict(monkeypatch, tmp_path):
     store.prune_workspace(workspace_duckdb_path=str(workspace_db))
 
 
+def test_is_lock_conflict_detects_windows_duckdb_message():
+    exc = duckdb.IOException(
+        'IO Error: Cannot open file "C:\\temp\\artifacts.duckdb": '
+        "The process cannot access the file because it is being used by another process."
+    )
+    assert ArtifactScratchpadStore._is_lock_conflict(exc) is True
+
+
 def _insert_dataframe_artifact(con, artifact_id, logical_name, expires_offset="+ INTERVAL 1 DAY"):
     con.execute(
         f"""

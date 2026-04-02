@@ -20,6 +20,10 @@ def _sqlite_async_url(path: Path) -> str:
 # Force all test imports to use a temporary user home + sqlite files.
 os.environ["INQUIRA_TEST_HOME"] = str(_TEST_HOME)
 os.environ["HOME"] = str(_TEST_HOME)
+os.environ["USERPROFILE"] = str(_TEST_HOME)
+if _TEST_HOME.drive:
+    os.environ["HOMEDRIVE"] = _TEST_HOME.drive
+    os.environ["HOMEPATH"] = str(_TEST_HOME)[len(_TEST_HOME.drive) :]
 os.environ["INQUIRA_AUTH_DB_URL"] = _sqlite_async_url(_TEST_INQUIRA_DIR / "auth_v1.db")
 os.environ["INQUIRA_APPDATA_DB_URL"] = _sqlite_async_url(_TEST_INQUIRA_DIR / "appdata_v1.db")
 os.environ.setdefault("INQUIRA_AUTH_PROVIDER", "sqlite")

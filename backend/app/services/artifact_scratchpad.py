@@ -275,7 +275,8 @@ class ArtifactScratchpadStore:
 
     @staticmethod
     def _is_lock_conflict(exc: duckdb.IOException) -> bool:
-        return "Conflicting lock is held" in str(exc)
+        message = str(exc).lower()
+        return "conflicting lock is held" in message or "used by another process" in message
 
     @staticmethod
     def _open_readonly(workspace_duckdb_path: str) -> duckdb.DuckDBPyConnection | None:
