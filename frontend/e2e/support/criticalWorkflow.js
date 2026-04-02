@@ -71,6 +71,12 @@ export async function installCriticalWorkflowMocks(page) {
     lastSchema: null,
     generatedSchema: null,
   }
+  const registeredRoutes = []
+
+  const registerRoute = async (url, handler) => {
+    registeredRoutes.push({ url, handler })
+    await page.route(url, handler)
+  }
 
   const withReadyPreferences = (json) => ({
     ...json,
@@ -84,7 +90,7 @@ export async function installCriticalWorkflowMocks(page) {
     },
   })
 
-  await page.route('**/api/v1/preferences', async (route) => {
+  await registerRoute('**/api/v1/preferences', async (route) => {
     const response = await route.fetch()
     const json = await response.json()
     if (route.request().method() === 'GET') {
@@ -97,7 +103,7 @@ export async function installCriticalWorkflowMocks(page) {
     })
   })
 
-  await page.route('**/api/v1/preferences/models/refresh', async (route) => {
+  await registerRoute('**/api/v1/preferences/models/refresh', async (route) => {
     const response = await route.fetch()
     const json = await response.json()
     await route.fulfill({
@@ -106,7 +112,7 @@ export async function installCriticalWorkflowMocks(page) {
     })
   })
 
-  await page.route('**/api/v1/workspaces/*/datasets/*/schema', async (route) => {
+  await registerRoute('**/api/v1/workspaces/*/datasets/*/schema', async (route) => {
     if (route.request().method() !== 'GET') {
       await route.continue()
       return
@@ -129,7 +135,7 @@ export async function installCriticalWorkflowMocks(page) {
     })
   })
 
-  await page.route('**/api/v1/workspaces/*/datasets/*/schema/regenerate', async (route) => {
+  await registerRoute('**/api/v1/workspaces/*/datasets/*/schema/regenerate', async (route) => {
     state.generatedSchema = buildGeneratedSchema(state.lastSchema)
 
     await route.fulfill({
@@ -139,7 +145,7 @@ export async function installCriticalWorkflowMocks(page) {
     })
   })
 
-  await page.route('**/api/v1/chat/stream', async (route) => {
+  await registerRoute('**/api/v1/chat/stream', async (route) => {
     const sseBody = buildSsePayload([
       {
         event: 'status',
@@ -178,7 +184,38 @@ export async function installCriticalWorkflowMocks(page) {
     })
   })
 
-  return state
+  const cleanup = async () => {
+    for (const { url, handler } of registeredRoutes.reverse()) {
+      try {
+        await page.unroute(url, handler)
+      } catch {
+        // Ignore shutdown races when the page or browser is already closing.
+      }
+    }
+  }
+
+  return { state, cleanup }
+}
+
+async function openSidebarForWorkspaceCreation(page) {
+  const toggle = page.getByRole('button', { name: 'Open sidebar' })
+  await expect(toggle).toBeVisible({ timeout: 90_000 })
+
+  const preferenceSync = page
+    .waitForResponse(
+      (response) =>
+        response.url().includes('/api/v1/preferences') && response.request().method() === 'PUT',
+      { timeout: 5_000 },
+    )
+    .catch(() => null)
+
+  await toggle.click()
+
+  const createWorkspaceButton = page.getByTitle('Create Workspace')
+  await expect(createWorkspaceButton).toBeVisible({ timeout: 30_000 })
+  await preferenceSync
+  await expect(createWorkspaceButton).toBeVisible({ timeout: 30_000 })
+  return createWorkspaceButton
 }
 
 async function importDatasetFromNativePathBridge(page) {
@@ -201,48 +238,50 @@ async function importDatasetFromNativePathBridge(page) {
 }
 
 export async function runCriticalWorkflow(page) {
-  await installCriticalWorkflowMocks(page)
+  const { cleanup } = await installCriticalWorkflowMocks(page)
 
-  const workspaceName = `Playwright Workspace ${Date.now()}-${Math.floor(Math.random() * 10_000)}`
+  try {
+    const workspaceName = `Playwright Workspace ${Date.now()}-${Math.floor(Math.random() * 10_000)}`
 
-  await page.goto('/')
+    await page.goto('/')
 
-  await expect(page.getByRole('button', { name: 'Open sidebar' })).toBeVisible({ timeout: 90_000 })
-  await page.getByRole('button', { name: 'Open sidebar' }).click()
+    const createWorkspaceButton = await openSidebarForWorkspaceCreation(page)
+    await createWorkspaceButton.click()
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 })
+    await page.getByLabel('Workspace Name').fill(workspaceName)
+    await page.getByRole('dialog').getByRole('button', { name: 'Create Workspace' }).click()
 
-  await page.getByTitle('Create Workspace').click()
-  await expect(page.getByRole('dialog')).toBeVisible()
-  await page.getByLabel('Workspace Name').fill(workspaceName)
-  await page.getByRole('dialog').getByRole('button', { name: 'Create Workspace' }).click()
+    await expect(page.getByRole('button', { name: workspaceName })).toBeVisible({ timeout: 30_000 })
 
-  await expect(page.getByRole('button', { name: workspaceName })).toBeVisible({ timeout: 30_000 })
+    await page.getByTitle('Add Dataset').click()
+    await expect(page.getByText('Data Configuration')).toBeVisible()
 
-  await page.getByTitle('Add Dataset').click()
-  await expect(page.getByText('Data Configuration')).toBeVisible()
+    await importDatasetFromNativePathBridge(page)
 
-  await importDatasetFromNativePathBridge(page)
+    await expect(page.getByText(`Loaded "${datasetFileName}"`)).toBeVisible({ timeout: 60_000 })
+    await page.getByLabel('Close settings').click()
 
-  await expect(page.getByText(`Loaded "${datasetFileName}"`)).toBeVisible({ timeout: 60_000 })
-  await page.getByLabel('Close settings').click()
+    await page.getByTitle('Switch to Schema Editor').click()
+    await expect(page.getByText('Schema Editor')).toBeVisible()
+    await expect(page.getByLabel('Select dataset for schema editor')).toContainText(datasetTableName, { timeout: 30_000 })
 
-  await page.getByTitle('Switch to Schema Editor').click()
-  await expect(page.getByText('Schema Editor')).toBeVisible()
-  await expect(page.getByLabel('Select dataset for schema editor')).toContainText(datasetTableName, { timeout: 30_000 })
+    await page.getByRole('button', { name: 'Regenerate' }).click()
+    await expect(page.getByText('Generated 4 descriptions')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('order_id')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('Revenue amount in USD for the order.')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Regenerate' }).click()
-  await expect(page.getByText('Generated 4 descriptions')).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByText('order_id')).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByText('Revenue amount in USD for the order.')).toBeVisible()
+    await page.getByTitle('Switch to Workspace').click()
+    await page.getByRole('button', { name: 'Chat' }).click()
+    await expect(page.getByPlaceholder('How can I help you today?')).toBeVisible()
 
-  await page.getByTitle('Switch to Workspace').click()
-  await page.getByRole('button', { name: 'Chat' }).click()
-  await expect(page.getByPlaceholder('How can I help you today?')).toBeVisible()
+    const composer = page.getByPlaceholder('How can I help you today?')
+    await composer.fill('Which customer has the highest revenue?')
+    await composer.press('Enter')
 
-  const composer = page.getByPlaceholder('How can I help you today?')
-  await composer.fill('Which customer has the highest revenue?')
-  await composer.press('Enter')
-
-  await expect(
-    page.getByText('The dataset contains three orders. The highest revenue entry belongs to Carla in the West region with revenue of 1640.25 USD.'),
-  ).toBeVisible({ timeout: 30_000 })
+    await expect(
+      page.getByText('The dataset contains three orders. The highest revenue entry belongs to Carla in the West region with revenue of 1640.25 USD.'),
+    ).toBeVisible({ timeout: 30_000 })
+  } finally {
+    await cleanup()
+  }
 }
