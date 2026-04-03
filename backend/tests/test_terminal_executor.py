@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from app.services.terminal_executor import (
+    _CWD_RE,
     TerminalSessionManager,
     detect_shell_command,
     normalize_workspace_cwd,
@@ -75,6 +76,16 @@ def test_powershell_wrapper_uses_explicit_marker_concatenation():
 
     assert "Write-Output ('__INQUIRA_DONE__abc123__' + $__inq_exit)" in payload
     assert "Write-Output ('__INQUIRA_CWD__abc123__' + $__inq_cwd)" in payload
+
+
+def test_cwd_marker_parser_ignores_echoed_powershell_wrapper_source():
+    echoed_wrapper_line = "Write-Output ('__INQUIRA_CWD__abc123__' + $__inq_cwd)"
+    actual_marker_line = "__INQUIRA_CWD__abc123__C:\\workspace"
+
+    assert _CWD_RE.fullmatch(echoed_wrapper_line) is None
+    match = _CWD_RE.fullmatch(actual_marker_line)
+    assert match is not None
+    assert match.group("cwd") == "C:\\workspace"
 
 
 @pytest.mark.asyncio

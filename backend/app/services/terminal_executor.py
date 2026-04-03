@@ -16,8 +16,8 @@ from typing import Any, AsyncIterator, Awaitable, Callable
 from app.core.logger import logprint
 
 
-_DONE_RE = re.compile(r"__INQUIRA_DONE__(?P<token>[A-Za-z0-9]+)__(?P<code>-?\d+)")
-_CWD_RE = re.compile(r"__INQUIRA_CWD__(?P<token>[A-Za-z0-9]+)__(?P<cwd>.*)")
+_DONE_RE = re.compile(r"^__INQUIRA_DONE__(?P<token>[A-Za-z0-9]+)__(?P<code>-?\d+)$")
+_CWD_RE = re.compile(r"^__INQUIRA_CWD__(?P<token>[A-Za-z0-9]+)__(?P<cwd>.*)$")
 
 
 @dataclass
@@ -275,13 +275,13 @@ class TerminalSessionManager:
 
                     line = line_bytes.decode("utf-8", errors="replace").rstrip("\r\n")
 
-                    done_match = _DONE_RE.search(line)
+                    done_match = _DONE_RE.fullmatch(line)
                     if done_match and done_match.group("token") == token:
                         exit_code = int(done_match.group("code"))
                         done_seen = True
                         continue
 
-                    cwd_match = _CWD_RE.search(line)
+                    cwd_match = _CWD_RE.fullmatch(line)
                     if cwd_match and cwd_match.group("token") == token:
                         detected_cwd = cwd_match.group("cwd") or detected_cwd
                         cwd_seen = True
