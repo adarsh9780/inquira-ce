@@ -66,6 +66,17 @@ def test_normalize_workspace_cwd_defaults_to_workspace(tmp_path):
     assert resolved == str(workspace_dir.resolve())
 
 
+def test_powershell_wrapper_uses_explicit_marker_concatenation():
+    payload = TerminalSessionManager()._wrap_command(
+        mode="powershell",
+        command="Write-Output hello",
+        token="abc123",
+    )
+
+    assert "Write-Output ('__INQUIRA_DONE__abc123__' + $__inq_exit)" in payload
+    assert "Write-Output ('__INQUIRA_CWD__abc123__' + $__inq_cwd)" in payload
+
+
 @pytest.mark.asyncio
 async def test_run_workspace_terminal_command_executes_in_workspace_dir(tmp_path):
     workspace_dir = tmp_path / "workspace"

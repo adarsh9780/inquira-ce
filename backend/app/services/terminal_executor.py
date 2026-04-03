@@ -149,8 +149,9 @@ class TerminalSessionManager:
                 "$__inq_success = $?\n"
                 "$__inq_native_exit = $LASTEXITCODE\n"
                 "$__inq_exit = if ($__inq_success) { 0 } elseif ($null -ne $__inq_native_exit) { $__inq_native_exit } else { 1 }\n"
-                f"Write-Output \"__INQUIRA_DONE__{token}__$__inq_exit\"\n"
-                f"Write-Output \"__INQUIRA_CWD__{token}__$($PWD.Path)\"\n"
+                "$__inq_cwd = $PWD.Path\n"
+                f"Write-Output ('__INQUIRA_DONE__{token}__' + $__inq_exit)\n"
+                f"Write-Output ('__INQUIRA_CWD__{token}__' + $__inq_cwd)\n"
             )
         if mode == "cmd":
             return (
