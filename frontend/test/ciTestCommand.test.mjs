@@ -15,3 +15,14 @@ test("frontend npm test script does not require forwarded --run arg", () => {
   assert.match(testScript, /node\s+--test/);
   assert.doesNotMatch(testScript, /\s--run(\s|$)/);
 });
+
+test("frontend npm test script quotes the glob so Windows shells pass it through", () => {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const pkgPath = path.resolve(__dirname, "..", "package.json");
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+  const testScript = pkg?.scripts?.test ?? "";
+
+  assert.equal(typeof testScript, "string");
+  assert.match(testScript, /node\s+--test\s+"test\/\*\.test\.mjs"/);
+});
