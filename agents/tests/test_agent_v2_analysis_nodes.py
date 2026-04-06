@@ -8,6 +8,7 @@ from agent_v2.nodes import (
     _ASSESS_CONTEXT_PROMPT,
     _CONTEXT_ENRICHMENT_TOOL_PROMPT,
     _build_context_enrichment_user_prompt,
+    _is_recoverable_structured_output_error,
     analysis_assess_context_node,
     analysis_collect_context_node,
     analysis_prepare_sample_to_next,
@@ -84,6 +85,50 @@ async def test_analysis_enrich_context_node_produces_structured_pending_tools(mo
     tool_messages = result.get("analysis_tool_messages") or []
     assert len(tool_messages) == 1
     assert isinstance(tool_messages[0], AIMessage)
+
+
+@pytest.mark.asyncio
+async def test_analysis_enrich_context_node_recovers_from_injected_sse_json_error(monkeypatch) -> None:
+    class _FakePrompt:
+        def __or__(self, _other):
+            return object()
+
+    class _FakeModel:
+        def with_structured_output(self, _schema):
+            return self
+
+    monkeypatch.setattr("agent_v2.nodes._get_model", lambda *_args, **_kwargs: _FakeModel())
+    monkeypatch.setattr("agent_v2.nodes.ChatPromptTemplate.from_messages", lambda *_args, **_kwargs: _FakePrompt())
+
+    async def fake_ainvoke(*_args, **_kwargs):
+        raise RuntimeError("JSON error injected into SSE stream")
+
+    monkeypatch.setattr("agent_v2.nodes._ainvoke_structured_chain", fake_ainvoke)
+    state = {
+        "workspace_id": "ws1",
+        "user_id": "u1",
+        "known_columns": [{"table_name": "orders", "name": "amount"}],
+        "context_sufficiency": {"missing_context": ["matching columns"]},
+        "analysis_context": {
+            "data_path": "",
+            "table_names": ["orders"],
+            "sample_table": "orders",
+            "user_text": "show customer totals",
+            "schema_summary": "orders(customer_id, amount)",
+        },
+        "attempt_counters": {"enrichment": 0, "max_tool_calls": 5},
+        "messages": [HumanMessage(content="show customer totals")],
+    }
+
+    result = await analysis_enrich_context_node(state, {"configurable": {}})
+    assert result.get("pending_tools") == []
+    tool_messages = result.get("analysis_tool_messages") or []
+    assert len(tool_messages) == 1
+    assert "Structured enrichment planning failed" in str(tool_messages[0].content)
+
+
+def test_recoverable_structured_output_error_matches_injected_sse_json_error() -> None:
+    assert _is_recoverable_structured_output_error(RuntimeError("JSON error injected into SSE stream")) is True
 
 
 def test_context_enrichment_prompt_includes_prior_search_context() -> None:

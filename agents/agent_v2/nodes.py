@@ -1088,7 +1088,7 @@ async def _ainvoke_structured_chain(chain: Any, payload: dict[str, Any]) -> Any:
         return await ainvoke(payload)
 
 
-def _is_empty_json_structured_parse_error(exc: Exception) -> bool:
+def _is_recoverable_structured_output_error(exc: Exception) -> bool:
     message = str(exc or "").strip().lower()
     if not message:
         return False
@@ -1096,6 +1096,7 @@ def _is_empty_json_structured_parse_error(exc: Exception) -> bool:
         "expected value at line 1 column 1",
         "expecting value: line 1 column 1",
         "jsondecodeerror",
+        "json error injected into sse stream",
     )
     return any(marker in message for marker in markers)
 
@@ -1849,7 +1850,7 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
         output = await _ainvoke_structured_chain(chain, {"tool_request_prompt": prompt_payload})
         plan = output if isinstance(output, ContextEnrichmentPlan) else ContextEnrichmentPlan.model_validate(output)
     except Exception as exc:
-        if not _is_empty_json_structured_parse_error(exc):
+        if not _is_recoverable_structured_output_error(exc):
             raise
         plan = ContextEnrichmentPlan(
             enough_context=bool(known_columns),
@@ -2522,7 +2523,7 @@ async def chat_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, 
     try:
         output = await _ainvoke_structured_chain(chain, messages_payload)
     except Exception as exc:
-        if not _is_empty_json_structured_parse_error(exc):
+        if not _is_recoverable_structured_output_error(exc):
             raise
         fallback_chain = prompt | model
         output = await _ainvoke_structured_chain(fallback_chain, messages_payload)
