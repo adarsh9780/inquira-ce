@@ -1228,6 +1228,7 @@ fn bootstrap_python(
     venv_path: &Path,
     config: &InquiraConfig,
     project_label: &str,
+    install_project: bool,
 ) -> Result<(), String> {
     let python_version = config
         .python
@@ -1253,12 +1254,7 @@ fn bootstrap_python(
 
     log::info!("Syncing {project_label} Python environment...");
     let mut cmd = Command::new(uv_bin);
-    cmd.args([
-        "sync",
-        "--no-dev",
-        "--project",
-        project_dir.to_str().unwrap(),
-    ])
+    cmd.args(build_uv_sync_args(project_dir, install_project))
     .env("UV_PROJECT_ENVIRONMENT", venv_path.to_str().unwrap());
     apply_uv_package_env(&mut cmd, config);
     let status = cmd.status().map_err(|e| format!("uv sync failed: {}", e))?;
@@ -1267,6 +1263,19 @@ fn bootstrap_python(
     }
 
     Ok(())
+}
+
+fn build_uv_sync_args(project_dir: &Path, install_project: bool) -> Vec<String> {
+    let mut args = vec![
+        "sync".to_string(),
+        "--no-dev".to_string(),
+        "--project".to_string(),
+        project_dir.to_string_lossy().to_string(),
+    ];
+    if !install_project {
+        args.push("--no-install-project".to_string());
+    }
+    args
 }
 
 fn apply_proxy_env(cmd: &mut Command, config: &InquiraConfig) {
@@ -1324,6 +1333,52 @@ fn python_bin_from_venv(venv_path: &Path) -> PathBuf {
 
 fn langgraph_bin_from_venv(venv_path: &Path) -> PathBuf {
     venv_executable_path(venv_path, "langgraph", cfg!(target_os = "windows"))
+}
+
+#[derive(Deserialize)]
+struct CompiledBackendPythonEnv {
+    base_prefix: String,
+    sys_path: Vec<String>,
+}
+
+fn resolve_compiled_backend_python_env(
+    venv_path: &Path,
+    backend_dir: &Path,
+) -> Result<CompiledBackendPythonEnv, String> {
+    let python_bin = python_bin_from_venv(venv_path);
+    if !python_bin.exists() {
+        return Err(format!(
+            "Python executable not found in venv: {}",
+            python_bin.display()
+        ));
+    }
+
+    let output = Command::new(&python_bin)
+        .args([
+            "-c",
+            "import json,sys; print(json.dumps({'base_prefix': sys.base_prefix, 'sys_path': [p for p in sys.path if p and not p.startswith('__editable__.')]}))",
+        ])
+        .current_dir(backend_dir)
+        .env("VIRTUAL_ENV", venv_path.to_string_lossy().to_string())
+        .output()
+        .map_err(|e| format!("Failed to inspect compiled backend Python environment: {e}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(format!(
+            "Failed to inspect compiled backend Python environment: {}",
+            if stderr.is_empty() {
+                format!("process exited with status {}", output.status)
+            } else {
+                stderr
+            }
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    serde_json::from_str(stdout.trim()).map_err(|e| {
+        format!("Failed to parse compiled backend Python environment: {e}")
+    })
 }
 
 fn build_pythonpath_entries(
@@ -1545,12 +1600,16 @@ fn start_backend(
         .and_then(|e| e.provider.clone())
         .unwrap_or_else(|| "local_jupyter".to_string());
     let mut cmd = if let Some(compiled_backend_bin) = bundled_backend_bin {
+        let python_env = resolve_compiled_backend_python_env(venv_path, backend_dir)?;
+        let pythonpath = env::join_paths(python_env.sys_path.iter().map(PathBuf::from))
+            .map_err(|error| format!("Failed to build compiled backend PYTHONPATH: {error}"))?;
         let mut command = Command::new(compiled_backend_bin);
-        command.current_dir(
-            compiled_backend_bin
-                .parent()
-                .unwrap_or_else(|| backend_dir.as_path()),
-        );
+        command
+            .current_dir(backend_dir)
+            .env("VIRTUAL_ENV", venv_path.to_str().unwrap())
+            .env("PYTHONHOME", python_env.base_prefix)
+            .env("PYTHONPATH", pythonpath.clone())
+            .env("NUITKA_PYTHONPATH", pythonpath);
         command
     } else {
         let python_bin = python_bin_from_venv(venv_path);
@@ -1590,10 +1649,8 @@ fn start_backend(
     } else {
         format!("{} -m app.main", python_bin_from_venv(venv_path).display())
     };
-    let backend_log_cwd = if let Some(compiled_backend_bin) = bundled_backend_bin {
-        compiled_backend_bin
-            .parent()
-            .unwrap_or_else(|| backend_dir.as_path())
+    let backend_log_cwd = if bundled_backend_bin.is_some() {
+        backend_dir.as_path()
     } else {
         backend_dir.as_path()
     };
@@ -1885,23 +1942,15 @@ pub fn run() {
                         resolve_resource_path(&resource_dir, "agents")
                     };
                     let env_paths = desktop_python_env_paths(&data_dir);
-                    let expected_backend_env_fingerprint = if bundled_backend_bin.is_some() {
-                        String::new()
-                    } else {
-                        project_env_fingerprint(&backend_dir)
-                    };
+                    let expected_backend_env_fingerprint = project_env_fingerprint(&backend_dir);
                     let expected_agent_env_fingerprint = project_env_fingerprint(&agent_dir);
                     let always_sync_backend_env = cfg!(debug_assertions);
-                    let should_bootstrap_backend = if bundled_backend_bin.is_some() {
-                        false
-                    } else {
-                        needs_python_bootstrap(
-                            &env_paths.backend_venv,
-                            &env_paths.backend_marker,
-                            &expected_backend_env_fingerprint,
-                            always_sync_backend_env,
-                        )
-                    };
+                    let should_bootstrap_backend = needs_python_bootstrap(
+                        &env_paths.backend_venv,
+                        &env_paths.backend_marker,
+                        &expected_backend_env_fingerprint,
+                        always_sync_backend_env,
+                    );
                     let should_bootstrap_agent = needs_python_bootstrap(
                         &env_paths.agent_venv,
                         &env_paths.agent_marker,
@@ -1927,6 +1976,7 @@ pub fn run() {
                             &env_paths.backend_venv,
                             &config,
                             "backend",
+                            bundled_backend_bin.is_none(),
                         )
                         .map_err(|error| format!("Setup failed: {error}"))?;
 
@@ -1955,6 +2005,7 @@ pub fn run() {
                             &env_paths.agent_venv,
                             &config,
                             "agent",
+                            true,
                         )
                         .map_err(|error| format!("Setup failed: {error}"))?;
 
@@ -2170,7 +2221,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_pythonpath_entries, bundled_uv_candidates, default_backend_host,
+        build_pythonpath_entries, build_uv_sync_args, bundled_uv_candidates, default_backend_host,
         default_uv_search_paths, desktop_python_env_paths, detect_default_shell,
         langgraph_bin_from_venv, missing_uv_binary_error, needs_python_bootstrap,
         parse_lsof_pid_lines, parse_netstat_listening_pids, python_bin_from_venv, resolve_pty_cwd,
@@ -2194,6 +2245,18 @@ mod tests {
         let venv = PathBuf::from("/tmp/inq-missing-venv");
         let marker = PathBuf::from("/tmp/inq-missing-marker");
         assert!(needs_python_bootstrap(&venv, &marker, "abc", false));
+    }
+
+    #[test]
+    fn build_uv_sync_args_can_skip_installing_project() {
+        let args = build_uv_sync_args(Path::new("/tmp/backend"), false);
+        assert!(args.iter().any(|arg| arg == "--no-install-project"));
+    }
+
+    #[test]
+    fn build_uv_sync_args_installs_project_by_default() {
+        let args = build_uv_sync_args(Path::new("/tmp/backend"), true);
+        assert!(!args.iter().any(|arg| arg == "--no-install-project"));
     }
 
     #[test]
