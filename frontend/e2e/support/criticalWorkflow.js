@@ -248,6 +248,30 @@ async function importDatasetFromNativePathBridge(page) {
   })
 }
 
+export async function setupCriticalWorkspace(page) {
+  const workspaceName = `Playwright Workspace ${Date.now()}-${Math.floor(Math.random() * 10_000)}`
+
+  await page.goto('/')
+
+  const createWorkspaceButton = await openSidebarForWorkspaceCreation(page)
+  await createWorkspaceButton.click()
+  await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 })
+  await page.getByLabel('Workspace Name').fill(workspaceName)
+  await page.getByRole('dialog').getByRole('button', { name: 'Create Workspace' }).click()
+
+  await expect(page.getByRole('button', { name: workspaceName })).toBeVisible({ timeout: 30_000 })
+
+  await page.getByTitle('Add Dataset').click()
+  await expect(page.getByText('Data Configuration')).toBeVisible()
+
+  await importDatasetFromNativePathBridge(page)
+
+  await expect(page.getByText(`Loaded "${datasetFileName}"`)).toBeVisible({ timeout: 60_000 })
+  await page.getByLabel('Close settings').click()
+
+  return { workspaceName, tableName: datasetTableName }
+}
+
 export async function runCriticalWorkflow(page, options = {}) {
   const {
     useLiveChatStream = false,
@@ -260,25 +284,7 @@ export async function runCriticalWorkflow(page, options = {}) {
   })
 
   try {
-    const workspaceName = `Playwright Workspace ${Date.now()}-${Math.floor(Math.random() * 10_000)}`
-
-    await page.goto('/')
-
-    const createWorkspaceButton = await openSidebarForWorkspaceCreation(page)
-    await createWorkspaceButton.click()
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 })
-    await page.getByLabel('Workspace Name').fill(workspaceName)
-    await page.getByRole('dialog').getByRole('button', { name: 'Create Workspace' }).click()
-
-    await expect(page.getByRole('button', { name: workspaceName })).toBeVisible({ timeout: 30_000 })
-
-    await page.getByTitle('Add Dataset').click()
-    await expect(page.getByText('Data Configuration')).toBeVisible()
-
-    await importDatasetFromNativePathBridge(page)
-
-    await expect(page.getByText(`Loaded "${datasetFileName}"`)).toBeVisible({ timeout: 60_000 })
-    await page.getByLabel('Close settings').click()
+    await setupCriticalWorkspace(page)
 
     await page.getByTitle('Switch to Schema Editor').click()
     await expect(page.getByText('Schema Editor')).toBeVisible()
