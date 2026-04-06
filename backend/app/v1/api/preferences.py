@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -134,6 +135,25 @@ def _resolve_provider_catalogs(prefs) -> dict[str, dict[str, Any]]:
     return merged
 
 
+def _provider_env_api_key_present(provider: str) -> bool:
+    normalized = normalize_llm_provider(provider)
+    if normalized == "openai":
+        return bool(str(os.getenv("OPENAI_API_KEY", "")).strip())
+    if normalized == "anthropic":
+        return bool(str(os.getenv("ANTHROPIC_API_KEY", "")).strip())
+    if normalized == "ollama":
+        return bool(str(os.getenv("OLLAMA_API_KEY", "")).strip())
+    return bool(str(os.getenv("OPENROUTER_API_KEY", "")).strip())
+
+
+def _merge_env_api_key_presence(api_key_presence: dict[str, bool]) -> dict[str, bool]:
+    merged: dict[str, bool] = {}
+    for provider in SUPPORTED_LLM_PROVIDERS:
+        normalized = normalize_llm_provider(provider)
+        merged[normalized] = bool(api_key_presence.get(normalized)) or _provider_env_api_key_present(normalized)
+    return merged
+
+
 def _load_enabled_models(raw_json: str, catalog: dict[str, Any]) -> list[str]:
     allowed = set(_clean_models(catalog.get("main_models", [])))
     parsed: list[str] = []
@@ -193,6 +213,7 @@ def _normalize_model_preferences(prefs, provider_catalogs: dict[str, dict[str, A
 
 
 def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesResponse:
+    api_key_presence = _merge_env_api_key_presence(api_key_presence)
     provider = normalize_llm_provider(getattr(prefs, "llm_provider", "openrouter"))
     provider_catalogs = _resolve_provider_catalogs(prefs)
     catalog = provider_catalogs.get(provider, provider_model_catalog(provider))

@@ -8,6 +8,8 @@ const __dirname = path.dirname(__filename)
 export const datasetTableName = 'e2e_sales'
 export const datasetFileName = 'e2e_sales.csv'
 export const datasetPath = path.resolve(__dirname, '../fixtures', datasetFileName)
+const mockAnswerText =
+  'The dataset contains three orders. The highest revenue entry belongs to Carla in the West region with revenue of 1640.25 USD.'
 
 function buildSchemaColumns() {
   return [
@@ -65,7 +67,12 @@ function buildSsePayload(events) {
     .join('\n\n')}\n\n`
 }
 
-export async function installCriticalWorkflowMocks(page) {
+export async function installCriticalWorkflowMocks(page, options = {}) {
+  const {
+    mockPreferences = true,
+    mockSchemaRegenerate = true,
+    mockChatStream = true,
+  } = options
   const state = {
     basePreferences: null,
     lastSchema: null,
@@ -90,99 +97,103 @@ export async function installCriticalWorkflowMocks(page) {
     },
   })
 
-  await registerRoute('**/api/v1/preferences', async (route) => {
-    const response = await route.fetch()
-    const json = await response.json()
-    if (route.request().method() === 'GET') {
-      state.basePreferences = json
-    }
+  if (mockPreferences) {
+    await registerRoute('**/api/v1/preferences', async (route) => {
+      const response = await route.fetch()
+      const json = await response.json()
+      if (route.request().method() === 'GET') {
+        state.basePreferences = json
+      }
 
-    await route.fulfill({
-      response,
-      json: withReadyPreferences(json),
+      await route.fulfill({
+        response,
+        json: withReadyPreferences(json),
+      })
     })
-  })
 
-  await registerRoute('**/api/v1/preferences/models/refresh', async (route) => {
-    const response = await route.fetch()
-    const json = await response.json()
-    await route.fulfill({
-      response,
-      json: withReadyPreferences(json),
+    await registerRoute('**/api/v1/preferences/models/refresh', async (route) => {
+      const response = await route.fetch()
+      const json = await response.json()
+      await route.fulfill({
+        response,
+        json: withReadyPreferences(json),
+      })
     })
-  })
+  }
 
-  await registerRoute('**/api/v1/workspaces/*/datasets/*/schema', async (route) => {
-    if (route.request().method() !== 'GET') {
-      await route.continue()
-      return
-    }
+  if (mockSchemaRegenerate) {
+    await registerRoute('**/api/v1/workspaces/*/datasets/*/schema', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue()
+        return
+      }
 
-    if (state.generatedSchema) {
+      if (state.generatedSchema) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(state.generatedSchema),
+        })
+        return
+      }
+
+      const response = await route.fetch()
+      state.lastSchema = await response.json()
+      await route.fulfill({
+        response,
+        json: state.lastSchema,
+      })
+    })
+
+    await registerRoute('**/api/v1/workspaces/*/datasets/*/schema/regenerate', async (route) => {
+      state.generatedSchema = buildGeneratedSchema(state.lastSchema)
+
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(state.generatedSchema),
       })
-      return
-    }
-
-    const response = await route.fetch()
-    state.lastSchema = await response.json()
-    await route.fulfill({
-      response,
-      json: state.lastSchema,
     })
-  })
+  }
 
-  await registerRoute('**/api/v1/workspaces/*/datasets/*/schema/regenerate', async (route) => {
-    state.generatedSchema = buildGeneratedSchema(state.lastSchema)
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(state.generatedSchema),
-    })
-  })
-
-  await registerRoute('**/api/v1/chat/stream', async (route) => {
-    const sseBody = buildSsePayload([
-      {
-        event: 'status',
-        data: {
-          stage: 'planning',
-          message: 'Inspecting dataset and preparing answer...',
-        },
-      },
-      {
-        event: 'final',
-        data: {
-          is_safe: true,
-          code: '',
-          current_code: '',
-          explanation:
-            'The dataset contains three orders. The highest revenue entry belongs to Carla in the West region with revenue of 1640.25 USD.',
-          result_explanation:
-            'The dataset contains three orders. The highest revenue entry belongs to Carla in the West region with revenue of 1640.25 USD.',
-          code_explanation: '',
-          metadata: {
-            table_names: [datasetTableName],
-            source: 'playwright-e2e-mock',
+  if (mockChatStream) {
+    await registerRoute('**/api/v1/chat/stream', async (route) => {
+      const sseBody = buildSsePayload([
+        {
+          event: 'status',
+          data: {
+            stage: 'planning',
+            message: 'Inspecting dataset and preparing answer...',
           },
         },
-      },
-    ])
+        {
+          event: 'final',
+          data: {
+            is_safe: true,
+            code: '',
+            current_code: '',
+            explanation: mockAnswerText,
+            result_explanation: mockAnswerText,
+            code_explanation: '',
+            metadata: {
+              table_names: [datasetTableName],
+              source: 'playwright-e2e-mock',
+            },
+          },
+        },
+      ])
 
-    await route.fulfill({
-      status: 200,
-      headers: {
-        'content-type': 'text/event-stream',
-        'cache-control': 'no-cache',
-        connection: 'keep-alive',
-      },
-      body: sseBody,
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'content-type': 'text/event-stream',
+          'cache-control': 'no-cache',
+          connection: 'keep-alive',
+        },
+        body: sseBody,
+      })
     })
-  })
+  }
 
   const cleanup = async () => {
     for (const { url, handler } of registeredRoutes.reverse()) {
@@ -237,8 +248,16 @@ async function importDatasetFromNativePathBridge(page) {
   })
 }
 
-export async function runCriticalWorkflow(page) {
-  const { cleanup } = await installCriticalWorkflowMocks(page)
+export async function runCriticalWorkflow(page, options = {}) {
+  const {
+    useLiveChatStream = false,
+    expectedResponse = mockAnswerText,
+  } = options
+  const { cleanup } = await installCriticalWorkflowMocks(page, {
+    mockPreferences: !useLiveChatStream,
+    mockSchemaRegenerate: true,
+    mockChatStream: !useLiveChatStream,
+  })
 
   try {
     const workspaceName = `Playwright Workspace ${Date.now()}-${Math.floor(Math.random() * 10_000)}`
@@ -278,9 +297,12 @@ export async function runCriticalWorkflow(page) {
     await composer.fill('Which customer has the highest revenue?')
     await composer.press('Enter')
 
-    await expect(
-      page.getByText('The dataset contains three orders. The highest revenue entry belongs to Carla in the West region with revenue of 1640.25 USD.'),
-    ).toBeVisible({ timeout: 30_000 })
+    const responseTimeout = useLiveChatStream ? 120_000 : 30_000
+    if (expectedResponse instanceof RegExp) {
+      await expect(page.getByText(expectedResponse)).toBeVisible({ timeout: responseTimeout })
+    } else {
+      await expect(page.getByText(expectedResponse)).toBeVisible({ timeout: responseTimeout })
+    }
   } finally {
     await cleanup()
   }
