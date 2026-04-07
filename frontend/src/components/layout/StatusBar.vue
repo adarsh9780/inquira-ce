@@ -326,7 +326,7 @@ function toggleSidebarFromStatusBar() {
 }
 
 function openSidebar() {
-  appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+  appStore.setSidebarCollapsed(false)
 }
 
 function switchToWorkspace() {

@@ -32,6 +32,8 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
   assert.equal(statusBarSource.includes('Hide sidebar (Cmd/Ctrl+B)'), true)
   assert.equal(statusBarSource.includes('ChevronRightIcon'), true)
   assert.equal(statusBarSource.includes('ChevronLeftIcon'), true)
+  assert.equal(statusBarSource.includes('function openSidebar() {'), true)
+  assert.equal(statusBarSource.includes('appStore.setSidebarCollapsed(false)'), true)
 
   // Workspace/Schema toggle is next to account name in left section
   assert.equal(statusBarSource.includes('switchToWorkspace'), true)

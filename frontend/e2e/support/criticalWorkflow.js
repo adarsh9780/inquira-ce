@@ -319,6 +319,7 @@ async function clickWhenReady(page, locator, options = {}) {
 
 async function openSidebarForWorkspaceCreation(page) {
   const toggle = page.getByRole('button', { name: 'Open sidebar' })
+  const createWorkspaceButton = page.getByTitle('Create Workspace')
   await waitForAppReady(page)
   await expect(toggle).toBeVisible({ timeout: 90_000 })
 
@@ -330,9 +331,9 @@ async function openSidebarForWorkspaceCreation(page) {
     )
     .catch(() => null)
 
-  await clickWhenReady(page, toggle, { timeout: 15_000 })
-
-  const createWorkspaceButton = page.getByTitle('Create Workspace')
+  if (!(await createWorkspaceButton.isVisible().catch(() => false))) {
+    await clickWhenReady(page, toggle, { timeout: 15_000 })
+  }
   await expect(createWorkspaceButton).toBeVisible({ timeout: 30_000 })
   await preferenceSync
   await waitForAppReady(page)

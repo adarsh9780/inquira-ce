@@ -26,6 +26,8 @@ test('critical workflow waits for sidebar preference sync before creating a work
     'utf-8',
   )
 
+  assert.equal(source.includes("if (!(await createWorkspaceButton.isVisible().catch(() => false))) {"), true)
+  assert.equal(source.includes("await clickWhenReady(page, toggle, { timeout: 15_000 })"), true)
   assert.equal(source.includes("response.url().includes('/api/v1/preferences')"), true)
   assert.equal(source.includes("response.request().method() === 'PUT'"), true)
   assert.equal(source.includes('await preferenceSync'), true)
