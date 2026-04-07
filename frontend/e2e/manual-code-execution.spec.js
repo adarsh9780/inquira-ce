@@ -37,7 +37,7 @@ test('manual code edit runs and shows result output', async ({ page }) => {
   try {
     await setupCriticalWorkspace(page)
 
-    await expect(page.getByRole('button', { name: 'Code' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Code', exact: true })).toBeVisible()
 
     const editor = page.locator('.cm-content').first()
     await expect(editor).toBeVisible({ timeout: 30_000 })

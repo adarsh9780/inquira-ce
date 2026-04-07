@@ -83,6 +83,8 @@
 
     <Teleport to="body">
       <div
+        data-testid="startup-overlay"
+        :data-active="(workspaceRuntimeStatus.active || appBootstrap.active) ? 'true' : 'false'"
         class="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--color-base)] transition-opacity duration-300"
         :class="(workspaceRuntimeStatus.active || appBootstrap.active) ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
       >

@@ -67,11 +67,45 @@ function buildSsePayload(events) {
     .join('\n\n')}\n\n`
 }
 
+function isIgnorableRouteError(error) {
+  const message = String(error?.message || '')
+  return (
+    message.includes('Target page, context or browser has been closed') ||
+    message.includes('browserContext.close: Test ended.') ||
+    message.includes('Test ended.') ||
+    message.includes('Route is already handled!')
+  )
+}
+
+async function fetchRouteResponse(route) {
+  try {
+    const response = await route.fetch()
+    const json = await response.json()
+    return { response, json }
+  } catch (error) {
+    if (isIgnorableRouteError(error)) {
+      return null
+    }
+    throw error
+  }
+}
+
+async function fulfillRoute(route, payload) {
+  try {
+    await route.fulfill(payload)
+  } catch (error) {
+    if (!isIgnorableRouteError(error)) {
+      throw error
+    }
+  }
+}
+
 export async function installCriticalWorkflowMocks(page, options = {}) {
   const {
     mockPreferences = true,
     mockSchemaRegenerate = true,
     mockChatStream = true,
+    mockWorkspaceRuntime = true,
   } = options
   const state = {
     basePreferences: null,
@@ -99,22 +133,24 @@ export async function installCriticalWorkflowMocks(page, options = {}) {
 
   if (mockPreferences) {
     await registerRoute('**/api/v1/preferences', async (route) => {
-      const response = await route.fetch()
-      const json = await response.json()
+      const payload = await fetchRouteResponse(route)
+      if (!payload) return
+      const { response, json } = payload
       if (route.request().method() === 'GET') {
         state.basePreferences = json
       }
 
-      await route.fulfill({
+      await fulfillRoute(route, {
         response,
         json: withReadyPreferences(json),
       })
     })
 
     await registerRoute('**/api/v1/preferences/models/refresh', async (route) => {
-      const response = await route.fetch()
-      const json = await response.json()
-      await route.fulfill({
+      const payload = await fetchRouteResponse(route)
+      if (!payload) return
+      const { response, json } = payload
+      await fulfillRoute(route, {
         response,
         json: withReadyPreferences(json),
       })
@@ -129,7 +165,7 @@ export async function installCriticalWorkflowMocks(page, options = {}) {
       }
 
       if (state.generatedSchema) {
-        await route.fulfill({
+        await fulfillRoute(route, {
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify(state.generatedSchema),
@@ -137,9 +173,11 @@ export async function installCriticalWorkflowMocks(page, options = {}) {
         return
       }
 
-      const response = await route.fetch()
-      state.lastSchema = await response.json()
-      await route.fulfill({
+      const payload = await fetchRouteResponse(route)
+      if (!payload) return
+      const { response, json } = payload
+      state.lastSchema = json
+      await fulfillRoute(route, {
         response,
         json: state.lastSchema,
       })
@@ -148,10 +186,28 @@ export async function installCriticalWorkflowMocks(page, options = {}) {
     await registerRoute('**/api/v1/workspaces/*/datasets/*/schema/regenerate', async (route) => {
       state.generatedSchema = buildGeneratedSchema(state.lastSchema)
 
-      await route.fulfill({
+      await fulfillRoute(route, {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(state.generatedSchema),
+      })
+    })
+  }
+
+  if (mockWorkspaceRuntime) {
+    await registerRoute('**/api/v1/workspaces/*/runtime/bootstrap', async (route) => {
+      await fulfillRoute(route, {
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ reset: true }),
+      })
+    })
+
+    await registerRoute('**/api/v1/workspaces/*/kernel/status', async (route) => {
+      await fulfillRoute(route, {
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ready' }),
       })
     })
   }
@@ -183,7 +239,7 @@ export async function installCriticalWorkflowMocks(page, options = {}) {
         },
       ])
 
-      await route.fulfill({
+      await fulfillRoute(route, {
         status: 200,
         headers: {
           'content-type': 'text/event-stream',
@@ -203,13 +259,67 @@ export async function installCriticalWorkflowMocks(page, options = {}) {
         // Ignore shutdown races when the page or browser is already closing.
       }
     }
+
+    try {
+      await page.unrouteAll({ behavior: 'ignoreErrors' })
+    } catch {
+      // Ignore teardown races once the browser starts closing.
+    }
   }
 
   return { state, cleanup }
 }
 
+async function waitForAppReady(page, timeout = 90_000) {
+  const startupOverlay = page.getByTestId('startup-overlay')
+  await expect(startupOverlay).toHaveAttribute('data-active', 'false', { timeout })
+}
+
+async function clickWhenReady(page, locator, options = {}) {
+  const timeout = Number.isFinite(options.timeout) ? options.timeout : 30_000
+  const readinessTimeout = Number.isFinite(options.readinessTimeout) ? options.readinessTimeout : 90_000
+  const perAttemptTimeout = Number.isFinite(options.perAttemptTimeout)
+    ? options.perAttemptTimeout
+    : 5_000
+  const retryableFragments = [
+    'intercepts pointer events',
+    'element is not stable',
+    'element was detached from the DOM',
+  ]
+  let lastError = null
+
+  await waitForAppReady(page, readinessTimeout)
+
+  const deadline = Date.now() + timeout
+
+  while (Date.now() < deadline) {
+    await expect(locator).toBeVisible({
+      timeout: Math.min(perAttemptTimeout, Math.max(deadline - Date.now(), 1)),
+    })
+
+    try {
+      await locator.click({ timeout: Math.min(perAttemptTimeout, Math.max(deadline - Date.now(), 1)) })
+      return
+    } catch (error) {
+      lastError = error
+      const message = String(error?.message || '')
+      const isRetryable = retryableFragments.some((fragment) => message.includes(fragment))
+      if (!isRetryable || Date.now() >= deadline) {
+        throw error
+      }
+      await waitForAppReady(page, readinessTimeout)
+      await page.waitForTimeout(250)
+    }
+  }
+
+  if (lastError) {
+    throw lastError
+  }
+}
+
 async function openSidebarForWorkspaceCreation(page) {
   const toggle = page.getByRole('button', { name: 'Open sidebar' })
+  await waitForAppReady(page)
   await expect(toggle).toBeVisible({ timeout: 90_000 })
 
   const preferenceSync = page
@@ -220,11 +330,12 @@ async function openSidebarForWorkspaceCreation(page) {
     )
     .catch(() => null)
 
-  await toggle.click()
+  await clickWhenReady(page, toggle, { timeout: 15_000 })
 
   const createWorkspaceButton = page.getByTitle('Create Workspace')
   await expect(createWorkspaceButton).toBeVisible({ timeout: 30_000 })
   await preferenceSync
+  await waitForAppReady(page)
   await expect(createWorkspaceButton).toBeVisible({ timeout: 30_000 })
   return createWorkspaceButton
 }
@@ -252,9 +363,10 @@ export async function setupCriticalWorkspace(page) {
   const workspaceName = `Playwright Workspace ${Date.now()}-${Math.floor(Math.random() * 10_000)}`
 
   await page.goto('/')
+  await waitForAppReady(page)
 
   const createWorkspaceButton = await openSidebarForWorkspaceCreation(page)
-  await createWorkspaceButton.click()
+  await clickWhenReady(page, createWorkspaceButton)
   await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 })
   await page.getByLabel('Workspace Name').fill(workspaceName)
   await page.getByRole('dialog').getByRole('button', { name: 'Create Workspace' }).click()
@@ -267,7 +379,9 @@ export async function setupCriticalWorkspace(page) {
   await importDatasetFromNativePathBridge(page)
 
   await expect(page.getByText(`Loaded "${datasetFileName}"`)).toBeVisible({ timeout: 60_000 })
-  await page.getByLabel('Close settings').click()
+  const closeSettingsButton = page.getByLabel('Close settings')
+  await expect(closeSettingsButton).toBeEnabled({ timeout: 30_000 })
+  await clickWhenReady(page, closeSettingsButton)
 
   return { workspaceName, tableName: datasetTableName }
 }
@@ -290,7 +404,9 @@ export async function runCriticalWorkflow(page, options = {}) {
     await expect(page.getByText('Schema Editor')).toBeVisible()
     await expect(page.getByLabel('Select dataset for schema editor')).toContainText(datasetTableName, { timeout: 30_000 })
 
-    await page.getByRole('button', { name: 'Regenerate' }).click()
+    const regenerateButton = page.getByRole('button', { name: 'Regenerate', exact: true })
+    await expect(regenerateButton).toBeEnabled({ timeout: 30_000 })
+    await clickWhenReady(page, regenerateButton)
     await expect(page.getByText('Generated 4 descriptions')).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText('order_id')).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText('Revenue amount in USD for the order.')).toBeVisible()

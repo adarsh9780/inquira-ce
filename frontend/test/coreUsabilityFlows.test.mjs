@@ -34,3 +34,10 @@ test('critical workflow helper sets up workspace and dataset before higher-level
   assert.equal(source.includes('await importDatasetFromNativePathBridge(page)'), true)
   assert.equal(source.includes('await expect(page.getByText(`Loaded "${datasetFileName}"`)).toBeVisible'), true)
 })
+
+test('manual code workflow uses an exact Code tab selector before editing the script', () => {
+  const source = readFileSync(resolve(process.cwd(), 'e2e/manual-code-execution.spec.js'), 'utf-8')
+
+  assert.equal(source.includes("getByRole('button', { name: 'Code', exact: true })"), true)
+  assert.equal(source.includes("page.getByTitle('Run Code (R)').click()"), true)
+})
