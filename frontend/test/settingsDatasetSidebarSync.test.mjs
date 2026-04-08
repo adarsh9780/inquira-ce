@@ -25,4 +25,7 @@ test('dataset selection from settings emits shared switch event and sidebar re-s
   assert.equal(unifiedSidebarSource.includes("window.addEventListener('dataset-switched', handleDatasetCatalogChanged)"), true)
   assert.equal(unifiedSidebarSource.includes("window.removeEventListener('dataset-switched', handleDatasetCatalogChanged)"), true)
   assert.equal(unifiedSidebarSource.includes('void fetchDatasets()'), true)
+  assert.equal(unifiedSidebarSource.includes('file_path: item.source_path'), true)
+  assert.equal(unifiedSidebarSource.includes('if (appStore.activeWorkspaceId) {'), true)
+  assert.equal(unifiedSidebarSource.includes('await fetchDatasets()'), true)
 })

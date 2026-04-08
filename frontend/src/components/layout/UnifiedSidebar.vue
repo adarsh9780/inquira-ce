@@ -354,6 +354,8 @@ import { useAppStore } from '../../stores/appStore'
 import { useAuthStore } from '../../stores/authStore'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
+import { inferTableNameFromDataPath } from '../../utils/chatBootstrap'
+import { previewService } from '../../services/previewService'
 import SettingsModal from '../modals/SettingsModal.vue'
 import WorkspaceCreateModal from '../modals/WorkspaceCreateModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
@@ -481,8 +483,8 @@ async function fetchDatasets() {
     const workspaceDatasets = response?.datasets || []
     const catalogDatasets = workspaceDatasets.map((item) => ({
       table_name: item.table_name,
-      file_path: item.file_path,
-    }))
+      file_path: item.source_path,
+    })).filter((item) => Boolean(String(item.table_name || '').trim()))
     localDatasets.value = catalogDatasets
   } catch (error) {
     console.error('Failed to load datasets:', error)
@@ -515,11 +517,38 @@ async function selectWorkspace(id) {
   }
 }
 
-function selectDataset(ds) {
+async function selectDataset(ds) {
   if (!ds || !ds.table_name) return
-  appStore.setActiveDataset(ds.table_name)
-  if (ds.file_path) {
-    appStore.setActiveDatasetPath(ds.file_path)
+  try {
+    let selectedPath = ds.file_path
+    let selectedTableName = String(ds.table_name || inferTableNameFromDataPath(ds.file_path || '')).trim()
+
+    if (appStore.activeWorkspaceId && ds.file_path && !String(ds.file_path).startsWith('browser://')) {
+      const syncedDataset = await apiService.v1AddDataset(appStore.activeWorkspaceId, ds.file_path)
+      selectedPath = syncedDataset?.source_path || selectedPath
+      selectedTableName = String(syncedDataset?.table_name || selectedTableName).trim()
+    }
+
+    previewService.clearSchemaCache()
+
+    appStore.setDataFilePath(selectedPath || '')
+    appStore.setIngestedTableName(selectedTableName)
+    appStore.setIngestedColumns([])
+    appStore.setSchemaFileId(selectedPath || selectedTableName)
+
+    appStore.setGeneratedCode('')
+    appStore.setPythonFileContent('')
+    appStore.setResultData(null)
+    appStore.setPlotlyFigure(null)
+    appStore.setDataframes([])
+    appStore.setFigures([])
+    appStore.setTerminalOutput('')
+
+    window.dispatchEvent(new CustomEvent('dataset-switched', {
+      detail: { tableName: selectedTableName, dataPath: selectedPath }
+    }))
+  } catch (error) {
+    console.error('Failed to switch dataset:', error)
   }
 }
 
@@ -714,6 +743,10 @@ onMounted(async () => {
   try {
     await appStore.fetchWorkspaces()
     await appStore.fetchWorkspaceDeletionJobs()
+    if (appStore.activeWorkspaceId) {
+      await fetchDatasets()
+      await appStore.fetchConversations()
+    }
   } catch {
     // Ignore bootstrap failures here. The parent app handles global state recovery.
   }
