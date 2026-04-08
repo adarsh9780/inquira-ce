@@ -46,6 +46,12 @@ cd src-tauri
 cargo tauri dev
 ```
 
+For a local CE desktop package from the CE repo root:
+
+```bash
+make build
+```
+
 Before running `make git-commit`, create a local root `commit_message.txt` file and write your commit message in it. Check the Developer Documentation for full Makefile rules.
 
 ## Official Documentation Map

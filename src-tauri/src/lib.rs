@@ -1157,7 +1157,7 @@ fn uv_search_candidates(resource_dir: &Path) -> Vec<PathBuf> {
 
 fn missing_uv_binary_error() -> String {
     format!(
-        "Could not find the `{}` binary. Checked bundled desktop resources, {}{}, and common install locations. Install uv, set INQUIRA_UV_BIN to the full binary path, or use `make build-desktop` so src-tauri/bundled-tools/{} is staged for local desktop builds.",
+        "Could not find the `{}` binary. Checked bundled desktop resources, {}{}, and common install locations. Install uv, set INQUIRA_UV_BIN to the full binary path, or use `make build` so src-tauri/bundled-tools/{} is staged for local desktop builds.",
         uv_binary_file_name(),
         "PATH",
         if cfg!(target_os = "macos") {
@@ -2711,7 +2711,7 @@ mod tests {
         let error = missing_uv_binary_error();
         assert!(error.contains("Could not find the"));
         assert!(error.contains("INQUIRA_UV_BIN"));
-        assert!(error.contains("make build-desktop"));
+        assert!(error.contains("make build"));
     }
 
     #[test]

@@ -5,7 +5,7 @@ POS_VERSION := $(word 2,$(MAKECMDGOALS))
 EFFECTIVE_VERSION := $(if $(VERSION),$(VERSION),$(POS_VERSION))
 INLINE_GIT_COMMIT_MESSAGE := $(strip $(filter-out git-commit,$(MAKECMDGOALS)))
 
-.PHONY: help help-push check-version check-version-pretty check-message check-input-version check-input-version-greater check-version-file set-version test test-pretty ruff-test ruff-test-pretty mypy-test mypy-test-pretty test-backend test-backend-pretty test-frontend test-frontend-pretty test-e2e build-frontend sync-frontend-dist build-wheel git-add git-commit git-push push
+.PHONY: help help-push check-version check-version-pretty check-message check-input-version check-input-version-greater check-version-file set-version test test-pretty ruff-test ruff-test-pretty mypy-test mypy-test-pretty test-backend test-backend-pretty test-frontend test-frontend-pretty test-e2e build build-frontend sync-frontend-dist build-wheel git-add git-commit git-push push
 
 help:
 	@echo "Usage:"
@@ -19,6 +19,7 @@ help:
 	@echo "  make test-frontend-pretty"
 	@echo "  make test-e2e"
 	@echo "  make check-version-pretty"
+	@echo "  make build"
 	@echo "  make build-frontend"
 	@echo "  make sync-frontend-dist"
 	@echo "  make build-wheel"
@@ -46,6 +47,7 @@ help:
 	@echo "  test-frontend      Run frontend npm test suite"
 	@echo "  test-frontend-pretty Rich-formatted frontend test run"
 	@echo "  test-e2e           Run frontend Playwright end-to-end tests"
+	@echo "  build              Build the CE desktop app with bundled uv for local desktop runs"
 	@echo "  build-frontend     Build frontend assets into src/inquira/frontend/dist"
 	@echo "  sync-frontend-dist Copy frontend assets to backend/app/frontend/dist for wheel packaging"
 	@echo "  build-wheel        Build backend Python wheel with bundled frontend assets"
@@ -124,6 +126,15 @@ test-frontend-pretty:
 
 test-e2e:
 	cd frontend && npm ci && npx playwright install chromium webkit && npm run e2e
+
+build:
+	@uv_path="$$(command -v uv)"; \
+	test -n "$$uv_path" || (echo "uv binary not found on PATH."; exit 1); \
+	uv_name="$$(basename "$$uv_path")"; \
+	mkdir -p src-tauri/bundled-tools; \
+	cp "$$uv_path" "src-tauri/bundled-tools/$$uv_name"; \
+	chmod +x "src-tauri/bundled-tools/$$uv_name"; \
+	cd src-tauri && cargo tauri build
 
 build-frontend:
 	cd frontend && npm ci && npm run build

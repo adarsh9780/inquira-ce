@@ -37,6 +37,24 @@ def test_makefile_test_target_runs_backend_and_frontend_tests():
     assert "cd frontend && npm ci && npm test" in text
 
 
+def test_makefile_build_target_stages_uv_and_runs_ce_tauri_build():
+    text = MAKEFILE.read_text(encoding="utf-8")
+    assert "build:" in text
+    assert 'uv_path="$$(command -v uv)"' in text
+    assert 'uv_name="$$(basename "$$uv_path")"' in text
+    assert "mkdir -p src-tauri/bundled-tools" in text
+    assert 'cp "$$uv_path" "src-tauri/bundled-tools/$$uv_name"' in text
+    assert 'chmod +x "src-tauri/bundled-tools/$$uv_name"' in text
+    assert "cd src-tauri && cargo tauri build" in text
+
+
+def test_tauri_build_precommand_installs_from_ce_root_frontend_path():
+    text = (ROOT / "src-tauri" / "tauri.conf.json").read_text(encoding="utf-8")
+    assert "npm --prefix frontend ci" in text
+    assert "npm --prefix frontend run build -- --outDir dist" in text
+    assert "../frontend ci" not in text
+
+
 def test_makefile_git_commit_uses_commit_message_txt():
     text = MAKEFILE.read_text(encoding="utf-8")
     assert "commit_message.txt is missing or empty" in text
