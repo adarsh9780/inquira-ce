@@ -1099,41 +1099,6 @@ fn bundled_uv_candidates(resource_dir: &Path) -> Vec<PathBuf> {
     candidates
 }
 
-fn bundled_backend_binary_file_name() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "inquira-backend.exe"
-    } else {
-        "inquira-backend"
-    }
-}
-
-fn bundled_backend_candidates(resource_dir: &Path) -> Vec<PathBuf> {
-    let mut candidates = Vec::new();
-    let bundled_names = vec![bundled_backend_binary_file_name()];
-    let bundled_roots = vec!["bundled-backend", "src-tauri/bundled-backend"];
-
-    for candidate_name in bundled_names {
-        for bundled_root in &bundled_roots {
-            let bundled_relative = format!("{bundled_root}/{candidate_name}");
-            candidates.push(resolve_resource_path(
-                &resource_dir.to_path_buf(),
-                &bundled_relative,
-            ));
-        }
-        candidates.push(
-            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("bundled-backend")
-                .join(candidate_name),
-        );
-    }
-
-    candidates
-}
-
-fn find_bundled_backend_binary(resource_dir: &PathBuf) -> Option<PathBuf> {
-    first_existing_path(&bundled_backend_candidates(resource_dir))
-}
-
 fn uv_search_candidates(resource_dir: &Path) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
     let binary_name = uv_binary_file_name();
@@ -1255,7 +1220,7 @@ fn bootstrap_python(
     log::info!("Syncing {project_label} Python environment...");
     let mut cmd = Command::new(uv_bin);
     cmd.args(build_uv_sync_args(project_dir, install_project))
-    .env("UV_PROJECT_ENVIRONMENT", venv_path.to_str().unwrap());
+        .env("UV_PROJECT_ENVIRONMENT", venv_path.to_str().unwrap());
     apply_uv_package_env(&mut cmd, config);
     let status = cmd.status().map_err(|e| format!("uv sync failed: {}", e))?;
     if !status.success() {
@@ -1333,52 +1298,6 @@ fn python_bin_from_venv(venv_path: &Path) -> PathBuf {
 
 fn langgraph_bin_from_venv(venv_path: &Path) -> PathBuf {
     venv_executable_path(venv_path, "langgraph", cfg!(target_os = "windows"))
-}
-
-#[derive(Deserialize)]
-struct CompiledBackendPythonEnv {
-    base_prefix: String,
-    sys_path: Vec<String>,
-}
-
-fn resolve_compiled_backend_python_env(
-    venv_path: &Path,
-    backend_dir: &Path,
-) -> Result<CompiledBackendPythonEnv, String> {
-    let python_bin = python_bin_from_venv(venv_path);
-    if !python_bin.exists() {
-        return Err(format!(
-            "Python executable not found in venv: {}",
-            python_bin.display()
-        ));
-    }
-
-    let output = Command::new(&python_bin)
-        .args([
-            "-c",
-            "import json,sys; print(json.dumps({'base_prefix': sys.base_prefix, 'sys_path': [p for p in sys.path if p and not p.startswith('__editable__.')]}))",
-        ])
-        .current_dir(backend_dir)
-        .env("VIRTUAL_ENV", venv_path.to_string_lossy().to_string())
-        .output()
-        .map_err(|e| format!("Failed to inspect compiled backend Python environment: {e}"))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(format!(
-            "Failed to inspect compiled backend Python environment: {}",
-            if stderr.is_empty() {
-                format!("process exited with status {}", output.status)
-            } else {
-                stderr
-            }
-        ));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    serde_json::from_str(stdout.trim()).map_err(|e| {
-        format!("Failed to parse compiled backend Python environment: {e}")
-    })
 }
 
 fn build_pythonpath_entries(
@@ -1579,7 +1498,6 @@ fn start_backend(
     uv_bin: &PathBuf,
     backend_dir: &PathBuf,
     venv_path: &PathBuf,
-    bundled_backend_bin: Option<&PathBuf>,
     config: &InquiraConfig,
     inquira_toml_path: &PathBuf,
     shared_secret: &str,
@@ -1599,33 +1517,17 @@ fn start_backend(
         .as_ref()
         .and_then(|e| e.provider.clone())
         .unwrap_or_else(|| "local_jupyter".to_string());
-    let mut cmd = if let Some(compiled_backend_bin) = bundled_backend_bin {
-        let python_env = resolve_compiled_backend_python_env(venv_path, backend_dir)?;
-        let pythonpath = env::join_paths(python_env.sys_path.iter().map(PathBuf::from))
-            .map_err(|error| format!("Failed to build compiled backend PYTHONPATH: {error}"))?;
-        let mut command = Command::new(compiled_backend_bin);
-        command
-            .current_dir(backend_dir)
-            .env("VIRTUAL_ENV", venv_path.to_str().unwrap())
-            .env("PYTHONHOME", python_env.base_prefix)
-            .env("PYTHONPATH", pythonpath.clone())
-            .env("NUITKA_PYTHONPATH", pythonpath);
-        command
-    } else {
-        let python_bin = python_bin_from_venv(venv_path);
-        if !python_bin.exists() {
-            return Err(format!(
-                "Python executable not found in venv: {}",
-                python_bin.display()
-            ));
-        }
-        let mut command = Command::new(&python_bin);
-        command
-            .args(["-m", "app.main"])
-            .current_dir(backend_dir)
-            .env("VIRTUAL_ENV", venv_path.to_str().unwrap());
-        command
-    };
+    let python_bin = python_bin_from_venv(venv_path);
+    if !python_bin.exists() {
+        return Err(format!(
+            "Python executable not found in venv: {}",
+            python_bin.display()
+        ));
+    }
+    let mut cmd = Command::new(&python_bin);
+    cmd.args(["-m", "app.main"])
+        .current_dir(backend_dir)
+        .env("VIRTUAL_ENV", venv_path.to_str().unwrap());
 
     cmd.env("INQUIRA_HOST", host)
         .env("INQUIRA_PORT", port.to_string())
@@ -1644,16 +1546,8 @@ fn start_backend(
     #[cfg(target_os = "windows")]
     cmd.creation_flags(CREATE_NO_WINDOW_FLAG);
 
-    let backend_command_summary = if let Some(compiled_backend_bin) = bundled_backend_bin {
-        compiled_backend_bin.display().to_string()
-    } else {
-        format!("{} -m app.main", python_bin_from_venv(venv_path).display())
-    };
-    let backend_log_cwd = if bundled_backend_bin.is_some() {
-        backend_dir.as_path()
-    } else {
-        backend_dir.as_path()
-    };
+    let backend_command_summary = format!("{} -m app.main", python_bin.display());
+    let backend_log_cwd = backend_dir.as_path();
 
     redirect_command_output(
         &mut cmd,
@@ -1903,11 +1797,6 @@ pub fn run() {
 
                     let uv_bin = find_uv_binary(&resource_dir)
                         .map_err(|error| format!("Startup failed: {error}"))?;
-                    let bundled_backend_bin = if cfg!(debug_assertions) {
-                        None
-                    } else {
-                        find_bundled_backend_binary(&resource_dir)
-                    };
                     let backend_dir = if cfg!(debug_assertions) {
                         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../backend")
                     } else {
@@ -1976,7 +1865,7 @@ pub fn run() {
                             &env_paths.backend_venv,
                             &config,
                             "backend",
-                            bundled_backend_bin.is_none(),
+                            true,
                         )
                         .map_err(|error| format!("Setup failed: {error}"))?;
 
@@ -2057,7 +1946,6 @@ pub fn run() {
                         &uv_bin,
                         &backend_dir,
                         &env_paths.backend_venv,
-                        bundled_backend_bin.as_ref(),
                         &config,
                         &runtime_config_path,
                         &shared_secret,
