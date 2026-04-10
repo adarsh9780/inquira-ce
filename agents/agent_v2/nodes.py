@@ -8,7 +8,7 @@ import json
 import re
 import warnings
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, RemoveMessage, ToolMessage
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -16,7 +16,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from .coding_subagent import ainvoke_coding_chain, build_coding_chain
 from .services.chat_model_factory import create_chat_model
@@ -65,7 +65,7 @@ _CONTEXT_ENRICHMENT_TOOL_PROMPT = (
     "- notes: string\n"
     "- tools: list of tool actions. Each tool action must have:\n"
     "  - tool: one of search_schema, scan_schema_chunks, sample_data\n"
-    "  - args: object with the tool arguments\n"
+    "  - args: an object matching that tool exactly, with no extra keys\n"
     "  - explanation: one short operational sentence in the format 'what I got, what I will do next'.\n"
     "Available tools and allowed args:\n"
     "- search_schema(args={{query?: string, queries?: string[], table_name?: string, limit?: int}})\n"
@@ -82,15 +82,21 @@ _CONTEXT_ENRICHMENT_TOOL_PROMPT = (
 
 
 class ChatOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     answer: str | None = None
 
 
 class ResultExplanation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     result_explanation: str | None = None
     code_explanation: str | None = None
 
 
 class AnalysisToolPlanItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     tool: str
     query: str | None = None
     table_name: str | None = None
@@ -100,28 +106,83 @@ class AnalysisToolPlanItem(BaseModel):
 
 
 class AnalysisContextAssessment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     enough_context: bool = False
-    missing_context: list[str] = []
-    tool_plan: list[AnalysisToolPlanItem] = []
+    missing_context: list[str] = Field(default_factory=list)
+    tool_plan: list[AnalysisToolPlanItem] = Field(default_factory=list)
 
 
 class ContextEnrichmentDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     enough_context: bool = False
-    missing_context: list[str] = []
+    missing_context: list[str] = Field(default_factory=list)
     notes: str = ""
 
 
-class StructuredToolCall(BaseModel):
-    tool: str
-    args: dict[str, Any] = {}
+class SearchSchemaArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query: str | None = None
+    queries: list[str] = Field(default_factory=list)
+    table_name: str | None = None
+    limit: int | None = None
+
+
+class ScanSchemaChunksArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query_terms: list[str] = Field(default_factory=list)
+    table_names: list[str] = Field(default_factory=list)
+    chunk_size: int | None = None
+    max_chunks: int | None = None
+
+
+class SampleDataArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    table_name: str | None = None
+    limit: int | None = None
+
+
+class SearchSchemaToolCall(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tool: Literal["search_schema"]
+    args: SearchSchemaArgs = Field(default_factory=SearchSchemaArgs)
     explanation: str = ""
 
 
+class ScanSchemaChunksToolCall(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tool: Literal["scan_schema_chunks"]
+    args: ScanSchemaChunksArgs = Field(default_factory=ScanSchemaChunksArgs)
+    explanation: str = ""
+
+
+class SampleDataToolCall(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tool: Literal["sample_data"]
+    args: SampleDataArgs = Field(default_factory=SampleDataArgs)
+    explanation: str = ""
+
+
+StructuredToolCall = Annotated[
+    SearchSchemaToolCall | ScanSchemaChunksToolCall | SampleDataToolCall,
+    Field(discriminator="tool"),
+]
+
+
 class ContextEnrichmentPlan(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     enough_context: bool = False
-    missing_context: list[str] = []
+    missing_context: list[str] = Field(default_factory=list)
     notes: str = ""
-    tools: list[StructuredToolCall] = []
+    tools: list[StructuredToolCall] = Field(default_factory=list)
 
 
 _SCHEMA_QUERY_STOPWORDS = {

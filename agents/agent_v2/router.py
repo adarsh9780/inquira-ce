@@ -9,7 +9,7 @@ from typing import Literal
 
 from langchain_core.messages import AnyMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from .services.chat_model_factory import create_chat_model
 from .services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
@@ -26,6 +26,8 @@ _UNSAFE_RE = re.compile(
 
 
 class RouteDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     route: Literal["analysis", "general_chat", "unsafe"]
 
 

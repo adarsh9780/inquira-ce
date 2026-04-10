@@ -26,9 +26,9 @@ from agent_v2.nodes import (
     analysis_validate_to_next,
     analysis_retry_decider_node,
     ContextEnrichmentPlan,
-    StructuredToolCall,
+    SearchSchemaToolCall,
 )
-from agent_v2.coding_subagent import AnalysisOutput
+from agent_v2.coding_subagent.schema import AnalysisOutput
 
 
 @pytest.mark.asyncio
@@ -50,7 +50,7 @@ async def test_analysis_enrich_context_node_produces_structured_pending_tools(mo
             missing_context=["matching columns"],
             notes="Need schema matches first.",
             tools=[
-                StructuredToolCall(
+                SearchSchemaToolCall(
                     tool="search_schema",
                     args={"queries": ["customer", "amount"], "table_name": "orders", "limit": 10},
                     explanation="I have the user goal, so I’m checking schema matches before writing code.",
@@ -158,6 +158,24 @@ def test_context_enrichment_prompt_escapes_literal_tool_examples() -> None:
         ]
     )
     assert prompt.input_variables == ["tool_request_prompt"]
+
+
+def test_context_enrichment_plan_schema_uses_strict_nested_tool_args() -> None:
+    schema = ContextEnrichmentPlan.model_json_schema()
+    defs = schema["$defs"]
+    search_call = defs["SearchSchemaToolCall"]
+    search_args = defs["SearchSchemaArgs"]
+    chunk_call = defs["ScanSchemaChunksToolCall"]
+    chunk_args = defs["ScanSchemaChunksArgs"]
+    sample_call = defs["SampleDataToolCall"]
+    sample_args = defs["SampleDataArgs"]
+
+    assert search_call["additionalProperties"] is False
+    assert chunk_call["additionalProperties"] is False
+    assert sample_call["additionalProperties"] is False
+    assert search_args["additionalProperties"] is False
+    assert chunk_args["additionalProperties"] is False
+    assert sample_args["additionalProperties"] is False
 
 
 @pytest.mark.asyncio
