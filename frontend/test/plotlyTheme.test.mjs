@@ -20,7 +20,7 @@ test('soft plotly theme updates colors without forcing typography sizes', () => 
 
   const themed = applyPlotlyTheme(input, { mode: PLOTLY_THEME_MODE.SOFT })
 
-  assert.equal(themed.layout.paper_bgcolor, '#FDFCF8')
+  assert.equal(themed.layout.paper_bgcolor, '#FFFEFC')
   assert.equal(themed.layout.plot_bgcolor, '#FFFFFF')
   assert.deepEqual(
     themed.layout.colorway,
@@ -95,7 +95,7 @@ test('invalid mode falls back to soft theming', () => {
     { mode: 'unsupported-mode' },
   )
 
-  assert.equal(themed.layout.paper_bgcolor, '#FDFCF8')
+  assert.equal(themed.layout.paper_bgcolor, '#FFFEFC')
   assert.equal(themed.layout.font.size, undefined)
 })
 

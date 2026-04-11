@@ -685,7 +685,7 @@ async function downloadHtml() {
             margin: 0;
             padding: 20px;
             font-family: Ubuntu, "Avenir Next", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #FDFCF8;
+            background: #FFFEFC;
             color: #27272A;
         }
         h1 { font-size: 1rem; margin: 0 0 12px 0; }

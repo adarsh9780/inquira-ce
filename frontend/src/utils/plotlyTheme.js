@@ -1,5 +1,5 @@
 const UI_COLORS = Object.freeze({
-  base: '#FDFCF8',
+  base: '#FFFEFC',
   surface: '#FFFFFF',
   border: '#E4E4E7',
   borderHover: '#D4D4D8',
@@ -33,7 +33,7 @@ const BRAND_COLOR_SCALE = Object.freeze({
   ]),
   diverging: Object.freeze([
     [0, '#3B82F6'],
-    [0.5, '#FDFCF8'],
+    [0.5, '#FFFEFC'],
     [1, '#D47948'],
   ]),
 })
