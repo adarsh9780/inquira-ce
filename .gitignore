@@ -55,4 +55,5 @@ src/inquira/frontend/dist/
 backend/app/frontend/dist/
 span.txt
 src-tauri/bundled-backend/
+src-tauri/bundled-tools/uv.exe
 src-tauri/tauri.ee.conf.json

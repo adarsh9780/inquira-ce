@@ -128,12 +128,7 @@ test-e2e:
 	cd frontend && npm ci && npx playwright install chromium webkit && npm run e2e
 
 build:
-	@uv_path="$$(command -v uv)"; \
-	test -n "$$uv_path" || (echo "uv binary not found on PATH."; exit 1); \
-	uv_name="$$(basename "$$uv_path")"; \
-	mkdir -p src-tauri/bundled-tools; \
-	cp "$$uv_path" "src-tauri/bundled-tools/$$uv_name"; \
-	chmod +x "src-tauri/bundled-tools/$$uv_name"; \
+	uv run python scripts/maintenance/bundle_uv.py
 	cd src-tauri && cargo tauri build
 
 build-frontend:

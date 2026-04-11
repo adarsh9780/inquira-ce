@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CHECK_UV_SCRIPT = ROOT / "scripts" / "maintenance" / "check_uv_version.py"
 VERSION_GUARD_SCRIPT = ROOT / "scripts" / "maintenance" / "version_guard.py"
+BUNDLE_UV_SCRIPT = ROOT / "scripts" / "maintenance" / "bundle_uv.py"
 
 
 def _load_module(path: Path, name: str):
@@ -33,3 +34,14 @@ def test_version_guard_compare_rejects_non_increasing_version(tmp_path: Path):
         assert False, "Expected ValueError for non-increasing version"
     except ValueError as exc:
         assert "must be greater than current VERSION" in str(exc)
+
+
+def test_bundle_uv_binary_copies_executable_with_platform_suffix(tmp_path: Path):
+    mod = _load_module(BUNDLE_UV_SCRIPT, "bundle_uv")
+    fake_uv = tmp_path / "uv.exe"
+    fake_uv.write_text("fake uv", encoding="utf-8")
+
+    bundled = mod.bundle_uv_binary(root=tmp_path, uv_path=fake_uv)
+
+    assert bundled == tmp_path / "src-tauri" / "bundled-tools" / "uv.exe"
+    assert bundled.read_text(encoding="utf-8") == "fake uv"
