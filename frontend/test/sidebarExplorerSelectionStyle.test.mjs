@@ -19,8 +19,8 @@ test('sidebar renders minimal explorer style with compact brand active highlight
 
   assert.equal(unifiedSource.includes('Workspace explorer'), false)
   assert.equal(datasetsSource.includes("bg-[var(--color-accent-soft)] text-[var(--color-accent)]"), true)
-  assert.equal(conversationsSource.includes("bg-[var(--color-accent-soft)] text-[var(--color-accent-text)]"), true)
-  assert.equal(conversationsSource.includes("font-semibold text-[var(--color-accent-text)]"), true)
+  assert.equal(conversationsSource.includes("bg-[var(--color-accent-soft)] text-[var(--color-text-main)]"), true)
+  assert.equal(conversationsSource.includes("font-semibold text-[var(--color-text-main)]"), true)
   assert.equal(datasetsSource.includes("bg-emerald-50 text-emerald-800"), false)
   assert.equal(conversationsSource.includes("bg-emerald-50 text-emerald-800"), false)
   assert.equal(datasetsSource.includes('ChevronRightIcon'), true)

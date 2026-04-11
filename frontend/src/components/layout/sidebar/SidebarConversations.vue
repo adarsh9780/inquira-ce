@@ -41,7 +41,7 @@
           :key="conv.id"
           type="button"
           class="group/item relative flex items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors text-xs"
-          :class="conv.id === appStore.activeConversationId ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent-text)]' : 'text-zinc-600 hover:bg-zinc-100/60 hover:text-zinc-800'"
+          :class="conv.id === appStore.activeConversationId ? 'bg-[var(--color-accent-soft)] text-[var(--color-text-main)]' : 'text-zinc-600 hover:bg-zinc-100/60 hover:text-zinc-800'"
           @click="selectConversation(conv.id)"
         >
           <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5 flex-1" @dblclick="startEditing(conv)">
@@ -61,7 +61,7 @@
               <template v-else>
                 <p
                   class="truncate"
-                  :class="conv.id === appStore.activeConversationId ? 'font-semibold text-[var(--color-accent-text)]' : 'font-medium text-zinc-600'"
+                  :class="conv.id === appStore.activeConversationId ? 'font-semibold text-[var(--color-text-main)]' : 'font-medium text-zinc-600'"
                   :title="conv.title || 'Conversation'"
                 >
                   {{ conv.title || 'Conversation' }}

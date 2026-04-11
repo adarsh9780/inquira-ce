@@ -368,7 +368,7 @@ const errorSummary = computed(() => {
   line-height: 1.3;
   text-transform: none;
   letter-spacing: 0;
-  color: #71717a;
+  color: #52525b;
 }
 
 .tool-activity-pre {

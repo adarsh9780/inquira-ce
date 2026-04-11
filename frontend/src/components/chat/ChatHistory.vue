@@ -997,7 +997,7 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
 .chat-code-copy:hover {
   border-color: #d4d4d8;
   background-color: #f4f4f5;
-  color: #27272a;
+  color: #18181b;
 }
 
 :deep(.chat-code-copy:focus-visible),

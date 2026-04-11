@@ -3,8 +3,8 @@ const UI_COLORS = Object.freeze({
   surface: '#FFFFFF',
   border: '#E4E4E7',
   borderHover: '#D4D4D8',
-  textMain: '#27272A',
-  textMuted: '#71717A',
+  textMain: '#18181B',
+  textMuted: '#52525B',
   accent: '#D47948',
 })
 

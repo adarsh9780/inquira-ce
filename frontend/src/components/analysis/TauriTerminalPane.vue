@@ -156,7 +156,7 @@ onMounted(async () => {
   if (!terminalHostRef.value) return
 
   const terminalBackground = readThemeColor('--color-base', '#ffffff')
-  const terminalForeground = readThemeColor('--color-text-main', '#27272A')
+  const terminalForeground = readThemeColor('--color-text-main', '#18181B')
   const terminalCursor = readThemeColor('--color-accent', '#D47948')
 
   terminal = new Terminal({

@@ -17,16 +17,16 @@
   --color-border-hover: #D4D4D8;
   /* Zinc 300 - Slightly darker borders on hover */
 
-  --color-text-main: #27272A;
-  /* Zinc 800 - Highly readable body text */
-  --color-text-muted: #71717A;
-  /* Zinc 500 - Secondary text */
+  --color-text-main: #18181B;
+  /* Zinc 900 - Strong body text for pale app surfaces */
+  --color-text-muted: #52525B;
+  /* Zinc 600 - Secondary text with better contrast */
 
   --color-accent: #D47948;
   /* Brand orange - use for selected states, focus rings, and key highlights */
   --color-accent-hover: #CC8252;
-  --color-accent-text: #9A4F24;
-  /* Darker orange for selected text on pale accent surfaces */
+  --color-accent-text: #7C2D12;
+  /* Deep orange for selected text on pale accent surfaces */
   --color-accent-soft: #FFF7ED;
   --color-accent-border: #FED7AA;
 

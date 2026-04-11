@@ -175,7 +175,7 @@ async function copyOutput() {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
   line-height: 1.45;
-  color: #71717a;
+  color: #52525b;
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 180px;

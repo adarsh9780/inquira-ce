@@ -686,7 +686,7 @@ async function downloadHtml() {
             padding: 20px;
             font-family: Ubuntu, "Avenir Next", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
             background: #FFFEFC;
-            color: #27272A;
+            color: #18181B;
         }
         h1 { font-size: 1rem; margin: 0 0 12px 0; }
         #chart { width: 100%; height: calc(100vh - 84px); min-height: 600px; }

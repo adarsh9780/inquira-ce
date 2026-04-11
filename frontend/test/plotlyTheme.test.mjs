@@ -27,12 +27,12 @@ test('soft plotly theme updates colors without forcing typography sizes', () => 
     ['#D47948', '#3B82F6', '#0EA5E9', '#22C55E', '#F59E0B', '#EF4444', '#14B8A6', '#6366F1'],
   )
   assert.equal(themed.layout.font.size, 18)
-  assert.equal(themed.layout.font.color, '#27272A')
+  assert.equal(themed.layout.font.color, '#18181B')
   assert.equal(themed.layout.title.font.size, 20)
-  assert.equal(themed.layout.title.font.color, '#27272A')
+  assert.equal(themed.layout.title.font.color, '#18181B')
   assert.equal(themed.layout.xaxis.tickfont.size, 15)
-  assert.equal(themed.layout.xaxis.tickfont.color, '#71717A')
-  assert.equal(themed.layout.xaxis.title.font.color, '#27272A')
+  assert.equal(themed.layout.xaxis.tickfont.color, '#52525B')
+  assert.equal(themed.layout.xaxis.title.font.color, '#18181B')
   assert.deepEqual(
     themed.layout.colorscale.sequential,
     [
