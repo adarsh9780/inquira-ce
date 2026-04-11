@@ -704,9 +704,9 @@ async function initializeEditor() {
     autocompletion({ override: [completionSource] }),
     Prec.highest(keymap.of(customKeymap)),
     EditorView.theme({
-      '&': { fontSize: '14px', height: '100%', backgroundColor: '#FFFEFC' },
-      '.cm-editor': { backgroundColor: '#FFFEFC' },
-      '.cm-scroller': { fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace', backgroundColor: '#FFFEFC' },
+      '&': { fontSize: '14px', height: '100%', backgroundColor: '#FFFFFF' },
+      '.cm-editor': { backgroundColor: '#FFFFFF' },
+      '.cm-scroller': { fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace', backgroundColor: '#FFFFFF' },
       '.cm-gutters': { backgroundColor: '#F5F3ED', borderRight: '1px solid #E8E4DC', color: '#8a8070' },
       '.cm-content': { padding: '16px' },
       '.cm-focused': { outline: 'none' },

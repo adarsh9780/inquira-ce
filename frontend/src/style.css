@@ -2,8 +2,8 @@
 
 @theme {
   /* Brand-aligned product palette shared with the public site */
-  --color-base: #FFFEFC;
-  /* Near-white warm tint for the main app background */
+  --color-base: #FFFFFF;
+  /* Pure white for the main app background */
   --color-surface: #FFFFFF;
   /* Pure white for cards, sidebars, and main panes */
 

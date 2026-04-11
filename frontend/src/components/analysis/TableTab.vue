@@ -1279,9 +1279,9 @@ async function deleteSelectedArtifact() {
 
 <style>
 .ag-theme-quartz {
-  --ag-background-color: #FFFEFC;
+  --ag-background-color: #FFFFFF;
   --ag-header-background-color: #F5F3ED;
-  --ag-odd-row-background-color: #FFFEFC;
+  --ag-odd-row-background-color: #FFFFFF;
   --ag-even-row-background-color: #FAF8F3;
   --ag-row-hover-color: #F0EDE5;
   --ag-selected-row-background-color: #EDE9DE;
