@@ -13,9 +13,9 @@
 
     <!-- Loading indicator for first message when no history yet -->
     <div v-if="appStore.isLoading && appStore.chatHistory.length === 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
-      <div class="flex items-center space-x-3 px-4 py-3 rounded-xl shadow-sm" style="color: var(--color-text-muted); background-color: color-mix(in srgb, var(--color-base) 60%, var(--color-border) 40%);">
-        <div class="animate-spin rounded-full h-5 w-5 border-2" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);" aria-hidden="true"></div>
-        <span class="text-sm font-medium">Analyzing your question...</span>
+      <div class="analyzing-status">
+        <div class="analyzing-spinner" aria-hidden="true"></div>
+        <span class="analyzing-status-text">Analyzing your question...</span>
       </div>
     </div>
 
@@ -182,9 +182,9 @@
 
     <!-- Loading indicator when analyzing - shown below last message -->
     <div v-if="appStore.isLoading && appStore.chatHistory.length > 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
-      <div class="flex items-center space-x-3 px-4 py-3 rounded-xl shadow-sm" style="color: var(--color-text-muted); background-color: color-mix(in srgb, var(--color-base) 60%, var(--color-border) 40%);">
-        <div class="animate-spin rounded-full h-5 w-5 border-2" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);" aria-hidden="true"></div>
-        <span class="text-sm font-medium">Analyzing your question...</span>
+      <div class="analyzing-status">
+        <div class="analyzing-spinner" aria-hidden="true"></div>
+        <span class="analyzing-status-text">Analyzing your question...</span>
       </div>
     </div>
 
@@ -860,6 +860,7 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
 
 :deep(.chat-markdown-content p) {
   margin: 0.65rem 0;
+  color: var(--color-text-main);
 }
 
 :deep(.chat-markdown-content h1),
@@ -887,6 +888,68 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
 
 :deep(.chat-markdown-content li) {
   margin: 0.35rem 0;
+  color: var(--color-text-main);
+}
+
+.analyzing-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--color-text-main);
+}
+
+.analyzing-spinner {
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 1.5px solid color-mix(in srgb, var(--color-text-muted) 22%, transparent);
+  border-top-color: var(--color-accent-text);
+  border-radius: 9999px;
+  animation: analyzing-spin 0.9s linear infinite;
+}
+
+.analyzing-status-text {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  color: var(--color-text-main);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.analyzing-status-text::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-120%);
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    transparent 35%,
+    color-mix(in srgb, var(--color-surface) 85%, transparent) 50%,
+    transparent 65%,
+    transparent 100%
+  );
+  animation: analyzing-glimmer 1.65s ease-in-out infinite;
+}
+
+@keyframes analyzing-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes analyzing-glimmer {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .analyzing-spinner,
+  .analyzing-status-text::after {
+    animation: none;
+  }
 }
 
 :deep(.chat-markdown-content .chat-code-block) {

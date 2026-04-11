@@ -25,6 +25,8 @@
   --color-accent: #D47948;
   /* Brand orange - use for selected states, focus rings, and key highlights */
   --color-accent-hover: #CC8252;
+  --color-accent-text: #9A4F24;
+  /* Darker orange for selected text on pale accent surfaces */
   --color-accent-soft: #FFF7ED;
   --color-accent-border: #FED7AA;
 

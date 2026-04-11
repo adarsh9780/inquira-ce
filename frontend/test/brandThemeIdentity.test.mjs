@@ -10,6 +10,7 @@ test('app theme uses Ubuntu and the orange brand accent from the public site', (
   assert.equal(styleSource.includes('--font-display: "Ubuntu"'), true)
   assert.equal(styleSource.includes('--color-base: #FFFEFC;'), true)
   assert.equal(styleSource.includes('--color-accent: #D47948;'), true)
+  assert.equal(styleSource.includes('--color-accent-text: #9A4F24;'), true)
   assert.equal(styleSource.includes('--color-accent-soft: #FFF7ED;'), true)
   assert.equal(styleSource.includes('--color-primary-900: #D47948;'), true)
   assert.equal(styleSource.includes('--color-chat-user-bubble: #FFF7ED;'), true)

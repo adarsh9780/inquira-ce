@@ -41,11 +41,11 @@
           :key="conv.id"
           type="button"
           class="group/item relative flex items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors text-xs"
-          :class="conv.id === appStore.activeConversationId ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : 'text-zinc-600 hover:bg-zinc-100/60 hover:text-zinc-800'"
+          :class="conv.id === appStore.activeConversationId ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent-text)]' : 'text-zinc-600 hover:bg-zinc-100/60 hover:text-zinc-800'"
           @click="selectConversation(conv.id)"
         >
           <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5 flex-1" @dblclick="startEditing(conv)">
-            <ChatBubbleLeftRightIcon class="w-3.5 h-3.5 shrink-0 mt-0.5" :class="conv.id === appStore.activeConversationId ? 'text-[var(--color-accent)]' : 'text-zinc-400'" />
+            <ChatBubbleLeftRightIcon class="w-3.5 h-3.5 shrink-0 mt-0.5" :class="conv.id === appStore.activeConversationId ? 'text-[var(--color-accent-text)]' : 'text-zinc-400'" />
             <div class="flex-1 min-w-0">
               <div v-if="editingId === conv.id" class="flex items-center gap-1 w-full relative z-10">
                 <input
@@ -61,12 +61,12 @@
               <template v-else>
                 <p
                   class="truncate"
-                  :class="conv.id === appStore.activeConversationId ? 'font-semibold' : 'font-medium'"
+                  :class="conv.id === appStore.activeConversationId ? 'font-semibold text-[var(--color-accent-text)]' : 'font-medium text-zinc-600'"
                   :title="conv.title || 'Conversation'"
                 >
                   {{ conv.title || 'Conversation' }}
                 </p>
-                <p class="text-[9px] truncate" :class="conv.id === appStore.activeConversationId ? 'text-[var(--color-accent)] opacity-75' : 'text-zinc-400'">
+                <p class="text-[9px] truncate" :class="conv.id === appStore.activeConversationId ? 'text-[var(--color-accent-text)] opacity-80' : 'text-zinc-400'">
                   {{ formatTimestamp(conv.updated_at || conv.created_at) }}
                 </p>
               </template>
