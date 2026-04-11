@@ -39,7 +39,7 @@
         <div class="bg-white px-6 py-6 overflow-y-auto flex-1">
           <!-- Spinner and Timer -->
           <div class="flex flex-col items-center mb-6">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-accent)] mb-4"></div>
             <div class="text-center">
               <p class="text-sm text-gray-600 mb-1">Processing your data...</p>
               <p class="text-xs text-gray-500">{{ formatElapsedTime(elapsedTime) }}</p>
@@ -47,11 +47,11 @@
           </div>
 
           <!-- Current Progress Message -->
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div class="bg-[var(--color-accent-soft)] border border-[var(--color-accent-border)] rounded-lg p-4">
             <div class="flex items-center space-x-3">
-              <div class="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
+              <div class="animate-spin rounded-full h-5 w-5 border-2 border-[var(--color-accent)] border-t-transparent"></div>
               <div class="flex-1">
-                <p class="text-sm font-medium text-blue-900">
+                <p class="text-sm font-medium text-[var(--color-accent)]">
                   {{ currentMessage }}
                 </p>
               </div>
@@ -97,7 +97,7 @@
           <button
             @click="handleCancel"
             :disabled="isCancelling"
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div v-if="isCancelling" class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-700 mr-2"></div>
             {{ isCancelling ? 'Cancelling...' : 'Cancel' }}

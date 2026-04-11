@@ -1,7 +1,7 @@
 <template>
   <div class="p-6">
     <h2 class="text-xl font-semibold mb-4 flex items-center">
-      <DocumentArrowUpIcon class="w-6 h-6 mr-2 text-blue-600" />
+      <DocumentArrowUpIcon class="w-6 h-6 mr-2 text-[var(--color-accent)]" />
       Data Configuration
     </h2>
 
@@ -19,18 +19,18 @@
 
     <!-- Progress Indicator -->
     <div v-if="isProcessing" class="mb-4">
-      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div class="bg-[var(--color-accent-soft)] border border-[var(--color-accent-border)] rounded-lg p-4">
         <div class="flex items-center space-x-3 mb-2">
-          <div class="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
-          <span class="text-sm font-medium text-blue-900">{{ progressMessage }}</span>
+          <div class="animate-spin rounded-full h-5 w-5 border-2 border-[var(--color-accent)] border-t-transparent"></div>
+          <span class="text-sm font-medium text-[var(--color-accent)]">{{ progressMessage }}</span>
         </div>
-        <div class="w-full bg-blue-200 rounded-full h-2">
+        <div class="w-full bg-[var(--color-accent-border)] rounded-full h-2">
           <div
-            class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            class="bg-[var(--color-accent)] h-2 rounded-full transition-all duration-300"
             :style="{ width: progressPercent + '%' }"
           ></div>
         </div>
-        <p class="text-xs text-blue-600 mt-2">{{ formatElapsedTime(elapsedTime) }}</p>
+        <p class="text-xs text-[var(--color-accent)] mt-2">{{ formatElapsedTime(elapsedTime) }}</p>
       </div>
     </div>
 
@@ -39,17 +39,17 @@
       <div
         :class="[
           'rounded-lg p-4 border',
-          isCheckingUpdate ? 'bg-blue-50 border-blue-200' : (updateNeeded ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200')
+          isCheckingUpdate ? 'bg-[var(--color-accent-soft)] border-[var(--color-accent-border)]' : (updateNeeded ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200')
         ]"
       >
         <div class="flex items-start">
           <div class="mt-0.5 mr-2">
-            <div v-if="isCheckingUpdate" class="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
+            <div v-if="isCheckingUpdate" class="animate-spin rounded-full h-4 w-4 border-2 border-[var(--color-accent)] border-t-transparent"></div>
             <ExclamationTriangleIcon v-else-if="updateNeeded" class="h-5 w-5 text-yellow-600" />
             <CheckCircleIcon v-else class="h-5 w-5 text-green-600" />
           </div>
           <div class="flex-1">
-            <p class="text-sm font-medium" :class="updateNeeded ? 'text-yellow-900' : (isCheckingUpdate ? 'text-blue-900' : 'text-green-900')">
+            <p class="text-sm font-medium" :class="updateNeeded ? 'text-yellow-900' : (isCheckingUpdate ? 'text-[var(--color-accent)]' : 'text-green-900')">
               <span v-if="isCheckingUpdate">Checking if data re-creation is needed…</span>
               <span v-else-if="updateNeeded">Update recommended: database re-creation may be needed</span>
               <span v-else>Data is up to date. No re-creation needed</span>
@@ -72,7 +72,7 @@
             >
               Rebuild now
             </button>
-            <button v-if="!isCheckingUpdate" @click="checkForUpdate" class="text-xs text-blue-600 hover:text-blue-700">Recheck</button>
+            <button v-if="!isCheckingUpdate" @click="checkForUpdate" class="text-xs text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]">Recheck</button>
           </div>
         </div>
       </div>
@@ -115,12 +115,12 @@
               :disabled="isProcessing || isPickingFile || isRestoringFile"
               class="hidden"
             />
-            <span v-if="isPickingFile" class="inline-flex items-center text-sm text-blue-600">
-              <div class="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent mr-2"></div>
+            <span v-if="isPickingFile" class="inline-flex items-center text-sm text-[var(--color-accent)]">
+              <div class="animate-spin rounded-full h-4 w-4 border-2 border-[var(--color-accent)] border-t-transparent mr-2"></div>
               Ingesting…
             </span>
-            <span v-if="isRestoringFile" class="inline-flex items-center text-sm text-blue-600">
-              <div class="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent mr-2"></div>
+            <span v-if="isRestoringFile" class="inline-flex items-center text-sm text-[var(--color-accent)]">
+              <div class="animate-spin rounded-full h-4 w-4 border-2 border-[var(--color-accent)] border-t-transparent mr-2"></div>
               Restoring…
             </span>
           </div>
@@ -208,8 +208,8 @@
       <div class="bg-white rounded-xl shadow-2xl p-8 max-w-lg w-full mx-4">
         <!-- Header -->
         <div class="text-center mb-6">
-          <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-            <svg class="w-8 h-8 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+          <div class="inline-flex items-center justify-center w-16 h-16 bg-[var(--color-accent-soft)] rounded-full mb-4">
+            <svg class="w-8 h-8 text-[var(--color-accent)] animate-spin" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
@@ -222,7 +222,7 @@
         <div class="space-y-3">
           <div class="w-full bg-gray-200 rounded-full h-2">
             <div 
-              class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              class="bg-[var(--color-accent)] h-2 rounded-full transition-all duration-300"
               :style="{ width: progressPercent + '%' }"
             ></div>
           </div>

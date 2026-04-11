@@ -157,7 +157,7 @@ onMounted(async () => {
 
   const terminalBackground = readThemeColor('--color-base', '#ffffff')
   const terminalForeground = readThemeColor('--color-text-main', '#27272A')
-  const terminalCursor = readThemeColor('--color-accent', '#3B82F6')
+  const terminalCursor = readThemeColor('--color-accent', '#D47948')
 
   terminal = new Terminal({
     cursorBlink: true,

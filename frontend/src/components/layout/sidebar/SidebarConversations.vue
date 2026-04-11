@@ -41,11 +41,11 @@
           :key="conv.id"
           type="button"
           class="group/item relative flex items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors text-xs"
-          :class="conv.id === appStore.activeConversationId ? 'bg-emerald-50 text-emerald-800' : 'text-zinc-600 hover:bg-zinc-100/60 hover:text-zinc-800'"
+          :class="conv.id === appStore.activeConversationId ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : 'text-zinc-600 hover:bg-zinc-100/60 hover:text-zinc-800'"
           @click="selectConversation(conv.id)"
         >
           <div class="flex items-start gap-2 min-w-0 pr-2 pt-0.5 flex-1" @dblclick="startEditing(conv)">
-            <ChatBubbleLeftRightIcon class="w-3.5 h-3.5 shrink-0 mt-0.5" :class="conv.id === appStore.activeConversationId ? 'text-emerald-600' : 'text-zinc-400'" />
+            <ChatBubbleLeftRightIcon class="w-3.5 h-3.5 shrink-0 mt-0.5" :class="conv.id === appStore.activeConversationId ? 'text-[var(--color-accent)]' : 'text-zinc-400'" />
             <div class="flex-1 min-w-0">
               <div v-if="editingId === conv.id" class="flex items-center gap-1 w-full relative z-10">
                 <input
@@ -66,7 +66,7 @@
                 >
                   {{ conv.title || 'Conversation' }}
                 </p>
-                <p class="text-[9px] truncate" :class="conv.id === appStore.activeConversationId ? 'text-emerald-700/70' : 'text-zinc-400'">
+                <p class="text-[9px] truncate" :class="conv.id === appStore.activeConversationId ? 'text-[var(--color-accent)] opacity-75' : 'text-zinc-400'">
                   {{ formatTimestamp(conv.updated_at || conv.created_at) }}
                 </p>
               </template>
@@ -76,7 +76,7 @@
           <div v-if="editingId !== conv.id" class="flex-shrink-0 flex items-center opacity-0 group-hover/item:opacity-100 transition-opacity">
             <button
               @click.stop="startEditing(conv)"
-              class="btn-icon p-1 hover:text-blue-600"
+              class="btn-icon p-1 hover:text-[var(--color-accent)]"
               title="Rename Conversation"
             >
               <PencilIcon class="w-3 h-3" />

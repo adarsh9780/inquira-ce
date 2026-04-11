@@ -2,7 +2,7 @@
   <div ref="containerRef" class="relative">
     <button
       @click="toggleDropdown"
-      class="flex items-center space-x-2 px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+      class="flex items-center space-x-2 px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
       :disabled="loading || !appStore.hasWorkspace"
       :title="!appStore.hasWorkspace ? 'Create a workspace to enable datasets' : currentDatasetName"
     >
@@ -24,7 +24,7 @@
     >
       <!-- Loading (Global) -->
       <div v-if="loading" class="p-3 text-center text-sm text-gray-500">
-        <div class="animate-spin inline-block w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full mr-2"></div>
+        <div class="animate-spin inline-block w-4 h-4 border-2 border-gray-300 border-t-[var(--color-accent)] rounded-full mr-2"></div>
         {{ loadingMessage }}
       </div>
 
@@ -40,7 +40,7 @@
           v-for="ds in datasets"
           :key="ds.table_name"
           class="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 transition-colors flex items-center justify-between group"
-          :class="{ 'bg-blue-50': ds.file_path === currentDataPath }"
+          :class="{ 'bg-[var(--color-accent-soft)]': ds.file_path === currentDataPath }"
         >
           <button 
             @click="selectDataset(ds)"
@@ -50,7 +50,7 @@
             <!-- Show full path as requested -->
             <p class="text-xs text-gray-500 truncate" :title="ds.file_path">{{ ds.file_path }}</p>
           </button>
-          <svg v-if="ds.file_path === currentDataPath" class="w-4 h-4 text-blue-600 flex-shrink-0 ml-2" fill="currentColor" viewBox="0 0 20 20">
+          <svg v-if="ds.file_path === currentDataPath" class="w-4 h-4 text-[var(--color-accent)] flex-shrink-0 ml-2" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
           </svg>
         </div>
@@ -60,7 +60,7 @@
       <div class="border-t border-gray-100 p-2">
         <button
           @click="openSettings"
-          class="w-full px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors flex items-center justify-center"
+          class="w-full px-3 py-2 text-sm text-[var(--color-accent)] hover:bg-[var(--color-accent-soft)] rounded transition-colors flex items-center justify-center"
         >
           <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />

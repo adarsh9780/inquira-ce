@@ -5,20 +5,20 @@ const UI_COLORS = Object.freeze({
   borderHover: '#D4D4D8',
   textMain: '#27272A',
   textMuted: '#71717A',
-  accent: '#3B82F6',
+  accent: '#D47948',
 })
 
-const FONT_FAMILY = 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+const FONT_FAMILY = 'Ubuntu, "Avenir Next", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
 
 const COLORWAY = Object.freeze([
-  '#3B82F6', // accent blue
+  '#D47948', // brand orange
+  '#3B82F6', // brand blue
   '#0EA5E9', // sky
   '#22C55E', // success green
   '#F59E0B', // warning amber
   '#EF4444', // danger red
   '#14B8A6', // teal
   '#6366F1', // indigo
-  '#84CC16', // lime
 ])
 
 const CARTESIAN_AXIS_KEY = /^(x|y)axis(\d+)?$/i
@@ -26,15 +26,15 @@ const COLOR_AXIS_KEY = /^coloraxis(\d+)?$/i
 const BAR_LIKE_TRACE_TYPES = new Set(['bar', 'histogram', 'funnel', 'waterfall'])
 const BRAND_COLOR_SCALE = Object.freeze({
   sequential: Object.freeze([
-    [0, '#EEF3FF'],
-    [0.35, '#C7D8FF'],
-    [0.68, '#7DA7F8'],
-    [1, '#3B82F6'],
+    [0, '#FFF7ED'],
+    [0.35, '#FED7AA'],
+    [0.68, '#E7A06A'],
+    [1, '#D47948'],
   ]),
   diverging: Object.freeze([
-    [0, '#E26A6A'],
+    [0, '#3B82F6'],
     [0.5, '#FDFCF8'],
-    [1, '#3B82F6'],
+    [1, '#D47948'],
   ]),
 })
 

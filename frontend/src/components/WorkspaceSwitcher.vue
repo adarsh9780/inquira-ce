@@ -14,7 +14,7 @@
     <div v-if="isOpen" class="absolute top-full left-0 mt-1 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
       <div class="p-2 border-b border-gray-100 flex justify-between items-center">
         <span class="text-xs text-gray-500">Workspaces</span>
-        <button class="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700" @click="openCreateDialog">New</button>
+        <button class="text-xs px-2 py-1 rounded bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)]" @click="openCreateDialog">New</button>
       </div>
 
       <div v-if="appStore.workspaceDeletionJobs.length > 0" class="px-3 py-2 border-b border-gray-100 bg-amber-50 text-amber-800 text-xs flex items-center space-x-2">
@@ -32,7 +32,7 @@
           :key="ws.id"
           class="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between cursor-pointer"
           :class="[
-            ws.id === appStore.activeWorkspaceId ? 'bg-blue-50' : '',
+            ws.id === appStore.activeWorkspaceId ? 'bg-[var(--color-accent-soft)]' : '',
             isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : ''
           ]"
           @click="!isWorkspaceDeleting(ws.id) && activateWorkspace(ws.id)"

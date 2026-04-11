@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('sidebar renders minimal explorer style with compact emerald active highlights', () => {
+test('sidebar renders minimal explorer style with compact brand active highlights', () => {
   const unifiedSource = readFileSync(
     resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'),
     'utf-8',
@@ -18,10 +18,10 @@ test('sidebar renders minimal explorer style with compact emerald active highlig
   )
 
   assert.equal(unifiedSource.includes('Workspace explorer'), false)
-  assert.equal(datasetsSource.includes("bg-emerald-50 text-emerald-800"), true)
-  assert.equal(conversationsSource.includes("bg-emerald-50 text-emerald-800"), true)
-  assert.equal(datasetsSource.includes("border-emerald-200"), false)
-  assert.equal(conversationsSource.includes("border-emerald-200"), false)
+  assert.equal(datasetsSource.includes("bg-[var(--color-accent-soft)] text-[var(--color-accent)]"), true)
+  assert.equal(conversationsSource.includes("bg-[var(--color-accent-soft)] text-[var(--color-accent)]"), true)
+  assert.equal(datasetsSource.includes("bg-emerald-50 text-emerald-800"), false)
+  assert.equal(conversationsSource.includes("bg-emerald-50 text-emerald-800"), false)
   assert.equal(datasetsSource.includes('ChevronRightIcon'), true)
   assert.equal(conversationsSource.includes('ChevronRightIcon'), true)
   assert.equal(datasetsSource.includes('text-[11px] uppercase tracking'), true)

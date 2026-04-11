@@ -24,7 +24,7 @@ test('soft plotly theme updates colors without forcing typography sizes', () => 
   assert.equal(themed.layout.plot_bgcolor, '#FFFFFF')
   assert.deepEqual(
     themed.layout.colorway,
-    ['#3B82F6', '#0EA5E9', '#22C55E', '#F59E0B', '#EF4444', '#14B8A6', '#6366F1', '#84CC16'],
+    ['#D47948', '#3B82F6', '#0EA5E9', '#22C55E', '#F59E0B', '#EF4444', '#14B8A6', '#6366F1'],
   )
   assert.equal(themed.layout.font.size, 18)
   assert.equal(themed.layout.font.color, '#27272A')
@@ -36,10 +36,10 @@ test('soft plotly theme updates colors without forcing typography sizes', () => 
   assert.deepEqual(
     themed.layout.colorscale.sequential,
     [
-      [0, '#EEF3FF'],
-      [0.35, '#C7D8FF'],
-      [0.68, '#7DA7F8'],
-      [1, '#3B82F6'],
+      [0, '#FFF7ED'],
+      [0.35, '#FED7AA'],
+      [0.68, '#E7A06A'],
+      [1, '#D47948'],
     ],
   )
   assert.deepEqual(input, original)
@@ -56,7 +56,7 @@ test('hard plotly theme adds sensible layout defaults for chart readability', ()
 
   const themed = applyPlotlyTheme(input, { mode: PLOTLY_THEME_MODE.HARD, context: 'panel' })
 
-  assert.equal(themed.layout.font.family.includes('Inter'), true)
+  assert.equal(themed.layout.font.family.includes('Ubuntu'), true)
   assert.equal(themed.layout.font.size, 12)
   assert.equal(themed.layout.title.font.size, 14)
   assert.equal(themed.layout.title.x, 0.02)
@@ -124,7 +124,7 @@ test('single bar trace collapses continuous bar coloring into one UI accent colo
 
   const themed = applyPlotlyTheme(input, { mode: PLOTLY_THEME_MODE.SOFT })
 
-  assert.equal(themed.data[0].marker.color, '#3B82F6')
+  assert.equal(themed.data[0].marker.color, '#D47948')
   assert.equal(themed.data[0].marker.colorscale, undefined)
   assert.equal(themed.data[0].marker.colorbar, undefined)
   assert.equal(themed.data[0].marker.cmin, undefined)

@@ -23,7 +23,7 @@
             :key="conv.id"
             type="button"
             class="mb-2 w-full rounded-lg border px-3 py-2 text-left hover:bg-gray-50"
-            :class="conv.id === activeConversationId ? 'border-blue-300 bg-blue-50' : 'border-gray-200'"
+            :class="conv.id === activeConversationId ? 'border-[var(--color-accent-border)] bg-[var(--color-accent-soft)]' : 'border-gray-200'"
             @click="selectConversation(conv.id)"
           >
             <p class="truncate text-sm font-medium text-gray-800">{{ conv.title || 'Conversation' }}</p>

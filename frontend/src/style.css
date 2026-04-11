@@ -1,16 +1,16 @@
 @import "tailwindcss";
 
 @theme {
-  /* Minimal, strict color palette inspired by Cursor/Vercel */
+  /* Brand-aligned product palette shared with the public site */
   --color-base: #FDFCF8;
   /* Warm pastel yellow tint for the main app background */
   --color-surface: #FFFFFF;
   /* Pure white for cards, sidebars, and main panes */
 
-  --color-primary-900: #18181B;
-  /* Zinc 900 - Almost black for main buttons and heavy text */
-  --color-primary-800: #27272A;
-  /* Zinc 800 - Hover state for primary buttons */
+  --color-primary-900: #D47948;
+  /* Soft brand orange for primary actions */
+  --color-primary-800: #CC8252;
+  /* Slightly deeper orange for primary hover states */
 
   --color-border: #E4E4E7;
   /* Zinc 200 - Clean, subtle borders */
@@ -22,8 +22,11 @@
   --color-text-muted: #71717A;
   /* Zinc 500 - Secondary text */
 
-  --color-accent: #3B82F6;
-  /* Blue 500 - Only use for strictly necessary highlights like active rings */
+  --color-accent: #D47948;
+  /* Brand orange - use for selected states, focus rings, and key highlights */
+  --color-accent-hover: #CC8252;
+  --color-accent-soft: #FFF7ED;
+  --color-accent-border: #FED7AA;
 
   /* Status Colors */
   --color-success: #16A34A;
@@ -32,12 +35,12 @@
   /* Red 600 */
   --color-warning: #D97706;
   /* Amber 600 */
-  --color-chat-user-bubble: #EDE9DE;
-  /* User chat bubble and matched hover affordance */
+  --color-chat-user-bubble: #FFF7ED;
+  /* User chat bubble and matched orange-tinted hover affordance */
 
   /* Typography */
-  --font-ui: "Plus Jakarta Sans", "Inter", "Avenir Next", "Segoe UI", sans-serif;
-  --font-display: "Plus Jakarta Sans", "Inter", "Avenir Next", "Segoe UI", sans-serif;
+  --font-ui: "Ubuntu", "Avenir Next", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: "Ubuntu", "Avenir Next", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
@@ -69,12 +72,20 @@ body {
 
   /* Base Button - The foundation for all interactive elements */
   .btn {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2;
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+    --tw-ring-color: var(--color-accent);
   }
 
   /* Primary Button - High emphasis actions (e.g., Save, Submit, Create) */
   .btn-primary {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none bg-zinc-900 text-white shadow-sm hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-900;
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed border;
+    background-color: var(--color-primary-900);
+    border-color: var(--color-primary-900);
+  }
+
+  .btn-primary:hover {
+    background-color: var(--color-primary-800);
+    border-color: var(--color-primary-800);
   }
 
   /* Secondary Button - Medium emphasis actions (e.g., Cancel, Refresh) */

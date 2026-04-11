@@ -61,15 +61,15 @@
           :key="ds.table_name"
           type="button"
           class="group/item relative flex items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors text-xs"
-          :class="isSelectedDataset(ds) ? 'bg-emerald-50 text-emerald-800' : 'text-zinc-600 hover:bg-zinc-100/60 hover:text-zinc-800'"
+          :class="isSelectedDataset(ds) ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : 'text-zinc-600 hover:bg-zinc-100/60 hover:text-zinc-800'"
           @click="selectDataset(ds)"
         >
-          <CircleStackIcon class="w-3.5 h-3.5 shrink-0" :class="isSelectedDataset(ds) ? 'text-emerald-600' : 'text-zinc-400'" />
+          <CircleStackIcon class="w-3.5 h-3.5 shrink-0" :class="isSelectedDataset(ds) ? 'text-[var(--color-accent)]' : 'text-zinc-400'" />
           <div class="min-w-0 flex-1">
             <p class="truncate" :class="isSelectedDataset(ds) ? 'font-semibold' : 'font-medium'">
               {{ ds.table_name }}
             </p>
-            <p v-if="ds.file_path" class="truncate text-[10px]" :class="isSelectedDataset(ds) ? 'text-emerald-700/70' : 'text-zinc-400'">
+            <p v-if="ds.file_path" class="truncate text-[10px]" :class="isSelectedDataset(ds) ? 'text-[var(--color-accent)] opacity-75' : 'text-zinc-400'">
               {{ datasetCaption(ds.file_path) }}
             </p>
           </div>

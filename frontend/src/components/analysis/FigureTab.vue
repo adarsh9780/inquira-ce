@@ -684,7 +684,7 @@ async function downloadHtml() {
         body {
             margin: 0;
             padding: 20px;
-            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: Ubuntu, "Avenir Next", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
             background: #FDFCF8;
             color: #27272A;
         }

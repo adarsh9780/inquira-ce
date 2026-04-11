@@ -66,12 +66,12 @@
                   class="group/item flex items-center justify-between gap-2 rounded-lg px-3 py-2 transition-colors"
                   :class="[
                     active ? 'bg-zinc-100/80' : '',
-                    selected ? 'bg-emerald-50 text-emerald-800' : '',
+                    selected ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : '',
                     isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
                   ]"
                 >
                   <div class="flex items-center gap-2 min-w-0 flex-1">
-                    <CheckCircleIcon v-if="selected" class="w-4 h-4 shrink-0 text-emerald-600" />
+                    <CheckCircleIcon v-if="selected" class="w-4 h-4 shrink-0 text-[var(--color-accent)]" />
                     <BuildingOffice2Icon v-else class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
                     <span class="truncate text-sm" :class="selected ? 'font-semibold' : 'font-medium'">{{ ws.name }}</span>
                   </div>

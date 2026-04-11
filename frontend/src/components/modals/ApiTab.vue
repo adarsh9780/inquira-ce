@@ -28,7 +28,7 @@
             >
               <span v-if="!isRefreshingModels">Refresh Models</span>
               <span v-else class="inline-flex items-center">
-                <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-700 mr-2"></div>
+                <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-[var(--color-accent)] mr-2"></div>
                 Refreshing...
               </span>
             </button>
@@ -77,7 +77,7 @@
               >
                 <span v-if="!isSavingApiKey">Save Key</span>
                 <span v-else class="inline-flex items-center">
-                  <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-700 mr-2"></div>
+                  <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-[var(--color-accent)] mr-2"></div>
                   Saving...
                 </span>
               </button>
@@ -90,7 +90,7 @@
               >
                 <span v-if="!isTestingApiKey">Test</span>
                 <span v-else class="inline-flex items-center">
-                  <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-700 mr-2"></div>
+                  <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-[var(--color-accent)] mr-2"></div>
                   Testing...
                 </span>
               </button>

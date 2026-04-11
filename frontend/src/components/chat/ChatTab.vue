@@ -6,7 +6,7 @@
           <div class="flex items-center gap-1 bg-zinc-50 p-1 rounded-xl border border-zinc-200">
             <button
               type="button"
-              class="btn-icon hover:text-blue-600 hover:bg-white hover:shadow-sm"
+              class="btn-icon hover:text-[var(--color-accent)] hover:bg-white hover:shadow-sm"
               @click="createConversation"
               :disabled="!appStore.hasWorkspace"
               title="New Conversation"
@@ -52,7 +52,7 @@
         <div v-else-if="appStore.chatHistory.length === 0" class="flex items-center justify-center h-full px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-2 sm:pb-3 lg:pb-4">
           <div class="text-center max-w-md">
             <div class="mx-auto flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 mb-4 sm:mb-6 shadow-lg">
-              <ChatBubbleLeftRightIcon class="h-8 w-8 sm:h-10 sm:w-10 text-blue-600" />
+              <ChatBubbleLeftRightIcon class="h-8 w-8 sm:h-10 sm:w-10 text-[var(--color-accent)]" />
             </div>
             <h3 class="text-xl sm:text-2xl font-bold mb-2 sm:mb-3" style="color: var(--color-text-main);">Start Your Analysis</h3>
             <p class="text-sm sm:text-base leading-relaxed" style="color: var(--color-text-muted);">

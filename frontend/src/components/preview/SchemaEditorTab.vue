@@ -20,7 +20,7 @@
         >
           <div class="relative overflow-hidden rounded-2xl shadow-2xl border w-full max-w-md mx-4" style="background: linear-gradient(180deg, var(--color-surface) 0%, color-mix(in srgb, var(--color-surface) 95%, var(--color-base)) 100%); border-color: color-mix(in srgb, var(--color-border) 50%, transparent);">
             <!-- Accent line -->
-            <div class="absolute top-0 left-0 right-0 h-1" style="background: linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 60%, #8b5cf6), var(--color-accent));"></div>
+            <div class="absolute top-0 left-0 right-0 h-1" style="background: linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 60%, #f97316), var(--color-accent));"></div>
             
             <div class="px-6 py-6">
               <div class="flex items-start justify-between gap-4 mb-5">
@@ -40,7 +40,7 @@
                   class="h-full rounded-full transition-all duration-500 ease-out"
                   :style="{
                     width: `${regenerationProgress}%`,
-                    background: 'linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 70%, #8b5cf6))',
+                    background: 'linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 70%, #f97316))',
                     boxShadow: '0 0 12px color-mix(in srgb, var(--color-accent) 50%, transparent)',
                   }"
                 ></div>
@@ -146,7 +146,7 @@
             :disabled="schemaLoading || !schemaEdited || !hasActiveDataset"
             class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
             :class="schemaEdited && hasActiveDataset && !schemaLoading ? 'hover:shadow-md hover:-translate-y-0.5' : ''"
-            style="background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 85%, #8b5cf6)); color: white; box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 30%, transparent);"
+            style="background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 85%, #f97316)); color: white; box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 30%, transparent);"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -392,7 +392,7 @@
                   @click.stop
                 >
                   <!-- Accent gradient top bar -->
-                  <div class="absolute top-0 left-0 right-0 h-1" style="background: linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 60%, #8b5cf6), var(--color-accent));"></div>
+                  <div class="absolute top-0 left-0 right-0 h-1" style="background: linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 60%, #f97316), var(--color-accent));"></div>
                   
                   <!-- Header -->
                   <div class="px-6 pt-6 pb-5" style="border-bottom: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);">
@@ -470,7 +470,7 @@
                     <button
                       @click="saveEditDialog"
                       class="rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5"
-                      style="background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 85%, #8b5cf6)); color: white; box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 30%, transparent);"
+                      style="background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 85%, #f97316)); color: white; box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 30%, transparent);"
                     >
                       Save Changes
                     </button>

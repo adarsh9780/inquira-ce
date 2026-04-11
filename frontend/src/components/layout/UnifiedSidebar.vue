@@ -98,8 +98,8 @@
                 @click="selectDataset(ds)"
               >
                 <div class="min-w-0 flex-1">
-                  <p class="truncate text-[13px] font-normal" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-700' : ''" style="color: var(--color-text-main);">{{ ds.table_name }}</p>
-                  <p v-if="ds.file_path" class="truncate text-[10px]" :class="appStore.activeDatasetId === ds.table_name ? 'text-emerald-700/70' : ''" style="color: var(--color-text-muted);">{{ ds.file_path }}</p>
+                  <p class="truncate text-[13px] font-normal" :class="appStore.activeDatasetId === ds.table_name ? 'text-[var(--color-accent)]' : ''" style="color: var(--color-text-main);">{{ ds.table_name }}</p>
+                  <p v-if="ds.file_path" class="truncate text-[10px]" :class="appStore.activeDatasetId === ds.table_name ? 'text-[var(--color-accent)] opacity-75' : ''" style="color: var(--color-text-muted);">{{ ds.file_path }}</p>
                 </div>
                 <button
                   @click.stop="confirmDeleteDataset(ds.table_name)"
@@ -169,7 +169,7 @@
                     <template v-else>
                       <p
                         class="truncate text-[13px] font-normal"
-                        :class="conv.id === appStore.activeConversationId ? 'text-emerald-700' : ''"
+                        :class="conv.id === appStore.activeConversationId ? 'text-[var(--color-accent)]' : ''"
                         :title="conv.title || 'Untitled'"
                       >
                         {{ conv.title || 'Untitled' }}
@@ -180,7 +180,7 @@
                 <div v-if="editingId !== conv.id" class="flex-shrink-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     @click.stop="startEditing(conv)"
-                    class="btn-icon p-1 rounded hover:text-blue-600"
+                    class="btn-icon p-1 rounded hover:text-[var(--color-accent)]"
                     style="color: var(--color-text-muted);"
                     title="Rename Conversation"
                   >

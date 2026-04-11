@@ -19,7 +19,7 @@
           <button
             @click="syncTableNameInCode"
             title="Sync table name in code to current data file"
-            class="btn-icon hover:bg-white hover:text-blue-600 hover:shadow-sm"
+            class="btn-icon hover:bg-white hover:text-[var(--color-accent)] hover:shadow-sm"
           >
             <ArrowPathIcon class="h-4 w-4" />
           </button>
@@ -30,7 +30,7 @@
             @click="undo"
             :disabled="!canUndo"
             class="btn-icon"
-            :class="canUndo ? 'hover:bg-white hover:text-blue-600 hover:shadow-sm' : ''"
+            :class="canUndo ? 'hover:bg-white hover:text-[var(--color-accent)] hover:shadow-sm' : ''"
             title="Undo (Ctrl+Z)"
           >
             <ArrowUturnLeftIcon class="h-4 w-4" />
@@ -40,7 +40,7 @@
             @click="redo"
             :disabled="!canRedo"
             class="btn-icon"
-            :class="canRedo ? 'hover:bg-white hover:text-blue-600 hover:shadow-sm' : ''"
+            :class="canRedo ? 'hover:bg-white hover:text-[var(--color-accent)] hover:shadow-sm' : ''"
             title="Redo (Ctrl+Y)"
           >
             <ArrowUturnRightIcon class="h-4 w-4" />
@@ -52,7 +52,7 @@
             @click="downloadCode"
             :disabled="!appStore.pythonFileContent"
             class="btn-icon"
-            :class="appStore.pythonFileContent ? 'hover:bg-white hover:text-blue-600 hover:shadow-sm' : ''"
+            :class="appStore.pythonFileContent ? 'hover:bg-white hover:text-[var(--color-accent)] hover:shadow-sm' : ''"
             title="Download code"
           >
             <ArrowDownTrayIcon class="h-4 w-4" />
@@ -72,7 +72,7 @@
           class="flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm"
           style="background-color: color-mix(in srgb, var(--color-surface) 92%, white); border-color: var(--color-border); color: var(--color-text-main);"
         >
-          <div class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
+          <div class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-[var(--color-accent)]"></div>
           <span>Generating code...</span>
         </div>
       </div>
