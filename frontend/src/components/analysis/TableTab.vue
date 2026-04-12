@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col h-full">
+  <div class="flex flex-col h-full" style="background-color: #FAF9F6;">
     <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'table'">
       <div class="flex min-w-0 items-center justify-end w-full gap-3">
         <!-- Loading / error status (left) -->
@@ -89,7 +89,7 @@
       </div>
     </Teleport>
 
-    <div class="flex-1 relative mt-1">
+    <div class="flex-1 relative mt-1 table-pane-surface">
       <!-- Grid: infinite model -->
       <ag-grid-vue
         v-if="selectedArtifactId && hasRenderableRows && useInfiniteModel"
@@ -1281,39 +1281,71 @@ async function deleteSelectedArtifact() {
 
 <style>
 .ag-theme-quartz {
-  --ag-background-color: #FFFFFF;
-  --ag-header-background-color: #F4F4F5;
+  --ag-background-color: #FAF9F6;
+  --ag-header-background-color: #EFEDE8;
   --ag-header-height: 34px;
   --ag-row-height: 30px;
   --ag-grid-size: 4px;
   --ag-cell-horizontal-padding: 8px;
   --ag-header-cell-horizontal-padding: 8px;
-  --ag-odd-row-background-color: #FFFFFF;
-  --ag-even-row-background-color: #FAFAFA;
-  --ag-row-hover-color: #F5F5F5;
-  --ag-selected-row-background-color: #F1F5F9;
-  --ag-border-color: #E4E4E7;
-  --ag-header-foreground-color: #3f3f46;
-  --ag-foreground-color: #18181B;
-  --ag-secondary-foreground-color: #52525B;
-  --ag-input-focus-border-color: #A1A1AA;
-  --ag-range-selection-border-color: #D4D4D8;
-  --ag-cell-horizontal-border: solid #E4E4E7;
-  --ag-header-column-separator-color: #E4E4E7;
+  --ag-odd-row-background-color: #FAF9F6;
+  --ag-even-row-background-color: #F7F5F0;
+  --ag-row-hover-color: #F3F0E9;
+  --ag-selected-row-background-color: #F2E5DF;
+  --ag-border-color: #E5E3DC;
+  --ag-header-foreground-color: #1A1915;
+  --ag-foreground-color: #1A1915;
+  --ag-secondary-foreground-color: #6E6A60;
+  --ag-input-focus-border-color: #D97757;
+  --ag-range-selection-border-color: #D7D3C8;
+  --ag-cell-horizontal-border: solid #E5E3DC;
+  --ag-header-column-separator-color: #E5E3DC;
   --ag-header-column-separator-display: block;
+  --ag-icon-color: #7A7467;
+  --ag-active-color: #D97757;
 }
 
 .ag-theme-quartz .ag-header {
-  border-bottom: 1px solid #E4E4E7;
+  border-bottom: 1px solid #E5E3DC;
+  font-weight: 500;
 }
 
 .ag-theme-quartz .ag-cell,
 .ag-theme-quartz .ag-header-cell {
-  border-right: 1px solid #E4E4E7;
+  border-right: 1px solid #E5E3DC;
 }
 
 .ag-theme-quartz .ag-row .ag-cell:last-child,
 .ag-theme-quartz .ag-header-row .ag-header-cell:last-child {
   border-right: none;
+}
+
+.ag-theme-quartz .ag-icon {
+  color: #7A7467;
+}
+
+.ag-theme-quartz .ag-header-cell-sorted-asc .ag-icon,
+.ag-theme-quartz .ag-header-cell-sorted-desc .ag-icon,
+.ag-theme-quartz .ag-header-cell-filtered .ag-icon {
+  color: #D97757;
+}
+
+.ag-theme-quartz .ag-root-wrapper,
+.ag-theme-quartz .ag-root,
+.ag-theme-quartz .ag-center-cols-viewport,
+.ag-theme-quartz .ag-center-cols-container,
+.ag-theme-quartz .ag-body-viewport,
+.ag-theme-quartz .ag-body {
+  background-color: #FAF9F6;
+}
+
+.ag-theme-quartz .ag-paging-panel {
+  background-color: #EFEDE8;
+  border-top: 1px solid #E5E3DC;
+  color: #1A1915;
+}
+
+.table-pane-surface {
+  background-color: #FAF9F6;
 }
 </style>

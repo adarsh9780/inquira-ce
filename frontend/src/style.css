@@ -1,41 +1,41 @@
 @import "tailwindcss";
 
 @theme {
-  --color-shell-backdrop: #F3F4F6;
+  --color-shell-backdrop: #F5F4EF;
   /* Subtle neutral backdrop behind the pane layout */
-  --color-sidebar-surface: #F7F7F8;
+  --color-sidebar-surface: #EFEDE8;
   /* Slightly darker navigation surface for visual elevation */
-  --color-workspace-surface: #FFFFFF;
+  --color-workspace-surface: #FAF9F6;
   /* Active workspace surface (center and right panes) */
 
   /* Brand-aligned product palette shared with the public site */
-  --color-base: #FFFFFF;
-  /* Pure white for the main app background */
-  --color-surface: #FFFFFF;
-  /* Pure white for cards, sidebars, and main panes */
+  --color-base: #FAF9F6;
+  /* Warm off-white for the main app background */
+  --color-surface: #F5F4EF;
+  /* Warm neutral for controls/cards */
 
-  --color-primary-900: #D47948;
-  /* Soft brand orange for primary actions */
-  --color-primary-800: #CC8252;
-  /* Slightly deeper orange for primary hover states */
+  --color-primary-900: #D97757;
+  /* Warm terracotta for primary actions */
+  --color-primary-800: #C96647;
+  /* Slightly deeper terracotta for hover states */
 
-  --color-border: #E4E4E7;
-  /* Zinc 200 - Clean, subtle borders */
-  --color-border-hover: #D4D4D8;
-  /* Zinc 300 - Slightly darker borders on hover */
+  --color-border: #E5E3DC;
+  /* Soft warm gray borders/dividers */
+  --color-border-hover: #D7D3C8;
+  /* Slightly stronger warm divider */
 
-  --color-text-main: #18181B;
-  /* Zinc 900 - Strong body text for pale app surfaces */
-  --color-text-muted: #52525B;
-  /* Zinc 600 - Secondary text with better contrast */
+  --color-text-main: #1A1915;
+  /* Warm charcoal for primary text */
+  --color-text-muted: #6E6A60;
+  /* Warm muted text */
 
-  --color-accent: #D47948;
-  /* Brand orange - use for selected states, focus rings, and key highlights */
-  --color-accent-hover: #CC8252;
-  --color-accent-text: #7C2D12;
-  /* Deep orange for selected text on pale accent surfaces */
-  --color-accent-soft: #FFF7ED;
-  --color-accent-border: #FED7AA;
+  --color-accent: #D97757;
+  /* Terracotta accent for active states and CTAs */
+  --color-accent-hover: #C96647;
+  --color-accent-text: #7A3E2C;
+  /* Deep terracotta text on soft accent surfaces */
+  --color-accent-soft: #F8E6DF;
+  --color-accent-border: #E8C5B8;
 
   /* Status Colors */
   --color-success: #16A34A;
@@ -44,8 +44,8 @@
   /* Red 600 */
   --color-warning: #D97706;
   /* Amber 600 */
-  --color-chat-user-bubble: #FFF7ED;
-  /* User chat bubble and matched orange-tinted hover affordance */
+  --color-chat-user-bubble: #F8E6DF;
+  /* Warm user-turn bubble surface */
 
   /* Typography */
   --font-ui: "Ubuntu", "Avenir Next", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;

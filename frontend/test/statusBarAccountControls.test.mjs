@@ -17,7 +17,8 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
   assert.equal(statusBarSource.includes('@click.stop="toggleSidebarFromStatusBar"'), true)
   assert.equal(statusBarSource.includes('toggleAccountMenu'), false)
   assert.equal(statusBarSource.includes('accountMenuRef'), false)
-  assert.equal(statusBarSource.includes('aria-label="Open sidebar"'), true)
+  assert.equal(statusBarSource.includes(':aria-label="sidebarToggleTitle"'), true)
+  assert.equal(statusBarSource.includes(':title="sidebarToggleTitle"'), true)
 
   // No dropdown-related elements
   assert.equal(statusBarSource.includes('Open account menu'), false)
@@ -42,7 +43,7 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
   assert.equal(statusBarSource.includes('DocumentTextIcon'), true)
 
   // Check Workspace/Schema toggle appears before Kernel Status in the left section
-  const accountNameIndex = statusBarSource.indexOf('Open sidebar')
+  const accountNameIndex = statusBarSource.indexOf('@click.stop="toggleSidebarFromStatusBar"')
   const workspaceToggleIndex = statusBarSource.indexOf('switchToWorkspace')
   const kernelStatusIndex = statusBarSource.indexOf('<!-- Kernel Status -->')
   assert.equal(workspaceToggleIndex > accountNameIndex && workspaceToggleIndex < kernelStatusIndex, true)

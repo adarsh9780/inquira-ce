@@ -22,6 +22,6 @@ test('markdown code fences render editor-like block with copy icon and delegated
   assert.equal(source.includes("Prism.highlight(rawCode, grammar, 'python')"), true)
   assert.equal(source.includes('class="language-python" v-html="renderCodeSnapshot(message.codeSnapshot)"'), true)
   assert.equal(source.includes(':deep(.chat-code-block)'), true)
-  assert.equal(source.includes('background-color: #fdfcfb;'), true)
-  assert.equal(source.includes('background-color: #f3f3ed;'), true)
+  assert.equal(source.includes('background-color: #FAF9F6;'), true)
+  assert.equal(source.includes('background-color: #EFEDE8;'), true)
 })

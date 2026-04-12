@@ -8,8 +8,8 @@
         v-if="authStore.isAuthenticated"
         @click.stop="toggleSidebarFromStatusBar"
         class="flex items-center gap-1 max-w-[150px] truncate px-1 text-[var(--color-accent)] text-left rounded hover:bg-[var(--color-base)] transition-colors"
-        title="Open sidebar"
-        aria-label="Open sidebar"
+        :title="sidebarToggleTitle"
+        :aria-label="sidebarToggleTitle"
       >
         <span class="truncate">{{ accountDisplayLabel }}</span>
         <ChevronLeftIcon v-if="!appStore.isSidebarCollapsed" class="w-3.5 h-3.5 shrink-0" />
@@ -97,7 +97,7 @@
              :class="artifactCountClass">
           <span>{{ paneArtifactCountLabel }}</span>
         </div>
-        <div v-if="appStore.activeWorkspaceId && tableViewportLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-[var(--color-accent)]/10 text-[var(--color-accent)]">
+        <div v-if="appStore.activeWorkspaceId && tableViewportLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium" :class="artifactCountClass">
           <span>{{ tableViewportLabel }}</span>
         </div>
         <div
@@ -297,8 +297,8 @@ const paneArtifactCountLabel = computed(() => {
 })
 
 const artifactCountClass = computed(() => {
-  // Subtle muted pill — informational, not actionable
-  return 'bg-[var(--color-base)] text-[var(--color-text-muted)]'
+  // Neutral metadata badge — informational, not an accent action.
+  return 'bg-[var(--color-surface)] text-[var(--color-text-muted)] border border-[var(--color-border)]'
 })
 
 const showArtifactUsageWarning = computed(() => {

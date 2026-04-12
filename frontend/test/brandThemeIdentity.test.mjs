@@ -8,14 +8,15 @@ test('app theme uses Ubuntu and the orange brand accent from the public site', (
 
   assert.equal(styleSource.includes('--font-ui: "Ubuntu"'), true)
   assert.equal(styleSource.includes('--font-display: "Ubuntu"'), true)
-  assert.equal(styleSource.includes('--color-base: #FFFFFF;'), true)
-  assert.equal(styleSource.includes('--color-text-main: #18181B;'), true)
-  assert.equal(styleSource.includes('--color-text-muted: #52525B;'), true)
-  assert.equal(styleSource.includes('--color-accent: #D47948;'), true)
-  assert.equal(styleSource.includes('--color-accent-text: #7C2D12;'), true)
-  assert.equal(styleSource.includes('--color-accent-soft: #FFF7ED;'), true)
-  assert.equal(styleSource.includes('--color-primary-900: #D47948;'), true)
-  assert.equal(styleSource.includes('--color-chat-user-bubble: #FFF7ED;'), true)
+  assert.equal(styleSource.includes('--color-base: #FAF9F6;'), true)
+  assert.equal(styleSource.includes('--color-sidebar-surface: #EFEDE8;'), true)
+  assert.equal(styleSource.includes('--color-text-main: #1A1915;'), true)
+  assert.equal(styleSource.includes('--color-text-muted: #6E6A60;'), true)
+  assert.equal(styleSource.includes('--color-accent: #D97757;'), true)
+  assert.equal(styleSource.includes('--color-accent-text: #7A3E2C;'), true)
+  assert.equal(styleSource.includes('--color-accent-soft: #F8E6DF;'), true)
+  assert.equal(styleSource.includes('--color-primary-900: #D97757;'), true)
+  assert.equal(styleSource.includes('--color-chat-user-bubble: #F8E6DF;'), true)
 })
 
 test('desktop favicon follows the blue-orange Inquira brand mark', () => {
@@ -34,6 +35,6 @@ test('native splash screen mirrors the branded font and accent', () => {
   const splashSource = readFileSync(resolve(process.cwd(), 'public/splash.html'), 'utf-8')
 
   assert.equal(splashSource.includes('font-family: "Ubuntu"'), true)
-  assert.equal(splashSource.includes('--color-accent: #D47948;'), true)
+  assert.equal(splashSource.includes('--color-accent: #D97757;'), true)
   assert.equal(splashSource.includes('background: var(--color-accent);'), true)
 })

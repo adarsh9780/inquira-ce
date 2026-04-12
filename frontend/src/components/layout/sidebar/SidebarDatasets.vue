@@ -69,7 +69,12 @@
             <p class="truncate" :class="isSelectedDataset(ds) ? 'font-semibold' : 'font-medium'" :title="ds.table_name">
               {{ datasetFriendlyName(ds.table_name) }}
             </p>
-            <p v-if="ds.file_path" class="truncate text-[10px]" :class="isSelectedDataset(ds) ? 'text-[var(--color-accent)] opacity-75' : 'text-zinc-400'">
+            <p
+              v-if="ds.file_path"
+              class="truncate text-[10px]"
+              :class="isSelectedDataset(ds) ? 'text-[var(--color-accent)] opacity-75' : 'text-zinc-400'"
+              :title="ds.file_path"
+            >
               {{ datasetCaption(ds.file_path) }}
             </p>
           </div>
@@ -122,7 +127,7 @@ function datasetCaption(path) {
   const normalized = String(path || '').trim().replace(/\\/g, '/')
   if (!normalized) return ''
   const parts = normalized.split('/').filter(Boolean)
-  return parts.slice(-2).join('/')
+  return parts[parts.length - 1] || normalized
 }
 
 function datasetFriendlyName(tableName) {

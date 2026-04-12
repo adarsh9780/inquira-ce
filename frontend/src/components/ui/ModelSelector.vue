@@ -4,13 +4,14 @@
       <div class="relative">
         <!-- Text-only trigger (Cursor-style: "Model Name ↓") -->
         <ListboxButton
-          class="flex items-center gap-1 text-xs font-medium transition-colors focus:outline-none group"
-          style="color: var(--color-text-muted);"
+          class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none group"
+          style="color: var(--color-text-main); border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-surface) 88%, var(--color-workspace-surface));"
+          title="Select model"
         >
-          <span class="truncate max-w-[160px]" style="color: var(--color-text-muted);">
+          <span class="truncate max-w-[170px]" style="color: var(--color-text-main);">
             {{ getModelDisplayName(selectedModel) }}
           </span>
-          <ChevronUpIcon class="h-3 w-3 shrink-0 transition-transform group-data-[open]:rotate-180" style="color: var(--color-text-muted);" />
+          <ChevronDownIcon class="h-3.5 w-3.5 shrink-0 transition-transform group-data-[open]:rotate-180" style="color: var(--color-text-muted);" />
         </ListboxButton>
 
         <transition
@@ -23,7 +24,7 @@
         >
           <ListboxOptions
             class="absolute z-50 bottom-full mb-2 right-0 min-w-[200px] rounded-lg py-1 text-xs shadow-md focus:outline-none overflow-hidden"
-            style="background-color: var(--color-surface); border: 1px solid var(--color-border);"
+            style="background-color: var(--color-workspace-surface); border: 1px solid var(--color-border);"
           >
             <ListboxOption
               v-slot="{ active, selected }"
@@ -34,7 +35,7 @@
             >
               <li
                 :style="{
-                  backgroundColor: active ? 'color-mix(in srgb, var(--color-text-main) 6%, transparent)' : 'transparent',
+                  backgroundColor: active ? 'color-mix(in srgb, var(--color-surface) 78%, transparent)' : 'transparent',
                   color: 'var(--color-text-main)'
                 }"
                 class="relative cursor-default select-none py-2 pl-3 pr-9 flex items-center justify-between"
@@ -62,7 +63,7 @@ import {
   ListboxOptions,
   ListboxOption,
 } from '@headlessui/vue'
-import { CheckIcon, ChevronUpIcon } from '@heroicons/vue/20/solid'
+import { CheckIcon, ChevronDownIcon } from '@heroicons/vue/20/solid'
 
 const props = defineProps({
   selectedModel: {

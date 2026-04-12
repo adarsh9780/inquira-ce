@@ -26,7 +26,16 @@
     >
       <!-- User Message -->
       <div class="w-full mb-1">
-        <div class="px-3 py-2.5 rounded-2xl rounded-tl-sm" style="background-color: var(--color-chat-user-bubble);">
+        <div class="user-turn-bubble px-3 py-2.5 rounded-2xl rounded-tl-sm">
+          <button
+            @click.stop="copyQuestion(message.question)"
+            type="button"
+            aria-label="Copy question"
+            class="user-turn-copy-btn"
+            title="Copy question"
+          >
+            <DocumentDuplicateIcon class="h-3.5 w-3.5" />
+          </button>
           <div v-if="message.attachments && message.attachments.length" class="mb-3 grid grid-cols-2 gap-2">
             <img
               v-for="attachment in message.attachments"
@@ -43,57 +52,36 @@
             v-html="renderQuestionWithHighlights(message.question)"
           ></p>
         </div>
-        <div class="flex items-center justify-between mt-1 px-1">
+        <div class="mt-1 px-1">
           <p class="text-xs" style="color: var(--color-text-muted);">{{ formatTimestamp(message.timestamp) }}</p>
-          <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-            <button
-              @click="copyQuestion(message.question)"
-              type="button"
-              aria-label="Copy question"
-              class="btn-icon text-xs p-1"
-              title="Copy question"
-            >
-              <DocumentDuplicateIcon class="h-3 w-3" />
-            </button>
-          </div>
         </div>
       </div>
 
       <!-- Assistant Response -->
       <div v-if="hasAssistantContent(message)" class="w-full group">
         <div class="px-3 py-2.5 rounded-2xl rounded-tl-sm" style="background-color: transparent">
-          <div v-if="SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length" class="space-y-3">
-            <div v-for="row in ephemeralRows(message)" :key="row.id">
+          <div v-if="SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length" class="space-y-2">
+            <div v-for="row in ephemeralRows(message)" :key="row.id" class="thinking-block">
               <button
                 v-if="row.output"
                 type="button"
-                class="inline-flex items-center gap-1.5 text-sm font-medium"
-                style="color: var(--color-text-muted);"
+                class="thinking-toggle"
                 @click="toggleEphemeralRow(row.id)"
               >
-                <ChevronRightIcon
-                  v-if="!isEphemeralRowExpanded(row.id)"
-                  class="h-3.5 w-3.5"
-                  aria-hidden="true"
-                />
-                <ChevronDownIcon
-                  v-else
-                  class="h-3.5 w-3.5"
-                  aria-hidden="true"
-                />
+                <span class="thinking-chevron" aria-hidden="true">&gt;</span>
                 <span>{{ row.summary }}</span>
+                <span class="thinking-caret" aria-hidden="true">{{ isEphemeralRowExpanded(row.id) ? '▾' : '▸' }}</span>
               </button>
               <p
                 v-else
-                class="text-sm font-medium"
-                style="color: var(--color-text-muted);"
+                class="thinking-static"
               >
+                <span class="thinking-chevron" aria-hidden="true">&gt;</span>
                 {{ row.summary }}
               </p>
               <div
                 v-if="row.output && isEphemeralRowExpanded(row.id)"
-                class="mt-1 pl-5 chat-markdown-content text-sm leading-relaxed max-w-none"
-                style="color: var(--color-text-main);"
+                class="thinking-output chat-markdown-content text-sm leading-relaxed max-w-none"
               >
                 <div v-html="renderMarkdown(row.output)"></div>
               </div>
@@ -129,18 +117,18 @@
             <div v-html="renderMarkdown(message.explanation)"></div>
           </div>
 
-          <div v-if="tableUsageSummary(message)" class="mt-3 rounded-xl border px-3 py-2 text-xs" style="border-color: var(--color-border); color: var(--color-text-muted);">
-            {{ tableUsageSummary(message) }}
-          </div>
-
-          <details v-if="shouldRenderCodeDetails(message)" class="mt-3 rounded-xl border code-details-panel" style="border-color: var(--color-border);">
-            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium" style="color: var(--color-text-main);">
-              <span class="inline-flex items-center gap-1.5 text-[13px]" style="color: var(--color-text-muted);">
+          <details v-if="shouldRenderCodeDetails(message)" class="mt-2 view-code-details">
+            <summary class="view-code-toggle">
+              <span class="inline-flex items-center gap-1.5">
                 <CodeBracketIcon class="h-4 w-4" title="View code details" />
-                <span>View Code</span>
+                <span>&lt;/&gt; View code</span>
+                <span class="view-code-caret" aria-hidden="true">↓</span>
               </span>
             </summary>
-            <div class="px-4 pb-4 pt-1">
+            <div class="view-code-panel">
+              <div v-if="tableUsageSummary(message)" class="mb-3">
+                <span class="view-code-meta-badge">{{ tableUsageSummary(message) }}</span>
+              </div>
               <div
                 v-if="message.codeExplanation"
                 class="chat-markdown-content text-sm leading-relaxed max-w-none mb-3"
@@ -228,7 +216,6 @@ import { useAppStore } from '../../stores/appStore'
 import apiService from '../../services/apiService'
 import {
   DocumentDuplicateIcon,
-  ChevronRightIcon,
   ChevronDownIcon,
   CodeBracketIcon,
 } from '@heroicons/vue/24/outline'
@@ -260,7 +247,7 @@ const end = ref(null)
 const ephemeralExpandedRows = ref(new Set())
 const pendingInterventionIds = ref(new Set())
 const suppressMutationAutoScroll = ref(false)
-const SHOW_EPHEMERAL_TRACE = false
+const SHOW_EPHEMERAL_TRACE = true
 const showScrollToBottomButton = ref(false)
 let shouldAutoScroll = true
 let mutationObserver = null
@@ -291,12 +278,12 @@ function tableUsageSummary(message) {
     ? metadata.join_keys.map((item) => String(item || '').trim()).filter(Boolean)
     : []
   if (!joinsUsed) {
-    return `Tables used: ${tables.join(', ')}.`
+    return `Tables used: ${tables.join(', ')}`
   }
   if (joinKeys.length > 0) {
-    return `Tables used: ${tables.join(', ')}. Joined using: ${joinKeys.join(', ')}.`
+    return `Tables used: ${tables.join(', ')} · Join keys: ${joinKeys.join(', ')}`
   }
-  return `Tables used: ${tables.join(', ')}. A conservative join was used.`
+  return `Tables used: ${tables.join(', ')} · Conservative join`
 }
 
 function escapeHtml(rawValue) {
@@ -632,7 +619,8 @@ function shouldRenderCodeSnapshot(message) {
 function shouldRenderCodeDetails(message) {
   return Boolean(
     String(message?.codeExplanation || '').trim() ||
-    shouldRenderCodeSnapshot(message)
+    shouldRenderCodeSnapshot(message) ||
+    tableUsageSummary(message)
   )
 }
 
@@ -856,6 +844,129 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   line-height: 1.6;
 }
 
+.user-turn-bubble {
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border));
+  background-color: var(--color-chat-user-bubble);
+}
+
+.user-turn-copy-btn {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  color: var(--color-text-muted);
+  background: transparent;
+  opacity: 0;
+  transition: opacity 120ms ease, background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.group:hover .user-turn-copy-btn,
+.group:focus-within .user-turn-copy-btn {
+  opacity: 1;
+}
+
+.user-turn-copy-btn:hover {
+  color: var(--color-text-main);
+  border-color: var(--color-border);
+  background-color: color-mix(in srgb, var(--color-surface) 78%, transparent);
+}
+
+.thinking-block {
+  border-left: 2px solid color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  padding-left: 0.75rem;
+}
+
+.thinking-toggle,
+.thinking-static {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.86rem;
+  font-style: italic;
+  color: color-mix(in srgb, var(--color-text-muted) 88%, var(--color-text-main) 12%);
+}
+
+.thinking-toggle {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.thinking-toggle:hover {
+  color: var(--color-text-main);
+}
+
+.thinking-chevron {
+  color: color-mix(in srgb, var(--color-accent) 65%, var(--color-text-muted) 35%);
+  font-weight: 700;
+}
+
+.thinking-caret {
+  color: var(--color-text-muted);
+  font-style: normal;
+}
+
+.thinking-output {
+  margin-top: 0.25rem;
+  padding-left: 0.35rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.view-code-details {
+  margin-top: 0.6rem;
+}
+
+.view-code-toggle {
+  display: inline-flex;
+  list-style: none;
+  cursor: pointer;
+  font-size: 0.77rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.view-code-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.view-code-toggle:hover {
+  color: var(--color-text-main);
+}
+
+.view-code-caret {
+  transition: transform 130ms ease;
+}
+
+.view-code-details[open] .view-code-caret {
+  transform: rotate(180deg);
+}
+
+.view-code-panel {
+  margin-top: 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  background-color: color-mix(in srgb, var(--color-surface) 88%, var(--color-workspace-surface));
+  padding: 0.7rem 0.9rem 0.9rem;
+}
+
+.view-code-meta-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 9999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.69rem;
+  color: var(--color-text-muted);
+  background-color: color-mix(in srgb, var(--color-surface) 92%, transparent);
+}
+
 :deep(.chat-markdown-content strong),
 :deep(.chat-markdown-content em),
 :deep(.chat-markdown-content a) {
@@ -969,7 +1080,7 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   border: 1px solid var(--color-border);
   border-radius: 14px;
   overflow: hidden;
-  background-color: #fdfcfb;
+  background-color: #FAF9F6;
 }
 
 :deep(.chat-code-header),
@@ -979,8 +1090,8 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   justify-content: space-between;
   padding: 11px 14px;
   border-bottom: 1px solid var(--color-border);
-  background-color: #f3f3ed;
-  color: #6b7280;
+  background-color: #EFEDE8;
+  color: var(--color-text-muted);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -996,30 +1107,30 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   justify-content: center;
   border: 1px solid transparent;
   border-radius: 8px;
-  color: #52525b;
+  color: var(--color-text-muted);
   background-color: transparent;
   transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
 :deep(.chat-code-copy:hover),
 .chat-code-copy:hover {
-  border-color: #d4d4d8;
-  background-color: #f4f4f5;
-  color: #18181b;
+  border-color: var(--color-border);
+  background-color: color-mix(in srgb, var(--color-surface) 80%, transparent);
+  color: var(--color-text-main);
 }
 
 :deep(.chat-code-copy:focus-visible),
 .chat-code-copy:focus-visible {
   outline: none;
-  border-color: #a1a1aa;
-  box-shadow: 0 0 0 2px rgba(161, 161, 170, 0.2);
+  border-color: var(--color-border-hover);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-border-hover) 32%, transparent);
 }
 
 :deep(.chat-code-copy[data-copied="true"]),
 .chat-code-copy[data-copied="true"] {
-  border-color: #d4d4d8;
-  background-color: #f4f4f5;
-  color: #18181b;
+  border-color: var(--color-border);
+  background-color: color-mix(in srgb, var(--color-surface) 80%, transparent);
+  color: var(--color-text-main);
 }
 
 :deep(.chat-code-copy svg),
@@ -1036,8 +1147,8 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   overflow: auto;
   font-size: 14px;
   line-height: 1.62;
-  background-color: #fdfcfb;
-  color: #111827;
+  background-color: #FAF9F6;
+  color: var(--color-text-main);
 }
 
 :deep(.chat-code-scroll code),

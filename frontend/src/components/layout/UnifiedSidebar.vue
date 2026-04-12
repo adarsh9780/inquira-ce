@@ -501,7 +501,7 @@ function datasetSourceCaption(filePath) {
   const normalized = String(filePath || '').trim().replace(/\\/g, '/')
   if (!normalized) return ''
   const parts = normalized.split('/').filter(Boolean)
-  return parts.slice(-2).join('/')
+  return parts[parts.length - 1] || normalized
 }
 
 // Fetch datasets from API
@@ -534,6 +534,11 @@ function handleDatasetCatalogChanged() {
   // leaving users with a stale dataset list until restart or manual context hop.
   if (!appStore.hasWorkspace || !appStore.activeWorkspaceId) return
   void fetchDatasets()
+}
+
+function handleOpenSettingsRequest(event) {
+  const requestedTab = String(event?.detail?.tab || 'api').trim() || 'api'
+  openSettings(requestedTab)
 }
 
 async function selectWorkspace(id) {
@@ -785,10 +790,12 @@ onMounted(async () => {
     // Ignore bootstrap failures here. The parent app handles global state recovery.
   }
   window.addEventListener('dataset-switched', handleDatasetCatalogChanged)
+  window.addEventListener('sidebar-open-settings', handleOpenSettingsRequest)
 })
 
 onUnmounted(() => {
   window.removeEventListener('dataset-switched', handleDatasetCatalogChanged)
+  window.removeEventListener('sidebar-open-settings', handleOpenSettingsRequest)
 })
 
 // Watch for workspace changes to fetch datasets and conversations
