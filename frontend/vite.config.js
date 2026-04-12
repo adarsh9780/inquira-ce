@@ -1,6 +1,15 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const frontendRoot = fileURLToPath(new URL('.', import.meta.url))
+const frontendPackage = JSON.parse(
+  readFileSync(resolve(frontendRoot, 'package.json'), 'utf-8')
+)
+const frontendVersion = String(frontendPackage.version || '0.0.0').trim() || '0.0.0'
 
 
 // https://vite.dev/config/
@@ -17,6 +26,7 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis',
+    __APP_VERSION__: JSON.stringify(frontendVersion),
   },
   optimizeDeps: {
     include: [

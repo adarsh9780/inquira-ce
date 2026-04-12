@@ -23,8 +23,10 @@ test('ApiTab uses external link handler for provider URLs', () => {
 test('StatusBar uses external link helper (CE: AuthModal removed)', () => {
   const statusBarPath = resolve(process.cwd(), 'src/components/layout/StatusBar.vue')
   const statusBarSource = readFileSync(statusBarPath, 'utf-8')
-  assert.equal(statusBarSource.includes('@click.prevent="openGitHubRepo"'), true)
-  assert.equal(statusBarSource.includes("openExternalUrl('https://github.com/adarsh9780/inquira')"), true)
+  assert.equal(statusBarSource.includes('@click.prevent="openInquiraSite"'), true)
+  assert.equal(statusBarSource.includes("openExternalUrl('https://inquiraai.com')"), true)
+  assert.equal(statusBarSource.includes('Inquira v{{ uiVersion }}'), true)
+  assert.equal(statusBarSource.includes('typeof __APP_VERSION__ !== \'undefined\''), true)
 
   // CE: AuthModal.vue was deleted
   const authPath = resolve(process.cwd(), 'src/components/modals/AuthModal.vue')

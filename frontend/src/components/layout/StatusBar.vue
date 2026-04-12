@@ -141,14 +141,14 @@
 
       <!-- Version -->
       <a
-        href="https://github.com/adarsh9780/inquira"
-        @click.prevent="openGitHubRepo"
+        href="https://inquiraai.com"
+        @click.prevent="openInquiraSite"
         target="_blank"
         class="text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] transition-colors"
         style="font-family: var(--font-mono);"
-        title="View on GitHub"
+        title="Visit inquiraai.com"
       >
-        Inquira v0.5.7
+        Inquira v{{ uiVersion }}
       </a>
     </div>
 
@@ -175,6 +175,9 @@ import { toast } from '../../composables/useToast'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
+const uiVersion = String(
+  typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'
+).trim() || '0.0.0'
 
 // --- Kernel Status Management ---
 const kernelStatus = computed(() => appStore.activeWorkspaceKernelStatus)
@@ -482,8 +485,8 @@ async function refreshKernelStatusFromApi(workspaceId, fallbackStatus = 'missing
   }
 }
 
-function openGitHubRepo() {
-  void openExternalUrl('https://github.com/adarsh9780/inquira')
+function openInquiraSite() {
+  void openExternalUrl('https://inquiraai.com')
 }
 
 function syncWorkspaceRealtimeSubscriptions() {
