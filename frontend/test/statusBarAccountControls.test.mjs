@@ -14,7 +14,7 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
   )
 
   // Account name button toggles sidebar (not dropdown)
-  assert.equal(statusBarSource.includes('openSidebar'), true)
+  assert.equal(statusBarSource.includes('@click.stop="toggleSidebarFromStatusBar"'), true)
   assert.equal(statusBarSource.includes('toggleAccountMenu'), false)
   assert.equal(statusBarSource.includes('accountMenuRef'), false)
   assert.equal(statusBarSource.includes('aria-label="Open sidebar"'), true)
@@ -32,8 +32,8 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
   assert.equal(statusBarSource.includes('Hide sidebar (Cmd/Ctrl+B)'), true)
   assert.equal(statusBarSource.includes('ChevronRightIcon'), true)
   assert.equal(statusBarSource.includes('ChevronLeftIcon'), true)
-  assert.equal(statusBarSource.includes('function openSidebar() {'), true)
-  assert.equal(statusBarSource.includes('appStore.setSidebarCollapsed(false)'), true)
+  assert.equal(statusBarSource.includes('appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)'), true)
+  assert.equal(statusBarSource.includes('function openSidebar() {'), false)
 
   // Workspace/Schema toggle is next to account name in left section
   assert.equal(statusBarSource.includes('switchToWorkspace'), true)

@@ -6,7 +6,7 @@
       <!-- Account Name with Sidebar Toggle (chevron beside username) -->
       <button
         v-if="authStore.isAuthenticated"
-        @click.stop="openSidebar"
+        @click.stop="toggleSidebarFromStatusBar"
         class="flex items-center gap-1 max-w-[150px] truncate px-1 text-[var(--color-accent)] text-left rounded hover:bg-[var(--color-base)] transition-colors"
         title="Open sidebar"
         aria-label="Open sidebar"
@@ -323,10 +323,6 @@ const artifactUsageWarningTitle = computed(() => {
 
 function toggleSidebarFromStatusBar() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
-}
-
-function openSidebar() {
-  appStore.setSidebarCollapsed(false)
 }
 
 function switchToWorkspace() {
