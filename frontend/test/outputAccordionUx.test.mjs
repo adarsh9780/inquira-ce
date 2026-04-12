@@ -7,7 +7,7 @@ test('output tab renders collapsible cards with header-level filters and run sta
   const outputTabPath = resolve(process.cwd(), 'src/components/analysis/OutputTab.vue')
   const source = readFileSync(outputTabPath, 'utf-8')
 
-  assert.equal(source.includes('Teleport to="#workspace-right-pane-toolbar"'), true)
+  assert.equal(source.includes('Teleport to="#workspace-right-pane-toolbar-right"'), true)
   assert.equal(source.includes('class="mb-2 overflow-hidden rounded-xl border"'), true)
   assert.equal(source.includes("status === 'running'"), true)
   assert.equal(source.includes('title: `Run ${runId}`'), true)

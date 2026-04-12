@@ -1,91 +1,91 @@
 <template>
   <div class="flex flex-col h-full" style="background-color: #FAF9F6;">
-    <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'table'">
-      <div class="flex min-w-0 items-center justify-end w-full gap-3">
-        <!-- Loading / error status (left) -->
-        <div class="mr-auto flex min-w-0 items-center space-x-3 text-sm">
-          <div v-if="tableStatusMessage" class="flex items-center gap-2 text-xs" :class="tableStatusClass">
-            <div
-              v-if="isPageLoading"
-              class="h-3.5 w-3.5 animate-spin rounded-full border border-gray-300 border-t-gray-800"
-              aria-hidden="true"
-            ></div>
-            <span>{{ tableStatusMessage }}</span>
-          </div>
+    <Teleport to="#workspace-right-pane-toolbar-center" v-if="isMounted && appStore.dataPane === 'table'">
+      <div class="flex min-w-0 w-full items-center justify-center">
+        <div
+          v-if="displayArtifacts.length > 0"
+          class="flex min-w-[11rem] w-full items-center"
+          style="max-width: min(34vw, 20rem);"
+        >
+          <HeaderDropdown
+            id="dataframe-select"
+            v-model="selectedArtifactId"
+            :options="tableDropdownOptions"
+            placeholder="Select table"
+            aria-label="Select table"
+            :fit-to-longest-label="true"
+            :min-chars="12"
+            :max-chars="36"
+            max-width-class="w-full"
+          />
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && appStore.dataPane === 'table'">
+      <div class="flex min-w-0 items-center justify-end w-full gap-2">
+        <div v-if="tableStatusMessage" class="flex items-center gap-2 text-[12px] leading-[1.3] mr-1" :class="tableStatusClass">
+          <div
+            v-if="isPageLoading"
+            class="h-3.5 w-3.5 animate-spin rounded-full border border-gray-300 border-t-gray-800"
+            aria-hidden="true"
+          ></div>
+          <span>{{ tableStatusMessage }}</span>
         </div>
 
-        <div class="flex min-w-0 flex-1 items-center justify-end gap-2">
-          <!-- Table selector dropdown — always shown when artifacts are available -->
-          <div
-            v-if="displayArtifacts.length > 0"
-            class="flex min-w-[10rem] flex-1 items-center"
-            style="max-width: min(34vw, 20rem);"
-          >
-            <HeaderDropdown
-              id="dataframe-select"
-              v-model="selectedArtifactId"
-              :options="tableDropdownOptions"
-              placeholder="Select table"
-              aria-label="Select table"
-              :fit-to-longest-label="true"
-              :min-chars="12"
-              :max-chars="36"
-              max-width-class="w-full"
-            />
-          </div>
-
-          <div
-            class="relative min-w-[9rem] flex-1"
-            style="max-width: min(24vw, 13rem);"
-          >
-            <FunnelIcon
-              class="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-              title="Search rows"
-              aria-hidden="true"
-            />
-            <input
-              v-model="tableSearch"
-              type="text"
-              placeholder="Search rows"
-              class="input-base h-8 pl-8 pr-2"
-              title="Search rows in current table"
-              :disabled="!selectedArtifactId"
-              aria-label="Search rows"
-            />
-          </div>
-
-          <!-- Delete selected table -->
-          <button
-            @click="openDeleteDialog"
-            type="button"
-            :disabled="!canDeleteSelectedArtifact || isDeletingArtifact"
-            class="btn-icon h-8 w-8 shrink-0 border"
-            style="border-color: var(--color-border); color: var(--color-text-muted);"
-            :class="(!canDeleteSelectedArtifact || isDeletingArtifact) ? 'opacity-50 cursor-not-allowed' : ''"
-            :title="isDeletingArtifact ? 'Deleting table' : 'Delete table'"
-            :aria-label="isDeletingArtifact ? 'Deleting table' : 'Delete table'"
-          >
-            <div
-              v-if="isDeletingArtifact"
-              class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-red-500"
-            ></div>
-            <TrashIcon v-else class="h-4 w-4" />
-          </button>
-
-          <!-- CSV download -->
-          <button
-            @click="downloadCsv"
-            :disabled="!downloadRows.length || isDownloading"
-            class="btn-icon h-8 w-8 shrink-0 border"
-            style="border-color: var(--color-border); color: var(--color-text-muted);"
-            :class="!downloadRows.length ? 'opacity-50 cursor-not-allowed' : ''"
-            :title="isDownloading ? 'Exporting CSV' : 'Export CSV'"
-            :aria-label="isDownloading ? 'Exporting CSV' : 'Export CSV'"
-          >
-            <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4" />
-            <div v-else class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"></div>
-          </button>
+        <div
+          class="relative min-w-[10rem] flex-1"
+          style="max-width: min(24vw, 13.5rem);"
+        >
+          <FunnelIcon
+            class="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2"
+            style="color: #9CA3AF;"
+            title="Search rows"
+            aria-hidden="true"
+          />
+          <input
+            v-model="tableSearch"
+            type="text"
+            placeholder="Search rows"
+            class="input-base h-8 pl-8 pr-2"
+            title="Search rows in current table"
+            :disabled="!selectedArtifactId"
+            aria-label="Search rows"
+            style="background-color: #F5F3EE; border-color: #E5E3DC;"
+          />
         </div>
+
+        <!-- Delete selected table -->
+        <button
+          @click="openDeleteDialog"
+          type="button"
+          :disabled="!canDeleteSelectedArtifact || isDeletingArtifact"
+          class="btn-icon h-8 w-8 shrink-0 border"
+          style="border-color: var(--color-border); color: var(--color-text-muted);"
+          :class="(!canDeleteSelectedArtifact || isDeletingArtifact) ? 'opacity-50 cursor-not-allowed' : ''"
+          :title="isDeletingArtifact ? 'Deleting table' : 'Delete table'"
+          :aria-label="isDeletingArtifact ? 'Deleting table' : 'Delete table'"
+        >
+          <div
+            v-if="isDeletingArtifact"
+            class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-red-500"
+          ></div>
+          <TrashIcon v-else class="h-4 w-4" />
+        </button>
+
+        <!-- CSV download -->
+        <button
+          @click="downloadCsv"
+          :disabled="!downloadRows.length || isDownloading"
+          class="btn-icon h-8 w-8 shrink-0 border"
+          style="border-color: var(--color-border); color: var(--color-text-muted);"
+          :class="!downloadRows.length ? 'opacity-50 cursor-not-allowed' : ''"
+          :title="isDownloading ? 'Exporting CSV' : 'Export CSV'"
+          :aria-label="isDownloading ? 'Exporting CSV' : 'Export CSV'"
+        >
+          <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4" />
+          <div v-else class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"></div>
+        </button>
       </div>
     </Teleport>
 
@@ -1289,30 +1289,42 @@ async function deleteSelectedArtifact() {
   --ag-cell-horizontal-padding: 8px;
   --ag-header-cell-horizontal-padding: 8px;
   --ag-odd-row-background-color: #FAF9F6;
-  --ag-even-row-background-color: #F7F5F0;
-  --ag-row-hover-color: #F3F0E9;
-  --ag-selected-row-background-color: #F2E5DF;
+  --ag-even-row-background-color: #F5F3EE;
+  --ag-row-hover-color: #EDE9E3;
+  --ag-selected-row-background-color: #F2E7DD;
   --ag-border-color: #E5E3DC;
-  --ag-header-foreground-color: #1A1915;
-  --ag-foreground-color: #1A1915;
-  --ag-secondary-foreground-color: #6E6A60;
-  --ag-input-focus-border-color: #D97757;
+  --ag-header-foreground-color: #1A1F2E;
+  --ag-foreground-color: #1A1F2E;
+  --ag-secondary-foreground-color: #6B7280;
+  --ag-input-focus-border-color: #C96A2E;
   --ag-range-selection-border-color: #D7D3C8;
   --ag-cell-horizontal-border: solid #E5E3DC;
   --ag-header-column-separator-color: #E5E3DC;
   --ag-header-column-separator-display: block;
-  --ag-icon-color: #7A7467;
-  --ag-active-color: #D97757;
+  --ag-icon-color: #9CA3AF;
+  --ag-active-color: #C96A2E;
 }
 
 .ag-theme-quartz .ag-header {
   border-bottom: 1px solid #E5E3DC;
-  font-weight: 500;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #1A1F2E;
 }
 
 .ag-theme-quartz .ag-cell,
 .ag-theme-quartz .ag-header-cell {
   border-right: 1px solid #E5E3DC;
+}
+
+.ag-theme-quartz .ag-cell {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #1A1F2E;
 }
 
 .ag-theme-quartz .ag-row .ag-cell:last-child,
@@ -1321,13 +1333,13 @@ async function deleteSelectedArtifact() {
 }
 
 .ag-theme-quartz .ag-icon {
-  color: #7A7467;
+  color: #9CA3AF;
 }
 
 .ag-theme-quartz .ag-header-cell-sorted-asc .ag-icon,
 .ag-theme-quartz .ag-header-cell-sorted-desc .ag-icon,
 .ag-theme-quartz .ag-header-cell-filtered .ag-icon {
-  color: #D97757;
+  color: #C96A2E;
 }
 
 .ag-theme-quartz .ag-root-wrapper,
@@ -1342,7 +1354,16 @@ async function deleteSelectedArtifact() {
 .ag-theme-quartz .ag-paging-panel {
   background-color: #EFEDE8;
   border-top: 1px solid #E5E3DC;
-  color: #1A1915;
+  color: #1A1F2E;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.ag-theme-quartz .ag-paging-button[aria-current='page'] {
+  color: #C96A2E;
+  font-weight: 500;
 }
 
 .table-pane-surface {

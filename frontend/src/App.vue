@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-white flex flex-col">
+  <div class="min-h-screen bg-[var(--color-base)] flex flex-col">
     <ToastContainer />
 
     <div
@@ -69,46 +69,12 @@
     <div v-show="authStore.isAuthenticated && appBootstrap.ready" class="flex flex-col h-screen">
       <ConnectionStatusIndicator />
       <div class="flex-1 flex overflow-hidden app-shell-frame relative">
-        <Transition name="sidebar-rail-shell">
-          <div
-            v-if="appStore.isSidebarCollapsed"
-            class="app-sidebar-rail"
-            @mouseenter="expandSidebarFromRail()"
-          >
-            <button
-              type="button"
-              class="app-sidebar-rail-btn"
-              title="Open datasets sidebar"
-              aria-label="Open datasets sidebar"
-              @click="expandSidebarFromRail('datasets')"
-            >
-              <CircleStackIcon class="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              class="app-sidebar-rail-btn"
-              title="Open conversations sidebar"
-              aria-label="Open conversations sidebar"
-              @click="expandSidebarFromRail('conversations')"
-            >
-              <ChatBubbleLeftRightIcon class="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              class="app-sidebar-rail-btn"
-              title="Open settings sidebar"
-              aria-label="Open settings sidebar"
-              @click="expandSidebarFromRail('settings')"
-            >
-              <Cog6ToothIcon class="h-4 w-4" />
-            </button>
-          </div>
-        </Transition>
-        <Transition name="sidebar-shell">
-          <div v-if="!appStore.isSidebarCollapsed" class="h-full shrink-0 app-nav-pane">
-            <UnifiedSidebar />
-          </div>
-        </Transition>
+        <div
+          class="h-full shrink-0 app-nav-pane"
+          :class="{ 'app-nav-pane-collapsed': appStore.isSidebarCollapsed }"
+        >
+          <UnifiedSidebar />
+        </div>
         <div class="flex-1 flex flex-col overflow-hidden app-workspace-pane">
           <RightPanel />
         </div>
@@ -175,11 +141,6 @@ import RightPanel from './components/layout/RightPanel.vue'
 import StatusBar from './components/layout/StatusBar.vue'
 import ToastContainer from './components/ui/ToastContainer.vue'
 import ConnectionStatusIndicator from './components/ui/ConnectionStatusIndicator.vue'
-import {
-  CircleStackIcon,
-  ChatBubbleLeftRightIcon,
-  Cog6ToothIcon,
-} from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -409,13 +370,6 @@ const progressPercent = computed(() => {
 
 function toggleSidebarVisibility() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
-}
-
-function expandSidebarFromRail(target = '') {
-  appStore.setSidebarCollapsed(false)
-  if (String(target || '').trim() === 'settings') {
-    window.dispatchEvent(new CustomEvent('sidebar-open-settings', { detail: { tab: 'api' } }))
-  }
 }
 
 function handleGlobalShortcuts(event) {
@@ -749,79 +703,21 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-.sidebar-shell-enter-active,
-.sidebar-shell-leave-active {
-  transition: width 0.24s ease, opacity 0.2s ease;
-  overflow: hidden;
-}
-.sidebar-shell-enter-from,
-.sidebar-shell-leave-to {
-  width: 0;
-  opacity: 0;
-}
-.sidebar-shell-enter-to,
-.sidebar-shell-leave-from {
-  width: 16rem;
-  opacity: 1;
-}
-
-.sidebar-rail-shell-enter-active,
-.sidebar-rail-shell-leave-active {
-  transition: width 0.18s ease, opacity 0.16s ease;
-  overflow: hidden;
-}
-
-.sidebar-rail-shell-enter-from,
-.sidebar-rail-shell-leave-to {
-  width: 0;
-  opacity: 0;
-}
-
-.sidebar-rail-shell-enter-to,
-.sidebar-rail-shell-leave-from {
-  width: 3rem;
-  opacity: 1;
-}
-
 .app-shell-frame {
   background-color: var(--color-shell-backdrop);
 }
 
-.app-sidebar-rail {
-  width: 3rem;
-  border-right: 1px solid var(--color-border);
-  background-color: var(--color-sidebar-surface);
-  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--color-text-main) 4%, transparent);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  padding-top: 0.75rem;
-}
-
-.app-sidebar-rail-btn {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.5rem;
-  border: 1px solid transparent;
-  color: var(--color-text-muted);
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
-}
-
-.app-sidebar-rail-btn:hover {
-  color: var(--color-text-main);
-  border-color: var(--color-border);
-  background-color: color-mix(in srgb, var(--color-surface) 86%, transparent);
-}
-
 .app-nav-pane {
+  width: 240px;
+  transition: width 200ms ease;
+  overflow: hidden;
   border-right: 1px solid var(--color-border);
   background-color: var(--color-sidebar-surface);
   box-shadow: inset -1px 0 0 color-mix(in srgb, var(--color-text-main) 4%, transparent);
+}
+
+.app-nav-pane-collapsed {
+  width: 48px;
 }
 
 .app-workspace-pane {

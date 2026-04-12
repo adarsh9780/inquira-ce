@@ -1,6 +1,6 @@
 <template>
   <div class="flex h-full flex-col overflow-hidden">
-    <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'output'">
+    <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && appStore.dataPane === 'output'">
       <div class="flex min-w-0 w-full items-center justify-end gap-2">
         <div class="mr-auto text-xs tabular-nums" style="color: var(--color-text-muted);">
           {{ filteredEvents.length }} {{ filteredEvents.length === 1 ? 'event' : 'events' }}

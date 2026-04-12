@@ -47,13 +47,13 @@
             />
           </div>
           <p
-            class="chat-question-text text-sm whitespace-pre-wrap"
+            class="chat-question-text text-[14px] font-medium whitespace-pre-wrap leading-[1.7]"
             style="color: var(--color-text-main);"
             v-html="renderQuestionWithHighlights(message.question)"
           ></p>
         </div>
         <div class="mt-1 px-1">
-          <p class="text-xs" style="color: var(--color-text-muted);">{{ formatTimestamp(message.timestamp) }}</p>
+          <p class="text-[12px] font-normal leading-[1.3]" style="color: var(--color-text-muted);">{{ formatTimestamp(message.timestamp) }}</p>
         </div>
       </div>
 
@@ -109,7 +109,7 @@
             class="mt-4 mb-3 flex items-center gap-3"
           >
             <div class="h-px flex-1" style="background-color: var(--color-border);"></div>
-            <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">Final response</span>
+            <span class="text-[11px] uppercase tracking-[0.08em] font-medium" style="color: var(--color-accent);">Final response</span>
             <div class="h-px flex-1" style="background-color: var(--color-border);"></div>
           </div>
 
@@ -131,7 +131,7 @@
               </div>
               <div
                 v-if="message.codeExplanation"
-                class="chat-markdown-content text-sm leading-relaxed max-w-none mb-3"
+                class="chat-markdown-content text-[14px] leading-[1.7] max-w-none mb-3"
                 style="color: var(--color-text-main);"
               >
                 <div v-html="renderMarkdown(message.codeExplanation)"></div>
@@ -141,7 +141,7 @@
                   <span>python</span>
                   <button
                     type="button"
-                    class="text-xs font-medium underline-offset-2 hover:underline"
+                    class="text-[13px] font-medium underline-offset-2 hover:underline"
                     style="color: #A1A1AA;"
                     @click="openCodePane"
                   >
@@ -828,20 +828,22 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
 :deep(.chat-ref-highlight) {
   color: #0369a1;
   font-style: italic;
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 :deep(.chat-markdown-content) {
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.7;
   color: var(--color-text-main);
+  font-weight: 400;
 }
 
 :deep(.final-response-body) {
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.7;
+  font-weight: 400;
 }
 
 .user-turn-bubble {
@@ -926,8 +928,9 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   display: inline-flex;
   list-style: none;
   cursor: pointer;
-  font-size: 0.77rem;
+  font-size: 13px;
   font-weight: 500;
+  line-height: 1.4;
   color: var(--color-text-muted);
   text-decoration: none;
 }
@@ -1145,15 +1148,16 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   padding: 18px 16px;
   max-height: 320px;
   overflow: auto;
-  font-size: 14px;
-  line-height: 1.62;
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 400;
   background-color: #FAF9F6;
   color: var(--color-text-main);
 }
 
 :deep(.chat-code-scroll code),
 .chat-code-scroll code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: var(--font-mono);
   white-space: pre;
 }
 

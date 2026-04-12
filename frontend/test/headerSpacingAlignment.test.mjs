@@ -10,10 +10,13 @@ test('workspace pane headers use aligned spacing and toolbar offsets', () => {
   const leftPane = readFileSync(leftPanePath, 'utf-8')
   const rightPane = readFileSync(rightPanePath, 'utf-8')
 
-  const expectedHeaderClass = 'flex-shrink-0 h-16 px-4 flex items-center gap-4'
+  const leftHeaderClass = 'flex-shrink-0 h-16 px-4 flex items-center gap-4'
+  const rightHeaderClass = 'workspace-toolbar-shell flex-shrink-0 h-16 px-3 flex items-center border-b'
 
-  assert.equal(leftPane.includes(expectedHeaderClass), true)
-  assert.equal(rightPane.includes(expectedHeaderClass), true)
-  assert.equal(rightPane.includes('id="workspace-right-pane-toolbar" class="flex-1 min-w-0 flex items-center justify-end ml-4"'), false)
-  assert.equal(rightPane.includes('id="workspace-right-pane-toolbar" class="flex-1 min-w-0 flex items-center justify-end"'), true)
+  assert.equal(leftPane.includes(leftHeaderClass), true)
+  assert.equal(rightPane.includes(rightHeaderClass), true)
+  assert.equal(rightPane.includes('id="workspace-right-pane-toolbar"'), false)
+  assert.equal(rightPane.includes('id="workspace-right-pane-toolbar-center"'), true)
+  assert.equal(rightPane.includes('id="workspace-right-pane-toolbar-right"'), true)
+  assert.equal(rightPane.includes('class="workspace-toolbar-divider"'), true)
 })

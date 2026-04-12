@@ -119,7 +119,7 @@ async function copyOutput() {
 .shell-badge {
   display: inline-block;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1;
   padding: 3px 7px;
   border-radius: 4px;
@@ -157,12 +157,13 @@ async function copyOutput() {
 
 .shell-command {
   margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12.5px;
-  line-height: 1.5;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
   color: #3f3f46;
   white-space: pre-wrap;
   word-break: break-word;
+  font-weight: 400;
 }
 
 .shell-command code {
@@ -172,23 +173,25 @@ async function copyOutput() {
 
 .shell-output {
   margin-top: 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  line-height: 1.45;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
   color: #52525b;
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 180px;
   overflow: auto;
+  font-weight: 400;
 }
 
 .shell-no-output {
   margin-top: 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  line-height: 1.45;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
   color: #a1a1aa;
   font-style: italic;
+  font-weight: 400;
 }
 
 .shell-footer {

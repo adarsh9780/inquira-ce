@@ -7,13 +7,20 @@ test('sidebar uses file explorer layout with unified design', () => {
   const sidebarPath = resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue')
   const source = readFileSync(sidebarPath, 'utf-8')
 
-  // Toggle sidebar function exists
-  assert.equal(source.includes('function toggleSidebar() {'), true)
-  assert.equal(source.includes('@click="toggleSidebar"'), true)
+  // Brand click only collapses (no hover-open behavior)
+  assert.equal(source.includes('function handleBrandClick() {'), true)
+  assert.equal(source.includes('@click="handleBrandClick"'), true)
+  assert.equal(source.includes('@mouseenter='), false)
+
+  // Collapsed icon rail uses click actions to reopen
+  assert.equal(source.includes('class="sidebar-rail-btn"'), true)
+  assert.equal(source.includes("expandSidebarFromIcon('datasets')"), true)
+  assert.equal(source.includes("expandSidebarFromIcon('conversations')"), true)
+  assert.equal(source.includes("expandSidebarFromIcon('settings')"), true)
+  assert.equal(source.includes('function expandSidebarFromIcon(target = \'\') {'), true)
   
   // No expand/collapse text labels
   assert.equal(source.includes('Expand sidebar'), false)
-  assert.equal(source.includes('Collapse sidebar'), false)
   
   // No old separate sidebar components - unified design
   assert.equal(source.includes('SidebarWorkspaces'), false)

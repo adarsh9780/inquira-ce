@@ -1,7 +1,11 @@
 <template>
   <div class="flex h-full flex-col" style="background-color: var(--color-workspace-surface);">
-    <div ref="headerRef" class="flex-shrink-0 h-16 px-4 flex items-center gap-4 border-b" style="background-color: var(--color-workspace-surface); border-color: var(--color-border);">
-      <div class="flex-shrink-0">
+    <div
+      ref="headerRef"
+      class="workspace-toolbar-shell flex-shrink-0 h-16 px-3 flex items-center border-b"
+      style="background-color: var(--color-workspace-surface); border-color: var(--color-border);"
+    >
+      <div class="workspace-toolbar-zone workspace-toolbar-zone-left">
         <HeaderDropdown
           v-if="useCompactPaneSwitcher"
           v-model="selectedDataPane"
@@ -46,9 +50,16 @@
           </button>
         </div>
       </div>
-      
-      <!-- Teleport Target for Table/Figure/Output Toolbar -->
-      <div id="workspace-right-pane-toolbar" class="flex-1 min-w-0 flex items-center justify-end"></div>
+
+      <div class="workspace-toolbar-divider" aria-hidden="true"></div>
+
+      <!-- Teleport Target: centered selector slot -->
+      <div id="workspace-right-pane-toolbar-center" class="workspace-toolbar-zone workspace-toolbar-zone-center"></div>
+
+      <div class="workspace-toolbar-divider" aria-hidden="true"></div>
+
+      <!-- Teleport Target: right controls slot -->
+      <div id="workspace-right-pane-toolbar-right" class="workspace-toolbar-zone workspace-toolbar-zone-right"></div>
     </div>
 
     <div class="min-h-0 flex-1 p-3 sm:p-4 pb-0" style="background-color: var(--color-workspace-surface);">
@@ -115,3 +126,38 @@ onUnmounted(() => {
   switcherResizeObserver = null
 })
 </script>
+
+<style scoped>
+.workspace-toolbar-shell {
+  gap: 0.5rem;
+}
+
+.workspace-toolbar-zone {
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.workspace-toolbar-zone-left {
+  justify-content: flex-start;
+  flex: 0 0 auto;
+  padding-right: 0.25rem;
+}
+
+.workspace-toolbar-zone-center {
+  justify-content: center;
+  flex: 1 1 auto;
+}
+
+.workspace-toolbar-zone-right {
+  justify-content: flex-end;
+  flex: 1 1 auto;
+}
+
+.workspace-toolbar-divider {
+  width: 1px;
+  height: 1.75rem;
+  background-color: var(--color-border);
+}
+</style>

@@ -1,5 +1,5 @@
 <template>
-  <div class="h-7 w-full bg-[var(--color-surface)] border-t border-[var(--color-border)] flex items-center justify-between px-3 text-[11px] text-[var(--color-text-muted)] select-none z-50 shrink-0">
+  <div class="h-7 w-full bg-[var(--color-surface)] border-t border-[var(--color-border)] flex items-center justify-between px-3 text-[12px] text-[var(--color-text-muted)] select-none z-50 shrink-0">
 
     <!-- Left Section: Account, Editor Toggle, Kernel Status, and Editor Position -->
     <div class="flex items-center gap-3 h-full">
@@ -75,7 +75,7 @@
 
       <template v-if="appStore.isEditorFocused">
         <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
-        <div class="flex items-center text-[var(--color-text-muted)] font-mono tracking-tight gap-1 px-1">
+        <div class="flex items-center text-[var(--color-text-muted)] tracking-tight gap-1 px-1" style="font-family: var(--font-mono);">
           <span>Ln {{ appStore.editorLine }},</span>
           <span>Col {{ appStore.editorCol }}</span>
         </div>
@@ -144,7 +144,8 @@
         href="https://github.com/adarsh9780/inquira"
         @click.prevent="openGitHubRepo"
         target="_blank"
-        class="text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] transition-colors font-mono"
+        class="text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] transition-colors"
+        style="font-family: var(--font-mono);"
         title="View on GitHub"
       >
         Inquira v0.5.7

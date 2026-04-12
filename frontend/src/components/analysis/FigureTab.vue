@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col h-full">
     <!-- Figure Header (Teleported) -->
-    <Teleport to="#workspace-right-pane-toolbar" v-if="isMounted && appStore.dataPane === 'figure'">
+    <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && appStore.dataPane === 'figure'">
       <div class="flex min-w-0 items-center justify-end w-full gap-3">
         <div class="mr-auto flex min-w-0 items-center space-x-3 text-sm">
           <span v-if="appStore.isCodeRunning" class="text-xs px-2 py-1 rounded text-orange-600 bg-orange-100">
