@@ -1,6 +1,13 @@
 @import "tailwindcss";
 
 @theme {
+  --color-shell-backdrop: #F3F4F6;
+  /* Subtle neutral backdrop behind the pane layout */
+  --color-sidebar-surface: #F7F7F8;
+  /* Slightly darker navigation surface for visual elevation */
+  --color-workspace-surface: #FFFFFF;
+  /* Active workspace surface (center and right panes) */
+
   /* Brand-aligned product palette shared with the public site */
   --color-base: #FFFFFF;
   /* Pure white for the main app background */

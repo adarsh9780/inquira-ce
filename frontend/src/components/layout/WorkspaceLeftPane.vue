@@ -1,7 +1,7 @@
 <template>
-  <div class="flex h-full flex-col">
-    <div class="flex-shrink-0 h-16 px-4 flex items-center gap-4" style="background-color: var(--color-base);">
-      <div class="inline-flex rounded-lg border p-1 flex-shrink-0" style="border-color: var(--color-border); background-color: var(--color-base);">
+  <div class="flex h-full flex-col" style="background-color: var(--color-workspace-surface);">
+    <div class="flex-shrink-0 h-16 px-4 flex items-center gap-4" style="background-color: var(--color-workspace-surface);">
+      <div class="inline-flex rounded-lg border p-1 flex-shrink-0" style="border-color: var(--color-border); background-color: var(--color-workspace-surface);">
         <button
           @click="appStore.setWorkspacePane('code')"
           class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
@@ -24,7 +24,7 @@
       <div id="workspace-left-pane-toolbar" class="flex-1 min-w-0 flex items-center justify-end"></div>
     </div>
 
-    <div class="min-h-0 flex-1 flex flex-col p-3 sm:p-4 pb-0">
+    <div class="min-h-0 flex-1 flex flex-col p-3 sm:p-4 pb-0" :style="leftPaneBodyStyle">
       <div class="min-h-0 flex-1">
       <div v-show="appStore.workspacePane === 'code'" class="h-full">
         <CodeTab />
@@ -34,7 +34,7 @@
       </div>
       </div>
 
-      <div class="flex-shrink-0 pt-2 sm:pt-3" style="background-color: var(--color-base);">
+      <div class="flex-shrink-0 pt-2 sm:pt-3" style="background-color: var(--color-workspace-surface);">
         <ChatInput />
       </div>
     </div>
@@ -42,10 +42,23 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import CodeTab from '../analysis/CodeTab.vue'
 import ChatTab from '../chat/ChatTab.vue'
 import ChatInput from '../chat/ChatInput.vue'
 
 const appStore = useAppStore()
+
+const shouldAnchorComposerToHistory = computed(() => {
+  if (appStore.workspacePane !== 'chat') return false
+  if (appStore.isLoading) return false
+  const count = Number(appStore.chatHistory?.length || 0)
+  return count > 0 && count <= 2
+})
+
+const leftPaneBodyStyle = computed(() => {
+  if (!shouldAnchorComposerToHistory.value) return undefined
+  return { flex: '0 0 auto' }
+})
 </script>

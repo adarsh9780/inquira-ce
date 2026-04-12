@@ -1,5 +1,5 @@
 <template>
-  <div ref="panelRef" class="flex flex-col h-full overflow-hidden relative" style="background-color: var(--color-base);">
+  <div ref="panelRef" class="flex flex-col h-full overflow-hidden relative workspace-shell-panel" style="background-color: var(--color-workspace-surface);">
     
     <!-- Top Workspace Area (Chat/Code & Data Panes) -->
     <div 
@@ -10,7 +10,7 @@
       <!-- Left Pane (Chat / Code) -->
       <div 
         v-if="!appStore.isDataFocusMode"
-        class="flex flex-col h-full border-r" 
+        class="flex flex-col h-full border-r workspace-center-pane" 
         :style="{ width: appStore.leftPaneWidth + '%', borderColor: 'var(--color-border)' }"
       >
         <WorkspaceLeftPane />
@@ -25,7 +25,7 @@
 
       <!-- Right Pane (Table / Figure / Output) -->
       <div 
-        class="flex flex-col h-full"
+        class="flex flex-col h-full workspace-data-pane"
         :style="{ width: rightPaneWidth + '%' }"
       >
         <WorkspaceRightPane />
@@ -45,9 +45,9 @@
       v-if="isWorkspaceActive"
       class="w-full flex flex-col border-t z-10 overflow-hidden transition-[height,opacity,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
       :class="appStore.isTerminalOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'"
-      :style="{ height: terminalVisualHeight + '%', borderColor: appStore.isTerminalOpen ? 'var(--color-border)' : 'transparent', backgroundColor: 'var(--color-base)' }"
+      :style="{ height: terminalVisualHeight + '%', borderColor: appStore.isTerminalOpen ? 'var(--color-border)' : 'transparent', backgroundColor: 'var(--color-workspace-surface)' }"
     >
-      <div class="flex h-7 justify-between items-center px-3 border-b" style="background-color: var(--color-base); border-color: var(--color-border);">
+      <div class="flex h-7 justify-between items-center px-3 border-b" style="background-color: var(--color-workspace-surface); border-color: var(--color-border);">
         <div class="text-[10px] font-medium uppercase tracking-wide flex items-center gap-1" style="color: var(--color-text-muted);">
           <CommandLineIcon class="w-3.5 h-3.5" />
           Terminal
@@ -70,7 +70,7 @@
     </div>
 
     <!-- Other Full-Screen Views (Schema) -->
-    <div v-show="appStore.activeTab !== 'workspace'" class="relative flex-1 overflow-hidden" style="background-color: var(--color-base);">
+    <div v-show="appStore.activeTab !== 'workspace'" class="relative flex-1 overflow-hidden" style="background-color: var(--color-workspace-surface);">
       <div v-show="appStore.activeTab === 'schema-editor'" class="h-full p-3 sm:p-4">
         <SchemaEditorTab />
       </div>
@@ -162,3 +162,19 @@ onUnmounted(() => {
   window.removeEventListener('mouseup', stopResize)
 })
 </script>
+
+<style scoped>
+.workspace-shell-panel {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-text-main) 3%, transparent);
+}
+
+.workspace-center-pane {
+  background-color: var(--color-workspace-surface);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--color-text-main) 3%, transparent);
+}
+
+.workspace-data-pane {
+  background-color: var(--color-workspace-surface);
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--color-text-main) 2%, transparent);
+}
+</style>

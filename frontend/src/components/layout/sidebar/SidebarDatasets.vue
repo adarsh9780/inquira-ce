@@ -11,7 +11,7 @@
           :class="isExpanded ? 'rotate-90' : ''"
           style="color: var(--color-text-muted);"
         />
-        <FolderIcon class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-muted);" />
+        <CircleStackIcon class="w-3.5 h-3.5 shrink-0" style="color: var(--color-text-muted);" title="Datasets" />
         <span class="text-[11px] uppercase tracking-[0.08em] font-semibold" style="color: var(--color-text-muted);">
           Datasets
         </span>
@@ -66,8 +66,8 @@
         >
           <CircleStackIcon class="w-3.5 h-3.5 shrink-0" :class="isSelectedDataset(ds) ? 'text-[var(--color-accent)]' : 'text-zinc-400'" />
           <div class="min-w-0 flex-1">
-            <p class="truncate" :class="isSelectedDataset(ds) ? 'font-semibold' : 'font-medium'">
-              {{ ds.table_name }}
+            <p class="truncate" :class="isSelectedDataset(ds) ? 'font-semibold' : 'font-medium'" :title="ds.table_name">
+              {{ datasetFriendlyName(ds.table_name) }}
             </p>
             <p v-if="ds.file_path" class="truncate text-[10px]" :class="isSelectedDataset(ds) ? 'text-[var(--color-accent)] opacity-75' : 'text-zinc-400'">
               {{ datasetCaption(ds.file_path) }}
@@ -89,7 +89,6 @@ import { mergeDatasetSources } from '../../../utils/datasetCatalogMerge'
 import { toast } from '../../../composables/useToast'
 import {
   ChevronRightIcon,
-  FolderIcon,
   CircleStackIcon,
   PlusIcon,
 } from '@heroicons/vue/24/outline'
@@ -124,6 +123,14 @@ function datasetCaption(path) {
   if (!normalized) return ''
   const parts = normalized.split('/').filter(Boolean)
   return parts.slice(-2).join('/')
+}
+
+function datasetFriendlyName(tableName) {
+  const raw = String(tableName || '').trim()
+  if (!raw) return 'Untitled dataset'
+  const withoutHashSuffix = raw.replace(/__\d{6,}(?=__|$)/g, '')
+  const compacted = withoutHashSuffix.replace(/_{2,}/g, '_').replace(/^_+|_+$/g, '')
+  return compacted || raw
 }
 
 function isSelectedDataset(ds) {

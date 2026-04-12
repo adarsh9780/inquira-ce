@@ -1,6 +1,6 @@
 <template>
-  <div class="flex h-full flex-col" style="background-color: var(--color-surface);">
-    <div ref="headerRef" class="flex-shrink-0 h-16 px-4 flex items-center gap-4" style="background-color: var(--color-base);">
+  <div class="flex h-full flex-col" style="background-color: var(--color-workspace-surface);">
+    <div ref="headerRef" class="flex-shrink-0 h-16 px-4 flex items-center gap-4 border-b" style="background-color: var(--color-workspace-surface); border-color: var(--color-border);">
       <div class="flex-shrink-0">
         <HeaderDropdown
           v-if="useCompactPaneSwitcher"
@@ -10,7 +10,7 @@
           aria-label="Select data pane"
           max-width-class="w-[150px]"
         />
-        <div v-else class="inline-flex rounded-lg border p-1" style="border-color: var(--color-border); background-color: var(--color-base);">
+        <div v-else class="inline-flex rounded-lg border p-1" style="border-color: var(--color-border); background-color: var(--color-workspace-surface);">
           <button
             @click="appStore.setDataPane('table')"
             class="rounded-md p-2 transition-colors flex items-center justify-center"
@@ -51,7 +51,7 @@
       <div id="workspace-right-pane-toolbar" class="flex-1 min-w-0 flex items-center justify-end"></div>
     </div>
 
-    <div class="min-h-0 flex-1 p-3 sm:p-4 pb-0" style="background-color: var(--color-base);">
+    <div class="min-h-0 flex-1 p-3 sm:p-4 pb-0" style="background-color: var(--color-workspace-surface);">
       <div v-if="appStore.dataPane === 'table'" class="h-full">
         <TableTab />
       </div>

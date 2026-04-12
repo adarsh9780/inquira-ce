@@ -1,7 +1,7 @@
 <template>
   <div
-    class="flex flex-col w-72 h-full shrink-0 z-40 relative overflow-visible border-r"
-    style="background-color: var(--color-base); border-color: var(--color-border);"
+    class="flex flex-col w-72 h-full shrink-0 z-40 relative overflow-visible"
+    style="background-color: var(--color-sidebar-surface);"
   >
     <!-- Header with Logo -->
     <div
@@ -22,9 +22,9 @@
 
     <!-- Scrollable Content -->
     <div class="flex-1 overflow-y-auto overflow-x-hidden flex flex-col custom-scrollbar">
-      <div class="px-3 py-2 space-y-0.5">
+      <div class="px-3 py-3 space-y-2">
         <!-- Workspaces Section -->
-        <div class="space-y-0.5">
+        <div class="space-y-1">
           <!-- Section Header -->
           <button
             @click="workspacesExpanded = !workspacesExpanded"
@@ -56,12 +56,12 @@
         <!-- Datasets Section -->
         <div
           v-if="appStore.hasWorkspace && workspacesExpanded"
-          class="space-y-0.5 pl-2"
+          class="space-y-1 pl-2"
         >
           <!-- Section Header -->
           <div class="group flex items-center justify-between px-2 py-1">
             <div class="flex items-center gap-2 min-w-0">
-              <CircleStackIcon class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" />
+              <CircleStackIcon class="w-4 h-4 shrink-0" style="color: var(--color-text-muted);" title="Datasets" />
               <p class="text-[11px] font-normal truncate" style="color: var(--color-text-muted);">Datasets</p>
             </div>
             <button
@@ -98,8 +98,23 @@
                 @click="selectDataset(ds)"
               >
                 <div class="min-w-0 flex-1">
-                  <p class="truncate text-[13px] font-normal" :class="appStore.activeDatasetId === ds.table_name ? 'text-[var(--color-accent)]' : ''" style="color: var(--color-text-main);">{{ ds.table_name }}</p>
-                  <p v-if="ds.file_path" class="truncate text-[10px]" :class="appStore.activeDatasetId === ds.table_name ? 'text-[var(--color-accent)] opacity-75' : ''" style="color: var(--color-text-muted);">{{ ds.file_path }}</p>
+                  <p
+                    class="truncate text-[13px] font-normal"
+                    :class="appStore.activeDatasetId === ds.table_name ? 'text-[var(--color-accent)]' : ''"
+                    style="color: var(--color-text-main);"
+                    :title="ds.table_name"
+                  >
+                    {{ datasetFriendlyName(ds.table_name) }}
+                  </p>
+                  <p
+                    v-if="ds.file_path"
+                    class="truncate text-[10px]"
+                    :class="appStore.activeDatasetId === ds.table_name ? 'text-[var(--color-accent)] opacity-75' : ''"
+                    style="color: var(--color-text-muted);"
+                    :title="ds.file_path"
+                  >
+                    {{ datasetSourceCaption(ds.file_path) }}
+                  </p>
                 </div>
                 <button
                   @click.stop="confirmDeleteDataset(ds.table_name)"
@@ -117,7 +132,7 @@
         <!-- Conversations Section -->
         <div
           v-if="appStore.hasWorkspace && workspacesExpanded"
-          class="space-y-0.5 pl-2"
+          class="space-y-1 pl-2"
         >
           <!-- Section Header -->
           <div class="group flex items-center justify-between px-2 py-1">
@@ -227,7 +242,7 @@
     </Transition>
 
     <!-- Footer Icons -->
-    <div class="border-t p-3 shrink-0 flex items-center justify-center gap-4" style="border-color: var(--color-border); background-color: var(--color-base);">
+    <div class="border-t p-3 shrink-0 flex items-center justify-center gap-4" style="border-color: var(--color-border); background-color: var(--color-sidebar-surface);">
       <button
         @click="openCreateDialog"
         class="relative group flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
@@ -450,7 +465,11 @@ const termsHtml = computed(() => {
 const filteredDatasets = computed(() => {
   if (!searchQuery.value) return localDatasets.value
   const query = searchQuery.value.toLowerCase()
-  return localDatasets.value.filter(ds => ds.table_name?.toLowerCase().includes(query))
+  return localDatasets.value.filter((ds) => {
+    const rawName = String(ds?.table_name || '').toLowerCase()
+    const friendlyName = datasetFriendlyName(ds?.table_name).toLowerCase()
+    return rawName.includes(query) || friendlyName.includes(query)
+  })
 })
 
 const filteredConversations = computed(() => {
@@ -469,6 +488,21 @@ const workspaceHeaderLabel = computed(() => {
   if (appStore.hasWorkspace) return activeWorkspaceName.value
   return 'Workspace'
 })
+
+function datasetFriendlyName(tableName) {
+  const raw = String(tableName || '').trim()
+  if (!raw) return 'Untitled dataset'
+  const withoutHashSuffix = raw.replace(/__\d{6,}(?=__|$)/g, '')
+  const compacted = withoutHashSuffix.replace(/_{2,}/g, '_').replace(/^_+|_+$/g, '')
+  return compacted || raw
+}
+
+function datasetSourceCaption(filePath) {
+  const normalized = String(filePath || '').trim().replace(/\\/g, '/')
+  if (!normalized) return ''
+  const parts = normalized.split('/').filter(Boolean)
+  return parts.slice(-2).join('/')
+}
 
 // Fetch datasets from API
 async function fetchDatasets() {
@@ -815,7 +849,7 @@ watch(() => appStore.activeWorkspaceId, async (newId) => {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.25rem 0.625rem;
+  padding: 0.1875rem 0.5rem;
   border-radius: 0.5rem;
   cursor: pointer;
   transition: background-color 150ms ease, color 150ms ease;

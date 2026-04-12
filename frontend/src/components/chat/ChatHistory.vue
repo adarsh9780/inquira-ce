@@ -125,7 +125,7 @@
             <div class="h-px flex-1" style="background-color: var(--color-border);"></div>
           </div>
 
-          <div v-if="message.explanation" class="chat-markdown-content text-sm leading-relaxed max-w-none" style="color: var(--color-text-main);">
+          <div v-if="message.explanation" class="chat-markdown-content final-response-body max-w-none" style="color: var(--color-text-main);">
             <div v-html="renderMarkdown(message.explanation)"></div>
           </div>
 
@@ -135,8 +135,10 @@
 
           <details v-if="shouldRenderCodeDetails(message)" class="mt-3 rounded-xl border code-details-panel" style="border-color: var(--color-border);">
             <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium" style="color: var(--color-text-main);">
-              <span>Generated code details</span>
-              <span class="text-xs uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">Optional</span>
+              <span class="inline-flex items-center gap-1.5 text-[13px]" style="color: var(--color-text-muted);">
+                <CodeBracketIcon class="h-4 w-4" title="View code details" />
+                <span>View Code</span>
+              </span>
             </summary>
             <div class="px-4 pb-4 pt-1">
               <div
@@ -227,7 +229,8 @@ import apiService from '../../services/apiService'
 import {
   DocumentDuplicateIcon,
   ChevronRightIcon,
-  ChevronDownIcon
+  ChevronDownIcon,
+  CodeBracketIcon,
 } from '@heroicons/vue/24/outline'
 import ToolActivityCard from './ToolActivityCard.vue'
 import AgentIntervention from './AgentIntervention.vue'
@@ -844,8 +847,13 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
 
 :deep(.chat-markdown-content) {
   font-size: 15px;
-  line-height: 1.78;
+  line-height: 1.6;
   color: var(--color-text-main);
+}
+
+:deep(.final-response-body) {
+  font-size: 16px;
+  line-height: 1.6;
 }
 
 :deep(.chat-markdown-content strong),

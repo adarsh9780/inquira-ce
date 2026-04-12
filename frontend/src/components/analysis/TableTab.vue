@@ -40,6 +40,7 @@
           >
             <FunnelIcon
               class="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+              title="Search rows"
               aria-hidden="true"
             />
             <input
@@ -47,6 +48,7 @@
               type="text"
               placeholder="Search rows"
               class="input-base h-8 pl-8 pr-2"
+              title="Search rows in current table"
               :disabled="!selectedArtifactId"
               aria-label="Search rows"
             />
@@ -1280,17 +1282,38 @@ async function deleteSelectedArtifact() {
 <style>
 .ag-theme-quartz {
   --ag-background-color: #FFFFFF;
-  --ag-header-background-color: #F5F3ED;
+  --ag-header-background-color: #F4F4F5;
+  --ag-header-height: 34px;
+  --ag-row-height: 30px;
+  --ag-grid-size: 4px;
+  --ag-cell-horizontal-padding: 8px;
+  --ag-header-cell-horizontal-padding: 8px;
   --ag-odd-row-background-color: #FFFFFF;
-  --ag-even-row-background-color: #FAF8F3;
-  --ag-row-hover-color: #F0EDE5;
-  --ag-selected-row-background-color: #EDE9DE;
-  --ag-border-color: #E8E4DC;
-  --ag-header-foreground-color: #3d3830;
-  --ag-foreground-color: #1a1612;
-  --ag-secondary-foreground-color: #6b6358;
-  --ag-input-focus-border-color: #d4b896;
-  --ag-range-selection-border-color: #c8a87c;
-  --ag-cell-horizontal-border: solid #E8E4DC;
+  --ag-even-row-background-color: #FAFAFA;
+  --ag-row-hover-color: #F5F5F5;
+  --ag-selected-row-background-color: #F1F5F9;
+  --ag-border-color: #E4E4E7;
+  --ag-header-foreground-color: #3f3f46;
+  --ag-foreground-color: #18181B;
+  --ag-secondary-foreground-color: #52525B;
+  --ag-input-focus-border-color: #A1A1AA;
+  --ag-range-selection-border-color: #D4D4D8;
+  --ag-cell-horizontal-border: solid #E4E4E7;
+  --ag-header-column-separator-color: #E4E4E7;
+  --ag-header-column-separator-display: block;
+}
+
+.ag-theme-quartz .ag-header {
+  border-bottom: 1px solid #E4E4E7;
+}
+
+.ag-theme-quartz .ag-cell,
+.ag-theme-quartz .ag-header-cell {
+  border-right: 1px solid #E4E4E7;
+}
+
+.ag-theme-quartz .ag-row .ag-cell:last-child,
+.ag-theme-quartz .ag-header-row .ag-header-cell:last-child {
+  border-right: none;
 }
 </style>

@@ -68,13 +68,13 @@
 
     <div v-show="authStore.isAuthenticated && appBootstrap.ready" class="flex flex-col h-screen">
       <ConnectionStatusIndicator />
-      <div class="flex-1 flex overflow-hidden bg-white relative">
+      <div class="flex-1 flex overflow-hidden app-shell-frame relative">
         <Transition name="sidebar-shell">
-          <div v-if="!appStore.isSidebarCollapsed" class="h-full shrink-0">
+          <div v-if="!appStore.isSidebarCollapsed" class="h-full shrink-0 app-nav-pane">
             <UnifiedSidebar />
           </div>
         </Transition>
-        <div class="flex-1 bg-white flex flex-col overflow-hidden">
+        <div class="flex-1 flex flex-col overflow-hidden app-workspace-pane">
           <RightPanel />
         </div>
       </div>
@@ -716,6 +716,21 @@ onUnmounted(() => {
 .sidebar-shell-leave-from {
   width: 16rem;
   opacity: 1;
+}
+
+.app-shell-frame {
+  background-color: var(--color-shell-backdrop);
+}
+
+.app-nav-pane {
+  border-right: 1px solid var(--color-border);
+  background-color: var(--color-sidebar-surface);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--color-text-main) 4%, transparent);
+}
+
+.app-workspace-pane {
+  background-color: var(--color-workspace-surface);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-text-main) 3%, transparent);
 }
 
 .startup-brand-logo {
