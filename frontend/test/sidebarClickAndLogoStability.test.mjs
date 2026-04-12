@@ -14,7 +14,7 @@ test('collapsed sidebar expands only on explicit icon click (never on hover)', (
   assert.equal(sidebarSource.includes('class="sidebar-rail-btn"'), true)
   assert.equal(sidebarSource.includes("expandSidebarFromIcon('datasets')"), true)
   assert.equal(sidebarSource.includes("expandSidebarFromIcon('conversations')"), true)
-  assert.equal(sidebarSource.includes("expandSidebarFromIcon('settings')"), true)
+  assert.equal(sidebarSource.includes("expandSidebarFromIcon('settings')"), false)
 })
 
 test('sidebar keeps logo mounted and uses width transition to avoid layout jerk', () => {

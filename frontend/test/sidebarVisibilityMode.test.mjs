@@ -21,5 +21,5 @@ test('app keeps a single sidebar container and relies on click-only collapse sta
   assert.equal(sidebarSource.includes('function expandSidebarFromIcon(target = \'\') {'), true)
   assert.equal(sidebarSource.includes("title=\"Open datasets sidebar\""), true)
   assert.equal(sidebarSource.includes("title=\"Open conversations sidebar\""), true)
-  assert.equal(sidebarSource.includes("title=\"Open settings sidebar\""), true)
+  assert.equal(sidebarSource.includes("title=\"Open settings sidebar\""), false)
 })

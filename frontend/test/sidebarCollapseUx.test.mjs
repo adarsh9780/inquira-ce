@@ -16,7 +16,7 @@ test('sidebar uses file explorer layout with unified design', () => {
   assert.equal(source.includes('class="sidebar-rail-btn"'), true)
   assert.equal(source.includes("expandSidebarFromIcon('datasets')"), true)
   assert.equal(source.includes("expandSidebarFromIcon('conversations')"), true)
-  assert.equal(source.includes("expandSidebarFromIcon('settings')"), true)
+  assert.equal(source.includes("expandSidebarFromIcon('settings')"), false)
   assert.equal(source.includes('function expandSidebarFromIcon(target = \'\') {'), true)
   
   // No expand/collapse text labels

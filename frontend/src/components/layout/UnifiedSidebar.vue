@@ -53,15 +53,6 @@
         >
           <ChatBubbleLeftRightIcon class="h-4 w-4" />
         </button>
-        <button
-          type="button"
-          class="sidebar-rail-btn"
-          title="Open settings sidebar"
-          aria-label="Open settings sidebar"
-          @click="expandSidebarFromIcon('settings')"
-        >
-          <CogIcon class="h-4 w-4" />
-        </button>
       </div>
 
       <div v-show="!appStore.isSidebarCollapsed" class="px-3 py-3 space-y-2">
@@ -474,10 +465,6 @@ function handleBrandClick() {
 function expandSidebarFromIcon(target = '') {
   appStore.setSidebarCollapsed(false)
   const normalized = String(target || '').trim().toLowerCase()
-  if (normalized === 'settings') {
-    openSettings('api')
-    return
-  }
   if (normalized === 'conversations') {
     workspacesExpanded.value = true
     conversationsExpanded.value = true
