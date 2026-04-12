@@ -33,11 +33,13 @@ test('sidebar has settings and terms (CE: no logout)', () => {
 
   // Settings button instead of workspace/schema tabs
   assert.equal(sidebarSource.includes('@click="openSettings'), true)
-  assert.equal(sidebarSource.includes('title="Settings"'), true)
+  assert.equal(sidebarSource.includes('title="Settings"'), false)
+  assert.equal(sidebarSource.includes('aria-label="Settings"'), true)
 
   // Terms button
   assert.equal(sidebarSource.includes('@click="openTerms'), true)
-  assert.equal(sidebarSource.includes('title="Terms & Conditions"'), true)
+  assert.equal(sidebarSource.includes('title="Terms & Conditions"'), false)
+  assert.equal(sidebarSource.includes('aria-label="Terms & Conditions"'), true)
 
   // CE: Logout removed — no auth needed
   assert.equal(sidebarSource.includes('@click="promptLogout'), false)

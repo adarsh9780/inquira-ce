@@ -82,9 +82,9 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
   // ConfirmationModal is used for delete confirmations (new feature in redesign)
   assert.equal(sidebarSource.includes('ConfirmationModal'), true)
 
-  // Sidebar no longer has Workspace/Schema toggle
+  // Sidebar no longer has legacy Workspace/Schema top toggle handlers
   assert.equal(sidebarSource.includes('handleTabClick'), false)
-  assert.equal(sidebarSource.includes('DocumentTextIcon'), false) // In schema editor toggle context
+  assert.equal(sidebarSource.includes('DocumentTextIcon'), true) // Used in collapsed icon rail
 
   // StatusBar no longer has Settings/Confirmation modal directly
   assert.equal(statusBarSource.includes('<SettingsModal'), false)
@@ -105,11 +105,13 @@ test('sidebar has settings and terms buttons (CE: no logout)', () => {
 
   // Settings button in sidebar
   assert.equal(sidebarSource.includes('@click="openSettings'), true)
-  assert.equal(sidebarSource.includes('title="Settings"'), true)
+  assert.equal(sidebarSource.includes('title="Settings"'), false)
+  assert.equal(sidebarSource.includes('aria-label="Settings"'), true)
 
   // Terms & Conditions button in sidebar
   assert.equal(sidebarSource.includes('@click="openTerms'), true)
-  assert.equal(sidebarSource.includes('title="Terms & Conditions"'), true)
+  assert.equal(sidebarSource.includes('title="Terms & Conditions"'), false)
+  assert.equal(sidebarSource.includes('aria-label="Terms & Conditions"'), true)
 
   // CE: logout removed — no auth needed
   assert.equal(sidebarSource.includes('@click="promptLogout'), false)

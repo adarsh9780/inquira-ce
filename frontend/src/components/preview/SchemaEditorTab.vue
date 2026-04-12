@@ -1,8 +1,5 @@
 <template>
   <div class="schema-editor h-full flex flex-col relative overflow-hidden">
-    <!-- Subtle background texture -->
-    <div class="absolute inset-0 opacity-[0.015] pointer-events-none" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E');"></div>
-
     <Teleport to="body">
       <!-- Regeneration Overlay -->
       <Transition
@@ -61,23 +58,15 @@
     </Teleport>
 
     <!-- Header -->
-    <div class="relative z-10 mb-5">
-      <div class="flex flex-wrap items-end justify-between gap-4 pb-4 border-b" style="border-color: color-mix(in srgb, var(--color-border) 30%, transparent);">
-        <div class="flex min-w-0 flex-wrap items-center gap-3">
-          <div class="flex items-center gap-2">
-            <!-- Schema icon -->
-            <div class="flex h-9 w-9 items-center justify-center rounded-xl" style="background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 15%, transparent), color-mix(in srgb, var(--color-accent) 5%, transparent)); border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);">
-              <svg class="w-5 h-5" style="color: var(--color-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
-              </svg>
-            </div>
-            <div>
-              <h2 class="text-base font-semibold tracking-tight" style="color: var(--color-text-main);">Schema Editor</h2>
-              <p class="text-xs" style="color: var(--color-text-muted);">Manage column metadata</p>
-            </div>
-          </div>
-          
-          <div class="w-[240px] max-w-[50vw] min-w-[180px]">
+    <div class="schema-top-bar relative z-10">
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <div class="min-w-0">
+          <h2 class="schema-page-title">Schema Editor</h2>
+          <p class="schema-page-subtitle">Manage column metadata</p>
+        </div>
+
+        <div class="schema-action-bar">
+          <div class="schema-dataset-selector w-[240px] max-w-[52vw] min-w-[180px]">
             <HeaderDropdown
               v-model="selectedDatasetTable"
               :options="datasetDropdownOptions"
@@ -90,67 +79,43 @@
               @update:model-value="handleDatasetSelection"
             />
           </div>
-        </div>
 
-        <div class="flex flex-wrap items-center gap-2">
+          <div class="schema-action-divider" aria-hidden="true"></div>
+
           <button
             @click="refreshSchema"
             :disabled="schemaLoading || !hasActiveDataset"
-            class="group inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
-            style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-main); background: transparent;"
-            :class="{ 'hover:border-color: color-mix(in srgb, var(--color-accent) 40%, transparent); hover:bg-color-mix(in srgb, var(--color-accent) 5%, transparent, 50%)': !schemaLoading && hasActiveDataset }"
+            class="schema-ghost-btn"
           >
-            <svg class="w-4 h-4 transition-transform duration-200 group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
             Refresh
           </button>
           <button
             @click="regenerateSchema"
             :disabled="schemaLoading || !hasActiveDataset"
-            class="group inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
-            style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-main); background: transparent;"
-            :class="{ 'hover:border-color: color-mix(in srgb, var(--color-accent) 40%, transparent); hover:bg-color-mix(in srgb, var(--color-accent) 5%, transparent, 50%)': !schemaLoading && hasActiveDataset }"
+            class="schema-ghost-btn"
             title="Regenerate schema with AI descriptions"
           >
-            <svg class="w-4 h-4 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-            </svg>
             Regenerate
           </button>
           <button
             @click="clearCache"
-            class="inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-medium transition-all duration-200"
-            style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-muted); background: transparent;"
+            class="schema-ghost-btn"
             title="Clear cached schema data"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-            </svg>
             Clear Cache
           </button>
-          <div class="w-px h-6 mx-1" style="background-color: color-mix(in srgb, var(--color-border) 40%, transparent);"></div>
           <button
             @click="exportSchema"
             :disabled="schema.length === 0"
-            class="inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
-            style="border-color: color-mix(in srgb, var(--color-border) 60%, transparent); color: var(--color-text-main); background: transparent;"
+            class="schema-ghost-btn"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-            </svg>
             Export
           </button>
           <button
             @click="saveSchema"
             :disabled="schemaLoading || !schemaEdited || !hasActiveDataset"
-            class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
-            :class="schemaEdited && hasActiveDataset && !schemaLoading ? 'hover:shadow-md hover:-translate-y-0.5' : ''"
-            style="background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 85%, #f97316)); color: white; box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 30%, transparent);"
+            class="schema-save-btn"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
             Save
           </button>
         </div>
@@ -204,7 +169,7 @@
 
       <!-- Schema Content -->
       <div v-else-if="hasActiveDataset" class="h-full overflow-auto">
-        <div class="px-4 pb-4 space-y-4">
+        <div class="px-4 py-4 space-y-4">
           <!-- Warning Banner -->
           <Transition
             enter-active-class="transition duration-300 ease-out"
@@ -234,76 +199,69 @@
           </Transition>
 
           <!-- Context Section -->
-          <div class="rounded-xl border p-4" style="border-color: color-mix(in srgb, var(--color-border) 40%, transparent); background: linear-gradient(135deg, var(--color-surface) 0%, color-mix(in srgb, var(--color-surface) 70%, var(--color-base)));">
-            <div class="flex items-start justify-between gap-3 mb-3">
-              <label class="text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Context</label>
+          <div class="schema-context-card">
+            <div class="mb-2 flex items-start justify-between gap-3">
+              <label class="schema-context-label">Context</label>
               <button
                 @click="openEditDialog(-1, 'context')"
-                class="group inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all duration-200"
-                style="border-color: color-mix(in srgb, var(--color-border) 50%, transparent); color: var(--color-text-muted);"
+                class="schema-context-edit-link"
               >
-                <svg class="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
                 </svg>
                 Edit
               </button>
             </div>
-            
+
             <div
               v-if="schemaContext && schemaContext.trim()"
-              class="rounded-lg px-4 py-3 prose prose-sm max-w-none"
-              style="background-color: color-mix(in srgb, var(--color-base) 80%, transparent); border: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);"
+              class="schema-context-body prose prose-sm max-w-none"
             >
-              <div class="text-sm leading-relaxed" style="color: var(--color-text-main);" v-html="renderedContext"></div>
+              <div v-html="renderedContext"></div>
             </div>
             <div
               v-else
-              class="rounded-lg px-4 py-4 text-sm text-center italic"
-              style="color: var(--color-text-muted); opacity: 0.6; background-color: color-mix(in srgb, var(--color-base) 60%, transparent); border: 1px dashed color-mix(in srgb, var(--color-border) 30%, transparent);"
+              class="schema-context-empty"
             >
               Click edit to add context for this dataset...
             </div>
           </div>
 
           <!-- Schema Table -->
-          <div class="rounded-xl border overflow-hidden" style="border-color: color-mix(in srgb, var(--color-border) 40%, transparent); background: linear-gradient(135deg, var(--color-surface) 0%, color-mix(in srgb, var(--color-surface) 70%, var(--color-base)));">
-            <table class="min-w-full">
+          <div class="schema-table-wrap overflow-hidden">
+            <table class="schema-table min-w-full">
               <thead>
-                <tr style="background: linear-gradient(180deg, color-mix(in srgb, var(--color-base) 60%, var(--color-surface)) 0%, color-mix(in srgb, var(--color-base) 80%, var(--color-surface)) 100%);">
-                  <th class="w-12 px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">#</th>
-                  <th class="w-[24%] px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Column</th>
-                  <th class="w-[46%] px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Description</th>
-                  <th class="w-[30%] px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Aliases</th>
+                <tr class="schema-table-header-row">
+                  <th class="schema-row-header-cell" aria-label="Row"></th>
+                  <th class="schema-header-cell">Column</th>
+                  <th class="schema-header-cell">Description</th>
+                  <th class="schema-header-cell">Aliases</th>
                 </tr>
               </thead>
-              <tbody class="divide-y" style="--tw-divide-opacity: 0.08; border-top: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);">
+              <tbody>
                 <tr
                   v-for="(col, i) in schema"
                   :key="i"
-                  class="group align-top transition-colors duration-150"
-                  style="border-bottom: 1px solid color-mix(in srgb, var(--color-border) 20%, transparent);"
+                  class="schema-row group align-top"
+                  :class="i % 2 === 0 ? 'schema-row-odd' : 'schema-row-even'"
                 >
-                  <td class="px-4 py-3.5">
-                    <span class="text-xs font-mono font-medium" style="color: var(--color-text-muted);">
-                      {{ i + 1 }}
-                    </span>
+                  <td class="schema-row-number-cell">
+                    {{ i + 1 }}
                   </td>
-                  <td class="px-4 py-3.5">
-                    <span class="text-sm font-medium font-mono" style="color: var(--color-text-main);">{{ col.name }}</span>
+                  <td class="schema-column-cell">
+                    {{ col.name }}
                   </td>
-                  <td class="px-4 py-3.5 relative">
+                  <td class="schema-description-cell relative">
                     <div class="min-h-[24px] pr-10">
                       <span
                         v-if="col.description"
-                        class="text-sm leading-relaxed"
-                        style="color: var(--color-text-main); white-space: pre-wrap;"
+                        class="schema-description-text"
                       >{{ col.description }}</span>
-                      <span v-else class="text-sm" style="color: var(--color-text-muted);">No description</span>
+                      <span v-else class="schema-description-empty">No description</span>
                     </div>
                     <button
                       @click="openEditDialog(i, 'description')"
-                      class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 rounded-md transition-all duration-150"
-                      style="color: var(--color-text-muted);"
+                      class="schema-inline-edit-btn absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100"
                       title="Edit description"
                     >
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -311,24 +269,22 @@
                       </svg>
                     </button>
                   </td>
-                  <td class="px-4 py-3.5 relative">
+                  <td class="schema-alias-cell relative">
                     <div class="min-h-[24px] pr-10">
-                      <div v-if="col.aliases && col.aliases.length > 0" class="flex flex-wrap gap-1.5">
+                      <div v-if="col.aliases && col.aliases.length > 0" class="flex flex-wrap gap-1">
                         <span
                           v-for="(alias, ai) in col.aliases"
                           :key="ai"
-                          class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium"
-                          style="border-color: color-mix(in srgb, var(--color-border) 50%, transparent); color: var(--color-text-muted); background: color-mix(in srgb, var(--color-base) 60%, transparent);"
+                          class="schema-alias-tag"
                         >
                           {{ alias }}
                         </span>
                       </div>
-                      <span v-else class="text-sm" style="color: var(--color-text-muted);">No aliases</span>
+                      <span v-else class="schema-description-empty">No aliases</span>
                     </div>
                     <button
                       @click="openEditDialog(i, 'aliases')"
-                      class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 rounded-md transition-all duration-150"
-                      style="color: var(--color-text-muted);"
+                      class="schema-inline-edit-btn absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100"
                       title="Edit aliases"
                     >
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -342,7 +298,7 @@
           </div>
 
           <!-- Footer hint -->
-          <div class="flex items-center justify-center gap-2 py-2 text-xs" style="color: var(--color-text-muted); opacity: 0.6;">
+          <div class="schema-footer-hint flex items-center justify-center gap-2 py-2">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
@@ -542,7 +498,7 @@ const datasetDropdownOptions = computed(() => {
   }
   return options.map((item) => ({
     value: item.tableName,
-    label: item.tableName,
+    label: datasetFriendlyName(item.tableName),
     key: item.tableName,
   }))
 })
@@ -581,6 +537,14 @@ function formatElapsedTime(ms) {
     return `${minutes}m ${remainingSeconds}s`
   }
   return `${remainingSeconds}s`
+}
+
+function datasetFriendlyName(tableName) {
+  const raw = String(tableName || '').trim()
+  if (!raw) return 'Untitled dataset'
+  const withoutHashSuffix = raw.replace(/__\d{6,}(?=__|$)/g, '')
+  const compacted = withoutHashSuffix.replace(/_{2,}/g, '_').replace(/^_+|_+$/g, '')
+  return compacted || raw
 }
 
 function normalizeDatasetEntries(items) {
@@ -1203,25 +1167,276 @@ async function exportSchema() {
 <style scoped>
 .schema-editor {
   position: relative;
+  background-color: #FAF9F6;
+  color: #1A1F2E;
+  font-family: 'Ubuntu', sans-serif;
 }
 
-/* Subtle noise texture overlay */
-.schema-editor::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.02;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='2200 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+.schema-top-bar {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid #E5E3DC;
+}
+
+.schema-page-title {
+  color: #1A1F2E;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.schema-page-subtitle {
+  margin-top: 2px;
+  color: #6B7280;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.schema-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.schema-action-divider {
+  width: 1px;
+  min-height: 26px;
+  background: #E5E3DC;
+  margin: 0 4px;
+}
+
+.schema-ghost-btn {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 6px 10px;
+  color: #1A1F2E;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.schema-ghost-btn:hover:not(:disabled) {
+  background-color: #EDE9E3;
+}
+
+.schema-ghost-btn:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.schema-save-btn {
+  border: 0;
+  border-radius: 6px;
+  background: #C96A2E;
+  color: #fff;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  transition: filter 140ms ease, opacity 140ms ease;
+}
+
+.schema-save-btn:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.schema-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.schema-dataset-selector :deep(button) {
+  background-color: #FAF9F6;
+  border-color: #E5E3DC;
+  color: #1A1F2E;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.schema-dataset-selector :deep(button:focus-visible) {
+  box-shadow: 0 0 0 2px color-mix(in srgb, #C96A2E 28%, transparent);
+}
+
+.schema-context-card {
+  background: #F0EDE6;
+  border-left: 3px solid #C96A2E;
+  border-radius: 6px;
+  padding: 12px 16px;
+}
+
+.schema-context-label {
+  color: #6B7280;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  line-height: 1.3;
+}
+
+.schema-context-edit-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #C96A2E;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.schema-context-body {
+  color: #1A1F2E;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.schema-context-empty {
+  color: #6B7280;
+  font-size: 14px;
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.6;
+}
+
+.schema-table-wrap {
+  background: #FAF9F6;
+  border: 0;
+  border-radius: 0;
+}
+
+.schema-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.schema-table-header-row {
+  background: #EFEDE8;
+}
+
+.schema-row-header-cell {
+  width: 32px;
+  padding: 9px 6px;
+  text-align: right;
+  border-bottom: 1px solid #E5E3DC;
+}
+
+.schema-header-cell {
+  padding: 9px 16px;
+  text-align: left;
+  border-bottom: 1px solid #E5E3DC;
+  color: #6B7280;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  line-height: 1.3;
+}
+
+.schema-row {
+  transition: background-color 150ms ease;
+}
+
+.schema-row-odd {
+  background: #FAF9F6;
+}
+
+.schema-row-even {
+  background: #F5F3EE;
+}
+
+.schema-row:hover {
+  background: #EDE9E3;
+}
+
+.schema-row-number-cell {
+  width: 32px;
+  padding: 12px 6px;
+  text-align: right;
+  color: #9CA3AF;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.schema-column-cell {
+  padding: 12px 16px;
+  vertical-align: top;
+  color: #1A1F2E;
+  font-family: 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.schema-description-cell,
+.schema-alias-cell {
+  padding: 12px 16px;
+  vertical-align: top;
+}
+
+.schema-description-text {
+  white-space: pre-wrap;
+  color: #1A1F2E;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.schema-description-empty {
+  color: #6B7280;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.schema-alias-tag {
+  display: inline-flex;
+  align-items: center;
+  background: #EDE9E3;
+  color: #4B4540;
+  border: 0;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.schema-inline-edit-btn {
+  border: 0;
+  border-radius: 6px;
+  padding: 6px;
+  color: #6B7280;
+  background: transparent;
+  transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.schema-inline-edit-btn:hover {
+  color: #1A1F2E;
+  background: color-mix(in srgb, #1A1F2E 5%, transparent);
+}
+
+.schema-footer-hint {
+  color: #6B7280;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.3;
+  opacity: 0.85;
 }
 
 /* Markdown rendered content styling */
 .prose {
-  color: var(--color-text-main);
+  color: #1A1F2E;
 }
 
 .prose :deep(p) {
-  margin: 0 0 0.5em 0;
+  margin: 0;
 }
 
 .prose :deep(p:last-child) {
@@ -1229,37 +1444,38 @@ async function exportSchema() {
 }
 
 .prose :deep(strong) {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .prose :deep(code) {
-  font-family: var(--font-mono);
-  font-size: 0.875em;
+  font-family: 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
   padding: 0.125em 0.375em;
   border-radius: 0.25rem;
-  background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent);
+  background-color: color-mix(in srgb, #1A1F2E 8%, transparent);
 }
 
 .prose :deep(ul),
 .prose :deep(ol) {
-  margin: 0.5em 0;
+  margin: 0.35em 0;
   padding-left: 1.5em;
 }
 
 .prose :deep(li) {
-  margin: 0.25em 0;
+  margin: 0.2em 0;
 }
 
 .prose :deep(a) {
-  color: var(--color-accent);
+  color: #C96A2E;
   text-decoration: underline;
 }
 
 .prose :deep(blockquote) {
-  margin: 0.5em 0;
+  margin: 0.35em 0;
   padding-left: 1em;
-  border-left: 3px solid var(--color-border);
-  color: var(--color-text-muted);
+  border-left: 3px solid #E5E3DC;
+  color: #6B7280;
 }
 
 /* Custom scrollbar styling */
@@ -1276,20 +1492,20 @@ async function exportSchema() {
 
 .overflow-auto::-webkit-scrollbar-thumb,
 .overflow-auto::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--color-border) 50%, transparent);
+  background: color-mix(in srgb, #E5E3DC 68%, transparent);
   border-radius: 4px;
 }
 
 .overflow-auto::-webkit-scrollbar-thumb:hover,
 .overflow-auto::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--color-border) 70%, transparent);
+  background: color-mix(in srgb, #E5E3DC 86%, transparent);
 }
 
 /* Focus styles */
 textarea:focus,
 button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 30%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, #C96A2E 30%, transparent);
 }
 
 /* Animation utilities */

@@ -38,6 +38,7 @@
         <button
           type="button"
           class="sidebar-rail-btn"
+          :class="{ 'sidebar-rail-btn-active': appStore.activeTab === 'workspace' }"
           title="Open datasets sidebar"
           aria-label="Open datasets sidebar"
           @click="expandSidebarFromIcon('datasets')"
@@ -47,11 +48,22 @@
         <button
           type="button"
           class="sidebar-rail-btn"
+          :class="{ 'sidebar-rail-btn-active': appStore.activeTab === 'workspace' }"
           title="Open conversations sidebar"
           aria-label="Open conversations sidebar"
           @click="expandSidebarFromIcon('conversations')"
         >
           <ChatBubbleLeftRightIcon class="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          class="sidebar-rail-btn"
+          :class="{ 'sidebar-rail-btn-active': appStore.activeTab === 'schema-editor' }"
+          title="Open schema editor"
+          aria-label="Open schema editor"
+          @click="openSchemaFromRail"
+        >
+          <DocumentTextIcon class="h-4 w-4" />
         </button>
       </div>
 
@@ -284,7 +296,7 @@
         @click="openCreateDialog"
         class="relative group flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
         style="color: var(--color-text-main);"
-        title="Create Workspace"
+        aria-label="Create Workspace"
       >
         <FolderPlusIcon class="w-4 h-4" />
         <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style="background-color: var(--color-surface); color: var(--color-text-main);">
@@ -296,7 +308,7 @@
         @click="openSettings('api')"
         class="relative group flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
         style="color: var(--color-text-main);"
-        title="Settings"
+        aria-label="Settings"
       >
         <CogIcon class="w-4 h-4" />
         <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style="background-color: var(--color-surface); color: var(--color-text-main);">
@@ -308,7 +320,7 @@
         @click="toggleSearch"
         class="relative group flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
         style="color: var(--color-text-main);"
-        title="Search"
+        aria-label="Search"
       >
         <MagnifyingGlassIcon class="w-4 h-4" />
         <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style="background-color: var(--color-surface); color: var(--color-text-main);">
@@ -320,7 +332,7 @@
         @click="openTerms"
         class="relative group flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
         style="color: var(--color-text-main);"
-        title="Terms & Conditions"
+        aria-label="Terms & Conditions"
       >
         <ScaleIcon class="w-4 h-4" />
         <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style="background-color: var(--color-surface); color: var(--color-text-main);">
@@ -427,6 +439,7 @@ import {
   MagnifyingGlassIcon,
   CircleStackIcon,
   ChatBubbleLeftRightIcon,
+  DocumentTextIcon,
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
@@ -463,6 +476,7 @@ function handleBrandClick() {
 }
 
 function expandSidebarFromIcon(target = '') {
+  appStore.setActiveTab('workspace')
   appStore.setSidebarCollapsed(false)
   const normalized = String(target || '').trim().toLowerCase()
   if (normalized === 'conversations') {
@@ -474,6 +488,10 @@ function expandSidebarFromIcon(target = '') {
     workspacesExpanded.value = true
     datasetsExpanded.value = true
   }
+}
+
+function openSchemaFromRail() {
+  appStore.setActiveTab('schema-editor')
 }
 
 // Section expansion states
@@ -956,6 +974,12 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
   background-color: color-mix(in srgb, var(--color-text-main) 6%, transparent);
   border-color: var(--color-border);
   color: var(--color-text-main);
+}
+
+.sidebar-rail-btn-active {
+  color: #C96A2E;
+  border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-accent) 14%, transparent);
 }
 
 .sidebar-item-row {
