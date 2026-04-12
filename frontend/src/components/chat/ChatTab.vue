@@ -36,7 +36,7 @@
       </div>
     </Teleport>
 
-      <div class="flex-1 min-h-0 overflow-y-auto" style="background-color: var(--color-base);" data-chat-scroll-container>
+      <div class="chat-scroll-shell flex-1 min-h-0 overflow-y-auto" style="background-color: var(--color-base);" data-chat-scroll-container>
         <div v-if="!appStore.hasWorkspace" class="flex items-center justify-center h-full px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-2 sm:pb-3 lg:pb-4">
           <div class="text-center max-w-md">
             <div class="mx-auto flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 mb-4 sm:mb-6 shadow-lg">
@@ -144,3 +144,27 @@ watch(
   }
 )
 </script>
+
+<style scoped>
+.chat-scroll-shell {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-border) 68%, transparent) transparent;
+}
+
+.chat-scroll-shell::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-scroll-shell::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scroll-shell::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-border) 62%, transparent);
+}
+
+.chat-scroll-shell::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-border) 80%, transparent);
+}
+</style>

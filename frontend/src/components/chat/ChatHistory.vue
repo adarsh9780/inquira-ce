@@ -121,7 +121,7 @@
             <summary class="view-code-toggle">
               <span class="inline-flex items-center gap-1.5">
                 <CodeBracketIcon class="h-4 w-4" title="View code details" />
-                <span>&lt;/&gt; View code</span>
+                <span>View code</span>
                 <span class="view-code-caret" aria-hidden="true">↓</span>
               </span>
             </summary>
