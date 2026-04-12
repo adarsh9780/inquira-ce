@@ -168,7 +168,7 @@
       </div>
 
       <!-- Schema Content -->
-      <div v-else-if="hasActiveDataset" class="h-full overflow-auto">
+      <div v-else-if="hasActiveDataset" class="schema-scroll-area h-full overflow-auto">
         <div class="px-4 py-4 space-y-4">
           <!-- Warning Banner -->
           <Transition
@@ -1478,27 +1478,15 @@ async function exportSchema() {
   color: #6B7280;
 }
 
-/* Custom scrollbar styling */
-.overflow-auto::-webkit-scrollbar,
-.overflow-auto::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Hide clunky scrollbars while keeping scroll behavior */
+.schema-scroll-area {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-.overflow-auto::-webkit-scrollbar-track,
-.overflow-auto::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.overflow-auto::-webkit-scrollbar-thumb,
-.overflow-auto::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, #E5E3DC 68%, transparent);
-  border-radius: 4px;
-}
-
-.overflow-auto::-webkit-scrollbar-thumb:hover,
-.overflow-auto::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, #E5E3DC 86%, transparent);
+.schema-scroll-area::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 /* Focus styles */
