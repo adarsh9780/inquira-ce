@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict
 from .services.chat_model_factory import create_chat_model
 from .services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
 from .services.llm_provider_catalog import normalize_llm_provider, provider_requires_api_key
+from .structured_schema import openai_strict_json_schema
 
 _ROUTER_PROMPT = (
     Path(__file__).parent / "prompts" / "router_system.yaml"
@@ -26,7 +27,7 @@ _UNSAFE_RE = re.compile(
 
 
 class RouteDecision(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra=openai_strict_json_schema)
 
     route: Literal["analysis", "general_chat", "unsafe"]
 

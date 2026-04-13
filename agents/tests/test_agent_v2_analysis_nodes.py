@@ -26,7 +26,7 @@ from agent_v2.nodes import (
     analysis_validate_to_next,
     analysis_retry_decider_node,
     ContextEnrichmentPlan,
-    SearchSchemaToolCall,
+    StructuredToolCall,
 )
 from agent_v2.coding_subagent.schema import AnalysisOutput
 
@@ -50,7 +50,7 @@ async def test_analysis_enrich_context_node_produces_structured_pending_tools(mo
             missing_context=["matching columns"],
             notes="Need schema matches first.",
             tools=[
-                SearchSchemaToolCall(
+                StructuredToolCall(
                     tool="search_schema",
                     args={"queries": ["customer", "amount"], "table_name": "orders", "limit": 10},
                     explanation="I have the user goal, so I’m checking schema matches before writing code.",
@@ -160,22 +160,19 @@ def test_context_enrichment_prompt_escapes_literal_tool_examples() -> None:
     assert prompt.input_variables == ["tool_request_prompt"]
 
 
-def test_context_enrichment_plan_schema_uses_strict_nested_tool_args() -> None:
+def test_context_enrichment_plan_schema_uses_openai_strict_tool_args() -> None:
     schema = ContextEnrichmentPlan.model_json_schema()
     defs = schema["$defs"]
-    search_call = defs["SearchSchemaToolCall"]
-    search_args = defs["SearchSchemaArgs"]
-    chunk_call = defs["ScanSchemaChunksToolCall"]
-    chunk_args = defs["ScanSchemaChunksArgs"]
-    sample_call = defs["SampleDataToolCall"]
-    sample_args = defs["SampleDataArgs"]
+    tool_call = defs["StructuredToolCall"]
+    tool_args = defs["StructuredToolArgs"]
 
-    assert search_call["additionalProperties"] is False
-    assert chunk_call["additionalProperties"] is False
-    assert sample_call["additionalProperties"] is False
-    assert search_args["additionalProperties"] is False
-    assert chunk_args["additionalProperties"] is False
-    assert sample_args["additionalProperties"] is False
+    assert tool_call["additionalProperties"] is False
+    assert tool_args["additionalProperties"] is False
+    assert "oneOf" not in schema["properties"]["tools"]["items"]
+    assert "discriminator" not in schema["properties"]["tools"]["items"]
+    assert set(tool_call["required"]) == set(tool_call["properties"])
+    assert set(tool_args["required"]) == set(tool_args["properties"])
+    assert "default" not in str(tool_args)
 
 
 @pytest.mark.asyncio

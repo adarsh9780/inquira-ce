@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from agent_v2.structured_schema import openai_strict_json_schema
+
 
 class OutputContractItem(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra=openai_strict_json_schema)
 
     name: str
     kind: str
@@ -14,7 +16,7 @@ class OutputContractItem(BaseModel):
 
 
 class AnalysisOutput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra=openai_strict_json_schema)
 
     code: str | None = None
     explanation: str | None = None
