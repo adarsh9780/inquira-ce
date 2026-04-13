@@ -75,7 +75,12 @@
 
         <div class="relative p-5">
           <LLMSettingsTab v-show="activeTab === 'llm'" />
-          <WorkspaceTab v-show="activeTab === 'workspace'" />
+          <WorkspaceTab
+            v-show="activeTab === 'workspace'"
+            :initial-step="initialStep"
+            :modal-open="modelValue"
+            @close-request="closeModal"
+          />
           <AccountTab v-show="activeTab === 'account'" />
         </div>
       </div>
@@ -97,6 +102,10 @@ const props = defineProps({
   initialTab: {
     type: String,
     default: 'llm',
+  },
+  initialStep: {
+    type: Number,
+    default: 1,
   },
 })
 

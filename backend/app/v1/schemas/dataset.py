@@ -37,3 +37,11 @@ class DatasetListResponse(BaseModel):
     """List datasets response."""
 
     datasets: list[DatasetResponse]
+
+
+class DatasetDeleteResponse(BaseModel):
+    """Delete one workspace dataset response."""
+
+    workspace_id: str
+    table_name: str
+    removed: bool

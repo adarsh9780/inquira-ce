@@ -111,7 +111,7 @@
             </div>
             <button
               v-if="appStore.hasWorkspace"
-              @click.stop="openSettings('data')"
+              @click.stop="openSettings('workspace', 2)"
               class="btn-icon shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
               title="Add Dataset"
             >
@@ -293,7 +293,7 @@
       style="border-color: var(--color-border); background-color: var(--color-sidebar-surface);"
     >
       <button
-        @click="openCreateDialog"
+        @click="openSettings('workspace', 1)"
         class="flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
         style="color: var(--color-text-main);"
         title="Create Workspace"
@@ -336,17 +336,7 @@
     <SettingsModal
       v-model="isSettingsOpen"
       :initial-tab="settingsInitialTab"
-    />
-
-    <WorkspaceCreateModal
-      :is-open="isCreateDialogOpen"
-      :is-submitting="isCreatingWorkspace"
-      :plan="authStore.planLabel"
-      :workspaces="appStore.workspaces"
-      :active-workspace-id="appStore.activeWorkspaceId"
-      @close="closeCreateDialog"
-      @open-workspace="openWorkspaceFromDialog"
-      @submit="createWorkspace"
+      :initial-step="settingsInitialStep"
     />
 
     <ConfirmationModal
@@ -406,13 +396,11 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import { useAppStore } from '../../stores/appStore'
-import { useAuthStore } from '../../stores/authStore'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { inferTableNameFromDataPath } from '../../utils/chatBootstrap'
 import { previewService } from '../../services/previewService'
 import SettingsModal from '../modals/SettingsModal.vue'
-import WorkspaceCreateModal from '../modals/WorkspaceCreateModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
@@ -434,7 +422,6 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
-const authStore = useAuthStore()
 
 // Search
 const searchQuery = ref('')
@@ -497,6 +484,7 @@ const isLoadingDatasets = ref(false)
 // Settings dialog
 const isSettingsOpen = ref(false)
 const settingsInitialTab = ref('llm')
+const settingsInitialStep = ref(1)
 
 // Terms dialog
 const isTermsDialogOpen = ref(false)
@@ -504,10 +492,6 @@ const isTermsLoading = ref(false)
 const termsError = ref('')
 const termsMarkdown = ref('')
 const termsLastUpdated = ref('')
-
-// Create workspace
-const isCreateDialogOpen = ref(false)
-const isCreatingWorkspace = ref(false)
 
 // Delete confirmation
 const isDeleteDialogOpen = ref(false)
@@ -615,7 +599,8 @@ function handleDatasetCatalogChanged() {
 
 function handleOpenSettingsRequest(event) {
   const requestedTab = String(event?.detail?.tab || 'api').trim() || 'api'
-  openSettings(requestedTab)
+  const requestedStep = Number(event?.detail?.step || 1)
+  openSettings(requestedTab, requestedStep)
 }
 
 async function selectWorkspace(id) {
@@ -719,10 +704,12 @@ async function saveTitle(id) {
 }
 
 // Settings
-function openSettings(tab = 'llm') {
+function openSettings(tab = 'llm', step = 1) {
   const normalized = String(tab || '').trim().toLowerCase()
   if (normalized === 'api') {
     settingsInitialTab.value = 'llm'
+  } else if (normalized === 'workspace') {
+    settingsInitialTab.value = 'workspace'
   } else if (normalized === 'data') {
     settingsInitialTab.value = 'workspace'
   } else if (normalized === 'account') {
@@ -730,6 +717,8 @@ function openSettings(tab = 'llm') {
   } else {
     settingsInitialTab.value = 'llm'
   }
+  const parsedStep = Number(step)
+  settingsInitialStep.value = Number.isFinite(parsedStep) && parsedStep >= 1 ? Math.floor(parsedStep) : 1
   isSettingsOpen.value = true
 }
 
@@ -756,40 +745,6 @@ async function openTerms() {
 
 function closeTermsDialog() {
   isTermsDialogOpen.value = false
-}
-
-// Create workspace
-function openCreateDialog() {
-  isCreateDialogOpen.value = true
-}
-
-function closeCreateDialog() {
-  if (isCreatingWorkspace.value) return
-  isCreateDialogOpen.value = false
-}
-
-async function createWorkspace(name) {
-  if (!name) return
-  isCreatingWorkspace.value = true
-  try {
-    await appStore.createWorkspace(name)
-    isCreateDialogOpen.value = false
-  } catch (error) {
-    toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to create workspace'))
-  } finally {
-    isCreatingWorkspace.value = false
-  }
-}
-
-async function openWorkspaceFromDialog(workspaceId) {
-  if (!workspaceId) return
-  isCreatingWorkspace.value = true
-  try {
-    await selectWorkspace(workspaceId)
-    isCreateDialogOpen.value = false
-  } finally {
-    isCreatingWorkspace.value = false
-  }
 }
 
 // Delete confirmations

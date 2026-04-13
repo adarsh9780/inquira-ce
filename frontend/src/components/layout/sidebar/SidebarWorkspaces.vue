@@ -8,7 +8,7 @@
         </span>
       </div>
       <button
-        @click.stop="openCreateDialog"
+        @click.stop="openWorkspaceSettings"
         class="btn-icon shrink-0"
         title="New Workspace"
       >
@@ -91,15 +91,10 @@
       </Listbox>
     </div>
 
-    <WorkspaceCreateModal
-      :is-open="isCreateDialogOpen"
-      :is-submitting="isCreatingWorkspace"
-      :plan="authStore.planLabel"
-      :workspaces="appStore.workspaces"
-      :active-workspace-id="appStore.activeWorkspaceId"
-      @close="closeCreateDialog"
-      @open-workspace="openWorkspaceFromDialog"
-      @submit="createWorkspace"
+    <SettingsModal
+      v-model="isSettingsOpen"
+      :initial-tab="settingsInitialTab"
+      :initial-step="settingsInitialStep"
     />
 
     <ConfirmationModal
@@ -118,10 +113,9 @@
 import { computed, ref, onMounted } from 'vue'
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/vue'
 import { useAppStore } from '../../../stores/appStore'
-import { useAuthStore } from '../../../stores/authStore'
 import { toast } from '../../../composables/useToast'
 import { extractApiErrorMessage } from '../../../utils/apiError'
-import WorkspaceCreateModal from '../../modals/WorkspaceCreateModal.vue'
+import SettingsModal from '../../modals/SettingsModal.vue'
 import ConfirmationModal from '../../modals/ConfirmationModal.vue'
 import {
   BuildingOffice2Icon,
@@ -138,10 +132,9 @@ defineProps({
 const emit = defineEmits(['header-click', 'select'])
 
 const appStore = useAppStore()
-const authStore = useAuthStore()
-
-const isCreateDialogOpen = ref(false)
-const isCreatingWorkspace = ref(false)
+const isSettingsOpen = ref(false)
+const settingsInitialTab = ref('workspace')
+const settingsInitialStep = ref(1)
 const isDeleteDialogOpen = ref(false)
 const pendingDeleteWorkspaceId = ref('')
 
@@ -169,38 +162,10 @@ async function selectWorkspace(id) {
   }
 }
 
-function openCreateDialog() {
-  isCreateDialogOpen.value = true
-}
-
-function closeCreateDialog() {
-  if (isCreatingWorkspace.value) return
-  isCreateDialogOpen.value = false
-}
-
-async function createWorkspace(name) {
-  if (!name) return
-  isCreatingWorkspace.value = true
-  try {
-    await appStore.createWorkspace(name)
-    isCreateDialogOpen.value = false
-    emit('select')
-  } catch (error) {
-    toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to create workspace'))
-  } finally {
-    isCreatingWorkspace.value = false
-  }
-}
-
-async function openWorkspaceFromDialog(workspaceId) {
-  if (!workspaceId) return
-  isCreatingWorkspace.value = true
-  try {
-    await selectWorkspace(workspaceId)
-    isCreateDialogOpen.value = false
-  } finally {
-    isCreatingWorkspace.value = false
-  }
+function openWorkspaceSettings() {
+  settingsInitialTab.value = 'workspace'
+  settingsInitialStep.value = 1
+  isSettingsOpen.value = true
 }
 
 function isWorkspaceDeleting(workspaceId) {

@@ -12,6 +12,7 @@ def test_openapi_contains_core_workspace_dataset_chat_and_conversation_routes():
     assert "/api/v1/workspaces/{workspace_id}/summary" in paths
 
     assert "/api/v1/workspaces/{workspace_id}/datasets" in paths
+    assert "/api/v1/workspaces/{workspace_id}/datasets/{table_name}" in paths
     assert "/api/v1/workspaces/{workspace_id}/datasets/browser-sync" in paths
     assert "/api/v1/workspaces/{workspace_id}/datasets/{table_name}/schema" in paths
     assert "/api/v1/workspaces/{workspace_id}/datasets/{table_name}/schema/regenerate" in paths
@@ -37,6 +38,7 @@ def test_openapi_contains_methods_for_core_user_actions():
     assert "post" in paths["/api/v1/workspaces"]
     assert "put" in paths["/api/v1/workspaces/{workspace_id}/activate"]
     assert "post" in paths["/api/v1/workspaces/{workspace_id}/datasets"]
+    assert "delete" in paths["/api/v1/workspaces/{workspace_id}/datasets/{table_name}"]
     assert "post" in paths["/api/v1/workspaces/{workspace_id}/datasets/browser-sync"]
     assert "post" in paths["/api/v1/chat/stream"]
     assert "post" in paths["/api/v1/workspaces/{workspace_id}/conversations"]

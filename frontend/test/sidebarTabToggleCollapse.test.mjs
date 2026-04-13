@@ -12,7 +12,7 @@ test('workspace/schema toggle is in status bar, not sidebar', () => {
   // Sidebar no longer has workspace/schema tab buttons
   assert.equal(sidebarSource.includes("@click=\"handleTabClick('workspace')\""), false)
   assert.equal(sidebarSource.includes("@click=\"handleTabClick('schema-editor')\""), false)
-  assert.equal(sidebarSource.includes("if (normalized === 'workspace')"), false)
+  assert.equal(sidebarSource.includes("if (normalized === 'workspace')"), true)
   assert.equal(sidebarSource.includes("if (normalized === 'schema-editor')"), false)
 
   // Sidebar no longer has workspace/schema specific collapse logic

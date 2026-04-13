@@ -240,3 +240,43 @@ class DatasetService:
         await session.commit()
         await session.refresh(dataset)
         return dataset
+
+    @staticmethod
+    async def remove_dataset(
+        session: AsyncSession,
+        principal_id: str,
+        workspace_id: str,
+        table_name: str,
+    ) -> WorkspaceDataset:
+        """Remove one dataset metadata row from a workspace catalog."""
+        workspace = await WorkspaceRepository.get_by_id(session, workspace_id, principal_id)
+        if workspace is None:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        normalized_table = str(table_name or "").strip()
+        if not normalized_table:
+            raise HTTPException(status_code=400, detail="Dataset table name is required")
+
+        result = await session.execute(
+            select(WorkspaceDataset).where(
+                WorkspaceDataset.workspace_id == workspace_id,
+                WorkspaceDataset.table_name == normalized_table,
+            )
+        )
+        dataset = result.scalar_one_or_none()
+        if dataset is None:
+            raise HTTPException(status_code=404, detail="Dataset not found")
+
+        schema_path = str(dataset.schema_path or "").strip()
+        if schema_path:
+            try:
+                schema_file = Path(schema_path).expanduser().resolve()
+                if schema_file.exists() and schema_file.is_file():
+                    schema_file.unlink()
+            except Exception:
+                # Metadata row deletion remains the source of truth.
+                pass
+
+        await session.delete(dataset)
+        await session.commit()
+        return dataset

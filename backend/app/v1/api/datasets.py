@@ -9,6 +9,7 @@ from ..db.session import get_appdata_db_session
 from ..schemas.dataset import (
     BrowserDatasetSyncRequest,
     DatasetAddRequest,
+    DatasetDeleteResponse,
     DatasetListResponse,
     DatasetResponse,
 )
@@ -93,4 +94,25 @@ async def sync_browser_workspace_dataset(
         file_type=ds.file_type,
         created_at=ds.created_at,
         updated_at=ds.updated_at,
+    )
+
+
+@router.delete("/workspaces/{workspace_id}/datasets/{table_name}", response_model=DatasetDeleteResponse)
+async def remove_workspace_dataset(
+    workspace_id: str,
+    table_name: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Remove one dataset from workspace catalog metadata."""
+    removed = await DatasetService.remove_dataset(
+        session=session,
+        principal_id=current_user.id,
+        workspace_id=workspace_id,
+        table_name=table_name,
+    )
+    return DatasetDeleteResponse(
+        workspace_id=removed.workspace_id,
+        table_name=removed.table_name,
+        removed=True,
     )

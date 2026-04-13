@@ -25,32 +25,26 @@ test('workspace creation activates the new workspace centrally in the store', ()
   assert.equal(createBlock.includes('await fetchWorkspaces()'), true)
 })
 
-test('workspace create modal warns that creating a workspace switches active context', () => {
-  const modalPath = resolve(process.cwd(), 'src/components/modals/WorkspaceCreateModal.vue')
-  const source = readFileSync(modalPath, 'utf-8')
+test('workspace flow supports settings-driven initial step handoff and dataset-management mode', () => {
+  const settingsPath = resolve(process.cwd(), 'src/components/modals/SettingsModal.vue')
+  const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue')
+  const stepperPath = resolve(process.cwd(), 'src/components/modals/WorkspaceStepper.vue')
 
-  assert.equal(
-    source.includes('Your new workspace will become the active workspace right away.'),
-    true,
-  )
-  assert.equal(
-    source.includes('we will clean up its running resources first.'),
-    true,
-  )
-  assert.equal(
-    source.includes('You can switch back later from the workspace picker.'),
-    true,
-  )
-  assert.equal(source.includes('Open Existing Workspace'), true)
-  assert.equal(source.includes('Workspace names must be unique.'), true)
-  assert.equal(source.includes('emit(\'open-workspace\''), true)
-  assert.equal(source.includes('const duplicateWorkspace = computed(() => {'), true)
-  assert.equal(source.includes('View details'), true)
-  assert.equal(source.includes('const workspaceSummaryVisible = ref(false)'), true)
-  assert.equal(source.includes('await apiService.v1GetWorkspaceSummary(workspaceId)'), true)
+  const settingsSource = readFileSync(settingsPath, 'utf-8')
+  const tabSource = readFileSync(tabPath, 'utf-8')
+  const stepperSource = readFileSync(stepperPath, 'utf-8')
+
+  assert.equal(settingsSource.includes('initialStep: {'), true)
+  assert.equal(settingsSource.includes(':initial-step="initialStep"'), true)
+  assert.equal(tabSource.includes('const normalizedInitialStep = computed(() => {'), true)
+  assert.equal(tabSource.includes('const isDatasetManagementMode = computed(() => normalizedInitialStep.value === 2)'), true)
+  assert.equal(stepperSource.includes('title="Refresh from source file"'), true)
+  assert.equal(stepperSource.includes('title="Remove dataset from workspace"'), true)
+  assert.equal(stepperSource.includes('Add another dataset'), true)
+  assert.equal(stepperSource.includes('Done'), true)
 })
 
-test('workspace launchers pass existing workspaces into the create modal', () => {
+test('workspace launchers open settings modal at workspace step 1 instead of old create modal', () => {
   const launcherPaths = [
     resolve(process.cwd(), 'src/components/WorkspaceSwitcher.vue'),
     resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'),
@@ -59,9 +53,9 @@ test('workspace launchers pass existing workspaces into the create modal', () =>
 
   for (const filePath of launcherPaths) {
     const source = readFileSync(filePath, 'utf-8')
-    assert.equal(source.includes(':workspaces="appStore.workspaces"'), true)
-    assert.equal(source.includes(':active-workspace-id="appStore.activeWorkspaceId"'), true)
-    assert.equal(source.includes('@open-workspace="openWorkspaceFromDialog"'), true)
+    assert.equal(source.includes('WorkspaceCreateModal'), false)
+    assert.equal(source.includes('SettingsModal'), true)
+    assert.equal(source.includes('initial-step'), true)
   }
 })
 

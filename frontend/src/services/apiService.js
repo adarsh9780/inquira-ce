@@ -808,6 +808,10 @@ export const apiService = {
     return v1Api.datasets.add(workspaceId, sourcePath)
   },
 
+  async v1DeleteDataset(workspaceId, tableName) {
+    return v1Api.datasets.remove(workspaceId, tableName)
+  },
+
   async v1GetDatasetSchema(workspaceId, tableName) {
     return axios.get(`/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema`)
   },

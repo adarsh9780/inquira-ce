@@ -14,7 +14,7 @@
     <div v-if="isOpen" class="absolute top-full left-0 mt-1 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
       <div class="p-2 border-b border-gray-100 flex justify-between items-center">
         <span class="text-xs text-gray-500">Workspaces</span>
-        <button class="text-xs px-2 py-1 rounded bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)]" @click="openCreateDialog">New</button>
+        <button class="text-xs px-2 py-1 rounded bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)]" @click="openWorkspaceSettings">New</button>
       </div>
 
       <div v-if="appStore.workspaceDeletionJobs.length > 0" class="px-3 py-2 border-b border-gray-100 bg-amber-50 text-amber-800 text-xs flex items-center space-x-2">
@@ -77,15 +77,10 @@
     </button>
   </div>
 
-  <WorkspaceCreateModal
-    :is-open="isCreateDialogOpen"
-    :is-submitting="isCreatingWorkspace"
-    :plan="authStore.planLabel"
-    :workspaces="appStore.workspaces"
-    :active-workspace-id="appStore.activeWorkspaceId"
-    @close="closeCreateDialog"
-    @open-workspace="openWorkspaceFromDialog"
-    @submit="createWorkspace"
+  <SettingsModal
+    v-model="isSettingsOpen"
+    :initial-tab="settingsInitialTab"
+    :initial-step="settingsInitialStep"
   />
 
   <WorkspaceRenameModal
@@ -120,19 +115,18 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAppStore } from '../stores/appStore'
-import { useAuthStore } from '../stores/authStore'
 import { toast } from '../composables/useToast'
 import { extractApiErrorMessage } from '../utils/apiError'
-import WorkspaceCreateModal from './modals/WorkspaceCreateModal.vue'
+import SettingsModal from './modals/SettingsModal.vue'
 import WorkspaceRenameModal from './modals/WorkspaceRenameModal.vue'
 import ConfirmationModal from './modals/ConfirmationModal.vue'
 
 const appStore = useAppStore()
-const authStore = useAuthStore()
 const isOpen = ref(false)
 const containerRef = ref(null)
-const isCreateDialogOpen = ref(false)
-const isCreatingWorkspace = ref(false)
+const isSettingsOpen = ref(false)
+const settingsInitialTab = ref('workspace')
+const settingsInitialStep = ref(1)
 const isDeleteDialogOpen = ref(false)
 const pendingDeleteWorkspaceId = ref('')
 const isClearDbDialogOpen = ref(false)
@@ -169,40 +163,12 @@ async function activateWorkspace(workspaceId) {
   }
 }
 
-function openCreateDialog() {
+function openWorkspaceSettings() {
   closeWorkspaceContextMenu()
   isOpen.value = false
-  isCreateDialogOpen.value = true
-}
-
-function closeCreateDialog() {
-  if (isCreatingWorkspace.value) return
-  isCreateDialogOpen.value = false
-}
-
-async function createWorkspace(name) {
-  if (!name) return
-  isCreatingWorkspace.value = true
-  try {
-    await appStore.createWorkspace(name)
-    isCreateDialogOpen.value = false
-    isOpen.value = false
-  } catch (error) {
-    toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to create workspace'))
-  } finally {
-    isCreatingWorkspace.value = false
-  }
-}
-
-async function openWorkspaceFromDialog(workspaceId) {
-  if (!workspaceId) return
-  isCreatingWorkspace.value = true
-  try {
-    await activateWorkspace(workspaceId)
-    isCreateDialogOpen.value = false
-  } finally {
-    isCreatingWorkspace.value = false
-  }
+  settingsInitialTab.value = 'workspace'
+  settingsInitialStep.value = 1
+  isSettingsOpen.value = true
 }
 
 function isWorkspaceDeleting(workspaceId) {
