@@ -10,7 +10,7 @@ test('settings modal includes LLM, Workspace, and Account tabs with state-preser
   assert.equal(source.includes('LLM &amp; API Keys'), true)
   assert.equal(source.includes('Workspace'), true)
   assert.equal(source.includes('Account'), true)
-  assert.equal(source.includes('<LLMSettingsTab v-show="activeTab === \'llm\'" />'), true)
+  assert.equal(source.includes('<LLMSettingsTab v-show="activeTab === \'llm\'" @close-request="closeModal" />'), true)
   assert.equal(source.includes('<WorkspaceTab'), true)
   assert.equal(source.includes("v-show=\"activeTab === 'workspace'\""), true)
   assert.equal(source.includes('<AccountTab v-show="activeTab === \'account\'" />'), true)

@@ -4,10 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urljoin
 
 import httpx
 
-from .llm_provider_catalog import normalize_llm_provider, provider_model_catalog
+from .llm_provider_catalog import (
+    normalize_llm_provider,
+    provider_default_base_url,
+    provider_model_catalog,
+)
 
 OPENROUTER_ACCOUNT_MODELS_URL = "https://openrouter.ai/settings"
 _REQUEST_TIMEOUT_SECONDS = 20.0
@@ -38,23 +43,44 @@ class ProviderRefreshResult:
     provider: str
     catalog: dict[str, Any]
     detail: str
+    error: str = ""
 
 
-async def refresh_provider_model_catalog(provider: str, api_key: str | None = None) -> ProviderRefreshResult:
+async def refresh_provider_model_catalog(
+    provider: str,
+    api_key: str | None = None,
+    base_url: str | None = None,
+) -> ProviderRefreshResult:
     """Fetch provider model IDs and convert them into a settings catalog payload."""
     normalized_provider = normalize_llm_provider(provider)
     fallback_catalog = provider_model_catalog(normalized_provider)
 
     if normalized_provider == "ollama":
-        catalog = {
-            **fallback_catalog,
-            "source": "default",
-        }
-        return ProviderRefreshResult(
-            provider=normalized_provider,
-            catalog=catalog,
-            detail="Ollama uses local models; refreshed using local defaults.",
-        )
+        resolved_base_url = str(base_url or provider_default_base_url("ollama")).strip() or "http://localhost:11434/v1"
+        tags_url = _resolve_ollama_tags_url(resolved_base_url)
+        try:
+            async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT_SECONDS) as client:
+                models = await _fetch_ollama_models(client, tags_url)
+                catalog = _build_catalog(normalized_provider, models)
+                return ProviderRefreshResult(
+                    provider=normalized_provider,
+                    catalog=catalog,
+                    detail=f"Refreshed {len(catalog['main_models'])} Ollama models.",
+                )
+        except httpx.HTTPStatusError:
+            return ProviderRefreshResult(
+                provider=normalized_provider,
+                catalog={**fallback_catalog, "source": "default"},
+                detail=f"Ollama not detected at '{resolved_base_url}'. Is it running?",
+                error="ollama_unreachable",
+            )
+        except httpx.HTTPError:
+            return ProviderRefreshResult(
+                provider=normalized_provider,
+                catalog={**fallback_catalog, "source": "default"},
+                detail=f"Ollama not detected at '{resolved_base_url}'. Is it running?",
+                error="ollama_unreachable",
+            )
 
     key = str(api_key or "").strip()
     if not key:
@@ -131,6 +157,23 @@ def _provider_http_error_message(provider: str, status_code: int) -> str:
     return f"Provider '{provider}' failed to return model catalog (HTTP {status_code})."
 
 
+def _resolve_ollama_tags_url(base_url: str) -> str:
+    raw = str(base_url or "").strip().rstrip("/")
+    if not raw:
+        return "http://localhost:11434/api/tags"
+
+    if raw.endswith("/v1"):
+        raw = raw[:-3]
+
+    if raw.endswith("/api"):
+        return f"{raw}/tags"
+
+    if raw.endswith("/api/tags"):
+        return raw
+
+    return urljoin(f"{raw}/", "api/tags")
+
+
 async def _fetch_openai_models(client: httpx.AsyncClient, api_key: str) -> list[str]:
     response = await client.get(
         "https://api.openai.com/v1/models",
@@ -145,6 +188,24 @@ async def _fetch_openai_models(client: httpx.AsyncClient, api_key: str) -> list[
             continue
         if _is_openai_chat_model(model_id):
             raw_models.append(model_id)
+    return _unique_models(raw_models)
+
+
+async def _fetch_ollama_models(client: httpx.AsyncClient, tags_url: str) -> list[str]:
+    response = await client.get(tags_url)
+    response.raise_for_status()
+    payload = response.json()
+
+    raw_models: list[str] = []
+    models = payload.get("models") if isinstance(payload, dict) else None
+    if isinstance(models, list):
+        for item in models:
+            if not isinstance(item, dict):
+                continue
+            model_id = str(item.get("name") or "").strip()
+            if model_id:
+                raw_models.append(model_id)
+
     return _unique_models(raw_models)
 
 

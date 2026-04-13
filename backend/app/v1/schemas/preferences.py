@@ -5,6 +5,15 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+class ProviderModelEntry(BaseModel):
+    id: str = ""
+    display_name: str = ""
+    provider: str = "openrouter"
+    context_window: int = 0
+    recommended_for: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+
+
 class ProviderModelCatalog(BaseModel):
     main_models: list[str] = Field(default_factory=list)
     lite_models: list[str] = Field(default_factory=list)
@@ -13,6 +22,7 @@ class ProviderModelCatalog(BaseModel):
     source: str = "default"
     account_models_configured: bool | None = None
     account_models_url: str = ""
+    models: list[ProviderModelEntry] = Field(default_factory=list)
 
 
 class PreferencesResponse(BaseModel):
@@ -67,7 +77,19 @@ class ApiKeyUpdateRequest(BaseModel):
 class ProviderModelsRefreshRequest(BaseModel):
     provider: str | None = None
     api_key: str | None = None
+    base_url: str | None = None
 
 
 class ProviderModelsRefreshResponse(PreferencesResponse):
     detail: str = ""
+    error: str = ""
+
+
+class ApiKeyVerifyRequest(BaseModel):
+    provider: str = "openrouter"
+    api_key: str = Field(min_length=1)
+
+
+class ApiKeyVerifyResponse(BaseModel):
+    valid: bool
+    error: str = ""

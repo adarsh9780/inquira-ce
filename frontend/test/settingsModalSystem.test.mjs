@@ -12,7 +12,7 @@ test('settings modal uses v-model contract and preserves tab state with v-show',
 
   assert.equal(source.includes('modelValue'), true)
   assert.equal(source.includes("defineEmits(['update:modelValue'])"), true)
-  assert.equal(source.includes("<LLMSettingsTab v-show=\"activeTab === 'llm'\" />"), true)
+  assert.equal(source.includes("<LLMSettingsTab v-show=\"activeTab === 'llm'\" @close-request=\"closeModal\" />"), true)
   assert.equal(source.includes('<WorkspaceTab'), true)
   assert.equal(source.includes(':initial-step="initialStep"'), true)
   assert.equal(source.includes(':modal-open="modelValue"'), true)

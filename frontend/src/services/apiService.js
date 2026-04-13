@@ -788,6 +788,10 @@ export const apiService = {
     return v1Api.preferences.refreshModels(payload)
   },
 
+  async v1VerifyApiKey(provider, apiKey) {
+    return v1Api.preferences.verifyKey(provider, apiKey)
+  },
+
   async v1SetApiKey(apiKey, provider = 'openrouter') {
     return v1Api.preferences.setApiKey(apiKey, provider)
   },

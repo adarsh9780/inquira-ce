@@ -74,7 +74,7 @@
         </div>
 
         <div class="relative p-5">
-          <LLMSettingsTab v-show="activeTab === 'llm'" />
+          <LLMSettingsTab v-show="activeTab === 'llm'" @close-request="closeModal" />
           <WorkspaceTab
             v-show="activeTab === 'workspace'"
             :initial-step="initialStep"
@@ -93,6 +93,7 @@ import { ref, watch } from 'vue'
 import LLMSettingsTab from './tabs/LLMSettingsTab.vue'
 import WorkspaceTab from './tabs/WorkspaceTab.vue'
 import AccountTab from './tabs/AccountTab.vue'
+import { useLLMConfig } from '../../composables/useLLMConfig'
 
 const props = defineProps({
   modelValue: {
@@ -110,6 +111,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue'])
+const llmConfig = useLLMConfig()
 
 const activeTab = ref('llm')
 
@@ -126,6 +128,8 @@ watch(
   (isOpen) => {
     if (isOpen) {
       activeTab.value = normalizeTab(props.initialTab)
+    } else {
+      llmConfig.clearSensitiveState()
     }
   },
   { immediate: true },

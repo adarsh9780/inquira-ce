@@ -6,6 +6,7 @@ import json
 import os
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +14,8 @@ from ..db.session import get_appdata_db_session
 from ..repositories.preferences_repository import PreferencesRepository
 from ..schemas.common import MessageResponse
 from ..schemas.preferences import (
+    ApiKeyVerifyRequest,
+    ApiKeyVerifyResponse,
     ApiKeyUpdateRequest,
     PreferencesResponse,
     PreferencesUpdateRequest,
@@ -34,6 +37,7 @@ from ...services.provider_model_refresh import (
     ProviderModelRefreshError,
     refresh_provider_model_catalog,
 )
+from ...services.model_registry import merge_refreshed_model_metadata
 from .deps import ensure_appdata_principal, get_current_user
 
 router = APIRouter(
@@ -41,6 +45,10 @@ router = APIRouter(
     tags=["V1 Preferences"],
     dependencies=[Depends(ensure_appdata_principal)],
 )
+
+_VERIFY_TIMEOUT_SECONDS = 20.0
+_RECOMMENDED_FOR_ALLOWED = {"main", "lite", "both"}
+_TAGS_ALLOWED = {"recommended", "extended"}
 
 
 def _clean_models(raw: Any) -> list[str]:
@@ -54,6 +62,85 @@ def _clean_models(raw: Any) -> list[str]:
             continue
         seen.add(value)
         cleaned.append(value)
+    return cleaned
+
+
+def _clean_recommended_for(raw: Any) -> list[str]:
+    if isinstance(raw, str):
+        values = [raw]
+    elif isinstance(raw, list):
+        values = raw
+    else:
+        values = []
+
+    cleaned: list[str] = []
+    for item in values:
+        value = str(item or "").strip().lower()
+        if value in _RECOMMENDED_FOR_ALLOWED and value not in cleaned:
+            cleaned.append(value)
+
+    if not cleaned:
+        return ["main"]
+    if "both" in cleaned:
+        return ["both"]
+    return cleaned
+
+
+def _clean_tags(raw: Any) -> list[str]:
+    if isinstance(raw, str):
+        values = [raw]
+    elif isinstance(raw, list):
+        values = raw
+    else:
+        values = []
+
+    cleaned: list[str] = []
+    for item in values:
+        value = str(item or "").strip().lower()
+        if value in _TAGS_ALLOWED and value not in cleaned:
+            cleaned.append(value)
+
+    if not cleaned:
+        return ["recommended"]
+    return cleaned
+
+
+def _clean_model_metadata_entries(
+    provider: str,
+    raw: Any,
+    fallback: Any,
+) -> list[dict[str, Any]]:
+    entries = raw if isinstance(raw, list) else fallback if isinstance(fallback, list) else []
+    cleaned: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    for item in entries:
+        if not isinstance(item, dict):
+            continue
+        model_id = str(item.get("id") or "").strip()
+        if not model_id or model_id in seen:
+            continue
+        seen.add(model_id)
+
+        context_window_raw = item.get("context_window")
+        try:
+            context_window = int(context_window_raw)
+        except Exception:  # noqa: BLE001
+            context_window = 0
+        if context_window < 0:
+            context_window = 0
+
+        cleaned.append(
+            {
+                "id": model_id,
+                "display_name": str(item.get("display_name") or model_id).strip() or model_id,
+                "provider": normalize_llm_provider(item.get("provider") or provider),
+                "context_window": context_window,
+                "recommended_for": _clean_recommended_for(item.get("recommended_for")),
+                "tags": _clean_tags(item.get("tags")),
+            }
+        )
+
     return cleaned
 
 
@@ -105,6 +192,12 @@ def _coerce_provider_catalog(
         or (OPENROUTER_ACCOUNT_MODELS_URL if provider == "openrouter" else "")
     ).strip()
 
+    models = _clean_model_metadata_entries(
+        provider,
+        data.get("models"),
+        fallback.get("models"),
+    )
+
     return {
         "main_models": main_models,
         "lite_models": lite_models,
@@ -113,6 +206,7 @@ def _coerce_provider_catalog(
         "source": source,
         "account_models_configured": account_models_configured,
         "account_models_url": account_models_url,
+        "models": models,
     }
 
 
@@ -379,14 +473,25 @@ async def refresh_provider_models(
         api_key = str(SecretStorageService.get_api_key(current_user.id, provider=provider) or "").strip()
 
     try:
-        refresh_result = await refresh_provider_model_catalog(provider, api_key=api_key)
+        refresh_result = await refresh_provider_model_catalog(
+            provider,
+            api_key=api_key,
+            base_url=payload.base_url,
+        )
     except ProviderModelRefreshError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     fallback = provider_catalogs.get(provider, provider_model_catalog(provider))
+    merged_catalog = dict(refresh_result.catalog)
+    merged_catalog["models"] = merge_refreshed_model_metadata(
+        provider,
+        fallback.get("models"),
+        merged_catalog.get("main_models", []),
+        merged_catalog.get("lite_models", []),
+    )
     provider_catalogs[provider] = _coerce_provider_catalog(
         provider,
-        refresh_result.catalog,
+        merged_catalog,
         fallback,
     )
     prefs.provider_model_catalogs_json = json.dumps(provider_catalogs)
@@ -398,7 +503,49 @@ async def refresh_provider_models(
         current_user.id, list(SUPPORTED_LLM_PROVIDERS)
     )
     response = _to_response(prefs, key_presence)
-    return ProviderModelsRefreshResponse(**response.model_dump(), detail=refresh_result.detail)
+    return ProviderModelsRefreshResponse(
+        **response.model_dump(),
+        detail=refresh_result.detail,
+        error=refresh_result.error,
+    )
+
+
+def _verify_error_from_status(status_code: int) -> str:
+    if status_code == 429:
+        return "quota_exceeded"
+    if status_code in {401, 403}:
+        return "invalid_key"
+    return "network_error"
+
+
+@router.post("/verify-key", response_model=ApiKeyVerifyResponse)
+async def verify_api_key(
+    payload: ApiKeyVerifyRequest,
+) -> ApiKeyVerifyResponse:
+    provider = normalize_llm_provider(payload.provider)
+    key = str(payload.api_key or "").strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="API key cannot be empty.")
+    if provider not in {"openai", "openrouter"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Only openai and openrouter support API key verification.",
+        )
+
+    url = "https://api.openai.com/v1/models" if provider == "openai" else "https://openrouter.ai/api/v1/auth/key"
+    headers = {"Authorization": f"Bearer {key}"}
+
+    try:
+        async with httpx.AsyncClient(timeout=_VERIFY_TIMEOUT_SECONDS) as client:
+            response = await client.get(url, headers=headers)
+    except httpx.HTTPError:
+        return ApiKeyVerifyResponse(valid=False, error="network_error")
+
+    status_code = int(getattr(response, "status_code", 0) or 0)
+    if 200 <= status_code < 300:
+        return ApiKeyVerifyResponse(valid=True, error="")
+
+    return ApiKeyVerifyResponse(valid=False, error=_verify_error_from_status(status_code))
 
 
 @router.put("/api-key", response_model=MessageResponse)

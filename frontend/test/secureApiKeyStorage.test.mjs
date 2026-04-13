@@ -11,6 +11,9 @@ test('api service persists API key via v1 preferences secure endpoint', () => {
 
   assert.equal(source.includes("v1SetApiKey(apiKey || '', provider)"), true)
   assert.equal(contract.includes('setApiKey: (apiKey, provider = \'openrouter\')'), true)
+  assert.equal(contract.includes('verifyKey: (provider, apiKey)'), true)
+  assert.equal(contract.includes('/api/v1/preferences/verify-key'), true)
+  assert.equal(source.includes('v1VerifyApiKey(provider, apiKey)'), true)
   assert.equal(contract.includes('/api/v1/preferences/api-key'), true)
   assert.equal(source.includes('API key saved securely.'), true)
 })

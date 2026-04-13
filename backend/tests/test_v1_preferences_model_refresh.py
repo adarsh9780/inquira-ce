@@ -4,10 +4,11 @@ import json
 from types import SimpleNamespace
 
 import pytest
+import httpx
 
 from app.services.provider_model_refresh import ProviderRefreshResult, refresh_provider_model_catalog
-from app.v1.api.preferences import refresh_provider_models
-from app.v1.schemas.preferences import ProviderModelsRefreshRequest
+from app.v1.api.preferences import refresh_provider_models, verify_api_key
+from app.v1.schemas.preferences import ApiKeyVerifyRequest, ProviderModelsRefreshRequest
 
 
 @pytest.mark.asyncio
@@ -129,8 +130,8 @@ async def test_refresh_endpoint_persists_catalog_and_returns_updated_preferences
     async def _fake_get_or_create(_session, _principal_id):
         return prefs
 
-    async def _fake_refresh_provider_model_catalog(_provider: str, api_key: str | None = None):
-        _ = api_key
+    async def _fake_refresh_provider_model_catalog(_provider: str, api_key: str | None = None, base_url: str | None = None):
+        _ = api_key, base_url
         return ProviderRefreshResult(
             provider="openrouter",
             detail="Refreshed OpenRouter account models.",
@@ -181,3 +182,176 @@ async def test_refresh_endpoint_persists_catalog_and_returns_updated_preferences
     ]
     assert response.selected_model == "openrouter/free"
     assert response.detail == "Refreshed OpenRouter account models."
+
+
+@pytest.mark.asyncio
+async def test_refresh_endpoint_preserves_existing_recommended_tags_when_merging(monkeypatch):
+    prefs = SimpleNamespace(
+        llm_provider="openai",
+        selected_model="gpt-4.1",
+        selected_lite_model="gpt-4.1-mini",
+        selected_coding_model="gpt-4.1",
+        enabled_main_models_json='["gpt-4.1"]',
+        provider_model_catalogs_json=json.dumps(
+            {
+                "openai": {
+                    "main_models": ["gpt-4.1"],
+                    "lite_models": ["gpt-4.1-mini"],
+                    "default_main_model": "gpt-4.1",
+                    "default_lite_model": "gpt-4.1-mini",
+                    "source": "bundled",
+                    "models": [
+                        {
+                            "id": "gpt-4.1",
+                            "display_name": "GPT-4.1",
+                            "provider": "openai",
+                            "context_window": 1047576,
+                            "recommended_for": ["main"],
+                            "tags": ["recommended"],
+                        }
+                    ],
+                }
+            }
+        ),
+        schema_context="",
+        allow_schema_sample_values=False,
+        terminal_risk_acknowledged=False,
+        chat_overlay_width=0.25,
+        is_sidebar_collapsed=True,
+        hide_shortcuts_modal=False,
+        active_workspace_id=None,
+        active_dataset_path=None,
+        active_table_name=None,
+    )
+
+    class _Session:
+        async def commit(self):
+            return None
+
+    async def _fake_get_or_create(_session, _principal_id):
+        return prefs
+
+    async def _fake_refresh_provider_model_catalog(_provider: str, api_key: str | None = None, base_url: str | None = None):
+        _ = api_key, base_url
+        return ProviderRefreshResult(
+            provider="openai",
+            detail="Refreshed OpenAI models.",
+            catalog={
+                "main_models": ["gpt-4.1", "gpt-5"],
+                "lite_models": ["gpt-4.1-mini"],
+                "default_main_model": "gpt-4.1",
+                "default_lite_model": "gpt-4.1-mini",
+                "source": "refreshed",
+            },
+        )
+
+    monkeypatch.setattr(
+        "app.v1.api.preferences.PreferencesRepository.get_or_create",
+        _fake_get_or_create,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences.refresh_provider_model_catalog",
+        _fake_refresh_provider_model_catalog,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences.SecretStorageService.get_api_key_presence_map",
+        lambda _user_id, _providers: {
+            "openrouter": False,
+            "openai": True,
+            "anthropic": False,
+            "ollama": False,
+        },
+    )
+
+    await refresh_provider_models(
+        ProviderModelsRefreshRequest(provider="openai", api_key="sk-openai-test"),
+        session=_Session(),
+        current_user=SimpleNamespace(id="u1"),
+    )
+
+    persisted_catalogs = json.loads(prefs.provider_model_catalogs_json)
+    openai_models = persisted_catalogs["openai"]["models"]
+    model_by_id = {item["id"]: item for item in openai_models}
+
+    assert model_by_id["gpt-4.1"]["tags"] == ["recommended"]
+    assert model_by_id["gpt-4.1"]["recommended_for"] == ["main"]
+    assert model_by_id["gpt-5"]["tags"] == ["extended"]
+
+
+@pytest.mark.asyncio
+async def test_refresh_service_ollama_unreachable_returns_non_fatal_error(monkeypatch):
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            _ = args, kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            _ = exc_type, exc, tb
+            return False
+
+        async def get(self, _url, *args, **kwargs):
+            _ = args, kwargs
+            raise httpx.ConnectError("connection failed")
+
+    monkeypatch.setattr("app.services.provider_model_refresh.httpx.AsyncClient", _Client)
+
+    refreshed = await refresh_provider_model_catalog("ollama", base_url="http://localhost:11434")
+
+    assert refreshed.error == "ollama_unreachable"
+    assert refreshed.catalog.get("source") == "default"
+
+
+@pytest.mark.asyncio
+async def test_verify_api_key_maps_provider_status_codes(monkeypatch):
+    class _Resp:
+        def __init__(self, status_code: int):
+            self.status_code = status_code
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            _ = args, kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            _ = exc_type, exc, tb
+            return False
+
+        async def get(self, _url, *args, **kwargs):
+            _ = args, kwargs
+            return _Resp(429)
+
+    monkeypatch.setattr("app.v1.api.preferences.httpx.AsyncClient", _Client)
+    response = await verify_api_key(ApiKeyVerifyRequest(provider="openrouter", api_key="sk-or-test"))
+    assert response.valid is False
+    assert response.error == "quota_exceeded"
+
+
+@pytest.mark.asyncio
+async def test_verify_api_key_accepts_success_status(monkeypatch):
+    class _Resp:
+        def __init__(self, status_code: int):
+            self.status_code = status_code
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            _ = args, kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            _ = exc_type, exc, tb
+            return False
+
+        async def get(self, _url, *args, **kwargs):
+            _ = args, kwargs
+            return _Resp(200)
+
+    monkeypatch.setattr("app.v1.api.preferences.httpx.AsyncClient", _Client)
+    response = await verify_api_key(ApiKeyVerifyRequest(provider="openai", api_key="sk-openai-test"))
+    assert response.valid is True
+    assert response.error == ""
