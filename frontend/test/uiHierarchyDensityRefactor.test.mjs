@@ -29,9 +29,10 @@ test('sidebar datasets use friendly labels while preserving full identifiers', (
   const source = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
   assert.equal(source.includes('function datasetFriendlyName(tableName) {'), true)
-  assert.equal(source.includes('/__\\d{6,}(?=__|$)/g'), true)
+  assert.equal(source.includes('/_[0-9a-f]{6,}(?=_|$)/i'), true)
   assert.equal(source.includes('{{ datasetFriendlyName(ds.table_name) }}'), true)
-  assert.equal(source.includes(':title="ds.table_name"'), true)
+  assert.equal(source.includes(':title="datasetRowTitle(ds)"'), true)
+  assert.equal(source.includes(':title="ds.table_name"'), false)
   assert.equal(source.includes('function datasetSourceCaption(filePath) {'), true)
   assert.equal(source.includes('return parts[parts.length - 1] || normalized'), true)
 })

@@ -140,6 +140,7 @@
                 :key="ds.table_name"
                 class="group sidebar-item-row"
                 :class="{ 'sidebar-item-row-active': appStore.activeDatasetId === ds.table_name }"
+                :title="datasetRowTitle(ds)"
                 @click="selectDataset(ds)"
               >
                 <div class="min-w-0 flex-1">
@@ -147,7 +148,6 @@
                     class="truncate text-[13px] font-medium leading-[1.4]"
                     :class="appStore.activeDatasetId === ds.table_name ? 'text-[var(--color-accent)]' : ''"
                     style="color: var(--color-text-main);"
-                    :title="ds.table_name"
                   >
                     {{ datasetFriendlyName(ds.table_name) }}
                   </p>
@@ -561,9 +561,12 @@ const workspaceHeaderLabel = computed(() => {
 function datasetFriendlyName(tableName) {
   const raw = String(tableName || '').trim()
   if (!raw) return 'Untitled dataset'
-  const withoutHashSuffix = raw.replace(/__\d{6,}(?=__|$)/g, '')
+  const hashSegmentIndex = raw.search(/_[0-9a-f]{6,}(?=_|$)/i)
+  const withoutHashSuffix = hashSegmentIndex >= 0 ? raw.slice(0, hashSegmentIndex) : raw
   const compacted = withoutHashSuffix.replace(/_{2,}/g, '_').replace(/^_+|_+$/g, '')
-  return compacted || raw
+  if (compacted) return compacted
+  const firstToken = raw.split('_')[0]?.trim()
+  return firstToken || 'Untitled dataset'
 }
 
 function datasetSourceCaption(filePath) {
@@ -571,6 +574,11 @@ function datasetSourceCaption(filePath) {
   if (!normalized) return ''
   const parts = normalized.split('/').filter(Boolean)
   return parts[parts.length - 1] || normalized
+}
+
+function datasetRowTitle(dataset) {
+  const fullPath = String(dataset?.file_path || '').trim()
+  return fullPath
 }
 
 // Fetch datasets from API
