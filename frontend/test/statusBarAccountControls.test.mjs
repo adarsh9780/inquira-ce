@@ -74,6 +74,8 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
   assert.equal(sidebarSource.includes('openSettings'), true)
   assert.equal(sidebarSource.includes('openTerms'), true)
   assert.equal(sidebarSource.includes('isTermsDialogOpen'), true)
+  assert.equal(sidebarSource.includes('title="Settings"'), true)
+  assert.equal(sidebarSource.includes('title="Terms & Conditions"'), true)
 
   // CE: auth/logout elements removed from sidebar
   assert.equal(sidebarSource.includes('ArrowRightOnRectangleIcon'), false)
@@ -105,12 +107,12 @@ test('sidebar has settings and terms buttons (CE: no logout)', () => {
 
   // Settings button in sidebar
   assert.equal(sidebarSource.includes('@click="openSettings'), true)
-  assert.equal(sidebarSource.includes('title="Settings"'), false)
+  assert.equal(sidebarSource.includes('title="Settings"'), true)
   assert.equal(sidebarSource.includes('aria-label="Settings"'), true)
 
   // Terms & Conditions button in sidebar
   assert.equal(sidebarSource.includes('@click="openTerms'), true)
-  assert.equal(sidebarSource.includes('title="Terms & Conditions"'), false)
+  assert.equal(sidebarSource.includes('title="Terms & Conditions"'), true)
   assert.equal(sidebarSource.includes('aria-label="Terms & Conditions"'), true)
 
   // CE: logout removed — no auth needed

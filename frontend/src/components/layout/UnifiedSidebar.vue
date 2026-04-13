@@ -294,50 +294,42 @@
     >
       <button
         @click="openCreateDialog"
-        class="relative group flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
+        class="flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
         style="color: var(--color-text-main);"
+        title="Create Workspace"
         aria-label="Create Workspace"
       >
         <FolderPlusIcon class="w-4 h-4" />
-        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style="background-color: var(--color-surface); color: var(--color-text-main);">
-          Create Workspace
-        </span>
       </button>
 
       <button
         @click="openSettings('api')"
-        class="relative group flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
+        class="flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
         style="color: var(--color-text-main);"
+        title="Settings"
         aria-label="Settings"
       >
         <CogIcon class="w-4 h-4" />
-        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style="background-color: var(--color-surface); color: var(--color-text-main);">
-          Settings
-        </span>
       </button>
 
       <button
         @click="toggleSearch"
-        class="relative group flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
+        class="flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
         style="color: var(--color-text-main);"
+        title="Search"
         aria-label="Search"
       >
         <MagnifyingGlassIcon class="w-4 h-4" />
-        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style="background-color: var(--color-surface); color: var(--color-text-main);">
-          Search
-        </span>
       </button>
 
       <button
         @click="openTerms"
-        class="relative group flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
+        class="flex items-center justify-center p-2 rounded-lg transition-all duration-200 hover:bg-[var(--color-surface)]"
         style="color: var(--color-text-main);"
+        title="Terms & Conditions"
         aria-label="Terms & Conditions"
       >
         <ScaleIcon class="w-4 h-4" />
-        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style="background-color: var(--color-surface); color: var(--color-text-main);">
-          Terms & Conditions
-        </span>
       </button>
     </div>
 
