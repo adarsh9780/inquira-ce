@@ -1,599 +1,150 @@
 <template>
-  <!-- Modal Overlay -->
-  <div
-    v-if="isOpen"
-    class="fixed inset-0 z-50 overflow-y-auto"
-    aria-labelledby="modal-title"
-    role="dialog"
-    aria-modal="true"
+  <Transition
+    enter-active-class="transition duration-200"
+    enter-from-class="opacity-0"
+    leave-active-class="transition duration-150"
+    leave-to-class="opacity-0"
   >
-    <!-- Background overlay -->
     <div
-      class="fixed inset-0 bg-black/20 backdrop-blur-sm transition-opacity"
+      v-if="modelValue"
+      class="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4"
       @click="closeModal"
-    ></div>
-
-    <!-- Modal container -->
-    <div class="flex min-h-full items-center justify-center p-4">
+    >
       <div
-        class="relative transform overflow-hidden rounded-xl text-left transition-all mx-auto w-full max-w-4xl max-h-[90vh] flex flex-col animate-modal-in"
-        style="background-color: var(--color-surface);"
+        class="relative w-full max-w-[560px] rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-base)] text-[var(--color-text-main)] shadow-2xl"
         @click.stop
       >
-        <!-- Modal Header -->
-        <div class="px-6 py-4 border-b" style="border-color: var(--color-border);">
-          <div class="flex items-center justify-between w-full">
-            <h3 class="text-base font-semibold" id="modal-title" style="color: var(--color-text-main);">
-              Settings
-            </h3>
+        <div class="flex items-center justify-between border-b border-[var(--color-border)] px-4 pt-2">
+          <div class="flex items-center gap-1">
             <button
-              @click="closeModal"
-              :disabled="isSavingSettings || isProgressModalVisible"
-              class="btn-icon disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Close settings"
-              title="Close settings"
+              type="button"
+              class="inline-flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-all"
+              :class="activeTab === 'llm'
+                ? 'border-[var(--color-accent)] text-[var(--color-accent)]'
+                : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
+              @click="activeTab = 'llm'"
             >
-              <XMarkIcon class="h-5 w-5" />
+              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" />
+                <path d="M8.5 10.5h7M8.5 13.5h4" />
+              </svg>
+              <span>LLM &amp; API Keys</span>
+            </button>
+
+            <button
+              type="button"
+              class="inline-flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-all"
+              :class="activeTab === 'workspace'
+                ? 'border-[var(--color-accent)] text-[var(--color-accent)]'
+                : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
+              @click="activeTab = 'workspace'"
+            >
+              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M3 7h6l2 2h10v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+              </svg>
+              <span>Workspace</span>
+            </button>
+
+            <button
+              type="button"
+              class="inline-flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-all"
+              :class="activeTab === 'account'
+                ? 'border-[var(--color-accent)] text-[var(--color-accent)]'
+                : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
+              @click="activeTab = 'account'"
+            >
+              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="8" r="3.5" />
+                <path d="M4.5 20a7.5 7.5 0 0 1 15 0" />
+              </svg>
+              <span>Account</span>
             </button>
           </div>
+
+          <button
+            type="button"
+            class="mb-2 rounded-md p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-base-soft)] hover:text-[var(--color-text-main)]"
+            aria-label="Close settings"
+            @click="closeModal"
+          >
+            <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
         </div>
 
-        <!-- Modal Body -->
-        <div class="flex flex-1 overflow-hidden" style="background-color: var(--color-surface);">
-          <!-- Sidebar Tabs -->
-          <div class="w-48 shrink-0 border-r flex flex-col" style="background-color: var(--color-base); border-color: var(--color-border);">
-            <!-- Tab Navigation -->
-            <nav class="flex-1 px-3 py-4 space-y-0.5">
-              <button
-                @click="activeTab = 'api'"
-                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg transition-all relative"
-                :class="activeTab === 'api' ? 'text-[var(--color-text-main)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] hover:bg-[var(--color-border)]'"
-              >
-                <KeyIcon class="w-4 h-4 shrink-0" />
-                <span class="flex-1 text-left">Models</span>
-                <ExclamationTriangleIcon
-                  v-if="!hasApiKey"
-                  class="w-3.5 h-3.5 shrink-0"
-                  style="color: var(--color-warning);"
-                  title="API key is required"
-                />
-                <!-- Active indicator -->
-                <div
-                  v-if="activeTab === 'api'"
-                  class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
-                  style="background-color: var(--color-accent);"
-                ></div>
-              </button>
-
-              <button
-                @click="activeTab = 'data'"
-                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg transition-all relative"
-                :class="activeTab === 'data' ? 'text-[var(--color-text-main)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] hover:bg-[var(--color-border)]'"
-              >
-                <DocumentArrowUpIcon class="w-4 h-4 shrink-0" />
-                <span class="flex-1 text-left">Data</span>
-                <ExclamationTriangleIcon
-                  v-if="!hasApiKey"
-                  class="w-3.5 h-3.5 shrink-0"
-                  style="color: var(--color-warning);"
-                  title="API key is required for data configuration"
-                />
-                <!-- Active indicator -->
-                <div
-                  v-if="activeTab === 'data'"
-                  class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
-                  style="background-color: var(--color-accent);"
-                ></div>
-              </button>
-
-              <button
-                @click="activeTab = 'packages'"
-                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg transition-all relative"
-                :class="activeTab === 'packages' ? 'text-[var(--color-text-main)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] hover:bg-[var(--color-border)]'"
-              >
-                <CubeIcon class="w-4 h-4 shrink-0" />
-                <span class="flex-1 text-left">Packages</span>
-                <!-- Active indicator -->
-                <div
-                  v-if="activeTab === 'packages'"
-                  class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
-                  style="background-color: var(--color-accent);"
-                ></div>
-              </button>
-
-              <button
-                @click="activeTab = 'account'"
-                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg transition-all relative"
-                :class="activeTab === 'account' ? 'text-[var(--color-text-main)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] hover:bg-[var(--color-border)]'"
-              >
-                <UserIcon class="w-4 h-4 shrink-0" />
-                <span class="flex-1 text-left">Account</span>
-                <!-- Active indicator -->
-                <div
-                  v-if="activeTab === 'account'"
-                  class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
-                  style="background-color: var(--color-accent);"
-                ></div>
-              </button>
-            </nav>
-
-            <!-- Sidebar Footer -->
-            <div class="px-4 py-4 border-t" style="border-color: var(--color-border);">
-              <div class="space-y-1.5">
-                <div class="flex items-center gap-2">
-                  <span :class="hasApiKey ? 'status-dot status-dot-green' : 'status-dot status-dot-yellow'"></span>
-                  <span class="text-xs" style="color: var(--color-text-muted);">{{ hasApiKey ? 'API Key Set' : 'API Key Missing' }}</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span :class="appStore.canAnalyze ? 'status-dot status-dot-green' : 'status-dot status-dot-muted'"></span>
-                  <span class="text-xs" style="color: var(--color-text-muted);">{{ appStore.canAnalyze ? 'Ready to Analyze' : 'Setup Incomplete' }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Tab Content -->
-          <div class="flex-1 overflow-y-auto">
-            <!-- Loading State -->
-            <div v-if="isLoadingSettings" class="flex items-center justify-center py-12">
-              <div class="animate-spin rounded-full h-7 w-7 border-b-2" style="border-color: var(--color-text-main);"></div>
-              <span class="ml-3 text-sm" style="color: var(--color-text-muted);">Loading settings...</span>
-            </div>
-
-            <!-- Tab Content -->
-            <div v-else>
-              <ApiTab
-                v-if="activeTab === 'api'"
-                @api-saved="handleApiSaved"
-                @api-tested="handleApiTested"
-              />
-              <DataTab
-                v-if="activeTab === 'data'"
-                @data-saved="handleDataSaved"
-              />
-              <PackagesTab v-if="activeTab === 'packages'" />
-              <AccountTab v-if="activeTab === 'account'" />
-            </div>
-          </div>
+        <div class="relative p-5">
+          <LLMSettingsTab v-show="activeTab === 'llm'" />
+          <WorkspaceTab v-show="activeTab === 'workspace'" />
+          <AccountTab v-show="activeTab === 'account'" />
         </div>
-
-
       </div>
     </div>
-    
-
-
-    <!-- Settings Progress Modal -->
-    <SettingsProgressModal
-      :is-visible="isProgressModalVisible"
-      :current-message="currentProgressMessage"
-      :is-connected="isWebSocketConnected"
-      :current-fact="currentFact"
-      @cancel="handleProgressCancel"
-    />
-  </div>
+  </Transition>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { useAppStore } from '../../stores/appStore'
-import { apiService } from '../../services/apiService'
-import { previewService } from '../../services/previewService'
-import { settingsWebSocket } from '../../services/websocketService'
-import { factService } from '../../services/factService'
-import { toast } from '../../composables/useToast'
-import { ref as vueRef } from 'vue'
-import SettingsProgressModal from './SettingsProgressModal.vue'
-import ApiTab from './ApiTab.vue'
-import DataTab from './DataTab.vue'
-import PackagesTab from './PackagesTab.vue'
-import AccountTab from './AccountTab.vue'
-import {
-  XMarkIcon,
-  DocumentArrowUpIcon,
-  CubeIcon,
-  KeyIcon,
-  UserIcon,
-  ExclamationTriangleIcon
-} from '@heroicons/vue/24/outline'
+import { ref, watch } from 'vue'
+import LLMSettingsTab from './tabs/LLMSettingsTab.vue'
+import WorkspaceTab from './tabs/WorkspaceTab.vue'
+import AccountTab from './tabs/AccountTab.vue'
 
 const props = defineProps({
-  isOpen: {
+  modelValue: {
     type: Boolean,
-    default: false
+    default: false,
   },
   initialTab: {
     type: String,
-    default: 'api' // 'api' | 'data' | 'packages' | 'account'
-  }
+    default: 'llm',
+  },
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['update:modelValue'])
 
-const appStore = useAppStore()
-const isLoadingSettings = ref(false)
-const isSavingSettings = ref(false)
-const settingsLoaded = ref(false)
-const activeTab = ref(props.initialTab)
+const activeTab = ref('llm')
 
 function normalizeTab(tab) {
-  const candidate = typeof tab === 'string' ? tab.toLowerCase() : 'api'
-  return ['api', 'data', 'packages', 'account'].includes(candidate) ? candidate : 'api'
+  const candidate = String(tab || '').toLowerCase()
+  if (candidate === 'api') return 'llm'
+  if (candidate === 'data') return 'workspace'
+  if (candidate === 'llm' || candidate === 'workspace' || candidate === 'account') return candidate
+  return 'llm'
 }
 
-// Watch for modal opening to reset to initial tab
-watch(() => props.isOpen, (newVal) => {
-  if (newVal) {
-    activeTab.value = normalizeTab(props.initialTab)
-  }
-})
+watch(
+  () => props.modelValue,
+  (isOpen) => {
+    if (isOpen) {
+      activeTab.value = normalizeTab(props.initialTab)
+    }
+  },
+  { immediate: true },
+)
 
-// WebSocket and Progress State
-const isProgressModalVisible = ref(false)
-const currentProgressMessage = ref('Initializing...')
-const isWebSocketConnected = ref(false)
-const currentFact = ref('')
-
-// Computed properties
-const hasApiKey = computed(() => {
-  if (!appStore.providerRequiresApiKey) return true
-  return !!appStore.selectedProviderApiKeyPresent
-})
-
+watch(
+  () => props.initialTab,
+  (tab) => {
+    if (props.modelValue) {
+      activeTab.value = normalizeTab(tab)
+    }
+  },
+)
 
 function closeModal() {
-  // Don't close if currently saving, clearing, or progress modal is visible
-  if (isSavingSettings.value || isProgressModalVisible.value) return
-
-  // Stop fact rotation when modal closes
-  stopFactRotation()
-
-  emit('close')
+  emit('update:modelValue', false)
 }
-
-
-// Tab event handlers
-function handleApiSaved(data) {
-  console.debug('API settings saved:', data)
-  // Could emit an event or update local state if needed
-}
-
-function handleApiTested(data) {
-  console.debug('API key tested:', data)
-  // Could emit an event or update local state if needed
-}
-
-function handleDataSaved(data) {
-  console.debug('Data settings saved:', data)
-  // Could emit an event or update local state if needed
-}
-
-
-// Removed: testFilePath (Test button has been removed)
-
-// Fact rotation functions
-async function startFactRotation() {
-  try {
-    // Load facts if not already loaded
-    await factService.loadFacts()
-
-    // Start rotation with callback to update currentFact
-    factService.startRotation((newFact) => {
-      currentFact.value = newFact
-    })
-
-    console.debug('🎯 Started fact rotation every 5 seconds for WebSocket connection')
-  } catch (error) {
-    console.error('❌ Failed to start fact rotation:', error)
-  }
-}
-
-function stopFactRotation() {
-  factService.stopRotation()
-  currentFact.value = ''
-}
-
-// WebSocket event handlers
-// Keep reference to unsubscribe function to avoid leaking listeners
-const unsubscribeConnection = vueRef(null)
-
-function setupWebSocketHandlers() {
-  // Clear previous connection listener if any
-  if (typeof unsubscribeConnection.value === 'function') {
-    unsubscribeConnection.value()
-    unsubscribeConnection.value = null
-  }
-  settingsWebSocket.onProgress((data) => {
-    updateProgressStep(data)
-  })
-
-  settingsWebSocket.onComplete((result) => {
-    handleSaveComplete(result)
-  })
-
-  settingsWebSocket.onError((error) => {
-    handleSaveError(error)
-  })
-
-  unsubscribeConnection.value = settingsWebSocket.onConnection((connected) => {
-    isWebSocketConnected.value = connected
-    console.debug('WebSocket connection state changed:', connected)
-
-    // Start fact rotation when WebSocket connects
-    if (connected) {
-      startFactRotation()
-    } else {
-      stopFactRotation()
-    }
-  })
-}
-
-function updateProgressStep(data) {
-  // Handle connection status
-  if (data.type === 'connected') {
-    isWebSocketConnected.value = true
-    return
-  }
-
-  // Handle progress updates - display message directly
-  if (data.type === 'progress') {
-    currentProgressMessage.value = data.message || 'Processing...'
-
-    // Update current fact if provided
-    if (data.fact) {
-      currentFact.value = data.fact
-    }
-  }
-}
-
-function handleSaveComplete(result) {
-  console.debug('Settings save completed:', result)
-
-  // Update progress message for completion
-  currentProgressMessage.value = 'All settings saved successfully'
-
-  // Start prefetching immediately but keep modal visible to show progress
-  setTimeout(async () => {
-    try {
-      // Generate and save schema
-      await generateAndSaveSchema()
-
-      // Clear old schema/settings cache and prefetch fresh schema metadata.
-      console.debug('🔄 Clearing schema cache and prefetching schema...')
-
-      currentProgressMessage.value = 'Preparing dataset schema...'
-
-      previewService.clearSchemaCache()
-
-      // Prefetch schema data (only if we have a valid data file path)
-      if (appStore.dataFilePath.trim()) {
-        try {
-          await previewService.loadSchema(appStore.dataFilePath.trim(), false) // Use cached version, don't force refresh
-          console.debug('✅ Schema data prefetched successfully')
-        } catch (schemaPrefetchError) {
-          console.warn('⚠️ Schema prefetch failed, but settings save was successful:', schemaPrefetchError)
-          // Don't show error to user - prefetch failure shouldn't affect settings save success
-        }
-      }
-
-      // Update final message
-      currentProgressMessage.value = 'Schema metadata ready'
-
-      // Close progress modal after showing completion
-      setTimeout(() => {
-        isProgressModalVisible.value = false
-        isSavingSettings.value = false
-
-        // Remove modal's connection listener
-        if (typeof unsubscribeConnection.value === 'function') {
-          unsubscribeConnection.value()
-          unsubscribeConnection.value = null
-        }
-
-        toast.success('Settings Saved', 'Your settings have been saved successfully.')
-
-        emit('close')
-      }, 1500) // Show completion for 1.5 seconds
-
-    } catch (error) {
-      console.error('❌ Error during post-save operations:', error)
-
-      // Close progress modal even if post-save operations fail
-      setTimeout(() => {
-        isProgressModalVisible.value = false
-        isSavingSettings.value = false
-
-        // Remove modal's connection listener
-        if (typeof unsubscribeConnection.value === 'function') {
-          unsubscribeConnection.value()
-          unsubscribeConnection.value = null
-        }
-
-        emit('close')
-      }, 1000)
-    }
-  }, 500) // Start prefetching after 0.5 seconds to allow other steps to complete
-}
-
-function handleSaveError(error) {
-  console.error('Settings save error:', error)
-
-  // Update progress message for error
-  currentProgressMessage.value = `Error: ${error.message || 'An error occurred while saving settings'}`
-
-  // Close progress modal after showing error
-  setTimeout(() => {
-    isProgressModalVisible.value = false
-    isSavingSettings.value = false
-
-    // Remove modal's connection listener
-    if (typeof unsubscribeConnection.value === 'function') {
-      unsubscribeConnection.value()
-      unsubscribeConnection.value = null
-    }
-
-    toast.error('Save Failed', error || 'An error occurred while saving settings')
-  }, 3000)
-}
-
-function handleProgressCancel() {
-  console.debug('User cancelled progress')
-
-  // Stop fact rotation
-  stopFactRotation()
-
-  // Remove modal's connection listener
-  if (typeof unsubscribeConnection.value === 'function') {
-    unsubscribeConnection.value()
-    unsubscribeConnection.value = null
-  }
-
-  // Reset progress state
-  isProgressModalVisible.value = false
-  isSavingSettings.value = false
-
-  // Reset progress message
-  currentProgressMessage.value = 'Initializing...'
-
-  // Connection state will be updated by the onConnection callback
-}
-
-// Settings management methods
-async function fetchSettings() {
-  if (isLoadingSettings.value) return
-
-  isLoadingSettings.value = true
-  settingsLoaded.value = false
-
-  try {
-    // Fetch main settings
-    const settings = await apiService.getSettings()
-    console.debug('Fetched settings:', settings)
-
-    // Update app store with backend settings
-    appStore.setApiKeyConfigured(!!settings.api_key_present)
-    if (settings.data_path) {
-      appStore.setDataFilePath(settings.data_path)
-    }
-    if (settings.context) {
-      appStore.setSchemaContext(settings.context)
-    }
-
-
-    settingsLoaded.value = true
-  } catch (error) {
-    console.error('Failed to fetch settings:', error)
-    // If settings don't exist yet, that's okay - user can set them
-    settingsLoaded.value = true
-  } finally {
-    isLoadingSettings.value = false
-  }
-}
-
-
-
-
-// Generate and save schema synchronously (keeps loading state active)
-async function generateAndSaveSchema() {
-  try {
-    // Only attempt schema generation if we have a valid data file path
-    if (!appStore.dataFilePath.trim()) {
-      console.debug('ℹ️ Skipping schema generation - no data file path provided')
-      return
-    }
-
-    // Verify authentication is still valid before schema generation
-    console.debug('🔐 Verifying authentication for schema generation...')
-    try {
-      await apiService.verifyAuth()
-      console.debug('✅ Authentication verified for schema generation')
-    } catch (authError) {
-      console.error('❌ Authentication failed for schema generation:', authError)
-      toast.warning('Schema Generation Skipped', 'Authentication expired. You can generate schema manually later.')
-      return
-    }
-
-    // Check if schema already exists to avoid unnecessary regeneration
-    try {
-      console.debug('🔍 Checking if schema already exists...')
-      const existingSchema = await apiService.loadSchema(appStore.dataFilePath.trim())
-
-      if (existingSchema && existingSchema.fields && existingSchema.fields.length > 0) {
-        console.debug('✅ Schema already exists, skipping regeneration')
-
-        // Update store to reflect existing schema
-        appStore.setIsSchemaFileUploaded(true)
-        appStore.setSchemaFileId(appStore.dataFilePath.trim())
-
-        toast.info('Schema Already Exists', 'Using existing schema for the data file.')
-        return
-      }
-    } catch (error) {
-      // Schema doesn't exist, continue with generation
-      console.debug('ℹ️ Schema does not exist, proceeding with generation')
-    }
-
-    console.debug('🔄 Generating schema...')
-
-    // Generate schema using the saved data file path and context
-    const schemaData = await apiService.generateSchema(
-      appStore.dataFilePath.trim(),
-      appStore.schemaContext.trim() || null
-    )
-
-    console.debug('✅ Schema generated successfully:', schemaData)
-
-    // Save the generated schema
-    if (schemaData && schemaData.columns) {
-      const saveResponse = await apiService.saveSchema(
-        appStore.dataFilePath.trim(),
-        appStore.schemaContext.trim() || null,
-        schemaData.columns
-      )
-
-      console.debug('💾 Schema saved successfully:', saveResponse)
-
-      // Update the store to reflect that schema is now available
-      appStore.setIsSchemaFileUploaded(true)
-      appStore.setSchemaFileId(saveResponse.id || appStore.dataFilePath.trim())
-
-      // Show success message for schema generation
-      toast.success('Schema Generated', 'Schema has been generated and saved successfully.')
-    } else {
-      console.warn('⚠️ No schema columns generated, skipping save')
-      toast.warning('Schema Generation Incomplete', 'No schema columns were generated.')
-    }
-
-  } catch (error) {
-    // Show user-friendly error message for schema generation failures
-    console.error('❌ Schema generation failed:', error)
-
-    // Log specific error details for debugging
-    if (error.response?.status === 401) {
-      toast.warning('Schema Generation Failed', 'Authentication expired. Please log in again to generate schema.')
-    } else if (error.response?.status === 404) {
-      toast.error('File Not Found', 'Data file not found. Please check the file path.')
-    } else if (error.response?.status === 400) {
-      toast.error('Schema Generation Failed', 'Please check your data file format.')
-    } else {
-      toast.warning('Schema Generation Failed', 'You can try generating it manually later.')
-    }
-
-    // Don't throw error - allow settings save to complete even if schema generation fails
-  }
-}
-
-// Watch for modal open/close to fetch settings
-watch(() => props.isOpen, (isOpen) => {
-  if (isOpen) {
-    fetchSettings()
-  }
-})
-
-// Close modal on Escape key
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && props.isOpen && !isSavingSettings.value && !isProgressModalVisible.value) {
-    closeModal()
-  }
-})
 </script>
+
+<style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap');
+
+:global(body),
+:global(button),
+:global(input),
+:global(select),
+:global(textarea) {
+  font-family: 'Ubuntu', sans-serif;
+  font-weight: 400;
+}
+</style>

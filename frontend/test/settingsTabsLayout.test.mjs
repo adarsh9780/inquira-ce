@@ -3,14 +3,17 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('settings modal includes a dedicated Packages tab', () => {
+test('settings modal includes LLM, Workspace, and Account tabs with state-preserving v-show', () => {
   const path = resolve(process.cwd(), 'src/components/modals/SettingsModal.vue')
   const source = readFileSync(path, 'utf-8')
 
-  assert.equal(source.includes('<span class="flex-1 text-left">Models</span>'), true)
-  assert.equal(source.includes("activeTab = 'packages'"), true)
-  assert.equal(source.includes('<PackagesTab v-if="activeTab === \'packages\'" />'), true)
-  assert.equal(source.includes("['api', 'data', 'packages', 'account']"), true)
+  assert.equal(source.includes('LLM &amp; API Keys'), true)
+  assert.equal(source.includes('Workspace'), true)
+  assert.equal(source.includes('Account'), true)
+  assert.equal(source.includes('<LLMSettingsTab v-show="activeTab === \'llm\'" />'), true)
+  assert.equal(source.includes('<WorkspaceTab v-show="activeTab === \'workspace\'" />'), true)
+  assert.equal(source.includes('<AccountTab v-show="activeTab === \'account\'" />'), true)
+  assert.equal(source.includes("if (candidate === 'api') return 'llm'"), true)
 })
 
 test('packages tab routes installs to terminal workflow', () => {

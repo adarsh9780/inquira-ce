@@ -334,9 +334,8 @@
     </div>
 
     <SettingsModal
-      :is-open="isSettingsOpen"
+      v-model="isSettingsOpen"
       :initial-tab="settingsInitialTab"
-      @close="closeSettings"
     />
 
     <WorkspaceCreateModal
@@ -497,7 +496,7 @@ const isLoadingDatasets = ref(false)
 
 // Settings dialog
 const isSettingsOpen = ref(false)
-const settingsInitialTab = ref('api')
+const settingsInitialTab = ref('llm')
 
 // Terms dialog
 const isTermsDialogOpen = ref(false)
@@ -712,14 +711,18 @@ async function saveTitle(id) {
 }
 
 // Settings
-function openSettings(tab = 'api') {
-  settingsInitialTab.value = tab
+function openSettings(tab = 'llm') {
+  const normalized = String(tab || '').trim().toLowerCase()
+  if (normalized === 'api') {
+    settingsInitialTab.value = 'llm'
+  } else if (normalized === 'data') {
+    settingsInitialTab.value = 'workspace'
+  } else if (normalized === 'account') {
+    settingsInitialTab.value = 'account'
+  } else {
+    settingsInitialTab.value = 'llm'
+  }
   isSettingsOpen.value = true
-}
-
-function closeSettings() {
-  isSettingsOpen.value = false
-  settingsInitialTab.value = 'api'
 }
 
 // Terms
