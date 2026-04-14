@@ -14,6 +14,9 @@ def _build_openai_client(
     api_key: str,
     base_url: str,
     temperature: float,
+    top_p: float | None,
+    frequency_penalty: float | None,
+    presence_penalty: float | None,
     max_tokens: int | None,
     max_retries: int,
     timeout: float,
@@ -28,6 +31,12 @@ def _build_openai_client(
     }
     if max_tokens is not None:
         kwargs["max_tokens"] = max_tokens
+    if top_p is not None:
+        kwargs["top_p"] = top_p
+    if frequency_penalty is not None:
+        kwargs["frequency_penalty"] = frequency_penalty
+    if presence_penalty is not None:
+        kwargs["presence_penalty"] = presence_penalty
     return ChatOpenAI(**kwargs)
 
 
@@ -38,6 +47,9 @@ def create_chat_model(
     api_key: str = "",
     base_url: str = "",
     temperature: float = 0,
+    top_p: float | None = None,
+    frequency_penalty: float | None = None,
+    presence_penalty: float | None = None,
     max_tokens: int | None = None,
     max_retries: int = 0,
     timeout: float = 60.0,
@@ -50,6 +62,9 @@ def create_chat_model(
             api_key=api_key,
             base_url=base_url,
             temperature=temperature,
+            top_p=top_p,
+            frequency_penalty=frequency_penalty,
+            presence_penalty=presence_penalty,
             max_tokens=max_tokens,
             max_retries=max_retries,
             timeout=timeout,
@@ -61,6 +76,9 @@ def create_chat_model(
             api_key=api_key or "ollama",
             base_url=base_url or "http://localhost:11434/v1",
             temperature=temperature,
+            top_p=top_p,
+            frequency_penalty=frequency_penalty,
+            presence_penalty=presence_penalty,
             max_tokens=max_tokens,
             max_retries=max_retries,
             timeout=timeout,
@@ -83,6 +101,8 @@ def create_chat_model(
         }
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
+        if top_p is not None:
+            kwargs["top_p"] = top_p
         return ChatAnthropic(**kwargs)
 
     raise ValueError(

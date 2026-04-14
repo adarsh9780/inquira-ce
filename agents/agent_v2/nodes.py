@@ -448,6 +448,19 @@ def _get_model(config: RunnableConfig, *, lite: bool) -> BaseChatModel:
     )
     selected = normalize_model_id(str(configurable.get("model") or "").strip())
     coding_model = normalize_model_id(str(configurable.get("coding_model") or "").strip())
+    temperature = float(configurable.get("temperature") if configurable.get("temperature") is not None else 0.0)
+    max_tokens = int(
+        configurable.get("max_tokens")
+        if configurable.get("max_tokens") is not None
+        else runtime.code_generation_max_tokens
+    )
+    top_p = float(configurable.get("top_p") if configurable.get("top_p") is not None else 1.0)
+    frequency_penalty = float(
+        configurable.get("frequency_penalty") if configurable.get("frequency_penalty") is not None else 0.0
+    )
+    presence_penalty = float(
+        configurable.get("presence_penalty") if configurable.get("presence_penalty") is not None else 0.0
+    )
     if lite:
         model_name = lite_model or selected or default_model
     else:
@@ -461,8 +474,11 @@ def _get_model(config: RunnableConfig, *, lite: bool) -> BaseChatModel:
         model=model_name,
         api_key=api_key,
         base_url=base_url,
-        temperature=0,
-        max_tokens=runtime.code_generation_max_tokens,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        top_p=top_p,
+        frequency_penalty=frequency_penalty,
+        presence_penalty=presence_penalty,
     )
 
 

@@ -43,7 +43,6 @@ from ..services.conversation_service import ConversationService
 from .deps import ensure_appdata_principal, get_current_user
 from ...core.prompt_library import get_prompt
 from ...services.llm_service import LLMService
-from ...services.llm_runtime_config import load_llm_runtime_config
 from ...services.llm_provider_catalog import (
     normalize_llm_provider,
     provider_requires_api_key,
@@ -1789,14 +1788,45 @@ async def regenerate_workspace_dataset_schema(
     )
     prompt = get_prompt("schema_generation", context=context, columns_text=columns_text)
 
-    llm_service = LLMService(api_key=api_key or "", provider=provider, model=model)
-    runtime = load_llm_runtime_config()
+    llm_temperature = getattr(prefs, "llm_temperature", None)
+    llm_max_tokens = getattr(prefs, "llm_max_tokens", None)
+    llm_top_p = getattr(prefs, "llm_top_p", None)
+    llm_frequency_penalty = getattr(prefs, "llm_frequency_penalty", None)
+    llm_presence_penalty = getattr(prefs, "llm_presence_penalty", None)
+    missing_advanced = [
+        field_name
+        for field_name, value in (
+            ("llm_temperature", llm_temperature),
+            ("llm_max_tokens", llm_max_tokens),
+            ("llm_top_p", llm_top_p),
+            ("llm_frequency_penalty", llm_frequency_penalty),
+            ("llm_presence_penalty", llm_presence_penalty),
+        )
+        if value is None
+    ]
+    if missing_advanced:
+        missing_text = ", ".join(missing_advanced)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing LLM advanced settings ({missing_text}). Configure them in Settings.",
+        )
+
+    llm_service = LLMService(
+        api_key=api_key or "",
+        provider=provider,
+        model=model,
+        temperature=float(llm_temperature),
+        max_tokens=int(llm_max_tokens),
+        top_p=float(llm_top_p),
+        frequency_penalty=float(llm_frequency_penalty),
+        presence_penalty=float(llm_presence_penalty),
+    )
     try:
         schema_response = await asyncio.to_thread(
             llm_service.ask,
             prompt,
             SchemaDescriptionList,
-            runtime.schema_max_tokens,
+            int(llm_max_tokens),
         )
     except HTTPException as exc:
         detail = exc.detail if getattr(exc, "detail", None) is not None else str(exc)

@@ -19,6 +19,11 @@ test('useLLMConfig composable exposes unified save flow actions', () => {
   assert.equal(source.includes('const modelsLoading = ref(false)'), true)
   assert.equal(source.includes('const mainModel = ref(null)'), true)
   assert.equal(source.includes('const liteModel = ref(null)'), true)
+  assert.equal(source.includes('const llmTemperature = ref(0)'), true)
+  assert.equal(source.includes('const llmMaxTokens = ref(2048)'), true)
+  assert.equal(source.includes('const llmTopP = ref(1)'), true)
+  assert.equal(source.includes('const llmFrequencyPenalty = ref(0)'), true)
+  assert.equal(source.includes('const llmPresencePenalty = ref(0)'), true)
 
   assert.equal(source.includes('async function verifyKey()'), true)
   assert.equal(source.includes('async function saveKey()'), true)
@@ -28,6 +33,8 @@ test('useLLMConfig composable exposes unified save flow actions', () => {
   assert.equal(source.includes("const response = await apiService.v1GetPreferences(providerHint)"), true)
   assert.equal(source.includes('selectedProviderApiKeyPresent.value = !!apiKeyPresenceByProvider.value?.[normalizedProvider]'), true)
   assert.equal(source.includes("return { ok: false, stage: 'verify', error: verifyResult.error || 'verify_failed' }"), true)
+  assert.equal(source.includes('llm_temperature: Number(llmTemperature.value)'), true)
+  assert.equal(source.includes('llm_max_tokens: Number(llmMaxTokens.value)'), true)
 })
 
 test('LLM settings tab renders flat sections and a single save action', () => {
@@ -51,6 +58,11 @@ test('LLM settings tab renders flat sections and a single save action', () => {
   assert.equal(source.includes('max-options-without-search="100"'), true)
   assert.equal(source.includes('v-model="mainSearch"'), false)
   assert.equal(source.includes('v-model="liteSearch"'), false)
+  assert.equal(source.includes('Advanced settings'), true)
+  assert.equal(source.includes('Temperature'), true)
+  assert.equal(source.includes('Max tokens'), true)
+  assert.equal(source.includes('Frequency penalty'), true)
+  assert.equal(source.includes('Presence penalty'), true)
 
   assert.equal(source.includes('async function handleProviderSelect(nextProvider)'), true)
   assert.equal(source.includes('async function refreshModelList()'), true)

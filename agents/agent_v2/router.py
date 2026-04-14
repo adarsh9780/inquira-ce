@@ -66,6 +66,15 @@ async def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
     selected_model = normalize_model_id(str(configurable.get("model") or "").strip())
     model_name = lite_model or selected_model or default_model
     api_key = str(configurable.get("api_key") or "").strip()
+    temperature = float(configurable.get("temperature") if configurable.get("temperature") is not None else 0.0)
+    max_tokens = int(configurable.get("max_tokens") if configurable.get("max_tokens") is not None else 256)
+    top_p = float(configurable.get("top_p") if configurable.get("top_p") is not None else 1.0)
+    frequency_penalty = float(
+        configurable.get("frequency_penalty") if configurable.get("frequency_penalty") is not None else 0.0
+    )
+    presence_penalty = float(
+        configurable.get("presence_penalty") if configurable.get("presence_penalty") is not None else 0.0
+    )
     if provider_requires_api_key(provider) and not api_key:
         return "analysis"
 
@@ -75,8 +84,11 @@ async def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
             model=model_name,
             api_key=api_key,
             base_url=base_url,
-            temperature=0,
-            max_tokens=256,
+            temperature=temperature,
+            top_p=top_p,
+            frequency_penalty=frequency_penalty,
+            presence_penalty=presence_penalty,
+            max_tokens=max_tokens,
         )
         prompt = ChatPromptTemplate.from_messages(
             [

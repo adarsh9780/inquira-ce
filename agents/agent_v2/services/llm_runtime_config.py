@@ -1,4 +1,4 @@
-"""LLM runtime configuration loaded from env and inquira.toml."""
+"""LLM runtime configuration loaded from env and static defaults."""
 
 from __future__ import annotations
 
@@ -102,9 +102,6 @@ def load_llm_runtime_config() -> LlmRuntimeConfig:
     llm = data.get("llm", {})
     if not isinstance(llm, dict):
         llm = {}
-    llm_limits = llm.get("limits", {})
-    if not isinstance(llm_limits, dict):
-        llm_limits = {}
 
     provider = str(
         os.getenv("INQUIRA_LLM_PROVIDER") or llm.get("provider") or "openrouter"
@@ -132,19 +129,11 @@ def load_llm_runtime_config() -> LlmRuntimeConfig:
 
     default_max_tokens_raw: Any = os.getenv("INQUIRA_LLM_DEFAULT_MAX_TOKENS")
     if default_max_tokens_raw is None:
-        default_max_tokens_raw = llm_limits.get("default")
-    if default_max_tokens_raw is None:
-        default_max_tokens_raw = llm.get("default-max-tokens")
-    if default_max_tokens_raw is None:
         default_max_tokens_raw = 4096
     schema_max_tokens_raw: Any = os.getenv("INQUIRA_LLM_SCHEMA_MAX_TOKENS")
     if schema_max_tokens_raw is None:
-        schema_max_tokens_raw = llm_limits.get("schema")
-    if schema_max_tokens_raw is None:
         schema_max_tokens_raw = 2048
     code_generation_max_tokens_raw: Any = os.getenv("INQUIRA_LLM_CODE_MAX_TOKENS")
-    if code_generation_max_tokens_raw is None:
-        code_generation_max_tokens_raw = llm_limits.get("code_generation")
     if code_generation_max_tokens_raw is None:
         code_generation_max_tokens_raw = 4096
 

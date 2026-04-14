@@ -48,6 +48,24 @@ async def test_chat_service_passes_model_and_context_to_agent_payload(monkeypatc
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
     monkeypatch.setattr("app.v1.services.chat_service.AgentClient.assert_health", fake_health)
     monkeypatch.setattr("app.v1.services.chat_service.AgentClient.run", fake_run)
+    async def _fake_resolve_llm_preferences(_session, _user_id):
+        return {
+            "provider": "openrouter",
+            "base_url": "https://openrouter.ai/api/v1",
+            "requires_api_key": True,
+            "selected_lite_model": "google/gemini-2.5-flash-lite",
+            "selected_main_model": "google/gemini-2.5-flash",
+            "selected_coding_model": "google/gemini-2.5-flash",
+            "temperature": 0.0,
+            "max_tokens": 2048,
+            "top_p": 1.0,
+            "frequency_penalty": 0.0,
+            "presence_penalty": 0.0,
+        }
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.ChatService._resolve_llm_preferences",
+        staticmethod(_fake_resolve_llm_preferences),
+    )
 
     session = SimpleNamespace()
 
@@ -80,6 +98,11 @@ async def test_resolve_llm_preferences_includes_selected_coding_model(monkeypatc
         selected_model="google/gemini-2.5-flash",
         selected_lite_model="google/gemini-2.5-flash-lite",
         selected_coding_model="openai/gpt-4.1-mini",
+        llm_temperature=0.0,
+        llm_max_tokens=2048,
+        llm_top_p=1.0,
+        llm_frequency_penalty=0.0,
+        llm_presence_penalty=0.0,
     )
 
     async def fake_get_or_create(_session, _user_id):

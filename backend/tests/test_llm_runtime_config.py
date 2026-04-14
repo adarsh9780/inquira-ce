@@ -3,7 +3,7 @@ import pytest
 from app.services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
 
 
-def test_llm_runtime_config_reads_base_url_and_limits_from_toml_but_ignores_model_fields(
+def test_llm_runtime_config_reads_base_url_from_toml_and_ignores_toml_limits(
     monkeypatch, tmp_path
 ):
     cfg_path = tmp_path / "inquira.toml"
@@ -34,9 +34,9 @@ def test_llm_runtime_config_reads_base_url_and_limits_from_toml_but_ignores_mode
     assert cfg.base_url == "http://localhost:4000/v1"
     assert cfg.default_model == "google/gemini-2.5-flash"
     assert cfg.lite_model == "google/gemini-2.5-flash-lite"
-    assert cfg.default_max_tokens == 2048
-    assert cfg.schema_max_tokens == 1024
-    assert cfg.code_generation_max_tokens == 3072
+    assert cfg.default_max_tokens == 4096
+    assert cfg.schema_max_tokens == 2048
+    assert cfg.code_generation_max_tokens == 4096
     assert "acme/private-model" not in cfg.supported_models
 
 
@@ -122,50 +122,18 @@ def test_llm_runtime_config_ignores_toml_shorthand_model_ids(monkeypatch, tmp_pa
     assert cfg.lite_model == "google/gemini-2.5-flash-lite"
 
 
-def test_llm_runtime_config_rejects_non_positive_default_max_tokens(
-    monkeypatch, tmp_path
-):
-    cfg_path = tmp_path / "inquira.toml"
-    cfg_path.write_text(
-        "\n".join(
-            [
-                "[llm]",
-                'provider = "openrouter"',
-                'base-url = "https://openrouter.ai/api/v1"',
-                "[llm.limits]",
-                "default = 0",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    monkeypatch.setenv("INQUIRA_TOML_PATH", str(cfg_path))
+def test_llm_runtime_config_rejects_non_positive_env_token_limits(monkeypatch):
+    monkeypatch.setenv("INQUIRA_LLM_DEFAULT_MAX_TOKENS", "0")
     load_llm_runtime_config.cache_clear()
 
     with pytest.raises(ValueError, match="must be a positive integer"):
         load_llm_runtime_config()
 
 
-def test_llm_runtime_config_rejects_non_positive_schema_or_code_limits(
-    monkeypatch, tmp_path
-):
-    cfg_path = tmp_path / "inquira.toml"
-    cfg_path.write_text(
-        "\n".join(
-            [
-                "[llm]",
-                'provider = "openrouter"',
-                'base-url = "https://openrouter.ai/api/v1"',
-                "[llm.limits]",
-                "default = 4096",
-                "schema = -1",
-                "code_generation = 4096",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    monkeypatch.setenv("INQUIRA_TOML_PATH", str(cfg_path))
+def test_llm_runtime_config_rejects_non_positive_env_schema_or_code_limits(monkeypatch):
+    monkeypatch.setenv("INQUIRA_LLM_DEFAULT_MAX_TOKENS", "4096")
+    monkeypatch.setenv("INQUIRA_LLM_SCHEMA_MAX_TOKENS", "-1")
+    monkeypatch.setenv("INQUIRA_LLM_CODE_MAX_TOKENS", "4096")
     load_llm_runtime_config.cache_clear()
 
     with pytest.raises(ValueError, match="must be a positive integer"):

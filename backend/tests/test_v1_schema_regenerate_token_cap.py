@@ -4,9 +4,6 @@ from types import SimpleNamespace
 import pytest
 
 from app.v1.api import runtime as runtime_api
-from app.services.llm_runtime_config import load_llm_runtime_config
-
-
 @pytest.mark.asyncio
 async def test_regenerate_schema_caps_llm_max_tokens(monkeypatch, tmp_path):
     duckdb_path = tmp_path / "workspace.duckdb"
@@ -24,12 +21,32 @@ async def test_regenerate_schema_caps_llm_max_tokens(monkeypatch, tmp_path):
             schema_context="Default context",
             selected_model="google/gemini-2.5-flash",
             allow_schema_sample_values=False,
+            llm_temperature=0.2,
+            llm_max_tokens=512,
+            llm_top_p=0.95,
+            llm_frequency_penalty=0.0,
+            llm_presence_penalty=0.0,
         )
 
     class FakeLLMService:
-        def __init__(self, api_key: str, model: str, provider: str | None = None):
+        def __init__(
+            self,
+            api_key: str,
+            model: str,
+            provider: str | None = None,
+            temperature: float = 0.0,
+            max_tokens: int | None = None,
+            top_p: float | None = None,
+            frequency_penalty: float | None = None,
+            presence_penalty: float | None = None,
+        ):
             captured["api_key"] = api_key
             captured["model"] = model
+            captured["temperature"] = temperature
+            captured["init_max_tokens"] = max_tokens
+            captured["top_p"] = top_p
+            captured["frequency_penalty"] = frequency_penalty
+            captured["presence_penalty"] = presence_penalty
 
         def ask(self, _prompt, _schema_type, max_tokens=None):
             captured["max_tokens"] = max_tokens
@@ -81,8 +98,10 @@ async def test_regenerate_schema_caps_llm_max_tokens(monkeypatch, tmp_path):
     assert result.table_name == "amounts"
     assert captured["api_key"] == "test-key"
     assert captured["model"] == "google/gemini-2.5-flash"
-    load_llm_runtime_config.cache_clear()
-    assert captured["max_tokens"] == load_llm_runtime_config().schema_max_tokens
+    assert captured["temperature"] == 0.2
+    assert captured["init_max_tokens"] == 512
+    assert captured["top_p"] == 0.95
+    assert captured["max_tokens"] == 512
     schema_path = Path(duckdb_path).parent / "meta" / "amounts_schema.json"
     assert schema_path.exists()
 
@@ -119,10 +138,15 @@ async def test_regenerate_schema_falls_back_to_saved_schema_columns_when_table_u
             schema_context="Default context",
             selected_model="google/gemini-2.5-flash",
             allow_schema_sample_values=False,
+            llm_temperature=0.0,
+            llm_max_tokens=1024,
+            llm_top_p=1.0,
+            llm_frequency_penalty=0.0,
+            llm_presence_penalty=0.0,
         )
 
     class FakeLLMService:
-        def __init__(self, api_key: str, model: str, provider: str | None = None):
+        def __init__(self, api_key: str, model: str, provider: str | None = None, **_kwargs):
             self.api_key = api_key
             self.model = model
 
@@ -195,10 +219,15 @@ async def test_regenerate_schema_matches_descriptions_with_normalized_names(monk
             schema_context="Default context",
             selected_model="google/gemini-2.5-flash",
             allow_schema_sample_values=False,
+            llm_temperature=0.0,
+            llm_max_tokens=1024,
+            llm_top_p=1.0,
+            llm_frequency_penalty=0.0,
+            llm_presence_penalty=0.0,
         )
 
     class FakeLLMService:
-        def __init__(self, api_key: str, model: str, provider: str | None = None):
+        def __init__(self, api_key: str, model: str, provider: str | None = None, **_kwargs):
             _ = (api_key, model)
 
         def ask(self, _prompt, _schema_type, max_tokens=None):

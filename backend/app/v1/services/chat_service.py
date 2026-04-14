@@ -107,19 +107,25 @@ class ChatService:
     @staticmethod
     async def _resolve_llm_preferences(session: AsyncSession, user_id: str) -> dict[str, Any]:
         runtime = load_llm_runtime_config()
-        try:
-            prefs = await PreferencesRepository.get_or_create(session, user_id)
-        except Exception:  # noqa: BLE001
-            provider = normalize_llm_provider(runtime.provider)
-            base_url = runtime.base_url if provider == "openrouter" else provider_default_base_url(provider)
-            return {
-                "provider": provider,
-                "base_url": base_url,
-                "requires_api_key": provider_requires_api_key(provider),
-                "selected_lite_model": runtime.lite_model,
-                "selected_main_model": runtime.default_model,
-                "selected_coding_model": runtime.default_model,
-            }
+        prefs = await PreferencesRepository.get_or_create(session, user_id)
+
+        def _required_float(field_name: str) -> float:
+            raw = getattr(prefs, field_name, None)
+            if raw is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Missing LLM advanced setting '{field_name}'. Configure it in Settings.",
+                )
+            return float(raw)
+
+        def _required_int(field_name: str) -> int:
+            raw = getattr(prefs, field_name, None)
+            if raw is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Missing LLM advanced setting '{field_name}'. Configure it in Settings.",
+                )
+            return int(raw)
 
         provider = normalize_llm_provider(getattr(prefs, "llm_provider", runtime.provider))
         base_url = runtime.base_url if provider == "openrouter" else provider_default_base_url(provider)
@@ -137,6 +143,11 @@ class ChatService:
                 or getattr(prefs, "selected_model", runtime.default_model)
                 or runtime.default_model
             ).strip(),
+            "temperature": _required_float("llm_temperature"),
+            "max_tokens": _required_int("llm_max_tokens"),
+            "top_p": _required_float("llm_top_p"),
+            "frequency_penalty": _required_float("llm_frequency_penalty"),
+            "presence_penalty": _required_float("llm_presence_penalty"),
         }
 
     @staticmethod
@@ -266,6 +277,11 @@ class ChatService:
                 "lite_model": llm_prefs["selected_lite_model"],
                 "default_model": llm_prefs["selected_main_model"],
                 "coding_model": llm_prefs.get("selected_coding_model") or llm_prefs["selected_main_model"],
+                "temperature": llm_prefs["temperature"],
+                "max_tokens": llm_prefs["max_tokens"],
+                "top_p": llm_prefs["top_p"],
+                "frequency_penalty": llm_prefs["frequency_penalty"],
+                "presence_penalty": llm_prefs["presence_penalty"],
             },
         }
 

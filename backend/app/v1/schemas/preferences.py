@@ -31,6 +31,11 @@ class PreferencesResponse(BaseModel):
     selected_model: str = "google/gemini-2.5-flash"
     selected_lite_model: str = "google/gemini-2.5-flash-lite"
     selected_coding_model: str = "google/gemini-2.5-flash"
+    llm_temperature: float = 0.0
+    llm_max_tokens: int = 2048
+    llm_top_p: float = 1.0
+    llm_frequency_penalty: float = 0.0
+    llm_presence_penalty: float = 0.0
     enabled_models: list[str] = Field(default_factory=list)
     schema_context: str = ""
     allow_schema_sample_values: bool = False
@@ -57,6 +62,11 @@ class PreferencesUpdateRequest(BaseModel):
     selected_model: str | None = None
     selected_lite_model: str | None = None
     selected_coding_model: str | None = None
+    llm_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    llm_max_tokens: int | None = Field(default=None, ge=1, le=131072)
+    llm_top_p: float | None = Field(default=None, ge=0.0, le=1.0)
+    llm_frequency_penalty: float | None = Field(default=None, ge=-2.0, le=2.0)
+    llm_presence_penalty: float | None = Field(default=None, ge=-2.0, le=2.0)
     enabled_models: list[str] | None = None
     schema_context: str | None = None
     allow_schema_sample_values: bool | None = None

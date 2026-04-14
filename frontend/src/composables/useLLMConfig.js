@@ -25,6 +25,11 @@ const refreshNotice = ref('')
 const refreshLoading = ref(false)
 const saveLoading = ref(false)
 const showAllModels = ref(false)
+const llmTemperature = ref(0)
+const llmMaxTokens = ref(2048)
+const llmTopP = ref(1)
+const llmFrequencyPenalty = ref(0)
+const llmPresencePenalty = ref(0)
 
 const modelMetaByProvider = ref({})
 
@@ -209,6 +214,11 @@ async function loadPreferences(providerHint = null, preserveSelection = false) {
     }
 
     applyProviderModelState(normalizedProvider, response, preserveSelection)
+    llmTemperature.value = Number(response?.llm_temperature ?? 0)
+    llmMaxTokens.value = Number(response?.llm_max_tokens ?? 2048)
+    llmTopP.value = Number(response?.llm_top_p ?? 1)
+    llmFrequencyPenalty.value = Number(response?.llm_frequency_penalty ?? 0)
+    llmPresencePenalty.value = Number(response?.llm_presence_penalty ?? 0)
     keyVerified.value = normalizedProvider === 'ollama' || !!selectedProviderApiKeyPresent.value
 
     return response
@@ -415,6 +425,11 @@ async function saveConfig() {
       selected_lite_model: String(liteModel.value || '').trim(),
       selected_coding_model: String(mainModel.value || '').trim(),
       enabled_models: [...mainModels.value],
+      llm_temperature: Number(llmTemperature.value),
+      llm_max_tokens: Number(llmMaxTokens.value),
+      llm_top_p: Number(llmTopP.value),
+      llm_frequency_penalty: Number(llmFrequencyPenalty.value),
+      llm_presence_penalty: Number(llmPresencePenalty.value),
     }
 
     const response = await apiService.v1UpdatePreferences(payload)
@@ -470,6 +485,11 @@ export const useLLMConfig = () => {
     refreshLoading,
     saveLoading,
     showAllModels,
+    llmTemperature,
+    llmMaxTokens,
+    llmTopP,
+    llmFrequencyPenalty,
+    llmPresencePenalty,
     providerLabel,
     maskedKeySuffix,
     currentProviderModelMeta,

@@ -129,6 +129,78 @@
 
         <p v-if="provider !== 'ollama' && verifyWarning" class="text-xs text-[var(--color-info)]">{{ verifyWarning }}</p>
       </div>
+
+      <div class="border-t border-[var(--color-border)]"></div>
+
+      <div class="space-y-3">
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]"
+          @click="showAdvanced = !showAdvanced"
+        >
+          <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 transition-transform" :class="showAdvanced ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M6 8l4 4 4-4" />
+          </svg>
+          Advanced settings
+        </button>
+
+        <div v-if="showAdvanced" class="grid grid-cols-2 gap-3">
+          <label class="space-y-1">
+            <span class="block text-xs text-[var(--color-text-sub)]">Temperature</span>
+            <input
+              v-model.number="llmTemperature"
+              type="number"
+              min="0"
+              max="2"
+              step="0.1"
+              class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+            />
+          </label>
+          <label class="space-y-1">
+            <span class="block text-xs text-[var(--color-text-sub)]">Max tokens</span>
+            <input
+              v-model.number="llmMaxTokens"
+              type="number"
+              min="1"
+              step="1"
+              class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+            />
+          </label>
+          <label class="space-y-1">
+            <span class="block text-xs text-[var(--color-text-sub)]">Top P</span>
+            <input
+              v-model.number="llmTopP"
+              type="number"
+              min="0"
+              max="1"
+              step="0.01"
+              class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+            />
+          </label>
+          <label class="space-y-1">
+            <span class="block text-xs text-[var(--color-text-sub)]">Frequency penalty</span>
+            <input
+              v-model.number="llmFrequencyPenalty"
+              type="number"
+              min="-2"
+              max="2"
+              step="0.1"
+              class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+            />
+          </label>
+          <label class="space-y-1">
+            <span class="block text-xs text-[var(--color-text-sub)]">Presence penalty</span>
+            <input
+              v-model.number="llmPresencePenalty"
+              type="number"
+              min="-2"
+              max="2"
+              step="0.1"
+              class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+            />
+          </label>
+        </div>
+      </div>
     </div>
 
     <div class="flex justify-end gap-2 border-t border-[var(--color-border)] pt-4">
@@ -187,6 +259,11 @@ const {
   refreshLoading,
   saveLoading,
   showAllModels,
+  llmTemperature,
+  llmMaxTokens,
+  llmTopP,
+  llmFrequencyPenalty,
+  llmPresencePenalty,
   loadPreferences,
   setProvider,
   setApiKey,
@@ -197,6 +274,7 @@ const {
 } = llm
 
 const showKey = ref(false)
+const showAdvanced = ref(false)
 
 const providerOptions = [
   {

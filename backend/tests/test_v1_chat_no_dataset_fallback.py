@@ -472,6 +472,12 @@ async def test_chat_allows_ollama_without_api_key(monkeypatch):
             "requires_api_key": False,
             "selected_lite_model": "llama3.2:3b",
             "selected_main_model": "llama3.2",
+            "selected_coding_model": "llama3.2",
+            "temperature": 0.0,
+            "max_tokens": 2048,
+            "top_p": 1.0,
+            "frequency_penalty": 0.0,
+            "presence_penalty": 0.0,
         }
 
     monkeypatch.setattr(

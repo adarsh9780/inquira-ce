@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..db.base import AppDataBase
@@ -33,6 +33,11 @@ class UserPreferences(AppDataBase):
     provider_model_catalogs_json: Mapped[str] = mapped_column(
         Text, nullable=False, default="{}"
     )
+    llm_temperature: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    llm_max_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=2048)
+    llm_top_p: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    llm_frequency_penalty: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    llm_presence_penalty: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     schema_context: Mapped[str] = mapped_column(Text, nullable=False, default="")
     allow_schema_sample_values: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     terminal_risk_acknowledged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

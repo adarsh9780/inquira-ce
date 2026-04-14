@@ -34,6 +34,11 @@ class LLMService:
         model: str = "google/gemini-2.5-flash",
         provider: str | None = None,
         base_url: str | None = None,
+        temperature: float = 0.0,
+        max_tokens: int | None = None,
+        top_p: float | None = None,
+        frequency_penalty: float | None = None,
+        presence_penalty: float | None = None,
     ):
         """Initialize LLM service with API key and OpenAI-compatible base URL."""
         runtime = load_llm_runtime_config()
@@ -57,7 +62,11 @@ class LLMService:
             self.base_url = provider_default_base_url(resolved_provider)
         self.provider = resolved_provider
         self.requires_api_key = provider_requires_api_key(resolved_provider)
-        self.default_max_tokens = runtime.default_max_tokens
+        self.temperature = float(temperature)
+        self.top_p = top_p
+        self.frequency_penalty = frequency_penalty
+        self.presence_penalty = presence_penalty
+        self.default_max_tokens = int(max_tokens) if max_tokens is not None else runtime.default_max_tokens
         self.client: Any | None
         self.chat_client: Any | None
 
@@ -68,7 +77,10 @@ class LLMService:
                 model=self.model,
                 api_key=self.api_key,
                 base_url=self.base_url,
-                temperature=0,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                frequency_penalty=self.frequency_penalty,
+                presence_penalty=self.presence_penalty,
                 max_retries=0,  # Fail fast instead of hanging the UI with automatic retries
                 timeout=60.0,
             )
@@ -99,7 +111,10 @@ class LLMService:
             model=selected_model,
             api_key=self.api_key,
             base_url=self.base_url,
-            temperature=0,
+            temperature=self.temperature,
+            top_p=self.top_p,
+            frequency_penalty=self.frequency_penalty,
+            presence_penalty=self.presence_penalty,
             max_retries=0,  # Fail fast
             timeout=60.0,
         )

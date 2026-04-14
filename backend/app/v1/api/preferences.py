@@ -341,6 +341,11 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
         selected_model=selected_model,
         selected_lite_model=selected_lite_model,
         selected_coding_model=selected_coding_model,
+        llm_temperature=float(getattr(prefs, "llm_temperature", 0.0)),
+        llm_max_tokens=int(getattr(prefs, "llm_max_tokens", 2048)),
+        llm_top_p=float(getattr(prefs, "llm_top_p", 1.0)),
+        llm_frequency_penalty=float(getattr(prefs, "llm_frequency_penalty", 0.0)),
+        llm_presence_penalty=float(getattr(prefs, "llm_presence_penalty", 0.0)),
         enabled_models=enabled_models,
         schema_context=prefs.schema_context,
         allow_schema_sample_values=bool(prefs.allow_schema_sample_values),
@@ -426,6 +431,16 @@ async def update_preferences(
         selected_coding_model = str(payload.selected_coding_model or "").strip()
         if selected_coding_model in enabled_models:
             prefs.selected_coding_model = selected_coding_model
+    if payload.llm_temperature is not None:
+        prefs.llm_temperature = float(payload.llm_temperature)
+    if payload.llm_max_tokens is not None:
+        prefs.llm_max_tokens = int(payload.llm_max_tokens)
+    if payload.llm_top_p is not None:
+        prefs.llm_top_p = float(payload.llm_top_p)
+    if payload.llm_frequency_penalty is not None:
+        prefs.llm_frequency_penalty = float(payload.llm_frequency_penalty)
+    if payload.llm_presence_penalty is not None:
+        prefs.llm_presence_penalty = float(payload.llm_presence_penalty)
     if payload.schema_context is not None:
         prefs.schema_context = payload.schema_context
     if payload.allow_schema_sample_values is not None:

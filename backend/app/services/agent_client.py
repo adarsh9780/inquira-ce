@@ -72,6 +72,11 @@ class AgentClient:
             "default_model": str(llm.get("default_model") or "").strip(),
             "lite_model": str(llm.get("lite_model") or "").strip(),
             "coding_model": str(llm.get("coding_model") or "").strip(),
+            "temperature": llm.get("temperature"),
+            "max_tokens": llm.get("max_tokens"),
+            "top_p": llm.get("top_p"),
+            "frequency_penalty": llm.get("frequency_penalty"),
+            "presence_penalty": llm.get("presence_penalty"),
         }
 
     @staticmethod

@@ -46,6 +46,24 @@ async def test_analyze_and_persist_turn_uses_remote_agent_client(monkeypatch):
 
     monkeypatch.setattr("app.v1.services.chat_service.AgentClient.assert_health", fake_health)
     monkeypatch.setattr("app.v1.services.chat_service.AgentClient.run", fake_run)
+    async def _fake_resolve_llm_preferences(_session, _user_id):
+        return {
+            "provider": "openrouter",
+            "base_url": "https://openrouter.ai/api/v1",
+            "requires_api_key": True,
+            "selected_lite_model": "openai/gpt-4.1-mini",
+            "selected_main_model": "google/gemini-2.5-flash",
+            "selected_coding_model": "google/gemini-2.5-flash",
+            "temperature": 0.0,
+            "max_tokens": 2048,
+            "top_p": 1.0,
+            "frequency_penalty": 0.0,
+            "presence_penalty": 0.0,
+        }
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.ChatService._resolve_llm_preferences",
+        staticmethod(_fake_resolve_llm_preferences),
+    )
 
     user = SimpleNamespace(id="user-1", username="alice")
     payload, conversation_id, turn_id = await ChatService.analyze_and_persist_turn(
@@ -96,6 +114,11 @@ def test_build_remote_agent_payload_normalizes_windows_paths():
             "selected_lite_model": "openai/gpt-4.1-mini",
             "selected_main_model": "google/gemini-2.5-flash",
             "selected_coding_model": "google/gemini-2.5-flash",
+            "temperature": 0.0,
+            "max_tokens": 2048,
+            "top_p": 1.0,
+            "frequency_penalty": 0.0,
+            "presence_penalty": 0.0,
         },
         resolved_api_key="key",
         agent_profile="agent_v2",
