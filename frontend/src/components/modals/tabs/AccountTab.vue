@@ -8,20 +8,10 @@
       </div>
       <div class="min-w-0 flex-1">
         <p class="truncate text-sm font-medium text-[var(--color-text-main)]">{{ displayName }}</p>
-        <p class="text-xs text-[var(--color-text-muted)]">v{{ version }}</p>
       </div>
     </div>
 
     <div class="space-y-4">
-      <label class="space-y-1">
-        <span class="block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Display name</span>
-        <input
-          v-model="displayName"
-          type="text"
-          class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
-        />
-      </label>
-
       <button
         type="button"
         class="flex w-full items-center justify-center gap-3 rounded-lg border border-[var(--color-border-strong)] bg-white py-2.5 text-sm font-medium text-[var(--color-text-main)] transition-colors hover:bg-[var(--color-base-soft)] disabled:cursor-not-allowed disabled:opacity-60"
@@ -61,7 +51,6 @@ import { useAuthStore } from '../../../stores/authStore'
 
 const authStore = useAuthStore()
 const displayName = ref('Adarsh Maurya')
-const version = ref('1.0.0')
 
 const isSigningIn = computed(() => authStore.pendingAuthAction === 'google' && authStore.isLoading)
 

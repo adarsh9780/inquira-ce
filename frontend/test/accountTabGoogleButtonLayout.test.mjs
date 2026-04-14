@@ -7,10 +7,11 @@ function readSource(relativePath) {
   return readFileSync(resolve(process.cwd(), relativePath), 'utf-8')
 }
 
-test('settings account tab keeps profile fields and restores Google sign-in trigger', () => {
+test('settings account tab hides rename/version fields and keeps Google sign-in trigger', () => {
   const source = readSource('src/components/modals/tabs/AccountTab.vue')
 
-  assert.equal(source.includes('Display name'), true)
+  assert.equal(source.includes('Display name'), false)
+  assert.equal(source.includes('v{{ version }}'), false)
   assert.equal(source.includes('Sign in with Google'), true)
   assert.equal(source.includes("@click=\"startGoogleSignIn\""), true)
   assert.equal(source.includes("authStore.signInWithProvider('google')"), true)
