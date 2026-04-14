@@ -5,25 +5,17 @@
     <div class="max-h-[34rem] space-y-5 overflow-y-auto pr-1">
       <div class="space-y-3">
         <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Choose provider</label>
-        <div class="grid grid-cols-3 gap-2">
-          <button
-            v-for="card in providerCards"
-            :key="card.id"
-            type="button"
-            class="rounded-lg border px-3 py-3 text-left transition-all"
-            :class="provider === card.id
-              ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
-              : 'border-[var(--color-border-strong)] bg-[var(--color-base-soft)] hover:border-[var(--color-accent-border)]'"
-            @click="handleProviderSelect(card.id)"
+        <div class="relative">
+          <select
+            :value="provider"
+            class="w-full appearance-none rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 pr-9 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+            @change="handleProviderSelect($event.target.value)"
           >
-            <div class="mb-2 inline-flex h-7 w-7 items-center justify-center rounded-md bg-[var(--color-base)] text-[var(--color-text-sub)]">
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path :d="card.icon" />
-              </svg>
-            </div>
-            <p class="text-sm font-medium text-[var(--color-text-main)]">{{ card.label }}</p>
-            <p class="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">{{ card.description }}</p>
-          </button>
+            <option v-for="option in providerOptions" :key="option.id" :value="option.id">{{ option.label }}</option>
+          </select>
+          <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M6 8l4 4 4-4" />
+          </svg>
         </div>
       </div>
 
@@ -219,24 +211,18 @@ const showKey = ref(false)
 const mainSearch = ref('')
 const liteSearch = ref('')
 
-const providerCards = [
+const providerOptions = [
   {
     id: 'openai',
     label: 'OpenAI',
-    description: 'Direct OpenAI models.',
-    icon: 'M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z',
   },
   {
     id: 'openrouter',
     label: 'OpenRouter',
-    description: 'Route across providers.',
-    icon: 'M4 6h16M4 12h16M4 18h16',
   },
   {
     id: 'ollama',
     label: 'Ollama (local)',
-    description: 'Run local models only.',
-    icon: 'M4 12h16M12 4v16',
   },
 ]
 

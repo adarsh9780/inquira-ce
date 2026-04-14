@@ -45,6 +45,8 @@ test('LLM settings tab renders flat sections and a single save action', () => {
   assert.equal(source.includes('Configuration ready'), false)
   assert.equal(source.includes('Update key'), false)
   assert.equal(source.includes('@click="openPanel'), false)
+  assert.equal(source.includes('v-for="card in providerCards"'), false)
+  assert.equal(source.includes('@change="handleProviderSelect($event.target.value)"'), true)
 
   assert.equal(source.includes('async function handleProviderSelect(nextProvider)'), true)
   assert.equal(source.includes('async function refreshModelList()'), true)
