@@ -107,14 +107,6 @@ enabled = false
 project = "inquira-agent"
 endpoint = "http://127.0.0.1:6006/v1/traces"
 
-[llm.limits]
-# Default output cap when no endpoint-specific override is used.
-default = 4096
-# Schema generation/regeneration cap.
-schema = 2048
-# Code-generation/chat execution cap.
-code_generation = 4096
-
 [agent]
 version = "agent_v2"
 max-tool-calls = 5
