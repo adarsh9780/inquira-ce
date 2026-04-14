@@ -528,6 +528,25 @@ function startDatasetIngest(path) {
   datasetIngestPercent.value = null
 }
 
+function applyDatasetSelectionFromUpload(uploadResult, fallbackPath = '') {
+  const resolvedPath = String(uploadResult?.file_path || fallbackPath || '').trim()
+  const resolvedTableName = String(uploadResult?.table_name || '').trim()
+  const resolvedColumns = Array.isArray(uploadResult?.columns) ? uploadResult.columns : []
+  if (!resolvedPath && !resolvedTableName) return
+
+  appStore.setDataFilePath(resolvedPath)
+  appStore.setIngestedTableName(resolvedTableName)
+  appStore.setIngestedColumns(resolvedColumns)
+  appStore.setSchemaFileId(resolvedPath || resolvedTableName)
+
+  window.dispatchEvent(new CustomEvent('dataset-switched', {
+    detail: {
+      tableName: resolvedTableName || null,
+      dataPath: resolvedPath || null,
+    },
+  }))
+}
+
 function finishDatasetIngest() {
   isDatasetIngesting.value = false
   datasetIngestFilename.value = ''
@@ -736,7 +755,8 @@ async function refreshDataset(dataset) {
   }
   startDatasetIngest(sourcePath)
   try {
-    await apiService.uploadDataPath(sourcePath)
+    const uploadResult = await apiService.uploadDataPath(sourcePath)
+    applyDatasetSelectionFromUpload(uploadResult, sourcePath)
     await loadWorkspaceDatasets()
     toast.success('Dataset refreshed', 'Dataset refreshed successfully.')
   } catch (error) {
@@ -758,7 +778,8 @@ async function openDatasetPicker() {
     const selectedPath = Array.isArray(selected) ? String(selected[0] || '').trim() : String(selected || '').trim()
     if (!selectedPath) return
     startDatasetIngest(selectedPath)
-    await apiService.uploadDataPath(selectedPath)
+    const uploadResult = await apiService.uploadDataPath(selectedPath)
+    applyDatasetSelectionFromUpload(uploadResult, selectedPath)
     await loadWorkspaceDatasets()
     toast.success('Dataset added', 'Dataset added to workspace.')
   } catch (error) {
@@ -866,7 +887,8 @@ async function createWorkspace() {
       emit('set-active-workspace', workspaceId)
     }
     if (newWorkspaceDatasetPath.value) {
-      await apiService.uploadDataPath(newWorkspaceDatasetPath.value)
+      const uploadResult = await apiService.uploadDataPath(newWorkspaceDatasetPath.value)
+      applyDatasetSelectionFromUpload(uploadResult, newWorkspaceDatasetPath.value)
     }
     if (String(newWorkspaceContext.value || '').trim()) {
       await apiService.v1UpdatePreferences({
