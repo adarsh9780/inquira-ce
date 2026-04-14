@@ -564,6 +564,27 @@ export const useAppStore = defineStore('app', () => {
     saveLocalConfig()
   }
 
+  function clearActiveDatasetSelection() {
+    setDataFilePath('')
+    setIngestedColumns([])
+    setSchemaFileId('')
+    setGeneratedCode('')
+    setPythonFileContent('')
+    setResultData(null)
+    setPlotlyFigure(null)
+    setDataframes([])
+    setFigures([])
+    setTerminalOutput('')
+  }
+
+  function handleDatasetRemoved(tableName) {
+    const removedTable = String(tableName || '').trim().toLowerCase()
+    const activeTable = String(ingestedTableName.value || '').trim().toLowerCase()
+    if (!removedTable || !activeTable || removedTable !== activeTable) return false
+    clearActiveDatasetSelection()
+    return true
+  }
+
   function setColumnCatalog(columns) {
     columnCatalog.value = Array.isArray(columns) ? columns : []
   }
@@ -2185,6 +2206,8 @@ export const useAppStore = defineStore('app', () => {
     setIsSchemaFileUploaded,
     setIngestedTableName,
     setIngestedColumns,
+    clearActiveDatasetSelection,
+    handleDatasetRemoved,
     setColumnCatalog,
     setProfileData,
     setApiKey,

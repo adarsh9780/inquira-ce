@@ -139,14 +139,14 @@
                 v-for="ds in filteredDatasets"
                 :key="ds.table_name"
                 class="group sidebar-item-row"
-                :class="{ 'sidebar-item-row-active': appStore.activeDatasetId === ds.table_name }"
+                :class="{ 'sidebar-item-row-active': isSelectedDataset(ds) }"
                 :title="datasetRowTitle(ds)"
                 @click="selectDataset(ds)"
               >
                 <div class="min-w-0 flex-1">
                   <p
                     class="truncate text-[13px] font-medium leading-[1.4]"
-                    :class="appStore.activeDatasetId === ds.table_name ? 'text-[var(--color-accent)]' : ''"
+                    :class="isSelectedDataset(ds) ? 'text-[var(--color-accent)]' : ''"
                     style="color: var(--color-text-main);"
                   >
                     {{ datasetFriendlyName(ds.table_name) }}
@@ -154,7 +154,7 @@
                   <p
                     v-if="ds.file_path"
                     class="truncate text-[12px] font-normal leading-[1.3]"
-                    :class="appStore.activeDatasetId === ds.table_name ? 'text-[var(--color-accent)] opacity-75' : ''"
+                    :class="isSelectedDataset(ds) ? 'text-[var(--color-accent)] opacity-75' : ''"
                     style="color: var(--color-text-muted);"
                     :title="ds.file_path"
                   >
@@ -576,6 +576,24 @@ function datasetSourceCaption(filePath) {
   return parts[parts.length - 1] || normalized
 }
 
+function normalizeDatasetPath(path) {
+  return String(path || '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/\/{2,}/g, '/')
+    .toLowerCase()
+}
+
+function isSelectedDataset(dataset) {
+  const datasetPath = normalizeDatasetPath(dataset?.file_path)
+  const activePath = normalizeDatasetPath(appStore.dataFilePath)
+  if (datasetPath && activePath && datasetPath === activePath) return true
+
+  const datasetTable = String(dataset?.table_name || '').trim().toLowerCase()
+  const activeTable = String(appStore.ingestedTableName || '').trim().toLowerCase()
+  return Boolean(datasetTable && activeTable && datasetTable === activeTable)
+}
+
 function datasetRowTitle(dataset) {
   const fullPath = String(dataset?.file_path || '').trim()
   return fullPath
@@ -841,9 +859,16 @@ async function confirmDelete() {
     } else if (pendingDeleteType.value === 'dataset') {
       const workspaceId = appStore.activeWorkspaceId
       if (workspaceId) {
-        await apiService.v1DeleteDataset(workspaceId, pendingDeleteId.value)
-        toast.success('Dataset Deleted', 'Dataset has been removed.')
+        const deletedTableName = String(pendingDeleteId.value || '').trim()
+        await apiService.v1DeleteDataset(workspaceId, deletedTableName)
+        const deletedActiveDataset = appStore.handleDatasetRemoved(deletedTableName)
+        previewService.clearSchemaCache()
+        window.dispatchEvent(new CustomEvent('dataset-switched', { detail: null }))
         await fetchDatasets()
+        toast.success(
+          'Dataset Deleted',
+          deletedActiveDataset ? 'Dataset removed. Active selection cleared.' : 'Dataset has been removed.',
+        )
       }
     } else if (pendingDeleteType.value === 'conversation') {
       await appStore.deleteConversationById(pendingDeleteId.value)

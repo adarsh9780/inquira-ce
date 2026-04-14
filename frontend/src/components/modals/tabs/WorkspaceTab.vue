@@ -304,6 +304,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { apiService } from '../../../services/apiService'
+import { previewService } from '../../../services/previewService'
 import { useAppStore } from '../../../stores/appStore'
 import { toast } from '../../../composables/useToast'
 import { extractApiErrorMessage } from '../../../utils/apiError'
@@ -554,9 +555,15 @@ async function confirmRemoveDataset(dataset) {
   if (!workspaceId || !tableName) return
   try {
     await apiService.v1DeleteDataset(workspaceId, tableName)
+    const deletedActiveDataset = appStore.handleDatasetRemoved(tableName)
+    previewService.clearSchemaCache()
+    window.dispatchEvent(new CustomEvent('dataset-switched', { detail: null }))
     pendingRemovalTable.value = ''
     await loadWorkspaceDatasets()
-    toast.success('Dataset removed', 'Dataset removed from workspace.')
+    toast.success(
+      'Dataset removed',
+      deletedActiveDataset ? 'Dataset removed. Active selection cleared.' : 'Dataset removed from workspace.',
+    )
   } catch (error) {
     toast.error('Remove failed', extractApiErrorMessage(error, 'Failed to remove dataset.'))
   }
