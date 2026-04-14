@@ -37,6 +37,7 @@ class LLMService:
         temperature: float = 0.0,
         max_tokens: int | None = None,
         top_p: float | None = None,
+        top_k: int | None = None,
         frequency_penalty: float | None = None,
         presence_penalty: float | None = None,
     ):
@@ -64,6 +65,7 @@ class LLMService:
         self.requires_api_key = provider_requires_api_key(resolved_provider)
         self.temperature = float(temperature)
         self.top_p = top_p
+        self.top_k = top_k
         self.frequency_penalty = frequency_penalty
         self.presence_penalty = presence_penalty
         self.default_max_tokens = int(max_tokens) if max_tokens is not None else runtime.default_max_tokens
@@ -79,6 +81,7 @@ class LLMService:
                 base_url=self.base_url,
                 temperature=self.temperature,
                 top_p=self.top_p,
+                top_k=self.top_k,
                 frequency_penalty=self.frequency_penalty,
                 presence_penalty=self.presence_penalty,
                 max_retries=0,  # Fail fast instead of hanging the UI with automatic retries
@@ -113,6 +116,7 @@ class LLMService:
             base_url=self.base_url,
             temperature=self.temperature,
             top_p=self.top_p,
+            top_k=self.top_k,
             frequency_penalty=self.frequency_penalty,
             presence_penalty=self.presence_penalty,
             max_retries=0,  # Fail fast

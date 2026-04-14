@@ -57,6 +57,7 @@ async def test_analyze_and_persist_turn_uses_remote_agent_client(monkeypatch):
             "temperature": 0.0,
             "max_tokens": 2048,
             "top_p": 1.0,
+            "top_k": 0,
             "frequency_penalty": 0.0,
             "presence_penalty": 0.0,
         }
@@ -91,6 +92,7 @@ async def test_analyze_and_persist_turn_uses_remote_agent_client(monkeypatch):
     assert "active_schema" not in captured_payload
     assert captured_payload["agent_profile"] == "agent_v2"
     assert captured_payload["llm"]["api_key"] == "key"
+    assert captured_payload["llm"]["top_k"] == 0
 
 
 def test_build_remote_agent_payload_normalizes_windows_paths():
@@ -117,6 +119,7 @@ def test_build_remote_agent_payload_normalizes_windows_paths():
             "temperature": 0.0,
             "max_tokens": 2048,
             "top_p": 1.0,
+            "top_k": 0,
             "frequency_penalty": 0.0,
             "presence_penalty": 0.0,
         },

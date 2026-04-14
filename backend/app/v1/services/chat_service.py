@@ -146,6 +146,7 @@ class ChatService:
             "temperature": _required_float("llm_temperature"),
             "max_tokens": _required_int("llm_max_tokens"),
             "top_p": _required_float("llm_top_p"),
+            "top_k": _required_int("llm_top_k"),
             "frequency_penalty": _required_float("llm_frequency_penalty"),
             "presence_penalty": _required_float("llm_presence_penalty"),
         }
@@ -280,6 +281,7 @@ class ChatService:
                 "temperature": llm_prefs["temperature"],
                 "max_tokens": llm_prefs["max_tokens"],
                 "top_p": llm_prefs["top_p"],
+                "top_k": llm_prefs["top_k"],
                 "frequency_penalty": llm_prefs["frequency_penalty"],
                 "presence_penalty": llm_prefs["presence_penalty"],
             },

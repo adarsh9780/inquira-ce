@@ -59,6 +59,7 @@ async def test_chat_service_passes_model_and_context_to_agent_payload(monkeypatc
             "temperature": 0.0,
             "max_tokens": 2048,
             "top_p": 1.0,
+            "top_k": 0,
             "frequency_penalty": 0.0,
             "presence_penalty": 0.0,
         }
@@ -101,6 +102,7 @@ async def test_resolve_llm_preferences_includes_selected_coding_model(monkeypatc
         llm_temperature=0.0,
         llm_max_tokens=2048,
         llm_top_p=1.0,
+        llm_top_k=0,
         llm_frequency_penalty=0.0,
         llm_presence_penalty=0.0,
     )
@@ -115,3 +117,4 @@ async def test_resolve_llm_preferences_includes_selected_coding_model(monkeypatc
 
     resolved = await ChatService._resolve_llm_preferences(SimpleNamespace(), "u1")
     assert resolved["selected_coding_model"] == "openai/gpt-4.1-mini"
+    assert resolved["top_k"] == 0

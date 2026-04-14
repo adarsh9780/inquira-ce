@@ -25,9 +25,10 @@ const refreshNotice = ref('')
 const refreshLoading = ref(false)
 const saveLoading = ref(false)
 const showAllModels = ref(false)
-const llmTemperature = ref(0)
-const llmMaxTokens = ref(2048)
+const llmTemperature = ref(0.7)
+const llmMaxTokens = ref(4096)
 const llmTopP = ref(1)
+const llmTopK = ref(0)
 const llmFrequencyPenalty = ref(0)
 const llmPresencePenalty = ref(0)
 
@@ -214,9 +215,10 @@ async function loadPreferences(providerHint = null, preserveSelection = false) {
     }
 
     applyProviderModelState(normalizedProvider, response, preserveSelection)
-    llmTemperature.value = Number(response?.llm_temperature ?? 0)
-    llmMaxTokens.value = Number(response?.llm_max_tokens ?? 2048)
+    llmTemperature.value = Number(response?.llm_temperature ?? 0.7)
+    llmMaxTokens.value = Number(response?.llm_max_tokens ?? 4096)
     llmTopP.value = Number(response?.llm_top_p ?? 1)
+    llmTopK.value = Number(response?.llm_top_k ?? 0)
     llmFrequencyPenalty.value = Number(response?.llm_frequency_penalty ?? 0)
     llmPresencePenalty.value = Number(response?.llm_presence_penalty ?? 0)
     keyVerified.value = normalizedProvider === 'ollama' || !!selectedProviderApiKeyPresent.value
@@ -340,7 +342,10 @@ async function saveKey() {
     return { ok: false, error: 'missing_key' }
   }
 
-  await apiService.v1SetApiKey(key, selectedProvider)
+  await apiService.v1SetApiKey({
+    provider: selectedProvider,
+    api_key: key,
+  })
   apiKeyPresenceByProvider.value = {
     ...apiKeyPresenceByProvider.value,
     [selectedProvider]: true,
@@ -349,6 +354,33 @@ async function saveKey() {
   keyMask.value = 'sk-••••••••••••••••••••YzBp'
   apiKey.value = keyMask.value
   usingMaskedKey.value = true
+  return { ok: true }
+}
+
+async function verifyAndSaveKey() {
+  const selectedProvider = normalizeProvider(provider.value)
+  clearTransientMessages()
+
+  if (selectedProvider === 'ollama') {
+    keyVerified.value = true
+    const refreshed = await refreshModels({ background: true })
+    return refreshed.ok
+      ? { ok: true }
+      : { ok: false, stage: 'refresh_models', error: refreshed.error || 'refresh_failed' }
+  }
+
+  const verifyResult = await verifyKey()
+  if (!verifyResult.ok) {
+    return { ok: false, stage: 'verify', error: verifyResult.error || 'verify_failed' }
+  }
+
+  const saveResult = await saveKey()
+  if (!saveResult.ok) {
+    return { ok: false, stage: 'save_key', error: saveResult.error || 'save_key_failed' }
+  }
+
+  verifySuccess.value = 'Key verified'
+  void refreshModels({ background: true })
   return { ok: true }
 }
 
@@ -404,7 +436,10 @@ async function saveConfig() {
   const selectedProvider = normalizeProvider(provider.value)
 
   try {
-    if (selectedProvider !== 'ollama' && !usingMaskedKey.value) {
+    const enteredKey = String(apiKey.value || '').trim()
+    const hasNewUnmaskedKey = selectedProvider !== 'ollama' && !usingMaskedKey.value && !!enteredKey
+
+    if (hasNewUnmaskedKey) {
       const verifyResult = await verifyKey()
       if (!verifyResult.ok) {
         return { ok: false, stage: 'verify', error: verifyResult.error || 'verify_failed' }
@@ -412,15 +447,8 @@ async function saveConfig() {
     }
 
     saveLoading.value = true
-    if (selectedProvider !== 'ollama') {
-      const keyResult = await saveKey()
-      if (!keyResult.ok) {
-        return { ok: false, stage: 'save_key', error: keyResult.error || 'save_key_failed' }
-      }
-    }
-
     const payload = {
-      llm_provider: selectedProvider,
+      provider: selectedProvider,
       selected_model: String(mainModel.value || '').trim(),
       selected_lite_model: String(liteModel.value || '').trim(),
       selected_coding_model: String(mainModel.value || '').trim(),
@@ -428,17 +456,21 @@ async function saveConfig() {
       llm_temperature: Number(llmTemperature.value),
       llm_max_tokens: Number(llmMaxTokens.value),
       llm_top_p: Number(llmTopP.value),
+      llm_top_k: Number(llmTopK.value),
       llm_frequency_penalty: Number(llmFrequencyPenalty.value),
       llm_presence_penalty: Number(llmPresencePenalty.value),
     }
+    if (hasNewUnmaskedKey) {
+      payload.api_key = enteredKey
+    }
 
-    const response = await apiService.v1UpdatePreferences(payload)
-    applyProviderModelState(selectedProvider, response, true)
+    await apiService.v1SetApiKey(payload)
+    const response = await loadPreferences(selectedProvider, true)
     return { ok: true, response }
   } catch (error) {
     return {
       ok: false,
-      stage: 'save_preferences',
+      stage: 'save_configuration',
       error: extractApiErrorMessage(error, 'Failed to save configuration.'),
     }
   } finally {
@@ -488,6 +520,7 @@ export const useLLMConfig = () => {
     llmTemperature,
     llmMaxTokens,
     llmTopP,
+    llmTopK,
     llmFrequencyPenalty,
     llmPresencePenalty,
     providerLabel,
@@ -498,6 +531,7 @@ export const useLLMConfig = () => {
     setApiKey,
     verifyKey,
     saveKey,
+    verifyAndSaveKey,
     refreshModels,
     saveConfig,
     getModelMeta,

@@ -31,9 +31,10 @@ class PreferencesResponse(BaseModel):
     selected_model: str = "google/gemini-2.5-flash"
     selected_lite_model: str = "google/gemini-2.5-flash-lite"
     selected_coding_model: str = "google/gemini-2.5-flash"
-    llm_temperature: float = 0.0
-    llm_max_tokens: int = 2048
+    llm_temperature: float = 0.7
+    llm_max_tokens: int = 4096
     llm_top_p: float = 1.0
+    llm_top_k: int = 0
     llm_frequency_penalty: float = 0.0
     llm_presence_penalty: float = 0.0
     enabled_models: list[str] = Field(default_factory=list)
@@ -65,6 +66,7 @@ class PreferencesUpdateRequest(BaseModel):
     llm_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     llm_max_tokens: int | None = Field(default=None, ge=1, le=131072)
     llm_top_p: float | None = Field(default=None, ge=0.0, le=1.0)
+    llm_top_k: int | None = Field(default=None, ge=0, le=500)
     llm_frequency_penalty: float | None = Field(default=None, ge=-2.0, le=2.0)
     llm_presence_penalty: float | None = Field(default=None, ge=-2.0, le=2.0)
     enabled_models: list[str] | None = None
@@ -81,7 +83,17 @@ class PreferencesUpdateRequest(BaseModel):
 
 class ApiKeyUpdateRequest(BaseModel):
     provider: str = "openrouter"
-    api_key: str = Field(min_length=1)
+    api_key: str | None = None
+    selected_model: str | None = None
+    selected_lite_model: str | None = None
+    selected_coding_model: str | None = None
+    enabled_models: list[str] | None = None
+    llm_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    llm_max_tokens: int | None = Field(default=None, ge=1, le=131072)
+    llm_top_p: float | None = Field(default=None, ge=0.0, le=1.0)
+    llm_top_k: int | None = Field(default=None, ge=0, le=500)
+    llm_frequency_penalty: float | None = Field(default=None, ge=-2.0, le=2.0)
+    llm_presence_penalty: float | None = Field(default=None, ge=-2.0, le=2.0)
 
 
 class ProviderModelsRefreshRequest(BaseModel):

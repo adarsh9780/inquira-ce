@@ -1791,6 +1791,7 @@ async def regenerate_workspace_dataset_schema(
     llm_temperature = getattr(prefs, "llm_temperature", None)
     llm_max_tokens = getattr(prefs, "llm_max_tokens", None)
     llm_top_p = getattr(prefs, "llm_top_p", None)
+    llm_top_k = getattr(prefs, "llm_top_k", None)
     llm_frequency_penalty = getattr(prefs, "llm_frequency_penalty", None)
     llm_presence_penalty = getattr(prefs, "llm_presence_penalty", None)
     missing_advanced = [
@@ -1799,6 +1800,7 @@ async def regenerate_workspace_dataset_schema(
             ("llm_temperature", llm_temperature),
             ("llm_max_tokens", llm_max_tokens),
             ("llm_top_p", llm_top_p),
+            ("llm_top_k", llm_top_k),
             ("llm_frequency_penalty", llm_frequency_penalty),
             ("llm_presence_penalty", llm_presence_penalty),
         )
@@ -1818,6 +1820,7 @@ async def regenerate_workspace_dataset_schema(
         temperature=float(llm_temperature),
         max_tokens=int(llm_max_tokens),
         top_p=float(llm_top_p),
+        top_k=int(llm_top_k),
         frequency_penalty=float(llm_frequency_penalty),
         presence_penalty=float(llm_presence_penalty),
     )

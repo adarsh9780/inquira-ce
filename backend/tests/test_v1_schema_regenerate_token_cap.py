@@ -24,6 +24,7 @@ async def test_regenerate_schema_caps_llm_max_tokens(monkeypatch, tmp_path):
             llm_temperature=0.2,
             llm_max_tokens=512,
             llm_top_p=0.95,
+            llm_top_k=0,
             llm_frequency_penalty=0.0,
             llm_presence_penalty=0.0,
         )
@@ -37,6 +38,7 @@ async def test_regenerate_schema_caps_llm_max_tokens(monkeypatch, tmp_path):
             temperature: float = 0.0,
             max_tokens: int | None = None,
             top_p: float | None = None,
+            top_k: int | None = None,
             frequency_penalty: float | None = None,
             presence_penalty: float | None = None,
         ):
@@ -45,6 +47,7 @@ async def test_regenerate_schema_caps_llm_max_tokens(monkeypatch, tmp_path):
             captured["temperature"] = temperature
             captured["init_max_tokens"] = max_tokens
             captured["top_p"] = top_p
+            captured["top_k"] = top_k
             captured["frequency_penalty"] = frequency_penalty
             captured["presence_penalty"] = presence_penalty
 
@@ -101,6 +104,7 @@ async def test_regenerate_schema_caps_llm_max_tokens(monkeypatch, tmp_path):
     assert captured["temperature"] == 0.2
     assert captured["init_max_tokens"] == 512
     assert captured["top_p"] == 0.95
+    assert captured["top_k"] == 0
     assert captured["max_tokens"] == 512
     schema_path = Path(duckdb_path).parent / "meta" / "amounts_schema.json"
     assert schema_path.exists()
@@ -141,6 +145,7 @@ async def test_regenerate_schema_falls_back_to_saved_schema_columns_when_table_u
             llm_temperature=0.0,
             llm_max_tokens=1024,
             llm_top_p=1.0,
+            llm_top_k=0,
             llm_frequency_penalty=0.0,
             llm_presence_penalty=0.0,
         )
@@ -222,6 +227,7 @@ async def test_regenerate_schema_matches_descriptions_with_normalized_names(monk
             llm_temperature=0.0,
             llm_max_tokens=1024,
             llm_top_p=1.0,
+            llm_top_k=0,
             llm_frequency_penalty=0.0,
             llm_presence_penalty=0.0,
         )

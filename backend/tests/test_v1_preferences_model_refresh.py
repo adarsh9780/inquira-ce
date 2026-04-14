@@ -7,8 +7,8 @@ import pytest
 import httpx
 
 from app.services.provider_model_refresh import ProviderRefreshResult, refresh_provider_model_catalog
-from app.v1.api.preferences import refresh_provider_models, verify_api_key
-from app.v1.schemas.preferences import ApiKeyVerifyRequest, ProviderModelsRefreshRequest
+from app.v1.api.preferences import refresh_provider_models, set_api_key, verify_api_key
+from app.v1.schemas.preferences import ApiKeyUpdateRequest, ApiKeyVerifyRequest, ProviderModelsRefreshRequest
 
 
 @pytest.mark.asyncio
@@ -182,6 +182,86 @@ async def test_refresh_endpoint_persists_catalog_and_returns_updated_preferences
     ]
     assert response.selected_model == "openrouter/free"
     assert response.detail == "Refreshed OpenRouter account models."
+
+
+@pytest.mark.asyncio
+async def test_set_api_key_endpoint_persists_models_and_advanced_settings(monkeypatch):
+    prefs = SimpleNamespace(
+        llm_provider="openrouter",
+        selected_model="openrouter/free",
+        selected_lite_model="openrouter/free",
+        selected_coding_model="openrouter/free",
+        enabled_main_models_json='["openrouter/free"]',
+        provider_model_catalogs_json="{}",
+        llm_temperature=0.7,
+        llm_max_tokens=4096,
+        llm_top_p=1.0,
+        llm_top_k=0,
+        llm_frequency_penalty=0.0,
+        llm_presence_penalty=0.0,
+        schema_context="",
+        allow_schema_sample_values=False,
+        terminal_risk_acknowledged=False,
+        chat_overlay_width=0.25,
+        is_sidebar_collapsed=True,
+        hide_shortcuts_modal=False,
+        active_workspace_id=None,
+        active_dataset_path=None,
+        active_table_name=None,
+    )
+    captured_secret_write: dict[str, str] = {}
+
+    class _Session:
+        async def commit(self):
+            return None
+
+    async def _fake_get_or_create(_session, _principal_id):
+        return prefs
+
+    def _fake_set_api_key(_user_id, key, provider="openrouter"):
+        captured_secret_write["key"] = key
+        captured_secret_write["provider"] = provider
+
+    monkeypatch.setattr(
+        "app.v1.api.preferences.PreferencesRepository.get_or_create",
+        _fake_get_or_create,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences.SecretStorageService.set_api_key",
+        _fake_set_api_key,
+    )
+
+    response = await set_api_key(
+        ApiKeyUpdateRequest(
+            provider="openrouter",
+            api_key="sk-test",
+            selected_model="openai/gpt-4o",
+            selected_lite_model="google/gemini-2.0-flash-001",
+            selected_coding_model="openai/gpt-4o",
+            enabled_models=["openai/gpt-4o"],
+            llm_temperature=0.9,
+            llm_max_tokens=3072,
+            llm_top_p=0.8,
+            llm_top_k=32,
+            llm_frequency_penalty=0.1,
+            llm_presence_penalty=0.2,
+        ),
+        session=_Session(),
+        current_user=SimpleNamespace(id="u1"),
+    )
+
+    assert prefs.llm_provider == "openrouter"
+    assert prefs.selected_model == "openai/gpt-4o"
+    assert prefs.selected_lite_model == "google/gemini-2.0-flash-001"
+    assert prefs.selected_coding_model == "openai/gpt-4o"
+    assert prefs.llm_temperature == 0.9
+    assert prefs.llm_max_tokens == 3072
+    assert prefs.llm_top_p == 0.8
+    assert prefs.llm_top_k == 32
+    assert prefs.llm_frequency_penalty == 0.1
+    assert prefs.llm_presence_penalty == 0.2
+    assert captured_secret_write == {"key": "sk-test", "provider": "openrouter"}
+    assert "Configuration and API key" in response.message
 
 
 @pytest.mark.asyncio

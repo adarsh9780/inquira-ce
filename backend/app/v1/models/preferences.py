@@ -33,9 +33,10 @@ class UserPreferences(AppDataBase):
     provider_model_catalogs_json: Mapped[str] = mapped_column(
         Text, nullable=False, default="{}"
     )
-    llm_temperature: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    llm_max_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=2048)
+    llm_temperature: Mapped[float] = mapped_column(Float, nullable=False, default=0.7)
+    llm_max_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=4096)
     llm_top_p: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    llm_top_k: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     llm_frequency_penalty: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     llm_presence_penalty: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     schema_context: Mapped[str] = mapped_column(Text, nullable=False, default="")

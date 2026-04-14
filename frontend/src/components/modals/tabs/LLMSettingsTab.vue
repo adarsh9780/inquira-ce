@@ -1,113 +1,129 @@
 <template>
-  <section class="space-y-4">
-    <h2 class="text-lg font-bold text-[var(--color-text-main)]">LLM &amp; API Keys</h2>
+  <section class="relative h-full">
+    <div class="h-full overflow-y-auto pb-24">
+      <h2 class="mb-4 text-lg font-bold text-[var(--color-text-main)]">LLM &amp; API Keys</h2>
 
-    <div class="max-h-[34rem] space-y-5 overflow-y-auto pr-1">
-      <div class="space-y-3">
-        <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Choose provider</label>
-        <div class="relative">
-          <select
-            :value="provider"
-            class="w-full appearance-none rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 pr-9 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
-            @change="handleProviderSelect($event.target.value)"
-          >
-            <option v-for="option in providerOptions" :key="option.id" :value="option.id">{{ option.label }}</option>
-          </select>
-          <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M6 8l4 4 4-4" />
-          </svg>
-        </div>
-      </div>
-
-      <div class="border-t border-[var(--color-border)]"></div>
-
-      <div class="space-y-3">
-        <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">
-          {{ provider === 'ollama' ? 'Ollama base URL' : apiKeyLabel }}
-        </label>
-
-        <div v-if="provider === 'ollama'" class="space-y-2">
-          <input
-            v-model="ollamaBaseUrl"
-            type="text"
-            class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
-            placeholder="http://localhost:11434"
-          />
-        </div>
-
-        <div v-else class="space-y-2">
+      <div class="space-y-5">
+        <div class="space-y-2">
+          <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Provider</label>
           <div class="relative">
-            <input
-              :value="apiKey"
-              :type="showKey ? 'text' : 'password'"
-              class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 pr-10 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
-              :placeholder="apiKeyPlaceholder"
-              @input="setApiKey($event.target.value)"
-            />
-            <button
-              type="button"
-              class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-base-muted)] hover:text-[var(--color-text-main)]"
-              :aria-label="showKey ? 'Hide key' : 'Show key'"
-              @click="showKey = !showKey"
+            <select
+              :value="provider"
+              class="w-full appearance-none rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 pr-9 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+              @change="handleProviderSelect($event.target.value)"
             >
-              <svg v-if="!showKey" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" />
-                <circle cx="12" cy="12" r="2.8" />
-              </svg>
-              <svg v-else class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M3 3l18 18" />
-                <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
-                <path d="M9.8 5.4A11.3 11.3 0 0 1 12 5c6.5 0 10 7 10 7a16.3 16.3 0 0 1-3.1 3.9" />
-                <path d="M6.6 6.6C3.5 8.6 2 12 2 12s3.5 7 10 7c1.2 0 2.3-.2 3.2-.5" />
-              </svg>
-            </button>
+              <option v-for="option in providerOptions" :key="option.id" :value="option.id">{{ option.label }}</option>
+            </select>
+            <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M6 8l4 4 4-4" />
+            </svg>
+          </div>
+        </div>
+
+        <div class="border-t border-[var(--color-border)]"></div>
+
+        <div class="space-y-3">
+          <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">
+            {{ provider === 'ollama' ? 'Ollama base URL' : apiKeyLabel }}
+          </label>
+
+          <div v-if="provider === 'ollama'" class="space-y-2">
+            <input
+              v-model="ollamaBaseUrl"
+              type="text"
+              class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+              placeholder="http://localhost:11434"
+            />
           </div>
 
-          <p v-if="showVerifyOnSaveNote" class="text-xs text-[var(--color-text-muted)]">Key will be verified on save</p>
-          <p v-if="verifyError" class="text-xs text-[var(--color-danger)]">{{ verifyError }}</p>
+          <div v-else class="space-y-2">
+            <div class="relative">
+              <input
+                :value="apiKey"
+                :type="showKey ? 'text' : 'password'"
+                class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 pr-10 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+                :placeholder="apiKeyPlaceholder"
+                @input="setApiKey($event.target.value)"
+              />
+              <button
+                type="button"
+                class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-base-muted)] hover:text-[var(--color-text-main)]"
+                :aria-label="showKey ? 'Hide key' : 'Show key'"
+                @click="showKey = !showKey"
+              >
+                <svg v-if="!showKey" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" />
+                  <circle cx="12" cy="12" r="2.8" />
+                </svg>
+                <svg v-else class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M3 3l18 18" />
+                  <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                  <path d="M9.8 5.4A11.3 11.3 0 0 1 12 5c6.5 0 10 7 10 7a16.3 16.3 0 0 1-3.1 3.9" />
+                  <path d="M6.6 6.6C3.5 8.6 2 12 2 12s3.5 7 10 7c1.2 0 2.3-.2 3.2-.5" />
+                </svg>
+              </button>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                class="rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-xs font-medium text-[var(--color-text-main)] transition-all hover:bg-[var(--color-base)] disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="verifyLoading || saveLoading"
+                @click="handleVerifyAndSaveKey"
+              >
+                <span v-if="verifyLoading" class="inline-flex items-center gap-2">
+                  <span class="h-3 w-3 animate-spin rounded-full border-2 border-[var(--color-accent)]/40 border-t-[var(--color-accent)]"></span>
+                  Verifying...
+                </span>
+                <span v-else>Verify &amp; save key</span>
+              </button>
+              <span v-if="verifySuccessMessage" class="text-xs text-[var(--color-success)]">✓ {{ verifySuccessMessage }}</span>
+            </div>
+
+            <p v-if="verifyError" class="text-xs text-[var(--color-danger)]">{{ verifyError }}</p>
+          </div>
+
           <p v-if="refreshNotice" class="text-xs text-[var(--color-info)]">{{ refreshNotice }}</p>
         </div>
-      </div>
 
-      <div class="border-t border-[var(--color-border)]"></div>
+        <div class="border-t border-[var(--color-border)]"></div>
 
-      <div class="space-y-3">
-        <div class="grid grid-cols-2 gap-3">
-          <div class="space-y-2">
-            <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Main model</label>
-            <HeaderDropdown
-              :model-value="mainModel"
-              :options="mainOptions"
-              :searchable="true"
-              :max-options-without-search="100"
-              search-placeholder="Search model"
-              placeholder="Select main model"
-              max-width-class="w-full"
-              aria-label="Main model"
-              @update:model-value="mainModel = $event"
-            />
+        <div class="space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-2">
+              <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Main model</label>
+              <HeaderDropdown
+                :model-value="mainModel"
+                :options="mainOptions"
+                :searchable="true"
+                :max-options-without-search="100"
+                search-placeholder="Search model"
+                placeholder="Select main model"
+                max-width-class="w-full"
+                aria-label="Main model"
+                @update:model-value="mainModel = $event"
+              />
+            </div>
+
+            <div class="space-y-2">
+              <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">
+                Lite model
+                <span class="normal-case tracking-normal font-normal text-xs text-[var(--color-text-muted)]">for quick tasks</span>
+              </label>
+              <HeaderDropdown
+                :model-value="liteModel"
+                :options="liteOptions"
+                :searchable="true"
+                :max-options-without-search="100"
+                search-placeholder="Search model"
+                placeholder="Select lite model"
+                max-width-class="w-full"
+                aria-label="Lite model"
+                @update:model-value="liteModel = $event"
+              />
+            </div>
           </div>
 
-          <div class="space-y-2">
-            <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">
-              Lite model
-              <span class="normal-case tracking-normal font-normal text-xs text-[var(--color-text-muted)]">for quick tasks</span>
-            </label>
-            <HeaderDropdown
-              :model-value="liteModel"
-              :options="liteOptions"
-              :searchable="true"
-              :max-options-without-search="100"
-              search-placeholder="Search model"
-              placeholder="Select lite model"
-              max-width-class="w-full"
-              aria-label="Lite model"
-              @update:model-value="liteModel = $event"
-            />
-          </div>
-        </div>
-
-        <div class="flex items-center justify-between">
           <label v-if="provider !== 'ollama'" class="inline-flex cursor-pointer items-center gap-2 text-xs text-[var(--color-text-sub)]">
             <input v-model="showAllModels" type="checkbox" class="rounded border-[var(--color-border-strong)]" />
             Show all models
@@ -127,83 +143,88 @@
           </button>
         </div>
 
-        <p v-if="provider !== 'ollama' && verifyWarning" class="text-xs text-[var(--color-info)]">{{ verifyWarning }}</p>
-      </div>
+        <div class="border-t border-[var(--color-border)]"></div>
 
-      <div class="border-t border-[var(--color-border)]"></div>
+        <div class="space-y-3">
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 text-xs text-[var(--color-text-muted)]"
+            @click="showAdvanced = !showAdvanced"
+          >
+            <span>{{ showAdvanced ? '▾' : '▸' }}</span>
+            <span>Advanced settings</span>
+          </button>
 
-      <div class="space-y-3">
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]"
-          @click="showAdvanced = !showAdvanced"
-        >
-          <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 transition-transform" :class="showAdvanced ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M6 8l4 4 4-4" />
-          </svg>
-          Advanced settings
-        </button>
+          <div
+            class="overflow-hidden transition-all duration-200 ease-in-out"
+            :style="{ maxHeight: showAdvanced ? '520px' : '0px' }"
+          >
+            <div class="grid grid-cols-2 gap-3 pt-1">
+              <label class="space-y-1">
+                <span class="block text-xs text-[var(--color-text-sub)]">Max tokens</span>
+                <input
+                  v-model.number="llmMaxTokens"
+                  type="number"
+                  min="1"
+                  step="1"
+                  class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+                />
+              </label>
 
-        <div v-if="showAdvanced" class="grid grid-cols-2 gap-3">
-          <label class="space-y-1">
-            <span class="block text-xs text-[var(--color-text-sub)]">Temperature</span>
-            <input
-              v-model.number="llmTemperature"
-              type="number"
-              min="0"
-              max="2"
-              step="0.1"
-              class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
-            />
-          </label>
-          <label class="space-y-1">
-            <span class="block text-xs text-[var(--color-text-sub)]">Max tokens</span>
-            <input
-              v-model.number="llmMaxTokens"
-              type="number"
-              min="1"
-              step="1"
-              class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
-            />
-          </label>
-          <label class="space-y-1">
-            <span class="block text-xs text-[var(--color-text-sub)]">Top P</span>
-            <input
-              v-model.number="llmTopP"
-              type="number"
-              min="0"
-              max="1"
-              step="0.01"
-              class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
-            />
-          </label>
-          <label class="space-y-1">
-            <span class="block text-xs text-[var(--color-text-sub)]">Frequency penalty</span>
-            <input
-              v-model.number="llmFrequencyPenalty"
-              type="number"
-              min="-2"
-              max="2"
-              step="0.1"
-              class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
-            />
-          </label>
-          <label class="space-y-1">
-            <span class="block text-xs text-[var(--color-text-sub)]">Presence penalty</span>
-            <input
-              v-model.number="llmPresencePenalty"
-              type="number"
-              min="-2"
-              max="2"
-              step="0.1"
-              class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
-            />
-          </label>
+              <label class="space-y-1">
+                <span class="block text-xs text-[var(--color-text-sub)]">Top K</span>
+                <input
+                  v-model.number="llmTopK"
+                  type="number"
+                  min="0"
+                  step="1"
+                  class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+                />
+              </label>
+
+              <label class="space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="block text-xs text-[var(--color-text-sub)]">Temperature</span>
+                  <span class="text-xs text-[var(--color-text-muted)]">{{ llmTemperature.toFixed(1) }}</span>
+                </div>
+                <input v-model.number="llmTemperature" type="range" min="0" max="2" step="0.1" class="w-full accent-[var(--color-accent)]" />
+              </label>
+
+              <label class="space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="block text-xs text-[var(--color-text-sub)]">Top P</span>
+                  <span class="text-xs text-[var(--color-text-muted)]">{{ llmTopP.toFixed(2) }}</span>
+                </div>
+                <input v-model.number="llmTopP" type="range" min="0" max="1" step="0.05" class="w-full accent-[var(--color-accent)]" />
+              </label>
+
+              <label class="space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="block text-xs text-[var(--color-text-sub)]">Frequency penalty</span>
+                  <span class="text-xs text-[var(--color-text-muted)]">{{ llmFrequencyPenalty.toFixed(1) }}</span>
+                </div>
+                <input v-model.number="llmFrequencyPenalty" type="range" min="0" max="2" step="0.1" class="w-full accent-[var(--color-accent)]" />
+              </label>
+
+              <label class="space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="block text-xs text-[var(--color-text-sub)]">Presence penalty</span>
+                  <span class="text-xs text-[var(--color-text-muted)]">{{ llmPresencePenalty.toFixed(1) }}</span>
+                </div>
+                <input v-model.number="llmPresencePenalty" type="range" min="0" max="2" step="0.1" class="w-full accent-[var(--color-accent)]" />
+              </label>
+            </div>
+            <div class="pt-2">
+              <button type="button" class="text-xs text-[var(--color-accent)] hover:underline" @click="resetAdvancedDefaults">
+                Reset to defaults
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="flex justify-end gap-2 border-t border-[var(--color-border)] pt-4">
+    <div class="absolute inset-x-0 bottom-0 flex justify-end gap-2 border-t border-[var(--color-border)] bg-[var(--color-base)] px-1 pt-4">
       <button
         type="button"
         class="rounded-lg border border-[var(--color-border-strong)] px-4 py-2 text-sm text-[var(--color-text-sub)] transition-all hover:bg-[var(--color-base-soft)]"
@@ -213,14 +234,11 @@
       </button>
       <button
         type="button"
-        class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-90"
+        class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-60"
+        :disabled="saveLoading"
         @click="saveConfiguration"
       >
-        <span v-if="verifyLoading" class="inline-flex items-center gap-2">
-          <span class="h-3 w-3 animate-spin rounded-full border-2 border-white/60 border-t-white"></span>
-          Verifying...
-        </span>
-        <span v-else-if="saveLoading" class="inline-flex items-center gap-2">
+        <span v-if="saveLoading" class="inline-flex items-center gap-2">
           <span class="h-3 w-3 animate-spin rounded-full border-2 border-white/60 border-t-white"></span>
           Saving...
         </span>
@@ -232,10 +250,10 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 import { useLLMConfig } from '../../../composables/useLLMConfig'
 import { useAppStore } from '../../../stores/appStore'
 import { toast } from '../../../composables/useToast'
-import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 
 const emit = defineEmits(['close-request'])
 
@@ -250,11 +268,10 @@ const {
   liteModels,
   mainModel,
   liteModel,
-  keyMask,
   usingMaskedKey,
   verifyLoading,
   verifyError,
-  verifyWarning,
+  verifySuccess,
   refreshNotice,
   refreshLoading,
   saveLoading,
@@ -262,11 +279,13 @@ const {
   llmTemperature,
   llmMaxTokens,
   llmTopP,
+  llmTopK,
   llmFrequencyPenalty,
   llmPresencePenalty,
   loadPreferences,
   setProvider,
   setApiKey,
+  verifyAndSaveKey,
   refreshModels,
   saveConfig,
   getModelMeta,
@@ -277,28 +296,14 @@ const showKey = ref(false)
 const showAdvanced = ref(false)
 
 const providerOptions = [
-  {
-    id: 'openai',
-    label: 'OpenAI',
-  },
-  {
-    id: 'openrouter',
-    label: 'OpenRouter',
-  },
-  {
-    id: 'ollama',
-    label: 'Ollama (local)',
-  },
+  { id: 'openai', label: 'OpenAI' },
+  { id: 'openrouter', label: 'OpenRouter' },
+  { id: 'ollama', label: 'Ollama (local)' },
 ]
 
+const verifySuccessMessage = computed(() => String(verifySuccess.value || '').trim())
 const apiKeyLabel = computed(() => (provider.value === 'openai' ? 'OpenAI API key' : 'OpenRouter API key'))
 const apiKeyPlaceholder = computed(() => (provider.value === 'openai' ? 'sk-...' : 'or-...'))
-const showVerifyOnSaveNote = computed(() => (
-  provider.value !== 'ollama' &&
-  !usingMaskedKey.value &&
-  !!String(apiKey.value || '').trim()
-))
-
 const mainOptions = computed(() => buildModelOptions('main', mainModel.value))
 const liteOptions = computed(() => buildModelOptions('lite', liteModel.value))
 
@@ -307,8 +312,7 @@ onMounted(async () => {
 })
 
 function buildModelOptions(type, selectedId) {
-  const isMain = type === 'main'
-  const ids = isMain ? mainModels.value : liteModels.value
+  const ids = type === 'main' ? mainModels.value : liteModels.value
 
   let options = ids.map((id) => {
     const meta = getModelMeta(provider.value, id)
@@ -346,8 +350,24 @@ async function handleProviderSelect(nextProvider) {
   }
 }
 
+async function handleVerifyAndSaveKey() {
+  const result = await verifyAndSaveKey()
+  if (!result.ok && result.stage !== 'verify') {
+    toast.error('Key Save Failed', 'Could not save API key.')
+  }
+}
+
 async function refreshModelList() {
   await refreshModels()
+}
+
+function resetAdvancedDefaults() {
+  llmMaxTokens.value = 4096
+  llmTemperature.value = 0.7
+  llmTopP.value = 1.0
+  llmTopK.value = 0
+  llmFrequencyPenalty.value = 0.0
+  llmPresencePenalty.value = 0.0
 }
 
 async function saveConfiguration() {
@@ -363,6 +383,5 @@ async function saveConfiguration() {
     appStore.applyPreferencesResponse(result.response)
   }
   toast.success('Configuration saved', 'Configuration saved')
-  emit('close-request')
 }
 </script>

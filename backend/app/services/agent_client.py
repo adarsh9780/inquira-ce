@@ -75,6 +75,7 @@ class AgentClient:
             "temperature": llm.get("temperature"),
             "max_tokens": llm.get("max_tokens"),
             "top_p": llm.get("top_p"),
+            "top_k": llm.get("top_k"),
             "frequency_penalty": llm.get("frequency_penalty"),
             "presence_penalty": llm.get("presence_penalty"),
         }

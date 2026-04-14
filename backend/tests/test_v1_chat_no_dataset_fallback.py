@@ -26,6 +26,30 @@ def _patch_remote_agent(monkeypatch, captured: dict, response: dict | None = Non
     monkeypatch.setattr("app.v1.services.chat_service.AgentClient.run", fake_run)
 
 
+@pytest.fixture(autouse=True)
+def _stub_llm_preferences(monkeypatch):
+    async def _fake_resolve_llm_preferences(_session, _user_id):
+        return {
+            "provider": "openrouter",
+            "base_url": "https://openrouter.ai/api/v1",
+            "requires_api_key": True,
+            "selected_lite_model": "google/gemini-2.5-flash-lite",
+            "selected_main_model": "google/gemini-2.5-flash",
+            "selected_coding_model": "google/gemini-2.5-flash",
+            "temperature": 0.0,
+            "max_tokens": 2048,
+            "top_p": 1.0,
+            "top_k": 0,
+            "frequency_penalty": 0.0,
+            "presence_penalty": 0.0,
+        }
+
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.ChatService._resolve_llm_preferences",
+        staticmethod(_fake_resolve_llm_preferences),
+    )
+
+
 @pytest.mark.asyncio
 async def test_chat_uses_empty_schema_when_workspace_has_no_dataset(monkeypatch):
     captured = {}
@@ -476,6 +500,7 @@ async def test_chat_allows_ollama_without_api_key(monkeypatch):
             "temperature": 0.0,
             "max_tokens": 2048,
             "top_p": 1.0,
+            "top_k": 0,
             "frequency_penalty": 0.0,
             "presence_penalty": 0.0,
         }

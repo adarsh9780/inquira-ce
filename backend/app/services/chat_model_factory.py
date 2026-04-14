@@ -15,6 +15,7 @@ def _build_openai_client(
     base_url: str,
     temperature: float,
     top_p: float | None,
+    top_k: int | None,
     frequency_penalty: float | None,
     presence_penalty: float | None,
     max_tokens: int | None,
@@ -33,6 +34,8 @@ def _build_openai_client(
         kwargs["max_tokens"] = max_tokens
     if top_p is not None:
         kwargs["top_p"] = top_p
+    if top_k is not None and top_k > 0:
+        kwargs["top_k"] = top_k
     if frequency_penalty is not None:
         kwargs["frequency_penalty"] = frequency_penalty
     if presence_penalty is not None:
@@ -48,6 +51,7 @@ def create_chat_model(
     base_url: str = "",
     temperature: float = 0,
     top_p: float | None = None,
+    top_k: int | None = None,
     frequency_penalty: float | None = None,
     presence_penalty: float | None = None,
     max_tokens: int | None = None,
@@ -63,6 +67,7 @@ def create_chat_model(
             base_url=base_url,
             temperature=temperature,
             top_p=top_p,
+            top_k=top_k if provider_name == "openrouter" else None,
             frequency_penalty=frequency_penalty,
             presence_penalty=presence_penalty,
             max_tokens=max_tokens,
@@ -77,6 +82,7 @@ def create_chat_model(
             base_url=base_url or "http://localhost:11434/v1",
             temperature=temperature,
             top_p=top_p,
+            top_k=top_k,
             frequency_penalty=frequency_penalty,
             presence_penalty=presence_penalty,
             max_tokens=max_tokens,
@@ -103,6 +109,8 @@ def create_chat_model(
             kwargs["max_tokens"] = max_tokens
         if top_p is not None:
             kwargs["top_p"] = top_p
+        if top_k is not None and top_k > 0:
+            kwargs["top_k"] = top_k
         return ChatAnthropic(**kwargs)
 
     raise ValueError(

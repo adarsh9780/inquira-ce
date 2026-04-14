@@ -792,8 +792,14 @@ export const apiService = {
     return v1Api.preferences.verifyKey(provider, apiKey)
   },
 
-  async v1SetApiKey(apiKey, provider = 'openrouter') {
-    return v1Api.preferences.setApiKey(apiKey, provider)
+  async v1SetApiKey(apiKeyOrPayload, provider = 'openrouter') {
+    if (apiKeyOrPayload && typeof apiKeyOrPayload === 'object' && !Array.isArray(apiKeyOrPayload)) {
+      return v1Api.preferences.setApiKey(apiKeyOrPayload)
+    }
+    return v1Api.preferences.setApiKey({
+      api_key: apiKeyOrPayload,
+      provider,
+    })
   },
 
   async v1DeleteApiKey(provider = 'openrouter') {

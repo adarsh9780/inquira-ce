@@ -341,9 +341,10 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
         selected_model=selected_model,
         selected_lite_model=selected_lite_model,
         selected_coding_model=selected_coding_model,
-        llm_temperature=float(getattr(prefs, "llm_temperature", 0.0)),
-        llm_max_tokens=int(getattr(prefs, "llm_max_tokens", 2048)),
+        llm_temperature=float(getattr(prefs, "llm_temperature", 0.7)),
+        llm_max_tokens=int(getattr(prefs, "llm_max_tokens", 4096)),
         llm_top_p=float(getattr(prefs, "llm_top_p", 1.0)),
+        llm_top_k=int(getattr(prefs, "llm_top_k", 0)),
         llm_frequency_penalty=float(getattr(prefs, "llm_frequency_penalty", 0.0)),
         llm_presence_penalty=float(getattr(prefs, "llm_presence_penalty", 0.0)),
         enabled_models=enabled_models,
@@ -437,6 +438,8 @@ async def update_preferences(
         prefs.llm_max_tokens = int(payload.llm_max_tokens)
     if payload.llm_top_p is not None:
         prefs.llm_top_p = float(payload.llm_top_p)
+    if payload.llm_top_k is not None:
+        prefs.llm_top_k = int(payload.llm_top_k)
     if payload.llm_frequency_penalty is not None:
         prefs.llm_frequency_penalty = float(payload.llm_frequency_penalty)
     if payload.llm_presence_penalty is not None:
@@ -566,22 +569,80 @@ async def verify_api_key(
 @router.put("/api-key", response_model=MessageResponse)
 async def set_api_key(
     payload: ApiKeyUpdateRequest,
+    session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
     provider = normalize_llm_provider(payload.provider)
-    api_key = (payload.api_key or "").strip()
-    if not api_key:
-        raise HTTPException(status_code=400, detail="API key cannot be empty.")
-    try:
-        SecretStorageService.set_api_key(current_user.id, api_key, provider=provider)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=501, detail=str(exc)) from exc
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(
-            status_code=500, detail="Failed to persist API key in OS keychain."
-        ) from exc
+    prefs = await PreferencesRepository.get_or_create(session, current_user.id)
+    provider_catalogs = _resolve_provider_catalogs(prefs)
+    prefs.llm_provider = provider
+    catalog = provider_catalogs.get(provider, provider_model_catalog(provider))
+
+    if payload.enabled_models is not None:
+        allowed = set(catalog.get("main_models", []))
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for model in payload.enabled_models:
+            value = str(model or "").strip()
+            if not value or value not in allowed or value in seen:
+                continue
+            seen.add(value)
+            cleaned.append(value)
+        prefs.enabled_main_models_json = json.dumps(
+            cleaned or list(catalog.get("main_models", []))
+        )
+
+    enabled_models = _load_enabled_models(
+        getattr(prefs, "enabled_main_models_json", "[]"),
+        catalog,
+    )
+
+    if payload.selected_model is not None:
+        selected_model = str(payload.selected_model or "").strip()
+        if selected_model in enabled_models:
+            prefs.selected_model = selected_model
+    if payload.selected_lite_model is not None:
+        selected_lite_model = str(payload.selected_lite_model or "").strip()
+        if selected_lite_model in catalog.get("lite_models", []):
+            prefs.selected_lite_model = selected_lite_model
+    if payload.selected_coding_model is not None:
+        selected_coding_model = str(payload.selected_coding_model or "").strip()
+        if selected_coding_model in enabled_models:
+            prefs.selected_coding_model = selected_coding_model
+
+    if payload.llm_temperature is not None:
+        prefs.llm_temperature = float(payload.llm_temperature)
+    if payload.llm_max_tokens is not None:
+        prefs.llm_max_tokens = int(payload.llm_max_tokens)
+    if payload.llm_top_p is not None:
+        prefs.llm_top_p = float(payload.llm_top_p)
+    if payload.llm_top_k is not None:
+        prefs.llm_top_k = int(payload.llm_top_k)
+    if payload.llm_frequency_penalty is not None:
+        prefs.llm_frequency_penalty = float(payload.llm_frequency_penalty)
+    if payload.llm_presence_penalty is not None:
+        prefs.llm_presence_penalty = float(payload.llm_presence_penalty)
+
+    _normalize_model_preferences(prefs, provider_catalogs)
+
+    api_key = str(payload.api_key or "").strip()
+    if api_key:
+        try:
+            SecretStorageService.set_api_key(current_user.id, api_key, provider=provider)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=501, detail=str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(
+                status_code=500, detail="Failed to persist API key in OS keychain."
+            ) from exc
+
+    await session.commit()
+    if api_key:
+        return MessageResponse(
+            message=f"Configuration and API key for provider '{provider}' saved."
+        )
     return MessageResponse(
-        message=f"API key for provider '{provider}' saved to OS keychain."
+        message=f"Configuration for provider '{provider}' saved."
     )
 
 

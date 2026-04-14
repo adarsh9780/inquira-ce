@@ -455,6 +455,7 @@ def _get_model(config: RunnableConfig, *, lite: bool) -> BaseChatModel:
         else runtime.code_generation_max_tokens
     )
     top_p = float(configurable.get("top_p") if configurable.get("top_p") is not None else 1.0)
+    top_k = int(configurable.get("top_k") if configurable.get("top_k") is not None else 0)
     frequency_penalty = float(
         configurable.get("frequency_penalty") if configurable.get("frequency_penalty") is not None else 0.0
     )
@@ -477,6 +478,7 @@ def _get_model(config: RunnableConfig, *, lite: bool) -> BaseChatModel:
         temperature=temperature,
         max_tokens=max_tokens,
         top_p=top_p,
+        top_k=top_k,
         frequency_penalty=frequency_penalty,
         presence_penalty=presence_penalty,
     )

@@ -69,6 +69,7 @@ async def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
     temperature = float(configurable.get("temperature") if configurable.get("temperature") is not None else 0.0)
     max_tokens = int(configurable.get("max_tokens") if configurable.get("max_tokens") is not None else 256)
     top_p = float(configurable.get("top_p") if configurable.get("top_p") is not None else 1.0)
+    top_k = int(configurable.get("top_k") if configurable.get("top_k") is not None else 0)
     frequency_penalty = float(
         configurable.get("frequency_penalty") if configurable.get("frequency_penalty") is not None else 0.0
     )
@@ -86,6 +87,7 @@ async def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
             base_url=base_url,
             temperature=temperature,
             top_p=top_p,
+            top_k=top_k,
             frequency_penalty=frequency_penalty,
             presence_penalty=presence_penalty,
             max_tokens=max_tokens,

@@ -33,15 +33,19 @@ def upgrade() -> None:
         return
     op.add_column(
         "v1_user_preferences",
-        sa.Column("llm_temperature", sa.Float(), nullable=False, server_default="0"),
+        sa.Column("llm_temperature", sa.Float(), nullable=False, server_default="0.7"),
     )
     op.add_column(
         "v1_user_preferences",
-        sa.Column("llm_max_tokens", sa.Integer(), nullable=False, server_default="2048"),
+        sa.Column("llm_max_tokens", sa.Integer(), nullable=False, server_default="4096"),
     )
     op.add_column(
         "v1_user_preferences",
         sa.Column("llm_top_p", sa.Float(), nullable=False, server_default="1"),
+    )
+    op.add_column(
+        "v1_user_preferences",
+        sa.Column("llm_top_k", sa.Integer(), nullable=False, server_default="0"),
     )
     op.add_column(
         "v1_user_preferences",
@@ -58,6 +62,7 @@ def downgrade() -> None:
         return
     op.drop_column("v1_user_preferences", "llm_presence_penalty")
     op.drop_column("v1_user_preferences", "llm_frequency_penalty")
+    op.drop_column("v1_user_preferences", "llm_top_k")
     op.drop_column("v1_user_preferences", "llm_top_p")
     op.drop_column("v1_user_preferences", "llm_max_tokens")
     op.drop_column("v1_user_preferences", "llm_temperature")
