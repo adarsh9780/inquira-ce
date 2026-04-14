@@ -28,6 +28,7 @@ from .v1.repositories.workspace_repository import WorkspaceRepository
 from .v1.db.init import init_v1_database
 from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
 from .v1.services.workspace_deletion_service import WorkspaceDeletionService
+from .v1.services.dataset_deletion_service import DatasetDeletionService
 from .core.config_models import AppConfig
 from .core.logger import logprint, patch_print
 from .services.code_executor import (
@@ -109,6 +110,7 @@ async def lifespan(app: FastAPI):
     app.state.llm_initialized = False
     app.state.workspace_langgraph_manager = WorkspaceLangGraphManager()
     app.state.workspace_deletion_service = WorkspaceDeletionService()
+    app.state.dataset_deletion_service = DatasetDeletionService()
 
     # Load merged configuration
     try:
@@ -156,6 +158,12 @@ async def lifespan(app: FastAPI):
             await app.state.workspace_deletion_service.shutdown()
         except Exception as e:
             logprint(f"Error closing workspace deletion service: {e}", level="error")
+
+    if hasattr(app.state, "dataset_deletion_service") and app.state.dataset_deletion_service:
+        try:
+            await app.state.dataset_deletion_service.shutdown()
+        except Exception as e:
+            logprint(f"Error closing dataset deletion service: {e}", level="error")
 
     try:
         await shutdown_workspace_kernel_manager()

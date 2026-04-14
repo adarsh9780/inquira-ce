@@ -134,6 +134,29 @@
       <div class="space-y-2">
         <p class="text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Datasets</p>
 
+        <div
+          v-if="isDatasetIngesting"
+          class="rounded-lg border border-[var(--color-accent-border)] bg-[var(--color-accent-soft)] px-4 py-3"
+          aria-live="polite"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="truncate text-sm font-medium text-[var(--color-accent)]">{{ datasetIngestFilename || 'Selected dataset' }}</p>
+              <p class="mt-1 text-xs text-[var(--color-accent)]/90">{{ datasetIngestStatusLabel }}</p>
+            </div>
+            <span class="mt-0.5 h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-accent)]/40 border-t-[var(--color-accent)]"></span>
+          </div>
+          <div v-if="datasetIngestPercent !== null" class="mt-2">
+            <div class="h-1.5 overflow-hidden rounded-full bg-[var(--color-accent-border)]/80">
+              <div
+                class="h-full rounded-full bg-[var(--color-accent)] transition-all duration-300"
+                :style="{ width: `${datasetIngestPercent}%` }"
+              ></div>
+            </div>
+            <p class="mt-1 text-right text-[11px] text-[var(--color-accent)]">{{ datasetIngestPercent }}%</p>
+          </div>
+        </div>
+
         <div v-if="datasetEntries.length" class="space-y-2">
           <div
             v-for="dataset in datasetEntries"
@@ -145,8 +168,9 @@
               <div class="flex items-center gap-1">
                 <button
                   type="button"
-                  class="rounded p-1 text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
+                  class="rounded p-1 text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)] disabled:cursor-not-allowed disabled:opacity-50"
                   title="Refresh dataset"
+                  :disabled="isDatasetIngesting || isDeletingDataset"
                   @click="refreshDataset(dataset)"
                 >
                   <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -156,9 +180,10 @@
                 </button>
                 <button
                   type="button"
-                  class="rounded p-1 text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
+                  class="rounded p-1 text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)] disabled:cursor-not-allowed disabled:opacity-50"
                   title="Remove dataset"
-                  @click="requestRemoveDataset(dataset.table_name)"
+                  :disabled="isDatasetIngesting || isDeletingDataset"
+                  @click="requestRemoveDataset(dataset)"
                 >
                   <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
                     <path d="M5 7h14" />
@@ -169,30 +194,9 @@
               </div>
             </div>
 
-            <p v-if="pendingRemovalTable !== dataset.table_name" class="mt-1 text-xs text-[var(--color-text-muted)]">
+            <p class="mt-1 text-xs text-[var(--color-text-muted)]">
               {{ datasetMetadata(dataset) }}
             </p>
-
-            <div
-              v-if="pendingRemovalTable === dataset.table_name"
-              class="mt-2 flex items-center gap-2 border-t border-[var(--color-border)]/70 pt-2"
-            >
-              <span class="mr-auto text-xs text-[var(--color-text-muted)]">Remove "{{ dataset.filename }}"?</span>
-              <button
-                type="button"
-                class="rounded bg-[var(--color-danger)] px-2.5 py-1 text-xs font-medium text-white"
-                @click="confirmRemoveDataset(dataset)"
-              >
-                Confirm
-              </button>
-              <button
-                type="button"
-                class="rounded border border-[var(--color-border-strong)] px-2.5 py-1 text-xs text-[var(--color-text-sub)]"
-                @click="pendingRemovalTable = ''"
-              >
-                Cancel
-              </button>
-            </div>
           </div>
         </div>
 
@@ -202,10 +206,12 @@
 
         <button
           type="button"
-          class="w-full rounded-lg border border-dashed border-[var(--color-border-strong)] px-4 py-3 text-center text-sm text-[var(--color-text-muted)] transition-all hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)]"
+          class="w-full rounded-lg border border-dashed border-[var(--color-border-strong)] px-4 py-3 text-center text-sm text-[var(--color-text-muted)] transition-all hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+          :disabled="isDatasetIngesting || isDeletingDataset"
           @click="openDatasetPicker"
         >
-          + Add dataset
+          <span v-if="isDatasetIngesting">Processing dataset...</span>
+          <span v-else>+ Add dataset</span>
         </button>
       </div>
 
@@ -297,16 +303,28 @@
         </button>
       </div>
     </div>
+
+    <ConfirmationModal
+      :is-open="isDatasetDeleteDialogOpen"
+      title="Delete Dataset"
+      :message="datasetDeleteDialogMessage"
+      confirm-text="Delete"
+      cancel-text="Cancel"
+      @close="closeDatasetDeleteDialog"
+      @confirm="confirmRemoveDataset"
+    />
   </section>
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { apiService } from '../../../services/apiService'
 import { previewService } from '../../../services/previewService'
+import { settingsWebSocket } from '../../../services/websocketService'
 import { useAppStore } from '../../../stores/appStore'
 import { toast } from '../../../composables/useToast'
 import { extractApiErrorMessage } from '../../../utils/apiError'
+import ConfirmationModal from '../ConfirmationModal.vue'
 
 const props = defineProps({
   panelMode: {
@@ -332,11 +350,19 @@ const workspaceDetail = ref(null)
 const datasetEntries = ref([])
 const datasetColumnCounts = ref({})
 const datasetFileSizes = ref({})
-const pendingRemovalTable = ref('')
+const isDatasetIngesting = ref(false)
+const datasetIngestFilename = ref('')
+const datasetIngestMessage = ref('')
+const datasetIngestPercent = ref(null)
+const isDatasetDeleteDialogOpen = ref(false)
+const pendingRemovalDataset = ref(null)
+const isDeletingDataset = ref(false)
 const isRenamingInline = ref(false)
 const renameValue = ref('')
 const renameInputRef = ref(null)
 const showDeleteConfirm = ref(false)
+const datasetDeletionPollers = new Map()
+let unsubscribeProgress = null
 
 const newWorkspaceName = ref('')
 const newWorkspaceDatasetPath = ref('')
@@ -369,6 +395,11 @@ const isWorkspaceActive = computed(() => !!activeWorkspace.value && !!activeWork
 const detailCreatedAt = computed(() => formatCreatedDate(workspaceDetail.value?.created_at || activeWorkspace.value?.created_at))
 const detailConversationCount = computed(() => Number(workspaceDetail.value?.conversation_count || 0))
 const detailLastActive = computed(() => formatRelativeTime(workspaceDetail.value?.updated_at || activeWorkspace.value?.updated_at))
+const datasetIngestStatusLabel = computed(() => String(datasetIngestMessage.value || 'Processing dataset...').trim() || 'Processing dataset...')
+const datasetDeleteDialogMessage = computed(() => {
+  const filename = String(pendingRemovalDataset.value?.filename || '').trim()
+  return `Are you sure you want to delete "${filename || 'this dataset'}"? Dataset disappears immediately while storage cleanup continues in background.`
+})
 watch(
   () => props.panelMode,
   async (nextMode) => {
@@ -378,6 +409,7 @@ watch(
     if (nextMode === 'ws-detail') {
       await loadWorkspaceDetail()
       await loadWorkspaceDatasets()
+      await loadActiveDatasetDeletionJobs()
     }
   },
   { immediate: true },
@@ -399,13 +431,26 @@ watch(
     if (props.panelMode !== 'ws-detail') return
     await loadWorkspaceDetail()
     await loadWorkspaceDatasets()
+    await loadActiveDatasetDeletionJobs()
   },
 )
 
 onMounted(async () => {
+  unsubscribeProgress = settingsWebSocket.subscribeProgress(handleSettingsProgressUpdate)
   if (props.panelMode === 'ws-list') {
     await hydrateWorkspaceCards()
   }
+  if (props.panelMode === 'ws-detail') {
+    await loadActiveDatasetDeletionJobs()
+  }
+})
+
+onUnmounted(() => {
+  if (typeof unsubscribeProgress === 'function') {
+    unsubscribeProgress()
+    unsubscribeProgress = null
+  }
+  stopDatasetDeletionPollers()
 })
 
 async function hydrateWorkspaceCards() {
@@ -472,6 +517,95 @@ async function loadWorkspaceDatasets() {
   } catch (error) {
     datasetEntries.value = []
     toast.error('Dataset Error', extractApiErrorMessage(error, 'Failed to load datasets.'))
+  }
+}
+
+function startDatasetIngest(path) {
+  const normalizedPath = String(path || '').trim()
+  isDatasetIngesting.value = true
+  datasetIngestFilename.value = formatFilename(normalizedPath)
+  datasetIngestMessage.value = 'Preparing dataset ingestion...'
+  datasetIngestPercent.value = null
+}
+
+function finishDatasetIngest() {
+  isDatasetIngesting.value = false
+  datasetIngestFilename.value = ''
+  datasetIngestMessage.value = ''
+  datasetIngestPercent.value = null
+}
+
+function handleSettingsProgressUpdate(data) {
+  if (!isDatasetIngesting.value) return
+  if (!data || data.type !== 'progress') return
+  const stage = String(data?.stage || '').trim().toLowerCase()
+  if (stage.startsWith('workspace_runtime')) return
+  const nextMessage = String(data?.message || '').trim()
+  if (nextMessage) {
+    datasetIngestMessage.value = nextMessage
+  }
+  const percent = Number(data?.progress)
+  if (Number.isFinite(percent) && percent >= 0 && percent <= 100) {
+    datasetIngestPercent.value = Math.round(percent)
+  }
+}
+
+function stopDatasetDeletionPollers() {
+  datasetDeletionPollers.forEach((timerId) => clearTimeout(timerId))
+  datasetDeletionPollers.clear()
+}
+
+function trackDatasetDeletionJob(workspaceId, jobId, datasetLabel, timeoutMs = 300000) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  const normalizedJobId = String(jobId || '').trim()
+  if (!normalizedWorkspaceId || !normalizedJobId) return
+  if (datasetDeletionPollers.has(normalizedJobId)) return
+  const startedAt = Date.now()
+  const displayName = String(datasetLabel || '').trim() || 'dataset'
+
+  const poll = async () => {
+    try {
+      const job = await apiService.v1GetDatasetDeletionJob(normalizedWorkspaceId, normalizedJobId)
+      const status = String(job?.status || '').trim().toLowerCase()
+      if (status === 'completed') {
+        datasetDeletionPollers.delete(normalizedJobId)
+        toast.success('Dataset deletion completed', `"${displayName}" cleanup finished.`)
+        return
+      }
+      if (status === 'failed') {
+        datasetDeletionPollers.delete(normalizedJobId)
+        const detail = String(job?.error_message || '').trim()
+        toast.error('Dataset deletion failed', detail || `Background cleanup failed for "${displayName}".`)
+        return
+      }
+      if (Date.now() - startedAt > timeoutMs) {
+        datasetDeletionPollers.delete(normalizedJobId)
+        toast.info('Dataset cleanup still running', `Background cleanup for "${displayName}" is still in progress.`)
+        return
+      }
+      const timer = setTimeout(poll, 2000)
+      datasetDeletionPollers.set(normalizedJobId, timer)
+    } catch (_error) {
+      datasetDeletionPollers.delete(normalizedJobId)
+    }
+  }
+
+  poll()
+}
+
+async function loadActiveDatasetDeletionJobs() {
+  const workspaceId = String(props.activeWorkspaceId || '').trim()
+  if (!workspaceId) return
+  try {
+    const response = await apiService.v1ListDatasetDeletionJobs(workspaceId)
+    const jobs = Array.isArray(response?.jobs) ? response.jobs : []
+    jobs.forEach((job) => {
+      const jobId = String(job?.job_id || '').trim()
+      const label = formatFilename(job?.table_name || '')
+      trackDatasetDeletionJob(workspaceId, jobId, label)
+    })
+  } catch (_error) {
+    // Ignore hydration errors; explicit delete actions still start polling.
   }
 }
 
@@ -542,27 +676,55 @@ function datasetMetadata(dataset) {
   return segments.join(' · ')
 }
 
-function requestRemoveDataset(tableName) {
-  pendingRemovalTable.value = String(tableName || '').trim()
+function requestRemoveDataset(dataset) {
+  if (!dataset || isDeletingDataset.value) return
+  pendingRemovalDataset.value = dataset
+  isDatasetDeleteDialogOpen.value = true
 }
 
-async function confirmRemoveDataset(dataset) {
+function closeDatasetDeleteDialog({ force = false } = {}) {
+  if (isDeletingDataset.value && !force) return
+  isDatasetDeleteDialogOpen.value = false
+  pendingRemovalDataset.value = null
+}
+
+async function confirmRemoveDataset() {
+  if (isDeletingDataset.value) return
   const workspaceId = String(props.activeWorkspaceId || '').trim()
+  const dataset = pendingRemovalDataset.value
   const tableName = String(dataset?.table_name || '').trim()
+  const datasetLabel = String(dataset?.filename || formatFilename(tableName)).trim()
   if (!workspaceId || !tableName) return
+  isDeletingDataset.value = true
   try {
-    await apiService.v1DeleteDataset(workspaceId, tableName)
+    const job = await apiService.v1DeleteDataset(workspaceId, tableName)
     const deletedActiveDataset = appStore.handleDatasetRemoved(tableName)
     previewService.clearSchemaCache()
     window.dispatchEvent(new CustomEvent('dataset-switched', { detail: null }))
-    pendingRemovalTable.value = ''
     await loadWorkspaceDatasets()
-    toast.success(
-      'Dataset removed',
-      deletedActiveDataset ? 'Dataset removed. Active selection cleared.' : 'Dataset removed from workspace.',
-    )
+    closeDatasetDeleteDialog({ force: true })
+    const jobId = String(job?.job_id || '').trim()
+    if (jobId) {
+      toast.info(
+        'Dataset deletion started',
+        deletedActiveDataset
+          ? 'Dataset removed. Active selection cleared. Background cleanup started.'
+          : 'Dataset removed from workspace. Background cleanup started.',
+      )
+      trackDatasetDeletionJob(workspaceId, jobId, datasetLabel)
+    } else {
+      toast.success(
+        'Dataset removed',
+        deletedActiveDataset ? 'Dataset removed. Active selection cleared.' : 'Dataset removed from workspace.',
+      )
+    }
   } catch (error) {
     toast.error('Remove failed', extractApiErrorMessage(error, 'Failed to remove dataset.'))
+  } finally {
+    isDeletingDataset.value = false
+    if (!isDatasetDeleteDialogOpen.value) {
+      pendingRemovalDataset.value = null
+    }
   }
 }
 
@@ -572,12 +734,15 @@ async function refreshDataset(dataset) {
     toast.error('Refresh failed', 'This dataset cannot be refreshed from source.')
     return
   }
+  startDatasetIngest(sourcePath)
   try {
     await apiService.uploadDataPath(sourcePath)
     await loadWorkspaceDatasets()
     toast.success('Dataset refreshed', 'Dataset refreshed successfully.')
   } catch (error) {
     toast.error('Refresh failed', extractApiErrorMessage(error, 'Failed to refresh dataset.'))
+  } finally {
+    finishDatasetIngest()
   }
 }
 
@@ -592,11 +757,14 @@ async function openDatasetPicker() {
     })
     const selectedPath = Array.isArray(selected) ? String(selected[0] || '').trim() : String(selected || '').trim()
     if (!selectedPath) return
+    startDatasetIngest(selectedPath)
     await apiService.uploadDataPath(selectedPath)
     await loadWorkspaceDatasets()
     toast.success('Dataset added', 'Dataset added to workspace.')
   } catch (error) {
     toast.error('Dataset Error', extractApiErrorMessage(error, 'Failed to add dataset.'))
+  } finally {
+    finishDatasetIngest()
   }
 }
 

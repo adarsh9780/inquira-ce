@@ -515,6 +515,7 @@ const deleteDialogTitle = ref('')
 const deleteDialogMessage = ref('')
 const pendingDeleteType = ref('')
 const pendingDeleteId = ref('')
+const datasetDeletionPollers = new Map()
 
 const termsMarkdownRenderer = new MarkdownIt({
   html: false,
@@ -849,6 +850,48 @@ function closeDeleteDialog() {
   deleteDialogMessage.value = ''
 }
 
+function stopDatasetDeletionPollers() {
+  datasetDeletionPollers.forEach((timerId) => clearTimeout(timerId))
+  datasetDeletionPollers.clear()
+}
+
+function trackDatasetDeletionJob(workspaceId, jobId, datasetLabel, timeoutMs = 300000) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  const normalizedJobId = String(jobId || '').trim()
+  if (!normalizedWorkspaceId || !normalizedJobId) return
+  if (datasetDeletionPollers.has(normalizedJobId)) return
+  const startedAt = Date.now()
+  const displayName = String(datasetLabel || '').trim() || 'dataset'
+
+  const poll = async () => {
+    try {
+      const job = await apiService.v1GetDatasetDeletionJob(normalizedWorkspaceId, normalizedJobId)
+      const status = String(job?.status || '').trim().toLowerCase()
+      if (status === 'completed') {
+        datasetDeletionPollers.delete(normalizedJobId)
+        toast.success('Dataset deletion completed', `"${displayName}" cleanup finished.`)
+        return
+      }
+      if (status === 'failed') {
+        datasetDeletionPollers.delete(normalizedJobId)
+        const detail = String(job?.error_message || '').trim()
+        toast.error('Dataset deletion failed', detail || `Background cleanup failed for "${displayName}".`)
+        return
+      }
+      if (Date.now() - startedAt > timeoutMs) {
+        datasetDeletionPollers.delete(normalizedJobId)
+        return
+      }
+      const timer = setTimeout(poll, 2000)
+      datasetDeletionPollers.set(normalizedJobId, timer)
+    } catch (_error) {
+      datasetDeletionPollers.delete(normalizedJobId)
+    }
+  }
+
+  poll()
+}
+
 async function confirmDelete() {
   if (!pendingDeleteId.value) return
 
@@ -860,15 +903,26 @@ async function confirmDelete() {
       const workspaceId = appStore.activeWorkspaceId
       if (workspaceId) {
         const deletedTableName = String(pendingDeleteId.value || '').trim()
-        await apiService.v1DeleteDataset(workspaceId, deletedTableName)
+        const job = await apiService.v1DeleteDataset(workspaceId, deletedTableName)
         const deletedActiveDataset = appStore.handleDatasetRemoved(deletedTableName)
         previewService.clearSchemaCache()
         window.dispatchEvent(new CustomEvent('dataset-switched', { detail: null }))
         await fetchDatasets()
-        toast.success(
-          'Dataset Deleted',
-          deletedActiveDataset ? 'Dataset removed. Active selection cleared.' : 'Dataset has been removed.',
-        )
+        const jobId = String(job?.job_id || '').trim()
+        if (jobId) {
+          toast.info(
+            'Dataset deletion started',
+            deletedActiveDataset
+              ? 'Dataset removed. Active selection cleared. Background cleanup started.'
+              : 'Dataset removed from workspace. Background cleanup started.',
+          )
+          trackDatasetDeletionJob(workspaceId, jobId, datasetFriendlyName(deletedTableName))
+        } else {
+          toast.success(
+            'Dataset Deleted',
+            deletedActiveDataset ? 'Dataset removed. Active selection cleared.' : 'Dataset has been removed.',
+          )
+        }
       }
     } else if (pendingDeleteType.value === 'conversation') {
       await appStore.deleteConversationById(pendingDeleteId.value)
@@ -901,6 +955,7 @@ onUnmounted(() => {
   window.removeEventListener('dataset-switched', handleDatasetCatalogChanged)
   window.removeEventListener('sidebar-open-settings', handleOpenSettingsRequest)
   window.removeEventListener('click', handleConversationMenuOutsideClick)
+  stopDatasetDeletionPollers()
 })
 
 // Watch for workspace changes to fetch datasets and conversations

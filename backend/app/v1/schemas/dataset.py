@@ -45,3 +45,21 @@ class DatasetDeleteResponse(BaseModel):
     workspace_id: str
     table_name: str
     removed: bool
+
+
+class DatasetDeletionJobResponse(BaseModel):
+    """Dataset deletion job status payload."""
+
+    job_id: str
+    workspace_id: str
+    table_name: str
+    status: str
+    error_message: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class DatasetDeletionJobListResponse(BaseModel):
+    """List active dataset deletion jobs response."""
+
+    jobs: list[DatasetDeletionJobResponse]

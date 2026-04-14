@@ -822,6 +822,14 @@ export const apiService = {
     return v1Api.datasets.remove(workspaceId, tableName)
   },
 
+  async v1ListDatasetDeletionJobs(workspaceId) {
+    return v1Api.datasets.deletions(workspaceId)
+  },
+
+  async v1GetDatasetDeletionJob(workspaceId, jobId) {
+    return v1Api.datasets.deletionById(workspaceId, jobId)
+  },
+
   async v1GetDatasetSchema(workspaceId, tableName) {
     return axios.get(`/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema`)
   },

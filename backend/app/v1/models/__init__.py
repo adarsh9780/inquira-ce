@@ -4,7 +4,13 @@ from .conversation import Conversation, Turn
 from .enums import UserPlan
 from .preferences import UserPreferences
 from .user import User
-from .workspace import Principal, Workspace, WorkspaceDataset, WorkspaceDeletionJob
+from .workspace import (
+    Principal,
+    Workspace,
+    WorkspaceDataset,
+    WorkspaceDeletionJob,
+    WorkspaceDatasetDeletionJob,
+)
 
 __all__ = [
     "User",
@@ -14,6 +20,7 @@ __all__ = [
     "Workspace",
     "WorkspaceDataset",
     "WorkspaceDeletionJob",
+    "WorkspaceDatasetDeletionJob",
     "Conversation",
     "Turn",
 ]

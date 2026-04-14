@@ -27,6 +27,10 @@ export const v1Api = {
       axios.post(`/api/v1/workspaces/${workspaceId}/datasets`, { source_path: sourcePath }),
     remove: (workspaceId, tableName) =>
       axios.delete(`/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}`),
+    deletions: (workspaceId) =>
+      axios.get(`/api/v1/workspaces/${workspaceId}/datasets/deletions`),
+    deletionById: (workspaceId, jobId) =>
+      axios.get(`/api/v1/workspaces/${workspaceId}/datasets/deletions/${jobId}`),
     syncBrowser: (workspaceId, payload) =>
       axios.post(`/api/v1/workspaces/${workspaceId}/datasets/browser-sync`, payload)
   },

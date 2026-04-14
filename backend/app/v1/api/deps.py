@@ -69,3 +69,11 @@ def get_workspace_deletion_service(request: Request):
     if service is None:
         raise HTTPException(status_code=500, detail="Workspace deletion service not initialized")
     return service
+
+
+def get_dataset_deletion_service(request: Request):
+    """Return shared dataset deletion service from app state."""
+    service = getattr(request.app.state, "dataset_deletion_service", None)
+    if service is None:
+        raise HTTPException(status_code=500, detail="Dataset deletion service not initialized")
+    return service

@@ -26,6 +26,7 @@ class Principal(AppDataBase):
     conversations = relationship("Conversation", back_populates="created_by_principal", cascade="all, delete-orphan")
     preferences = relationship("UserPreferences", back_populates="principal", cascade="all, delete-orphan", uselist=False)
     deletion_jobs = relationship("WorkspaceDeletionJob", back_populates="owner_principal", cascade="all, delete-orphan")
+    dataset_deletion_jobs = relationship("WorkspaceDatasetDeletionJob", back_populates="owner_principal", cascade="all, delete-orphan")
 
 
 class Workspace(AppDataBase):
@@ -101,3 +102,28 @@ class WorkspaceDeletionJob(AppDataBase):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     owner_principal = relationship("Principal", back_populates="deletion_jobs")
+
+
+class WorkspaceDatasetDeletionJob(AppDataBase):
+    """Asynchronous dataset physical cleanup tracker."""
+
+    __tablename__ = "v1_dataset_deletion_jobs"
+    __table_args__ = (
+        Index("ix_v1_ds_delete_jobs_owner_created", "owner_principal_id", "created_at"),
+        Index("ix_v1_ds_delete_jobs_ws_table_status", "workspace_id", "table_name", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    owner_principal_id: Mapped[str] = mapped_column(
+        ForeignKey("v1_principals.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    workspace_id: Mapped[str] = mapped_column(String(36), index=True, nullable=False)
+    table_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued")
+    error_message: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    owner_principal = relationship("Principal", back_populates="dataset_deletion_jobs")
