@@ -122,23 +122,28 @@
             </div>
           </div>
 
-          <label v-if="provider !== 'ollama'" class="inline-flex cursor-pointer items-center gap-2 text-xs text-[var(--color-text-sub)]">
-            <input v-model="showAllModels" type="checkbox" class="rounded border-[var(--color-border-strong)]" />
-            Show all models
-          </label>
+          <div class="mt-4 flex items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)]/40 px-3 py-2">
+            <label v-if="provider !== 'ollama'" class="inline-flex cursor-pointer items-center gap-2 text-xs text-[var(--color-text-sub)]">
+              <input v-model="showAllModels" type="checkbox" class="rounded border-[var(--color-border-strong)]" />
+              Show all models
+            </label>
+            <p v-else class="text-xs text-[var(--color-text-muted)]">Ollama shows local models.</p>
 
-          <button
-            type="button"
-            class="inline-flex items-center gap-1 text-xs text-[var(--color-accent)] transition-all hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-60"
-            :disabled="refreshLoading"
-            @click="refreshModelList"
-          >
-            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" :class="refreshLoading ? 'animate-spin' : ''" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M20 12a8 8 0 1 1-2.34-5.66" />
-              <path d="M20 4v6h-6" />
-            </svg>
-            <span>Refresh model list</span>
-          </button>
+            <button
+              type="button"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--color-border-strong)] text-[var(--color-accent)] transition-all hover:bg-[var(--color-base)] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="refreshLoading"
+              :title="refreshModelListTooltip"
+              :aria-label="refreshModelListTooltip"
+              @click="refreshModelList"
+            >
+              <svg viewBox="0 0 24 24" class="h-4 w-4" :class="refreshLoading ? 'animate-spin' : ''" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+                <path d="M20 4v6h-6" />
+              </svg>
+              <span class="sr-only">Refresh model list</span>
+            </button>
+          </div>
         </div>
 
         <div class="border-t border-[var(--color-border)]"></div>
@@ -300,6 +305,7 @@ const providerOptions = [
 ]
 
 const verifySuccessMessage = computed(() => String(verifySuccess.value || '').trim())
+const refreshModelListTooltip = 'This icon refreshes list of models available based on selected provider.'
 const apiKeyLabel = computed(() => (provider.value === 'openai' ? 'OpenAI API key' : 'OpenRouter API key'))
 const apiKeyPlaceholder = computed(() => (provider.value === 'openai' ? 'sk-...' : 'or-...'))
 const mainOptions = computed(() => buildModelOptions('main', mainModel.value))
