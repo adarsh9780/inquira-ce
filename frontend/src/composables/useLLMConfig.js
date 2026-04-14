@@ -134,12 +134,14 @@ function applyProviderModelState(providerName, prefs = {}, preserveSelection = t
   }
 
   const catalog = providerCatalogs.value?.[normalized] || {}
-  const providerMain = Array.isArray(prefs?.provider_available_main_models)
+  const responseProvider = normalizeProvider(prefs?.llm_provider)
+  const useResponseModelLists = responseProvider === normalized
+  const providerMain = useResponseModelLists && Array.isArray(prefs?.provider_available_main_models)
     ? prefs.provider_available_main_models
     : Array.isArray(catalog?.main_models)
       ? catalog.main_models
       : []
-  const providerLite = Array.isArray(prefs?.provider_available_lite_models)
+  const providerLite = useResponseModelLists && Array.isArray(prefs?.provider_available_lite_models)
     ? prefs.provider_available_lite_models
     : Array.isArray(catalog?.lite_models)
       ? catalog.lite_models
@@ -157,8 +159,12 @@ function applyProviderModelState(providerName, prefs = {}, preserveSelection = t
     [normalized]: metadata,
   }
 
-  const preferredMain = String(prefs?.selected_model || '').trim()
-  const preferredLite = String(prefs?.selected_lite_model || '').trim()
+  const preferredMain = useResponseModelLists
+    ? String(prefs?.selected_model || '').trim()
+    : String(catalog?.default_main_model || '').trim()
+  const preferredLite = useResponseModelLists
+    ? String(prefs?.selected_lite_model || '').trim()
+    : String(catalog?.default_lite_model || '').trim()
 
   if (!preserveSelection || !mainModel.value || !mainModels.value.includes(mainModel.value)) {
     mainModel.value = mainModels.value.includes(preferredMain)
@@ -181,12 +187,12 @@ function getModelMeta(providerName, modelId) {
 async function loadPreferences(providerHint = null, preserveSelection = false) {
   modelsLoading.value = true
   try {
-    const response = await apiService.v1GetPreferences()
+    const response = await apiService.v1GetPreferences(providerHint)
     const normalizedProvider = normalizeProvider(providerHint || response?.llm_provider)
 
     provider.value = normalizedProvider
     apiKeyPresenceByProvider.value = response?.api_key_present_by_provider || {}
-    selectedProviderApiKeyPresent.value = !!response?.selected_provider_api_key_present
+    selectedProviderApiKeyPresent.value = !!apiKeyPresenceByProvider.value?.[normalizedProvider]
     verifyError.value = ''
     verifyWarning.value = ''
     verifySuccess.value = ''
@@ -245,14 +251,17 @@ function setProvider(nextProvider) {
     apiKey.value = ''
     usingMaskedKey.value = false
   }
-
-  applyProviderModelState(normalized, {}, false)
+  mainModels.value = []
+  liteModels.value = []
+  mainModel.value = null
+  liteModel.value = null
 }
 
 function setApiKey(value) {
-  apiKey.value = String(value || '')
-  usingMaskedKey.value = false
-  keyVerified.value = false
+  const nextValue = String(value || '')
+  apiKey.value = nextValue
+  usingMaskedKey.value = !!keyMask.value && nextValue === keyMask.value
+  keyVerified.value = usingMaskedKey.value
   verifySuccess.value = ''
   verifyError.value = ''
   verifyWarning.value = ''
@@ -269,7 +278,6 @@ async function verifyKey() {
 
   if (usingMaskedKey.value && apiKey.value === keyMask.value) {
     keyVerified.value = true
-    verifySuccess.value = 'Saved key is already configured.'
     return { ok: true, valid: true, error: '' }
   }
 
@@ -284,25 +292,23 @@ async function verifyKey() {
     const response = await apiService.v1VerifyApiKey(selectedProvider, key)
     if (response?.valid) {
       keyVerified.value = true
-      verifySuccess.value = 'Key verified.'
       return { ok: true, valid: true, error: '' }
     }
 
     const code = String(response?.error || 'invalid_key').trim()
     if (code === 'quota_exceeded') {
-      keyVerified.value = true
-      verifyWarning.value = 'Key is valid but quota is exceeded.'
-      return { ok: true, valid: false, error: code }
+      verifyError.value = 'Key is valid but quota is exceeded for this provider.'
+      return { ok: false, valid: false, error: code }
     }
     if (code === 'network_error') {
-      verifyWarning.value = 'Could not reach provider - check your connection.'
+      verifyError.value = 'Could not reach provider. Check your connection and try again.'
       return { ok: false, valid: false, error: code }
     }
 
     verifyError.value = 'Invalid API key. Please check and try again.'
     return { ok: false, valid: false, error: code }
   } catch (error) {
-    verifyWarning.value = 'Could not reach provider - check your connection.'
+    verifyError.value = 'Could not reach provider. Check your connection and try again.'
     return { ok: false, valid: false, error: 'network_error', detail: extractApiErrorMessage(error) }
   } finally {
     verifyLoading.value = false
@@ -387,12 +393,19 @@ async function refreshModels({ background = false } = {}) {
 async function saveConfig() {
   const selectedProvider = normalizeProvider(provider.value)
 
-  saveLoading.value = true
   try {
+    if (selectedProvider !== 'ollama' && !usingMaskedKey.value) {
+      const verifyResult = await verifyKey()
+      if (!verifyResult.ok) {
+        return { ok: false, stage: 'verify', error: verifyResult.error || 'verify_failed' }
+      }
+    }
+
+    saveLoading.value = true
     if (selectedProvider !== 'ollama') {
       const keyResult = await saveKey()
       if (!keyResult.ok) {
-        return { ok: false, error: keyResult.error || 'save_key_failed' }
+        return { ok: false, stage: 'save_key', error: keyResult.error || 'save_key_failed' }
       }
     }
 
@@ -408,7 +421,11 @@ async function saveConfig() {
     applyProviderModelState(selectedProvider, response, true)
     return { ok: true, response }
   } catch (error) {
-    return { ok: false, error: extractApiErrorMessage(error, 'Failed to save configuration.') }
+    return {
+      ok: false,
+      stage: 'save_preferences',
+      error: extractApiErrorMessage(error, 'Failed to save configuration.'),
+    }
   } finally {
     saveLoading.value = false
   }

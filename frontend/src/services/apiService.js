@@ -776,8 +776,8 @@ export const apiService = {
     return v1Api.datasets.list(workspaceId)
   },
 
-  async v1GetPreferences() {
-    return v1Api.preferences.get()
+  async v1GetPreferences(provider = null) {
+    return v1Api.preferences.get(provider)
   },
 
   async v1UpdatePreferences(payload) {

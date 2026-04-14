@@ -31,7 +31,9 @@ export const v1Api = {
       axios.post(`/api/v1/workspaces/${workspaceId}/datasets/browser-sync`, payload)
   },
   preferences: {
-    get: () => axios.get('/api/v1/preferences'),
+    get: (provider = null) => axios.get('/api/v1/preferences', {
+      params: provider ? { provider } : undefined,
+    }),
     update: (payload) => axios.put('/api/v1/preferences', payload),
     refreshModels: (payload) => axios.post('/api/v1/preferences/models/refresh', payload),
     verifyKey: (provider, apiKey) =>
