@@ -1,0 +1,27 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+function readSource(relativePath) {
+  return readFileSync(resolve(process.cwd(), relativePath), 'utf-8')
+}
+
+test('settings account tab keeps profile fields and restores Google sign-in trigger', () => {
+  const source = readSource('src/components/modals/tabs/AccountTab.vue')
+
+  assert.equal(source.includes('Display name'), true)
+  assert.equal(source.includes('Sign in with Google'), true)
+  assert.equal(source.includes("@click=\"startGoogleSignIn\""), true)
+  assert.equal(source.includes("authStore.signInWithProvider('google')"), true)
+  assert.equal(source.includes('fill="#4285F4"'), true)
+  assert.equal(source.includes('fill="#34A853"'), true)
+  assert.equal(source.includes('fill="#FBBC05"'), true)
+  assert.equal(source.includes('fill="#EA4335"'), true)
+  assert.equal(source.includes('<!-- Microsoft sign-in button will go here -->'), true)
+
+  assert.equal(source.includes('Theme'), false)
+  assert.equal(source.includes('Default LLM provider'), false)
+  assert.equal(source.includes('Local workspace data'), false)
+  assert.equal(source.includes('Clear all conversation history'), false)
+})
