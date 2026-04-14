@@ -1,6 +1,6 @@
 <template>
   <section class="relative h-full">
-    <div class="h-full overflow-y-auto pb-24">
+    <div class="h-full overflow-y-auto pb-24" :class="showAdvanced ? 'scrollbar-hidden' : ''">
       <h2 class="mb-4 text-lg font-bold text-[var(--color-text-main)]">LLM &amp; API Keys</h2>
 
       <div class="space-y-5">
@@ -390,3 +390,16 @@ async function saveConfiguration() {
   toast.success('Configuration saved', 'Configuration saved')
 }
 </script>
+
+<style scoped>
+.scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+</style>
