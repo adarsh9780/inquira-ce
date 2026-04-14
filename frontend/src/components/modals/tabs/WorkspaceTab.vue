@@ -1,18 +1,20 @@
 <template>
   <section class="h-full">
     <div v-if="panelMode === 'ws-list'" class="space-y-4">
-      <header class="space-y-1">
-        <h2 class="text-lg font-bold text-[var(--color-text-main)]">Workspaces</h2>
-        <p class="text-sm text-[var(--color-text-muted)]">Select a workspace to manage it, or create a new one.</p>
+      <header class="flex items-start justify-between gap-3">
+        <div class="space-y-1">
+          <h2 class="text-lg font-bold text-[var(--color-text-main)]">Workspaces</h2>
+          <p class="text-sm text-[var(--color-text-muted)]">Select a workspace to manage it, or create a new one.</p>
+        </div>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-base)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-accent)] transition-all hover:border-[var(--color-accent-border)] hover:bg-[var(--color-base-soft)]"
+          @click="emit('navigate', 'ws-create', 'forward')"
+        >
+          <span class="text-sm leading-none">+</span>
+          <span>New workspace</span>
+        </button>
       </header>
-
-      <button
-        type="button"
-        class="w-full rounded-lg border border-dashed border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-main)] transition-all hover:border-[var(--color-accent-border)] hover:text-[var(--color-accent)]"
-        @click="emit('navigate', 'ws-create', 'forward')"
-      >
-        + New workspace
-      </button>
 
       <div v-if="workspaceCards.length" class="space-y-2">
         <button
@@ -60,18 +62,27 @@
       </div>
     </div>
 
-    <div v-else-if="panelMode === 'ws-detail'" class="space-y-4">
+    <div v-else-if="panelMode === 'ws-detail'" class="mx-auto max-w-[660px] space-y-4 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-base)] p-4">
       <header class="flex items-start justify-between gap-3">
         <div>
           <h2 class="text-lg font-bold text-[var(--color-text-main)]">{{ activeWorkspace?.name || 'Workspace detail' }}</h2>
           <p class="text-sm text-[var(--color-text-muted)]">{{ activeWorkspaceFilename }}</p>
         </div>
-        <span
-          class="rounded-full px-2 py-0.5 text-[11px]"
-          :class="isWorkspaceActive ? 'bg-[var(--color-success-bg)] text-[var(--color-success)]' : 'bg-[var(--color-base-soft)] text-[var(--color-text-muted)]'"
-        >
-          {{ isWorkspaceActive ? 'Active' : 'Inactive' }}
-        </span>
+        <div class="flex items-center gap-2">
+          <span
+            class="rounded-full px-2 py-0.5 text-[11px]"
+            :class="isWorkspaceActive ? 'bg-[var(--color-success-bg)] text-[var(--color-success)]' : 'bg-[var(--color-base-soft)] text-[var(--color-text-muted)]'"
+          >
+            {{ isWorkspaceActive ? 'Active' : 'Inactive' }}
+          </span>
+          <button
+            type="button"
+            class="rounded-md border border-[var(--color-border-strong)] px-2.5 py-1 text-xs text-[var(--color-text-sub)] transition-all hover:bg-[var(--color-base-soft)]"
+            @click="emit('navigate', 'ws-list', 'backward')"
+          >
+            Back
+          </button>
+        </div>
       </header>
 
       <div class="rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base)]">
@@ -200,10 +211,19 @@
       </footer>
     </div>
 
-    <div v-else class="space-y-4">
-      <header class="space-y-1">
-        <h2 class="text-lg font-bold text-[var(--color-text-main)]">New workspace</h2>
-        <p class="text-sm text-[var(--color-text-muted)]">Create a workspace and optionally attach a dataset.</p>
+    <div v-else class="mx-auto max-w-[660px] space-y-4 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-base)] p-4">
+      <header class="flex items-start justify-between gap-3">
+        <div class="space-y-1">
+          <h2 class="text-lg font-bold text-[var(--color-text-main)]">New workspace</h2>
+          <p class="text-sm text-[var(--color-text-muted)]">Create a workspace and optionally attach a dataset.</p>
+        </div>
+        <button
+          type="button"
+          class="rounded-md border border-[var(--color-border-strong)] px-2.5 py-1 text-xs text-[var(--color-text-sub)] transition-all hover:bg-[var(--color-base-soft)]"
+          @click="emit('navigate', 'ws-list', 'backward')"
+        >
+          Back
+        </button>
       </header>
 
       <label class="space-y-1">
