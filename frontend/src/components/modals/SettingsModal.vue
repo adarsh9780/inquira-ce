@@ -11,7 +11,7 @@
       @click="closeModal"
     >
       <div
-        class="relative h-[680px] w-full max-w-[980px] overflow-hidden rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-base)] text-[var(--color-text-main)] shadow-2xl"
+        class="relative h-[680px] w-full max-w-[900px] overflow-hidden rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-base)] text-[var(--color-text-main)] shadow-2xl"
         @click.stop
       >
         <button
