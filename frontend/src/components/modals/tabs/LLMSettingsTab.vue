@@ -6,18 +6,16 @@
       <div class="space-y-5">
         <div class="space-y-2">
           <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Provider</label>
-          <div class="relative">
-            <select
-              :value="provider"
-              class="w-full appearance-none rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 pr-9 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
-              @change="handleProviderSelect($event.target.value)"
-            >
-              <option v-for="option in providerOptions" :key="option.id" :value="option.id">{{ option.label }}</option>
-            </select>
-            <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M6 8l4 4 4-4" />
-            </svg>
-          </div>
+          <HeaderDropdown
+            :model-value="provider"
+            :options="providerOptions"
+            :searchable="true"
+            search-placeholder="Search provider"
+            placeholder="Select provider"
+            max-width-class="w-full"
+            aria-label="Provider"
+            @update:model-value="handleProviderSelect"
+          />
         </div>
 
         <div class="border-t border-[var(--color-border)]"></div>
@@ -296,9 +294,9 @@ const showKey = ref(false)
 const showAdvanced = ref(false)
 
 const providerOptions = [
-  { id: 'openai', label: 'OpenAI' },
-  { id: 'openrouter', label: 'OpenRouter' },
-  { id: 'ollama', label: 'Ollama (local)' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'openrouter', label: 'OpenRouter' },
+  { value: 'ollama', label: 'Ollama (local)' },
 ]
 
 const verifySuccessMessage = computed(() => String(verifySuccess.value || '').trim())
@@ -340,11 +338,12 @@ function buildModelOptions(type, selectedId) {
 }
 
 async function handleProviderSelect(nextProvider) {
-  if (provider.value === nextProvider) return
-  setProvider(nextProvider)
+  const normalizedProvider = String(nextProvider || '').trim().toLowerCase()
+  if (!normalizedProvider || provider.value === normalizedProvider) return
+  setProvider(normalizedProvider)
   clearTransientMessages()
   try {
-    await loadPreferences(nextProvider, false)
+    await loadPreferences(normalizedProvider, false)
   } catch (_error) {
     toast.error('Provider Error', 'Could not load provider configuration.')
   }

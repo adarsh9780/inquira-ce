@@ -46,7 +46,11 @@ test('useLLMConfig composable exposes provider-aware save flow and advanced fiel
 test('LLM settings tab uses provider dropdown, searchable model selects, and advanced controls', () => {
   const source = read('src/components/modals/tabs/LLMSettingsTab.vue')
 
-  assert.equal(source.includes('@change="handleProviderSelect($event.target.value)"'), true)
+  assert.equal(source.includes(':model-value="provider"'), true)
+  assert.equal(source.includes('search-placeholder="Search provider"'), true)
+  assert.equal(source.includes('placeholder="Select provider"'), true)
+  assert.equal(source.includes('aria-label="Provider"'), true)
+  assert.equal(source.includes('@update:model-value="handleProviderSelect"'), true)
   assert.equal(source.includes('Provider'), true)
   assert.equal(source.includes('OpenAI'), true)
   assert.equal(source.includes('OpenRouter'), true)
