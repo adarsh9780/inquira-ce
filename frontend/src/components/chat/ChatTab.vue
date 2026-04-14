@@ -23,15 +23,6 @@
             >
               <ArrowPathIcon class="h-4 w-4" />
             </button>
-            <button
-              type="button"
-              class="btn-icon hover:text-red-600 hover:bg-white hover:shadow-sm"
-              :disabled="!appStore.activeConversationId"
-              @click="deleteConversation"
-              title="Delete Conversation"
-            >
-              <TrashIcon class="h-4 w-4" />
-            </button>
           </div>
       </div>
     </Teleport>
@@ -71,14 +62,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch, nextTick } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import ChatHistory from './ChatHistory.vue'
 import { 
   ChatBubbleLeftRightIcon, 
   ArrowPathIcon,
-  PlusIcon,
-  TrashIcon
+  PlusIcon
 } from '@heroicons/vue/24/outline'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
@@ -101,18 +91,6 @@ async function clearConversation() {
     await appStore.clearActiveConversation()
   } catch (error) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to clear conversation'))
-  }
-}
-
-async function deleteConversation() {
-  if (!appStore.activeConversationId) return
-  try {
-    await appStore.deleteActiveConversation()
-    if (appStore.activeConversationId) {
-      await appStore.fetchConversationTurns({ reset: true })
-    }
-  } catch (error) {
-    toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to delete conversation'))
   }
 }
 

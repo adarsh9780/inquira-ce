@@ -1287,8 +1287,22 @@ export const useAppStore = defineStore('app', () => {
     if (!activeWorkspaceId.value) return
     const response = await apiService.v1ListConversations(activeWorkspaceId.value, 50)
     conversations.value = response?.conversations || []
-    if (!activeConversationId.value && conversations.value.length > 0) {
-      activeConversationId.value = conversations.value[0].id
+
+    const currentActiveId = String(activeConversationId.value || '').trim()
+    if (!currentActiveId) {
+      if (conversations.value.length > 0) {
+        setActiveConversationId(conversations.value[0].id)
+      }
+      return
+    }
+
+    const conversationIds = new Set(
+      conversations.value
+        .map((conversation) => String(conversation?.id || '').trim())
+        .filter(Boolean),
+    )
+    if (!conversationIds.has(currentActiveId)) {
+      setActiveConversationId(conversations.value[0]?.id || '')
     }
   }
 
@@ -1329,14 +1343,43 @@ export const useAppStore = defineStore('app', () => {
     turnsNextCursor.value = null
   }
 
-  async function deleteActiveConversation() {
-    if (!activeConversationId.value) return
-    await apiService.v1DeleteConversation(activeConversationId.value)
-    const deletedId = activeConversationId.value
-    conversations.value = conversations.value.filter((c) => c.id !== deletedId)
-    activeConversationId.value = conversations.value[0]?.id || ''
+  async function deleteConversationById(conversationId) {
+    const targetId = String(conversationId || '').trim()
+    if (!targetId) return ''
+
+    await apiService.v1DeleteConversation(targetId)
+    conversations.value = conversations.value.filter((conversation) => String(conversation?.id || '').trim() !== targetId)
+
+    const currentActiveId = String(activeConversationId.value || '').trim()
+    const activeStillExists = currentActiveId
+      ? conversations.value.some((conversation) => String(conversation?.id || '').trim() === currentActiveId)
+      : false
+
+    if (activeStillExists) return targetId
+
+    const fallbackConversationId = String(conversations.value[0]?.id || '').trim()
+    if (currentActiveId !== fallbackConversationId) {
+      setActiveConversationId(fallbackConversationId)
+    } else {
+      saveLocalConfig()
+    }
+
     chatHistory.value = []
     turnsNextCursor.value = null
+
+    if (fallbackConversationId) {
+      await fetchConversationTurns({ reset: true })
+    } else {
+      setDataframes([])
+      setFigures([])
+    }
+
+    return targetId
+  }
+
+  async function deleteActiveConversation() {
+    if (!activeConversationId.value) return
+    await deleteConversationById(activeConversationId.value)
   }
 
   async function updateConversationTitle(title) {
@@ -2188,6 +2231,7 @@ export const useAppStore = defineStore('app', () => {
     createConversation,
     fetchConversationTurns,
     clearActiveConversation,
+    deleteConversationById,
     deleteActiveConversation,
     updateConversationTitle,
     setGeneratedCode,

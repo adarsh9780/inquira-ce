@@ -237,23 +237,38 @@
                     </template>
                   </div>
                 </div>
-                <div v-if="editingId !== conv.id" class="flex-shrink-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <div v-if="editingId !== conv.id" class="relative flex-shrink-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
-                    @click.stop="startEditing(conv)"
+                    @click.stop="toggleConversationMenu(conv.id)"
                     class="btn-icon p-1 rounded hover:text-[var(--color-accent)]"
                     style="color: var(--color-text-muted);"
-                    title="Rename Conversation"
+                    title="Conversation actions"
                   >
-                    <PencilIcon class="w-3.5 h-3.5" />
+                    <EllipsisHorizontalIcon class="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    @click.stop="confirmDeleteConversation(conv.id)"
-                    class="btn-icon p-1 rounded hover:text-red-500"
-                    style="color: var(--color-text-muted);"
-                    title="Delete Conversation"
+                  <div
+                    v-if="conversationMenuId === conv.id"
+                    class="absolute right-0 top-7 z-20 w-32 overflow-hidden rounded-lg border shadow-lg"
+                    style="border-color: var(--color-border-strong); background-color: var(--color-surface);"
+                    data-conversation-actions-menu
                   >
-                    <TrashIcon class="w-3.5 h-3.5" />
-                  </button>
+                    <button
+                      type="button"
+                      class="w-full px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-[var(--color-base-soft)]"
+                      style="color: var(--color-text-main);"
+                      @click.stop="startEditingFromMenu(conv)"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      type="button"
+                      class="w-full px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-red-50"
+                      style="color: #dc2626;"
+                      @click.stop="confirmDeleteConversation(conv.id)"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -410,8 +425,8 @@ import {
   FolderOpenIcon,
   FolderPlusIcon,
   PlusIcon,
-  PencilIcon,
   TrashIcon,
+  EllipsisHorizontalIcon,
   CogIcon,
   ScaleIcon,
   XMarkIcon,
@@ -431,6 +446,7 @@ const isSearchOpen = ref(false)
 const editingId = ref(null)
 const editingTitleValue = ref('')
 const editInputs = ref({})
+const conversationMenuId = ref('')
 const searchInputRef = ref(null)
 
 function toggleSearch() {
@@ -653,11 +669,20 @@ async function selectDataset(ds) {
   }
 }
 
-function selectConversation(id) {
-  appStore.setActiveConversation(id)
+async function selectConversation(id) {
+  conversationMenuId.value = ''
+  const targetConversationId = String(id || '').trim()
+  if (!targetConversationId || targetConversationId === String(appStore.activeConversationId || '').trim()) return
+  try {
+    appStore.setActiveConversationId(targetConversationId)
+    await appStore.fetchConversationTurns({ reset: true })
+  } catch (error) {
+    toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to load conversation'))
+  }
 }
 
 function startEditing(conv) {
+  conversationMenuId.value = ''
   editingId.value = conv.id
   editingTitleValue.value = conv.title || 'Untitled'
   setTimeout(() => {
@@ -672,6 +697,28 @@ function startEditing(conv) {
 function cancelEditing() {
   editingId.value = null
   editingTitleValue.value = ''
+}
+
+function toggleConversationMenu(conversationId) {
+  const targetConversationId = String(conversationId || '').trim()
+  if (!targetConversationId) return
+  conversationMenuId.value = conversationMenuId.value === targetConversationId ? '' : targetConversationId
+}
+
+function startEditingFromMenu(conv) {
+  conversationMenuId.value = ''
+  startEditing(conv)
+}
+
+function closeConversationMenu() {
+  conversationMenuId.value = ''
+}
+
+function handleConversationMenuOutsideClick(event) {
+  const target = event?.target
+  if (!(target instanceof Element)) return
+  if (target.closest('[data-conversation-actions-menu]')) return
+  closeConversationMenu()
 }
 
 async function saveTitle(id) {
@@ -768,6 +815,7 @@ function confirmDeleteDataset(tableName) {
 
 function confirmDeleteConversation(conversationId) {
   const target = appStore.conversations.find((c) => c.id === conversationId)
+  closeConversationMenu()
   pendingDeleteType.value = 'conversation'
   pendingDeleteId.value = conversationId
   deleteDialogTitle.value = 'Delete Conversation'
@@ -798,8 +846,7 @@ async function confirmDelete() {
         await fetchDatasets()
       }
     } else if (pendingDeleteType.value === 'conversation') {
-      await apiService.v1DeleteConversation(pendingDeleteId.value)
-      await appStore.fetchConversations()
+      await appStore.deleteConversationById(pendingDeleteId.value)
       toast.success('Conversation Deleted', 'Conversation has been removed.')
     }
     closeDeleteDialog()
@@ -822,11 +869,13 @@ onMounted(async () => {
   }
   window.addEventListener('dataset-switched', handleDatasetCatalogChanged)
   window.addEventListener('sidebar-open-settings', handleOpenSettingsRequest)
+  window.addEventListener('click', handleConversationMenuOutsideClick)
 })
 
 onUnmounted(() => {
   window.removeEventListener('dataset-switched', handleDatasetCatalogChanged)
   window.removeEventListener('sidebar-open-settings', handleOpenSettingsRequest)
+  window.removeEventListener('click', handleConversationMenuOutsideClick)
 })
 
 // Watch for workspace changes to fetch datasets and conversations

@@ -19,11 +19,11 @@ test('chat tab exposes conversation lifecycle controls for usable analysis sessi
 
   assert.equal(source.includes('title="New Conversation"'), true)
   assert.equal(source.includes('title="Clear Conversation"'), true)
-  assert.equal(source.includes('title="Delete Conversation"'), true)
+  assert.equal(source.includes('title="Delete Conversation"'), false)
   assert.equal(source.includes('await appStore.createConversation()'), true)
   assert.equal(source.includes('await appStore.fetchConversationTurns({ reset: true })'), true)
   assert.equal(source.includes('await appStore.clearActiveConversation()'), true)
-  assert.equal(source.includes('await appStore.deleteActiveConversation()'), true)
+  assert.equal(source.includes('await appStore.deleteActiveConversation()'), false)
 })
 
 test('critical workflow helper sets up workspace and dataset before higher-level interactions', () => {
