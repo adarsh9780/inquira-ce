@@ -1,12 +1,8 @@
 <template>
   <section class="h-full">
     <div v-if="panelMode === 'ws-list'" class="space-y-4">
-      <header class="space-y-1">
+      <header class="mb-4 flex items-center justify-between">
         <h2 class="text-lg font-bold text-[var(--color-text-main)]">Workspaces</h2>
-        <p class="text-sm text-[var(--color-text-muted)]">Select a workspace to manage it, or create a new one.</p>
-      </header>
-
-      <div class="flex justify-end">
         <button
           type="button"
           class="inline-flex items-center gap-1 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-base)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-accent)] transition-all hover:border-[var(--color-accent-border)] hover:bg-[var(--color-base-soft)]"
@@ -15,7 +11,7 @@
           <span class="text-sm leading-none">+</span>
           <span>New workspace</span>
         </button>
-      </div>
+      </header>
 
       <div v-if="workspaceCards.length" class="space-y-2">
         <button
@@ -43,7 +39,7 @@
             </span>
           </div>
           <p class="text-xs text-[var(--color-text-muted)]">
-            {{ workspace.filename }} · {{ workspace.conversationCount }} conversations · last active {{ workspace.lastActiveLabel }}
+            {{ workspace.conversationCount }} conversations · last active {{ workspace.lastActiveLabel }}
           </p>
         </button>
       </div>
@@ -64,28 +60,61 @@
     </div>
 
     <div v-else-if="panelMode === 'ws-detail'" class="space-y-4">
-      <header class="flex items-start gap-3">
+      <header class="flex items-center justify-between gap-3">
         <button
           type="button"
-          class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--color-text-sub)] transition-all hover:bg-[var(--color-base-soft)] hover:text-[var(--color-text-main)]"
-          title="Back to workspace list"
-          aria-label="Back to workspace list"
+          class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--color-accent)] transition-all hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)]"
+          title="Back to workspaces"
+          aria-label="Back to workspaces"
           @click="emit('navigate', 'ws-list', 'backward')"
         >
           <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
             <path d="M12.5 4.5L7 10l5.5 5.5" />
           </svg>
         </button>
-        <div class="min-w-0 flex-1">
-          <h2 class="text-lg font-bold text-[var(--color-text-main)]">{{ activeWorkspace?.name || 'Workspace detail' }}</h2>
-          <p class="text-sm text-[var(--color-text-muted)]">{{ activeWorkspaceFilename }}</p>
+        <div class="min-w-0 flex-1 text-center">
+          <div class="inline-flex max-w-full items-center gap-1.5">
+            <input
+              v-if="isRenamingInline"
+              ref="renameInputRef"
+              v-model="renameValue"
+              type="text"
+              class="min-w-[160px] max-w-[320px] rounded-md border border-[var(--color-border-strong)] bg-[var(--color-base)] px-2 py-1 text-lg font-bold text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+              @keydown.enter.prevent="saveRename"
+              @keydown.esc.prevent="cancelRename"
+              @blur="saveRename"
+            />
+            <h2 v-else class="truncate text-lg font-bold text-[var(--color-text-main)]">{{ activeWorkspace?.name || 'Workspace detail' }}</h2>
+            <button
+              v-if="!isRenamingInline"
+              type="button"
+              class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--color-text-muted)] transition-all hover:bg-[var(--color-base-soft)] hover:text-[var(--color-text-main)]"
+              title="Rename workspace"
+              aria-label="Rename workspace"
+              @click="startRename"
+            >
+              <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M3 14.5V17h2.5l8.1-8.1-2.5-2.5L3 14.5z" />
+                <path d="M10.8 5.2l2.5 2.5" />
+              </svg>
+            </button>
+          </div>
+          <p v-if="primaryDatasetFilename" class="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">{{ primaryDatasetFilename }}</p>
         </div>
         <span
-          class="rounded-full px-2 py-0.5 text-[11px]"
-          :class="isWorkspaceActive ? 'bg-[var(--color-success-bg)] text-[var(--color-success)]' : 'bg-[var(--color-base-soft)] text-[var(--color-text-muted)]'"
+          v-if="isWorkspaceActive"
+          class="rounded-full bg-[var(--color-success-bg)] px-2 py-0.5 text-[11px] text-[var(--color-success)]"
         >
-          {{ isWorkspaceActive ? 'Active' : 'Inactive' }}
+          Active
         </span>
+        <button
+          v-else
+          type="button"
+          class="rounded-md bg-[var(--color-accent)] px-2.5 py-1 text-xs font-medium text-white transition-all hover:brightness-90"
+          @click="openCurrentWorkspace"
+        >
+          Open workspace
+        </button>
       </header>
 
       <div class="rounded-lg bg-[var(--color-base-soft)]/55">
@@ -110,24 +139,14 @@
           <div
             v-for="dataset in datasetEntries"
             :key="dataset.table_name"
-            class="rounded-lg bg-[var(--color-base-soft)]/45 px-3 py-2"
+            class="mb-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] px-4 py-3"
           >
             <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <div class="mb-1 flex items-center gap-2">
-                  <span class="rounded bg-[var(--color-base-soft)] px-1.5 py-0.5 text-[10px] uppercase text-[var(--color-text-muted)]">
-                    {{ dataset.file_type || 'data' }}
-                  </span>
-                  <span class="truncate text-sm font-medium text-[var(--color-text-main)]">{{ dataset.filename }}</span>
-                </div>
-                <p class="text-xs text-[var(--color-text-muted)]">
-                  {{ datasetRowCount(dataset) }} rows · {{ datasetColumnCount(dataset) }} cols · {{ datasetFileSize(dataset) }}
-                </p>
-              </div>
+              <p class="min-w-0 truncate text-sm font-medium text-[var(--color-text-main)]">{{ dataset.filename }}</p>
               <div class="flex items-center gap-1">
                 <button
                   type="button"
-                  class="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-base-soft)] hover:text-[var(--color-accent)]"
+                  class="rounded p-1 text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
                   title="Refresh dataset"
                   @click="refreshDataset(dataset)"
                 >
@@ -138,7 +157,7 @@
                 </button>
                 <button
                   type="button"
-                  class="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-base-soft)] hover:text-[var(--color-danger)]"
+                  class="rounded p-1 text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
                   title="Remove dataset"
                   @click="requestRemoveDataset(dataset.table_name)"
                 >
@@ -151,24 +170,28 @@
               </div>
             </div>
 
+            <p v-if="pendingRemovalTable !== dataset.table_name" class="mt-1 text-xs text-[var(--color-text-muted)]">
+              {{ datasetMetadata(dataset) }}
+            </p>
+
             <div
               v-if="pendingRemovalTable === dataset.table_name"
-              class="mt-2 flex items-center justify-end gap-2 border-t border-[var(--color-border)]/70 pt-2"
+              class="mt-2 flex items-center gap-2 border-t border-[var(--color-border)]/70 pt-2"
             >
-              <span class="mr-auto text-xs text-[var(--color-text-muted)]">Remove this dataset?</span>
+              <span class="mr-auto text-xs text-[var(--color-text-muted)]">Remove "{{ dataset.filename }}"?</span>
               <button
                 type="button"
-                class="rounded border border-[var(--color-border-strong)] px-2 py-1 text-xs text-[var(--color-text-sub)]"
-                @click="pendingRemovalTable = ''"
+                class="rounded bg-[var(--color-danger)] px-2.5 py-1 text-xs font-medium text-white"
+                @click="confirmRemoveDataset(dataset)"
               >
-                Cancel
+                Confirm
               </button>
               <button
                 type="button"
-                class="rounded bg-[var(--color-danger)] px-2 py-1 text-xs font-medium text-white"
-                @click="confirmRemoveDataset(dataset)"
+                class="rounded border border-[var(--color-border-strong)] px-2.5 py-1 text-xs text-[var(--color-text-sub)]"
+                @click="pendingRemovalTable = ''"
               >
-                Remove
+                Cancel
               </button>
             </div>
           </div>
@@ -180,38 +203,30 @@
 
         <button
           type="button"
-          class="w-full rounded-lg bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] transition-all hover:text-[var(--color-accent)]"
+          class="w-full rounded-lg border border-dashed border-[var(--color-border-strong)] px-4 py-3 text-center text-sm text-[var(--color-text-muted)] transition-all hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)]"
           @click="openDatasetPicker"
         >
           + Add dataset
         </button>
       </div>
 
-      <div v-if="showRenameEditor" class="space-y-2 rounded-lg bg-[var(--color-base-soft)] px-3 py-3">
-        <label class="block text-xs text-[var(--color-text-sub)]">Rename workspace</label>
-        <input
-          v-model="renameValue"
-          type="text"
-          class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
-        />
-        <div class="flex justify-end gap-2">
-          <button type="button" class="rounded border border-[var(--color-border-strong)] px-3 py-1.5 text-xs" @click="cancelRename">Cancel</button>
-          <button type="button" class="rounded bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white" @click="saveRename">Save</button>
+      <div class="mt-6 border-t border-[var(--color-border)] pt-4">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-[var(--color-text-muted)]">Danger zone</p>
+          <button
+            type="button"
+            class="rounded border border-[var(--color-danger)] px-3 py-1 text-xs text-[var(--color-danger)] transition-colors hover:bg-red-50"
+            @click="showDeleteConfirm = !showDeleteConfirm"
+          >
+            Delete workspace
+          </button>
+        </div>
+        <div v-if="showDeleteConfirm" class="mt-3 flex items-center justify-end gap-2 rounded-lg bg-[var(--color-base-soft)] px-3 py-2">
+          <span class="mr-auto text-xs text-[var(--color-text-muted)]">Delete this workspace and all its datasets?</span>
+          <button type="button" class="rounded border border-[var(--color-border-strong)] px-2.5 py-1 text-xs text-[var(--color-text-sub)]" @click="showDeleteConfirm = false">Cancel</button>
+          <button type="button" class="rounded bg-[var(--color-danger)] px-2.5 py-1 text-xs font-medium text-white" @click="deleteWorkspace">Delete</button>
         </div>
       </div>
-
-      <div v-if="showDeleteConfirm" class="space-y-2 rounded-lg bg-[var(--color-base-soft)] px-3 py-3">
-        <p class="text-sm text-[var(--color-danger)]">Delete this workspace and all its datasets?</p>
-        <div class="flex justify-end gap-2">
-          <button type="button" class="rounded border border-[var(--color-border-strong)] px-3 py-1.5 text-xs" @click="showDeleteConfirm = false">Cancel</button>
-          <button type="button" class="rounded bg-[var(--color-danger)] px-3 py-1.5 text-xs font-medium text-white" @click="deleteWorkspace">Delete</button>
-        </div>
-      </div>
-
-      <footer class="flex items-center justify-between pt-1">
-        <button type="button" class="text-sm text-[var(--color-danger)]" @click="showDeleteConfirm = !showDeleteConfirm">Delete workspace…</button>
-        <button type="button" class="text-sm text-[var(--color-accent)]" @click="startRename">Rename</button>
-      </footer>
     </div>
 
     <div v-else class="space-y-4">
@@ -287,7 +302,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { apiService } from '../../../services/apiService'
 import { useAppStore } from '../../../stores/appStore'
 import { toast } from '../../../composables/useToast'
@@ -318,8 +333,9 @@ const datasetEntries = ref([])
 const datasetColumnCounts = ref({})
 const datasetFileSizes = ref({})
 const pendingRemovalTable = ref('')
-const showRenameEditor = ref(false)
+const isRenamingInline = ref(false)
 const renameValue = ref('')
+const renameInputRef = ref(null)
 const showDeleteConfirm = ref(false)
 
 const newWorkspaceName = ref('')
@@ -349,11 +365,11 @@ const workspaceCards = computed(() => {
 })
 
 const activeWorkspace = computed(() => workspaceCards.value.find((workspace) => workspace.id === String(props.activeWorkspaceId || '').trim()) || null)
-const activeWorkspaceFilename = computed(() => activeWorkspace.value?.filename || 'workspace.duckdb')
 const isWorkspaceActive = computed(() => !!activeWorkspace.value && !!activeWorkspace.value.is_active)
-const detailCreatedAt = computed(() => formatDateTime(workspaceDetail.value?.created_at || activeWorkspace.value?.created_at))
+const detailCreatedAt = computed(() => formatCreatedDate(workspaceDetail.value?.created_at || activeWorkspace.value?.created_at))
 const detailConversationCount = computed(() => Number(workspaceDetail.value?.conversation_count || 0))
 const detailLastActive = computed(() => formatRelativeTime(workspaceDetail.value?.updated_at || activeWorkspace.value?.updated_at))
+const primaryDatasetFilename = computed(() => String(datasetEntries.value?.[0]?.filename || '').trim())
 
 watch(
   () => props.panelMode,
@@ -509,11 +525,23 @@ function datasetColumnCount(dataset) {
 
 function datasetFileSize(dataset) {
   const bytes = Number(datasetFileSizes.value?.[dataset?.table_name] || 0)
-  if (!Number.isFinite(bytes) || bytes <= 0) return 'unknown size'
+  if (!Number.isFinite(bytes) || bytes <= 0) return null
   if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${bytes} B`
+}
+
+function datasetMetadata(dataset) {
+  const segments = [
+    `${datasetRowCount(dataset)} rows`,
+    `${datasetColumnCount(dataset)} cols`,
+  ]
+  const sizeLabel = datasetFileSize(dataset)
+  if (sizeLabel) {
+    segments.push(sizeLabel)
+  }
+  return segments.join(' · ')
 }
 
 function requestRemoveDataset(tableName) {
@@ -568,28 +596,55 @@ async function openDatasetPicker() {
   }
 }
 
-function startRename() {
+async function startRename() {
   renameValue.value = String(activeWorkspace.value?.name || '').trim()
-  showRenameEditor.value = true
+  isRenamingInline.value = true
+  await nextTick()
+  renameInputRef.value?.focus?.()
+  renameInputRef.value?.select?.()
 }
 
 function cancelRename() {
-  showRenameEditor.value = false
+  isRenamingInline.value = false
   renameValue.value = ''
 }
 
 async function saveRename() {
+  if (!isRenamingInline.value) return
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   const name = String(renameValue.value || '').trim()
-  if (!workspaceId || !name) return
+  const currentName = String(activeWorkspace.value?.name || '').trim()
+  if (!workspaceId) {
+    cancelRename()
+    return
+  }
+  if (!name) {
+    cancelRename()
+    return
+  }
+  if (name === currentName) {
+    cancelRename()
+    return
+  }
   try {
     await appStore.renameWorkspace(workspaceId, name)
     await appStore.fetchWorkspaces()
-    showRenameEditor.value = false
+    isRenamingInline.value = false
+    renameValue.value = ''
     toast.success('Workspace renamed', 'Workspace name updated.')
   } catch (error) {
+    isRenamingInline.value = false
+    renameValue.value = ''
     toast.error('Rename failed', extractApiErrorMessage(error, 'Failed to rename workspace.'))
   }
+}
+
+async function openCurrentWorkspace() {
+  const workspaceId = String(activeWorkspace.value?.id || props.activeWorkspaceId || '').trim()
+  if (!workspaceId) return
+  await emitActiveWorkspace(workspaceId)
+  await appStore.fetchWorkspaces()
+  await loadWorkspaceDetail()
 }
 
 async function deleteWorkspace() {
@@ -666,12 +721,12 @@ function formatFilename(raw) {
   return last
 }
 
-function formatDateTime(raw) {
+function formatCreatedDate(raw) {
   const value = String(raw || '').trim()
   if (!value) return '—'
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return '—'
-  return parsed.toLocaleString()
+  return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function formatRelativeTime(raw) {

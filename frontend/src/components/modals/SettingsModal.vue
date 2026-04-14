@@ -62,7 +62,7 @@
               <LLMSettingsTab @close-request="closeModal" />
             </section>
 
-            <section :class="panelClass('ws-list')" class="absolute inset-0 overflow-y-auto px-5 pb-5 pt-10">
+            <section :class="panelClass('ws-list')" class="absolute inset-0 overflow-y-auto pb-5 pl-5 pr-12 pt-5">
               <WorkspaceTab
                 panel-mode="ws-list"
                 :active-workspace-id="activeWorkspaceId"
@@ -72,7 +72,7 @@
               />
             </section>
 
-            <section :class="panelClass('ws-detail')" class="absolute inset-0 overflow-y-auto px-5 pb-5 pt-10">
+            <section :class="panelClass('ws-detail')" class="absolute inset-0 overflow-y-auto pb-5 pl-5 pr-12 pt-5">
               <WorkspaceTab
                 panel-mode="ws-detail"
                 :active-workspace-id="activeWorkspaceId"
@@ -82,7 +82,7 @@
               />
             </section>
 
-            <section :class="panelClass('ws-create')" class="absolute inset-0 overflow-y-auto px-5 pb-5 pt-10">
+            <section :class="panelClass('ws-create')" class="absolute inset-0 overflow-y-auto pb-5 pl-5 pr-12 pt-5">
               <WorkspaceTab
                 panel-mode="ws-create"
                 :active-workspace-id="activeWorkspaceId"
