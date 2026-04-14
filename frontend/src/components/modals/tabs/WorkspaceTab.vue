@@ -99,7 +99,6 @@
               </svg>
             </button>
           </div>
-          <p v-if="primaryDatasetFilename" class="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">{{ primaryDatasetFilename }}</p>
         </div>
         <span
           v-if="isWorkspaceActive"
@@ -370,8 +369,6 @@ const isWorkspaceActive = computed(() => !!activeWorkspace.value && !!activeWork
 const detailCreatedAt = computed(() => formatCreatedDate(workspaceDetail.value?.created_at || activeWorkspace.value?.created_at))
 const detailConversationCount = computed(() => Number(workspaceDetail.value?.conversation_count || 0))
 const detailLastActive = computed(() => formatRelativeTime(workspaceDetail.value?.updated_at || activeWorkspace.value?.updated_at))
-const primaryDatasetFilename = computed(() => String(datasetEntries.value?.[0]?.filename || '').trim())
-
 watch(
   () => props.panelMode,
   async (nextMode) => {
