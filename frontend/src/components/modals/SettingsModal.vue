@@ -45,7 +45,6 @@
               @click="openWorkspaceSection"
             >
               <span>Workspace</span>
-              <span class="text-xs">›</span>
             </button>
 
             <button
@@ -63,7 +62,7 @@
               <LLMSettingsTab @close-request="closeModal" />
             </section>
 
-            <section :class="panelClass('ws-list')" class="absolute inset-0 overflow-y-auto px-5 py-5">
+            <section :class="panelClass('ws-list')" class="absolute inset-0 overflow-y-auto px-5 pb-5 pt-10">
               <WorkspaceTab
                 panel-mode="ws-list"
                 :active-workspace-id="activeWorkspaceId"
@@ -73,7 +72,7 @@
               />
             </section>
 
-            <section :class="panelClass('ws-detail')" class="absolute inset-0 overflow-y-auto px-5 py-5">
+            <section :class="panelClass('ws-detail')" class="absolute inset-0 overflow-y-auto px-5 pb-5 pt-10">
               <WorkspaceTab
                 panel-mode="ws-detail"
                 :active-workspace-id="activeWorkspaceId"
@@ -83,7 +82,7 @@
               />
             </section>
 
-            <section :class="panelClass('ws-create')" class="absolute inset-0 overflow-y-auto px-5 py-5">
+            <section :class="panelClass('ws-create')" class="absolute inset-0 overflow-y-auto px-5 pb-5 pt-10">
               <WorkspaceTab
                 panel-mode="ws-create"
                 :active-workspace-id="activeWorkspaceId"

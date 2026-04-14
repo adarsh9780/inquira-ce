@@ -13,6 +13,7 @@ test('settings modal keeps left nav static and routes workspace panels on the ri
   assert.equal(source.includes('const navLevel = ref(1)'), false)
   assert.equal(source.includes('openWorkspaceSection'), true)
   assert.equal(source.includes('closeWorkspaceLevel'), false)
+  assert.equal(source.includes('<span class="text-xs">›</span>'), false)
   assert.equal(source.includes('<LLMSettingsTab @close-request="closeModal" />'), true)
   assert.equal(source.includes('<WorkspaceTab'), true)
   assert.equal(source.includes("panel-mode=\"ws-list\""), true)

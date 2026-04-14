@@ -1,11 +1,12 @@
 <template>
   <section class="h-full">
     <div v-if="panelMode === 'ws-list'" class="space-y-4">
-      <header class="flex items-start justify-between gap-3">
-        <div class="space-y-1">
-          <h2 class="text-lg font-bold text-[var(--color-text-main)]">Workspaces</h2>
-          <p class="text-sm text-[var(--color-text-muted)]">Select a workspace to manage it, or create a new one.</p>
-        </div>
+      <header class="space-y-1">
+        <h2 class="text-lg font-bold text-[var(--color-text-main)]">Workspaces</h2>
+        <p class="text-sm text-[var(--color-text-muted)]">Select a workspace to manage it, or create a new one.</p>
+      </header>
+
+      <div class="flex justify-end">
         <button
           type="button"
           class="inline-flex items-center gap-1 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-base)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-accent)] transition-all hover:border-[var(--color-accent-border)] hover:bg-[var(--color-base-soft)]"
@@ -14,7 +15,7 @@
           <span class="text-sm leading-none">+</span>
           <span>New workspace</span>
         </button>
-      </header>
+      </div>
 
       <div v-if="workspaceCards.length" class="space-y-2">
         <button
@@ -62,35 +63,37 @@
       </div>
     </div>
 
-    <div v-else-if="panelMode === 'ws-detail'" class="mx-auto max-w-[660px] space-y-4 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-base)] p-4">
-      <header class="flex items-start justify-between gap-3">
-        <div>
+    <div v-else-if="panelMode === 'ws-detail'" class="space-y-4">
+      <header class="flex items-start gap-3">
+        <button
+          type="button"
+          class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--color-text-sub)] transition-all hover:bg-[var(--color-base-soft)] hover:text-[var(--color-text-main)]"
+          title="Back to workspace list"
+          aria-label="Back to workspace list"
+          @click="emit('navigate', 'ws-list', 'backward')"
+        >
+          <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M12.5 4.5L7 10l5.5 5.5" />
+          </svg>
+        </button>
+        <div class="min-w-0 flex-1">
           <h2 class="text-lg font-bold text-[var(--color-text-main)]">{{ activeWorkspace?.name || 'Workspace detail' }}</h2>
           <p class="text-sm text-[var(--color-text-muted)]">{{ activeWorkspaceFilename }}</p>
         </div>
-        <div class="flex items-center gap-2">
-          <span
-            class="rounded-full px-2 py-0.5 text-[11px]"
-            :class="isWorkspaceActive ? 'bg-[var(--color-success-bg)] text-[var(--color-success)]' : 'bg-[var(--color-base-soft)] text-[var(--color-text-muted)]'"
-          >
-            {{ isWorkspaceActive ? 'Active' : 'Inactive' }}
-          </span>
-          <button
-            type="button"
-            class="rounded-md border border-[var(--color-border-strong)] px-2.5 py-1 text-xs text-[var(--color-text-sub)] transition-all hover:bg-[var(--color-base-soft)]"
-            @click="emit('navigate', 'ws-list', 'backward')"
-          >
-            Back
-          </button>
-        </div>
+        <span
+          class="rounded-full px-2 py-0.5 text-[11px]"
+          :class="isWorkspaceActive ? 'bg-[var(--color-success-bg)] text-[var(--color-success)]' : 'bg-[var(--color-base-soft)] text-[var(--color-text-muted)]'"
+        >
+          {{ isWorkspaceActive ? 'Active' : 'Inactive' }}
+        </span>
       </header>
 
-      <div class="rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base)]">
-        <div class="flex items-center justify-between border-b border-[var(--color-border)] px-3 py-2 text-sm">
+      <div class="rounded-lg bg-[var(--color-base-soft)]/55">
+        <div class="flex items-center justify-between border-b border-[var(--color-border)]/70 px-3 py-2 text-sm">
           <span class="text-[var(--color-text-muted)]">Created date</span>
           <span class="text-[var(--color-text-main)]">{{ detailCreatedAt }}</span>
         </div>
-        <div class="flex items-center justify-between border-b border-[var(--color-border)] px-3 py-2 text-sm">
+        <div class="flex items-center justify-between border-b border-[var(--color-border)]/70 px-3 py-2 text-sm">
           <span class="text-[var(--color-text-muted)]">Conversations</span>
           <span class="text-[var(--color-text-main)]">{{ detailConversationCount }}</span>
         </div>
@@ -107,7 +110,7 @@
           <div
             v-for="dataset in datasetEntries"
             :key="dataset.table_name"
-            class="rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base)] px-3 py-2"
+            class="rounded-lg bg-[var(--color-base-soft)]/45 px-3 py-2"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
@@ -150,7 +153,7 @@
 
             <div
               v-if="pendingRemovalTable === dataset.table_name"
-              class="mt-2 flex items-center justify-end gap-2 border-t border-[var(--color-border)] pt-2"
+              class="mt-2 flex items-center justify-end gap-2 border-t border-[var(--color-border)]/70 pt-2"
             >
               <span class="mr-auto text-xs text-[var(--color-text-muted)]">Remove this dataset?</span>
               <button
@@ -171,20 +174,20 @@
           </div>
         </div>
 
-        <p v-else class="rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-3 text-sm text-[var(--color-text-muted)]">
+        <p v-else class="rounded-lg bg-[var(--color-base-soft)] px-3 py-3 text-sm text-[var(--color-text-muted)]">
           No datasets loaded for this workspace.
         </p>
 
         <button
           type="button"
-          class="w-full rounded-lg border border-dashed border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] transition-all hover:border-[var(--color-accent-border)] hover:text-[var(--color-accent)]"
+          class="w-full rounded-lg bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] transition-all hover:text-[var(--color-accent)]"
           @click="openDatasetPicker"
         >
           + Add dataset
         </button>
       </div>
 
-      <div v-if="showRenameEditor" class="space-y-2 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-3">
+      <div v-if="showRenameEditor" class="space-y-2 rounded-lg bg-[var(--color-base-soft)] px-3 py-3">
         <label class="block text-xs text-[var(--color-text-sub)]">Rename workspace</label>
         <input
           v-model="renameValue"
@@ -197,7 +200,7 @@
         </div>
       </div>
 
-      <div v-if="showDeleteConfirm" class="space-y-2 rounded-lg border border-[var(--color-danger)]/25 bg-[var(--color-base-soft)] px-3 py-3">
+      <div v-if="showDeleteConfirm" class="space-y-2 rounded-lg bg-[var(--color-base-soft)] px-3 py-3">
         <p class="text-sm text-[var(--color-danger)]">Delete this workspace and all its datasets?</p>
         <div class="flex justify-end gap-2">
           <button type="button" class="rounded border border-[var(--color-border-strong)] px-3 py-1.5 text-xs" @click="showDeleteConfirm = false">Cancel</button>
@@ -205,25 +208,29 @@
         </div>
       </div>
 
-      <footer class="flex items-center justify-between border-t border-[var(--color-border)] pt-3">
+      <footer class="flex items-center justify-between pt-1">
         <button type="button" class="text-sm text-[var(--color-danger)]" @click="showDeleteConfirm = !showDeleteConfirm">Delete workspace…</button>
         <button type="button" class="text-sm text-[var(--color-accent)]" @click="startRename">Rename</button>
       </footer>
     </div>
 
-    <div v-else class="mx-auto max-w-[660px] space-y-4 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-base)] p-4">
-      <header class="flex items-start justify-between gap-3">
+    <div v-else class="space-y-4">
+      <header class="flex items-start gap-3">
+        <button
+          type="button"
+          class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--color-text-sub)] transition-all hover:bg-[var(--color-base-soft)] hover:text-[var(--color-text-main)]"
+          title="Back to workspace list"
+          aria-label="Back to workspace list"
+          @click="emit('navigate', 'ws-list', 'backward')"
+        >
+          <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M12.5 4.5L7 10l5.5 5.5" />
+          </svg>
+        </button>
         <div class="space-y-1">
           <h2 class="text-lg font-bold text-[var(--color-text-main)]">New workspace</h2>
           <p class="text-sm text-[var(--color-text-muted)]">Create a workspace and optionally attach a dataset.</p>
         </div>
-        <button
-          type="button"
-          class="rounded-md border border-[var(--color-border-strong)] px-2.5 py-1 text-xs text-[var(--color-text-sub)] transition-all hover:bg-[var(--color-base-soft)]"
-          @click="emit('navigate', 'ws-list', 'backward')"
-        >
-          Back
-        </button>
       </header>
 
       <label class="space-y-1">
@@ -261,7 +268,7 @@
         ></textarea>
       </label>
 
-      <div class="flex justify-end border-t border-[var(--color-border)] pt-3">
+      <div class="flex justify-end pt-3">
         <button
           type="button"
           class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-60"
