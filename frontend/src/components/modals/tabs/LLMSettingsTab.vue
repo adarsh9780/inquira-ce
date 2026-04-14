@@ -75,23 +75,17 @@
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-2">
             <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Main model</label>
-            <input
-              v-model="mainSearch"
-              type="text"
-              class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
-              placeholder="Search model"
+            <HeaderDropdown
+              :model-value="mainModel"
+              :options="mainOptions"
+              :searchable="true"
+              :max-options-without-search="100"
+              search-placeholder="Search model"
+              placeholder="Select main model"
+              max-width-class="w-full"
+              aria-label="Main model"
+              @update:model-value="mainModel = $event"
             />
-            <div class="relative">
-              <select
-                v-model="mainModel"
-                class="w-full appearance-none rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 pr-9 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
-              >
-                <option v-for="item in mainOptions" :key="item.id" :value="item.id">{{ item.display_name }}</option>
-              </select>
-              <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M6 8l4 4 4-4" />
-              </svg>
-            </div>
           </div>
 
           <div class="space-y-2">
@@ -99,23 +93,17 @@
               Lite model
               <span class="normal-case tracking-normal font-normal text-xs text-[var(--color-text-muted)]">for quick tasks</span>
             </label>
-            <input
-              v-model="liteSearch"
-              type="text"
-              class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
-              placeholder="Search model"
+            <HeaderDropdown
+              :model-value="liteModel"
+              :options="liteOptions"
+              :searchable="true"
+              :max-options-without-search="100"
+              search-placeholder="Search model"
+              placeholder="Select lite model"
+              max-width-class="w-full"
+              aria-label="Lite model"
+              @update:model-value="liteModel = $event"
             />
-            <div class="relative">
-              <select
-                v-model="liteModel"
-                class="w-full appearance-none rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 pr-9 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
-              >
-                <option v-for="item in liteOptions" :key="item.id" :value="item.id">{{ item.display_name }}</option>
-              </select>
-              <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M6 8l4 4 4-4" />
-              </svg>
-            </div>
           </div>
         </div>
 
@@ -175,6 +163,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useLLMConfig } from '../../../composables/useLLMConfig'
 import { useAppStore } from '../../../stores/appStore'
 import { toast } from '../../../composables/useToast'
+import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 
 const emit = defineEmits(['close-request'])
 
@@ -208,8 +197,6 @@ const {
 } = llm
 
 const showKey = ref(false)
-const mainSearch = ref('')
-const liteSearch = ref('')
 
 const providerOptions = [
   {
@@ -234,23 +221,22 @@ const showVerifyOnSaveNote = computed(() => (
   !!String(apiKey.value || '').trim()
 ))
 
-const mainOptions = computed(() => buildModelOptions('main', mainSearch.value, mainModel.value))
-const liteOptions = computed(() => buildModelOptions('lite', liteSearch.value, liteModel.value))
+const mainOptions = computed(() => buildModelOptions('main', mainModel.value))
+const liteOptions = computed(() => buildModelOptions('lite', liteModel.value))
 
 onMounted(async () => {
   await loadPreferences(provider.value, false)
 })
 
-function buildModelOptions(type, query, selectedId) {
+function buildModelOptions(type, selectedId) {
   const isMain = type === 'main'
   const ids = isMain ? mainModels.value : liteModels.value
-  const normalizedQuery = String(query || '').trim().toLowerCase()
 
   let options = ids.map((id) => {
     const meta = getModelMeta(provider.value, id)
     return {
-      id,
-      display_name: meta?.display_name || id,
+      value: id,
+      label: meta?.display_name || id,
       tags: Array.isArray(meta?.tags) ? meta.tags : ['recommended'],
     }
   })
@@ -259,15 +245,11 @@ function buildModelOptions(type, query, selectedId) {
     options = options.filter((item) => item.tags.includes('recommended'))
   }
 
-  if (normalizedQuery) {
-    options = options.filter((item) => item.display_name.toLowerCase().includes(normalizedQuery))
-  }
-
-  if (selectedId && !options.some((item) => item.id === selectedId)) {
+  if (selectedId && !options.some((item) => item.value === selectedId)) {
     const meta = getModelMeta(provider.value, selectedId)
     options.unshift({
-      id: selectedId,
-      display_name: meta?.display_name || selectedId,
+      value: selectedId,
+      label: meta?.display_name || selectedId,
       tags: Array.isArray(meta?.tags) ? meta.tags : ['recommended'],
     })
   }

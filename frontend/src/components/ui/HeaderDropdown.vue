@@ -179,6 +179,10 @@ const props = defineProps({
   noResultsLabel: {
     type: String,
     default: 'No results found'
+  },
+  maxOptionsWithoutSearch: {
+    type: Number,
+    default: 0
   }
 })
 
@@ -202,7 +206,13 @@ const normalizedSearchQuery = computed(() => String(searchQuery.value || '').tri
 const filteredOptions = computed(() => {
   const options = Array.isArray(props.options) ? props.options : []
   const query = normalizedSearchQuery.value
-  if (!query) return options
+  if (!query) {
+    const maxCount = Number(props.maxOptionsWithoutSearch || 0)
+    if (maxCount > 0) {
+      return options.slice(0, maxCount)
+    }
+    return options
+  }
   return options.filter((option) => optionMatchesSearch(option, query))
 })
 const groupedFilteredOptions = computed(() => {

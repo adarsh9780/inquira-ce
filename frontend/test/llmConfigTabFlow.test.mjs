@@ -47,8 +47,19 @@ test('LLM settings tab renders flat sections and a single save action', () => {
   assert.equal(source.includes('@click="openPanel'), false)
   assert.equal(source.includes('v-for="card in providerCards"'), false)
   assert.equal(source.includes('@change="handleProviderSelect($event.target.value)"'), true)
+  assert.equal(source.includes('<HeaderDropdown'), true)
+  assert.equal(source.includes('max-options-without-search="100"'), true)
+  assert.equal(source.includes('v-model="mainSearch"'), false)
+  assert.equal(source.includes('v-model="liteSearch"'), false)
 
   assert.equal(source.includes('async function handleProviderSelect(nextProvider)'), true)
   assert.equal(source.includes('async function refreshModelList()'), true)
   assert.equal(source.includes('async function saveConfiguration()'), true)
+})
+
+test('HeaderDropdown supports limiting default visible options before search', () => {
+  const source = read('src/components/ui/HeaderDropdown.vue')
+
+  assert.equal(source.includes('maxOptionsWithoutSearch'), true)
+  assert.equal(source.includes('return options.slice(0, maxCount)'), true)
 })
