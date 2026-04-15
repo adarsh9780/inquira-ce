@@ -25,23 +25,23 @@ test('workspace creation activates the new workspace centrally in the store', ()
   assert.equal(createBlock.includes('await fetchWorkspaces()'), true)
 })
 
-test('workspace flow supports settings-driven initial step handoff and dataset-management mode', () => {
+test('workspace flow routes through settings panels and workspace list/detail/create modes', () => {
   const settingsPath = resolve(process.cwd(), 'src/components/modals/SettingsModal.vue')
   const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue')
-  const stepperPath = resolve(process.cwd(), 'src/components/modals/WorkspaceStepper.vue')
 
   const settingsSource = readFileSync(settingsPath, 'utf-8')
   const tabSource = readFileSync(tabPath, 'utf-8')
-  const stepperSource = readFileSync(stepperPath, 'utf-8')
 
-  assert.equal(settingsSource.includes('initialStep: {'), true)
-  assert.equal(settingsSource.includes(':initial-step="initialStep"'), true)
-  assert.equal(tabSource.includes('const normalizedInitialStep = computed(() => {'), true)
-  assert.equal(tabSource.includes('const isDatasetManagementMode = computed(() => normalizedInitialStep.value === 2)'), true)
-  assert.equal(stepperSource.includes('title="Refresh from source file"'), true)
-  assert.equal(stepperSource.includes('title="Remove dataset from workspace"'), true)
-  assert.equal(stepperSource.includes('Add another dataset'), true)
-  assert.equal(stepperSource.includes('Done'), true)
+  assert.equal(settingsSource.includes('openWorkspaceSection'), true)
+  assert.equal(settingsSource.includes("panelClass('ws-list')"), true)
+  assert.equal(settingsSource.includes("panelClass('ws-detail')"), true)
+  assert.equal(settingsSource.includes("panelClass('ws-create')"), true)
+  assert.equal(tabSource.includes("panelMode === 'ws-list'"), true)
+  assert.equal(tabSource.includes("panelMode === 'ws-detail'"), true)
+  assert.equal(tabSource.includes("@click=\"emit('navigate', 'ws-create', 'forward')\""), true)
+  assert.equal(tabSource.includes("@click=\"emit('navigate', 'ws-list', 'backward')\""), true)
+  assert.equal(tabSource.includes('title="Refresh dataset"'), true)
+  assert.equal(tabSource.includes('title="Remove dataset"'), true)
 })
 
 test('workspace launchers open settings modal at workspace step 1 instead of old create modal', () => {

@@ -4,6 +4,7 @@ import { apiService } from '../services/apiService'
 import { localStateService } from '../services/localStateService'
 import { useAuthStore } from './authStore'
 import { normalizePlotlyFigure } from '../utils/figurePayload'
+import { DEFAULT_THEME_ID, THEME_OPTIONS, normalizeThemeId } from '../constants/themes'
 
 export const useAppStore = defineStore('app', () => {
   const authStore = useAuthStore()
@@ -47,6 +48,8 @@ export const useAppStore = defineStore('app', () => {
   const schemaContext = ref('')
   const allowSchemaSampleValues = ref(false)
   const plotlyThemeMode = ref('soft')
+  const uiTheme = ref(DEFAULT_THEME_ID)
+  const availableThemes = THEME_OPTIONS.map((theme) => ({ ...theme }))
 
 
   // Single Python File per Session (simplified)
@@ -161,6 +164,7 @@ export const useAppStore = defineStore('app', () => {
         provider_lite_models: Array.isArray(providerLiteModels.value) ? [...providerLiteModels.value] : [],
       },
       ui: {
+        ui_theme: uiTheme.value,
         active_tab: activeTab.value || 'workspace',
         workspace_pane: workspacePane.value || 'code',
         data_pane: dataPane.value || 'table',
@@ -292,6 +296,9 @@ export const useAppStore = defineStore('app', () => {
     if (typeof ui.hide_shortcuts_modal === 'boolean') {
       hideShortcutsModal.value = ui.hide_shortcuts_modal
     }
+    if (typeof ui.ui_theme === 'string' && ui.ui_theme.trim()) {
+      uiTheme.value = normalizeThemeId(ui.ui_theme)
+    }
     if (typeof ui.table_row_count === 'number' && ui.table_row_count >= 0) {
       tableRowCount.value = Math.max(0, Math.floor(ui.table_row_count))
     }
@@ -403,6 +410,7 @@ export const useAppStore = defineStore('app', () => {
         allow_schema_sample_values: allowSchemaSampleValues.value,
         terminal_risk_acknowledged: terminalConsentGranted.value,
         chat_overlay_width: chatOverlayWidth.value,
+        ui_theme: uiTheme.value,
         is_sidebar_collapsed: isSidebarCollapsed.value,
         hide_shortcuts_modal: hideShortcutsModal.value,
         active_workspace_id: activeWorkspaceId.value || '',
@@ -635,6 +643,15 @@ export const useAppStore = defineStore('app', () => {
   function setAllowSchemaSampleValues(enabled) {
     allowSchemaSampleValues.value = !!enabled
     saveLocalConfig()
+  }
+
+  function setUiTheme(themeId, options = {}) {
+    const normalized = normalizeThemeId(themeId)
+    if (uiTheme.value === normalized) return
+    uiTheme.value = normalized
+    if (options?.persist !== false) {
+      saveLocalConfig()
+    }
   }
 
 
@@ -2064,6 +2081,9 @@ export const useAppStore = defineStore('app', () => {
       const normalizedPlotlyThemeMode = prefs.plotly_theme_mode.trim().toLowerCase()
       plotlyThemeMode.value = normalizedPlotlyThemeMode === 'hard' ? 'hard' : 'soft'
     }
+    if (typeof prefs?.ui_theme === 'string') {
+      uiTheme.value = normalizeThemeId(prefs.ui_theme)
+    }
     if (
       typeof prefs?.chat_overlay_width === 'number' &&
       prefs.chat_overlay_width > 0.1 &&
@@ -2136,6 +2156,8 @@ export const useAppStore = defineStore('app', () => {
     schemaContext,
     allowSchemaSampleValues,
     plotlyThemeMode,
+    uiTheme,
+    availableThemes,
     pythonFileContent,
     chatHistory,
     questionHistory,
@@ -2219,6 +2241,7 @@ export const useAppStore = defineStore('app', () => {
     setSelectedModel,
     setSchemaContext,
     setAllowSchemaSampleValues,
+    setUiTheme,
     setPythonFileContent,
     addChatMessage,
     addQuestionHistoryEntry,

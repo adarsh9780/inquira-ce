@@ -79,6 +79,103 @@
   --font-mono: "Ubuntu Mono", monospace;
 }
 
+/* Theme presets: switch by setting `data-theme` on <html>. */
+:root,
+:root[data-theme="warm"],
+[data-theme="warm"] {
+  color-scheme: light;
+  --color-shell-backdrop: #F5F4EF;
+  --color-sidebar-surface: #EFEDE8;
+  --color-workspace-surface: #FAF9F6;
+  --color-base: #FAF9F6;
+  --color-surface: #F5F4EF;
+  --color-primary-900: #C96A2E;
+  --color-primary-800: #B85F28;
+  --color-secondary-accent: #5B7FD4;
+  --color-border: #E5E3DC;
+  --color-border-hover: #D7D3C8;
+  --color-text-main: #1A1F2E;
+  --color-text-muted: #6B7280;
+  --color-accent: #C96A2E;
+  --color-accent-hover: #B85F28;
+  --color-accent-text: #8B4C22;
+  --color-accent-soft: #F3E8DF;
+  --color-accent-border: #E6CCBA;
+  --color-success: #16A34A;
+  --color-error: #DC2626;
+  --color-warning: #D97706;
+  --color-info: #5B7FD4;
+  --color-chat-user-bubble: #F3E8DF;
+}
+
+:root[data-theme="evergreen"],
+[data-theme="evergreen"] {
+  color-scheme: light;
+  --color-shell-backdrop: #EEF5F1;
+  --color-sidebar-surface: #E2EEE7;
+  --color-workspace-surface: #F8FBF9;
+  --color-base: #F4F8F5;
+  --color-surface: #EAF3ED;
+  --color-primary-900: #1F7A5A;
+  --color-primary-800: #1A684C;
+  --color-secondary-accent: #2B6CB0;
+  --color-border: #C7D8CF;
+  --color-border-hover: #ADC4B7;
+  --color-text-main: #12302A;
+  --color-text-muted: #527068;
+  --color-accent: #1F7A5A;
+  --color-accent-hover: #1A684C;
+  --color-accent-text: #16533F;
+  --color-accent-soft: #D6EBE2;
+  --color-accent-border: #A6D0BF;
+  --color-success: #15803D;
+  --color-error: #B91C1C;
+  --color-warning: #B45309;
+  --color-info: #1D4ED8;
+  --color-chat-user-bubble: #DCEEE6;
+}
+
+:root[data-theme="midnight"],
+[data-theme="midnight"] {
+  color-scheme: dark;
+  --color-shell-backdrop: #111827;
+  --color-sidebar-surface: #0F172A;
+  --color-workspace-surface: #111827;
+  --color-base: #0F172A;
+  --color-surface: #111827;
+  --color-primary-900: #E38B57;
+  --color-primary-800: #CF7640;
+  --color-secondary-accent: #60A5FA;
+  --color-border: #273449;
+  --color-border-hover: #34445F;
+  --color-text-main: #E5EDF9;
+  --color-text-muted: #9FB0C7;
+  --color-accent: #E38B57;
+  --color-accent-hover: #CF7640;
+  --color-accent-text: #FFD8BF;
+  --color-accent-soft: #352920;
+  --color-accent-border: #654739;
+  --color-success: #4ADE80;
+  --color-error: #F87171;
+  --color-warning: #FBBF24;
+  --color-info: #60A5FA;
+  --color-chat-user-bubble: #2D2420;
+}
+
+:root,
+[data-theme] {
+  --color-text-sub: var(--color-text-muted);
+  --color-base-soft: var(--color-surface);
+  --color-base-muted: color-mix(in srgb, var(--color-base) 72%, var(--color-border) 28%);
+  --color-surface-subtle: color-mix(in srgb, var(--color-surface) 78%, var(--color-base) 22%);
+  --color-border-strong: var(--color-border-hover);
+  --color-danger: var(--color-error);
+  --color-success-bg: color-mix(in srgb, var(--color-success) 14%, var(--color-base));
+  --color-danger-bg: color-mix(in srgb, var(--color-danger) 12%, var(--color-base));
+  --color-warning-bg: color-mix(in srgb, var(--color-warning) 14%, var(--color-base));
+  --color-info-bg: color-mix(in srgb, var(--color-info) 12%, var(--color-base));
+}
+
 /* Global styles */
 * {
   box-sizing: border-box;

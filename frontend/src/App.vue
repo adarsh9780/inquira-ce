@@ -134,7 +134,9 @@ import { settingsWebSocket } from './services/websocketService'
 import { previewService } from './services/previewService'
 import { walkthroughService } from './services/walkthroughService'
 import { apiService } from './services/apiService'
+import { themeService } from './services/themeService'
 import { toast } from './composables/useToast'
+import { normalizeThemeId } from './constants/themes'
 import logo from './assets/favicon.svg'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
@@ -167,6 +169,8 @@ const startupFailure = ref('')
 const startupTimeline = ref([])
 const desktopStartupTimeline = ref([])
 const startupClock = ref(Date.now())
+const hasLoadedThemePreference = ref(false)
+const applyingThemePreference = ref(false)
 let startupClockTimer = null
 const isE2EMode = import.meta.env.VITE_E2E === '1'
 
@@ -368,6 +372,12 @@ const progressPercent = computed(() => {
   return Math.round((completed / total) * 100)
 })
 
+function applyDocumentTheme(themeId) {
+  if (typeof document === 'undefined') return
+  const normalized = normalizeThemeId(themeId)
+  document.documentElement.setAttribute('data-theme', normalized)
+}
+
 function toggleSidebarVisibility() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
 }
@@ -556,7 +566,32 @@ function handleAuthClose() {
   console.debug('Auth modal closed without authentication')
 }
 
+watch(
+  () => appStore.uiTheme,
+  (themeId) => {
+    const normalized = normalizeThemeId(themeId)
+    applyDocumentTheme(normalized)
+    if (!hasLoadedThemePreference.value || applyingThemePreference.value) return
+    void themeService.saveThemePreference(normalized)
+  },
+  { immediate: true },
+)
+
 onMounted(async () => {
+  if (typeof window !== 'undefined') {
+    applyingThemePreference.value = true
+    try {
+      const storedTheme = await themeService.loadThemePreference()
+      appStore.setUiTheme(storedTheme, { persist: false })
+      applyDocumentTheme(storedTheme)
+    } finally {
+      applyingThemePreference.value = false
+      hasLoadedThemePreference.value = true
+    }
+  } else {
+    hasLoadedThemePreference.value = true
+  }
+
   startupClockTimer = window.setInterval(() => {
     startupClock.value = Date.now()
   }, 1000)
