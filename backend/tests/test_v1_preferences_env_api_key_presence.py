@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from app.v1.api.preferences import _to_response
 
 
-def test_preferences_response_treats_openrouter_env_key_as_present(monkeypatch):
+def test_preferences_response_uses_user_keychain_presence_only(monkeypatch):
     prefs = SimpleNamespace(
         llm_provider="openrouter",
         selected_model="openrouter/free",
@@ -40,6 +40,6 @@ def test_preferences_response_treats_openrouter_env_key_as_present(monkeypatch):
         },
     )
 
-    assert response.api_key_present is True
-    assert response.selected_provider_api_key_present is True
-    assert response.api_key_present_by_provider["openrouter"] is True
+    assert response.api_key_present is False
+    assert response.selected_provider_api_key_present is False
+    assert response.api_key_present_by_provider["openrouter"] is False

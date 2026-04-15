@@ -246,6 +246,19 @@ function clearSensitiveState() {
   clearTransientMessages()
 }
 
+function resetForAuthBoundary() {
+  provider.value = null
+  mainModels.value = []
+  liteModels.value = []
+  mainModel.value = null
+  liteModel.value = null
+  providerCatalogs.value = {}
+  apiKeyPresenceByProvider.value = {}
+  selectedProviderApiKeyPresent.value = false
+  modelMetaByProvider.value = {}
+  clearSensitiveState()
+}
+
 function setProvider(nextProvider) {
   const normalized = normalizeProvider(nextProvider)
   provider.value = normalized
@@ -536,6 +549,7 @@ export const useLLMConfig = () => {
     saveConfig,
     getModelMeta,
     clearSensitiveState,
+    resetForAuthBoundary,
     clearTransientMessages,
     applyProviderModelState,
   }

@@ -252,15 +252,17 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 import { useLLMConfig } from '../../../composables/useLLMConfig'
 import { useAppStore } from '../../../stores/appStore'
+import { useAuthStore } from '../../../stores/authStore'
 import { toast } from '../../../composables/useToast'
 
 const emit = defineEmits(['close-request'])
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const llm = useLLMConfig()
 
 const {
@@ -293,6 +295,7 @@ const {
   saveConfig,
   getModelMeta,
   clearTransientMessages,
+  resetForAuthBoundary,
 } = llm
 
 const showKey = ref(false)
@@ -312,8 +315,22 @@ const mainOptions = computed(() => buildModelOptions('main', mainModel.value))
 const liteOptions = computed(() => buildModelOptions('lite', liteModel.value))
 
 onMounted(async () => {
-  await loadPreferences(provider.value, false)
+  await loadPreferences(null, false)
 })
+
+watch(
+  () => authStore.userId,
+  async (newUserId, oldUserId) => {
+    if (!newUserId || newUserId === oldUserId) return
+    showKey.value = false
+    resetForAuthBoundary()
+    try {
+      await loadPreferences(null, false)
+    } catch (_error) {
+      toast.error('Provider Error', 'Could not load provider configuration.')
+    }
+  },
+)
 
 function buildModelOptions(type, selectedId) {
   const ids = type === 'main' ? mainModels.value : liteModels.value
