@@ -22,12 +22,12 @@
 
     <div v-if="currentStep === 1" class="space-y-4">
       <div>
-        <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Name it</label>
+        <label class="mb-1.5 block section-label">Name it</label>
         <input
           :value="wsName"
           type="text"
           placeholder="e.g. IPL 2024 analytics"
-          class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+          class="input-base"
           @input="emit('update:wsName', $event.target.value)"
         />
       </div>
@@ -35,7 +35,7 @@
       <div class="mt-5 flex justify-end gap-2 border-t border-[var(--color-border)] pt-4">
         <button
           type="button"
-          class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40"
+          class="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
           :disabled="!wsName.trim() || isApplyingDatasetAction"
           @click="emit('update:currentStep', 2)"
         >
@@ -65,7 +65,7 @@
             <div class="flex items-center gap-2">
               <button
                 type="button"
-                class="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white transition-all hover:brightness-90"
+                class="btn-primary px-3 py-1.5 text-xs"
                 :disabled="isApplyingDatasetAction"
                 @click="emit('confirm-remove-dataset', dataset)"
               >
@@ -73,7 +73,7 @@
               </button>
               <button
                 type="button"
-                class="rounded-lg border border-[var(--color-border-strong)] px-3 py-1.5 text-xs text-[var(--color-text-sub)] transition-all hover:bg-[var(--color-base-soft)]"
+                class="btn-secondary px-3 py-1.5 text-xs"
                 :disabled="isApplyingDatasetAction"
                 @click="emit('cancel-remove-dataset')"
               >
@@ -156,7 +156,7 @@
         <template v-if="isDatasetManagementMode">
           <button
             type="button"
-            class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40"
+            class="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
             :disabled="isApplyingDatasetAction"
             @click="emit('done')"
           >
@@ -167,7 +167,7 @@
         <template v-else>
           <button
             type="button"
-            class="rounded-lg border border-[var(--color-border-strong)] px-4 py-2 text-sm text-[var(--color-text-sub)] transition-all hover:bg-[var(--color-base-soft)] font-medium"
+            class="btn-secondary px-4 py-2 text-sm"
             :disabled="isApplyingDatasetAction"
             @click="emit('update:currentStep', 1)"
           >
@@ -175,7 +175,7 @@
           </button>
           <button
             type="button"
-            class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40"
+            class="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
             :disabled="!fileSelected || isApplyingDatasetAction"
             @click="emit('update:currentStep', 3)"
           >
@@ -187,7 +187,7 @@
 
     <div v-else-if="currentStep === 3" class="space-y-4">
       <div>
-        <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">
+        <label class="mb-1.5 block section-label">
           Data context
           <span class="ml-1 rounded-full bg-[var(--color-base-muted)] px-2 py-0.5 text-[10px] normal-case tracking-normal text-[var(--color-text-muted)]">Optional</span>
         </label>
@@ -195,7 +195,7 @@
           v-model="dataContext"
           rows="4"
           placeholder="Add business context so analyses are more accurate."
-          class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+          class="input-base"
         ></textarea>
       </div>
 
@@ -215,14 +215,14 @@
       <div class="mt-5 flex justify-end gap-2 border-t border-[var(--color-border)] pt-4">
         <button
           type="button"
-          class="rounded-lg border border-[var(--color-border-strong)] px-4 py-2 text-sm text-[var(--color-text-sub)] transition-all hover:bg-[var(--color-base-soft)] font-medium"
+          class="btn-secondary px-4 py-2 text-sm"
           @click="emit('update:currentStep', 2)"
         >
           Back
         </button>
         <button
           type="button"
-          class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-90"
+          class="btn-primary px-4 py-2 text-sm"
           @click="emit('trigger-save')"
         >
           Create workspace

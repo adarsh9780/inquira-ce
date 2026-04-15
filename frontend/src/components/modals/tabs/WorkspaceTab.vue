@@ -51,7 +51,7 @@
         <p class="mb-4 text-sm text-[var(--color-text-sub)]">No workspaces yet</p>
         <button
           type="button"
-          class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-90"
+          class="btn-primary px-4 py-2 text-sm"
           @click="emit('navigate', 'ws-create', 'forward')"
         >
           Create your first workspace
@@ -109,7 +109,7 @@
         <button
           v-else
           type="button"
-          class="rounded-md bg-[var(--color-accent)] px-2.5 py-1 text-xs font-medium text-white transition-all hover:brightness-90"
+          class="btn-primary px-2.5 py-1 text-xs"
           @click="openCurrentWorkspace"
         >
           Open workspace
@@ -218,19 +218,19 @@
       <div class="mt-6 border-t border-[var(--color-border)] pt-4">
         <div class="flex items-center justify-between">
           <p class="text-xs text-[var(--color-text-muted)]">Danger zone</p>
-          <button
-            type="button"
-            class="rounded border border-[var(--color-danger)] px-3 py-1 text-xs text-[var(--color-danger)] transition-colors hover:bg-red-50"
-            @click="showDeleteConfirm = !showDeleteConfirm"
-          >
-            Delete workspace
-          </button>
-        </div>
-        <div v-if="showDeleteConfirm" class="mt-3 flex items-center justify-end gap-2 rounded-lg bg-[var(--color-base-soft)] px-3 py-2">
-          <span class="mr-auto text-xs text-[var(--color-text-muted)]">Delete this workspace and all its datasets?</span>
-          <button type="button" class="rounded border border-[var(--color-border-strong)] px-2.5 py-1 text-xs text-[var(--color-text-sub)]" @click="showDeleteConfirm = false">Cancel</button>
-          <button type="button" class="rounded bg-[var(--color-danger)] px-2.5 py-1 text-xs font-medium text-white" @click="deleteWorkspace">Delete</button>
-        </div>
+        <button
+          type="button"
+          class="btn-danger px-3 py-1 text-xs"
+          @click="showDeleteConfirm = !showDeleteConfirm"
+        >
+          Delete workspace
+        </button>
+      </div>
+      <div v-if="showDeleteConfirm" class="mt-3 flex items-center justify-end gap-2 rounded-lg bg-[var(--color-base-soft)] px-3 py-2">
+        <span class="mr-auto text-xs text-[var(--color-text-muted)]">Delete this workspace and all its datasets?</span>
+        <button type="button" class="btn-secondary px-2.5 py-1 text-xs" @click="showDeleteConfirm = false">Cancel</button>
+        <button type="button" class="btn-danger px-2.5 py-1 text-xs" @click="deleteWorkspace">Delete</button>
+      </div>
       </div>
     </div>
 
@@ -258,7 +258,7 @@
         <input
           v-model="newWorkspaceName"
           type="text"
-          class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+          class="input-base"
           placeholder="e.g. Sales analysis"
         />
       </label>
@@ -283,7 +283,7 @@
         <textarea
           v-model="newWorkspaceContext"
           rows="4"
-          class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+          class="input-base"
           placeholder="Add context to guide schema generation..."
         ></textarea>
       </label>
@@ -291,7 +291,7 @@
       <div class="flex justify-end pt-3">
         <button
           type="button"
-          class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-60"
+          class="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="isCreatingWorkspace"
           @click="createWorkspace"
         >

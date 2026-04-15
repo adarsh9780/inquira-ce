@@ -2,7 +2,7 @@
   <!-- Modal Overlay -->
   <div
     v-if="isOpen"
-    class="fixed inset-0 z-[60] overflow-y-auto"
+    class="fixed inset-0 layer-modal overflow-y-auto"
     aria-labelledby="modal-title"
     role="dialog"
     aria-modal="true"
@@ -16,7 +16,7 @@
     <!-- Modal container -->
     <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
       <div
-        class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-md"
+        class="modal-card relative w-full max-w-md text-left sm:my-8"
         @click.stop
       >
         <!-- Modal Header -->
@@ -43,6 +43,7 @@
 </template>
 
 <script setup>
+import { onMounted, onUnmounted } from 'vue'
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -78,11 +79,18 @@ function confirmAction() {
   emit('confirm')
 }
 
-// Close modal on Escape key
-document.addEventListener('keydown', (e) => {
+function handleEscape(e) {
   if (e.key === 'Escape' && props.isOpen) {
     closeModal()
   }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleEscape)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleEscape)
 })
 </script>
 

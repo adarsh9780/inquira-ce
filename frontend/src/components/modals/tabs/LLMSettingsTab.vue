@@ -5,7 +5,7 @@
 
       <div class="space-y-5">
         <div class="space-y-2">
-          <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Provider</label>
+          <label class="mb-1.5 block section-label">Provider</label>
           <HeaderDropdown
             :model-value="provider"
             :options="providerOptions"
@@ -21,7 +21,7 @@
         <div class="border-t border-[var(--color-border)]"></div>
 
         <div class="space-y-3">
-          <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">
+          <label class="mb-1.5 block section-label">
             {{ provider === 'ollama' ? 'Ollama base URL' : apiKeyLabel }}
           </label>
 
@@ -29,7 +29,7 @@
             <input
               v-model="ollamaBaseUrl"
               type="text"
-              class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+              class="input-base"
               placeholder="http://localhost:11434"
             />
           </div>
@@ -39,7 +39,7 @@
               <input
                 :value="apiKey"
                 :type="showKey ? 'text' : 'password'"
-                class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 pr-10 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+                class="input-base pr-10"
                 :placeholder="apiKeyPlaceholder"
                 @input="setApiKey($event.target.value)"
               />
@@ -65,7 +65,7 @@
             <div class="flex items-center gap-2">
               <button
                 type="button"
-                class="rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-xs font-medium text-[var(--color-text-main)] transition-all hover:bg-[var(--color-base)] disabled:cursor-not-allowed disabled:opacity-60"
+                class="btn-secondary px-3 py-2 text-xs"
                 :disabled="verifyLoading || saveLoading"
                 @click="handleVerifyAndSaveKey"
               >
@@ -89,7 +89,7 @@
         <div class="space-y-3">
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-2">
-              <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Main model</label>
+              <label class="mb-1.5 block section-label">Main model</label>
               <HeaderDropdown
                 :model-value="mainModel"
                 :options="mainOptions"
@@ -104,7 +104,7 @@
             </div>
 
             <div class="space-y-2">
-              <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">
+              <label class="mb-1.5 block section-label">
                 Lite model
                 <span class="normal-case tracking-normal font-normal text-xs text-[var(--color-text-muted)]">for quick tasks</span>
               </label>
@@ -131,7 +131,7 @@
 
             <button
               type="button"
-              class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--color-border-strong)] text-[var(--color-accent)] transition-all hover:bg-[var(--color-base)] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--color-border-strong)] text-[var(--color-accent)] transition-colors hover:bg-[var(--color-base)] disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="refreshLoading"
               :title="refreshModelListTooltip"
               :aria-label="refreshModelListTooltip"
@@ -170,7 +170,7 @@
                   type="number"
                   min="1"
                   step="1"
-                  class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+                  class="input-base"
                 />
               </label>
 
@@ -181,7 +181,7 @@
                   type="number"
                   min="0"
                   step="1"
-                  class="w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-3 py-2 text-sm text-[var(--color-text-main)] outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+                  class="input-base"
                 />
               </label>
 
@@ -230,14 +230,14 @@
     <div class="absolute inset-x-0 bottom-0 flex justify-end gap-2 border-t border-[var(--color-border)] bg-[var(--color-base)] px-1 pt-4">
       <button
         type="button"
-        class="rounded-lg border border-[var(--color-border-strong)] px-4 py-2 text-sm text-[var(--color-text-sub)] transition-all hover:bg-[var(--color-base-soft)]"
+        class="btn-secondary px-4 py-2 text-sm"
         @click="emit('close-request')"
       >
         Cancel
       </button>
       <button
         type="button"
-        class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-60"
+        class="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
         :disabled="saveLoading"
         @click="saveConfiguration"
       >

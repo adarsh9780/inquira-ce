@@ -7,16 +7,16 @@
   >
     <div
       v-if="modelValue"
-      class="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4"
-      @click="closeModal"
+      class="fixed inset-0 layer-modal flex items-center justify-center p-4"
     >
+      <div class="modal-overlay" @click="closeModal"></div>
       <div
-        class="relative h-[680px] w-full max-w-[900px] overflow-hidden rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-base)] text-[var(--color-text-main)] shadow-2xl"
+        class="modal-card relative h-[680px] w-full max-w-[900px] text-[var(--color-text-main)]"
         @click.stop
       >
         <button
           type="button"
-          class="absolute right-3 top-3 z-20 rounded-md p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-base-soft)] hover:text-[var(--color-text-main)]"
+          class="btn-icon absolute right-3 top-3 z-20"
           aria-label="Close settings"
           @click="closeModal"
         >
@@ -31,7 +31,7 @@
 
             <button
               type="button"
-              class="mb-1 flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-sm transition-all"
+              class="mb-1"
               :class="activeSection === 'llm' ? activeNavClass : inactiveNavClass"
               @click="openLeafSection('llm')"
             >
@@ -40,7 +40,7 @@
 
             <button
               type="button"
-              class="mb-1 flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-sm transition-all"
+              class="mb-1"
               :class="activeSection === 'workspace' ? activeNavClass : inactiveNavClass"
               @click="openWorkspaceSection"
             >
@@ -49,7 +49,7 @@
 
             <button
               type="button"
-              class="mb-1 flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-sm transition-all"
+              class="mb-1"
               :class="activeSection === 'account' ? activeNavClass : inactiveNavClass"
               @click="openLeafSection('account')"
             >
@@ -131,8 +131,8 @@ const activeWorkspaceId = ref('')
 const currentPanel = ref('llm')
 const panelDirection = ref('forward')
 
-const activeNavClass = 'bg-[var(--color-accent-soft)] text-[var(--color-accent)] font-medium'
-const inactiveNavClass = 'text-[var(--color-text-main)] hover:bg-[var(--color-base)]'
+const activeNavClass = 'nav-tab-active'
+const inactiveNavClass = 'nav-tab'
 
 const workspaceItems = computed(() => {
   const items = Array.isArray(appStore.workspaces) ? appStore.workspaces : []
@@ -230,16 +230,3 @@ function closeModal() {
   emit('update:modelValue', false)
 }
 </script>
-
-<style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap');
-
-:global(body),
-:global(button),
-:global(input),
-:global(select),
-:global(textarea) {
-  font-family: 'Ubuntu', sans-serif;
-  font-weight: 400;
-}
-</style>

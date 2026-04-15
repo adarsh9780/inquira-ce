@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="isOpen"
-    class="fixed inset-0 z-[70] overflow-y-auto"
+    class="fixed inset-0 layer-modal overflow-y-auto"
     role="dialog"
     aria-modal="true"
   >
@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-import { nextTick, ref, watch } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 const props = defineProps({
   isOpen: {
@@ -85,9 +85,17 @@ watch(
   }
 )
 
-document.addEventListener('keydown', (event) => {
+function handleEscape(event) {
   if (event.key === 'Escape' && props.isOpen) {
     closeModal()
   }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleEscape)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleEscape)
 })
 </script>

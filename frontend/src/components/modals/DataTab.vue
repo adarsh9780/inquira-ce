@@ -204,8 +204,8 @@
 
   <!-- Fullscreen Processing Overlay - Blocks all UI interaction -->
   <Teleport to="body">
-    <div v-if="isProcessing" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div class="bg-white rounded-xl shadow-2xl p-8 max-w-lg w-full mx-4">
+    <div v-if="isProcessing" class="layer-blocking fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div class="modal-card mx-4 w-full max-w-lg p-8">
         <!-- Header -->
         <div class="text-center mb-6">
           <div class="inline-flex items-center justify-center w-16 h-16 bg-[var(--color-accent-soft)] rounded-full mb-4">
@@ -214,31 +214,31 @@
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
           </div>
-          <h3 class="text-lg font-semibold text-gray-900">Processing Data</h3>
-          <p class="text-sm text-gray-500 mt-1">{{ progressMessage }}</p>
+          <h3 class="text-lg font-semibold text-[var(--color-text-main)]">Processing Data</h3>
+          <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ progressMessage }}</p>
         </div>
 
         <!-- Progress Bar -->
         <div class="space-y-3">
-          <div class="w-full bg-gray-200 rounded-full h-2">
+          <div class="h-2 w-full rounded-full bg-[var(--color-border)]">
             <div 
               class="bg-[var(--color-accent)] h-2 rounded-full transition-all duration-300"
               :style="{ width: progressPercent + '%' }"
             ></div>
           </div>
-          <div class="flex justify-between text-sm text-gray-600">
+          <div class="flex justify-between text-sm text-[var(--color-text-muted)]">
             <span>{{ progressPercent }}%</span>
             <span>{{ formatElapsedTime(elapsedTime) }}</span>
           </div>
         </div>
 
         <!-- Warning -->
-        <div class="mt-6 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <div class="mt-6 rounded-lg border border-[var(--color-warning)]/30 bg-[var(--color-warning-bg)] p-3">
           <div class="flex items-start">
-            <ExclamationTriangleIcon class="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
+            <ExclamationTriangleIcon class="mr-2 mt-0.5 h-5 w-5 shrink-0 text-[var(--color-warning)]" />
             <div>
-              <p class="text-sm font-medium text-yellow-800">Do not close or refresh this page</p>
-              <p class="text-xs text-yellow-700 mt-1">Interrupting this process may corrupt your data and require reprocessing.</p>
+              <p class="text-sm font-medium text-[var(--color-warning)]">Do not close or refresh this page</p>
+              <p class="mt-1 text-xs text-[var(--color-warning)]">Interrupting this process may corrupt your data and require reprocessing.</p>
             </div>
           </div>
         </div>

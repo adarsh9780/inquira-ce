@@ -31,6 +31,16 @@
   /* Deep navy for primary text */
   --color-text-muted: #6B7280;
   /* Muted metadata tone */
+  --color-text-sub: var(--color-text-muted);
+  /* Secondary text alias used by older settings views */
+
+  --color-base-soft: var(--color-surface);
+  /* Soft panel/background alias used by form controls */
+  --color-base-muted: color-mix(in srgb, var(--color-base) 72%, var(--color-border) 28%);
+  /* Muted chips and inactive badges */
+  --color-surface-subtle: color-mix(in srgb, var(--color-surface) 78%, var(--color-base) 22%);
+  --color-border-strong: var(--color-border-hover);
+  /* Stronger border alias for high-contrast controls */
 
   --color-accent: #C96A2E;
   /* Burnt-orange accent for active states and CTAs */
@@ -43,12 +53,25 @@
   /* Status Colors */
   --color-success: #16A34A;
   /* Green 600 */
+  --color-success-bg: color-mix(in srgb, var(--color-success) 14%, var(--color-base));
   --color-error: #DC2626;
   /* Red 600 */
+  --color-danger: var(--color-error);
+  --color-danger-bg: color-mix(in srgb, var(--color-danger) 12%, var(--color-base));
   --color-warning: #D97706;
   /* Amber 600 */
+  --color-warning-bg: color-mix(in srgb, var(--color-warning) 14%, var(--color-base));
+  --color-info: var(--color-secondary-accent);
+  --color-info-bg: color-mix(in srgb, var(--color-info) 12%, var(--color-base));
   --color-chat-user-bubble: #F3E8DF;
   /* Accent-tinted user-turn bubble surface */
+
+  /* Layer scale */
+  --z-dropdown: 40;
+  --z-modal: 60;
+  --z-modal-dropdown: 65;
+  --z-toast: 70;
+  --z-blocking: 80;
 
   /* Typography */
   --font-ui: "Ubuntu", sans-serif;
@@ -137,7 +160,14 @@ body {
 
   /* Danger Button - For destructive actions */
   .btn-danger {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none bg-red-600 text-white shadow-sm border border-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none text-white shadow-sm border disabled:opacity-50 disabled:cursor-not-allowed;
+    background-color: var(--color-danger);
+    border-color: var(--color-danger);
+  }
+
+  .btn-danger:hover {
+    background-color: color-mix(in srgb, var(--color-danger) 88%, #000 12%);
+    border-color: color-mix(in srgb, var(--color-danger) 88%, #000 12%);
   }
 
   /* ============================================================
@@ -248,6 +278,27 @@ body {
 
   .status-dot-muted {
     background-color: var(--color-border-hover);
+  }
+
+  /* Layer utilities - keep overlays ordered across app */
+  .layer-dropdown {
+    z-index: var(--z-dropdown);
+  }
+
+  .layer-modal {
+    z-index: var(--z-modal);
+  }
+
+  .layer-modal-dropdown {
+    z-index: var(--z-modal-dropdown);
+  }
+
+  .layer-toast {
+    z-index: var(--z-toast);
+  }
+
+  .layer-blocking {
+    z-index: var(--z-blocking);
   }
 }
 

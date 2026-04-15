@@ -24,7 +24,7 @@
             <ListboxOptions
               v-if="open"
               ref="optionsRef"
-              class="fixed z-[90] overflow-auto rounded-md py-1 shadow-md focus:outline-none"
+              class="layer-modal-dropdown fixed overflow-auto rounded-md py-1 shadow-md focus:outline-none"
               :style="floatingOptionsStyle"
             >
               <div
