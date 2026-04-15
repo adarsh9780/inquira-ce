@@ -13,9 +13,9 @@ export const THEME_OPTIONS = [
   },
   {
     id: 'midnight',
-    label: 'Midnight',
-    description: 'High-contrast dark palette for low-light environments.',
-    preview: ['#0F172A', '#111827', '#E38B57']
+    label: 'Midnight Dark',
+    description: 'Deep slate dark palette with warm brand accent and softer glare.',
+    preview: ['#101722', '#151E2B', '#C96A2E']
   }
 ]
 

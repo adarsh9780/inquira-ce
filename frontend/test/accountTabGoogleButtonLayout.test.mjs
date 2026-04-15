@@ -28,7 +28,12 @@ test('settings account tab keeps Google auth controls and local-user fallback me
   assert.equal(source.includes('fill="#FBBC05"'), true)
   assert.equal(source.includes('fill="#EA4335"'), true)
 
-  assert.equal(source.includes('Theme'), false)
+  assert.equal(source.includes('Theme'), true)
+  assert.equal(source.includes('<HeaderDropdown'), true)
+  assert.equal(source.includes('appStore.uiTheme'), true)
+  assert.equal(source.includes('appStore.availableThemes'), true)
+  assert.equal(source.includes('@update:model-value="selectTheme"'), true)
+  assert.equal(source.includes('appStore.setUiTheme(themeId)'), true)
   assert.equal(source.includes('Default LLM provider'), false)
   assert.equal(source.includes('Local workspace data'), false)
   assert.equal(source.includes('Clear all conversation history'), false)

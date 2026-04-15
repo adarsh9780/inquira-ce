@@ -21,6 +21,21 @@
       </div>
     </div>
 
+    <div class="mb-5 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] p-4">
+      <label class="mb-1.5 block section-label">Theme</label>
+      <HeaderDropdown
+        :model-value="appStore.uiTheme"
+        :options="themeOptions"
+        placeholder="Select theme"
+        aria-label="UI theme"
+        max-width-class="w-full"
+        @update:model-value="selectTheme"
+      />
+      <p class="mt-2 text-xs text-[var(--color-text-muted)]">
+        Applies instantly across app surfaces. Midnight keeps the brand accent while reducing glare.
+      </p>
+    </div>
+
     <div class="space-y-4">
       <template v-if="authStore.isGuest">
         <button
@@ -75,9 +90,12 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import HeaderDropdown from '../../ui/HeaderDropdown.vue'
+import { useAppStore } from '../../../stores/appStore'
 import { useAuthStore } from '../../../stores/authStore'
 import { toast } from '../../../composables/useToast'
 
+const appStore = useAppStore()
 const authStore = useAuthStore()
 
 const isSigningIn = computed(() => authStore.pendingAuthAction === 'google' && authStore.isLoading)
@@ -88,6 +106,13 @@ const isGoogleLinked = computed(() => {
 })
 const displayName = computed(() => String(authStore.username || 'Local User').trim() || 'Local User')
 const displayEmail = computed(() => String(authStore.user?.email || '').trim())
+const themeOptions = computed(() => {
+  const options = Array.isArray(appStore.availableThemes) ? appStore.availableThemes : []
+  return options.map((theme) => ({
+    value: theme.id,
+    label: theme.label,
+  }))
+})
 
 const initials = computed(() => {
   const parts = String(displayName.value || '').trim().split(/\s+/).filter(Boolean)
@@ -124,5 +149,9 @@ async function signOutGoogle() {
   } finally {
     isSigningOut.value = false
   }
+}
+
+function selectTheme(themeId) {
+  appStore.setUiTheme(themeId)
 }
 </script>
