@@ -6,6 +6,10 @@ function storageKey() {
   return 'inquira-ce-auth'
 }
 
+function isTauriDesktop() {
+  return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
+}
+
 export async function getSupabaseClient(config) {
   if (!config?.configured || !config?.supabase_url || !config?.publishable_key) {
     return null
@@ -17,6 +21,7 @@ export async function getSupabaseClient(config) {
           autoRefreshToken: true,
           persistSession: true,
           detectSessionInUrl: false,
+          flowType: isTauriDesktop() ? 'pkce' : 'implicit',
           storageKey: storageKey(),
         },
       }),
