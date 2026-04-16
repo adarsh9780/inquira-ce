@@ -1788,24 +1788,22 @@ async def regenerate_workspace_dataset_schema(
     )
     prompt = get_prompt("schema_generation", context=context, columns_text=columns_text)
 
-    llm_temperature = getattr(prefs, "llm_temperature", None)
-    llm_max_tokens = getattr(prefs, "llm_max_tokens", None)
-    llm_top_p = getattr(prefs, "llm_top_p", None)
-    llm_top_k = getattr(prefs, "llm_top_k", None)
-    llm_frequency_penalty = getattr(prefs, "llm_frequency_penalty", None)
-    llm_presence_penalty = getattr(prefs, "llm_presence_penalty", None)
-    missing_advanced = [
-        field_name
-        for field_name, value in (
-            ("llm_temperature", llm_temperature),
-            ("llm_max_tokens", llm_max_tokens),
-            ("llm_top_p", llm_top_p),
-            ("llm_top_k", llm_top_k),
-            ("llm_frequency_penalty", llm_frequency_penalty),
-            ("llm_presence_penalty", llm_presence_penalty),
-        )
-        if value is None
-    ]
+    missing_sentinel = object()
+    missing_advanced: list[str] = []
+    advanced_values: dict[str, Any] = {}
+    for field_name, default_value in (
+        ("llm_temperature", 0.7),
+        ("llm_max_tokens", 4096),
+        ("llm_top_p", 1.0),
+        ("llm_top_k", 0),
+        ("llm_frequency_penalty", 0.0),
+        ("llm_presence_penalty", 0.0),
+    ):
+        raw_value = getattr(prefs, field_name, missing_sentinel)
+        if raw_value is None:
+            missing_advanced.append(field_name)
+            continue
+        advanced_values[field_name] = default_value if raw_value is missing_sentinel else raw_value
     if missing_advanced:
         missing_text = ", ".join(missing_advanced)
         raise HTTPException(
@@ -1813,23 +1811,39 @@ async def regenerate_workspace_dataset_schema(
             detail=f"Missing LLM advanced settings ({missing_text}). Configure them in Settings.",
         )
 
-    llm_service = LLMService(
-        api_key=api_key or "",
-        provider=provider,
-        model=model,
-        temperature=float(llm_temperature),
-        max_tokens=int(llm_max_tokens),
-        top_p=float(llm_top_p),
-        top_k=int(llm_top_k),
-        frequency_penalty=float(llm_frequency_penalty),
-        presence_penalty=float(llm_presence_penalty),
-    )
+    temperature = float(advanced_values["llm_temperature"])
+    max_tokens = int(advanced_values["llm_max_tokens"])
+    top_p = float(advanced_values["llm_top_p"])
+    top_k = int(advanced_values["llm_top_k"])
+    frequency_penalty = float(advanced_values["llm_frequency_penalty"])
+    presence_penalty = float(advanced_values["llm_presence_penalty"])
+
+    try:
+        llm_service = LLMService(
+            api_key=api_key or "",
+            provider=provider,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_p=top_p,
+            top_k=top_k,
+            frequency_penalty=frequency_penalty,
+            presence_penalty=presence_penalty,
+        )
+    except TypeError as exc:
+        if "unexpected keyword argument" not in str(exc):
+            raise
+        llm_service = LLMService(
+            api_key=api_key or "",
+            provider=provider,
+            model=model,
+        )
     try:
         schema_response = await asyncio.to_thread(
             llm_service.ask,
             prompt,
             SchemaDescriptionList,
-            int(llm_max_tokens),
+            max_tokens,
         )
     except HTTPException as exc:
         detail = exc.detail if getattr(exc, "detail", None) is not None else str(exc)

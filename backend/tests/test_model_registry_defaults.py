@@ -1,6 +1,7 @@
 from app.services.model_registry import (
     clear_model_registry_cache,
     load_bundled_model_registry,
+    merge_refreshed_model_metadata,
     provider_catalog_from_registry,
 )
 
@@ -26,3 +27,18 @@ def test_provider_catalog_from_registry_builds_main_and_lite_defaults():
     assert "gpt-4.1-mini" in openai_catalog["lite_models"]
     assert openai_catalog["default_main_model"] == "gpt-4.1"
     assert openai_catalog["default_lite_model"] == "gpt-4.1-mini"
+
+
+def test_merge_refreshed_model_metadata_coerces_invalid_context_window_values():
+    merged = merge_refreshed_model_metadata(
+        provider="openrouter",
+        existing_entries=[
+            {"id": "openrouter/free", "context_window": None},
+            {"id": "openai/gpt-4.1-mini", "context_window": -10},
+        ],
+        refreshed_main_models=["openrouter/free"],
+        refreshed_lite_models=["openai/gpt-4.1-mini"],
+    )
+
+    assert merged[0]["context_window"] == 0
+    assert merged[1]["context_window"] == 0

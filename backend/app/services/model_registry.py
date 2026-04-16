@@ -129,12 +129,14 @@ def merge_refreshed_model_metadata(
 ) -> list[dict[str, Any]]:
     normalized_provider = _normalize_provider(provider)
 
-    existing = [
-        _normalize_model_entry(item)
-        for item in (existing_entries or [])
-        if isinstance(item, dict)
-    ]
-    existing = [item for item in existing if item is not None]
+    existing: list[dict[str, Any]] = []
+    for item in existing_entries or []:
+        if not isinstance(item, dict):
+            continue
+        normalized_item = _normalize_model_entry(item)
+        if normalized_item is None:
+            continue
+        existing.append(normalized_item)
 
     existing_by_id = {
         str(item.get("id") or "").strip(): dict(item)
@@ -173,10 +175,10 @@ def merge_refreshed_model_metadata(
 
     merged: list[dict[str, Any]] = []
     for model_id in ordered_ids:
-        item = existing_by_id.get(model_id)
-        if not item:
+        entry = existing_by_id.get(model_id)
+        if not entry:
             continue
-        merged.append(dict(item))
+        merged.append(dict(entry))
 
     return merged
 
@@ -193,13 +195,7 @@ def _normalize_model_entry(raw: dict[str, Any]) -> dict[str, Any] | None:
 
     display_name = str(raw.get("display_name") or "").strip() or _display_name_from_model_id(model_id)
 
-    context_window_raw = raw.get("context_window")
-    try:
-        context_window = int(context_window_raw)
-    except Exception:  # noqa: BLE001
-        context_window = 0
-    if context_window < 0:
-        context_window = 0
+    context_window = _coerce_non_negative_int(raw.get("context_window"))
 
     recommended_for = _normalize_recommended_for(raw.get("recommended_for"))
     tags = _normalize_tags(raw.get("tags"))
@@ -212,6 +208,18 @@ def _normalize_model_entry(raw: dict[str, Any]) -> dict[str, Any] | None:
         "recommended_for": recommended_for,
         "tags": tags,
     }
+
+
+def _coerce_non_negative_int(raw: Any) -> int:
+    if raw is None:
+        return 0
+    try:
+        value = int(raw)
+    except Exception:  # noqa: BLE001
+        return 0
+    if value < 0:
+        return 0
+    return value
 
 
 def _clean_model_id_list(values: list[Any]) -> list[str]:

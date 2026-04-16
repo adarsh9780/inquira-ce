@@ -50,6 +50,18 @@ _RECOMMENDED_FOR_ALLOWED = {"main", "lite", "both"}
 _TAGS_ALLOWED = {"recommended", "extended"}
 
 
+def _coerce_non_negative_int(raw: Any) -> int:
+    if raw is None:
+        return 0
+    try:
+        value = int(raw)
+    except Exception:  # noqa: BLE001
+        return 0
+    if value < 0:
+        return 0
+    return value
+
+
 def _clean_models(raw: Any) -> list[str]:
     if not isinstance(raw, list):
         return []
@@ -121,13 +133,7 @@ def _clean_model_metadata_entries(
             continue
         seen.add(model_id)
 
-        context_window_raw = item.get("context_window")
-        try:
-            context_window = int(context_window_raw)
-        except Exception:  # noqa: BLE001
-            context_window = 0
-        if context_window < 0:
-            context_window = 0
+        context_window = _coerce_non_negative_int(item.get("context_window"))
 
         cleaned.append(
             {

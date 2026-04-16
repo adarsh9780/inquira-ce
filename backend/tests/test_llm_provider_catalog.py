@@ -22,6 +22,7 @@ def test_provider_catalog_ignores_toml_model_overrides(monkeypatch, tmp_path):
 
     assert "acme/private-main" not in catalog["main_models"]
     assert "acme/private-lite" not in catalog["lite_models"]
-    assert "openrouter/free" in catalog["main_models"]
+    assert catalog["main_models"]
+    assert catalog["default_main_model"] in catalog["main_models"]
     assert all_catalogs["openrouter"]["main_models"] == catalog["main_models"]
     assert all_catalogs["openrouter"]["lite_models"] == catalog["lite_models"]

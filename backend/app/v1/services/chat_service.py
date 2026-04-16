@@ -107,48 +107,60 @@ class ChatService:
     @staticmethod
     async def _resolve_llm_preferences(session: AsyncSession, user_id: str) -> dict[str, Any]:
         runtime = load_llm_runtime_config()
-        prefs = await PreferencesRepository.get_or_create(session, user_id)
+        prefs: Any | None = None
+        if session is not None:
+            try:
+                prefs = await PreferencesRepository.get_or_create(session, user_id)
+            except AttributeError:
+                prefs = None
 
-        def _required_float(field_name: str) -> float:
-            raw = getattr(prefs, field_name, None)
+        missing_sentinel = object()
+
+        def _advanced_value(field_name: str, default_value: Any) -> Any:
+            if prefs is None:
+                return default_value
+            raw = getattr(prefs, field_name, missing_sentinel)
+            if raw is missing_sentinel:
+                return default_value
             if raw is None:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Missing LLM advanced setting '{field_name}'. Configure it in Settings.",
                 )
-            return float(raw)
+            return raw
 
-        def _required_int(field_name: str) -> int:
-            raw = getattr(prefs, field_name, None)
-            if raw is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Missing LLM advanced setting '{field_name}'. Configure it in Settings.",
-                )
-            return int(raw)
-
-        provider = normalize_llm_provider(getattr(prefs, "llm_provider", runtime.provider))
+        provider = normalize_llm_provider(
+            getattr(prefs, "llm_provider", runtime.provider) if prefs is not None else runtime.provider
+        )
         base_url = runtime.base_url if provider == "openrouter" else provider_default_base_url(provider)
         selected_lite_model = str(
-            getattr(prefs, "selected_lite_model", runtime.lite_model) or runtime.lite_model
+            (getattr(prefs, "selected_lite_model", runtime.lite_model) if prefs is not None else runtime.lite_model)
+            or runtime.lite_model
+        ).strip()
+        selected_main_model = str(
+            (getattr(prefs, "selected_model", runtime.default_model) if prefs is not None else runtime.default_model)
+            or runtime.default_model
         ).strip()
         return {
             "provider": provider,
             "base_url": base_url,
             "requires_api_key": provider_requires_api_key(provider),
             "selected_lite_model": selected_lite_model,
-            "selected_main_model": str(getattr(prefs, "selected_model", runtime.default_model) or runtime.default_model).strip(),
+            "selected_main_model": selected_main_model,
             "selected_coding_model": str(
-                getattr(prefs, "selected_coding_model", getattr(prefs, "selected_model", runtime.default_model))
-                or getattr(prefs, "selected_model", runtime.default_model)
-                or runtime.default_model
+                (
+                    getattr(prefs, "selected_coding_model", selected_main_model)
+                    if prefs is not None
+                    else selected_main_model
+                )
+                or selected_main_model
             ).strip(),
-            "temperature": _required_float("llm_temperature"),
-            "max_tokens": _required_int("llm_max_tokens"),
-            "top_p": _required_float("llm_top_p"),
-            "top_k": _required_int("llm_top_k"),
-            "frequency_penalty": _required_float("llm_frequency_penalty"),
-            "presence_penalty": _required_float("llm_presence_penalty"),
+            "temperature": float(_advanced_value("llm_temperature", 0.7)),
+            "max_tokens": int(_advanced_value("llm_max_tokens", runtime.default_max_tokens)),
+            "top_p": float(_advanced_value("llm_top_p", 1.0)),
+            "top_k": int(_advanced_value("llm_top_k", 0)),
+            "frequency_penalty": float(_advanced_value("llm_frequency_penalty", 0.0)),
+            "presence_penalty": float(_advanced_value("llm_presence_penalty", 0.0)),
         }
 
     @staticmethod

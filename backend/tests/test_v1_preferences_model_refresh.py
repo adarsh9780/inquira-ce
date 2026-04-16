@@ -7,7 +7,12 @@ import pytest
 import httpx
 
 from app.services.provider_model_refresh import ProviderRefreshResult, refresh_provider_model_catalog
-from app.v1.api.preferences import refresh_provider_models, set_api_key, verify_api_key
+from app.v1.api.preferences import (
+    _coerce_provider_catalog,
+    refresh_provider_models,
+    set_api_key,
+    verify_api_key,
+)
 from app.v1.schemas.preferences import ApiKeyUpdateRequest, ApiKeyVerifyRequest, ProviderModelsRefreshRequest
 
 
@@ -262,6 +267,36 @@ async def test_set_api_key_endpoint_persists_models_and_advanced_settings(monkey
     assert prefs.llm_presence_penalty == 0.2
     assert captured_secret_write == {"key": "sk-test", "provider": "openrouter"}
     assert "Configuration and API key" in response.message
+
+
+def test_coerce_provider_catalog_coerces_invalid_context_window_values():
+    fallback = {
+        "main_models": ["openrouter/free"],
+        "lite_models": ["openrouter/free"],
+        "default_main_model": "openrouter/free",
+        "default_lite_model": "openrouter/free",
+        "source": "bundled",
+        "models": [],
+    }
+
+    catalog = _coerce_provider_catalog(
+        "openrouter",
+        {
+            "main_models": ["openrouter/free", "openrouter/fast"],
+            "lite_models": ["openrouter/free"],
+            "default_main_model": "openrouter/free",
+            "default_lite_model": "openrouter/free",
+            "models": [
+                {"id": "openrouter/free", "context_window": None},
+                {"id": "openrouter/fast", "context_window": -512},
+            ],
+        },
+        fallback,
+    )
+
+    models_by_id = {item["id"]: item for item in catalog["models"]}
+    assert models_by_id["openrouter/free"]["context_window"] == 0
+    assert models_by_id["openrouter/fast"]["context_window"] == 0
 
 
 @pytest.mark.asyncio
