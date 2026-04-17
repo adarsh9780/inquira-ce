@@ -79,6 +79,18 @@
             </div>
 
             <p v-if="verifyError" class="text-xs text-[var(--color-danger)]">{{ verifyError }}</p>
+            <p v-if="providerApiKeyPortal" class="text-xs text-[var(--color-text-muted)]">
+              Need an API key?
+              <a
+                :href="providerApiKeyPortal"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="font-medium text-[var(--color-accent)] hover:underline"
+                @click.prevent="openProviderApiKeyPortal"
+              >
+                Create {{ providerDisplayName }} API key
+              </a>
+            </p>
           </div>
 
           <p v-if="refreshNotice" class="text-xs text-[var(--color-info)]">{{ refreshNotice }}</p>
@@ -258,6 +270,7 @@ import { useLLMConfig } from '../../../composables/useLLMConfig'
 import { useAppStore } from '../../../stores/appStore'
 import { useAuthStore } from '../../../stores/authStore'
 import { toast } from '../../../composables/useToast'
+import { openExternalUrl } from '../../../services/externalLinkService'
 
 const emit = defineEmits(['close-request'])
 
@@ -311,6 +324,12 @@ const verifySuccessMessage = computed(() => String(verifySuccess.value || '').tr
 const refreshModelListTooltip = 'This icon refreshes list of models available based on selected provider.'
 const apiKeyLabel = computed(() => (provider.value === 'openai' ? 'OpenAI API key' : 'OpenRouter API key'))
 const apiKeyPlaceholder = computed(() => (provider.value === 'openai' ? 'sk-...' : 'or-...'))
+const providerDisplayName = computed(() => (provider.value === 'openai' ? 'OpenAI' : 'OpenRouter'))
+const providerApiKeyPortal = computed(() => {
+  if (provider.value === 'openai') return 'https://platform.openai.com/api-keys'
+  if (provider.value === 'openrouter') return 'https://openrouter.ai/keys'
+  return ''
+})
 const mainOptions = computed(() => buildModelOptions('main', mainModel.value))
 const liteOptions = computed(() => buildModelOptions('lite', liteModel.value))
 
@@ -381,6 +400,12 @@ async function handleVerifyAndSaveKey() {
 
 async function refreshModelList() {
   await refreshModels()
+}
+
+function openProviderApiKeyPortal() {
+  const url = String(providerApiKeyPortal.value || '').trim()
+  if (!url) return
+  void openExternalUrl(url)
 }
 
 function resetAdvancedDefaults() {
