@@ -19,5 +19,7 @@ test('code editor uses JetBrains font stack with design tokens for editor colors
   assert.equal(codeTabSource.includes('#E8E4DC'), false)
   assert.equal(codeTabSource.includes('#8a8070'), false)
   assert.equal(codeTabSource.includes('color-mix(in srgb, var(--color-surface) 92%, white)'), false)
+  assert.equal(codeTabSource.includes('hover:bg-white'), false)
+  assert.equal(codeTabSource.includes('hover:text-green-600'), false)
   assert.equal(styleSource.includes('family=JetBrains+Mono:wght@400;500;700'), true)
 })
