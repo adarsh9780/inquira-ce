@@ -2,7 +2,7 @@
   <div class="flex h-full flex-col">
     <Teleport to="#workspace-left-pane-toolbar" v-if="isMounted && appStore.workspacePane === 'code'">
       <div class="flex items-center w-full justify-end">
-        <div class="flex items-center gap-1 bg-zinc-50 p-1 rounded-xl border border-zinc-200">
+        <div class="flex items-center gap-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
           <button
             @click="runCode"
             :disabled="!canRunCode || isRunning"
@@ -13,7 +13,7 @@
               : ''"
           >
             <PlayIcon v-if="!isRunning" class="h-4 w-4" />
-            <div v-else class="h-4 w-4 animate-spin rounded-full border-b-2 border-gray-400"></div>
+            <div v-else class="h-4 w-4 animate-spin rounded-full border-b-2 border-[var(--color-text-muted)]"></div>
           </button>
 
           <button
@@ -24,7 +24,7 @@
             <ArrowPathIcon class="h-4 w-4" />
           </button>
 
-          <div class="w-px h-4 bg-zinc-200 mx-0.5"></div>
+          <div class="mx-0.5 h-4 w-px bg-[var(--color-border)]"></div>
 
           <button
             @click="undo"
@@ -46,7 +46,7 @@
             <ArrowUturnRightIcon class="h-4 w-4" />
           </button>
           
-          <div class="w-px h-4 bg-zinc-200 mx-0.5"></div>
+          <div class="mx-0.5 h-4 w-px bg-[var(--color-border)]"></div>
 
           <button
             @click="downloadCode"
@@ -70,9 +70,9 @@
       >
         <div
           class="flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm"
-          style="background-color: color-mix(in srgb, var(--color-surface) 92%, white); border-color: var(--color-border); color: var(--color-text-main);"
+          style="background-color: color-mix(in srgb, var(--color-surface) 92%, var(--color-base)); border-color: var(--color-border); color: var(--color-text-main);"
         >
-          <div class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-[var(--color-accent)]"></div>
+          <div class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-accent)]"></div>
           <span>Generating code...</span>
         </div>
       </div>
@@ -81,10 +81,10 @@
         v-if="!appStore.pythonFileContent.trim() && !isGeneratingCode"
         class="pointer-events-none absolute inset-0 flex items-center justify-center"
       >
-        <div class="text-center text-gray-400">
+        <div class="text-center text-[var(--color-text-muted)]">
           <CodeBracketIcon class="mx-auto mb-2 h-10 w-10" />
-          <p class="text-sm text-gray-500">Start writing your Python code</p>
-          <p class="mt-1 text-xs text-gray-400">One file per session - your code is automatically saved</p>
+          <p class="text-sm text-[var(--color-text-main)]">Start writing your Python code</p>
+          <p class="mt-1 text-xs text-[var(--color-text-muted)]">One file per session - your code is automatically saved</p>
         </div>
       </div>
     </div>
@@ -704,10 +704,14 @@ async function initializeEditor() {
     autocompletion({ override: [completionSource] }),
     Prec.highest(keymap.of(customKeymap)),
     EditorView.theme({
-      '&': { fontSize: '14px', height: '100%', backgroundColor: '#FFFFFF' },
-      '.cm-editor': { backgroundColor: '#FFFFFF' },
-      '.cm-scroller': { fontFamily: '"JetBrainsMono Nerd Font", "JetBrains Mono", monospace', backgroundColor: '#FFFFFF' },
-      '.cm-gutters': { backgroundColor: '#F5F3ED', borderRight: '1px solid #E8E4DC', color: '#8a8070' },
+      '&': { fontSize: '14px', height: '100%', backgroundColor: 'var(--color-base)' },
+      '.cm-editor': { backgroundColor: 'var(--color-base)' },
+      '.cm-scroller': { fontFamily: '"JetBrainsMono Nerd Font", "JetBrains Mono", monospace', backgroundColor: 'var(--color-base)' },
+      '.cm-gutters': {
+        backgroundColor: 'var(--color-surface)',
+        borderRight: '1px solid var(--color-border)',
+        color: 'var(--color-text-muted)',
+      },
       '.cm-content': { padding: '16px' },
       '.cm-focused': { outline: 'none' },
     }),
