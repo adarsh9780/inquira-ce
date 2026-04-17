@@ -399,6 +399,7 @@ async function handleProviderSelect(nextProvider) {
   clearTransientMessages()
   try {
     await loadPreferences(normalizedProvider, false)
+    await refreshModels()
   } catch (_error) {
     toast.error('Provider Error', 'Could not load provider configuration.')
   }
