@@ -387,6 +387,69 @@ def _normalize_alias_list(raw: Any, *, max_items: int = 5) -> list[str]:
     return normalized
 
 
+def _build_schema_generation_prompt(
+    *,
+    context: str,
+    columns: list[dict[str, Any]],
+) -> str:
+    columns_text = "\n".join(
+        [
+            f"- {col['name']} ({col['dtype']}): {(col.get('samples') or [])[:3]}"
+            for col in columns
+        ]
+    )
+    return get_prompt("schema_generation", context=context, columns_text=columns_text)
+
+
+def _is_length_limit_error(exc: BaseException) -> bool:
+    detail = getattr(exc, "detail", None)
+    text = str(detail if detail is not None else exc).lower()
+    return (
+        "length limit" in text
+        or "lengthfinishreasonerror" in text
+        or ("finish_reason" in text and "length" in text)
+    )
+
+
+def _coerce_schema_items(schema_response: Any) -> list[Any]:
+    if hasattr(schema_response, "schemas"):
+        raw = getattr(schema_response, "schemas")
+        return raw if isinstance(raw, list) else []
+    return schema_response if isinstance(schema_response, list) else []
+
+
+async def _generate_schema_items_with_split_fallback(
+    *,
+    llm_service: LLMService,
+    context: str,
+    columns: list[dict[str, Any]],
+    max_tokens: int,
+) -> list[Any]:
+    async def _generate_for_subset(subset: list[dict[str, Any]]) -> list[Any]:
+        prompt = _build_schema_generation_prompt(context=context, columns=subset)
+        try:
+            schema_response = await asyncio.to_thread(
+                llm_service.ask,
+                prompt,
+                SchemaDescriptionList,
+                max_tokens,
+            )
+            return _coerce_schema_items(schema_response)
+        except Exception as exc:
+            if _is_length_limit_error(exc) and len(subset) > 1:
+                midpoint = len(subset) // 2
+                left_subset = subset[:midpoint]
+                right_subset = subset[midpoint:]
+                left_items, right_items = await asyncio.gather(
+                    _generate_for_subset(left_subset),
+                    _generate_for_subset(right_subset),
+                )
+                return [*left_items, *right_items]
+            raise
+
+    return await _generate_for_subset(columns)
+
+
 def _validate_runner_install_request(
     payload: RunnerPackageInstallRequest,
     config: Any,
@@ -1732,7 +1795,12 @@ async def regenerate_workspace_dataset_schema(
     context = (
         payload.context if payload.context is not None else prefs.schema_context
     ) or "General data analysis"
-    model = (payload.model or prefs.selected_model or "google/gemini-2.5-flash").strip()
+    model = (
+        payload.model
+        or getattr(prefs, "selected_lite_model", "")
+        or getattr(prefs, "selected_model", "")
+        or "google/gemini-2.5-flash-lite"
+    ).strip()
     provider = normalize_llm_provider(getattr(prefs, "llm_provider", "openrouter"))
     allow_sample_values = bool(prefs.allow_schema_sample_values)
 
@@ -1779,14 +1847,6 @@ async def regenerate_workspace_dataset_schema(
         raise HTTPException(
             status_code=400, detail="No columns found for this dataset table"
         )
-
-    columns_text = "\n".join(
-        [
-            f"- {col['name']} ({col['dtype']}): {(col.get('samples') or [])[:3]}"
-            for col in columns
-        ]
-    )
-    prompt = get_prompt("schema_generation", context=context, columns_text=columns_text)
 
     missing_sentinel = object()
     missing_advanced: list[str] = []
@@ -1839,11 +1899,11 @@ async def regenerate_workspace_dataset_schema(
             model=model,
         )
     try:
-        schema_response = await asyncio.to_thread(
-            llm_service.ask,
-            prompt,
-            SchemaDescriptionList,
-            max_tokens,
+        generated_items = await _generate_schema_items_with_split_fallback(
+            llm_service=llm_service,
+            context=context,
+            columns=columns,
+            max_tokens=max_tokens,
         )
     except HTTPException as exc:
         detail = exc.detail if getattr(exc, "detail", None) is not None else str(exc)
@@ -1856,11 +1916,6 @@ async def regenerate_workspace_dataset_schema(
             status_code=500, detail=f"Failed to generate schema via LLM: {str(exc)}"
         ) from exc
 
-    generated_items = (
-        schema_response.schemas
-        if hasattr(schema_response, "schemas")
-        else (schema_response if isinstance(schema_response, list) else [])
-    )
     generated_by_name: dict[str, dict[str, Any]] = {}
     generated_by_normalized_name: dict[str, dict[str, Any]] = {}
     for item in generated_items:

@@ -23,6 +23,7 @@ async def test_regenerate_schema_caps_llm_max_tokens(monkeypatch, tmp_path):
         return SimpleNamespace(
             schema_context="Default context",
             selected_model="google/gemini-2.5-flash",
+            selected_lite_model="google/gemini-2.5-flash-lite",
             allow_schema_sample_values=False,
             llm_temperature=0.2,
             llm_max_tokens=512,
@@ -144,6 +145,7 @@ async def test_regenerate_schema_falls_back_to_saved_schema_columns_when_table_u
         return SimpleNamespace(
             schema_context="Default context",
             selected_model="google/gemini-2.5-flash",
+            selected_lite_model="google/gemini-2.5-flash-lite",
             allow_schema_sample_values=False,
             llm_temperature=0.0,
             llm_max_tokens=1024,
@@ -226,6 +228,7 @@ async def test_regenerate_schema_matches_descriptions_with_normalized_names(monk
         return SimpleNamespace(
             schema_context="Default context",
             selected_model="google/gemini-2.5-flash",
+            selected_lite_model="google/gemini-2.5-flash-lite",
             allow_schema_sample_values=False,
             llm_temperature=0.0,
             llm_max_tokens=1024,
@@ -312,6 +315,7 @@ async def test_regenerate_schema_requires_all_advanced_llm_preferences(monkeypat
         return SimpleNamespace(
             schema_context="Default context",
             selected_model="google/gemini-2.5-flash",
+            selected_lite_model="google/gemini-2.5-flash-lite",
             allow_schema_sample_values=False,
             llm_temperature=0.2,
             llm_max_tokens=512,
@@ -370,3 +374,195 @@ async def test_regenerate_schema_requires_all_advanced_llm_preferences(monkeypat
 
     assert exc_info.value.status_code == 400
     assert "llm_top_k" in str(exc_info.value.detail)
+
+
+@pytest.mark.asyncio
+async def test_regenerate_schema_uses_lite_model_by_default(monkeypatch, tmp_path):
+    duckdb_path = tmp_path / "workspace.duckdb"
+    duckdb_path.touch()
+    captured: dict[str, str] = {}
+
+    async def fake_require_workspace_access(_session, _user_id, _workspace_id):
+        return SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_get_dataset(*, session, workspace_id, table_name):
+        return SimpleNamespace(schema_path=None)
+
+    async def fake_get_prefs(_session, _user_id):
+        return SimpleNamespace(
+            schema_context="Default context",
+            selected_model="google/gemini-2.5-flash",
+            selected_lite_model="google/gemini-2.5-flash-lite",
+            allow_schema_sample_values=False,
+            llm_temperature=0.2,
+            llm_max_tokens=512,
+            llm_top_p=0.95,
+            llm_top_k=0,
+            llm_frequency_penalty=0.0,
+            llm_presence_penalty=0.0,
+        )
+
+    class FakeLLMService:
+        def __init__(self, api_key: str, model: str, provider: str | None = None, **_kwargs):
+            _ = (api_key, provider)
+            captured["model"] = model
+
+        def ask(self, _prompt, _schema_type, max_tokens=None):
+            _ = max_tokens
+            return SimpleNamespace(
+                schemas=[SimpleNamespace(name="amount", description="Amount column", aliases=[])]
+            )
+
+    async def _commit():
+        return None
+
+    session = SimpleNamespace(commit=_commit)
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(
+        runtime_api.DatasetRepository,
+        "get_for_workspace_table",
+        fake_get_dataset,
+    )
+    monkeypatch.setattr(
+        runtime_api.PreferencesRepository,
+        "get_or_create",
+        fake_get_prefs,
+    )
+    monkeypatch.setattr(
+        runtime_api.SecretStorageService,
+        "get_api_key",
+        lambda _user_id, provider="openrouter": "test-key",
+    )
+    monkeypatch.setattr(
+        runtime_api,
+        "_read_table_columns_for_prompt",
+        lambda *_args, **_kwargs: [
+            {"name": "amount", "dtype": "INTEGER", "samples": [], "description": ""}
+        ],
+    )
+    monkeypatch.setattr(runtime_api, "LLMService", FakeLLMService)
+
+    await runtime_api.regenerate_workspace_dataset_schema(
+        workspace_id="ws-1",
+        table_name="amounts",
+        payload=runtime_api.RegenerateSchemaRequest(context="Test context"),
+        session=session,
+        current_user=SimpleNamespace(id="user-1"),
+    )
+
+    assert captured["model"] == "google/gemini-2.5-flash-lite"
+
+
+@pytest.mark.asyncio
+async def test_regenerate_schema_splits_on_length_limit_until_single_column(monkeypatch, tmp_path):
+    duckdb_path = tmp_path / "workspace.duckdb"
+    duckdb_path.touch()
+    batch_sizes: list[int] = []
+
+    async def fake_require_workspace_access(_session, _user_id, _workspace_id):
+        return SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_get_dataset(*, session, workspace_id, table_name):
+        return SimpleNamespace(schema_path=None)
+
+    async def fake_get_prefs(_session, _user_id):
+        return SimpleNamespace(
+            schema_context="Default context",
+            selected_model="google/gemini-2.5-flash",
+            selected_lite_model="google/gemini-2.5-flash-lite",
+            allow_schema_sample_values=False,
+            llm_temperature=0.2,
+            llm_max_tokens=1024,
+            llm_top_p=0.95,
+            llm_top_k=0,
+            llm_frequency_penalty=0.0,
+            llm_presence_penalty=0.0,
+        )
+
+    def _columns_from_prompt(prompt: str) -> list[str]:
+        after_columns = prompt.split("Columns:\n", 1)[1]
+        section = after_columns.split("\n\nFor every column", 1)[0]
+        names: list[str] = []
+        for line in section.splitlines():
+            line = line.strip()
+            if not line.startswith("- "):
+                continue
+            names.append(line[2:].split(" (", 1)[0].strip())
+        return names
+
+    class FakeLLMService:
+        def __init__(self, api_key: str, model: str, provider: str | None = None, **_kwargs):
+            _ = (api_key, model, provider)
+
+        def ask(self, prompt, _schema_type, max_tokens=None):
+            _ = max_tokens
+            names = _columns_from_prompt(prompt)
+            batch_sizes.append(len(names))
+            if len(names) > 1:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Could not parse response content as the length limit was reached",
+                )
+            name = names[0]
+            return SimpleNamespace(
+                schemas=[
+                    SimpleNamespace(
+                        name=name,
+                        description=f"{name} description",
+                        aliases=[f"{name} alias"],
+                    )
+                ]
+            )
+
+    async def _commit():
+        return None
+
+    session = SimpleNamespace(commit=_commit)
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(
+        runtime_api.DatasetRepository,
+        "get_for_workspace_table",
+        fake_get_dataset,
+    )
+    monkeypatch.setattr(
+        runtime_api.PreferencesRepository,
+        "get_or_create",
+        fake_get_prefs,
+    )
+    monkeypatch.setattr(
+        runtime_api.SecretStorageService,
+        "get_api_key",
+        lambda _user_id, provider="openrouter": "test-key",
+    )
+    monkeypatch.setattr(
+        runtime_api,
+        "_read_table_columns_for_prompt",
+        lambda *_args, **_kwargs: [
+            {"name": "col_a", "dtype": "INTEGER", "samples": [], "description": ""},
+            {"name": "col_b", "dtype": "INTEGER", "samples": [], "description": ""},
+            {"name": "col_c", "dtype": "INTEGER", "samples": [], "description": ""},
+            {"name": "col_d", "dtype": "INTEGER", "samples": [], "description": ""},
+        ],
+    )
+    monkeypatch.setattr(runtime_api, "LLMService", FakeLLMService)
+
+    result = await runtime_api.regenerate_workspace_dataset_schema(
+        workspace_id="ws-1",
+        table_name="amounts",
+        payload=runtime_api.RegenerateSchemaRequest(context="Test context"),
+        session=session,
+        current_user=SimpleNamespace(id="user-1"),
+    )
+
+    assert result.table_name == "amounts"
+    assert [column["description"] for column in result.columns] == [
+        "col_a description",
+        "col_b description",
+        "col_c description",
+        "col_d description",
+    ]
+    assert batch_sizes.count(4) == 1
+    assert batch_sizes.count(2) == 2
+    assert batch_sizes.count(1) == 4
