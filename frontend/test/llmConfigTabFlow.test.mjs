@@ -25,6 +25,7 @@ test('useLLMConfig composable exposes provider-aware save flow and advanced fiel
   assert.equal(source.includes('const llmTopK = ref(0)'), true)
   assert.equal(source.includes('const llmFrequencyPenalty = ref(0)'), true)
   assert.equal(source.includes('const llmPresencePenalty = ref(0)'), true)
+  assert.equal(source.includes('const slowRequestWarningSeconds = ref(30)'), true)
 
   assert.equal(source.includes('async function verifyKey()'), true)
   assert.equal(source.includes('async function saveKey()'), true)
@@ -40,6 +41,7 @@ test('useLLMConfig composable exposes provider-aware save flow and advanced fiel
   assert.equal(source.includes('llm_temperature: Number(llmTemperature.value)'), true)
   assert.equal(source.includes('llm_max_tokens: Number(llmMaxTokens.value)'), true)
   assert.equal(source.includes('llm_top_k: Number(llmTopK.value)'), true)
+  assert.equal(source.includes('slow_request_warning_seconds: Number(slowRequestWarningSeconds.value)'), true)
   assert.equal(source.includes('await loadPreferences(selectedProvider, true)'), true)
 })
 
@@ -71,6 +73,7 @@ test('LLM settings tab uses provider dropdown, searchable model selects, and adv
   assert.equal(source.includes('Advanced settings'), true)
   assert.equal(source.includes('Temperature'), true)
   assert.equal(source.includes('Max tokens'), true)
+  assert.equal(source.includes('Slow-request warning (seconds)'), true)
   assert.equal(source.includes('Top K'), true)
   assert.equal(source.includes('Frequency penalty'), true)
   assert.equal(source.includes('Presence penalty'), true)

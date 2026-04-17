@@ -37,6 +37,7 @@ class PreferencesResponse(BaseModel):
     llm_top_k: int = 0
     llm_frequency_penalty: float = 0.0
     llm_presence_penalty: float = 0.0
+    slow_request_warning_seconds: int = 30
     enabled_models: list[str] = Field(default_factory=list)
     schema_context: str = ""
     allow_schema_sample_values: bool = False
@@ -69,6 +70,7 @@ class PreferencesUpdateRequest(BaseModel):
     llm_top_k: int | None = Field(default=None, ge=0, le=500)
     llm_frequency_penalty: float | None = Field(default=None, ge=-2.0, le=2.0)
     llm_presence_penalty: float | None = Field(default=None, ge=-2.0, le=2.0)
+    slow_request_warning_seconds: int | None = Field(default=None, ge=5, le=600)
     enabled_models: list[str] | None = None
     schema_context: str | None = None
     allow_schema_sample_values: bool | None = None
@@ -94,6 +96,7 @@ class ApiKeyUpdateRequest(BaseModel):
     llm_top_k: int | None = Field(default=None, ge=0, le=500)
     llm_frequency_penalty: float | None = Field(default=None, ge=-2.0, le=2.0)
     llm_presence_penalty: float | None = Field(default=None, ge=-2.0, le=2.0)
+    slow_request_warning_seconds: int | None = Field(default=None, ge=5, le=600)
 
 
 class ProviderModelsRefreshRequest(BaseModel):

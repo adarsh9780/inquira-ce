@@ -31,6 +31,7 @@ const llmTopP = ref(1)
 const llmTopK = ref(0)
 const llmFrequencyPenalty = ref(0)
 const llmPresencePenalty = ref(0)
+const slowRequestWarningSeconds = ref(30)
 
 const modelMetaByProvider = ref({})
 
@@ -221,6 +222,7 @@ async function loadPreferences(providerHint = null, preserveSelection = false) {
     llmTopK.value = Number(response?.llm_top_k ?? 0)
     llmFrequencyPenalty.value = Number(response?.llm_frequency_penalty ?? 0)
     llmPresencePenalty.value = Number(response?.llm_presence_penalty ?? 0)
+    slowRequestWarningSeconds.value = Number(response?.slow_request_warning_seconds ?? 30)
     keyVerified.value = normalizedProvider === 'ollama' || !!selectedProviderApiKeyPresent.value
 
     return response
@@ -472,6 +474,7 @@ async function saveConfig() {
       llm_top_k: Number(llmTopK.value),
       llm_frequency_penalty: Number(llmFrequencyPenalty.value),
       llm_presence_penalty: Number(llmPresencePenalty.value),
+      slow_request_warning_seconds: Number(slowRequestWarningSeconds.value),
     }
     if (hasNewUnmaskedKey) {
       payload.api_key = enteredKey
@@ -536,6 +539,7 @@ export const useLLMConfig = () => {
     llmTopK,
     llmFrequencyPenalty,
     llmPresencePenalty,
+    slowRequestWarningSeconds,
     providerLabel,
     maskedKeySuffix,
     currentProviderModelMeta,

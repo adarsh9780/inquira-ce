@@ -52,6 +52,7 @@ def test_v1_preferences_response_exposes_available_models():
     assert "selected_lite_model" in properties
     assert "selected_coding_model" in properties
     assert "enabled_models" in properties
+    assert "slow_request_warning_seconds" in properties
     assert "terminal_risk_acknowledged" in properties
     assert "plotly_theme_mode" in properties
 
@@ -62,3 +63,4 @@ def test_v1_preferences_update_request_exposes_terminal_ack_field():
     update = components.get("PreferencesUpdateRequest", {})
     properties = update.get("properties", {})
     assert "terminal_risk_acknowledged" in properties
+    assert "slow_request_warning_seconds" in properties

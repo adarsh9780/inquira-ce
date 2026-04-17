@@ -290,6 +290,7 @@ const FINAL_STREAM_NODES = new Set([
 ])
 const DEFAULT_ANALYZE_CANCEL_TIMEOUT_MS = 300000
 const FREE_MODEL_ANALYZE_CANCEL_TIMEOUT_MS = 900000
+const DEFAULT_SLOW_REQUEST_WARNING_TIMEOUT_MS = 30000
 
 function extractLangGraphTokenText(payload) {
   if (!payload) return ''
@@ -323,6 +324,13 @@ function resolveAnalyzeCancelTimeoutMs(modelId) {
     return FREE_MODEL_ANALYZE_CANCEL_TIMEOUT_MS
   }
   return DEFAULT_ANALYZE_CANCEL_TIMEOUT_MS
+}
+
+function resolveSlowRequestWarningTimeoutMs(seconds) {
+  const parsed = Number.parseInt(seconds, 10)
+  if (!Number.isFinite(parsed)) return DEFAULT_SLOW_REQUEST_WARNING_TIMEOUT_MS
+  const clampedSeconds = Math.min(600, Math.max(5, parsed))
+  return clampedSeconds * 1000
 }
 
 function parseArtifactTimestampMs(value) {
@@ -1135,9 +1143,10 @@ async function handleSubmit() {
 
     await ensureWorkspaceDatasetReady(workspaceId)
 
+    const warningAfterMs = resolveSlowRequestWarningTimeoutMs(appStore.slowRequestWarningSeconds)
     warningTimer = setTimeout(() => {
       toast.warning('Request Taking Longer', 'Your query is taking longer than expected.')
-    }, 30000)
+    }, warningAfterMs)
 
     const cancelAfterMs = resolveAnalyzeCancelTimeoutMs(appStore.selectedModel)
     cancelTimer = setTimeout(() => {

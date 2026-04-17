@@ -341,6 +341,9 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
         llm_top_k=int(getattr(prefs, "llm_top_k", 0)),
         llm_frequency_penalty=float(getattr(prefs, "llm_frequency_penalty", 0.0)),
         llm_presence_penalty=float(getattr(prefs, "llm_presence_penalty", 0.0)),
+        slow_request_warning_seconds=int(
+            getattr(prefs, "slow_request_warning_seconds", 30)
+        ),
         enabled_models=enabled_models,
         schema_context=prefs.schema_context,
         allow_schema_sample_values=bool(prefs.allow_schema_sample_values),
@@ -438,6 +441,8 @@ async def update_preferences(
         prefs.llm_frequency_penalty = float(payload.llm_frequency_penalty)
     if payload.llm_presence_penalty is not None:
         prefs.llm_presence_penalty = float(payload.llm_presence_penalty)
+    if payload.slow_request_warning_seconds is not None:
+        prefs.slow_request_warning_seconds = int(payload.slow_request_warning_seconds)
     if payload.schema_context is not None:
         prefs.schema_context = payload.schema_context
     if payload.allow_schema_sample_values is not None:
@@ -616,6 +621,8 @@ async def set_api_key(
         prefs.llm_frequency_penalty = float(payload.llm_frequency_penalty)
     if payload.llm_presence_penalty is not None:
         prefs.llm_presence_penalty = float(payload.llm_presence_penalty)
+    if payload.slow_request_warning_seconds is not None:
+        prefs.slow_request_warning_seconds = int(payload.slow_request_warning_seconds)
 
     _normalize_model_preferences(prefs, provider_catalogs)
 

@@ -25,6 +25,7 @@ async def test_update_preferences_persists_llm_advanced_settings(monkeypatch):
         llm_top_k=0,
         llm_frequency_penalty=0.0,
         llm_presence_penalty=0.0,
+        slow_request_warning_seconds=30,
         schema_context="",
         allow_schema_sample_values=False,
         terminal_risk_acknowledged=False,
@@ -65,6 +66,7 @@ async def test_update_preferences_persists_llm_advanced_settings(monkeypatch):
             llm_top_k=24,
             llm_frequency_penalty=0.4,
             llm_presence_penalty=-0.2,
+            slow_request_warning_seconds=75,
         ),
         session=_Session(),
         current_user=SimpleNamespace(id="user-1"),
@@ -76,12 +78,14 @@ async def test_update_preferences_persists_llm_advanced_settings(monkeypatch):
     assert prefs.llm_top_k == 24
     assert prefs.llm_frequency_penalty == 0.4
     assert prefs.llm_presence_penalty == -0.2
+    assert prefs.slow_request_warning_seconds == 75
     assert response.llm_temperature == 0.3
     assert response.llm_max_tokens == 1024
     assert response.llm_top_p == 0.85
     assert response.llm_top_k == 24
     assert response.llm_frequency_penalty == 0.4
     assert response.llm_presence_penalty == -0.2
+    assert response.slow_request_warning_seconds == 75
 
 
 @pytest.mark.asyncio

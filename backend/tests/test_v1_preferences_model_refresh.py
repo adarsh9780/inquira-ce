@@ -204,6 +204,7 @@ async def test_set_api_key_endpoint_persists_models_and_advanced_settings(monkey
         llm_top_k=0,
         llm_frequency_penalty=0.0,
         llm_presence_penalty=0.0,
+        slow_request_warning_seconds=30,
         schema_context="",
         allow_schema_sample_values=False,
         terminal_risk_acknowledged=False,
@@ -250,6 +251,7 @@ async def test_set_api_key_endpoint_persists_models_and_advanced_settings(monkey
             llm_top_k=32,
             llm_frequency_penalty=0.1,
             llm_presence_penalty=0.2,
+            slow_request_warning_seconds=45,
         ),
         session=_Session(),
         current_user=SimpleNamespace(id="u1"),
@@ -265,6 +267,7 @@ async def test_set_api_key_endpoint_persists_models_and_advanced_settings(monkey
     assert prefs.llm_top_k == 32
     assert prefs.llm_frequency_penalty == 0.1
     assert prefs.llm_presence_penalty == 0.2
+    assert prefs.slow_request_warning_seconds == 45
     assert captured_secret_write == {"key": "sk-test", "provider": "openrouter"}
     assert "Configuration and API key" in response.message
 

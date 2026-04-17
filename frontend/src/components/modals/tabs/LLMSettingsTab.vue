@@ -176,6 +176,18 @@
           >
             <div class="grid grid-cols-2 gap-3 pt-1">
               <label class="space-y-1">
+                <span class="block text-xs text-[var(--color-text-sub)]">Slow-request warning (seconds)</span>
+                <input
+                  v-model.number="slowRequestWarningSeconds"
+                  type="number"
+                  min="5"
+                  max="600"
+                  step="5"
+                  class="input-base"
+                />
+              </label>
+
+              <label class="space-y-1">
                 <span class="block text-xs text-[var(--color-text-sub)]">Max tokens</span>
                 <input
                   v-model.number="llmMaxTokens"
@@ -300,6 +312,7 @@ const {
   llmTopK,
   llmFrequencyPenalty,
   llmPresencePenalty,
+  slowRequestWarningSeconds,
   loadPreferences,
   setProvider,
   setApiKey,
@@ -415,6 +428,7 @@ function resetAdvancedDefaults() {
   llmTopK.value = 0
   llmFrequencyPenalty.value = 0.0
   llmPresencePenalty.value = 0.0
+  slowRequestWarningSeconds.value = 30
 }
 
 async function saveConfiguration() {

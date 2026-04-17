@@ -17,6 +17,7 @@ export const useAppStore = defineStore('app', () => {
   const DEFAULT_PROVIDER = 'openrouter'
   const DEFAULT_LITE_MODEL = 'google/gemini-2.5-flash-lite'
   const DEFAULT_PROVIDER_LIST = ['openrouter', 'openai', 'anthropic', 'ollama']
+  const DEFAULT_SLOW_REQUEST_WARNING_SECONDS = 30
 
   // Files
   const dataFilePath = ref('')
@@ -34,6 +35,7 @@ export const useAppStore = defineStore('app', () => {
   const selectedModel = ref('google/gemini-2.5-flash')
   const selectedLiteModel = ref(DEFAULT_LITE_MODEL)
   const selectedCodingModel = ref('google/gemini-2.5-flash')
+  const slowRequestWarningSeconds = ref(DEFAULT_SLOW_REQUEST_WARNING_SECONDS)
   const availableModels = ref([...DEFAULT_MODELS])
   const providerMainModels = ref([...DEFAULT_MODELS])
   const providerLiteModels = ref([DEFAULT_LITE_MODEL])
@@ -145,6 +147,12 @@ export const useAppStore = defineStore('app', () => {
   const MAX_TERMINAL_TOTAL_CHARS = 2000000
   const MAX_QUESTION_HISTORY = 30
 
+  function normalizeSlowRequestWarningSeconds(rawValue) {
+    const parsed = Number.parseInt(rawValue, 10)
+    if (!Number.isFinite(parsed)) return DEFAULT_SLOW_REQUEST_WARNING_SECONDS
+    return Math.min(600, Math.max(5, parsed))
+  }
+
   function resolveSnapshotUserId(explicitUserId = null) {
     const candidate = String(explicitUserId ?? authStore.userId ?? '').trim()
     return candidate || ''
@@ -159,6 +167,7 @@ export const useAppStore = defineStore('app', () => {
         selected_model: selectedModel.value || '',
         selected_lite_model: selectedLiteModel.value || '',
         selected_coding_model: selectedCodingModel.value || '',
+        slow_request_warning_seconds: normalizeSlowRequestWarningSeconds(slowRequestWarningSeconds.value),
         enabled_models: Array.isArray(availableModels.value) ? [...availableModels.value] : [],
         provider_main_models: Array.isArray(providerMainModels.value) ? [...providerMainModels.value] : [],
         provider_lite_models: Array.isArray(providerLiteModels.value) ? [...providerLiteModels.value] : [],
@@ -250,6 +259,9 @@ export const useAppStore = defineStore('app', () => {
     }
     if (!availableModels.value.includes(selectedCodingModel.value)) {
       selectedCodingModel.value = selectedModel.value || selectedCodingModel.value
+    }
+    if (llm.slow_request_warning_seconds !== undefined && llm.slow_request_warning_seconds !== null) {
+      slowRequestWarningSeconds.value = normalizeSlowRequestWarningSeconds(llm.slow_request_warning_seconds)
     }
 
     if (typeof ui.active_tab === 'string' && ui.active_tab.trim()) {
@@ -405,6 +417,7 @@ export const useAppStore = defineStore('app', () => {
         selected_model: selectedModel.value,
         selected_lite_model: selectedLiteModel.value,
         selected_coding_model: selectedCodingModel.value,
+        slow_request_warning_seconds: normalizeSlowRequestWarningSeconds(slowRequestWarningSeconds.value),
         enabled_models: availableModels.value,
         schema_context: schemaContext.value,
         allow_schema_sample_values: allowSchemaSampleValues.value,
@@ -439,6 +452,7 @@ export const useAppStore = defineStore('app', () => {
     selectedModel.value = 'google/gemini-2.5-flash'
     selectedLiteModel.value = DEFAULT_LITE_MODEL
     selectedCodingModel.value = 'google/gemini-2.5-flash'
+    slowRequestWarningSeconds.value = DEFAULT_SLOW_REQUEST_WARNING_SECONDS
     availableModels.value = [...DEFAULT_MODELS]
     providerMainModels.value = [...DEFAULT_MODELS]
     providerLiteModels.value = [DEFAULT_LITE_MODEL]
@@ -618,6 +632,11 @@ export const useAppStore = defineStore('app', () => {
 
   function setSelectedCodingModel(model) {
     selectedCodingModel.value = String(model || '').trim()
+    saveLocalConfig()
+  }
+
+  function setSlowRequestWarningSeconds(seconds) {
+    slowRequestWarningSeconds.value = normalizeSlowRequestWarningSeconds(seconds)
     saveLocalConfig()
   }
 
@@ -2068,6 +2087,11 @@ export const useAppStore = defineStore('app', () => {
     if (!availableModels.value.includes(selectedCodingModel.value)) {
       selectedCodingModel.value = selectedModel.value
     }
+    if (prefs?.slow_request_warning_seconds !== undefined && prefs?.slow_request_warning_seconds !== null) {
+      slowRequestWarningSeconds.value = normalizeSlowRequestWarningSeconds(
+        prefs.slow_request_warning_seconds
+      )
+    }
     if (!preserveLocalSchemaContext && typeof prefs?.schema_context === 'string') {
       schemaContext.value = prefs.schema_context
     }
@@ -2144,6 +2168,7 @@ export const useAppStore = defineStore('app', () => {
     selectedModel,
     selectedLiteModel,
     selectedCodingModel,
+    slowRequestWarningSeconds,
     availableModels,
     providerMainModels,
     providerLiteModels,
@@ -2236,6 +2261,7 @@ export const useAppStore = defineStore('app', () => {
     setLlmProvider,
     setSelectedLiteModel,
     setSelectedCodingModel,
+    setSlowRequestWarningSeconds,
     setEnabledModels,
     setApiKeyConfigured,
     setSelectedModel,
