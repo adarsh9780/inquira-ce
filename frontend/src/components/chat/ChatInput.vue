@@ -12,7 +12,7 @@
         style="
           background-color: var(--color-base);
           border-color: var(--color-border);
-          box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+          box-shadow: var(--shadow-button);
         "
         :style="composerCardStyle"
       >
@@ -115,7 +115,7 @@
             :title="actionButtonTitle"
           >
             <span
-              class="flex w-6 h-6 items-center justify-center rounded-full bg-zinc-900 text-white"
+              class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-text-main)] text-[var(--color-on-accent)]"
               :class="{ 'animate-pulse': isVoiceInputActive }"
             >
               <StopIcon v-if="appStore.isLoading" class="w-3 h-3" />

@@ -263,7 +263,7 @@
                     <button
                       type="button"
                       class="w-full px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-red-50"
-                      style="color: #dc2626;"
+                      style="color: var(--color-danger);"
                       @click.stop="confirmDeleteConversation(conv.id)"
                     >
                       Delete
@@ -369,10 +369,9 @@
       class="fixed inset-0 z-[70] flex items-center justify-center px-4"
       @click="closeTermsDialog"
     >
-      <div class="absolute inset-0 bg-black/10 backdrop-blur-[1.5px]"></div>
+      <div class="modal-overlay"></div>
       <div
-        class="relative w-full max-w-3xl rounded-xl border shadow-2xl"
-        style="background-color: var(--color-surface); border-color: var(--color-border); color: var(--color-text-main);"
+        class="modal-card relative w-full max-w-3xl text-[var(--color-text-main)]"
         @click.stop
       >
         <div class="flex items-center justify-between border-b px-5 py-3" style="border-color: var(--color-border);">
@@ -381,8 +380,7 @@
             <p v-if="termsLastUpdated" class="text-xs" style="color: var(--color-text-muted);">Last updated: {{ termsLastUpdated }}</p>
           </div>
           <button
-            class="h-7 w-7 p-1.5 rounded border"
-            style="border-color: var(--color-border); color: var(--color-text-main); background-color: var(--color-base);"
+            class="btn-icon h-7 w-7 rounded border border-[var(--color-border)] bg-[var(--color-base)] p-1.5 text-[var(--color-text-main)]"
             title="Close terms"
             aria-label="Close terms"
             @click="closeTermsDialog"
@@ -392,7 +390,7 @@
         </div>
         <div class="max-h-[70vh] overflow-y-auto px-5 py-4 text-sm leading-6">
           <p v-if="isTermsLoading" style="color: var(--color-text-muted);">Loading terms...</p>
-          <p v-else-if="termsError" class="rounded-md border px-3 py-2 text-xs text-red-700 bg-red-50" style="border-color: #fca5a5;">
+          <p v-else-if="termsError" class="rounded-md border border-[var(--color-danger)]/35 bg-[var(--color-danger-bg)] px-3 py-2 text-xs text-[var(--color-danger-text)]">
             {{ termsError }}
           </p>
           <div
@@ -1064,7 +1062,7 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 }
 
 .sidebar-rail-btn-active {
-  color: #C96A2E;
+  color: var(--color-accent);
   border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
   background-color: color-mix(in srgb, var(--color-accent) 14%, transparent);
 }
@@ -1124,7 +1122,7 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 }
 
 :deep(.terms-markdown-content a) {
-  color: #2563eb;
+  color: var(--color-info);
   text-decoration: underline;
 }
 </style>

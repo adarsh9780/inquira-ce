@@ -3,21 +3,19 @@
     <Teleport to="body">
       <!-- Regeneration Overlay -->
       <Transition
-        enter-active-class="transition duration-300 ease-out"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition duration-200 ease-in"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
+        enter-active-class="dialog-fade-enter-active dialog-pop-enter-active"
+        enter-from-class="dialog-fade-enter-from dialog-pop-enter-from"
+        leave-active-class="dialog-fade-leave-active dialog-pop-leave-active"
+        leave-to-class="dialog-fade-leave-to dialog-pop-leave-to"
       >
         <div
           v-if="isRegenerating"
           class="fixed inset-0 z-50 flex items-center justify-center"
-          style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.75) 0%, rgba(30, 41, 59, 0.85) 100%); backdrop-filter: blur(8px);"
+          style="background-color: var(--overlay-backdrop-strong); backdrop-filter: blur(var(--blur-backdrop-strong)); -webkit-backdrop-filter: blur(var(--blur-backdrop-strong));"
         >
           <div class="relative overflow-hidden rounded-2xl shadow-2xl border w-full max-w-md mx-4" style="background: linear-gradient(180deg, var(--color-surface) 0%, color-mix(in srgb, var(--color-surface) 95%, var(--color-base)) 100%); border-color: color-mix(in srgb, var(--color-border) 50%, transparent);">
             <!-- Accent line -->
-            <div class="absolute top-0 left-0 right-0 h-1" style="background: linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 60%, #f97316), var(--color-accent));"></div>
+            <div class="absolute top-0 left-0 right-0 h-1" style="background: linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 60%, var(--color-warning)), var(--color-accent));"></div>
             
             <div class="px-6 py-6">
               <div class="flex items-start justify-between gap-4 mb-5">
@@ -34,10 +32,10 @@
 
               <div class="mb-4 h-2 w-full overflow-hidden rounded-full" style="background-color: color-mix(in srgb, var(--color-border) 40%, transparent);">
                 <div
-                  class="h-full rounded-full transition-all duration-500 ease-out"
+                  class="motion-slower h-full rounded-full transition-all"
                   :style="{
                     width: `${regenerationProgress}%`,
-                    background: 'linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 70%, #f97316))',
+                    background: 'linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 70%, var(--color-warning)))',
                     boxShadow: '0 0 12px color-mix(in srgb, var(--color-accent) 50%, transparent)',
                   }"
                 ></div>
@@ -157,12 +155,12 @@
 
       <!-- Error State -->
       <div v-else-if="schemaError" class="mx-4 mt-4">
-        <div class="rounded-xl border px-4 py-3.5" style="border-color: color-mix(in srgb, #ef4444 40%, var(--color-border)); background: linear-gradient(135deg, color-mix(in srgb, #fef2f2 80%, var(--color-base)), color-mix(in srgb, #fef2f2 40%, var(--color-base)));">
+        <div class="rounded-xl border px-4 py-3.5" style="border-color: color-mix(in srgb, var(--color-danger) 40%, var(--color-border)); background: linear-gradient(135deg, color-mix(in srgb, var(--color-danger-bg) 80%, var(--color-base)), color-mix(in srgb, var(--color-danger-bg) 40%, var(--color-base)));">
           <div class="flex items-start gap-3">
-            <svg class="w-5 h-5 mt-0.5 flex-shrink-0" style="color: #dc2626;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5 mt-0.5 flex-shrink-0" style="color: var(--color-danger);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
-            <p class="text-sm" style="color: #991b1b;">{{ schemaError }}</p>
+            <p class="text-sm" style="color: var(--color-danger-text);">{{ schemaError }}</p>
           </div>
         </div>
       </div>
@@ -182,15 +180,15 @@
             <div
               v-if="schemaNeedsDescriptions && !isRegenerating"
               class="rounded-xl border px-4 py-3.5"
-              style="border-color: color-mix(in srgb, #f59e0b 40%, var(--color-border)); background: linear-gradient(135deg, color-mix(in srgb, #fffbeb 80%, var(--color-base)), color-mix(in srgb, #fef3c7 40%, var(--color-base)));"
+              style="border-color: color-mix(in srgb, var(--color-warning) 40%, var(--color-border)); background: linear-gradient(135deg, color-mix(in srgb, var(--color-warning-bg) 80%, var(--color-base)), color-mix(in srgb, var(--color-warning-bg) 40%, var(--color-base)));"
             >
               <div class="flex items-start gap-3">
-                <svg class="w-5 h-5 mt-0.5 flex-shrink-0" style="color: #d97706;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 mt-0.5 flex-shrink-0" style="color: var(--color-warning);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
                 <div>
-                  <h4 class="text-sm font-semibold" style="color: #92400e;">Schema Descriptions Not Generated Yet</h4>
-                  <p class="mt-0.5 text-sm" style="color: #b45309;">
+                  <h4 class="text-sm font-semibold" style="color: var(--color-warning-text);">Schema Descriptions Not Generated Yet</h4>
+                  <p class="mt-0.5 text-sm" style="color: var(--color-warning-text);">
                     Descriptions are blank. Click <strong>Regenerate</strong> to generate AI descriptions.
                   </p>
                 </div>
@@ -310,12 +308,10 @@
       <!-- Edit Dialog Modal -->
       <Teleport to="body">
         <Transition
-          enter-active-class="transition duration-300 ease-out"
-          enter-from-class="opacity-0"
-          enter-to-class="opacity-100"
-          leave-active-class="transition duration-200 ease-in"
-          leave-from-class="opacity-100"
-          leave-to-class="opacity-0"
+          enter-active-class="dialog-fade-enter-active"
+          enter-from-class="dialog-fade-enter-from"
+          leave-active-class="dialog-fade-leave-active"
+          leave-to-class="dialog-fade-leave-to"
         >
           <div
             v-if="editDialog.isOpen"
@@ -325,21 +321,15 @@
             aria-modal="true"
           >
             <!-- Backdrop -->
-            <div
-              class="fixed inset-0 transition-opacity duration-300"
-              style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.6) 0%, rgba(30, 41, 59, 0.75) 100%); backdrop-filter: blur(4px);"
-              @click="closeEditDialog"
-            ></div>
+            <div class="modal-overlay modal-overlay-strong" @click="closeEditDialog"></div>
 
             <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-6">
               <!-- Dialog Panel -->
               <Transition
-                enter-active-class="transition duration-300 ease-out"
-                enter-from-class="opacity-0 scale-95 translate-y-4"
-                enter-to-class="opacity-100 scale-100 translate-y-0"
-                leave-active-class="transition duration-200 ease-in"
-                leave-from-class="opacity-100 scale-100 translate-y-0"
-                leave-to-class="opacity-0 scale-95 translate-y-4"
+                enter-active-class="dialog-pop-enter-active"
+                enter-from-class="dialog-pop-enter-from"
+                leave-active-class="dialog-pop-leave-active"
+                leave-to-class="dialog-pop-leave-to"
               >
                 <div
                   v-if="editDialog.isOpen"
@@ -348,7 +338,7 @@
                   @click.stop
                 >
                   <!-- Accent gradient top bar -->
-                  <div class="absolute top-0 left-0 right-0 h-1" style="background: linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 60%, #f97316), var(--color-accent));"></div>
+                  <div class="absolute top-0 left-0 right-0 h-1" style="background: linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 60%, var(--color-warning)), var(--color-accent));"></div>
                   
                   <!-- Header -->
                   <div class="px-6 pt-6 pb-5" style="border-bottom: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);">
@@ -426,7 +416,7 @@
                     <button
                       @click="saveEditDialog"
                       class="rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5"
-                      style="background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 85%, #f97316)); color: white; box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 30%, transparent);"
+                      style="background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 85%, var(--color-warning))); color: white; box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 30%, transparent);"
                     >
                       Save Changes
                     </button>
@@ -1167,18 +1157,18 @@ async function exportSchema() {
 <style scoped>
 .schema-editor {
   position: relative;
-  background-color: #FAF9F6;
-  color: #1A1F2E;
-  font-family: 'Ubuntu', sans-serif;
+  background-color: var(--color-base);
+  color: var(--color-text-main);
+  font-family: var(--font-ui);
 }
 
 .schema-top-bar {
   padding: 12px 16px 10px;
-  border-bottom: 1px solid #E5E3DC;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .schema-page-title {
-  color: #1A1F2E;
+  color: var(--color-text-main);
   font-size: 15px;
   font-weight: 700;
   line-height: 1.3;
@@ -1186,7 +1176,7 @@ async function exportSchema() {
 
 .schema-page-subtitle {
   margin-top: 2px;
-  color: #6B7280;
+  color: var(--color-text-muted);
   font-size: 13px;
   font-weight: 400;
   line-height: 1.3;
@@ -1202,7 +1192,7 @@ async function exportSchema() {
 .schema-action-divider {
   width: 1px;
   min-height: 26px;
-  background: #E5E3DC;
+  background: var(--color-border);
   margin: 0 4px;
 }
 
@@ -1211,7 +1201,7 @@ async function exportSchema() {
   border-radius: 6px;
   background: transparent;
   padding: 6px 10px;
-  color: #1A1F2E;
+  color: var(--color-text-main);
   font-size: 13px;
   font-weight: 500;
   line-height: 1.3;
@@ -1219,7 +1209,7 @@ async function exportSchema() {
 }
 
 .schema-ghost-btn:hover:not(:disabled) {
-  background-color: #EDE9E3;
+  background-color: var(--color-base-muted);
 }
 
 .schema-ghost-btn:disabled {
@@ -1230,8 +1220,8 @@ async function exportSchema() {
 .schema-save-btn {
   border: 0;
   border-radius: 6px;
-  background: #C96A2E;
-  color: #fff;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
   padding: 6px 12px;
   font-size: 13px;
   font-weight: 500;
@@ -1249,26 +1239,26 @@ async function exportSchema() {
 }
 
 .schema-dataset-selector :deep(button) {
-  background-color: #FAF9F6;
-  border-color: #E5E3DC;
-  color: #1A1F2E;
+  background-color: var(--color-base);
+  border-color: var(--color-border);
+  color: var(--color-text-main);
   font-size: 13px;
   font-weight: 500;
 }
 
 .schema-dataset-selector :deep(button:focus-visible) {
-  box-shadow: 0 0 0 2px color-mix(in srgb, #C96A2E 28%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 28%, transparent);
 }
 
 .schema-context-card {
-  background: #F0EDE6;
-  border-left: 3px solid #C96A2E;
+  background: var(--color-base-muted);
+  border-left: 3px solid var(--color-accent);
   border-radius: 6px;
   padding: 12px 16px;
 }
 
 .schema-context-label {
-  color: #6B7280;
+  color: var(--color-text-muted);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -1283,21 +1273,21 @@ async function exportSchema() {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #C96A2E;
+  color: var(--color-accent);
   font-size: 13px;
   font-weight: 500;
   line-height: 1.3;
 }
 
 .schema-context-body {
-  color: #1A1F2E;
+  color: var(--color-text-main);
   font-size: 14px;
   font-weight: 400;
   line-height: 1.6;
 }
 
 .schema-context-empty {
-  color: #6B7280;
+  color: var(--color-text-muted);
   font-size: 14px;
   font-weight: 400;
   font-style: italic;
@@ -1305,7 +1295,7 @@ async function exportSchema() {
 }
 
 .schema-table-wrap {
-  background: #FAF9F6;
+  background: var(--color-base);
   border: 0;
   border-radius: 0;
 }
@@ -1316,21 +1306,21 @@ async function exportSchema() {
 }
 
 .schema-table-header-row {
-  background: #EFEDE8;
+  background: var(--color-surface);
 }
 
 .schema-row-header-cell {
   width: 32px;
   padding: 9px 6px;
   text-align: right;
-  border-bottom: 1px solid #E5E3DC;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .schema-header-cell {
   padding: 9px 16px;
   text-align: left;
-  border-bottom: 1px solid #E5E3DC;
-  color: #6B7280;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -1343,22 +1333,22 @@ async function exportSchema() {
 }
 
 .schema-row-odd {
-  background: #FAF9F6;
+  background: var(--color-base);
 }
 
 .schema-row-even {
-  background: #F5F3EE;
+  background: var(--color-surface);
 }
 
 .schema-row:hover {
-  background: #EDE9E3;
+  background: var(--color-base-muted);
 }
 
 .schema-row-number-cell {
   width: 32px;
   padding: 12px 6px;
   text-align: right;
-  color: #9CA3AF;
+  color: var(--color-text-sub);
   font-size: 12px;
   font-weight: 400;
   line-height: 1.3;
@@ -1367,8 +1357,8 @@ async function exportSchema() {
 .schema-column-cell {
   padding: 12px 16px;
   vertical-align: top;
-  color: #1A1F2E;
-  font-family: 'Ubuntu Mono', monospace;
+  color: var(--color-text-main);
+  font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 500;
   line-height: 1.6;
@@ -1382,14 +1372,14 @@ async function exportSchema() {
 
 .schema-description-text {
   white-space: pre-wrap;
-  color: #1A1F2E;
+  color: var(--color-text-main);
   font-size: 14px;
   font-weight: 400;
   line-height: 1.6;
 }
 
 .schema-description-empty {
-  color: #6B7280;
+  color: var(--color-text-muted);
   font-size: 14px;
   font-weight: 400;
   line-height: 1.6;
@@ -1398,8 +1388,8 @@ async function exportSchema() {
 .schema-alias-tag {
   display: inline-flex;
   align-items: center;
-  background: #EDE9E3;
-  color: #4B4540;
+  background: var(--color-base-muted);
+  color: var(--color-text-main);
   border: 0;
   border-radius: 4px;
   padding: 2px 8px;
@@ -1412,18 +1402,18 @@ async function exportSchema() {
   border: 0;
   border-radius: 6px;
   padding: 6px;
-  color: #6B7280;
+  color: var(--color-text-muted);
   background: transparent;
   transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease;
 }
 
 .schema-inline-edit-btn:hover {
-  color: #1A1F2E;
-  background: color-mix(in srgb, #1A1F2E 5%, transparent);
+  color: var(--color-text-main);
+  background: color-mix(in srgb, var(--color-text-main) 5%, transparent);
 }
 
 .schema-footer-hint {
-  color: #6B7280;
+  color: var(--color-text-muted);
   font-size: 12px;
   font-weight: 400;
   line-height: 1.3;
@@ -1432,7 +1422,7 @@ async function exportSchema() {
 
 /* Markdown rendered content styling */
 .prose {
-  color: #1A1F2E;
+  color: var(--color-text-main);
 }
 
 .prose :deep(p) {
@@ -1448,12 +1438,12 @@ async function exportSchema() {
 }
 
 .prose :deep(code) {
-  font-family: 'Ubuntu Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.6;
   padding: 0.125em 0.375em;
   border-radius: 0.25rem;
-  background-color: color-mix(in srgb, #1A1F2E 8%, transparent);
+  background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent);
 }
 
 .prose :deep(ul),
@@ -1467,15 +1457,15 @@ async function exportSchema() {
 }
 
 .prose :deep(a) {
-  color: #C96A2E;
+  color: var(--color-accent);
   text-decoration: underline;
 }
 
 .prose :deep(blockquote) {
   margin: 0.35em 0;
   padding-left: 1em;
-  border-left: 3px solid #E5E3DC;
-  color: #6B7280;
+  border-left: 3px solid var(--color-border);
+  color: var(--color-text-muted);
 }
 
 /* Hide clunky scrollbars while keeping scroll behavior */
@@ -1493,7 +1483,7 @@ async function exportSchema() {
 textarea:focus,
 button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px color-mix(in srgb, #C96A2E 30%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
 /* Animation utilities */

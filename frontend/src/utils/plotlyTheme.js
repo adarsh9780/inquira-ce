@@ -1,4 +1,4 @@
-const UI_COLORS = Object.freeze({
+const DEFAULT_UI_COLORS = Object.freeze({
   base: '#FFFFFF',
   surface: '#FFFFFF',
   border: '#E4E4E7',
@@ -8,7 +8,31 @@ const UI_COLORS = Object.freeze({
   accent: '#D47948',
 })
 
-const FONT_FAMILY = 'Ubuntu, "Avenir Next", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
+let UI_COLORS = { ...DEFAULT_UI_COLORS }
+
+function readUiColor(tokenName, fallback) {
+  if (typeof window === 'undefined') return fallback
+  const value = String(getComputedStyle(document.documentElement).getPropertyValue(tokenName) || '').trim()
+  return value || fallback
+}
+
+function refreshUiColors() {
+  UI_COLORS = {
+    base: readUiColor('--color-base', DEFAULT_UI_COLORS.base),
+    surface: readUiColor('--color-surface', DEFAULT_UI_COLORS.surface),
+    border: readUiColor('--color-border', DEFAULT_UI_COLORS.border),
+    borderHover: readUiColor('--color-border-hover', DEFAULT_UI_COLORS.borderHover),
+    textMain: readUiColor('--color-text-main', DEFAULT_UI_COLORS.textMain),
+    textMuted: readUiColor('--color-text-muted', DEFAULT_UI_COLORS.textMuted),
+    accent: readUiColor('--color-accent', DEFAULT_UI_COLORS.accent),
+  }
+}
+
+const FONT_FAMILY = (
+  typeof window !== 'undefined'
+    ? String(getComputedStyle(document.documentElement).getPropertyValue('--font-ui') || '').trim()
+    : ''
+) || 'sans-serif'
 
 const COLORWAY = Object.freeze([
   '#D47948', // brand orange
@@ -394,6 +418,7 @@ function applyHardTraceDefaults(data) {
 
 export function applyPlotlyTheme(figure, options = {}) {
   if (!isPlainObject(figure)) return null
+  refreshUiColors()
 
   const mode = normalizeMode(options.mode)
   const context = String(options.context || 'panel').toLowerCase()

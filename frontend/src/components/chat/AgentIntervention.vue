@@ -1,5 +1,5 @@
 <template>
-  <div class="rounded-xl border p-3 space-y-3" style="border-color: color-mix(in srgb, var(--color-border) 70%, #f59e0b 30%); background-color: color-mix(in srgb, var(--color-surface) 92%, #fef3c7 8%);">
+  <div class="rounded-xl border p-3 space-y-3" style="border-color: color-mix(in srgb, var(--color-border) 70%, var(--color-warning) 30%); background-color: color-mix(in srgb, var(--color-surface) 92%, var(--color-warning-bg) 8%);">
     <p class="text-xs font-semibold uppercase tracking-[0.08em]" style="color: var(--color-text-muted);">
       Agent needs your input
     </p>

@@ -1,18 +1,24 @@
 <template>
-  <div
-    v-if="isVisible"
-    class="fixed inset-0 layer-modal overflow-y-auto"
-    aria-labelledby="progress-modal-title"
-    role="dialog"
-    aria-modal="true"
+  <Transition
+    enter-active-class="dialog-fade-enter-active dialog-pop-enter-active"
+    enter-from-class="dialog-fade-enter-from dialog-pop-enter-from"
+    leave-active-class="dialog-fade-leave-active dialog-pop-leave-active"
+    leave-to-class="dialog-fade-leave-to dialog-pop-leave-to"
   >
-    <div class="modal-overlay" @click="handleCancel"></div>
+    <div
+      v-if="isVisible"
+      class="fixed inset-0 layer-modal overflow-y-auto"
+      aria-labelledby="progress-modal-title"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-overlay" @click="handleCancel"></div>
 
-    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-      <div
-        class="modal-card relative flex max-h-[90vh] w-full max-w-lg flex-col text-left sm:my-8"
-        @click.stop
-      >
+      <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+        <div
+          class="modal-card relative flex max-h-[90vh] w-full max-w-lg flex-col text-left sm:my-8"
+          @click.stop
+        >
         <div class="modal-header">
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold text-[var(--color-text-main)]" id="progress-modal-title">
@@ -90,9 +96,10 @@
             {{ isCancelling ? 'Cancelling...' : 'Cancel' }}
           </button>
         </div>
+        </div>
       </div>
     </div>
-  </div>
+  </Transition>
 </template>
 
 <script setup>

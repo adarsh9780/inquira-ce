@@ -299,14 +299,14 @@ const errorSummary = computed(() => {
   min-width: 0;
   width: 100%;
   color: inherit;
-  color: #52525b;
+  color: var(--color-text-muted);
 }
 
 .tool-activity-summary {
   display: inline-block;
   font-size: 15px;
   line-height: 1.5;
-  color: #52525b;
+  color: var(--color-text-muted);
   word-break: break-word;
 }
 
@@ -314,17 +314,17 @@ const errorSummary = computed(() => {
   margin: 0;
   min-width: 0;
   flex: 1;
-  color: #52525b;
+  color: var(--color-text-muted);
 }
 
 .tool-activity-summary-running {
   background-image: linear-gradient(
     110deg,
-    #52525b 0%,
-    #52525b 32%,
-    #a1a1aa 49%,
-    #52525b 66%,
-    #52525b 100%
+    var(--color-text-muted) 0%,
+    var(--color-text-muted) 32%,
+    var(--color-text-sub) 49%,
+    var(--color-text-muted) 66%,
+    var(--color-text-muted) 100%
   );
   background-size: 220% 100%;
   color: transparent;
@@ -334,11 +334,11 @@ const errorSummary = computed(() => {
 }
 
 .tool-activity-summary-error {
-  color: #b91c1c;
+  color: var(--color-danger);
 }
 
 .tool-activity-duration {
-  color: #a1a1aa;
+  color: var(--color-text-sub);
   font-weight: 400;
   margin-left: 2px;
 }
@@ -349,7 +349,7 @@ const errorSummary = computed(() => {
   margin-left: 24px;
   font-size: 12px;
   line-height: 1.4;
-  color: #b91c1c;
+  color: var(--color-danger);
   word-break: break-word;
 }
 
@@ -357,7 +357,7 @@ const errorSummary = computed(() => {
   margin-top: 7px;
   padding-top: 8px;
   padding-left: 24px;
-  border-top: 1px dashed #e4e4e7;
+  border-top: 1px dashed var(--color-border);
   display: grid;
   gap: 8px;
 }
@@ -368,7 +368,7 @@ const errorSummary = computed(() => {
   line-height: 1.3;
   text-transform: none;
   letter-spacing: 0;
-  color: #52525b;
+  color: var(--color-text-muted);
 }
 
 .tool-activity-pre {
@@ -379,11 +379,11 @@ const errorSummary = computed(() => {
   line-height: 1.45;
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid #e4e4e7;
+  border: 1px solid var(--color-border);
   white-space: pre-wrap;
   word-break: break-word;
-  color: #3f3f46;
-  background: #fafafa;
+  color: var(--color-text-main);
+  background: var(--color-base);
 }
 
 .tool-activity-log {

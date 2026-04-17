@@ -12,7 +12,7 @@ test('schema editor uses calm border-light design system and readable dataset la
 
   assert.equal(source.includes('class="schema-top-bar relative z-10"'), true)
   assert.equal(source.includes('class="schema-context-card"'), true)
-  assert.equal(source.includes('border-left: 3px solid #C96A2E;'), true)
+  assert.equal(source.includes('border-left: 3px solid var(--color-accent);'), true)
 
   assert.equal(source.includes('class="schema-table-header-row"'), true)
   assert.equal(source.includes('class="schema-row-header-cell" aria-label="Row"'), true)
@@ -23,13 +23,13 @@ test('schema editor uses calm border-light design system and readable dataset la
   assert.equal(source.includes('.schema-row:hover {'), true)
 
   assert.equal(source.includes('class="schema-column-cell"'), true)
-  assert.equal(source.includes("font-family: 'Ubuntu Mono', monospace;"), true)
+  assert.equal(source.includes('font-family: var(--font-mono);'), true)
   assert.equal(source.includes('class="schema-alias-tag"'), true)
-  assert.equal(source.includes('background: #EDE9E3;'), true)
+  assert.equal(source.includes('background: var(--color-base-muted);'), true)
 
   assert.equal(source.includes('class="schema-ghost-btn"'), true)
   assert.equal(source.includes('class="schema-save-btn"'), true)
-  assert.equal(source.includes('background: #C96A2E;'), true)
+  assert.equal(source.includes('background: var(--color-accent);'), true)
   assert.equal(source.includes('>#</th>'), false)
   assert.equal(source.includes('class="schema-scroll-area h-full overflow-auto"'), true)
   assert.equal(source.includes('.schema-scroll-area {'), true)

@@ -6,11 +6,11 @@
     </h2>
 
     <!-- API Key Warning -->
-    <div v-if="!hasApiKey" class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+    <div v-if="!hasApiKey" class="mb-4 rounded-md border border-[var(--color-warning)]/30 bg-[var(--color-warning-bg)] p-3">
       <div class="flex items-center">
-        <ExclamationTriangleIcon class="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0" />
+        <ExclamationTriangleIcon class="mr-2 h-5 w-5 flex-shrink-0 text-[var(--color-warning)]" />
         <div class="flex-1">
-          <p class="text-sm text-yellow-800">
+          <p class="text-sm text-[var(--color-warning-text)]">
             <strong>API Key Required:</strong> Please set your API key in the Models tab first before configuring data settings.
           </p>
         </div>
@@ -26,7 +26,7 @@
         </div>
         <div class="w-full bg-[var(--color-accent-border)] rounded-full h-2">
           <div
-            class="bg-[var(--color-accent)] h-2 rounded-full transition-all duration-300"
+            class="motion-slow h-2 rounded-full bg-[var(--color-accent)] transition-all"
             :style="{ width: progressPercent + '%' }"
           ></div>
         </div>
@@ -39,28 +39,28 @@
       <div
         :class="[
           'rounded-lg p-4 border',
-          isCheckingUpdate ? 'bg-[var(--color-accent-soft)] border-[var(--color-accent-border)]' : (updateNeeded ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200')
+          isCheckingUpdate ? 'bg-[var(--color-accent-soft)] border-[var(--color-accent-border)]' : (updateNeeded ? 'border-[var(--color-warning)]/30 bg-[var(--color-warning-bg)]' : 'border-[var(--color-success)]/30 bg-[var(--color-success-bg)]')
         ]"
       >
         <div class="flex items-start">
           <div class="mt-0.5 mr-2">
             <div v-if="isCheckingUpdate" class="animate-spin rounded-full h-4 w-4 border-2 border-[var(--color-accent)] border-t-transparent"></div>
-            <ExclamationTriangleIcon v-else-if="updateNeeded" class="h-5 w-5 text-yellow-600" />
-            <CheckCircleIcon v-else class="h-5 w-5 text-green-600" />
+            <ExclamationTriangleIcon v-else-if="updateNeeded" class="h-5 w-5 text-[var(--color-warning)]" />
+            <CheckCircleIcon v-else class="h-5 w-5 text-[var(--color-success)]" />
           </div>
           <div class="flex-1">
-            <p class="text-sm font-medium" :class="updateNeeded ? 'text-yellow-900' : (isCheckingUpdate ? 'text-[var(--color-accent)]' : 'text-green-900')">
+            <p class="text-sm font-medium" :class="updateNeeded ? 'text-[var(--color-warning-text)]' : (isCheckingUpdate ? 'text-[var(--color-accent)]' : 'text-[var(--color-success)]')">
               <span v-if="isCheckingUpdate">Checking if data re-creation is needed…</span>
               <span v-else-if="updateNeeded">Update recommended: database re-creation may be needed</span>
               <span v-else>Data is up to date. No re-creation needed</span>
             </p>
             <div v-if="!isCheckingUpdate && updateInfo && updateInfo.reasons && updateInfo.reasons.length" class="mt-1">
-              <p class="text-xs text-yellow-800">Reasons:</p>
-              <ul class="mt-1 text-xs text-yellow-800 list-disc list-inside">
+              <p class="text-xs text-[var(--color-warning-text)]">Reasons:</p>
+              <ul class="mt-1 list-inside list-disc text-xs text-[var(--color-warning-text)]">
                 <li v-for="(r, idx) in updateInfo.reasons" :key="idx">{{ r }}</li>
               </ul>
             </div>
-            <p v-if="!isCheckingUpdate && updateInfo && updateInfo.dataset_updated_at" class="text-xs text-gray-600 mt-1">
+            <p v-if="!isCheckingUpdate && updateInfo && updateInfo.dataset_updated_at" class="mt-1 text-xs text-[var(--color-text-muted)]">
               Last updated: {{ updateInfo.dataset_updated_at }}
             </p>
           </div>
@@ -68,7 +68,7 @@
             <button
               v-if="!isCheckingUpdate && updateNeeded && !isProcessing"
               @click="rebuildNow"
-              class="text-xs px-2 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+              class="btn-secondary rounded px-2 py-1 text-xs text-[var(--color-warning-text)]"
             >
               Rebuild now
             </button>
@@ -100,7 +100,7 @@
               :class="{ 'opacity-50 cursor-not-allowed': isProcessing || isPickingFile || isRestoringFile }"
               :disabled="isProcessing || isPickingFile || isRestoringFile"
             >
-              <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="mr-2 h-5 w-5 text-[var(--color-text-sub)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
               <span v-if="!appStore.dataFilePath" style="color: var(--color-text-muted);">Choose a file...</span>
@@ -125,10 +125,10 @@
             </span>
           </div>
         </div>
-        <p class="mt-1 text-xs text-gray-500">
+        <p class="mt-1 text-xs text-[var(--color-text-muted)]">
           Supported formats: CSV, Parquet, Excel (.xlsx), JSON, TSV
         </p>
-        <p v-if="ingestedColumns.length" class="mt-1 text-xs text-green-600">
+        <p v-if="ingestedColumns.length" class="mt-1 text-xs text-[var(--color-success)]">
           ✅ {{ ingestedColumns.length }} columns loaded into DuckDB
         </p>
       </div>
@@ -158,7 +158,7 @@
         <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
           Schema Privacy
         </label>
-        <label class="inline-flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+        <label class="inline-flex cursor-pointer items-start gap-2 text-sm text-[var(--color-text-main)]">
           <input
             type="checkbox"
             class="mt-0.5"
@@ -181,7 +181,7 @@
         class="w-full px-4 py-2 btn-primary"
       >
         <span v-if="isProcessing" class="inline-flex items-center">
-          <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+          <div class="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-[var(--color-on-accent)]"></div>
           Processing...
         </span>
         <span v-else>Save Data Settings</span>
@@ -204,8 +204,9 @@
 
   <!-- Fullscreen Processing Overlay - Blocks all UI interaction -->
   <Teleport to="body">
-    <div v-if="isProcessing" class="layer-blocking fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div class="modal-card mx-4 w-full max-w-lg p-8">
+    <div v-if="isProcessing" class="layer-blocking fixed inset-0 flex items-center justify-center">
+      <div class="modal-overlay modal-overlay-strong"></div>
+      <div class="modal-card relative z-10 mx-4 w-full max-w-lg p-8">
         <!-- Header -->
         <div class="text-center mb-6">
           <div class="inline-flex items-center justify-center w-16 h-16 bg-[var(--color-accent-soft)] rounded-full mb-4">
@@ -222,7 +223,7 @@
         <div class="space-y-3">
           <div class="h-2 w-full rounded-full bg-[var(--color-border)]">
             <div 
-              class="bg-[var(--color-accent)] h-2 rounded-full transition-all duration-300"
+              class="motion-slow h-2 rounded-full bg-[var(--color-accent)] transition-all"
               :style="{ width: progressPercent + '%' }"
             ></div>
           </div>

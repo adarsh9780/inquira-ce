@@ -731,7 +731,7 @@ onUnmounted(() => {
 /* Backend startup overlay transitions */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity var(--motion-duration-slow) var(--motion-ease-standard);
 }
 .fade-enter-from,
 .fade-leave-to {
@@ -744,7 +744,7 @@ onUnmounted(() => {
 
 .app-nav-pane {
   width: 240px;
-  transition: width 200ms ease;
+  transition: width var(--motion-duration-standard) var(--motion-ease-standard);
   overflow: hidden;
   border-right: 1px solid var(--color-border);
   background-color: var(--color-sidebar-surface);
@@ -761,37 +761,37 @@ onUnmounted(() => {
 }
 
 .startup-brand-logo {
-  animation: startup-logo-float 7s ease-in-out infinite;
-  filter: drop-shadow(0 20px 32px rgba(24, 24, 27, 0.2));
+  animation: startup-logo-float 7s var(--motion-ease-standard) infinite;
+  filter: drop-shadow(0 20px 32px color-mix(in srgb, var(--color-text-main) 20%, transparent));
 }
 
 /* Minimal startup screen animations */
 .startup-enter {
-  animation: startup-fade-in 0.6s ease-out forwards;
+  animation: startup-fade-in var(--motion-duration-slower) var(--motion-ease-standard) forwards;
 }
 
 .startup-logo {
-  animation: startup-logo-reveal 0.8s ease-out 0.2s forwards;
+  animation: startup-logo-reveal var(--motion-duration-slower) var(--motion-ease-standard) var(--motion-duration-standard) forwards;
 }
 
 .startup-text {
   opacity: 0;
-  animation: startup-text-reveal 0.6s ease-out 0.4s forwards;
+  animation: startup-text-reveal var(--motion-duration-slower) var(--motion-ease-standard) calc(var(--motion-duration-standard) * 2) forwards;
 }
 
 .startup-text-delay {
   opacity: 0;
-  animation: startup-text-reveal 0.6s ease-out 0.55s forwards;
+  animation: startup-text-reveal var(--motion-duration-slower) var(--motion-ease-standard) calc(var(--motion-duration-standard) * 2.75) forwards;
 }
 
 .startup-progress {
   opacity: 0;
-  animation: startup-progress-reveal 0.6s ease-out 0.7s forwards;
+  animation: startup-progress-reveal var(--motion-duration-slower) var(--motion-ease-standard) calc(var(--motion-duration-standard) * 3.5) forwards;
 }
 
 .startup-text-delay-2 {
   opacity: 0;
-  animation: startup-text-reveal 0.6s ease-out 0.65s forwards;
+  animation: startup-text-reveal var(--motion-duration-slower) var(--motion-ease-standard) calc(var(--motion-duration-standard) * 3.25) forwards;
 }
 
 @keyframes startup-fade-in {
@@ -847,7 +847,7 @@ onUnmounted(() => {
 
 .startup-progress-scroll::-webkit-scrollbar-thumb,
 .desktop-startup-progress-scroll::-webkit-scrollbar-thumb {
-  background: rgba(113, 113, 122, 0.35);
+  background: color-mix(in srgb, var(--color-text-muted) 35%, transparent);
   border-radius: 999px;
 }
 

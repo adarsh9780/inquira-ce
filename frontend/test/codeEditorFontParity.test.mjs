@@ -8,7 +8,9 @@ test('code editor uses JetBrains font stack with design tokens for editor colors
   const styleSource = readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf-8')
 
   assert.equal(codeTabSource.includes("'.cm-editor': { backgroundColor: 'var(--color-base)' }"), true)
-  assert.equal(codeTabSource.includes("'.cm-scroller': { fontFamily: '\"JetBrainsMono Nerd Font\", \"JetBrains Mono\", monospace', backgroundColor: 'var(--color-base)' }"), true)
+  assert.equal(codeTabSource.includes("const editorMonoFont = readEditorMonoFont()"), true)
+  assert.equal(codeTabSource.includes("getPropertyValue('--font-mono')"), true)
+  assert.equal(codeTabSource.includes("'.cm-scroller': { fontFamily: editorMonoFont, backgroundColor: 'var(--color-base)' }"), true)
   assert.equal(codeTabSource.includes("backgroundColor: 'var(--color-surface)'"), true)
   assert.equal(codeTabSource.includes("borderRight: '1px solid var(--color-border)'"), true)
   assert.equal(codeTabSource.includes("color: 'var(--color-text-muted)'"), true)
@@ -22,4 +24,5 @@ test('code editor uses JetBrains font stack with design tokens for editor colors
   assert.equal(codeTabSource.includes('hover:bg-white'), false)
   assert.equal(codeTabSource.includes('hover:text-green-600'), false)
   assert.equal(styleSource.includes('family=JetBrains+Mono:wght@400;500;700'), true)
+  assert.equal(styleSource.includes('--font-mono: "JetBrainsMono Nerd Font", "JetBrains Mono", "Ubuntu Mono", monospace;'), true)
 })

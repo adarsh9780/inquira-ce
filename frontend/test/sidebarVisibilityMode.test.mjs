@@ -13,7 +13,7 @@ test('app keeps a single sidebar container and relies on click-only collapse sta
   assert.equal(appSource.includes('class="app-sidebar-rail"'), false)
   assert.equal(appSource.includes('expandSidebarFromRail'), false)
   assert.equal(appSource.includes('@mouseenter='), false)
-  assert.equal(appSource.includes('transition: width 200ms ease;'), true)
+  assert.equal(appSource.includes('transition: width var(--motion-duration-standard) var(--motion-ease-standard);'), true)
   assert.equal(appSource.includes('.app-nav-pane-collapsed {'), true)
   assert.equal(appSource.includes('<StatusBar />'), true)
 

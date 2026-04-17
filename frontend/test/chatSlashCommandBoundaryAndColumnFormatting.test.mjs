@@ -33,7 +33,7 @@ test('column suggestion UI highlights escaped/special column references', () => 
   const source = readFileSync(suggestPath, 'utf-8')
 
   assert.equal(source.includes('item.displayText || `${item.table_name}.${item.column_name}`'), true)
-  assert.equal(source.includes("item?.isSpecial ? 'color: #0284c7;'"), true)
+  assert.equal(source.includes("item?.isSpecial ? 'color: var(--color-info);'"), true)
   assert.equal(source.includes(":class=\"openUp ? 'bottom-full mb-2' : 'top-full mt-1'\""), true)
 })
 

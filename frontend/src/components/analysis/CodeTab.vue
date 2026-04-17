@@ -693,8 +693,17 @@ function syncEditorEditability() {
   })
 }
 
+function readEditorMonoFont() {
+  if (typeof window === 'undefined' || !window.getComputedStyle) {
+    return '"JetBrainsMono Nerd Font", "JetBrains Mono", monospace'
+  }
+  const resolved = window.getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim()
+  return resolved || '"JetBrainsMono Nerd Font", "JetBrains Mono", monospace'
+}
+
 async function initializeEditor() {
   if (!editorContainer.value) return
+  const editorMonoFont = readEditorMonoFont()
 
   const extensions = [
     basicSetup,
@@ -706,7 +715,7 @@ async function initializeEditor() {
     EditorView.theme({
       '&': { fontSize: '14px', height: '100%', backgroundColor: 'var(--color-base)' },
       '.cm-editor': { backgroundColor: 'var(--color-base)' },
-      '.cm-scroller': { fontFamily: '"JetBrainsMono Nerd Font", "JetBrains Mono", monospace', backgroundColor: 'var(--color-base)' },
+      '.cm-scroller': { fontFamily: editorMonoFont, backgroundColor: 'var(--color-base)' },
       '.cm-gutters': {
         backgroundColor: 'var(--color-surface)',
         borderRight: '1px solid var(--color-border)',

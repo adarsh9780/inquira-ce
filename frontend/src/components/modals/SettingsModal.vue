@@ -1,9 +1,9 @@
 <template>
   <Transition
-    enter-active-class="transition duration-200"
-    enter-from-class="opacity-0"
-    leave-active-class="transition duration-150"
-    leave-to-class="opacity-0"
+    enter-active-class="dialog-fade-enter-active dialog-pop-enter-active"
+    enter-from-class="dialog-fade-enter-from dialog-pop-enter-from"
+    leave-active-class="dialog-fade-leave-active dialog-pop-leave-active"
+    leave-to-class="dialog-fade-leave-to dialog-pop-leave-to"
   >
     <div
       v-if="modelValue"
@@ -207,10 +207,10 @@ function initializePanelState(tab) {
 
 function panelClass(panelId) {
   if (currentPanel.value === panelId) {
-    return 'translate-x-0 opacity-100 pointer-events-auto transition-all duration-200 ease-in-out'
+    return 'translate-x-0 opacity-100 pointer-events-auto settings-panel-transition'
   }
   const offset = panelDirection.value === 'backward' ? '-translate-x-[30px]' : 'translate-x-[30px]'
-  return `${offset} opacity-0 pointer-events-none transition-all duration-200 ease-in-out`
+  return `${offset} opacity-0 pointer-events-none settings-panel-transition`
 }
 
 function navigateTo(panel, direction = 'forward') {
@@ -246,3 +246,10 @@ function closeModal() {
   emit('update:modelValue', false)
 }
 </script>
+
+<style scoped>
+.settings-panel-transition {
+  transition: transform var(--motion-duration-standard) var(--motion-ease-standard),
+    opacity var(--motion-duration-standard) var(--motion-ease-standard);
+}
+</style>

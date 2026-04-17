@@ -4,7 +4,8 @@
     class="max-w-sm w-full animate-toast-in"
   >
     <div
-      class="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-[0_8px_30px_rgba(0,0,0,0.08)] p-4 flex items-start gap-3"
+      class="flex items-start gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+      style="box-shadow: var(--shadow-lifted);"
     >
       <!-- Icon -->
       <div class="flex-shrink-0 mt-0.5">

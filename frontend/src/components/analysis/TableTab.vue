@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col h-full" style="background-color: #FAF9F6;">
+  <div class="flex flex-col h-full" style="background-color: var(--color-base);">
     <Teleport to="#workspace-right-pane-toolbar-center" v-if="isMounted && appStore.dataPane === 'table'">
       <div class="flex min-w-0 w-full items-center justify-center">
         <div
@@ -39,7 +39,7 @@
         >
           <FunnelIcon
             class="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2"
-            style="color: #9CA3AF;"
+            style="color: var(--color-text-sub);"
             title="Search rows"
             aria-hidden="true"
           />
@@ -51,7 +51,7 @@
             title="Search rows in current table"
             :disabled="!selectedArtifactId"
             aria-label="Search rows"
-            style="background-color: #F5F3EE; border-color: #E5E3DC;"
+            style="background-color: var(--color-surface); border-color: var(--color-border);"
           />
         </div>
 
@@ -1281,42 +1281,42 @@ async function deleteSelectedArtifact() {
 
 <style>
 .ag-theme-quartz {
-  --ag-background-color: #FAF9F6;
-  --ag-header-background-color: #EFEDE8;
+  --ag-background-color: var(--color-base);
+  --ag-header-background-color: var(--color-surface);
   --ag-header-height: 34px;
   --ag-row-height: 30px;
   --ag-grid-size: 4px;
   --ag-cell-horizontal-padding: 8px;
   --ag-header-cell-horizontal-padding: 8px;
-  --ag-odd-row-background-color: #FAF9F6;
-  --ag-even-row-background-color: #F5F3EE;
-  --ag-row-hover-color: #EDE9E3;
-  --ag-selected-row-background-color: #F2E7DD;
-  --ag-border-color: #E5E3DC;
-  --ag-header-foreground-color: #1A1F2E;
-  --ag-foreground-color: #1A1F2E;
-  --ag-secondary-foreground-color: #6B7280;
-  --ag-input-focus-border-color: #C96A2E;
-  --ag-range-selection-border-color: #D7D3C8;
-  --ag-cell-horizontal-border: solid #E5E3DC;
-  --ag-header-column-separator-color: #E5E3DC;
+  --ag-odd-row-background-color: var(--color-base);
+  --ag-even-row-background-color: var(--color-surface);
+  --ag-row-hover-color: var(--color-base-muted);
+  --ag-selected-row-background-color: var(--color-accent-soft);
+  --ag-border-color: var(--color-border);
+  --ag-header-foreground-color: var(--color-text-main);
+  --ag-foreground-color: var(--color-text-main);
+  --ag-secondary-foreground-color: var(--color-text-muted);
+  --ag-input-focus-border-color: var(--color-accent);
+  --ag-range-selection-border-color: var(--color-border-hover);
+  --ag-cell-horizontal-border: solid var(--color-border);
+  --ag-header-column-separator-color: var(--color-border);
   --ag-header-column-separator-display: block;
-  --ag-icon-color: #9CA3AF;
-  --ag-active-color: #C96A2E;
+  --ag-icon-color: var(--color-text-sub);
+  --ag-active-color: var(--color-accent);
 }
 
 .ag-theme-quartz .ag-header {
-  border-bottom: 1px solid #E5E3DC;
+  border-bottom: 1px solid var(--color-border);
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.3;
-  color: #1A1F2E;
+  color: var(--color-text-main);
 }
 
 .ag-theme-quartz .ag-cell,
 .ag-theme-quartz .ag-header-cell {
-  border-right: 1px solid #E5E3DC;
+  border-right: 1px solid var(--color-border);
 }
 
 .ag-theme-quartz .ag-cell {
@@ -1324,7 +1324,7 @@ async function deleteSelectedArtifact() {
   font-size: 14px;
   font-weight: 400;
   line-height: 1.5;
-  color: #1A1F2E;
+  color: var(--color-text-main);
 }
 
 .ag-theme-quartz .ag-row .ag-cell:last-child,
@@ -1333,13 +1333,13 @@ async function deleteSelectedArtifact() {
 }
 
 .ag-theme-quartz .ag-icon {
-  color: #9CA3AF;
+  color: var(--color-text-sub);
 }
 
 .ag-theme-quartz .ag-header-cell-sorted-asc .ag-icon,
 .ag-theme-quartz .ag-header-cell-sorted-desc .ag-icon,
 .ag-theme-quartz .ag-header-cell-filtered .ag-icon {
-  color: #C96A2E;
+  color: var(--color-accent);
 }
 
 .ag-theme-quartz .ag-root-wrapper,
@@ -1348,13 +1348,13 @@ async function deleteSelectedArtifact() {
 .ag-theme-quartz .ag-center-cols-container,
 .ag-theme-quartz .ag-body-viewport,
 .ag-theme-quartz .ag-body {
-  background-color: #FAF9F6;
+  background-color: var(--color-base);
 }
 
 .ag-theme-quartz .ag-paging-panel {
-  background-color: #EFEDE8;
-  border-top: 1px solid #E5E3DC;
-  color: #1A1F2E;
+  background-color: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-main);
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 400;
@@ -1362,11 +1362,11 @@ async function deleteSelectedArtifact() {
 }
 
 .ag-theme-quartz .ag-paging-button[aria-current='page'] {
-  color: #C96A2E;
+  color: var(--color-accent);
   font-weight: 500;
 }
 
 .table-pane-surface {
-  background-color: #FAF9F6;
+  background-color: var(--color-base);
 }
 </style>

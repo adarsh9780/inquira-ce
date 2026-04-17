@@ -142,7 +142,7 @@
                   <button
                     type="button"
                     class="text-[13px] font-medium underline-offset-2 hover:underline"
-                    style="color: #A1A1AA;"
+                    style="color: var(--color-text-sub);"
                     @click="openCodePane"
                   >
                     Open Code
@@ -826,7 +826,7 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
 
 <style scoped>
 :deep(.chat-ref-highlight) {
-  color: #0369a1;
+  color: var(--color-info-text);
   font-style: italic;
   font-weight: 500;
   text-decoration: underline;
@@ -1083,7 +1083,7 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   border: 1px solid var(--color-border);
   border-radius: 14px;
   overflow: hidden;
-  background-color: #FAF9F6;
+  background-color: var(--color-base);
 }
 
 :deep(.chat-code-header),
@@ -1093,7 +1093,7 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   justify-content: space-between;
   padding: 11px 14px;
   border-bottom: 1px solid var(--color-border);
-  background-color: #EFEDE8;
+  background-color: var(--color-surface);
   color: var(--color-text-muted);
   font-size: 13px;
   font-weight: 500;
@@ -1151,7 +1151,7 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   font-size: 13px;
   line-height: 1.6;
   font-weight: 400;
-  background-color: #FAF9F6;
+  background-color: var(--color-base);
   color: var(--color-text-main);
 }
 
@@ -1163,31 +1163,31 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
 
 :deep(.chat-code-scroll .token.comment),
 .chat-code-scroll .token.comment {
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 :deep(.chat-code-scroll .token.keyword),
 .chat-code-scroll .token.keyword {
-  color: #7c3aed;
+  color: var(--color-accent);
 }
 
 :deep(.chat-code-scroll .token.string),
 .chat-code-scroll .token.string {
-  color: #047857;
+  color: var(--color-success);
 }
 
 :deep(.chat-code-scroll .token.number),
 .chat-code-scroll .token.number {
-  color: #0f766e;
+  color: var(--color-info-text);
 }
 
 :deep(.chat-code-scroll .token.function),
 .chat-code-scroll .token.function {
-  color: #1d4ed8;
+  color: var(--color-info);
 }
 
 :deep(.chat-code-scroll .token.operator),
 .chat-code-scroll .token.operator {
-  color: #374151;
+  color: var(--color-text-main);
 }
 </style>

@@ -18,7 +18,7 @@
         >
           <span
             class="truncate"
-            :style="item?.isSpecial ? 'color: #0284c7;' : 'color: var(--color-text-main);'"
+            :style="item?.isSpecial ? 'color: var(--color-info);' : 'color: var(--color-text-main);'"
           >
             {{ item.displayText || `${item.table_name}.${item.column_name}` }}
           </span>

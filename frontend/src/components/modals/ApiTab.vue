@@ -123,7 +123,7 @@
       <div
         v-if="requiresApiKey && !hasSavedProviderApiKey"
         class="max-w-md rounded-md border p-3 text-xs"
-        style="border-color: var(--color-border); background-color: var(--color-surface-subtle, #f7f7f7); color: var(--color-text-muted);"
+        style="border-color: var(--color-border); background-color: var(--color-surface-subtle); color: var(--color-text-muted);"
       >
         The models shown below are built-in defaults. Save your API key first, then refresh to load models for this provider.
       </div>
@@ -131,7 +131,7 @@
       <div
         v-if="openrouterNeedsAccountModels"
         class="max-w-md rounded-md border p-3 text-xs"
-        style="border-color: #f5c26b; background-color: #fff8e8; color: #8a5a00;"
+        style="border-color: var(--color-warning); background-color: var(--color-warning-bg); color: var(--color-warning-text);"
       >
         OpenRouter account-level models are not configured yet. Configure account models first, then refresh this list.
         Until then, the default model is openrouter/free.
@@ -141,7 +141,7 @@
           target="_blank"
           rel="noopener"
           class="ml-1 underline"
-          style="color: #8a5a00;"
+          style="color: var(--color-warning-text);"
         >
           Open account model settings
         </a>

@@ -4,7 +4,7 @@
     <!-- Top Workspace Area (Chat/Code & Data Panes) -->
     <div 
       v-show="isWorkspaceActive"
-      class="flex w-full overflow-hidden transition-[height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+      class="flex w-full overflow-hidden transition-[height] motion-slow"
       :style="{ height: workspaceVisualHeight + '%' }"
     >
       <!-- Left Pane (Chat / Code) -->
@@ -19,7 +19,7 @@
       <!-- Vertical Resizer Handle (Left/Right panes) -->
       <div 
         v-if="!appStore.isDataFocusMode"
-        class="w-[3px] h-full hover:w-1 bg-transparent hover:bg-zinc-300 cursor-col-resize z-10 transition-all duration-150 relative -mx-[1px] hover:shadow-[0_0_6px_rgba(0,0,0,0.15)]"
+        class="pane-resizer-x relative z-10 -mx-[1px] h-full w-[3px] cursor-col-resize bg-transparent transition-all motion-fast hover:w-1"
         @mousedown="startResizeX"
       ></div>
 
@@ -35,15 +35,15 @@
     <!-- Horizontal Resizer Handle (Workspace/Terminal panes) -->
     <div
       v-if="isWorkspaceActive"
-      class="w-full bg-transparent z-20 relative -my-[1px] transition-[height,opacity,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
-      :class="appStore.isTerminalOpen ? 'h-[3px] hover:h-1 cursor-row-resize opacity-100 hover:bg-zinc-300 hover:shadow-[0_0_6px_rgba(0,0,0,0.15)]' : 'h-0 opacity-0 pointer-events-none'"
+      class="pane-resizer-y relative z-20 -my-[1px] w-full bg-transparent transition-[height,opacity,background-color,box-shadow] motion-slow"
+      :class="appStore.isTerminalOpen ? 'h-[3px] cursor-row-resize opacity-100 hover:h-1' : 'h-0 pointer-events-none opacity-0'"
       @mousedown="appStore.isTerminalOpen && startResizeY($event)"
     ></div>
 
     <!-- Bottom Pane (Terminal View) -->
     <div
       v-if="isWorkspaceActive"
-      class="w-full flex flex-col border-t z-10 overflow-hidden transition-[height,opacity,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+      class="w-full flex flex-col border-t z-10 overflow-hidden transition-[height,opacity,border-color] motion-slow"
       :class="appStore.isTerminalOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'"
       :style="{ height: terminalVisualHeight + '%', borderColor: appStore.isTerminalOpen ? 'var(--color-border)' : 'transparent', backgroundColor: 'var(--color-workspace-surface)' }"
     >
@@ -176,5 +176,11 @@ onUnmounted(() => {
 .workspace-data-pane {
   background-color: var(--color-workspace-surface);
   box-shadow: inset 1px 0 0 color-mix(in srgb, var(--color-text-main) 2%, transparent);
+}
+
+.pane-resizer-x:hover,
+.pane-resizer-y:hover {
+  background-color: var(--color-border-hover);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--color-text-main) 15%, transparent);
 }
 </style>

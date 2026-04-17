@@ -65,6 +65,12 @@ function readThemeColor(tokenName, fallback) {
   return value || fallback
 }
 
+function readThemeFont(tokenName, fallback) {
+  if (typeof window === 'undefined') return fallback
+  const value = String(getComputedStyle(document.documentElement).getPropertyValue(tokenName) || '').trim()
+  return value || fallback
+}
+
 function normalizeErrorMessage(error, fallback) {
   if (!error) return fallback
   if (typeof error === 'string') return error
@@ -155,19 +161,21 @@ onMounted(async () => {
   if (!tauriTerminalService.isTauriRuntime()) return
   if (!terminalHostRef.value) return
 
-  const terminalBackground = readThemeColor('--color-base', '#ffffff')
-  const terminalForeground = readThemeColor('--color-text-main', '#18181B')
-  const terminalCursor = readThemeColor('--color-accent', '#D47948')
+  const terminalBackground = readThemeColor('--color-base', 'var(--color-base)')
+  const terminalForeground = readThemeColor('--color-text-main', 'var(--color-text-main)')
+  const terminalCursor = readThemeColor('--color-accent', 'var(--color-accent)')
+  const terminalSelection = readThemeColor('--color-info-bg', 'color-mix(in srgb, var(--color-info) 18%, transparent)')
+  const terminalFontFamily = readThemeFont('--font-mono', '"JetBrainsMono Nerd Font", "JetBrains Mono", monospace')
 
   terminal = new Terminal({
     cursorBlink: true,
-    fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace',
+    fontFamily: terminalFontFamily,
     fontSize: 13,
     theme: {
       background: terminalBackground,
       foreground: terminalForeground,
       cursor: terminalCursor,
-      selectionBackground: 'rgba(59, 130, 246, 0.18)',
+      selectionBackground: terminalSelection,
     },
     allowProposedApi: false,
     convertEol: true,

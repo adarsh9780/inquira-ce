@@ -49,6 +49,7 @@
   /* Deep orange text on soft accent surfaces */
   --color-accent-soft: #F3E8DF;
   --color-accent-border: #E6CCBA;
+  --color-on-accent: #FFFFFF;
 
   /* Status Colors */
   --color-success: #16A34A;
@@ -63,6 +64,9 @@
   --color-warning-bg: color-mix(in srgb, var(--color-warning) 14%, var(--color-base));
   --color-info: var(--color-secondary-accent);
   --color-info-bg: color-mix(in srgb, var(--color-info) 12%, var(--color-base));
+  --color-danger-text: color-mix(in srgb, var(--color-danger) 70%, var(--color-text-main) 30%);
+  --color-warning-text: color-mix(in srgb, var(--color-warning) 72%, var(--color-text-main) 28%);
+  --color-info-text: color-mix(in srgb, var(--color-info) 72%, var(--color-text-main) 28%);
   --color-chat-user-bubble: #F3E8DF;
   /* Accent-tinted user-turn bubble surface */
 
@@ -76,7 +80,38 @@
   /* Typography */
   --font-ui: "Ubuntu", sans-serif;
   --font-display: "Ubuntu", sans-serif;
-  --font-mono: "Ubuntu Mono", monospace;
+  --font-mono: "JetBrainsMono Nerd Font", "JetBrains Mono", "Ubuntu Mono", monospace;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.3;
+  --line-height-body: 1.6;
+
+  /* Motion and Effects */
+  --motion-duration-fast: 150ms;
+  --motion-duration-quick: 100ms;
+  --motion-duration-micro: 75ms;
+  --motion-duration-standard: 200ms;
+  --motion-duration-slow: 300ms;
+  --motion-duration-slower: 500ms;
+  --motion-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --blur-backdrop-subtle: 2px;
+  --blur-backdrop-modal: 4px;
+  --blur-backdrop-strong: 8px;
+  --overlay-backdrop-color: color-mix(in srgb, var(--color-text-main) 36%, transparent);
+  --overlay-backdrop-strong: color-mix(in srgb, var(--color-text-main) 56%, transparent);
+  --overlay-backdrop-soft: color-mix(in srgb, var(--color-text-main) 10%, transparent);
+  --shadow-button: 0 1px 2px color-mix(in srgb, var(--color-text-main) 10%, transparent);
+  --shadow-modal: 0 24px 48px color-mix(in srgb, var(--color-text-main) 20%, transparent);
+  --shadow-lifted: 0 12px 32px color-mix(in srgb, var(--color-text-main) 14%, transparent);
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
 }
 
 /* Theme presets: switch by setting `data-theme` on <html>. */
@@ -174,6 +209,15 @@
   --color-danger-bg: color-mix(in srgb, var(--color-danger) 12%, var(--color-base));
   --color-warning-bg: color-mix(in srgb, var(--color-warning) 14%, var(--color-base));
   --color-info-bg: color-mix(in srgb, var(--color-info) 12%, var(--color-base));
+  --color-danger-text: color-mix(in srgb, var(--color-danger) 70%, var(--color-text-main) 30%);
+  --color-warning-text: color-mix(in srgb, var(--color-warning) 72%, var(--color-text-main) 28%);
+  --color-info-text: color-mix(in srgb, var(--color-info) 72%, var(--color-text-main) 28%);
+  --overlay-backdrop-color: color-mix(in srgb, var(--color-text-main) 36%, transparent);
+  --overlay-backdrop-strong: color-mix(in srgb, var(--color-text-main) 56%, transparent);
+  --overlay-backdrop-soft: color-mix(in srgb, var(--color-text-main) 10%, transparent);
+  --shadow-button: 0 1px 2px color-mix(in srgb, var(--color-text-main) 10%, transparent);
+  --shadow-modal: 0 24px 48px color-mix(in srgb, var(--color-text-main) 20%, transparent);
+  --shadow-lifted: 0 12px 32px color-mix(in srgb, var(--color-text-main) 14%, transparent);
 }
 
 /* Global styles */
@@ -204,15 +248,19 @@ body {
 
   /* Base Button - The foundation for all interactive elements */
   .btn {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+    @apply inline-flex items-center justify-center font-medium rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
     --tw-ring-color: var(--color-accent);
+    transition-property: background-color, border-color, color, box-shadow, opacity, transform;
+    transition-duration: var(--motion-duration-standard);
+    transition-timing-function: var(--motion-ease-standard);
   }
 
   /* Primary Button - High emphasis actions (e.g., Save, Submit, Create) */
   .btn-primary {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed border;
+    @apply inline-flex items-center justify-center font-medium rounded-lg focus:outline-none text-white disabled:opacity-50 disabled:cursor-not-allowed border;
     background-color: var(--color-primary-900);
     border-color: var(--color-primary-900);
+    box-shadow: var(--shadow-button);
   }
 
   .btn-primary:hover {
@@ -222,10 +270,11 @@ body {
 
   /* Secondary Button - Medium emphasis actions (e.g., Cancel, Refresh) */
   .btn-secondary {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none border shadow-sm disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center font-medium rounded-lg focus:outline-none border disabled:opacity-50 disabled:cursor-not-allowed;
     background-color: var(--color-chat-user-bubble);
     color: var(--color-text-main);
     border-color: var(--color-border);
+    box-shadow: var(--shadow-button);
   }
 
   .btn-secondary:hover {
@@ -235,7 +284,7 @@ body {
 
   /* Ghost Button - Low emphasis actions (e.g., subtle navigation, links) */
   .btn-ghost {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none bg-transparent disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center font-medium rounded-lg focus:outline-none bg-transparent disabled:opacity-50 disabled:cursor-not-allowed;
     color: var(--color-text-muted);
   }
 
@@ -246,8 +295,11 @@ body {
 
   /* Icon Button - For small controls in headers and sidebars */
   .btn-icon {
-    @apply inline-flex items-center justify-center rounded-md transition-all duration-150 p-1.5 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center rounded-md p-1.5 disabled:opacity-50 disabled:cursor-not-allowed;
     color: var(--color-text-muted);
+    transition-property: background-color, border-color, color, box-shadow, opacity, transform;
+    transition-duration: var(--motion-duration-fast);
+    transition-timing-function: var(--motion-ease-standard);
   }
 
   .btn-icon:hover {
@@ -257,14 +309,24 @@ body {
 
   /* Danger Button - For destructive actions */
   .btn-danger {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none text-white shadow-sm border disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center font-medium rounded-lg focus:outline-none text-white border disabled:opacity-50 disabled:cursor-not-allowed;
     background-color: var(--color-danger);
     border-color: var(--color-danger);
+    box-shadow: var(--shadow-button);
   }
 
   .btn-danger:hover {
-    background-color: color-mix(in srgb, var(--color-danger) 88%, #000 12%);
-    border-color: color-mix(in srgb, var(--color-danger) 88%, #000 12%);
+    background-color: color-mix(in srgb, var(--color-danger) 88%, var(--color-text-main) 12%);
+    border-color: color-mix(in srgb, var(--color-danger) 88%, var(--color-text-main) 12%);
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger {
+    transition-property: background-color, border-color, color, box-shadow, opacity, transform;
+    transition-duration: var(--motion-duration-standard);
+    transition-timing-function: var(--motion-ease-standard);
   }
 
   /* ============================================================
@@ -273,14 +335,67 @@ body {
 
   /* Semi-transparent backdrop */
   .modal-overlay {
-    @apply fixed inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity;
+    @apply fixed inset-0;
+    background-color: var(--overlay-backdrop-color);
+    backdrop-filter: blur(var(--blur-backdrop-subtle));
+    -webkit-backdrop-filter: blur(var(--blur-backdrop-subtle));
+    transition: opacity var(--motion-duration-standard) var(--motion-ease-standard),
+      backdrop-filter var(--motion-duration-standard) var(--motion-ease-standard);
+  }
+
+  .modal-overlay-strong {
+    background-color: var(--overlay-backdrop-strong);
+    backdrop-filter: blur(var(--blur-backdrop-modal));
+    -webkit-backdrop-filter: blur(var(--blur-backdrop-modal));
   }
 
   /* Modal card shell */
   .modal-card {
-    @apply relative rounded-xl shadow-2xl border overflow-hidden;
+    @apply relative rounded-xl border overflow-hidden;
     background-color: var(--color-surface);
     border-color: var(--color-border);
+    box-shadow: var(--shadow-modal);
+    transition: transform var(--motion-duration-standard) var(--motion-ease-standard),
+      opacity var(--motion-duration-standard) var(--motion-ease-standard),
+      box-shadow var(--motion-duration-standard) var(--motion-ease-standard);
+  }
+
+  /* Dialog transitions */
+  .dialog-fade-enter-active,
+  .dialog-fade-leave-active {
+    transition: opacity var(--motion-duration-standard) var(--motion-ease-standard);
+  }
+
+  .dialog-fade-enter-from,
+  .dialog-fade-leave-to {
+    opacity: 0;
+  }
+
+  .dialog-pop-enter-active,
+  .dialog-pop-leave-active {
+    transition: opacity var(--motion-duration-standard) var(--motion-ease-standard),
+      transform var(--motion-duration-standard) var(--motion-ease-emphasized);
+  }
+
+  .dialog-pop-enter-from,
+  .dialog-pop-leave-to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+
+  .motion-fast {
+    transition-duration: var(--motion-duration-fast);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  .motion-standard {
+    transition-duration: var(--motion-duration-standard);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  .motion-slow {
+    transition-duration: var(--motion-duration-slow);
+    transition-timing-function: var(--motion-ease-standard);
   }
 
   /* Modal header row */
@@ -423,6 +538,185 @@ p {
 
 .font-mono {
   font-family: var(--font-mono) !important;
+}
+
+@layer utilities {
+  .duration-75 {
+    transition-duration: var(--motion-duration-micro) !important;
+  }
+
+  .duration-100 {
+    transition-duration: var(--motion-duration-quick) !important;
+  }
+
+  .duration-150 {
+    transition-duration: var(--motion-duration-fast) !important;
+  }
+
+  .duration-200 {
+    transition-duration: var(--motion-duration-standard) !important;
+  }
+
+  .duration-300 {
+    transition-duration: var(--motion-duration-slow) !important;
+  }
+
+  .duration-500 {
+    transition-duration: var(--motion-duration-slower) !important;
+  }
+
+  .duration-1000 {
+    transition-duration: calc(var(--motion-duration-slower) * 2) !important;
+  }
+
+  .bg-white {
+    background-color: var(--color-base) !important;
+  }
+
+  .text-white {
+    color: var(--color-on-accent) !important;
+  }
+
+  .bg-black\/10 {
+    background-color: var(--overlay-backdrop-soft) !important;
+  }
+
+  .bg-black\/40 {
+    background-color: var(--overlay-backdrop-color) !important;
+  }
+
+  .bg-black\/60 {
+    background-color: var(--overlay-backdrop-strong) !important;
+  }
+
+  .backdrop-blur-sm {
+    backdrop-filter: blur(var(--blur-backdrop-modal)) !important;
+    -webkit-backdrop-filter: blur(var(--blur-backdrop-modal)) !important;
+  }
+
+  .backdrop-blur-\[1\.5px\] {
+    backdrop-filter: blur(var(--blur-backdrop-subtle)) !important;
+    -webkit-backdrop-filter: blur(var(--blur-backdrop-subtle)) !important;
+  }
+
+  .text-gray-400,
+  .text-zinc-400 {
+    color: var(--color-text-sub) !important;
+  }
+
+  .text-gray-500,
+  .text-zinc-500,
+  .text-zinc-600,
+  .text-zinc-700,
+  .text-zinc-800 {
+    color: var(--color-text-muted) !important;
+  }
+
+  .text-gray-900 {
+    color: var(--color-text-main) !important;
+  }
+
+  .bg-gray-50,
+  .bg-zinc-50,
+  .bg-amber-50,
+  .bg-yellow-50 {
+    background-color: var(--color-surface) !important;
+  }
+
+  .bg-gray-100,
+  .bg-zinc-100,
+  .bg-zinc-100\/60,
+  .bg-zinc-100\/80 {
+    background-color: var(--color-base-muted) !important;
+  }
+
+  .border-gray-100,
+  .border-gray-200,
+  .border-zinc-200 {
+    border-color: var(--color-border) !important;
+  }
+
+  .border-gray-300,
+  .border-zinc-300 {
+    border-color: var(--color-border-hover) !important;
+  }
+
+  .text-red-500,
+  .text-red-600,
+  .text-red-700 {
+    color: var(--color-danger-text) !important;
+  }
+
+  .bg-red-50 {
+    background-color: var(--color-danger-bg) !important;
+  }
+
+  .bg-red-100,
+  .border-red-200 {
+    background-color: color-mix(in srgb, var(--color-danger) 10%, var(--color-base)) !important;
+    border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border)) !important;
+  }
+
+  .bg-red-200 {
+    background-color: color-mix(in srgb, var(--color-danger) 20%, var(--color-base)) !important;
+  }
+
+  .bg-red-600 {
+    background-color: var(--color-danger) !important;
+  }
+
+  .text-green-600,
+  .text-green-700,
+  .text-green-800,
+  .text-emerald-700 {
+    color: var(--color-success) !important;
+  }
+
+  .bg-green-50 {
+    background-color: var(--color-success-bg) !important;
+  }
+
+  .border-green-200 {
+    border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border)) !important;
+  }
+
+  .text-yellow-600,
+  .text-yellow-700,
+  .text-yellow-800,
+  .text-yellow-900,
+  .text-amber-700,
+  .text-amber-800,
+  .text-amber-900 {
+    color: var(--color-warning-text) !important;
+  }
+
+  .bg-yellow-50,
+  .bg-amber-50 {
+    background-color: var(--color-warning-bg) !important;
+  }
+
+  .border-yellow-200,
+  .border-amber-200 {
+    border-color: color-mix(in srgb, var(--color-warning) 35%, var(--color-border)) !important;
+  }
+
+  .bg-amber-600,
+  .bg-yellow-600 {
+    background-color: var(--color-warning) !important;
+  }
+
+  .bg-amber-700,
+  .bg-yellow-700 {
+    background-color: color-mix(in srgb, var(--color-warning) 84%, var(--color-text-main) 16%) !important;
+  }
+
+  .text-blue-700 {
+    color: var(--color-info-text) !important;
+  }
+
+  .text-purple-600 {
+    color: var(--color-accent) !important;
+  }
 }
 
 /* ============================================================

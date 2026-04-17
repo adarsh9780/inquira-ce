@@ -51,7 +51,7 @@
                 <span class="inline-flex items-center gap-1.5">
                   <ArrowPathIcon v-if="event.status === 'running'" class="h-3.5 w-3.5 animate-spin" style="color: var(--color-text-muted);" />
                   <CheckCircleIcon v-else-if="event.status === 'success'" class="h-3.5 w-3.5" style="color: var(--color-success);" />
-                  <ExclamationTriangleIcon v-else-if="event.status === 'error'" class="h-3.5 w-3.5" style="color: #dc2626;" />
+                  <ExclamationTriangleIcon v-else-if="event.status === 'error'" class="h-3.5 w-3.5" style="color: var(--color-danger);" />
                   <span>{{ event.badgeLabel }}</span>
                 </span>
                 <span>{{ formatTimestamp(event.createdAt) }}</span>
@@ -76,7 +76,7 @@
               <pre
                 v-if="event.stderr"
                 class="mt-2 whitespace-pre-wrap break-words rounded-md border px-3 py-2 text-xs font-mono leading-5"
-                style="color: #b42318; border-color: color-mix(in srgb, #fca5a5 70%, var(--color-border)); background-color: color-mix(in srgb, #fef2f2 75%, var(--color-base));"
+                style="color: var(--color-danger-text); border-color: color-mix(in srgb, var(--color-danger) 70%, var(--color-border)); background-color: color-mix(in srgb, var(--color-danger-bg) 75%, var(--color-base));"
               >{{ event.stderr }}</pre>
               <p
                 v-if="!event.stdout && !event.stderr"

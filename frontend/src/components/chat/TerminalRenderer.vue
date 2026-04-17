@@ -123,8 +123,8 @@ async function copyOutput() {
   line-height: 1;
   padding: 3px 7px;
   border-radius: 4px;
-  background-color: color-mix(in srgb, var(--color-text-main, #3f3f46) 8%, transparent);
-  color: var(--color-text-main, #3f3f46);
+  background-color: color-mix(in srgb, var(--color-text-main, var(--color-text-main)) 8%, transparent);
+  color: var(--color-text-main, var(--color-text-main));
 }
 
 .shell-copy-btn {
@@ -132,7 +132,7 @@ async function copyOutput() {
   margin: 0;
   padding: 4px;
   background: transparent;
-  color: #a1a1aa;
+  color: var(--color-text-sub);
   cursor: pointer;
   border-radius: 4px;
   display: inline-flex;
@@ -142,8 +142,8 @@ async function copyOutput() {
 }
 
 .shell-copy-btn:hover {
-  color: #52525b;
-  background-color: #e4e4e7;
+  color: var(--color-text-muted);
+  background-color: var(--color-border);
 }
 
 .shell-copy-icon {
@@ -160,7 +160,7 @@ async function copyOutput() {
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.6;
-  color: #3f3f46;
+  color: var(--color-text-main);
   white-space: pre-wrap;
   word-break: break-word;
   font-weight: 400;
@@ -176,7 +176,7 @@ async function copyOutput() {
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.6;
-  color: #52525b;
+  color: var(--color-text-muted);
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 180px;
@@ -189,7 +189,7 @@ async function copyOutput() {
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.6;
-  color: #a1a1aa;
+  color: var(--color-text-sub);
   font-style: italic;
   font-weight: 400;
 }
@@ -215,10 +215,10 @@ async function copyOutput() {
 }
 
 .shell-status-success {
-  color: #16a34a;
+  color: var(--color-success);
 }
 
 .shell-status-error {
-  color: #dc2626;
+  color: var(--color-danger);
 }
 </style>
