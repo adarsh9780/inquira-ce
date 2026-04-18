@@ -19,6 +19,7 @@ class ProviderModelCatalog(BaseModel):
     lite_models: list[str] = Field(default_factory=list)
     default_main_model: str = ""
     default_lite_model: str = ""
+    base_url: str = ""
     source: str = "default"
     account_models_configured: bool | None = None
     account_models_url: str = ""
@@ -86,6 +87,7 @@ class PreferencesUpdateRequest(BaseModel):
 class ApiKeyUpdateRequest(BaseModel):
     provider: str = "openrouter"
     api_key: str | None = None
+    base_url: str | None = None
     selected_model: str | None = None
     selected_lite_model: str | None = None
     selected_coding_model: str | None = None

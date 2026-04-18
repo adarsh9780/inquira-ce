@@ -45,6 +45,8 @@ test('useLLMConfig composable exposes provider-aware save flow and advanced fiel
   assert.equal(source.includes('llm_max_tokens: Number(llmMaxTokens.value)'), true)
   assert.equal(source.includes('llm_top_k: Number(llmTopK.value)'), true)
   assert.equal(source.includes('slow_request_warning_seconds: Number(slowRequestWarningSeconds.value)'), true)
+  assert.equal(source.includes("if (selectedProvider === 'ollama') {"), true)
+  assert.equal(source.includes("payload.base_url = String(ollamaBaseUrl.value || '').trim() || 'http://localhost:11434'"), true)
   assert.equal(source.includes('await loadPreferences(selectedProvider, true)'), true)
 })
 

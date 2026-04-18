@@ -118,3 +118,32 @@ async def test_resolve_llm_preferences_includes_selected_coding_model(monkeypatc
     resolved = await ChatService._resolve_llm_preferences(SimpleNamespace(), "u1")
     assert resolved["selected_coding_model"] == "openai/gpt-4.1-mini"
     assert resolved["top_k"] == 0
+
+
+@pytest.mark.asyncio
+async def test_resolve_llm_preferences_uses_persisted_ollama_base_url(monkeypatch):
+    prefs = SimpleNamespace(
+        llm_provider="ollama",
+        selected_model="gpt-oss:20b-cloud",
+        selected_lite_model="llama3.2:3b",
+        selected_coding_model="gpt-oss:20b-cloud",
+        provider_model_catalogs_json='{"ollama":{"base_url":"http://localhost:11434/api"}}',
+        llm_temperature=0.0,
+        llm_max_tokens=2048,
+        llm_top_p=1.0,
+        llm_top_k=0,
+        llm_frequency_penalty=0.0,
+        llm_presence_penalty=0.0,
+    )
+
+    async def fake_get_or_create(_session, _user_id):
+        return prefs
+
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.PreferencesRepository.get_or_create",
+        fake_get_or_create,
+    )
+
+    resolved = await ChatService._resolve_llm_preferences(SimpleNamespace(), "u1")
+    assert resolved["provider"] == "ollama"
+    assert resolved["base_url"] == "http://localhost:11434/v1"

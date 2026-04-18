@@ -272,6 +272,71 @@ async def test_set_api_key_endpoint_persists_models_and_advanced_settings(monkey
     assert "Configuration and API key" in response.message
 
 
+@pytest.mark.asyncio
+async def test_set_api_key_endpoint_persists_ollama_base_url(monkeypatch):
+    prefs = SimpleNamespace(
+        llm_provider="ollama",
+        selected_model="llama3.2",
+        selected_lite_model="llama3.2:3b",
+        selected_coding_model="llama3.2",
+        enabled_main_models_json='["llama3.2"]',
+        provider_model_catalogs_json=json.dumps(
+            {
+                "ollama": {
+                    "main_models": ["llama3.2"],
+                    "lite_models": ["llama3.2:3b"],
+                    "default_main_model": "llama3.2",
+                    "default_lite_model": "llama3.2:3b",
+                    "base_url": "http://localhost:11434",
+                }
+            }
+        ),
+        llm_temperature=0.7,
+        llm_max_tokens=4096,
+        llm_top_p=1.0,
+        llm_top_k=0,
+        llm_frequency_penalty=0.0,
+        llm_presence_penalty=0.0,
+        slow_request_warning_seconds=30,
+        schema_context="",
+        allow_schema_sample_values=False,
+        terminal_risk_acknowledged=False,
+        chat_overlay_width=0.25,
+        is_sidebar_collapsed=True,
+        hide_shortcuts_modal=False,
+        active_workspace_id=None,
+        active_dataset_path=None,
+        active_table_name=None,
+    )
+
+    class _Session:
+        async def commit(self):
+            return None
+
+    async def _fake_get_or_create(_session, _principal_id):
+        return prefs
+
+    monkeypatch.setattr(
+        "app.v1.api.preferences.PreferencesRepository.get_or_create",
+        _fake_get_or_create,
+    )
+
+    await set_api_key(
+        ApiKeyUpdateRequest(
+            provider="ollama",
+            base_url="http://localhost:11434/api",
+            selected_model="llama3.2",
+            selected_lite_model="llama3.2:3b",
+            enabled_models=["llama3.2"],
+        ),
+        session=_Session(),
+        current_user=SimpleNamespace(id="u1"),
+    )
+
+    persisted_catalogs = json.loads(prefs.provider_model_catalogs_json)
+    assert persisted_catalogs["ollama"]["base_url"] == "http://localhost:11434/api"
+
+
 def test_coerce_provider_catalog_coerces_invalid_context_window_values():
     fallback = {
         "main_models": ["openrouter/free"],

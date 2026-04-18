@@ -184,6 +184,13 @@ function applyProviderModelState(providerName, prefs = {}, preserveSelection = t
       ? preferredLite
       : (liteModels.value[0] || null)
   }
+
+  if (normalized === 'ollama') {
+    const catalogBaseUrl = String(catalog?.base_url || '').trim()
+    if (catalogBaseUrl) {
+      ollamaBaseUrl.value = catalogBaseUrl
+    }
+  }
 }
 
 function getModelMeta(providerName, modelId) {
@@ -496,6 +503,9 @@ async function saveConfig() {
       llm_frequency_penalty: Number(llmFrequencyPenalty.value),
       llm_presence_penalty: Number(llmPresencePenalty.value),
       slow_request_warning_seconds: Number(slowRequestWarningSeconds.value),
+    }
+    if (selectedProvider === 'ollama') {
+      payload.base_url = String(ollamaBaseUrl.value || '').trim() || 'http://localhost:11434'
     }
     if (hasNewUnmaskedKey) {
       payload.api_key = enteredKey

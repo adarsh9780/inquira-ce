@@ -105,6 +105,33 @@ class ChatService:
         return input_state
 
     @staticmethod
+    def _normalize_ollama_chat_base_url(raw_base_url: str | None) -> str:
+        raw = str(raw_base_url or "").strip().rstrip("/")
+        if not raw:
+            return "http://localhost:11434/v1"
+        if raw.endswith("/v1"):
+            return raw
+        if raw.endswith("/api"):
+            return f"{raw[:-4].rstrip('/')}/v1"
+        return f"{raw}/v1"
+
+    @staticmethod
+    def _resolve_ollama_base_url_from_catalogs(prefs: Any | None) -> str:
+        if prefs is None:
+            return "http://localhost:11434/v1"
+        try:
+            raw_catalogs = json.loads(str(getattr(prefs, "provider_model_catalogs_json", "{}") or "{}"))
+        except Exception:  # noqa: BLE001
+            raw_catalogs = {}
+        if not isinstance(raw_catalogs, dict):
+            raw_catalogs = {}
+        ollama_catalog = raw_catalogs.get("ollama") if isinstance(raw_catalogs.get("ollama"), dict) else {}
+        base_url = str(ollama_catalog.get("base_url") or "").strip()
+        if not base_url:
+            return "http://localhost:11434/v1"
+        return ChatService._normalize_ollama_chat_base_url(base_url)
+
+    @staticmethod
     async def _resolve_llm_preferences(session: AsyncSession, user_id: str) -> dict[str, Any]:
         runtime = load_llm_runtime_config()
         prefs: Any | None = None
@@ -132,7 +159,12 @@ class ChatService:
         provider = normalize_llm_provider(
             getattr(prefs, "llm_provider", runtime.provider) if prefs is not None else runtime.provider
         )
-        base_url = runtime.base_url if provider == "openrouter" else provider_default_base_url(provider)
+        if provider == "openrouter":
+            base_url = runtime.base_url
+        elif provider == "ollama":
+            base_url = ChatService._resolve_ollama_base_url_from_catalogs(prefs)
+        else:
+            base_url = provider_default_base_url(provider)
         selected_lite_model = str(
             (getattr(prefs, "selected_lite_model", runtime.lite_model) if prefs is not None else runtime.lite_model)
             or runtime.lite_model

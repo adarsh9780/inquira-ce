@@ -28,6 +28,7 @@ from ...services.llm_provider_catalog import (
     SUPPORTED_LLM_PROVIDERS,
     all_provider_model_catalogs,
     normalize_llm_provider,
+    provider_default_base_url,
     provider_model_catalog,
     provider_requires_api_key,
 )
@@ -48,6 +49,7 @@ router = APIRouter(
 _VERIFY_TIMEOUT_SECONDS = 20.0
 _RECOMMENDED_FOR_ALLOWED = {"main", "lite", "both"}
 _TAGS_ALLOWED = {"recommended", "extended"}
+_DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 
 
 def _coerce_non_negative_int(raw: Any) -> int:
@@ -184,6 +186,17 @@ def _coerce_provider_catalog(
             default_lite_model = default_main_model
 
     source = str(data.get("source") or fallback.get("source") or "default").strip() or "default"
+    base_url = str(data.get("base_url") or fallback.get("base_url") or "").strip()
+    if provider == "ollama":
+        default_base = str(provider_default_base_url("ollama") or "").strip() or _DEFAULT_OLLAMA_BASE_URL
+        if default_base.endswith("/v1"):
+            default_base = default_base[:-3].rstrip("/")
+        if default_base.endswith("/api"):
+            default_base = default_base[:-4].rstrip("/")
+        normalized_base = base_url.rstrip("/")
+        if not normalized_base:
+            normalized_base = default_base.rstrip("/")
+        base_url = normalized_base or _DEFAULT_OLLAMA_BASE_URL
 
     account_models_configured: bool | None
     if data.get("account_models_configured") is None:
@@ -208,6 +221,7 @@ def _coerce_provider_catalog(
         "lite_models": lite_models,
         "default_main_model": default_main_model,
         "default_lite_model": default_lite_model,
+        "base_url": base_url,
         "source": source,
         "account_models_configured": account_models_configured,
         "account_models_url": account_models_url,
@@ -500,6 +514,10 @@ async def refresh_provider_models(
 
     fallback = provider_catalogs.get(provider, provider_model_catalog(provider))
     merged_catalog = dict(refresh_result.catalog)
+    if provider == "ollama":
+        requested_base_url = str(payload.base_url or "").strip()
+        fallback_base_url = str(fallback.get("base_url") or _DEFAULT_OLLAMA_BASE_URL).strip()
+        merged_catalog["base_url"] = (requested_base_url or fallback_base_url).rstrip("/") or _DEFAULT_OLLAMA_BASE_URL
     merged_catalog["models"] = merge_refreshed_model_metadata(
         provider,
         fallback.get("models"),
@@ -576,6 +594,20 @@ async def set_api_key(
     provider_catalogs = _resolve_provider_catalogs(prefs)
     prefs.llm_provider = provider
     catalog = provider_catalogs.get(provider, provider_model_catalog(provider))
+    if provider == "ollama":
+        requested_base_url = str(payload.base_url or "").strip().rstrip("/")
+        if requested_base_url:
+            catalog = {
+                **catalog,
+                "base_url": requested_base_url,
+            }
+            provider_catalogs[provider] = _coerce_provider_catalog(
+                provider,
+                catalog,
+                provider_model_catalog(provider),
+            )
+            prefs.provider_model_catalogs_json = json.dumps(provider_catalogs)
+            catalog = provider_catalogs[provider]
 
     if payload.enabled_models is not None:
         allowed = set(catalog.get("main_models", []))
