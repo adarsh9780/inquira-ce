@@ -540,3 +540,140 @@ async def test_agent_client_run_skips_assistant_management_when_disabled(monkeyp
     run_body = captured["https://agents.example.com/runs/wait"]
     assert run_body["assistant_id"] == "agent_v2"
     assert run_body["config"]["recursion_limit"] == 90
+
+
+@pytest.mark.asyncio
+async def test_agent_client_assert_health_uses_cached_result(monkeypatch):
+    counts = {"ok": 0, "info": 0}
+
+    class _Resp:
+        def __init__(self, status_code: int = 200, payload=None):
+            self.status_code = status_code
+            self.text = ""
+            self.content = b"{}"
+            self._payload = payload if payload is not None else {}
+
+        def json(self):
+            return self._payload
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            _ = args, kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            _ = exc_type, exc, tb
+            return False
+
+        async def get(self, url, *args, **kwargs):
+            _ = args, kwargs
+            if url.endswith("/ok"):
+                counts["ok"] += 1
+                return _Resp(200, {"ok": True})
+            if url.endswith("/info"):
+                counts["info"] += 1
+                return _Resp(200, {"version": "1.0"})
+            return _Resp(404, {})
+
+        async def post(self, url, *args, **kwargs):
+            _ = url, args, kwargs
+            return _Resp(404, {})
+
+    monkeypatch.setattr("app.services.agent_client.httpx.AsyncClient", _Client)
+    monkeypatch.setattr(
+        "app.services.agent_client.load_agent_service_config",
+        lambda: type(
+            "Cfg",
+            (),
+            {
+                "base_url": "http://127.0.0.1:8123",
+                "expected_api_major": 1,
+                "default_agent": "agent_v2",
+                "auth_mode": "shared_secret",
+                "shared_secret": "abc",
+                "manage_assistants": False,
+                "health_cache_ttl_sec": 60,
+            },
+        )(),
+    )
+    AgentClient._health_cache.clear()
+
+    client = AgentClient()
+    first = await client.assert_health()
+    second = await client.assert_health()
+
+    assert first["status"] == "ok"
+    assert second["status"] == "ok"
+    assert counts["ok"] == 1
+    assert counts["info"] == 1
+
+
+@pytest.mark.asyncio
+async def test_agent_client_run_reuses_cached_assistant_lookup(monkeypatch):
+    counts = {"search": 0}
+
+    class _Resp:
+        def __init__(self, status_code: int = 200, payload=None):
+            self.status_code = status_code
+            self.text = ""
+            self.content = b"{}"
+            self._payload = payload if payload is not None else {}
+
+        def json(self):
+            return self._payload
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            _ = args, kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            _ = exc_type, exc, tb
+            return False
+
+        async def post(self, url, *args, **kwargs):
+            _ = args, kwargs
+            if url.endswith("/assistants/search"):
+                counts["search"] += 1
+                return _Resp(200, [{"assistant_id": "agent_v2"}])
+            if url.endswith("/runs/wait"):
+                return _Resp(200, {"values": {"route": "analysis"}})
+            return _Resp(404, {})
+
+    monkeypatch.setattr("app.services.agent_client.httpx.AsyncClient", _Client)
+    monkeypatch.setattr(
+        "app.services.agent_client.load_agent_service_config",
+        lambda: type(
+            "Cfg",
+            (),
+            {
+                "base_url": "http://127.0.0.1:8123",
+                "expected_api_major": 1,
+                "default_agent": "agent_v2",
+                "auth_mode": "shared_secret",
+                "shared_secret": "abc",
+                "manage_assistants": True,
+                "assistant_cache_ttl_sec": 300,
+                "recursion_limit": 80,
+            },
+        )(),
+    )
+    AgentClient._assistant_cache.clear()
+
+    client = AgentClient()
+    payload = {
+        "agent_profile": "agent_v2",
+        "user_id": "u1",
+        "workspace_id": "w1",
+        "conversation_id": "c1",
+        "model": "gpt-test",
+        "llm": {},
+    }
+    _ = await client.run(payload)
+    _ = await client.run(payload)
+
+    assert counts["search"] == 1

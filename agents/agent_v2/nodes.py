@@ -6,6 +6,7 @@ import asyncio
 import ast
 import json
 import re
+import time
 import warnings
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -26,6 +27,7 @@ from .code_guard import guard_code
 from .events import emit_agent_event
 from .router import decide_route
 from .runtime import load_agent_runtime_config
+from .memory.summarizer import build_conversation_memory
 from .streaming import emit_stream_token
 from .structured_schema import openai_strict_json_schema
 from .tools.execute_python import execute_python
@@ -449,11 +451,12 @@ def _get_model(config: RunnableConfig, *, lite: bool) -> BaseChatModel:
     selected = normalize_model_id(str(configurable.get("model") or "").strip())
     coding_model = normalize_model_id(str(configurable.get("coding_model") or "").strip())
     temperature = float(configurable.get("temperature") if configurable.get("temperature") is not None else 0.0)
-    max_tokens = int(
-        configurable.get("max_tokens")
-        if configurable.get("max_tokens") is not None
-        else runtime.code_generation_max_tokens
-    )
+    if configurable.get("max_tokens") is not None:
+        max_tokens = int(configurable.get("max_tokens"))
+    elif lite:
+        max_tokens = int(runtime.schema_max_tokens)
+    else:
+        max_tokens = int(runtime.code_generation_max_tokens)
     top_p = float(configurable.get("top_p") if configurable.get("top_p") is not None else 1.0)
     top_k = int(configurable.get("top_k") if configurable.get("top_k") is not None else 0)
     frequency_penalty = float(
@@ -465,7 +468,7 @@ def _get_model(config: RunnableConfig, *, lite: bool) -> BaseChatModel:
     if lite:
         model_name = lite_model or selected or default_model
     else:
-        model_name = coding_model or default_model
+        model_name = coding_model or selected or default_model
     api_key = str(configurable.get("api_key") or "").strip()
     if provider_requires_api_key(provider) and not api_key:
         raise ValueError("API key not configured for agent v2.")
@@ -484,7 +487,7 @@ def _get_model(config: RunnableConfig, *, lite: bool) -> BaseChatModel:
     )
 
 
-def _emit_text_chunks(node_name: str, text: str, chunk_size: int = 24) -> None:
+def _emit_text_chunks(node_name: str, text: str, chunk_size: int = 72) -> None:
     rendered = str(text or "")
     if not rendered:
         return
@@ -1066,6 +1069,7 @@ async def validate_result_runtime_tool(
     run_id: Annotated[str, InjectedState("run_id")] = "",
 ) -> dict[str, Any]:
     """Normalize runtime execution result for explanation and routing."""
+    started = time.perf_counter()
     call_id = new_tool_call_id("validate_result_runtime")
     emit_agent_event(
         "tool_call",
@@ -1089,7 +1093,12 @@ async def validate_result_runtime_tool(
     )
     emit_agent_event(
         "tool_result",
-        {"call_id": call_id, "output": result, "status": "success", "duration_ms": 1},
+        {
+            "call_id": call_id,
+            "output": result,
+            "status": "success",
+            "duration_ms": max(1, int((time.perf_counter() - started) * 1000)),
+        },
     )
     return result
 
@@ -1193,6 +1202,7 @@ def _truncate_text(value: Any, *, limit: int = 2400) -> str:
 def _build_context_enrichment_user_prompt(
     *,
     user_text: str,
+    conversation_memory: str,
     schema_summary: str,
     known_columns: list[dict[str, str]],
     missing_context: list[str],
@@ -1206,9 +1216,11 @@ def _build_context_enrichment_user_prompt(
     hints_json = _safe_json_dumps(enrichment_hints[:8])
     feedback = _truncate_text(retry_feedback, limit=500)
     summary = _truncate_text(schema_summary, limit=2200)
+    memory = _truncate_text(conversation_memory, limit=1800)
     return (
         "User question:\n"
         f"{_truncate_text(user_text, limit=600)}\n\n"
+        f"Conversation memory summary:\n{memory or 'none'}\n\n"
         "Schema summary:\n"
         f"{summary}\n\n"
         f"Known columns JSON:\n{known_columns_json}\n\n"
@@ -1334,6 +1346,89 @@ def _merge_enrichment_results(
     if isinstance(incoming.get("sample_data"), dict):
         merged["sample_data"] = incoming["sample_data"]
     return merged
+
+
+def _filter_redundant_context_tools(
+    tools: list[dict[str, Any]],
+    existing_results: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    results = existing_results if isinstance(existing_results, dict) else {}
+    prior_search_queries: set[str] = set()
+    search_rows = results.get("search_schema")
+    if isinstance(search_rows, list):
+        for item in search_rows:
+            if not isinstance(item, dict):
+                continue
+            combined_queries: list[str] = []
+            primary = str(item.get("query") or "").strip()
+            if primary:
+                combined_queries.append(primary)
+            item_queries = item.get("queries")
+            if isinstance(item_queries, list):
+                combined_queries.extend(str(value).strip() for value in item_queries if str(value).strip())
+            for query in combined_queries:
+                for keyword in _extract_schema_query_keywords(query, max_items=8):
+                    prior_search_queries.add(keyword.lower())
+
+    prior_chunk_terms: list[set[str]] = []
+    chunk_rows = results.get("scan_schema_chunks")
+    if isinstance(chunk_rows, list):
+        for item in chunk_rows:
+            if not isinstance(item, dict):
+                continue
+            terms = [
+                str(term).strip().lower()
+                for term in (item.get("query_terms") or [])
+                if str(term).strip()
+            ]
+            if terms:
+                prior_chunk_terms.append(set(terms))
+
+    has_sample_data = isinstance(results.get("sample_data"), dict)
+    filtered: list[dict[str, Any]] = []
+    seen_signatures: set[str] = set()
+    for item in tools:
+        if not isinstance(item, dict):
+            continue
+        tool_name = str(item.get("tool") or "").strip()
+        args = item.get("args") if isinstance(item.get("args"), dict) else {}
+        action = dict(item)
+        action_args = dict(args)
+        if tool_name == "search_schema":
+            normalized_queries = _normalize_broad_search_queries(
+                query=str(action_args.get("query") or "").strip(),
+                queries=action_args.get("queries") if isinstance(action_args.get("queries"), list) else None,
+                max_items=8,
+            )
+            unseen_queries = [query for query in normalized_queries if query.lower() not in prior_search_queries]
+            if not unseen_queries:
+                continue
+            for query in unseen_queries:
+                prior_search_queries.add(query.lower())
+            action_args["queries"] = unseen_queries
+            action_args["query"] = unseen_queries[0]
+            action["args"] = action_args
+        elif tool_name == "scan_schema_chunks":
+            normalized_terms = [
+                str(term).strip().lower()
+                for term in (action_args.get("query_terms") or [])
+                if str(term).strip()
+            ]
+            if not normalized_terms:
+                continue
+            term_set = set(normalized_terms)
+            if any(term_set.issubset(previous) for previous in prior_chunk_terms):
+                continue
+            prior_chunk_terms.append(term_set)
+        elif tool_name == "sample_data" and has_sample_data:
+            continue
+
+        signature = _safe_json_dumps({"tool": tool_name, "args": action.get("args")})
+        if signature in seen_signatures:
+            continue
+        seen_signatures.add(signature)
+        filtered.append(action)
+    return filtered
 
 
 def _latest_tool_payload(
@@ -1531,6 +1626,7 @@ async def execute_pending_tools_node(
         )
 
         status = "success"
+        started = time.perf_counter()
         try:
             payload = await executor(state, args, explanation)
             if tool_name == "execute_python_runtime" and not bool(payload.get("success", False)):
@@ -1547,7 +1643,7 @@ async def execute_pending_tools_node(
                 "call_id": call_id,
                 "output": payload,
                 "status": status,
-                "duration_ms": 1,
+                "duration_ms": max(1, int((time.perf_counter() - started) * 1000)),
             },
         )
         _record_tool_span_event(
@@ -1697,7 +1793,20 @@ async def _generate_result_explanations(
 
 async def analysis_collect_context_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
     _ = config
-    messages = _bounded_messages(list(state.get("messages") or []), max_messages=8)
+    runtime = load_agent_runtime_config()
+    raw_messages = list(state.get("messages") or [])
+    memory = build_conversation_memory(
+        raw_messages,
+        max_recent_messages=max(1, int(runtime.memory_max_recent_messages)),
+        max_summary_chars=max(240, int(runtime.memory_max_summary_tokens) * 4),
+    )
+    recent_messages = (
+        memory.get("recent_messages") if isinstance(memory.get("recent_messages"), list) else raw_messages
+    )
+    messages = _bounded_messages(
+        recent_messages,
+        max_messages=max(1, int(runtime.memory_max_recent_messages)),
+    )
     table_names = _state_table_names(state, max_items=16)
     data_path = str(state.get("data_path") or "")
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
@@ -1715,8 +1824,11 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
             "Distilled schema memory from prior runs:\n"
             f"{schema_memory[:4000]}"
         )
+    conversation_memory = _truncate_text(
+        str(memory.get("summary") or ""),
+        limit=max(200, int(runtime.memory_max_summary_tokens) * 4),
+    )
     user_text = _latest_user_text(messages)
-    runtime = load_agent_runtime_config()
     attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
     existing_tool_messages = list(state.get("analysis_tool_messages") or [])
     reset_tool_messages = [
@@ -1743,6 +1855,7 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
             "context": str(state.get("context") or ""),
             "workspace_schema": workspace_schema,
             "schema_memory": schema_memory,
+            "conversation_memory": conversation_memory,
         },
         "known_columns": known_columns,
         "attempt_counters": {
@@ -1771,6 +1884,7 @@ async def analysis_assess_context_node(state: dict[str, Any], config: RunnableCo
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
     table_names = _normalize_table_names(analysis_context.get("table_names"), max_items=16)
     schema_summary = _truncate_text(str(analysis_context.get("schema_summary") or ""), limit=1800)
+    conversation_memory = _truncate_text(str(analysis_context.get("conversation_memory") or ""), limit=1200)
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", _ASSESS_CONTEXT_PROMPT),
@@ -1778,6 +1892,7 @@ async def analysis_assess_context_node(state: dict[str, Any], config: RunnableCo
                 "human",
                 (
                     "User question: {user_text}\n\n"
+                    "Conversation memory summary:\n{conversation_memory}\n\n"
                     "Schema summary:\n{schema_summary}\n\n"
                     "Known columns: {known_columns_json}\n\n"
                     "Prior retry feedback: {retry_feedback}\n\n"
@@ -1793,6 +1908,7 @@ async def analysis_assess_context_node(state: dict[str, Any], config: RunnableCo
             chain,
             {
                 "user_text": _truncate_text(user_text, limit=400),
+                "conversation_memory": conversation_memory or "none",
                 "schema_summary": schema_summary,
                 "known_columns_json": _safe_json_dumps(known_columns[:20]),
                 "retry_feedback": _truncate_text(str(state.get("retry_feedback") or ""), limit=400),
@@ -1854,6 +1970,7 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
     tool_budget_remaining = max(0, max_tool_calls - executed_tool_calls)
     prompt_payload = _build_context_enrichment_user_prompt(
         user_text=str(analysis_context.get("user_text") or ""),
+        conversation_memory=str(analysis_context.get("conversation_memory") or ""),
         schema_summary=str(analysis_context.get("schema_summary") or ""),
         known_columns=known_columns,
         missing_context=missing_context,
@@ -1914,6 +2031,7 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
         [item.model_dump() for item in (plan.tools or [])],
         max_items=max(1, tool_budget_remaining),
     )
+    pending_tools = _filter_redundant_context_tools(pending_tools, existing_results)
     if decision.enough_context:
         pending_tools = []
 
@@ -2156,12 +2274,19 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
 
     retry_feedback = str(state.get("retry_feedback") or "").strip()
     schema_memory = str(analysis_context.get("schema_memory") or "").strip()
+    conversation_memory = str(analysis_context.get("conversation_memory") or "").strip()
     generation_context = str(analysis_context.get("context") or "")
     if schema_memory:
         generation_context = (
             f"{generation_context}\n\n"
             "Use this schema memory as analyst notes before writing code:\n"
             f"{schema_memory[:5000]}"
+        ).strip()
+    if conversation_memory:
+        generation_context = (
+            f"{generation_context}\n\n"
+            "Conversation memory summary:\n"
+            f"{conversation_memory[:3000]}"
         ).strip()
     if retry_feedback:
         messages = list(messages) + [HumanMessage(content=f"Fix the previous issue: {retry_feedback}")]
@@ -2433,10 +2558,11 @@ async def analysis_validate_result_node(state: dict[str, Any], config: RunnableC
     artifact_count = int(result_summary.get("artifact_count") or 0)
     has_stdout_signal = bool(str(result_summary.get("stdout") or "").strip())
     has_result_signal = result_kind in {"dataframe", "figure", "scalar"}
+    has_summary_signal = bool(result_summary.get("has_signal"))
     validation_outcome = {"status": "ok", "reason": ""}
     retry_feedback = ""
     retry_target = ""
-    if not (artifact_count > 0 or has_result_signal or has_stdout_signal):
+    if not (artifact_count > 0 or has_result_signal or has_stdout_signal or has_summary_signal):
         validation_outcome = {
             "status": "retry",
             "reason": (

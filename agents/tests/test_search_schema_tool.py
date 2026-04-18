@@ -52,3 +52,26 @@ def test_search_schema_supports_multiple_query_patterns_in_one_call(tmp_path) ->
     assert "total_amount" in names
     first = columns[0] if columns else {}
     assert isinstance(first.get("matched_queries"), list)
+
+
+def test_search_schema_reports_query_coverage(tmp_path) -> None:
+    db_path = tmp_path / "workspace.duckdb"
+    con = duckdb.connect(str(db_path))
+    try:
+        con.execute("CREATE TABLE sales (customer_name VARCHAR, total_amount DOUBLE)")
+    finally:
+        con.close()
+
+    result = search_schema(
+        data_path=str(db_path),
+        table_names=["sales"],
+        query="customer",
+        queries=["customer", "missing_metric"],
+        table_name=None,
+        max_results=10,
+    )
+
+    covered = result.get("covered_queries") if isinstance(result, dict) else []
+    missing = result.get("missing_queries") if isinstance(result, dict) else []
+    assert "customer" in (covered or [])
+    assert "missing_metric" in (missing or [])

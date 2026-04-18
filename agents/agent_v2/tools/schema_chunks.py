@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+import time
 from typing import Any
 
 from ..events import emit_agent_event
@@ -10,6 +12,25 @@ from . import new_tool_call_id
 
 def _normalize_text(value: Any) -> str:
     return " ".join(str(value or "").strip().lower().split())
+
+
+def _normalize_terms(query_terms: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in query_terms or []:
+        raw = _normalize_text(item)
+        if not raw:
+            continue
+        tokens = re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*", raw) or [raw]
+        for token in tokens:
+            value = _normalize_text(token)
+            if not value or value in seen:
+                continue
+            if len(value) < 2 and value != "id":
+                continue
+            seen.add(value)
+            normalized.append(value)
+    return normalized
 
 
 def _score_table_chunk(
@@ -69,8 +90,9 @@ def scan_schema_chunks(
     explanation: str = "",
     emit_tool_events: bool = True,
 ) -> dict[str, Any]:
+    started = time.perf_counter()
     call_id = new_tool_call_id("scan_schema_chunks") if emit_tool_events else ""
-    normalized_terms = [_normalize_text(term) for term in (query_terms or []) if _normalize_text(term)]
+    normalized_terms = _normalize_terms([str(term or "") for term in (query_terms or [])])
     table_filter = {str(item or "").strip().lower() for item in (table_names or []) if str(item or "").strip()}
     safe_chunk_size = max(1, min(16, int(chunk_size or 4)))
     safe_max_chunks = max(1, min(40, int(max_chunks or 12)))
@@ -145,6 +167,7 @@ def scan_schema_chunks(
 
     output = {
         "query_terms": [str(term) for term in query_terms or []],
+        "normalized_terms": normalized_terms,
         "chunks_scanned": scanned_chunks,
         "relevant_table_count": len(relevant_tables),
         "relevant_tables": relevant_tables,
@@ -158,7 +181,7 @@ def scan_schema_chunks(
                 "call_id": call_id,
                 "output": output,
                 "status": "success",
-                "duration_ms": 1,
+                "duration_ms": max(1, int((time.perf_counter() - started) * 1000)),
             },
         )
     return output

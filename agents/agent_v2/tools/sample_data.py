@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+import time
+
 import duckdb
 
 from ..events import emit_agent_event
 from . import new_tool_call_id
+
+
+def _quote_identifier(identifier: str) -> str:
+    return f'"{str(identifier or "").replace(chr(34), chr(34) * 2)}"'
+
+
 def sample_data(
     *,
     data_path: str | None,
@@ -14,6 +22,7 @@ def sample_data(
     explanation: str = "",
     emit_tool_events: bool = True,
 ) -> dict:
+    started = time.perf_counter()
     call_id = new_tool_call_id("sample_data") if emit_tool_events else ""
     safe_limit = max(1, min(50, int(limit)))
     if emit_tool_events:
@@ -36,11 +45,16 @@ def sample_data(
         if emit_tool_events:
             emit_agent_event(
                 "tool_result",
-                {"call_id": call_id, "output": output, "status": "success", "duration_ms": 1},
+                {
+                    "call_id": call_id,
+                    "output": output,
+                    "status": "success",
+                    "duration_ms": max(1, int((time.perf_counter() - started) * 1000)),
+                },
             )
         return output
 
-    query = f'SELECT * FROM "{table_name}" LIMIT {safe_limit}'
+    query = f"SELECT * FROM {_quote_identifier(table_name)} LIMIT {safe_limit}"
     try:
         con = duckdb.connect(data_path, read_only=True)
         try:
@@ -56,7 +70,12 @@ def sample_data(
         if emit_tool_events:
             emit_agent_event(
                 "tool_result",
-                {"call_id": call_id, "output": output, "status": "success", "duration_ms": 3},
+                {
+                    "call_id": call_id,
+                    "output": output,
+                    "status": "success",
+                    "duration_ms": max(1, int((time.perf_counter() - started) * 1000)),
+                },
             )
         return output
     except Exception as exc:
@@ -67,7 +86,7 @@ def sample_data(
                     "call_id": call_id,
                     "output": {"error": str(exc)},
                     "status": "error",
-                    "duration_ms": 3,
+                    "duration_ms": max(1, int((time.perf_counter() - started) * 1000)),
                 },
             )
         return {"rows": [], "columns": [], "row_count": 0, "error": str(exc)}

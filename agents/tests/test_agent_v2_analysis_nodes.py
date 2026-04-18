@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate
@@ -25,6 +27,7 @@ from agent_v2.nodes import (
     analysis_validate_result_node,
     analysis_validate_to_next,
     analysis_retry_decider_node,
+    _filter_redundant_context_tools,
     ContextEnrichmentPlan,
     StructuredToolCall,
 )
@@ -134,6 +137,7 @@ def test_recoverable_structured_output_error_matches_injected_sse_json_error() -
 def test_context_enrichment_prompt_includes_prior_search_context() -> None:
     rendered = _build_context_enrichment_user_prompt(
         user_text="top scorers",
+        conversation_memory="Earlier we focused on batting metrics.",
         schema_summary="batting table",
         known_columns=[],
         missing_context=["columns"],
@@ -564,6 +568,78 @@ async def test_analysis_collect_context_reads_schema_memory(tmp_path) -> None:
     assert isinstance(analysis_context, dict)
     assert "schema_memory" in analysis_context
     assert "Schema Analysis Memory" in str(analysis_context.get("schema_memory") or "")
+
+
+@pytest.mark.asyncio
+async def test_analysis_collect_context_adds_conversation_memory_summary(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "agent_v2.nodes.load_agent_runtime_config",
+        lambda: SimpleNamespace(
+            max_tool_calls=5,
+            max_code_executions=3,
+            memory_max_recent_messages=3,
+            memory_max_summary_tokens=400,
+        ),
+    )
+    state = {
+        "messages": [
+            HumanMessage(content="Find yearly sales trend"),
+            AIMessage(content="I will inspect schema first."),
+            HumanMessage(content="Focus APAC region."),
+            AIMessage(content="Noted, filtering APAC."),
+            HumanMessage(content="Now compare with EMEA."),
+        ],
+        "table_names": ["sales"],
+        "known_columns": [],
+        "data_path": "/tmp/ws.db",
+    }
+    result = await analysis_collect_context_node(state, {"configurable": {}})
+    analysis_context = result.get("analysis_context") or {}
+    summary = str(analysis_context.get("conversation_memory") or "")
+    recent_messages = analysis_context.get("messages") or []
+
+    assert "User requests:" in summary
+    assert "Find yearly sales trend" in summary
+    assert len(recent_messages) <= 3
+
+
+def test_filter_redundant_context_tools_skips_duplicate_search_and_sample_calls() -> None:
+    existing_results = {
+        "search_schema": [
+            {"query": "runs", "queries": ["runs", "batsman"]},
+        ],
+        "scan_schema_chunks": [
+            {"query_terms": ["batsman", "runs"]},
+        ],
+        "sample_data": {"rows": [{"batsman": "A"}]},
+    }
+    tools = [
+        {
+            "tool": "search_schema",
+            "args": {"query": "runs", "queries": ["runs", "batsman"], "limit": 20},
+            "explanation": "Duplicate lookup",
+        },
+        {
+            "tool": "search_schema",
+            "args": {"query": "economy", "queries": ["economy", "runs"], "limit": 20},
+            "explanation": "Need unseen metric",
+        },
+        {
+            "tool": "scan_schema_chunks",
+            "args": {"query_terms": ["runs", "batsman"], "chunk_size": 4, "max_chunks": 12},
+            "explanation": "Duplicate chunk scan",
+        },
+        {
+            "tool": "sample_data",
+            "args": {"table_name": "ball_by_ball", "limit": 5},
+            "explanation": "Duplicate sample request",
+        },
+    ]
+
+    filtered = _filter_redundant_context_tools(tools, existing_results)
+    assert len(filtered) == 1
+    assert filtered[0]["tool"] == "search_schema"
+    assert filtered[0]["args"]["queries"] == ["economy"]
 
 
 @pytest.mark.asyncio

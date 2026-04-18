@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import httpx
@@ -37,6 +38,7 @@ async def execute_python(
     emit_tool_events: bool = True,
 ) -> dict[str, Any]:
     _ = data_path
+    started = time.perf_counter()
     call_id = new_tool_call_id("execute_python")
     if emit_tool_events:
         emit_agent_event(
@@ -54,7 +56,12 @@ async def execute_python(
         if emit_tool_events:
             emit_agent_event(
                 "tool_result",
-                {"call_id": call_id, "output": payload, "status": "error", "duration_ms": 1},
+                {
+                    "call_id": call_id,
+                    "output": payload,
+                    "status": "error",
+                    "duration_ms": max(1, int((time.perf_counter() - started) * 1000)),
+                },
             )
         return payload
 
@@ -84,7 +91,12 @@ async def execute_python(
         if emit_tool_events:
             emit_agent_event(
                 "tool_result",
-                {"call_id": call_id, "output": payload, "status": "error", "duration_ms": 1},
+                {
+                    "call_id": call_id,
+                    "output": payload,
+                    "status": "error",
+                    "duration_ms": max(1, int((time.perf_counter() - started) * 1000)),
+                },
             )
         return payload
 
@@ -105,7 +117,12 @@ async def execute_python(
         if emit_tool_events:
             emit_agent_event(
                 "tool_result",
-                {"call_id": call_id, "output": payload, "status": "error", "duration_ms": 1},
+                {
+                    "call_id": call_id,
+                    "output": payload,
+                    "status": "error",
+                    "duration_ms": max(1, int((time.perf_counter() - started) * 1000)),
+                },
             )
         return payload
 
@@ -119,6 +136,11 @@ async def execute_python(
     if emit_tool_events:
         emit_agent_event(
             "tool_result",
-            {"call_id": call_id, "output": result, "status": status, "duration_ms": 1},
+            {
+                "call_id": call_id,
+                "output": result,
+                "status": status,
+                "duration_ms": max(1, int((time.perf_counter() - started) * 1000)),
+            },
         )
     return result

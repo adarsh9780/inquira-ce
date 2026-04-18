@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+from pathlib import Path
+import time
 from typing import Any
 
 import duckdb
@@ -95,6 +98,7 @@ def _match_rank(column: dict[str, Any], normalized_query: str) -> int | None:
     name = _normalize_text(column.get("name"))
     aliases = [_normalize_text(alias) for alias in column.get("aliases", [])]
     description = _normalize_text(column.get("description"))
+    query_tokens = [token for token in normalized_query.split(" ") if token]
 
     if not normalized_query:
         return None
@@ -106,8 +110,12 @@ def _match_rank(column: dict[str, Any], normalized_query: str) -> int | None:
         return 3
     if any(normalized_query in alias for alias in aliases):
         return 4
+    if query_tokens and len(query_tokens) > 1 and all(token in name for token in query_tokens):
+        return 4
     if normalized_query in description:
         return 5
+    if query_tokens and len(query_tokens) > 1 and all(token in description for token in query_tokens):
+        return 6
     return None
 
 
@@ -134,6 +142,60 @@ def _quote_identifier(identifier: str) -> str:
     return f'"{identifier.replace(chr(34), chr(34) * 2)}"'
 
 
+def _workspace_db_mtime_ns(data_path: str | None) -> int:
+    if not data_path:
+        return 0
+    try:
+        return int(Path(data_path).stat().st_mtime_ns)
+    except Exception:
+        return 0
+
+
+@lru_cache(maxsize=256)
+def _cached_db_columns(
+    *,
+    data_path: str,
+    requested_table: str,
+    scoped_tables: tuple[str, ...],
+    mtime_ns: int,
+) -> tuple[tuple[str, str, str], ...]:
+    _ = mtime_ns
+    try:
+        con = duckdb.connect(data_path, read_only=True)
+    except Exception:
+        return tuple()
+
+    try:
+        if requested_table:
+            candidate_tables = [requested_table]
+        elif scoped_tables:
+            candidate_tables = list(scoped_tables)
+        else:
+            rows = con.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'main' ORDER BY table_name"
+            ).fetchall()
+            candidate_tables = [str(row[0]).strip() for row in rows if row and str(row[0]).strip()]
+
+        columns: list[tuple[str, str, str]] = []
+        for table in candidate_tables:
+            try:
+                describe_rows = con.execute(f"DESCRIBE {_quote_identifier(table)}").fetchall()
+            except Exception:
+                continue
+            for row in describe_rows:
+                if not row:
+                    continue
+                name = str(row[0] or "").strip()
+                if not name:
+                    continue
+                dtype = str(row[1] or "").strip() if len(row) > 1 else ""
+                columns.append((str(table).strip(), name, dtype))
+        return tuple(columns)
+    finally:
+        con.close()
+
+
 def _iter_db_columns(
     *,
     data_path: str | None,
@@ -143,6 +205,7 @@ def _iter_db_columns(
     if not data_path:
         return []
 
+    db_path = str(data_path or "").strip()
     requested_table = str(table_name or "").strip()
     normalized_tables: list[str] = []
     seen: set[str] = set()
@@ -156,47 +219,22 @@ def _iter_db_columns(
         seen.add(dedupe)
         normalized_tables.append(candidate)
 
-    try:
-        con = duckdb.connect(data_path, read_only=True)
-    except Exception:
-        return []
-
-    try:
-        if requested_table:
-            candidate_tables = [requested_table]
-        elif normalized_tables:
-            candidate_tables = normalized_tables
-        else:
-            rows = con.execute(
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = 'main' ORDER BY table_name"
-            ).fetchall()
-            candidate_tables = [str(row[0]).strip() for row in rows if row and str(row[0]).strip()]
-
-        columns: list[dict[str, Any]] = []
-        for table in candidate_tables:
-            try:
-                describe_rows = con.execute(f"DESCRIBE {_quote_identifier(table)}").fetchall()
-            except Exception:
-                continue
-            for row in describe_rows:
-                if not row:
-                    continue
-                name = str(row[0] or "").strip()
-                if not name:
-                    continue
-                columns.append(
-                    {
-                        "table_name": table,
-                        "name": name,
-                        "dtype": str(row[1] or "").strip() if len(row) > 1 else "",
-                        "description": "",
-                        "aliases": [],
-                    }
-                )
-        return columns
-    finally:
-        con.close()
+    rows = _cached_db_columns(
+        data_path=db_path,
+        requested_table=requested_table,
+        scoped_tables=tuple(normalized_tables),
+        mtime_ns=_workspace_db_mtime_ns(db_path),
+    )
+    return [
+        {
+            "table_name": table,
+            "name": name,
+            "dtype": dtype,
+            "description": "",
+            "aliases": [],
+        }
+        for table, name, dtype in rows
+    ]
 
 
 def search_schema(
@@ -211,6 +249,7 @@ def search_schema(
     explanation: str = "",
     emit_tool_events: bool = True,
 ) -> dict[str, Any]:
+    started = time.perf_counter()
     call_id = new_tool_call_id("search_schema") if emit_tool_events else ""
     normalized_queries = _normalize_queries(query=query, queries=queries, max_items=12)
     safe_max = max(1, min(100, int(max_results)))
@@ -270,10 +309,20 @@ def search_schema(
         deduped.append(payload)
         if len(deduped) >= safe_max:
             break
+    matched_queries = {
+        str(query_value).strip().lower()
+        for row in deduped
+        for query_value in (row.get("matched_queries") or [])
+        if str(query_value).strip()
+    }
+    covered_queries = [item for item in normalized_queries if item.lower() in matched_queries]
+    missing_queries = [item for item in normalized_queries if item.lower() not in matched_queries]
 
     output = {
         "query": str(query or "").strip(),
         "queries": normalized_queries,
+        "covered_queries": covered_queries,
+        "missing_queries": missing_queries,
         "table_name": str(table_name or "").strip(),
         "match_count": len(deduped),
         "columns": deduped,
@@ -285,7 +334,7 @@ def search_schema(
                 "call_id": call_id,
                 "output": output,
                 "status": "success",
-                "duration_ms": 1,
+                "duration_ms": max(1, int((time.perf_counter() - started) * 1000)),
             },
         )
     return output

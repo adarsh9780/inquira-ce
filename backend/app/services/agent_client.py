@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from typing import Any, AsyncGenerator
 
 import httpx
@@ -20,6 +21,10 @@ class AgentClient:
     _RUN_MAX_RETRIES = 1
     _STREAM_MAX_RETRIES = 1
     _RETRY_BACKOFF_SECONDS = 0.6
+    _HEALTH_CACHE_TTL_SECONDS = 20.0
+    _ASSISTANT_CACHE_TTL_SECONDS = 300.0
+    _health_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+    _assistant_cache: dict[str, tuple[float, str]] = {}
 
     def __init__(self) -> None:
         self._cfg = load_agent_service_config()
@@ -109,9 +114,38 @@ class AgentClient:
         requested = str(payload.get("agent_profile") or "").strip()
         return requested or self._cfg.default_agent
 
+    def _assistant_cache_key(self, assistant_id: str) -> str:
+        return f"{id(self._cfg)}::{self._cfg.base_url}::{assistant_id}"
+
+    def _health_cache_key(self) -> str:
+        return (
+            f"{id(self._cfg)}::{self._cfg.base_url}::"
+            f"{int(getattr(self._cfg, 'expected_api_major', self._CONTRACT_API_MAJOR))}::"
+            f"{str(getattr(self._cfg, 'default_agent', ''))}"
+        )
+
+    def _get_cached_assistant_id(self, assistant_id: str) -> str:
+        key = self._assistant_cache_key(assistant_id)
+        cached = type(self)._assistant_cache.get(key)
+        if not cached:
+            return ""
+        created_at, resolved_assistant = cached
+        ttl = float(getattr(self._cfg, "assistant_cache_ttl_sec", self._ASSISTANT_CACHE_TTL_SECONDS))
+        if time.monotonic() - float(created_at) > max(1.0, ttl):
+            type(self)._assistant_cache.pop(key, None)
+            return ""
+        return str(resolved_assistant or "").strip()
+
+    def _set_cached_assistant_id(self, assistant_id: str, resolved_assistant: str) -> None:
+        key = self._assistant_cache_key(assistant_id)
+        type(self)._assistant_cache[key] = (time.monotonic(), str(resolved_assistant or assistant_id).strip())
+
     async def _ensure_assistant(self, client: httpx.AsyncClient, assistant_id: str) -> str:
         if not bool(getattr(self._cfg, "manage_assistants", True)):
             return assistant_id
+        cached = self._get_cached_assistant_id(assistant_id)
+        if cached:
+            return cached
         search_resp = await client.post(
             f"{self._cfg.base_url}/assistants/search",
             json={"graph_id": assistant_id, "limit": 1, "offset": 0},
@@ -129,6 +163,7 @@ class AgentClient:
             first = assistants[0] if isinstance(assistants[0], dict) else {}
             found = str(first.get("assistant_id") or "").strip()
             if found:
+                self._set_cached_assistant_id(assistant_id, found)
                 return found
 
         create_resp = await client.post(
@@ -144,9 +179,16 @@ class AgentClient:
             raise AgentRuntimeError(
                 f"Assistant creation failed: {create_resp.status_code} {create_resp.text}"
             )
+        self._set_cached_assistant_id(assistant_id, assistant_id)
         return assistant_id
 
     async def assert_health(self) -> dict[str, Any]:
+        cache_key = self._health_cache_key()
+        cached = type(self)._health_cache.get(cache_key)
+        ttl = float(getattr(self._cfg, "health_cache_ttl_sec", self._HEALTH_CACHE_TTL_SECONDS))
+        now = time.monotonic()
+        if cached and (now - float(cached[0])) <= max(1.0, ttl):
+            return dict(cached[1])
         timeout = httpx.Timeout(5.0)
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
@@ -172,12 +214,14 @@ class AgentClient:
 
                 info = info_resp.json() if info_resp.content else {}
                 info_dict = info if isinstance(info, dict) else {}
-                return {
+                health_payload = {
                     "status": "ok",
                     "api_major": actual,
                     "active_agent": assistant_id,
                     "langgraph_info": info_dict,
                 }
+                type(self)._health_cache[cache_key] = (time.monotonic(), dict(health_payload))
+                return health_payload
         except httpx.HTTPError as exc:
             raise self._unreachable_error("health check", exc) from exc
 

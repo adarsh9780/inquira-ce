@@ -15,6 +15,7 @@ def _runtime_stub() -> SimpleNamespace:
         base_url="https://openrouter.ai/api/v1",
         default_model="default-model",
         lite_model="lite-model",
+        schema_max_tokens=2048,
         code_generation_max_tokens=4096,
     )
 
@@ -47,7 +48,7 @@ def test_get_model_prefers_lite_model_for_lite_tasks(monkeypatch) -> None:
     assert captured.get("model") == "preferred-lite-model"
 
 
-def test_get_model_uses_coding_model_then_default_for_non_lite_tasks(monkeypatch) -> None:
+def test_get_model_uses_coding_model_then_selected_for_non_lite_tasks(monkeypatch) -> None:
     monkeypatch.setattr("agent_v2.nodes.load_llm_runtime_config", _runtime_stub)
     monkeypatch.setattr("agent_v2.nodes.provider_requires_api_key", lambda _provider: False)
 
@@ -80,7 +81,34 @@ def test_get_model_uses_coding_model_then_default_for_non_lite_tasks(monkeypatch
         lite=False,
     )
 
-    assert captured_models == ["preferred-coding-model", "fallback-default-model"]
+    assert captured_models == ["preferred-coding-model", "selected-main-model"]
+
+
+def test_get_model_uses_schema_token_budget_for_lite_path(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr("agent_v2.nodes.load_llm_runtime_config", _runtime_stub)
+    monkeypatch.setattr("agent_v2.nodes.provider_requires_api_key", lambda _provider: False)
+
+    def fake_create_chat_model(**kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr("agent_v2.nodes.create_chat_model", fake_create_chat_model)
+
+    _get_model(
+        {
+            "configurable": {
+                "provider": "openrouter",
+                "model": "selected-main-model",
+                "lite_model": "preferred-lite-model",
+                "default_model": "fallback-default-model",
+            }
+        },
+        lite=True,
+    )
+
+    assert int(captured.get("max_tokens") or 0) == 2048
 
 
 @pytest.mark.asyncio

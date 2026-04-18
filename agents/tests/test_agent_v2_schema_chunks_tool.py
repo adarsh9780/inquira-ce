@@ -37,3 +37,5 @@ def test_scan_schema_chunks_returns_relevant_columns_from_aliases_and_descriptio
     names = {str(item.get("name") or "").strip().lower() for item in columns if isinstance(item, dict)}
     assert "striker" in names
     assert "batsman_runs" in names
+    normalized_terms = result.get("normalized_terms") if isinstance(result, dict) else []
+    assert "batsman" in (normalized_terms or [])
