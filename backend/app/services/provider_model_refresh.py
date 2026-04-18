@@ -234,7 +234,10 @@ def _extract_ollama_models_from_tags_payload(payload: Any) -> list[str]:
         for item in models:
             if not isinstance(item, dict):
                 continue
-            model_id = str(item.get("name") or item.get("model") or "").strip()
+            # Prefer `model` when both are present. Ollama cloud responses can
+            # include canonical IDs (for example, `minimax-m2.7:cloud`) in
+            # `model` while `name` may be a shortened display value.
+            model_id = str(item.get("model") or item.get("name") or "").strip()
             if model_id:
                 raw_models.append(model_id)
     return _unique_models(raw_models)
