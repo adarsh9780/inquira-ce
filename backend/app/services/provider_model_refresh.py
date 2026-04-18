@@ -224,7 +224,8 @@ async def _fetch_ollama_cloud_models(client: httpx.AsyncClient, api_key: str) ->
         return []
 
     response.raise_for_status()
-    return _extract_ollama_models_from_tags_payload(response.json())
+    raw_models = _extract_ollama_models_from_tags_payload(response.json())
+    return _unique_models([_normalize_ollama_cloud_model_id(model_id) for model_id in raw_models])
 
 
 def _extract_ollama_models_from_tags_payload(payload: Any) -> list[str]:
@@ -241,6 +242,17 @@ def _extract_ollama_models_from_tags_payload(payload: Any) -> list[str]:
             if model_id:
                 raw_models.append(model_id)
     return _unique_models(raw_models)
+
+
+def _normalize_ollama_cloud_model_id(model_id: str) -> str:
+    value = str(model_id or "").strip()
+    if not value:
+        return ""
+    # Ollama cloud often returns bare names (for example, "minimax-m2.7").
+    # OpenAI-compatible chat calls typically require the cloud-qualified ID.
+    if ":" in value:
+        return value
+    return f"{value}:cloud"
 
 
 async def _fetch_anthropic_models(client: httpx.AsyncClient, api_key: str) -> list[str]:

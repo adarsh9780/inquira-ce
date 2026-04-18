@@ -332,6 +332,47 @@ class ChatService:
         }
 
     @staticmethod
+    def _ollama_cloud_model_id(model_id: str) -> str:
+        value = str(model_id or "").strip()
+        if not value or ":" in value:
+            return value
+        return f"{value}:cloud"
+
+    @staticmethod
+    def _should_retry_with_ollama_cloud_suffix(
+        *,
+        provider: str,
+        model: str,
+        error: Exception,
+        already_retried: bool,
+    ) -> bool:
+        if already_retried:
+            return False
+        if normalize_llm_provider(provider) != "ollama":
+            return False
+        model_id = str(model or "").strip()
+        if not model_id or ":" in model_id:
+            return False
+        message = str(error or "")
+        return "NotFoundError" in message
+
+    @staticmethod
+    def _with_ollama_cloud_retry_models(
+        payload: dict[str, Any],
+    ) -> tuple[dict[str, Any], str]:
+        updated = dict(payload or {})
+        llm = dict(updated.get("llm") or {})
+
+        original_model = str(updated.get("model") or "").strip()
+        retried_model = ChatService._ollama_cloud_model_id(original_model)
+        updated["model"] = retried_model
+
+        for key in ("lite_model", "default_model", "coding_model"):
+            llm[key] = ChatService._ollama_cloud_model_id(str(llm.get(key) or "").strip())
+        updated["llm"] = llm
+        return updated, retried_model
+
+    @staticmethod
     def _normalize_remote_path(path: str | None) -> str:
         raw = str(path or "").strip()
         if not raw:
@@ -1451,39 +1492,63 @@ class ChatService:
         yield {"event": "status", "data": {"stage": "start", "message": "Starting analysis"}}
 
         aggregated: dict[str, Any] = {}
-        final_values_snapshot: dict[str, Any] | None = None
         stream_run_id = ""
-        async for item in agent_client.stream(payload):
-            event_name = str(item.get("event") or "message").strip() or "message"
-            data = item.get("data")
-            payload_dict = data if isinstance(data, dict) else {"value": data}
-            if event_name == "custom" and isinstance(data, dict):
-                custom_event = str(data.get("event") or "").strip()
-                custom_data = data.get("data")
-                if custom_event:
-                    event_name = custom_event
-                    payload_dict = custom_data if isinstance(custom_data, dict) else {"value": custom_data}
-            if event_name == "metadata":
-                stream_run_id = str(payload_dict.get("run_id") or stream_run_id)
-            elif event_name == "values" and isinstance(data, dict):
-                aggregated.update(data)
-                final_values_snapshot = dict(data)
-            elif event_name == "updates" and isinstance(data, dict):
-                for node_payload in data.values():
-                    if isinstance(node_payload, dict):
-                        aggregated.update(node_payload)
-            elif event_name == "final":
-                # Defensive compatibility for legacy stream fakes that emit a synthetic final payload.
-                candidate = payload_dict.get("result")
-                if isinstance(candidate, dict):
-                    aggregated.update(candidate)
-                continue
-            yield {"event": event_name, "data": payload_dict}
+        retried_with_cloud_suffix = False
+        while True:
+            aggregated = {}
+            final_values_snapshot: dict[str, Any] | None = None
+            stream_run_id = ""
+            try:
+                async for item in agent_client.stream(payload):
+                    event_name = str(item.get("event") or "message").strip() or "message"
+                    data = item.get("data")
+                    payload_dict = data if isinstance(data, dict) else {"value": data}
+                    if event_name == "custom" and isinstance(data, dict):
+                        custom_event = str(data.get("event") or "").strip()
+                        custom_data = data.get("data")
+                        if custom_event:
+                            event_name = custom_event
+                            payload_dict = custom_data if isinstance(custom_data, dict) else {"value": custom_data}
+                    if event_name == "metadata":
+                        stream_run_id = str(payload_dict.get("run_id") or stream_run_id)
+                    elif event_name == "values" and isinstance(data, dict):
+                        aggregated.update(data)
+                        final_values_snapshot = dict(data)
+                    elif event_name == "updates" and isinstance(data, dict):
+                        for node_payload in data.values():
+                            if isinstance(node_payload, dict):
+                                aggregated.update(node_payload)
+                    elif event_name == "final":
+                        # Defensive compatibility for legacy stream fakes that emit a synthetic final payload.
+                        candidate = payload_dict.get("result")
+                        if isinstance(candidate, dict):
+                            aggregated.update(candidate)
+                        continue
+                    yield {"event": event_name, "data": payload_dict}
+            except AgentRuntimeError as exc:
+                if ChatService._should_retry_with_ollama_cloud_suffix(
+                    provider=llm_prefs["provider"],
+                    model=str(payload.get("model") or ""),
+                    error=exc,
+                    already_retried=retried_with_cloud_suffix,
+                ):
+                    payload, retried_model = ChatService._with_ollama_cloud_retry_models(payload)
+                    retried_with_cloud_suffix = True
+                    yield {
+                        "event": "status",
+                        "data": {
+                            "stage": "retry",
+                            "message": f"Retrying with Ollama cloud model '{retried_model}'",
+                        },
+                    }
+                    continue
+                raise HTTPException(status_code=502, detail=str(exc)) from exc
+            if isinstance(final_values_snapshot, dict):
+                aggregated = final_values_snapshot
+            break
 
         if not aggregated:
             raise HTTPException(status_code=502, detail="Agent stream completed without final result")
-        if isinstance(final_values_snapshot, dict):
-            aggregated = final_values_snapshot
 
         response_payload = ChatService._build_response_payload(aggregated)
         run_id = str(
