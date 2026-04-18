@@ -40,8 +40,14 @@ export const v1Api = {
     }),
     update: (payload) => axios.put('/api/v1/preferences', payload),
     refreshModels: (payload) => axios.post('/api/v1/preferences/models/refresh', payload),
-    searchModels: (params) =>
-      axios.get('/api/v1/preferences/models/search', { params }),
+    searchModels: ({ provider, query, limit = 25 }) =>
+      axios.get('/api/v1/preferences/models/search', {
+        params: {
+          provider,
+          q: query,
+          limit,
+        },
+      }),
     verifyKey: (provider, apiKey) =>
       axios.post('/api/v1/preferences/verify-key', { provider, api_key: apiKey }),
     setApiKey: (payload) =>

@@ -358,12 +358,21 @@ export const apiService = {
     return { detail: 'Context saved.' }
   },
 
-  async setApiKeySettings(apiKey, provider = 'openrouter') {
+  async setApiKeySettings(apiKeyOrPayload, provider = 'openrouter') {
     const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
-    const response = await this.v1SetApiKey(apiKey || '', provider)
-    appStore.setApiKeyConfigured(true)
-    return response || { detail: 'API key saved securely.' }
+    const payload = apiKeyOrPayload && typeof apiKeyOrPayload === 'object' && !Array.isArray(apiKeyOrPayload)
+      ? apiKeyOrPayload
+      : {
+          api_key: apiKeyOrPayload || '',
+          provider,
+        }
+    const response = await this.v1SetApiKey(payload, provider)
+    const selectedProvider = String(response?.llm_provider || payload?.provider || provider || 'openrouter').trim().toLowerCase()
+    const providerPresence = Boolean(response?.api_key_present_by_provider?.[selectedProvider])
+    const fallbackPresence = Boolean(response?.selected_provider_api_key_present ?? response?.api_key_present)
+    appStore.setApiKeyConfigured(providerPresence || fallbackPresence || selectedProvider === 'ollama')
+    return response || { detail: 'Provider configuration saved.' }
   },
 
   // Generate schema with context
@@ -791,7 +800,7 @@ export const apiService = {
   async v1SearchProviderModels(provider, query, limit = 25) {
     return v1Api.preferences.searchModels({
       provider,
-      q: query,
+      query,
       limit,
     })
   },
