@@ -29,6 +29,7 @@ test('useLLMConfig composable exposes provider-aware save flow and advanced fiel
 
   assert.equal(source.includes('async function verifyKey()'), true)
   assert.equal(source.includes('async function saveKey()'), true)
+  assert.equal(source.includes('async function deleteKey()'), true)
   assert.equal(source.includes('async function verifyAndSaveKey()'), true)
   assert.equal(source.includes('async function refreshModels({ background = false } = {})'), true)
   assert.equal(source.includes('async function saveConfig()'), true)
@@ -38,6 +39,8 @@ test('useLLMConfig composable exposes provider-aware save flow and advanced fiel
   assert.equal(source.includes("return { ok: false, stage: 'verify', error: verifyResult.error || 'verify_failed' }"), true)
   assert.equal(source.includes("const hasNewUnmaskedKey = selectedProvider !== 'ollama' && !usingMaskedKey.value && !!enteredKey"), true)
   assert.equal(source.includes('await apiService.v1SetApiKey(payload)'), true)
+  assert.equal(source.includes('await apiService.v1DeleteApiKey(selectedProvider)'), true)
+  assert.equal(source.includes("verifySuccess.value = 'Saved key removed'"), true)
   assert.equal(source.includes('llm_temperature: Number(llmTemperature.value)'), true)
   assert.equal(source.includes('llm_max_tokens: Number(llmMaxTokens.value)'), true)
   assert.equal(source.includes('llm_top_k: Number(llmTopK.value)'), true)
@@ -59,6 +62,7 @@ test('LLM settings tab uses provider dropdown, searchable model selects, and adv
   assert.equal(source.includes('Ollama (local)'), true)
 
   assert.equal(source.includes('Verify &amp; save key'), true)
+  assert.equal(source.includes('Delete saved key'), true)
   assert.equal(source.includes('Refresh model list'), true)
   assert.equal(source.includes('Show all models'), true)
   assert.equal(source.includes('Save configuration'), true)
@@ -81,6 +85,7 @@ test('LLM settings tab uses provider dropdown, searchable model selects, and adv
 
   assert.equal(source.includes('async function handleProviderSelect(nextProvider)'), true)
   assert.equal(source.includes('async function handleVerifyAndSaveKey()'), true)
+  assert.equal(source.includes('async function handleDeleteSavedKey()'), true)
   assert.equal(source.includes('async function refreshModelList()'), true)
   assert.equal(source.includes('async function saveConfiguration()'), true)
 })

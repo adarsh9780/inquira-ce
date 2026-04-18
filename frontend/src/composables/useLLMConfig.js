@@ -372,6 +372,27 @@ async function saveKey() {
   return { ok: true }
 }
 
+async function deleteKey() {
+  const selectedProvider = normalizeProvider(provider.value)
+  if (selectedProvider === 'ollama') {
+    return { ok: false, error: 'provider_has_no_key' }
+  }
+
+  await apiService.v1DeleteApiKey(selectedProvider)
+  apiKeyPresenceByProvider.value = {
+    ...apiKeyPresenceByProvider.value,
+    [selectedProvider]: false,
+  }
+  selectedProviderApiKeyPresent.value = false
+  keyMask.value = ''
+  apiKey.value = ''
+  usingMaskedKey.value = false
+  keyVerified.value = false
+  clearTransientMessages()
+  verifySuccess.value = 'Saved key removed'
+  return { ok: true }
+}
+
 async function verifyAndSaveKey() {
   const selectedProvider = normalizeProvider(provider.value)
   clearTransientMessages()
@@ -549,6 +570,7 @@ export const useLLMConfig = () => {
     verifyKey,
     saveKey,
     verifyAndSaveKey,
+    deleteKey,
     refreshModels,
     saveConfig,
     getModelMeta,

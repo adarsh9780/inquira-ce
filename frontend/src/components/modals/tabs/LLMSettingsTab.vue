@@ -66,7 +66,7 @@
               <button
                 type="button"
                 class="btn-secondary px-3 py-2 text-xs"
-                :disabled="verifyLoading || saveLoading"
+                :disabled="verifyLoading || saveLoading || deleteLoading"
                 @click="handleVerifyAndSaveKey"
               >
                 <span v-if="verifyLoading" class="inline-flex items-center gap-2">
@@ -74,6 +74,19 @@
                   Verifying...
                 </span>
                 <span v-else>Verify &amp; save key</span>
+              </button>
+              <button
+                v-if="selectedProviderApiKeyPresent"
+                type="button"
+                class="btn-secondary px-3 py-2 text-xs"
+                :disabled="verifyLoading || saveLoading || deleteLoading"
+                @click="handleDeleteSavedKey"
+              >
+                <span v-if="deleteLoading" class="inline-flex items-center gap-2">
+                  <span class="h-3 w-3 animate-spin rounded-full border-2 border-[var(--color-accent)]/40 border-t-[var(--color-accent)]"></span>
+                  Removing...
+                </span>
+                <span v-else>Delete saved key</span>
               </button>
               <span v-if="verifySuccessMessage" class="text-xs text-[var(--color-success)]">✓ {{ verifySuccessMessage }}</span>
             </div>
@@ -298,6 +311,7 @@ const {
   liteModels,
   mainModel,
   liteModel,
+  selectedProviderApiKeyPresent,
   usingMaskedKey,
   verifyLoading,
   verifyError,
@@ -317,6 +331,7 @@ const {
   setProvider,
   setApiKey,
   verifyAndSaveKey,
+  deleteKey,
   refreshModels,
   saveConfig,
   getModelMeta,
@@ -326,6 +341,7 @@ const {
 
 const showKey = ref(false)
 const showAdvanced = ref(false)
+const deleteLoading = ref(false)
 
 const providerOptions = [
   { value: 'openai', label: 'OpenAI' },
@@ -414,6 +430,22 @@ async function handleVerifyAndSaveKey() {
 
 async function refreshModelList() {
   await refreshModels()
+}
+
+async function handleDeleteSavedKey() {
+  deleteLoading.value = true
+  try {
+    const result = await deleteKey()
+    if (!result.ok) {
+      toast.error('Delete Failed', 'Could not remove API key.')
+      return
+    }
+    toast.success('API key removed', 'Saved API key removed from secure storage.')
+  } catch (_error) {
+    toast.error('Delete Failed', 'Could not remove API key.')
+  } finally {
+    deleteLoading.value = false
+  }
 }
 
 function openProviderApiKeyPortal() {
