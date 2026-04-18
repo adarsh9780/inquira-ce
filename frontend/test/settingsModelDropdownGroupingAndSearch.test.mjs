@@ -11,9 +11,9 @@ test('settings model selectors are grouped by provider and searchable', () => {
   const searchableUsages = source.match(/:searchable="true"/g) ?? []
   const searchPlaceholderUsages = source.match(/search-placeholder="Search models"/g) ?? []
 
-  assert.equal(groupedUsages.length >= 3, true)
-  assert.equal(searchableUsages.length >= 3, true)
-  assert.equal(searchPlaceholderUsages.length >= 3, true)
+  assert.equal(groupedUsages.length >= 2, true)
+  assert.equal(searchableUsages.length >= 2, true)
+  assert.equal(searchPlaceholderUsages.length >= 2, true)
 })
 
 test('shared dropdown widgets support provider grouping and search filtering', () => {

@@ -16,10 +16,9 @@ test('app store reads available models from v1 preferences payload', () => {
   const path = resolve(process.cwd(), 'src/stores/appStore.js')
   const source = readFileSync(path, 'utf-8')
 
-  assert.equal(source.includes('if (Array.isArray(prefs?.available_models) && prefs.available_models.length)'), true)
-  assert.equal(source.includes('availableModels.value = prefs.available_models'), true)
-  assert.equal(source.includes('if (prefs?.selected_coding_model)'), true)
-  assert.equal(source.includes('selectedCodingModel.value = prefs.selected_coding_model'), true)
+  assert.equal(source.includes('const fallbackMainModels = normalizeModelList(prefs?.provider_available_main_models)'), true)
+  assert.equal(source.includes('availableModels.value = [...providerMainModels.value]'), true)
+  assert.equal(source.includes('selectedCodingModel.value = selectedModel.value'), true)
   assert.equal(source.includes('if (typeof prefs?.terminal_risk_acknowledged === \'boolean\')'), true)
   assert.equal(source.includes('terminalConsentGranted.value = prefs.terminal_risk_acknowledged'), true)
   assert.equal(source.includes('terminal_risk_acknowledged: terminalConsentGranted.value'), true)

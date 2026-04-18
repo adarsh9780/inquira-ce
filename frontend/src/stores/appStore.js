@@ -153,6 +153,19 @@ export const useAppStore = defineStore('app', () => {
     return Math.min(600, Math.max(5, parsed))
   }
 
+  function normalizeModelList(models) {
+    const raw = Array.isArray(models) ? models : []
+    const seen = new Set()
+    const cleaned = []
+    for (const item of raw) {
+      const value = String(item || '').trim()
+      if (!value || seen.has(value)) continue
+      seen.add(value)
+      cleaned.push(value)
+    }
+    return cleaned
+  }
+
   function resolveSnapshotUserId(explicitUserId = null) {
     const candidate = String(explicitUserId ?? authStore.userId ?? '').trim()
     return candidate || ''
@@ -166,9 +179,9 @@ export const useAppStore = defineStore('app', () => {
         llm_provider: llmProvider.value || DEFAULT_PROVIDER,
         selected_model: selectedModel.value || '',
         selected_lite_model: selectedLiteModel.value || '',
-        selected_coding_model: selectedCodingModel.value || '',
+        selected_coding_model: selectedModel.value || '',
         slow_request_warning_seconds: normalizeSlowRequestWarningSeconds(slowRequestWarningSeconds.value),
-        enabled_models: Array.isArray(availableModels.value) ? [...availableModels.value] : [],
+        enabled_models: Array.isArray(providerMainModels.value) ? [...providerMainModels.value] : [],
         provider_main_models: Array.isArray(providerMainModels.value) ? [...providerMainModels.value] : [],
         provider_lite_models: Array.isArray(providerLiteModels.value) ? [...providerLiteModels.value] : [],
       },
@@ -219,34 +232,29 @@ export const useAppStore = defineStore('app', () => {
       llmProvider.value = llm.llm_provider.trim().toLowerCase()
     }
     if (Array.isArray(llm.provider_main_models)) {
-      const restoredMainModels = llm.provider_main_models
-        .map((item) => String(item || '').trim())
-        .filter(Boolean)
+      const restoredMainModels = normalizeModelList(llm.provider_main_models)
       if (restoredMainModels.length) {
         providerMainModels.value = restoredMainModels
       }
     }
     if (Array.isArray(llm.provider_lite_models)) {
-      const restoredLiteModels = llm.provider_lite_models
-        .map((item) => String(item || '').trim())
-        .filter(Boolean)
+      const restoredLiteModels = normalizeModelList(llm.provider_lite_models)
       if (restoredLiteModels.length) {
         providerLiteModels.value = restoredLiteModels
       }
     }
-    if (Array.isArray(llm.enabled_models)) {
-      const restoredEnabledModels = llm.enabled_models
-        .map((item) => String(item || '').trim())
-        .filter(Boolean)
-      if (restoredEnabledModels.length) {
-        availableModels.value = restoredEnabledModels
-      }
+    const restoredEnabledModels = normalizeModelList(llm.enabled_models)
+    if (providerMainModels.value.length) {
+      availableModels.value = [...providerMainModels.value]
+    } else if (restoredEnabledModels.length) {
+      providerMainModels.value = [...restoredEnabledModels]
+      availableModels.value = [...restoredEnabledModels]
     }
     if (typeof llm.selected_model === 'string' && llm.selected_model.trim()) {
       selectedModel.value = llm.selected_model.trim()
     }
-    if (!availableModels.value.includes(selectedModel.value)) {
-      selectedModel.value = availableModels.value[0] || selectedModel.value
+    if (!providerMainModels.value.includes(selectedModel.value)) {
+      selectedModel.value = providerMainModels.value[0] || selectedModel.value
     }
     if (typeof llm.selected_lite_model === 'string' && llm.selected_lite_model.trim()) {
       selectedLiteModel.value = llm.selected_lite_model.trim()
@@ -254,12 +262,7 @@ export const useAppStore = defineStore('app', () => {
     if (!providerLiteModels.value.includes(selectedLiteModel.value)) {
       selectedLiteModel.value = providerLiteModels.value[0] || selectedLiteModel.value
     }
-    if (typeof llm.selected_coding_model === 'string' && llm.selected_coding_model.trim()) {
-      selectedCodingModel.value = llm.selected_coding_model.trim()
-    }
-    if (!availableModels.value.includes(selectedCodingModel.value)) {
-      selectedCodingModel.value = selectedModel.value || selectedCodingModel.value
-    }
+    selectedCodingModel.value = selectedModel.value || selectedCodingModel.value
     if (llm.slow_request_warning_seconds !== undefined && llm.slow_request_warning_seconds !== null) {
       slowRequestWarningSeconds.value = normalizeSlowRequestWarningSeconds(llm.slow_request_warning_seconds)
     }
@@ -416,9 +419,9 @@ export const useAppStore = defineStore('app', () => {
         llm_provider: llmProvider.value,
         selected_model: selectedModel.value,
         selected_lite_model: selectedLiteModel.value,
-        selected_coding_model: selectedCodingModel.value,
+        selected_coding_model: selectedModel.value,
         slow_request_warning_seconds: normalizeSlowRequestWarningSeconds(slowRequestWarningSeconds.value),
-        enabled_models: availableModels.value,
+        enabled_models: providerMainModels.value,
         schema_context: schemaContext.value,
         allow_schema_sample_values: allowSchemaSampleValues.value,
         terminal_risk_acknowledged: terminalConsentGranted.value,
@@ -631,7 +634,10 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setSelectedCodingModel(model) {
-    selectedCodingModel.value = String(model || '').trim()
+    selectedCodingModel.value = String(model || '').trim() || selectedModel.value
+    if (selectedCodingModel.value !== selectedModel.value) {
+      selectedCodingModel.value = selectedModel.value
+    }
     saveLocalConfig()
   }
 
@@ -641,7 +647,9 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setEnabledModels(models) {
-    availableModels.value = Array.isArray(models) ? models.map((m) => String(m || '').trim()).filter(Boolean) : []
+    const cleaned = normalizeModelList(models)
+    providerMainModels.value = cleaned.length ? cleaned : [...DEFAULT_MODELS]
+    availableModels.value = [...providerMainModels.value]
     saveLocalConfig()
   }
 
@@ -650,7 +658,8 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setSelectedModel(model) {
-    selectedModel.value = model
+    selectedModel.value = String(model || '').trim()
+    selectedCodingModel.value = selectedModel.value
     saveLocalConfig()
   }
 
@@ -2048,10 +2057,10 @@ export const useAppStore = defineStore('app', () => {
       availableProviders.value = prefs.available_providers
     }
     if (Array.isArray(prefs?.provider_available_main_models) && prefs.provider_available_main_models.length) {
-      providerMainModels.value = prefs.provider_available_main_models
+      providerMainModels.value = normalizeModelList(prefs.provider_available_main_models)
     }
     if (Array.isArray(prefs?.provider_available_lite_models) && prefs.provider_available_lite_models.length) {
-      providerLiteModels.value = prefs.provider_available_lite_models
+      providerLiteModels.value = normalizeModelList(prefs.provider_available_lite_models)
     }
     if (prefs?.provider_model_catalogs && typeof prefs.provider_model_catalogs === 'object') {
       providerModelCatalogs.value = prefs.provider_model_catalogs
@@ -2065,15 +2074,20 @@ export const useAppStore = defineStore('app', () => {
     if (typeof prefs?.selected_provider_api_key_present === 'boolean') {
       selectedProviderApiKeyPresent.value = prefs.selected_provider_api_key_present
     }
-    if (Array.isArray(prefs?.available_models) && prefs.available_models.length) {
-      availableModels.value = prefs.available_models
+    const fallbackMainModels = normalizeModelList(prefs?.provider_available_main_models)
+    const legacyAvailableModels = normalizeModelList(prefs?.available_models)
+    const legacyEnabledModels = normalizeModelList(prefs?.enabled_models)
+    if (fallbackMainModels.length) {
+      providerMainModels.value = fallbackMainModels
+    } else if (legacyAvailableModels.length) {
+      providerMainModels.value = legacyAvailableModels
+    } else if (legacyEnabledModels.length) {
+      providerMainModels.value = legacyEnabledModels
     }
-    if (Array.isArray(prefs?.enabled_models) && prefs.enabled_models.length) {
-      availableModels.value = prefs.enabled_models
-    }
+    availableModels.value = [...providerMainModels.value]
     if (prefs?.selected_model) selectedModel.value = prefs.selected_model
-    if (!availableModels.value.includes(selectedModel.value)) {
-      selectedModel.value = availableModels.value[0] || 'google/gemini-2.5-flash'
+    if (!providerMainModels.value.includes(selectedModel.value)) {
+      selectedModel.value = providerMainModels.value[0] || 'google/gemini-2.5-flash'
     }
     if (prefs?.selected_lite_model) {
       selectedLiteModel.value = prefs.selected_lite_model
@@ -2081,12 +2095,7 @@ export const useAppStore = defineStore('app', () => {
     if (!providerLiteModels.value.includes(selectedLiteModel.value)) {
       selectedLiteModel.value = providerLiteModels.value[0] || DEFAULT_LITE_MODEL
     }
-    if (prefs?.selected_coding_model) {
-      selectedCodingModel.value = prefs.selected_coding_model
-    }
-    if (!availableModels.value.includes(selectedCodingModel.value)) {
-      selectedCodingModel.value = selectedModel.value
-    }
+    selectedCodingModel.value = selectedModel.value
     if (prefs?.slow_request_warning_seconds !== undefined && prefs?.slow_request_warning_seconds !== null) {
       slowRequestWarningSeconds.value = normalizeSlowRequestWarningSeconds(
         prefs.slow_request_warning_seconds

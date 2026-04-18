@@ -150,13 +150,13 @@
 
       <div>
         <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
-          Main Models (shown in Chat selector)
+          Main Model (shown in Chat selector)
         </label>
-        <MultiSelectDropdown
-          :model-value="appStore.availableModels"
-          @update:model-value="handleMainModelsChange"
+        <HeaderDropdown
+          :model-value="appStore.selectedModel"
+          @update:model-value="handleMainModelChange"
           :options="mainModelOptions"
-          placeholder="Select main models"
+          placeholder="Select main model"
           :searchable="true"
           :group-by-provider="true"
           search-placeholder="Search models"
@@ -173,22 +173,6 @@
           @update:model-value="handleLiteModelChange"
           :options="liteModelOptions"
           placeholder="Select lite model"
-          :searchable="true"
-          :group-by-provider="true"
-          search-placeholder="Search models"
-          max-width-class="max-w-md w-full"
-        />
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
-          Coding Model (subagent)
-        </label>
-        <HeaderDropdown
-          :model-value="appStore.selectedCodingModel"
-          @update:model-value="handleCodingModelChange"
-          :options="codingModelOptions"
-          placeholder="Select coding model"
           :searchable="true"
           :group-by-provider="true"
           search-placeholder="Search models"
@@ -221,7 +205,6 @@ import { useAppStore } from '../../stores/appStore'
 import { apiService } from '../../services/apiService'
 import { openExternalUrl } from '../../services/externalLinkService'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
-import MultiSelectDropdown from '../ui/MultiSelectDropdown.vue'
 import {
   KeyIcon,
   EyeIcon,
@@ -242,7 +225,6 @@ const messageType = ref('') // 'success' | 'error'
 const providerOptions = computed(() => appStore.availableProviders.map(p => ({ label: p, value: p })))
 const mainModelOptions = computed(() => appStore.providerMainModels.map(m => ({ label: m, value: m })))
 const liteModelOptions = computed(() => appStore.providerLiteModels.map(m => ({ label: m, value: m })))
-const codingModelOptions = computed(() => appStore.availableModels.map(m => ({ label: m, value: m })))
 
 const messageTypeClass = computed(() => {
   return messageType.value === 'success'
@@ -279,15 +261,10 @@ function syncProviderCatalog(provider) {
   const mainModels = Array.isArray(catalog.main_models) ? catalog.main_models : []
   const liteModels = Array.isArray(catalog.lite_models) ? catalog.lite_models : []
   if (mainModels.length) {
-    appStore.providerMainModels = [...mainModels]
-    const enabled = appStore.availableModels.filter((item) => mainModels.includes(item))
-    appStore.setEnabledModels(enabled.length ? enabled : [...mainModels])
+    appStore.setEnabledModels(mainModels)
   }
-  if (!appStore.availableModels.includes(appStore.selectedModel)) {
-    appStore.setSelectedModel(appStore.availableModels[0] || '')
-  }
-  if (!appStore.availableModels.includes(appStore.selectedCodingModel)) {
-    appStore.setSelectedCodingModel(appStore.selectedModel || appStore.availableModels[0] || '')
+  if (!appStore.providerMainModels.includes(appStore.selectedModel)) {
+    appStore.setSelectedModel(appStore.providerMainModels[0] || '')
   }
   if (liteModels.length) {
     appStore.providerLiteModels = [...liteModels]
@@ -316,43 +293,8 @@ function handleLiteModelChange(event) {
   clearMessage()
 }
 
-function handleCodingModelChange(event) {
-  appStore.setSelectedCodingModel(event?.target?.value ?? event)
-  clearMessage()
-}
-
-function toggleEnabledModel(model, event) {
-  const checked = !!event?.target?.checked
-  const current = [...appStore.availableModels]
-  const next = checked ? Array.from(new Set([...current, model])) : current.filter((item) => item !== model)
-  if (!next.length) {
-    message.value = 'Please keep at least one main model enabled.'
-    messageType.value = 'error'
-    return
-  }
-  appStore.setEnabledModels(next)
-  if (!next.includes(appStore.selectedModel)) {
-    appStore.setSelectedModel(next[0])
-  }
-  if (!next.includes(appStore.selectedCodingModel)) {
-    appStore.setSelectedCodingModel(next[0])
-  }
-  clearMessage()
-}
-
-function handleMainModelsChange(next) {
-  if (!next || !next.length) {
-    message.value = 'Please keep at least one main model enabled.'
-    messageType.value = 'error'
-    return
-  }
-  appStore.setEnabledModels(next)
-  if (!next.includes(appStore.selectedModel)) {
-    appStore.setSelectedModel(next[0])
-  }
-  if (!next.includes(appStore.selectedCodingModel)) {
-    appStore.setSelectedCodingModel(next[0])
-  }
+function handleMainModelChange(event) {
+  appStore.setSelectedModel(event?.target?.value ?? event)
   clearMessage()
 }
 
@@ -444,8 +386,8 @@ async function saveProviderApiKey() {
 }
 
 async function saveApiSettings() {
-  if (!appStore.availableModels.length) {
-    message.value = 'Select at least one main model.'
+  if (!appStore.providerMainModels.length) {
+    message.value = 'No main models available for provider.'
     messageType.value = 'error'
     return
   }
@@ -458,8 +400,8 @@ async function saveApiSettings() {
       llm_provider: appStore.llmProvider,
       selected_model: appStore.selectedModel,
       selected_lite_model: appStore.selectedLiteModel,
-      selected_coding_model: appStore.selectedCodingModel,
-      enabled_models: appStore.availableModels,
+      selected_coding_model: appStore.selectedModel,
+      enabled_models: appStore.providerMainModels,
     })
     
     // Sync store state with backend response (especially providerRequiresApiKey)

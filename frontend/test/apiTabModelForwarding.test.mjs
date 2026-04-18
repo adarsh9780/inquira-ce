@@ -10,13 +10,14 @@ test('ApiTab forwards selected model when testing provider API key', () => {
   assert.equal(source.includes('apiService.testGeminiApi(key, appStore.selectedModel, appStore.llmProvider)'), true)
 })
 
-test('ApiTab saves dedicated coding model preference', () => {
+test('ApiTab saves a single main-model selection for both chat and coding preferences', () => {
   const path = resolve(process.cwd(), 'src/components/modals/ApiTab.vue')
   const source = readFileSync(path, 'utf-8')
 
-  assert.equal(source.includes('Coding Model (subagent)'), true)
-  assert.equal(source.includes('selected_coding_model: appStore.selectedCodingModel'), true)
-  assert.equal(source.includes('handleCodingModelChange'), true)
+  assert.equal(source.includes('Coding Model (subagent)'), false)
+  assert.equal(source.includes('selected_coding_model: appStore.selectedModel'), true)
+  assert.equal(source.includes('handleMainModelChange'), true)
+  assert.equal(source.includes('MultiSelectDropdown'), false)
 })
 
 test('ApiTab is focused on provider/model configuration only', () => {
