@@ -164,6 +164,46 @@ function normalizeModelMetadata(providerName, catalog, mainIds, liteIds) {
   return Object.fromEntries(map)
 }
 
+function syncProviderStateToAppStore(providerName) {
+  const store = getAppStore()
+  if (!store) return
+
+  const normalized = normalizeProvider(providerName)
+  const nextMainModels = [...mainModels.value]
+  const nextLiteModels = [...liteModels.value]
+  const selectedMain = String(mainModel.value || '').trim()
+  const selectedLite = String(liteModel.value || '').trim()
+
+  // Keep provider-scoped model lists synchronized in Pinia so all consumers refresh.
+  store.llmProvider = normalized
+  store.providerMainModels = nextMainModels
+  store.providerLiteModels = nextLiteModels
+
+  if (providerCatalogs.value && typeof providerCatalogs.value === 'object') {
+    store.providerModelCatalogs = providerCatalogs.value
+  }
+
+  if (selectedMain) {
+    store.selectedModel = selectedMain
+    store.selectedCodingModel = selectedMain
+  }
+  if (selectedLite) {
+    store.selectedLiteModel = selectedLite
+  }
+
+  store.providerRequiresApiKey = normalized !== 'ollama'
+  store.selectedProviderApiKeyPresent = !!apiKeyPresenceByProvider.value?.[normalized]
+
+  if (typeof store.clearProviderModelSearchState === 'function') {
+    store.clearProviderModelSearchState()
+  }
+  if (typeof store.mergeProviderModelOptions === 'function') {
+    store.mergeProviderModelOptions(normalized, [])
+  } else {
+    store.availableModels = nextMainModels
+  }
+}
+
 function applyProviderModelState(providerName, prefs = {}, preserveSelection = true) {
   const normalized = normalizeProvider(providerName)
   const catalogs = prefs?.provider_model_catalogs && typeof prefs.provider_model_catalogs === 'object'
@@ -225,6 +265,8 @@ function applyProviderModelState(providerName, prefs = {}, preserveSelection = t
       ollamaBaseUrl.value = catalogBaseUrl
     }
   }
+
+  syncProviderStateToAppStore(normalized)
 }
 
 function getModelMeta(providerName, modelId) {
@@ -257,13 +299,6 @@ async function loadPreferences(providerHint = null, preserveSelection = false) {
     }
 
     applyProviderModelState(normalizedProvider, response, preserveSelection)
-    if (normalizeProvider(appStore.llmProvider) === normalizedProvider) {
-      const selectedMain = String(mainModel.value || '').trim()
-      if (selectedMain) {
-        appStore.selectedModel = selectedMain
-        appStore.selectedCodingModel = selectedMain
-      }
-    }
     llmTemperature.value = Number(response?.llm_temperature ?? 0.7)
     llmMaxTokens.value = Number(response?.llm_max_tokens ?? 4096)
     llmTopP.value = Number(response?.llm_top_p ?? 1)
