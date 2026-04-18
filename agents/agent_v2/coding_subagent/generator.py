@@ -39,7 +39,7 @@ async def _ainvoke_structured_chain(chain: Any, payload: dict[str, Any]) -> Any:
         return await chain.ainvoke(payload)
 
 
-def build_coding_chain(*, model: Any) -> Any:
+def build_coding_chain(*, model: Any, method: str | None = None) -> Any:
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", _CODING_PROMPT),
@@ -59,7 +59,13 @@ def build_coding_chain(*, model: Any) -> Any:
             MessagesPlaceholder("messages"),
         ]
     )
-    return prompt | model.with_structured_output(AnalysisOutput)
+    if method is None:
+        return prompt | model.with_structured_output(AnalysisOutput)
+    try:
+        return prompt | model.with_structured_output(AnalysisOutput, method=method, include_raw=False)
+    except TypeError:
+        # Test doubles may not accept provider-specific kwargs.
+        return prompt | model.with_structured_output(AnalysisOutput)
 
 
 def invoke_coding_chain(

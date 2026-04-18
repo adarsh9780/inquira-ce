@@ -550,6 +550,55 @@ async def test_analysis_generate_code_stops_schema_enrichment_loop_at_generation
 
 
 @pytest.mark.asyncio
+async def test_analysis_generate_code_falls_back_structured_output_method_for_ollama(monkeypatch) -> None:
+    class _FakeModel:
+        _inquira_provider = "ollama"
+
+    monkeypatch.setattr("agent_v2.nodes._get_model", lambda *_args, **_kwargs: _FakeModel())
+    monkeypatch.setattr("agent_v2.nodes.sample_data", lambda **_kwargs: [])
+
+    def fake_build_coding_chain(**kwargs):
+        return {"method": kwargs.get("method")}
+
+    attempts: list[str] = []
+
+    async def fake_ainvoke_coding_chain(**kwargs):
+        method = str((kwargs.get("chain") or {}).get("method") or "")
+        attempts.append(method)
+        if method == "json_schema":
+            raise ValueError("JSONDecodeError: Expecting value: line 1 column 1 (char 0)")
+        return AnalysisOutput(
+            code="print('ok')",
+            explanation="done",
+            output_contract=[],
+            search_schema_queries=[],
+            selected_tables=[],
+            joins_used=False,
+        )
+
+    monkeypatch.setattr("agent_v2.nodes.build_coding_chain", fake_build_coding_chain)
+    monkeypatch.setattr("agent_v2.nodes.ainvoke_coding_chain", fake_ainvoke_coding_chain)
+
+    state = {
+        "analysis_context": {
+            "messages": [HumanMessage(content="top batsman by runs")],
+            "data_path": "/tmp/ws.db",
+            "table_names": ["batting"],
+            "schema_summary": "",
+            "sample_table": "",
+            "context": "",
+        },
+        "known_columns": [],
+        "attempt_counters": {"generation": 0},
+    }
+
+    result = await analysis_generate_code_node(state, {"configurable": {}})
+    assert result.get("candidate_code") == "print('ok')"
+    assert result.get("retry_target") == ""
+    assert attempts[:2] == ["json_schema", "function_calling"]
+
+
+@pytest.mark.asyncio
 async def test_analysis_collect_context_reads_schema_memory(tmp_path) -> None:
     workspace_db = tmp_path / "workspace.duckdb"
     workspace_db.write_text("", encoding="utf-8")

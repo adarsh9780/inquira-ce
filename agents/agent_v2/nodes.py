@@ -2353,20 +2353,36 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
     )
 
     model = _get_model(config, lite=False)
-    chain = build_coding_chain(model=model)
-    output = await ainvoke_coding_chain(
-        chain=chain,
-        messages=messages,
-        table_name=table_hint,
-        workspace_tables_json=_safe_json_dumps(table_names),
-        workspace_db_path=str(analysis_context.get("data_path") or ""),
-        schema_summary=str(analysis_context.get("schema_summary") or ""),
-        known_columns_json=_safe_json_dumps(known_columns),
-        sample_table=sample_table or "",
-        sample_json=_safe_json_dumps(sample),
-        context=generation_context,
-        invoke_structured_chain=_ainvoke_structured_chain,
-    )
+    output = None
+    methods = _structured_output_methods(model)
+    last_exc: Exception | None = None
+    for idx, method in enumerate(methods):
+        try:
+            chain = build_coding_chain(model=model, method=method)
+            output = await ainvoke_coding_chain(
+                chain=chain,
+                messages=messages,
+                table_name=table_hint,
+                workspace_tables_json=_safe_json_dumps(table_names),
+                workspace_db_path=str(analysis_context.get("data_path") or ""),
+                schema_summary=str(analysis_context.get("schema_summary") or ""),
+                known_columns_json=_safe_json_dumps(known_columns),
+                sample_table=sample_table or "",
+                sample_json=_safe_json_dumps(sample),
+                context=generation_context,
+                invoke_structured_chain=_ainvoke_structured_chain,
+            )
+            break
+        except Exception as exc:
+            last_exc = exc
+            if idx >= len(methods) - 1:
+                raise
+            if not _is_recoverable_structured_output_error(exc):
+                raise
+    if output is None:
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError("Code generation structured output failed without an error.")
     candidate_code = str(output.code or "").strip()
     requested_queries = _normalize_search_queries(output.search_schema_queries)
     if not requested_queries:
