@@ -67,31 +67,18 @@
                 <EyeSlashIcon v-else class="w-4 h-4 text-gray-400 hover:text-gray-600" />
               </button>
             </div>
-            <div v-if="hasTypedApiKey" class="flex items-center gap-2">
+            <div class="flex items-center gap-2">
               <button
-                @click="saveProviderApiKey"
+                @click="verifyAndSaveProviderConfig"
                 :disabled="isSavingApiKey || !appStore.apiKey.trim()"
-                class="inline-flex h-9 min-w-[5.5rem] items-center justify-center px-3 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-secondary"
-                title="Save your API key to secure storage"
+                class="inline-flex h-9 min-w-[7rem] items-center justify-center px-3 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-primary"
+                title="Verify key, save provider config, and refresh model catalog"
                 type="button"
               >
-                <span v-if="!isSavingApiKey">Save Key</span>
+                <span v-if="!isSavingApiKey">Verify &amp; Save</span>
                 <span v-else class="inline-flex items-center">
                   <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-[var(--color-accent)] mr-2"></div>
-                  Saving...
-                </span>
-              </button>
-              <button
-                @click="testApiKey"
-                :disabled="isTestingApiKey || !appStore.apiKey.trim() || !appStore.selectedModel"
-                class="inline-flex h-9 min-w-[5.5rem] items-center justify-center px-3 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-secondary"
-                title="Test your API key with the configured provider"
-                type="button"
-              >
-                <span v-if="!isTestingApiKey">Test</span>
-                <span v-else class="inline-flex items-center">
-                  <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-[var(--color-accent)] mr-2"></div>
-                  Testing...
+                  Verifying...
                 </span>
               </button>
             </div>
@@ -112,9 +99,35 @@
         </div>
       </div>
 
-      <p v-else class="text-xs text-green-700">
-        Ollama does not require an API key.
-      </p>
+      <div v-else class="space-y-3 max-w-md">
+        <p class="text-xs text-green-700">
+          Ollama does not require an API key.
+        </p>
+        <div>
+          <label for="ollama-base-url" class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
+            Ollama Base URL
+          </label>
+          <input
+            id="ollama-base-url"
+            type="text"
+            v-model="ollamaBaseUrl"
+            placeholder="http://localhost:11434"
+            class="input-base"
+          />
+        </div>
+        <button
+          @click="verifyAndSaveProviderConfig"
+          :disabled="isSavingApiKey"
+          class="inline-flex h-9 min-w-[8rem] items-center justify-center px-3 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-primary"
+          type="button"
+        >
+          <span v-if="!isSavingApiKey">Verify &amp; Save</span>
+          <span v-else class="inline-flex items-center">
+            <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-[var(--color-accent)] mr-2"></div>
+            Verifying...
+          </span>
+        </button>
+      </div>
 
       <p v-if="requiresApiKey && appStore.selectedProviderApiKeyPresent" class="text-xs text-green-700">
         A key for {{ appStore.llmProvider }} is already configured in secure storage.
@@ -152,17 +165,18 @@
         <label class="block text-sm font-medium mb-2" style="color: var(--color-text-main);">
           Main Model (shown in Chat selector)
         </label>
-        <HeaderDropdown
-          :model-value="appStore.selectedModel"
-          @update:model-value="handleMainModelChange"
-          :options="mainModelOptions"
-          :backend-search="searchProviderModels"
-          placeholder="Select main model"
-          :searchable="true"
-          :group-by-provider="true"
-          search-placeholder="Search models"
-          max-width-class="max-w-md w-full"
-        />
+        <div class="max-w-md">
+          <ModelSelector
+            :selected-model="appStore.selectedModel"
+            :provider="appStore.llmProvider"
+            :model-options="appStore.providerMainModels"
+            :backend-search="searchProviderModels"
+            :search-loading="appStore.providerModelSearchLoading"
+            :search-debounce-ms="250"
+            :max-options-without-search="10"
+            @model-changed="handleMainModelChange"
+          />
+        </div>
       </div>
 
       <div>
@@ -201,11 +215,12 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { apiService } from '../../services/apiService'
 import { openExternalUrl } from '../../services/externalLinkService'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
+import ModelSelector from '../ui/ModelSelector.vue'
 import {
   KeyIcon,
   EyeIcon,
@@ -216,23 +231,25 @@ import {
 
 const appStore = useAppStore()
 const showApiKey = ref(false)
-const isTestingApiKey = ref(false)
 const isRefreshingModels = ref(false)
 const isSavingApiKey = ref(false)
 const isSavingSettings = ref(false)
+const ollamaBaseUrl = ref('http://localhost:11434')
 const message = ref('')
-const messageType = ref('') // 'success' | 'error'
+const messageType = ref('') // 'success' | 'error' | 'warning'
 
 const providerOptions = computed(() => appStore.availableProviders.map(p => ({ label: p, value: p })))
-const mainModelOptions = computed(() => appStore.providerMainModels.map(m => ({ label: m, value: m })))
 const liteModelOptions = computed(() => appStore.providerLiteModels.map(m => ({ label: m, value: m })))
 
 const messageTypeClass = computed(() => {
-  return messageType.value === 'success'
-    ? 'bg-green-50 border border-green-200 text-green-800'
-    : 'bg-red-50 border border-red-200 text-red-800'
+  if (messageType.value === 'success') {
+    return 'bg-green-50 border border-green-200 text-green-800'
+  }
+  if (messageType.value === 'warning') {
+    return 'bg-yellow-50 border border-yellow-200 text-yellow-800'
+  }
+  return 'bg-red-50 border border-red-200 text-red-800'
 })
-const hasTypedApiKey = computed(() => !!appStore.apiKey.trim())
 const requiresApiKey = computed(() => !!appStore.providerRequiresApiKey)
 const hasSavedProviderApiKey = computed(() => !requiresApiKey.value || !!appStore.selectedProviderApiKeyPresent)
 const providerCatalog = computed(() => appStore.providerModelCatalogs?.[appStore.llmProvider] || {})
@@ -257,21 +274,20 @@ const providerKeyUrl = computed(() => {
   return 'https://openrouter.ai/keys'
 })
 
-function syncProviderCatalog(provider) {
-  const catalog = appStore.providerModelCatalogs?.[provider] || {}
-  const mainModels = Array.isArray(catalog.main_models) ? catalog.main_models : []
-  const liteModels = Array.isArray(catalog.lite_models) ? catalog.lite_models : []
-  appStore.providerMainModels = [...mainModels]
-  appStore.availableModels = [...mainModels]
-  if (!appStore.providerMainModels.includes(appStore.selectedModel)) {
-    appStore.setSelectedModel(appStore.providerMainModels[0] || '')
-  }
-  appStore.providerLiteModels = [...liteModels]
-  const fallbackLite = catalog.default_lite_model || liteModels[0] || ''
-  appStore.setSelectedLiteModel(
-    liteModels.includes(appStore.selectedLiteModel) ? appStore.selectedLiteModel : fallbackLite
-  )
+function syncOllamaBaseUrl() {
+  const catalogBaseUrl = String(appStore.providerModelCatalogs?.ollama?.base_url || '').trim()
+  ollamaBaseUrl.value = catalogBaseUrl || 'http://localhost:11434'
 }
+
+watch(
+  () => appStore.llmProvider,
+  (provider) => {
+    if (provider === 'ollama') {
+      syncOllamaBaseUrl()
+    }
+  },
+  { immediate: true }
+)
 
 function handleApiKeyChange(event) {
   appStore.setApiKey(event.target.value)
@@ -282,7 +298,9 @@ function handleProviderChange(event) {
   const provider = String(event?.target?.value ?? event ?? '').trim().toLowerCase()
   appStore.setLlmProvider(provider)
   appStore.setApiKey('')
-  syncProviderCatalog(provider)
+  if (provider === 'ollama') {
+    syncOllamaBaseUrl()
+  }
   clearMessage()
 }
 
@@ -297,10 +315,8 @@ function handleMainModelChange(event) {
 }
 
 async function searchProviderModels(query, limit = 25) {
-  const provider = String(appStore.llmProvider || '').trim()
-  if (!provider) return []
-  const response = await apiService.v1SearchProviderModels(provider, query, limit)
-  return Array.isArray(response?.models) ? response.models : []
+  const models = await appStore.searchProviderModels(query, limit)
+  return Array.isArray(models) ? models : []
 }
 
 function clearMessage() {
@@ -329,9 +345,11 @@ async function refreshProviderModels() {
     if (typeof appStore.applyPreferencesResponse === 'function') {
       appStore.applyPreferencesResponse(response)
     }
-    syncProviderCatalog(appStore.llmProvider)
+    if (appStore.llmProvider === 'ollama') {
+      syncOllamaBaseUrl()
+    }
     message.value = response?.detail || `Refreshed models for provider '${appStore.llmProvider}'.`
-    messageType.value = 'success'
+    messageType.value = response?.error ? 'warning' : 'success'
   } catch (error) {
     console.error('❌ Failed to refresh provider models:', error)
     message.value = extractErrorMessage(error, 'Failed to refresh provider models.')
@@ -341,33 +359,9 @@ async function refreshProviderModels() {
   }
 }
 
-async function testApiKey() {
+async function verifyAndSaveProviderConfig() {
   const key = appStore.apiKey.trim()
-  if (!key) {
-    message.value = 'Please enter your API key first.'
-    messageType.value = 'error'
-    return
-  }
-
-  isTestingApiKey.value = true
-  clearMessage()
-
-  try {
-    const res = await apiService.testGeminiApi(key, appStore.selectedModel, appStore.llmProvider)
-    message.value = res?.detail || 'Successfully connected to model provider.'
-    messageType.value = 'success'
-  } catch (error) {
-    console.error('❌ Provider API test failed:', error)
-    message.value = extractErrorMessage(error, 'Failed to validate API key.')
-    messageType.value = 'error'
-  } finally {
-    isTestingApiKey.value = false
-  }
-}
-
-async function saveProviderApiKey() {
-  const key = appStore.apiKey.trim()
-  if (!key) {
+  if (requiresApiKey.value && !key) {
     message.value = 'Please enter your API key first.'
     messageType.value = 'error'
     return
@@ -377,17 +371,39 @@ async function saveProviderApiKey() {
   clearMessage()
 
   try {
-    const response = await apiService.setApiKeySettings(key, appStore.llmProvider)
+    const payload = {
+      provider: appStore.llmProvider,
+      selected_model: appStore.selectedModel,
+      selected_lite_model: appStore.selectedLiteModel,
+      selected_coding_model: appStore.selectedModel,
+    }
+    if (requiresApiKey.value) {
+      payload.api_key = key
+    } else {
+      payload.base_url = String(ollamaBaseUrl.value || '').trim() || 'http://localhost:11434'
+    }
+
+    const response = await apiService.setApiKeySettings(payload, appStore.llmProvider)
     if (response && typeof appStore.applyPreferencesResponse === 'function') {
       appStore.applyPreferencesResponse(response)
     }
-    message.value = response?.warning
-      ? `${response.detail || `API key saved for ${appStore.llmProvider}.`} ${response.warning}`
-      : response?.detail || `API key saved for ${appStore.llmProvider}.`
-    messageType.value = 'success'
+    if (appStore.llmProvider === 'ollama') {
+      syncOllamaBaseUrl()
+    }
+
+    const refreshedCount = Array.isArray(response?.provider_available_main_models)
+      ? response.provider_available_main_models.length
+      : 0
+    if (response?.warning) {
+      message.value = 'Key saved. Model refresh failed. Use Refresh Models to retry.'
+      messageType.value = 'warning'
+    } else {
+      message.value = `Provider saved. Refreshed ${refreshedCount} models.`
+      messageType.value = 'success'
+    }
   } catch (error) {
-    console.error('❌ Failed to save provider API key:', error)
-    message.value = extractErrorMessage(error, 'Failed to save API key.')
+    console.error('❌ Failed to verify and save provider config:', error)
+    message.value = extractErrorMessage(error, 'Failed to verify and save provider configuration.')
     messageType.value = 'error'
   } finally {
     isSavingApiKey.value = false
@@ -395,7 +411,7 @@ async function saveProviderApiKey() {
 }
 
 async function saveApiSettings() {
-  if (!appStore.providerMainModels.length) {
+  if (!appStore.availableModels.length) {
     message.value = 'No main models available for provider.'
     messageType.value = 'error'
     return
@@ -416,7 +432,6 @@ async function saveApiSettings() {
     if (typeof appStore.applyPreferencesResponse === 'function') {
       appStore.applyPreferencesResponse(response)
     }
-    await appStore.loadUserPreferences()
     message.value = 'Provider and model settings saved.'
     messageType.value = 'success'
   } catch (error) {

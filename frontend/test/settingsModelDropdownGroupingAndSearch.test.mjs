@@ -3,17 +3,18 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('settings model selectors are grouped by provider and searchable', () => {
+test('settings model selectors use shared ModelSelector for main model and searchable HeaderDropdown for lite model', () => {
   const apiTabPath = resolve(process.cwd(), 'src/components/modals/ApiTab.vue')
   const source = readFileSync(apiTabPath, 'utf-8')
 
   const groupedUsages = source.match(/:group-by-provider="true"/g) ?? []
   const searchableUsages = source.match(/:searchable="true"/g) ?? []
-  const searchPlaceholderUsages = source.match(/search-placeholder="Search models"/g) ?? []
 
-  assert.equal(groupedUsages.length >= 2, true)
-  assert.equal(searchableUsages.length >= 2, true)
-  assert.equal(searchPlaceholderUsages.length >= 2, true)
+  assert.equal(source.includes('<ModelSelector'), true)
+  assert.equal(source.includes(':search-loading="appStore.providerModelSearchLoading"'), true)
+  assert.equal(groupedUsages.length >= 1, true)
+  assert.equal(searchableUsages.length >= 1, true)
+  assert.equal(source.includes('search-placeholder="Search models"'), true)
 })
 
 test('shared dropdown widgets support provider grouping and search filtering', () => {
