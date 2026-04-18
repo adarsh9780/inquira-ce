@@ -35,7 +35,14 @@ const llmPresencePenalty = ref(0)
 const slowRequestWarningSeconds = ref(30)
 
 const modelMetaByProvider = ref({})
-const appStore = useAppStore()
+let appStore = null
+
+function getAppStore() {
+  if (!appStore) {
+    appStore = useAppStore()
+  }
+  return appStore
+}
 
 function normalizeProvider(raw) {
   const value = String(raw || '').trim().toLowerCase()
@@ -338,8 +345,9 @@ function setApiKey(value) {
 function setMainModel(value) {
   const nextValue = String(value || '').trim()
   mainModel.value = nextValue || null
-  if (appStore && typeof appStore.setSelectedModel === 'function') {
-    appStore.setSelectedModel(nextValue)
+  const store = getAppStore()
+  if (store && typeof store.setSelectedModel === 'function') {
+    store.setSelectedModel(nextValue)
   }
 }
 
@@ -582,20 +590,23 @@ const currentProviderModelMeta = computed(() => (
   modelMetaByProvider.value?.[normalizeProvider(provider.value)] || {}
 ))
 
-watch(
-  () => appStore.selectedModel,
-  (nextValue) => {
-    const normalizedProvider = normalizeProvider(provider.value)
-    if (!normalizedProvider) return
-    if (normalizedProvider !== normalizeProvider(appStore.llmProvider)) return
-    const nextModel = String(nextValue || '').trim()
-    if (nextModel && nextModel !== mainModel.value) {
-      mainModel.value = nextModel
-    }
-  }
-)
-
 export const useLLMConfig = () => {
+  appStore = getAppStore()
+
+  watch(
+    () => getAppStore().selectedModel,
+    (nextValue) => {
+      const store = getAppStore()
+      const normalizedProvider = normalizeProvider(provider.value)
+      if (!normalizedProvider) return
+      if (normalizedProvider !== normalizeProvider(store.llmProvider)) return
+      const nextModel = String(nextValue || '').trim()
+      if (nextModel && nextModel !== mainModel.value) {
+        mainModel.value = nextModel
+      }
+    }
+  )
+
   return {
     provider,
     apiKey,
