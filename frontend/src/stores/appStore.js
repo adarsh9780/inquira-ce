@@ -39,6 +39,9 @@ export const useAppStore = defineStore('app', () => {
   const availableModels = ref([...DEFAULT_MODELS])
   const providerMainModels = ref([...DEFAULT_MODELS])
   const providerLiteModels = ref([DEFAULT_LITE_MODEL])
+  const providerModelSearchResults = ref({})
+  const providerModelSearchLoading = ref(false)
+  const providerModelSearchQuery = ref('')
   const providerModelCatalogs = ref({})
   const providerRequiresApiKey = ref(true)
   const apiKeyPresenceByProvider = ref({})
@@ -140,6 +143,7 @@ export const useAppStore = defineStore('app', () => {
   let suppressPreferenceSync = false
   let kernelEnsureWorkspaceId = ''
   let kernelEnsurePromise = null
+  let providerModelSearchToken = 0
   const ensuredKernelWorkspaceIds = new Set()
   const LOCAL_SNAPSHOT_VERSION = 1
   const MAX_TERMINAL_ENTRIES = 50
@@ -175,6 +179,49 @@ export const useAppStore = defineStore('app', () => {
       cleaned.push(value)
     }
     return cleaned
+  }
+
+  function normalizeProviderName(provider) {
+    const value = String(provider || '').trim().toLowerCase()
+    return value || DEFAULT_PROVIDER
+  }
+
+  function normalizeSearchModelIds(models, provider = '') {
+    const raw = Array.isArray(models) ? models : []
+    const modelIds = raw
+      .map((item) => {
+        if (typeof item === 'string' || typeof item === 'number') return String(item || '').trim()
+        if (!item || typeof item !== 'object') return ''
+        return String(item.id || item.value || item.model || '').trim()
+      })
+      .filter(Boolean)
+    return normalizeModelList(modelIds, provider)
+  }
+
+  function providerModelSearchCacheKey(provider, query) {
+    return `${normalizeProviderName(provider)}::${String(query || '').trim().toLowerCase()}`
+  }
+
+  function clearProviderModelSearchState() {
+    providerModelSearchResults.value = {}
+    providerModelSearchLoading.value = false
+    providerModelSearchQuery.value = ''
+    providerModelSearchToken += 1
+  }
+
+  function mergeProviderModelOptions(provider, results = []) {
+    const normalizedProvider = normalizeProviderName(provider)
+    const selected = String(selectedModel.value || '').trim()
+    const displayModels = normalizeModelList(providerMainModels.value, normalizedProvider)
+    const searchModels = normalizeModelList(results, normalizedProvider)
+    const merged = []
+    if (selected && modelAllowedForProvider(normalizedProvider, selected)) {
+      merged.push(selected)
+    }
+    merged.push(...displayModels)
+    merged.push(...searchModels)
+    availableModels.value = normalizeModelList(merged, normalizedProvider)
+    return availableModels.value
   }
 
   function resolveSnapshotUserId(explicitUserId = null) {
@@ -254,12 +301,8 @@ export const useAppStore = defineStore('app', () => {
         providerLiteModels.value = restoredLiteModels
       }
     }
-    const restoredEnabledModels = normalizeModelList(llm.enabled_models, snapshotProvider)
     if (providerMainModels.value.length) {
       availableModels.value = [...providerMainModels.value]
-    } else if (restoredEnabledModels.length) {
-      providerMainModels.value = [...restoredEnabledModels]
-      availableModels.value = [...restoredEnabledModels]
     }
     if (typeof llm.selected_model === 'string' && llm.selected_model.trim()) {
       selectedModel.value = llm.selected_model.trim()
@@ -469,6 +512,9 @@ export const useAppStore = defineStore('app', () => {
     availableModels.value = [...DEFAULT_MODELS]
     providerMainModels.value = [...DEFAULT_MODELS]
     providerLiteModels.value = [DEFAULT_LITE_MODEL]
+    providerModelSearchResults.value = {}
+    providerModelSearchLoading.value = false
+    providerModelSearchQuery.value = ''
     providerModelCatalogs.value = {}
     providerRequiresApiKey.value = true
     apiKeyPresenceByProvider.value = {}
@@ -635,6 +681,8 @@ export const useAppStore = defineStore('app', () => {
   function setLlmProvider(provider) {
     const value = String(provider || '').trim().toLowerCase()
     llmProvider.value = value || DEFAULT_PROVIDER
+    clearProviderModelSearchState()
+    mergeProviderModelOptions(llmProvider.value, [])
     saveLocalConfig()
   }
 
@@ -656,11 +704,16 @@ export const useAppStore = defineStore('app', () => {
     saveLocalConfig()
   }
 
-  function setEnabledModels(models) {
+  function setProviderDisplayModels(models) {
     const cleaned = normalizeModelList(models, llmProvider.value)
     providerMainModels.value = cleaned.length ? cleaned : [...DEFAULT_MODELS]
-    availableModels.value = [...providerMainModels.value]
+    mergeProviderModelOptions(llmProvider.value, [])
     saveLocalConfig()
+  }
+
+  // Backward-compatible alias. This mutates provider display cache, not full provider catalog.
+  function setEnabledModels(models) {
+    setProviderDisplayModels(models)
   }
 
   function setApiKeyConfigured(configured) {
@@ -670,7 +723,49 @@ export const useAppStore = defineStore('app', () => {
   function setSelectedModel(model) {
     selectedModel.value = String(model || '').trim()
     selectedCodingModel.value = selectedModel.value
+    mergeProviderModelOptions(llmProvider.value, [])
     saveLocalConfig()
+  }
+
+  async function searchProviderModels(query, limit = 25) {
+    const provider = normalizeProviderName(llmProvider.value)
+    const normalizedQuery = String(query || '').trim()
+    providerModelSearchQuery.value = normalizedQuery
+
+    if (normalizedQuery.length < 3) {
+      providerModelSearchLoading.value = false
+      return mergeProviderModelOptions(provider, [])
+    }
+
+    const cacheKey = providerModelSearchCacheKey(provider, normalizedQuery)
+    const cached = providerModelSearchResults.value?.[cacheKey]
+    if (Array.isArray(cached)) {
+      return mergeProviderModelOptions(provider, cached)
+    }
+
+    const requestToken = ++providerModelSearchToken
+    providerModelSearchLoading.value = true
+    try {
+      const response = await apiService.v1SearchProviderModels(provider, normalizedQuery, limit)
+      if (requestToken !== providerModelSearchToken) {
+        return mergeProviderModelOptions(provider, [])
+      }
+      const searchModels = normalizeSearchModelIds(response?.models, provider)
+      providerModelSearchResults.value = {
+        ...providerModelSearchResults.value,
+        [cacheKey]: searchModels,
+      }
+      return mergeProviderModelOptions(provider, searchModels)
+    } catch (_error) {
+      if (requestToken === providerModelSearchToken) {
+        return mergeProviderModelOptions(provider, [])
+      }
+      return mergeProviderModelOptions(provider, [])
+    } finally {
+      if (requestToken === providerModelSearchToken) {
+        providerModelSearchLoading.value = false
+      }
+    }
   }
 
   function setSchemaContext(context) {
@@ -2060,6 +2155,7 @@ export const useAppStore = defineStore('app', () => {
 
   function applyPreferencesResponse(prefs, options = {}) {
     const preserveLocalSchemaContext = options?.preserveLocalSchemaContext === true
+    const previousProvider = llmProvider.value
     if (typeof prefs?.llm_provider === 'string' && prefs.llm_provider.trim()) {
       llmProvider.value = prefs.llm_provider.trim().toLowerCase()
     }
@@ -2095,7 +2191,6 @@ export const useAppStore = defineStore('app', () => {
     } else if (legacyEnabledModels.length) {
       providerMainModels.value = legacyEnabledModels
     }
-    availableModels.value = [...providerMainModels.value]
     if (prefs?.selected_model) selectedModel.value = prefs.selected_model
     if (!providerMainModels.value.includes(selectedModel.value)) {
       selectedModel.value = providerMainModels.value[0] || 'google/gemini-2.5-flash'
@@ -2154,6 +2249,13 @@ export const useAppStore = defineStore('app', () => {
       ingestedTableName.value = prefs.active_table_name
     }
 
+    const providerChanged = previousProvider !== llmProvider.value
+    clearProviderModelSearchState()
+    if (providerChanged) {
+      providerModelSearchQuery.value = ''
+    }
+    mergeProviderModelOptions(llmProvider.value, [])
+
     // Preferences may point to deleted/stale workspace IDs.
     if (activeWorkspaceId.value && !workspaces.value.some((ws) => ws.id === activeWorkspaceId.value)) {
       const active = workspaces.value.find((ws) => ws.is_active) || workspaces.value[0]
@@ -2192,6 +2294,9 @@ export const useAppStore = defineStore('app', () => {
     availableModels,
     providerMainModels,
     providerLiteModels,
+    providerModelSearchResults,
+    providerModelSearchLoading,
+    providerModelSearchQuery,
     providerModelCatalogs,
     providerRequiresApiKey,
     apiKeyPresenceByProvider,
@@ -2282,9 +2387,13 @@ export const useAppStore = defineStore('app', () => {
     setSelectedLiteModel,
     setSelectedCodingModel,
     setSlowRequestWarningSeconds,
+    setProviderDisplayModels,
     setEnabledModels,
     setApiKeyConfigured,
     setSelectedModel,
+    searchProviderModels,
+    mergeProviderModelOptions,
+    clearProviderModelSearchState,
     setSchemaContext,
     setAllowSchemaSampleValues,
     setUiTheme,

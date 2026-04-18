@@ -17,7 +17,11 @@ test('model selector accepts injected model options prop', () => {
   assert.equal(source.includes('v-model="searchQuery"'), true)
   assert.equal(source.includes('const source = Array.isArray(props.modelOptions) && props.modelOptions.length'), true)
   assert.equal(source.includes('backendSearch'), true)
+  assert.equal(source.includes('provider'), true)
+  assert.equal(source.includes('searchLoading'), true)
+  assert.equal(source.includes('searchDebounceMs'), true)
   assert.equal(source.includes('Searching...'), true)
+  assert.equal(source.includes('No models found.'), true)
 })
 
 test('chat input model dropdown updates only main model in pinia store', () => {
@@ -27,6 +31,8 @@ test('chat input model dropdown updates only main model in pinia store', () => {
   assert.equal(source.includes(':selected-model="appStore.selectedModel"'), true)
   assert.equal(source.includes(':max-options-without-search="10"'), true)
   assert.equal(source.includes(':backend-search="searchProviderModels"'), true)
+  assert.equal(source.includes(':provider="appStore.llmProvider"'), true)
+  assert.equal(source.includes(':search-loading="appStore.providerModelSearchLoading"'), true)
   assert.equal(source.includes('appStore.setSelectedModel(model)'), true)
 })
 
@@ -37,8 +43,10 @@ test('app store reads available models from v1 preferences payload', () => {
   assert.equal(source.includes('function modelAllowedForProvider(provider, modelId)'), true)
   assert.equal(source.includes("normalizedProvider && normalizedProvider !== 'ollama' && value.includes(':cloud')"), true)
   assert.equal(source.includes('const fallbackMainModels = normalizeModelList(prefs?.provider_available_main_models, responseProvider)'), true)
-  assert.equal(source.includes('availableModels.value = [...providerMainModels.value]'), true)
+  assert.equal(source.includes('mergeProviderModelOptions(llmProvider.value, [])'), true)
   assert.equal(source.includes('enabled_models:'), false)
+  assert.equal(source.includes('providerModelSearchResults'), true)
+  assert.equal(source.includes('async function searchProviderModels(query, limit = 25)'), true)
   assert.equal(source.includes('selectedCodingModel.value = selectedModel.value'), true)
   assert.equal(source.includes('if (typeof prefs?.terminal_risk_acknowledged === \'boolean\')'), true)
   assert.equal(source.includes('terminalConsentGranted.value = prefs.terminal_risk_acknowledged'), true)

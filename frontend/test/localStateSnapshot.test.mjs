@@ -65,6 +65,15 @@ test('local snapshot restore recovers model selections and flushes pending prefe
   assert.equal(source.includes('await syncPreferencesNow(targetUserId)'), true)
 })
 
+test('preference sync payload excludes enabled_models and keeps selected model only', () => {
+  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const source = readFileSync(storePath, 'utf-8')
+
+  assert.equal(source.includes('selected_model: selectedModel.value'), true)
+  assert.equal(source.includes('selected_coding_model: selectedModel.value'), true)
+  assert.equal(source.includes('enabled_models:'), false)
+})
+
 test('tauri fs capability allows writing local snapshot into app data scope', () => {
   const capPath = resolve(process.cwd(), '../src-tauri/capabilities/default.json')
   const raw = readFileSync(capPath, 'utf-8')

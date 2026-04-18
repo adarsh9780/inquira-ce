@@ -99,7 +99,10 @@
           <ModelSelector
             :selected-model="appStore.selectedModel"
             :model-options="appStore.availableModels"
+            :provider="appStore.llmProvider"
             :backend-search="searchProviderModels"
+            :search-loading="appStore.providerModelSearchLoading"
+            :search-debounce-ms="250"
             :max-options-without-search="10"
             @model-changed="handleModelChange"
           />
@@ -457,10 +460,8 @@ function handleModelChange(model) {
 }
 
 async function searchProviderModels(query, limit = 25) {
-  const provider = String(appStore.llmProvider || '').trim()
-  if (!provider) return []
-  const response = await apiService.v1SearchProviderModels(provider, query, limit)
-  return Array.isArray(response?.models) ? response.models : []
+  const models = await appStore.searchProviderModels(query, limit)
+  return Array.isArray(models) ? models : []
 }
 
 function initializeVoiceInput() {

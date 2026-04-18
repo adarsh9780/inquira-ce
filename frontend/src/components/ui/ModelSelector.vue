@@ -62,6 +62,13 @@
                 </span>
               </li>
             </ListboxOption>
+            <li
+              v-if="!backendLoading && filteredModels.length === 0"
+              class="px-3 py-2 text-[11px]"
+              style="color: var(--color-text-muted);"
+            >
+              No models found.
+            </li>
           </ListboxOptions>
         </transition>
       </div>
@@ -90,6 +97,10 @@ const props = defineProps({
     type: String,
     required: true
   },
+  provider: {
+    type: String,
+    default: '',
+  },
   modelOptions: {
     type: Array,
     default: () => []
@@ -98,6 +109,10 @@ const props = defineProps({
     type: Function,
     default: null,
   },
+  searchLoading: {
+    type: Boolean,
+    default: false,
+  },
   backendSearchLimit: {
     type: Number,
     default: 25,
@@ -105,6 +120,10 @@ const props = defineProps({
   backendSearchMinChars: {
     type: Number,
     default: 3,
+  },
+  searchDebounceMs: {
+    type: Number,
+    default: 250,
   },
   backendSearchDebounceMs: {
     type: Number,
@@ -121,7 +140,7 @@ const emit = defineEmits(['model-changed'])
 const selectedModel = ref(props.selectedModel)
 const searchQuery = ref('')
 const backendModels = ref([])
-const backendLoading = ref(false)
+const backendLoadingLocal = ref(false)
 let backendSearchTimer = null
 let backendSearchToken = 0
 
@@ -136,8 +155,10 @@ const availableModels = computed(() => {
   const source = Array.isArray(props.modelOptions) && props.modelOptions.length
     ? props.modelOptions
     : fallbackModels
-  return normalizeModelOptions(source)
+  return normalizeModelOptions(source, props.provider)
 })
+
+const backendLoading = computed(() => Boolean(props.searchLoading) || backendLoadingLocal.value)
 
 const filteredModels = computed(() => {
   const query = String(searchQuery.value || '').trim().toLowerCase()
@@ -190,27 +211,32 @@ function getModelDisplayName(modelValue) {
 }
 
 function shouldSearchBackend(query, localMatches) {
+  const normalizedQuery = String(query || '').trim().toLowerCase()
   if (typeof props.backendSearch !== 'function') return false
-  if (query.length < Number(props.backendSearchMinChars || 3)) return false
-  return localMatches.length === 0
+  if (normalizedQuery.length < Number(props.backendSearchMinChars || 3)) return false
+  return !localMatches.some((model) => {
+    const value = String(model?.value || '').trim().toLowerCase()
+    const label = String(model?.label || '').trim().toLowerCase()
+    return value === normalizedQuery || label === normalizedQuery
+  })
 }
 
 function scheduleBackendSearch(query) {
   if (backendSearchTimer) clearTimeout(backendSearchTimer)
   if (!query || typeof props.backendSearch !== 'function') {
     backendModels.value = []
-    backendLoading.value = false
+    backendLoadingLocal.value = false
     return
   }
 
   const localMatches = availableModels.value.filter((model) => optionMatchesSearch(model, query))
   if (!shouldSearchBackend(query, localMatches)) {
     backendModels.value = []
-    backendLoading.value = false
+    backendLoadingLocal.value = false
     return
   }
 
-  const wait = Number(props.backendSearchDebounceMs || 250)
+  const wait = Number(props.searchDebounceMs ?? props.backendSearchDebounceMs ?? 250)
   backendSearchTimer = setTimeout(() => {
     void runBackendSearch(query)
   }, Number.isFinite(wait) && wait >= 0 ? wait : 250)
@@ -218,7 +244,7 @@ function scheduleBackendSearch(query) {
 
 async function runBackendSearch(query) {
   const token = ++backendSearchToken
-  backendLoading.value = true
+  backendLoadingLocal.value = true
   try {
     const result = await props.backendSearch(query, Number(props.backendSearchLimit || 25))
     if (token !== backendSearchToken) return
@@ -227,14 +253,14 @@ async function runBackendSearch(query) {
       : Array.isArray(result?.models)
         ? result.models
         : []
-    backendModels.value = normalizeModelOptions(raw)
+    backendModels.value = normalizeModelOptions(raw, props.provider)
   } catch (_error) {
     if (token === backendSearchToken) {
       backendModels.value = []
     }
   } finally {
     if (token === backendSearchToken) {
-      backendLoading.value = false
+      backendLoadingLocal.value = false
     }
   }
 }
