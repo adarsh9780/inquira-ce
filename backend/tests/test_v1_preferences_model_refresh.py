@@ -422,6 +422,94 @@ async def test_refresh_service_ollama_unreachable_returns_non_fatal_error(monkey
 
 
 @pytest.mark.asyncio
+async def test_refresh_service_ollama_merges_local_and_cloud_models(monkeypatch):
+    class _Resp:
+        def __init__(self, status_code: int, payload: dict):
+            self.status_code = status_code
+            self._payload = payload
+            self.request = httpx.Request("GET", "https://example.test")
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise httpx.HTTPStatusError(
+                    "status error",
+                    request=self.request,
+                    response=httpx.Response(self.status_code, request=self.request),
+                )
+
+        def json(self):
+            return self._payload
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            _ = args, kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            _ = exc_type, exc, tb
+            return False
+
+        async def get(self, url, *args, **kwargs):
+            _ = args, kwargs
+            if str(url).startswith("http://localhost:11434"):
+                return _Resp(200, {"models": [{"name": "llama3.2"}]})
+            if str(url) == "https://ollama.com/api/tags":
+                return _Resp(200, {"models": [{"model": "gpt-oss:20b-cloud"}]})
+            return _Resp(404, {})
+
+    monkeypatch.setattr("app.services.provider_model_refresh.httpx.AsyncClient", _Client)
+
+    refreshed = await refresh_provider_model_catalog("ollama", base_url="http://localhost:11434")
+
+    assert refreshed.error == ""
+    assert refreshed.catalog["main_models"] == ["llama3.2", "gpt-oss:20b-cloud"]
+    assert "local + 1 cloud" in refreshed.detail
+
+
+@pytest.mark.asyncio
+async def test_refresh_service_ollama_accepts_model_field_from_tags(monkeypatch):
+    class _Resp:
+        def __init__(self, status_code: int, payload: dict):
+            self.status_code = status_code
+            self._payload = payload
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError("unexpected status")
+
+        def json(self):
+            return self._payload
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            _ = args, kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            _ = exc_type, exc, tb
+            return False
+
+        async def get(self, url, *args, **kwargs):
+            _ = args, kwargs
+            if str(url).startswith("http://localhost:11434"):
+                return _Resp(200, {"models": [{"model": "qwen3-coder:480b-cloud"}]})
+            if str(url) == "https://ollama.com/api/tags":
+                return _Resp(401, {})
+            return _Resp(404, {})
+
+    monkeypatch.setattr("app.services.provider_model_refresh.httpx.AsyncClient", _Client)
+
+    refreshed = await refresh_provider_model_catalog("ollama", base_url="http://localhost:11434")
+
+    assert refreshed.error == ""
+    assert "qwen3-coder:480b-cloud" in refreshed.catalog["main_models"]
+
+
+@pytest.mark.asyncio
 async def test_verify_api_key_maps_provider_status_codes(monkeypatch):
     class _Resp:
         def __init__(self, status_code: int):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urljoin
@@ -15,6 +16,8 @@ from .llm_provider_catalog import (
 )
 
 OPENROUTER_ACCOUNT_MODELS_URL = "https://openrouter.ai/settings"
+OLLAMA_CLOUD_TAGS_URL = "https://ollama.com/api/tags"
+OLLAMA_CLOUD_API_KEY_ENV = "OLLAMA_API_KEY"
 _REQUEST_TIMEOUT_SECONDS = 20.0
 _LITE_MODEL_HINTS: tuple[str, ...] = (
     "nano",
@@ -58,14 +61,27 @@ async def refresh_provider_model_catalog(
     if normalized_provider == "ollama":
         resolved_base_url = str(base_url or provider_default_base_url("ollama")).strip() or "http://localhost:11434/v1"
         tags_url = _resolve_ollama_tags_url(resolved_base_url)
+        key = str(api_key or "").strip() or str(os.getenv(OLLAMA_CLOUD_API_KEY_ENV) or "").strip()
         try:
             async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT_SECONDS) as client:
-                models = await _fetch_ollama_models(client, tags_url)
+                local_models = await _fetch_ollama_models(client, tags_url)
+                cloud_models = await _fetch_ollama_cloud_models(client, key)
+                models = _unique_models([*local_models, *cloud_models])
                 catalog = _build_catalog(normalized_provider, models)
+                model_count = len(catalog["main_models"])
+                if local_models and cloud_models:
+                    detail = (
+                        f"Refreshed {model_count} Ollama models "
+                        f"({len(local_models)} local + {len(cloud_models)} cloud)."
+                    )
+                elif cloud_models:
+                    detail = f"Refreshed {model_count} Ollama cloud models."
+                else:
+                    detail = f"Refreshed {model_count} Ollama models."
                 return ProviderRefreshResult(
                     provider=normalized_provider,
                     catalog=catalog,
-                    detail=f"Refreshed {len(catalog['main_models'])} Ollama models.",
+                    detail=detail,
                 )
         except httpx.HTTPStatusError:
             return ProviderRefreshResult(
@@ -194,18 +210,33 @@ async def _fetch_openai_models(client: httpx.AsyncClient, api_key: str) -> list[
 async def _fetch_ollama_models(client: httpx.AsyncClient, tags_url: str) -> list[str]:
     response = await client.get(tags_url)
     response.raise_for_status()
-    payload = response.json()
+    return _extract_ollama_models_from_tags_payload(response.json())
 
+
+async def _fetch_ollama_cloud_models(client: httpx.AsyncClient, api_key: str) -> list[str]:
+    headers: dict[str, str] = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    response = await client.get(OLLAMA_CLOUD_TAGS_URL, headers=headers or None)
+    status_code = int(getattr(response, "status_code", 0) or 0)
+    if status_code in {401, 403}:
+        return []
+
+    response.raise_for_status()
+    return _extract_ollama_models_from_tags_payload(response.json())
+
+
+def _extract_ollama_models_from_tags_payload(payload: Any) -> list[str]:
     raw_models: list[str] = []
     models = payload.get("models") if isinstance(payload, dict) else None
     if isinstance(models, list):
         for item in models:
             if not isinstance(item, dict):
                 continue
-            model_id = str(item.get("name") or "").strip()
+            model_id = str(item.get("name") or item.get("model") or "").strip()
             if model_id:
                 raw_models.append(model_id)
-
     return _unique_models(raw_models)
 
 
