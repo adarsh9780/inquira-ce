@@ -31,7 +31,9 @@ test('app store reads available models from v1 preferences payload', () => {
   const path = resolve(process.cwd(), 'src/stores/appStore.js')
   const source = readFileSync(path, 'utf-8')
 
-  assert.equal(source.includes('const fallbackMainModels = normalizeModelList(prefs?.provider_available_main_models)'), true)
+  assert.equal(source.includes('function modelAllowedForProvider(provider, modelId)'), true)
+  assert.equal(source.includes("normalizedProvider && normalizedProvider !== 'ollama' && value.includes(':cloud')"), true)
+  assert.equal(source.includes('const fallbackMainModels = normalizeModelList(prefs?.provider_available_main_models, responseProvider)'), true)
   assert.equal(source.includes('availableModels.value = [...providerMainModels.value]'), true)
   assert.equal(source.includes('selectedCodingModel.value = selectedModel.value'), true)
   assert.equal(source.includes('if (typeof prefs?.terminal_risk_acknowledged === \'boolean\')'), true)

@@ -55,6 +55,8 @@ test('local snapshot restore recovers model selections and flushes pending prefe
   const source = readFileSync(storePath, 'utf-8')
 
   assert.equal(source.includes('const llm = snapshot.llm || {}'), true)
+  assert.equal(source.includes('const snapshotProvider = llmProvider.value || DEFAULT_PROVIDER'), true)
+  assert.equal(source.includes('const restoredMainModels = normalizeModelList(llm.provider_main_models, snapshotProvider)'), true)
   assert.equal(source.includes('if (typeof llm.selected_model === \'string\' && llm.selected_model.trim())'), true)
   assert.equal(source.includes('if (typeof llm.selected_lite_model === \'string\' && llm.selected_lite_model.trim())'), true)
   assert.equal(source.includes('selectedCodingModel.value = selectedModel.value || selectedCodingModel.value'), true)

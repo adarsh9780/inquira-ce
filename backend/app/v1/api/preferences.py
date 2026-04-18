@@ -64,7 +64,17 @@ def _coerce_non_negative_int(raw: Any) -> int:
     return value
 
 
-def _clean_models(raw: Any) -> list[str]:
+def _model_allowed_for_provider(provider: str, model_id: str) -> bool:
+    normalized_provider = normalize_llm_provider(provider)
+    value = str(model_id or "").strip().lower()
+    if not value:
+        return False
+    if normalized_provider != "ollama" and ":cloud" in value:
+        return False
+    return True
+
+
+def _clean_models(raw: Any, provider: str = "") -> list[str]:
     if not isinstance(raw, list):
         return []
     cleaned: list[str] = []
@@ -72,6 +82,8 @@ def _clean_models(raw: Any) -> list[str]:
     for item in raw:
         value = str(item or "").strip()
         if not value or value in seen:
+            continue
+        if provider and not _model_allowed_for_provider(provider, value):
             continue
         seen.add(value)
         cleaned.append(value)
@@ -133,6 +145,8 @@ def _clean_model_metadata_entries(
         model_id = str(item.get("id") or "").strip()
         if not model_id or model_id in seen:
             continue
+        if not _model_allowed_for_provider(provider, model_id):
+            continue
         seen.add(model_id)
 
         context_window = _coerce_non_negative_int(item.get("context_window"))
@@ -158,9 +172,9 @@ def _coerce_provider_catalog(
 ) -> dict[str, Any]:
     data = raw_catalog if isinstance(raw_catalog, dict) else {}
 
-    main_models = _clean_models(data.get("main_models"))
+    main_models = _clean_models(data.get("main_models"), provider)
     if not main_models:
-        main_models = _clean_models(fallback.get("main_models", []))
+        main_models = _clean_models(fallback.get("main_models", []), provider)
 
     default_main_model = str(data.get("default_main_model") or "").strip()
     if default_main_model not in main_models:
@@ -169,9 +183,9 @@ def _coerce_provider_catalog(
             fallback_default_main if fallback_default_main in main_models else (main_models[0] if main_models else "")
         )
 
-    lite_models = _clean_models(data.get("lite_models"))
+    lite_models = _clean_models(data.get("lite_models"), provider)
     if not lite_models:
-        lite_models = _clean_models(fallback.get("lite_models", []))
+        lite_models = _clean_models(fallback.get("lite_models", []), provider)
     if not lite_models and default_main_model:
         lite_models = [default_main_model]
 

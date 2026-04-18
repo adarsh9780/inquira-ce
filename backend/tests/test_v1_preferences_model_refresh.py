@@ -367,6 +367,58 @@ def test_coerce_provider_catalog_coerces_invalid_context_window_values():
     assert models_by_id["openrouter/fast"]["context_window"] == 0
 
 
+def test_coerce_provider_catalog_keeps_cloud_suffix_only_for_ollama():
+    openrouter_fallback = {
+        "main_models": ["openrouter/free"],
+        "lite_models": ["openrouter/free"],
+        "default_main_model": "openrouter/free",
+        "default_lite_model": "openrouter/free",
+        "source": "bundled",
+        "models": [],
+    }
+    ollama_fallback = {
+        "main_models": ["llama3.2"],
+        "lite_models": ["llama3.2:3b"],
+        "default_main_model": "llama3.2",
+        "default_lite_model": "llama3.2:3b",
+        "source": "bundled",
+        "models": [],
+    }
+
+    openrouter_catalog = _coerce_provider_catalog(
+        "openrouter",
+        {
+            "main_models": ["google/gemini-3-flash-preview:cloud", "openrouter/free"],
+            "lite_models": ["google/gemini-3-flash-preview:cloud", "openrouter/free"],
+            "default_main_model": "google/gemini-3-flash-preview:cloud",
+            "default_lite_model": "google/gemini-3-flash-preview:cloud",
+            "models": [
+                {"id": "google/gemini-3-flash-preview:cloud", "context_window": 1000},
+                {"id": "openrouter/free", "context_window": 1000},
+            ],
+        },
+        openrouter_fallback,
+    )
+    ollama_catalog = _coerce_provider_catalog(
+        "ollama",
+        {
+            "main_models": ["minimax-m2.7:cloud"],
+            "lite_models": ["minimax-m2.7:cloud"],
+            "default_main_model": "minimax-m2.7:cloud",
+            "default_lite_model": "minimax-m2.7:cloud",
+            "models": [{"id": "minimax-m2.7:cloud", "context_window": 1000}],
+        },
+        ollama_fallback,
+    )
+
+    assert openrouter_catalog["main_models"] == ["openrouter/free"]
+    assert openrouter_catalog["lite_models"] == ["openrouter/free"]
+    assert openrouter_catalog["default_main_model"] == "openrouter/free"
+    assert [item["id"] for item in openrouter_catalog["models"]] == ["openrouter/free"]
+    assert ollama_catalog["main_models"] == ["minimax-m2.7:cloud"]
+    assert ollama_catalog["models"][0]["id"] == "minimax-m2.7:cloud"
+
+
 @pytest.mark.asyncio
 async def test_refresh_endpoint_preserves_existing_recommended_tags_when_merging(monkeypatch):
     prefs = SimpleNamespace(

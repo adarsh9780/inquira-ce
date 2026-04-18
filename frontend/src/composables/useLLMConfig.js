@@ -42,6 +42,30 @@ function normalizeProvider(raw) {
   return 'openrouter'
 }
 
+function modelAllowedForProvider(providerName, modelId) {
+  const normalizedProvider = normalizeProvider(providerName)
+  const value = String(modelId || '').trim().toLowerCase()
+  if (!value) return false
+  if (normalizedProvider !== 'ollama' && value.includes(':cloud')) {
+    return false
+  }
+  return true
+}
+
+function normalizeModelIds(providerName, models) {
+  const seen = new Set()
+  const cleaned = []
+  const source = Array.isArray(models) ? models : []
+  for (const item of source) {
+    const value = String(item || '').trim()
+    if (!value || seen.has(value)) continue
+    if (!modelAllowedForProvider(providerName, value)) continue
+    seen.add(value)
+    cleaned.push(value)
+  }
+  return cleaned
+}
+
 function titleCaseWords(value) {
   return String(value || '')
     .replace(/[\/_-]+/g, ' ')
@@ -99,6 +123,7 @@ function normalizeModelMetadata(providerName, catalog, mainIds, liteIds) {
   for (const raw of rawEntries) {
     const id = String(raw?.id || '').trim()
     if (!id) continue
+    if (!modelAllowedForProvider(providerName, id)) continue
     const recommendedFor = Array.isArray(raw?.recommended_for) && raw.recommended_for.length
       ? raw.recommended_for.map((item) => String(item || '').trim().toLowerCase()).filter(Boolean)
       : inferRecommendedFor(id, mainSet, liteSet)
@@ -154,8 +179,8 @@ function applyProviderModelState(providerName, prefs = {}, preserveSelection = t
       ? catalog.lite_models
       : []
 
-  const normalizedMain = Array.from(new Set(providerMain.map((item) => String(item || '').trim()).filter(Boolean)))
-  const normalizedLite = Array.from(new Set(providerLite.map((item) => String(item || '').trim()).filter(Boolean)))
+  const normalizedMain = normalizeModelIds(normalized, providerMain)
+  const normalizedLite = normalizeModelIds(normalized, providerLite)
 
   mainModels.value = normalizedMain
   liteModels.value = normalizedLite.length ? normalizedLite : [...normalizedMain]

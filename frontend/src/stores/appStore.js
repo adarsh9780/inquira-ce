@@ -153,13 +153,24 @@ export const useAppStore = defineStore('app', () => {
     return Math.min(600, Math.max(5, parsed))
   }
 
-  function normalizeModelList(models) {
+  function modelAllowedForProvider(provider, modelId) {
+    const normalizedProvider = String(provider || '').trim().toLowerCase()
+    const value = String(modelId || '').trim().toLowerCase()
+    if (!value) return false
+    if (normalizedProvider && normalizedProvider !== 'ollama' && value.includes(':cloud')) {
+      return false
+    }
+    return true
+  }
+
+  function normalizeModelList(models, provider = '') {
     const raw = Array.isArray(models) ? models : []
     const seen = new Set()
     const cleaned = []
     for (const item of raw) {
       const value = String(item || '').trim()
       if (!value || seen.has(value)) continue
+      if (provider && !modelAllowedForProvider(provider, value)) continue
       seen.add(value)
       cleaned.push(value)
     }
@@ -231,19 +242,20 @@ export const useAppStore = defineStore('app', () => {
     if (typeof llm.llm_provider === 'string' && llm.llm_provider.trim()) {
       llmProvider.value = llm.llm_provider.trim().toLowerCase()
     }
+    const snapshotProvider = llmProvider.value || DEFAULT_PROVIDER
     if (Array.isArray(llm.provider_main_models)) {
-      const restoredMainModels = normalizeModelList(llm.provider_main_models)
+      const restoredMainModels = normalizeModelList(llm.provider_main_models, snapshotProvider)
       if (restoredMainModels.length) {
         providerMainModels.value = restoredMainModels
       }
     }
     if (Array.isArray(llm.provider_lite_models)) {
-      const restoredLiteModels = normalizeModelList(llm.provider_lite_models)
+      const restoredLiteModels = normalizeModelList(llm.provider_lite_models, snapshotProvider)
       if (restoredLiteModels.length) {
         providerLiteModels.value = restoredLiteModels
       }
     }
-    const restoredEnabledModels = normalizeModelList(llm.enabled_models)
+    const restoredEnabledModels = normalizeModelList(llm.enabled_models, snapshotProvider)
     if (providerMainModels.value.length) {
       availableModels.value = [...providerMainModels.value]
     } else if (restoredEnabledModels.length) {
@@ -647,7 +659,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setEnabledModels(models) {
-    const cleaned = normalizeModelList(models)
+    const cleaned = normalizeModelList(models, llmProvider.value)
     providerMainModels.value = cleaned.length ? cleaned : [...DEFAULT_MODELS]
     availableModels.value = [...providerMainModels.value]
     saveLocalConfig()
@@ -2057,10 +2069,10 @@ export const useAppStore = defineStore('app', () => {
       availableProviders.value = prefs.available_providers
     }
     if (Array.isArray(prefs?.provider_available_main_models) && prefs.provider_available_main_models.length) {
-      providerMainModels.value = normalizeModelList(prefs.provider_available_main_models)
+      providerMainModels.value = normalizeModelList(prefs.provider_available_main_models, llmProvider.value)
     }
     if (Array.isArray(prefs?.provider_available_lite_models) && prefs.provider_available_lite_models.length) {
-      providerLiteModels.value = normalizeModelList(prefs.provider_available_lite_models)
+      providerLiteModels.value = normalizeModelList(prefs.provider_available_lite_models, llmProvider.value)
     }
     if (prefs?.provider_model_catalogs && typeof prefs.provider_model_catalogs === 'object') {
       providerModelCatalogs.value = prefs.provider_model_catalogs
@@ -2074,9 +2086,10 @@ export const useAppStore = defineStore('app', () => {
     if (typeof prefs?.selected_provider_api_key_present === 'boolean') {
       selectedProviderApiKeyPresent.value = prefs.selected_provider_api_key_present
     }
-    const fallbackMainModels = normalizeModelList(prefs?.provider_available_main_models)
-    const legacyAvailableModels = normalizeModelList(prefs?.available_models)
-    const legacyEnabledModels = normalizeModelList(prefs?.enabled_models)
+    const responseProvider = llmProvider.value || DEFAULT_PROVIDER
+    const fallbackMainModels = normalizeModelList(prefs?.provider_available_main_models, responseProvider)
+    const legacyAvailableModels = normalizeModelList(prefs?.available_models, responseProvider)
+    const legacyEnabledModels = normalizeModelList(prefs?.enabled_models, responseProvider)
     if (fallbackMainModels.length) {
       providerMainModels.value = fallbackMainModels
     } else if (legacyAvailableModels.length) {
