@@ -8,8 +8,23 @@ test('model selector accepts injected model options prop', () => {
   const source = readFileSync(path, 'utf-8')
 
   assert.equal(source.includes('modelOptions'), true)
+  assert.equal(source.includes('maxOptionsWithoutSearch'), true)
+  assert.equal(source.includes('const searchQuery = ref(\'\')'), true)
   assert.equal(source.includes('const availableModels = computed(() => {'), true)
+  assert.equal(source.includes('const filteredModels = computed(() => {'), true)
+  assert.equal(source.includes('return source.slice(0, limit)'), true)
+  assert.equal(source.includes('placeholder="Search model"'), true)
+  assert.equal(source.includes('v-model="searchQuery"'), true)
   assert.equal(source.includes('const source = Array.isArray(props.modelOptions) && props.modelOptions.length'), true)
+})
+
+test('chat input model dropdown updates only main model in pinia store', () => {
+  const path = resolve(process.cwd(), 'src/components/chat/ChatInput.vue')
+  const source = readFileSync(path, 'utf-8')
+
+  assert.equal(source.includes(':selected-model="appStore.selectedModel"'), true)
+  assert.equal(source.includes(':max-options-without-search="10"'), true)
+  assert.equal(source.includes('appStore.setSelectedModel(model)'), true)
 })
 
 test('app store reads available models from v1 preferences payload', () => {

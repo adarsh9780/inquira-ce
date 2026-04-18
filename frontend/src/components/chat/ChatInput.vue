@@ -99,6 +99,7 @@
           <ModelSelector
             :selected-model="appStore.selectedModel"
             :model-options="appStore.availableModels"
+            :max-options-without-search="10"
             @model-changed="handleModelChange"
           />
 

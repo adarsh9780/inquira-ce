@@ -26,9 +26,20 @@
             class="absolute z-50 bottom-full mb-2 right-0 min-w-[200px] rounded-lg py-1 text-xs shadow-md focus:outline-none overflow-hidden"
             style="background-color: var(--color-workspace-surface); border: 1px solid var(--color-border);"
           >
+            <div class="px-2 pb-1 pt-1">
+              <input
+                v-model="searchQuery"
+                type="text"
+                class="w-full rounded-md border px-2 py-1 text-[12px] focus:outline-none"
+                placeholder="Search model"
+                style="background-color: var(--color-base); border-color: var(--color-border); color: var(--color-text-main);"
+                @click.stop
+                @keydown.stop
+              />
+            </div>
             <ListboxOption
               v-slot="{ active, selected }"
-              v-for="model in availableModels"
+              v-for="model in filteredModels"
               :key="model.value"
               :value="model.value"
               as="template"
@@ -73,12 +84,17 @@ const props = defineProps({
   modelOptions: {
     type: Array,
     default: () => []
+  },
+  maxOptionsWithoutSearch: {
+    type: Number,
+    default: 10
   }
 })
 
 const emit = defineEmits(['model-changed'])
 
 const selectedModel = ref(props.selectedModel)
+const searchQuery = ref('')
 
 const fallbackModels = [
   'google/gemini-3-flash-preview',
@@ -97,6 +113,21 @@ const availableModels = computed(() => {
   }))
 })
 
+const filteredModels = computed(() => {
+  const query = String(searchQuery.value || '').trim().toLowerCase()
+  const source = availableModels.value
+  if (!query) {
+    const limit = Number(props.maxOptionsWithoutSearch || 0)
+    if (limit > 0) return source.slice(0, limit)
+    return source
+  }
+  return source.filter((model) => {
+    const label = String(model.name || '').toLowerCase()
+    const value = String(model.value || '').toLowerCase()
+    return label.includes(query) || value.includes(query)
+  })
+})
+
 watch(
   () => props.selectedModel,
   (next) => {
@@ -106,6 +137,7 @@ watch(
 
 function handleModelChange(value) {
   selectedModel.value = value
+  searchQuery.value = ''
   emit('model-changed', value)
 }
 
