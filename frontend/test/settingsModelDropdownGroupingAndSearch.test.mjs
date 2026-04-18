@@ -27,7 +27,7 @@ test('shared dropdown widgets support provider grouping and search filtering', (
   assert.equal(headerSource.includes('searchQuery'), true)
   assert.equal(headerSource.includes("default: 'Search models'"), true)
   assert.equal(headerSource.includes("default: 'No results found'"), true)
-  assert.equal(headerSource.includes('formatProviderLabel'), true)
+  assert.equal(headerSource.includes('sharedProviderLabel'), true)
   assert.equal(headerSource.includes('sticky top-0 z-10'), true)
 
   assert.equal(multiSource.includes('groupByProvider'), true)

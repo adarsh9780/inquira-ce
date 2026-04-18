@@ -37,6 +37,9 @@
                 @keydown.stop
               />
             </div>
+            <div v-if="backendLoading && searchQuery" class="px-3 pb-1 text-[11px]" style="color: var(--color-text-muted);">
+              Searching...
+            </div>
             <ListboxOption
               v-slot="{ active, selected }"
               v-for="model in filteredModels"
@@ -52,7 +55,7 @@
                 class="relative cursor-default select-none py-2 pl-3 pr-9 flex items-center justify-between"
               >
                 <span :class="selected ? 'font-semibold' : 'font-normal'" class="block truncate">
-                  {{ model.name }}
+                  {{ model.label }}
                 </span>
                 <span v-if="selected" class="absolute right-3 flex items-center">
                   <CheckIcon class="h-4 w-4" style="color: var(--color-text-muted);" aria-hidden="true" />
@@ -67,7 +70,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import {
   Listbox,
   ListboxButton,
@@ -75,6 +78,12 @@ import {
   ListboxOption,
 } from '@headlessui/vue'
 import { CheckIcon, ChevronDownIcon } from '@heroicons/vue/20/solid'
+import {
+  mergeModelOptions,
+  normalizeModelOptions,
+  optionMatchesSearch,
+  prettifyModelName,
+} from './modelDropdownUtils'
 
 const props = defineProps({
   selectedModel: {
@@ -84,6 +93,22 @@ const props = defineProps({
   modelOptions: {
     type: Array,
     default: () => []
+  },
+  backendSearch: {
+    type: Function,
+    default: null,
+  },
+  backendSearchLimit: {
+    type: Number,
+    default: 25,
+  },
+  backendSearchMinChars: {
+    type: Number,
+    default: 3,
+  },
+  backendSearchDebounceMs: {
+    type: Number,
+    default: 250,
   },
   maxOptionsWithoutSearch: {
     type: Number,
@@ -95,6 +120,10 @@ const emit = defineEmits(['model-changed'])
 
 const selectedModel = ref(props.selectedModel)
 const searchQuery = ref('')
+const backendModels = ref([])
+const backendLoading = ref(false)
+let backendSearchTimer = null
+let backendSearchToken = 0
 
 const fallbackModels = [
   'google/gemini-3-flash-preview',
@@ -107,10 +136,7 @@ const availableModels = computed(() => {
   const source = Array.isArray(props.modelOptions) && props.modelOptions.length
     ? props.modelOptions
     : fallbackModels
-  return source.map((value) => ({
-    value,
-    name: prettifyModelName(value)
-  }))
+  return normalizeModelOptions(source)
 })
 
 const filteredModels = computed(() => {
@@ -121,11 +147,11 @@ const filteredModels = computed(() => {
     if (limit > 0) return source.slice(0, limit)
     return source
   }
-  return source.filter((model) => {
-    const label = String(model.name || '').toLowerCase()
-    const value = String(model.value || '').toLowerCase()
-    return label.includes(query) || value.includes(query)
-  })
+  const localMatches = source.filter((model) => optionMatchesSearch(model, query))
+  if (!shouldSearchBackend(query, localMatches)) {
+    return localMatches
+  }
+  return mergeModelOptions(localMatches, backendModels.value)
 })
 
 watch(
@@ -135,26 +161,81 @@ watch(
   }
 )
 
+watch(searchQuery, (value) => {
+  scheduleBackendSearch(String(value || '').trim())
+})
+
+watch(
+  () => props.backendSearch,
+  () => {
+    backendModels.value = []
+    scheduleBackendSearch(String(searchQuery.value || '').trim())
+  }
+)
+
+onBeforeUnmount(() => {
+  if (backendSearchTimer) clearTimeout(backendSearchTimer)
+})
+
 function handleModelChange(value) {
   selectedModel.value = value
   searchQuery.value = ''
+  backendModels.value = []
   emit('model-changed', value)
 }
 
 function getModelDisplayName(modelValue) {
   const model = availableModels.value.find(m => m.value === modelValue)
-  return model ? model.name : prettifyModelName(modelValue)
+  return model ? model.label : prettifyModelName(modelValue)
 }
 
-function prettifyModelName(modelId) {
-  const raw = String(modelId || '').trim()
-  if (!raw) return ''
-  if (raw === 'openrouter/free') return 'OpenRouter Free'
-  const withoutVendor = raw.includes('/') ? raw.split('/').slice(1).join('/') : raw
-  return withoutVendor
-    .split('-')
-    .filter(Boolean)
-    .map((part) => part.toUpperCase() === 'GPT' ? 'GPT' : `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
-    .join(' ')
+function shouldSearchBackend(query, localMatches) {
+  if (typeof props.backendSearch !== 'function') return false
+  if (query.length < Number(props.backendSearchMinChars || 3)) return false
+  return localMatches.length === 0
+}
+
+function scheduleBackendSearch(query) {
+  if (backendSearchTimer) clearTimeout(backendSearchTimer)
+  if (!query || typeof props.backendSearch !== 'function') {
+    backendModels.value = []
+    backendLoading.value = false
+    return
+  }
+
+  const localMatches = availableModels.value.filter((model) => optionMatchesSearch(model, query))
+  if (!shouldSearchBackend(query, localMatches)) {
+    backendModels.value = []
+    backendLoading.value = false
+    return
+  }
+
+  const wait = Number(props.backendSearchDebounceMs || 250)
+  backendSearchTimer = setTimeout(() => {
+    void runBackendSearch(query)
+  }, Number.isFinite(wait) && wait >= 0 ? wait : 250)
+}
+
+async function runBackendSearch(query) {
+  const token = ++backendSearchToken
+  backendLoading.value = true
+  try {
+    const result = await props.backendSearch(query, Number(props.backendSearchLimit || 25))
+    if (token !== backendSearchToken) return
+    const raw = Array.isArray(result)
+      ? result
+      : Array.isArray(result?.models)
+        ? result.models
+        : []
+    backendModels.value = normalizeModelOptions(raw)
+  } catch (_error) {
+    if (token === backendSearchToken) {
+      backendModels.value = []
+    }
+  } finally {
+    if (token === backendSearchToken) {
+      backendLoading.value = false
+    }
+  }
 }
 </script>

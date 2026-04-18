@@ -42,6 +42,9 @@
                   @keydown.stop
                 />
               </div>
+              <div v-if="backendLoading && searchable && searchQuery" class="px-3 pb-1 text-[11px]" style="color: var(--color-text-muted);">
+                Searching...
+              </div>
 
               <template v-if="groupByProvider">
                 <template v-if="groupedFilteredOptions.length">
@@ -130,6 +133,12 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions, Portal } from '@headlessui/vue'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/vue/20/solid'
+import {
+  mergeModelOptions,
+  normalizeModelOptions,
+  optionMatchesSearch as matchesModelOptionSearch,
+  providerLabel as sharedProviderLabel,
+} from './modelDropdownUtils'
 
 const props = defineProps({
   modelValue: {
@@ -168,6 +177,22 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  backendSearch: {
+    type: Function,
+    default: null,
+  },
+  backendSearchLimit: {
+    type: Number,
+    default: 25,
+  },
+  backendSearchMinChars: {
+    type: Number,
+    default: 3,
+  },
+  backendSearchDebounceMs: {
+    type: Number,
+    default: 250,
+  },
   searchPlaceholder: {
     type: String,
     default: 'Search models'
@@ -188,6 +213,8 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 const searchQuery = ref('')
+const backendOptions = ref([])
+const backendLoading = ref(false)
 const triggerRef = ref(null)
 const optionsRef = ref(null)
 const floatingOptionsStyle = ref({
@@ -198,13 +225,16 @@ const floatingOptionsStyle = ref({
   backgroundColor: 'var(--color-surface)',
   border: '1px solid var(--color-border)'
 })
+let backendSearchTimer = null
+let backendSearchToken = 0
 
-const selectedOption = computed(() => props.options.find((option) => option.value === props.modelValue) ?? null)
+const normalizedOptions = computed(() => normalizeModelOptions(props.options))
+const selectedOption = computed(() => normalizedOptions.value.find((option) => option.value === props.modelValue) ?? null)
 const selectedLabel = computed(() => selectedOption.value?.label || props.placeholder)
 const hasSelection = computed(() => !!selectedOption.value)
 const normalizedSearchQuery = computed(() => String(searchQuery.value || '').trim().toLowerCase())
 const filteredOptions = computed(() => {
-  const options = Array.isArray(props.options) ? props.options : []
+  const options = normalizedOptions.value
   const query = normalizedSearchQuery.value
   if (!query) {
     const maxCount = Number(props.maxOptionsWithoutSearch || 0)
@@ -213,7 +243,11 @@ const filteredOptions = computed(() => {
     }
     return options
   }
-  return options.filter((option) => optionMatchesSearch(option, query))
+  const localMatches = options.filter((option) => matchesModelOptionSearch(option, query))
+  if (!shouldSearchBackend(query, localMatches)) {
+    return localMatches
+  }
+  return mergeModelOptions(localMatches, backendOptions.value)
 })
 const groupedFilteredOptions = computed(() => {
   const groups = new Map()
@@ -226,7 +260,7 @@ const groupedFilteredOptions = computed(() => {
   })
   return Array.from(groups.entries()).map(([key, options]) => ({
     key,
-    label: formatProviderLabel(key),
+    label: sharedProviderLabel(key),
     options
   }))
 })
@@ -252,9 +286,22 @@ const triggerStyle = computed(() => ({
   borderColor: 'var(--color-border)'
 }))
 
+watch(searchQuery, (value) => {
+  scheduleBackendSearch(String(value || '').trim())
+})
+
+watch(
+  () => props.backendSearch,
+  () => {
+    backendOptions.value = []
+    scheduleBackendSearch(String(searchQuery.value || '').trim())
+  }
+)
+
 function handleChange(value) {
   if (props.searchable) {
     searchQuery.value = ''
+    backendOptions.value = []
   }
   emit('update:modelValue', value)
 }
@@ -296,6 +343,56 @@ function unbindPositionListeners() {
   window.removeEventListener('scroll', updateFloatingPosition, true)
 }
 
+function shouldSearchBackend(query, localMatches) {
+  if (typeof props.backendSearch !== 'function') return false
+  if (query.length < Number(props.backendSearchMinChars || 3)) return false
+  return localMatches.length === 0
+}
+
+function scheduleBackendSearch(query) {
+  if (backendSearchTimer) clearTimeout(backendSearchTimer)
+  if (!query || typeof props.backendSearch !== 'function') {
+    backendOptions.value = []
+    backendLoading.value = false
+    return
+  }
+
+  const localMatches = normalizedOptions.value.filter((option) => matchesModelOptionSearch(option, query))
+  if (!shouldSearchBackend(query, localMatches)) {
+    backendOptions.value = []
+    backendLoading.value = false
+    return
+  }
+
+  const wait = Number(props.backendSearchDebounceMs || 250)
+  backendSearchTimer = setTimeout(() => {
+    void runBackendSearch(query)
+  }, Number.isFinite(wait) && wait >= 0 ? wait : 250)
+}
+
+async function runBackendSearch(query) {
+  const token = ++backendSearchToken
+  backendLoading.value = true
+  try {
+    const result = await props.backendSearch(query, Number(props.backendSearchLimit || 25))
+    if (token !== backendSearchToken) return
+    const raw = Array.isArray(result)
+      ? result
+      : Array.isArray(result?.models)
+        ? result.models
+        : []
+    backendOptions.value = normalizeModelOptions(raw)
+  } catch (_error) {
+    if (token === backendSearchToken) {
+      backendOptions.value = []
+    }
+  } finally {
+    if (token === backendSearchToken) {
+      backendLoading.value = false
+    }
+  }
+}
+
 watch(optionsRef, async (value) => {
   if (!value) return
   await nextTick()
@@ -328,6 +425,7 @@ watch(optionsRef, (value) => {
 })
 
 onBeforeUnmount(() => {
+  if (backendSearchTimer) clearTimeout(backendSearchTimer)
   unbindPositionListeners()
 })
 
@@ -336,21 +434,6 @@ function optionKey(option, fallbackIndex, prefix = '') {
   if (option?.key != null) return `${keyPrefix}${String(option.key)}`
   if (option?.value != null) return `${keyPrefix}${String(option.value)}`
   return `${keyPrefix}${String(fallbackIndex)}`
-}
-
-function optionMatchesSearch(option, query) {
-  const normalized = String(query || '').trim().toLowerCase()
-  if (!normalized) return true
-  const provider = resolveProvider(option)
-  const fields = [
-    option?.label,
-    option?.value,
-    provider,
-    formatProviderLabel(provider)
-  ]
-    .map((value) => String(value || '').toLowerCase())
-    .filter(Boolean)
-  return fields.some((field) => field.includes(normalized))
 }
 
 function resolveProvider(option) {
@@ -364,20 +447,5 @@ function resolveProvider(option) {
 function normalizeProviderKey(provider) {
   const normalized = String(provider || '').trim().toLowerCase()
   return normalized || 'other'
-}
-
-function formatProviderLabel(provider) {
-  const normalized = String(provider || '').trim().toLowerCase()
-  if (!normalized || normalized === 'other') return 'Other'
-  if (normalized === 'openai') return 'OpenAI'
-  if (normalized === 'openrouter') return 'OpenRouter'
-  if (normalized === 'anthropic') return 'Anthropic'
-  if (normalized === 'google') return 'Google'
-  if (normalized === 'ollama') return 'Ollama'
-  return normalized
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
-    .join(' ')
 }
 </script>

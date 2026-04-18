@@ -6,14 +6,16 @@ from types import SimpleNamespace
 import pytest
 import httpx
 
-from app.services.provider_model_refresh import ProviderRefreshResult, refresh_provider_model_catalog
+from app.services.provider_model_refresh import ProviderModelRefreshError, ProviderRefreshResult, refresh_provider_model_catalog
 from app.v1.api.preferences import (
     _coerce_provider_catalog,
+    _to_response,
+    search_provider_models,
     refresh_provider_models,
     set_api_key,
     verify_api_key,
 )
-from app.v1.schemas.preferences import ApiKeyUpdateRequest, ApiKeyVerifyRequest, ProviderModelsRefreshRequest
+from app.v1.schemas.preferences import ApiKeyUpdateRequest, ApiKeyVerifyRequest, ApiKeyVerifyResponse, ProviderModelsRefreshRequest
 
 
 @pytest.mark.asyncio
@@ -51,10 +53,14 @@ async def test_refresh_service_openrouter_falls_back_when_account_models_missing
 
     refreshed = await refresh_provider_model_catalog("openrouter", api_key="sk-or-test")
 
-    assert refreshed.catalog["main_models"] == ["openrouter/free"]
-    assert refreshed.catalog["default_main_model"] == "openrouter/free"
+    assert refreshed.catalog["main_models"] == [
+        "google/gemini-2.5-flash",
+        "openai/gpt-4o",
+        "anthropic/claude-sonnet-4-5",
+    ]
+    assert refreshed.catalog["default_main_model"] == "google/gemini-2.5-flash"
     assert refreshed.catalog["account_models_configured"] is False
-    assert "openrouter/free" in refreshed.detail
+    assert "Using curated OpenRouter defaults" in refreshed.detail
 
 
 @pytest.mark.asyncio
@@ -106,6 +112,194 @@ async def test_refresh_service_openrouter_uses_user_filtered_models(monkeypatch)
     ]
     assert refreshed.catalog["account_models_configured"] is True
     assert "Refreshed 2 OpenRouter account models." == refreshed.detail
+
+
+@pytest.mark.asyncio
+async def test_preferences_response_injects_selected_openrouter_model_into_display_list():
+    prefs = SimpleNamespace(
+        llm_provider="openrouter",
+        selected_model="mistralai/mixtral-8x7b",
+        selected_lite_model="google/gemini-2.5-flash-lite",
+        selected_coding_model="mistralai/mixtral-8x7b",
+        enabled_main_models_json='["google/gemini-2.5-flash"]',
+        provider_model_catalogs_json=json.dumps(
+            {
+                "openrouter": {
+                    "main_models": [
+                        "google/gemini-2.5-flash",
+                        "openai/gpt-4o",
+                        "anthropic/claude-sonnet-4-5",
+                        "mistralai/mixtral-8x7b",
+                        "deepseek/deepseek-chat",
+                    ],
+                    "lite_models": ["google/gemini-2.5-flash-lite"],
+                    "default_main_model": "google/gemini-2.5-flash",
+                    "default_lite_model": "google/gemini-2.5-flash-lite",
+                    "source": "bundled",
+                    "models": [
+                        {"id": "google/gemini-2.5-flash", "display_name": "Gemini 2.5 Flash"},
+                        {"id": "openai/gpt-4o", "display_name": "GPT-4o"},
+                        {"id": "anthropic/claude-sonnet-4-5", "display_name": "Claude Sonnet 4.5"},
+                        {"id": "mistralai/mixtral-8x7b", "display_name": "Mixtral 8x7B"},
+                        {"id": "deepseek/deepseek-chat", "display_name": "DeepSeek Chat"},
+                    ],
+                }
+            }
+        ),
+        schema_context="",
+        allow_schema_sample_values=False,
+        terminal_risk_acknowledged=False,
+        chat_overlay_width=0.25,
+        is_sidebar_collapsed=True,
+        hide_shortcuts_modal=False,
+        active_workspace_id=None,
+        active_dataset_path=None,
+        active_table_name=None,
+    )
+
+    response = _to_response(
+        prefs,
+        {
+            "openrouter": False,
+            "openai": False,
+            "anthropic": False,
+            "ollama": False,
+        },
+    )
+
+    assert response.selected_model == "mistralai/mixtral-8x7b"
+    assert response.provider_available_main_models == [
+        "mistralai/mixtral-8x7b",
+        "google/gemini-2.5-flash",
+        "openai/gpt-4o",
+        "anthropic/claude-sonnet-4-5",
+    ]
+    assert "deepseek/deepseek-chat" not in response.provider_available_main_models
+
+
+@pytest.mark.asyncio
+async def test_search_provider_models_returns_full_openrouter_catalog_entries(monkeypatch):
+    prefs = SimpleNamespace(
+        llm_provider="openrouter",
+        selected_model="google/gemini-2.5-flash",
+        selected_lite_model="google/gemini-2.5-flash-lite",
+        selected_coding_model="google/gemini-2.5-flash",
+        enabled_main_models_json='["google/gemini-2.5-flash"]',
+        provider_model_catalogs_json=json.dumps(
+            {
+                "openrouter": {
+                    "main_models": [
+                        "google/gemini-2.5-flash",
+                        "openai/gpt-4o",
+                        "anthropic/claude-sonnet-4-5",
+                        "mistralai/mixtral-8x7b",
+                        "deepseek/deepseek-chat",
+                    ],
+                    "lite_models": ["google/gemini-2.5-flash-lite"],
+                    "default_main_model": "google/gemini-2.5-flash",
+                    "default_lite_model": "google/gemini-2.5-flash-lite",
+                    "source": "bundled",
+                    "models": [
+                        {"id": "google/gemini-2.5-flash", "display_name": "Gemini 2.5 Flash", "tags": ["recommended"]},
+                        {"id": "openai/gpt-4o", "display_name": "GPT-4o", "tags": ["recommended"]},
+                        {"id": "anthropic/claude-sonnet-4-5", "display_name": "Claude Sonnet 4.5", "tags": ["recommended"]},
+                        {"id": "mistralai/mixtral-8x7b", "display_name": "Mixtral 8x7B", "tags": ["extended"]},
+                        {"id": "deepseek/deepseek-chat", "display_name": "DeepSeek Chat", "tags": ["extended"]},
+                    ],
+                }
+            }
+        ),
+        schema_context="",
+        allow_schema_sample_values=False,
+        terminal_risk_acknowledged=False,
+        chat_overlay_width=0.25,
+        is_sidebar_collapsed=True,
+        hide_shortcuts_modal=False,
+        active_workspace_id=None,
+        active_dataset_path=None,
+        active_table_name=None,
+    )
+
+    class _Session:
+        async def commit(self):
+            return None
+
+    async def _fake_get_or_create(_session, _principal_id):
+        return prefs
+
+    monkeypatch.setattr(
+        "app.v1.api.preferences.PreferencesRepository.get_or_create",
+        _fake_get_or_create,
+    )
+
+    response = await search_provider_models(
+        provider="openrouter",
+        q="deepseek",
+        limit=25,
+        session=_Session(),
+        current_user=SimpleNamespace(id="u1"),
+    )
+
+    assert response.provider == "openrouter"
+    assert response.query == "deepseek"
+    assert [item.id for item in response.models] == ["deepseek/deepseek-chat"]
+
+
+@pytest.mark.asyncio
+async def test_search_provider_models_ignores_short_queries(monkeypatch):
+    prefs = SimpleNamespace(
+        llm_provider="openrouter",
+        selected_model="google/gemini-2.5-flash",
+        selected_lite_model="google/gemini-2.5-flash-lite",
+        selected_coding_model="google/gemini-2.5-flash",
+        enabled_main_models_json='["google/gemini-2.5-flash"]',
+        provider_model_catalogs_json=json.dumps(
+            {
+                "openrouter": {
+                    "main_models": ["google/gemini-2.5-flash", "mistralai/mixtral-8x7b"],
+                    "lite_models": ["google/gemini-2.5-flash-lite"],
+                    "default_main_model": "google/gemini-2.5-flash",
+                    "default_lite_model": "google/gemini-2.5-flash-lite",
+                    "source": "bundled",
+                    "models": [
+                        {"id": "google/gemini-2.5-flash", "display_name": "Gemini 2.5 Flash"},
+                        {"id": "mistralai/mixtral-8x7b", "display_name": "Mixtral 8x7B"},
+                    ],
+                }
+            }
+        ),
+        schema_context="",
+        allow_schema_sample_values=False,
+        terminal_risk_acknowledged=False,
+        chat_overlay_width=0.25,
+        is_sidebar_collapsed=True,
+        hide_shortcuts_modal=False,
+        active_workspace_id=None,
+        active_dataset_path=None,
+        active_table_name=None,
+    )
+
+    class _Session:
+        async def commit(self):
+            return None
+
+    async def _fake_get_or_create(_session, _principal_id):
+        return prefs
+
+    monkeypatch.setattr(
+        "app.v1.api.preferences.PreferencesRepository.get_or_create",
+        _fake_get_or_create,
+    )
+
+    response = await search_provider_models(
+        provider="openrouter",
+        q="g",
+        limit=25,
+        session=_Session(),
+        current_user=SimpleNamespace(id="u1"),
+    )
+
+    assert response.models == []
 
 
 @pytest.mark.asyncio
@@ -182,8 +376,8 @@ async def test_refresh_endpoint_persists_catalog_and_returns_updated_preferences
         "openrouter/free",
     ]
     assert response.provider_available_main_models == [
-        "openai/gpt-4o-mini",
         "openrouter/free",
+        "openai/gpt-4o-mini",
     ]
     assert response.selected_model == "openrouter/free"
     assert response.detail == "Refreshed OpenRouter account models."
@@ -228,6 +422,25 @@ async def test_set_api_key_endpoint_persists_models_and_advanced_settings(monkey
         captured_secret_write["key"] = key
         captured_secret_write["provider"] = provider
 
+    async def _fake_verify_provider_api_key(_provider: str, _api_key: str):
+        return ApiKeyVerifyResponse(valid=True, error="")
+
+    async def _fake_refresh_provider_model_catalog(_provider: str, api_key: str | None = None, base_url: str | None = None):
+        _ = api_key, base_url
+        return ProviderRefreshResult(
+            provider="openrouter",
+            detail="Refreshed 2 OpenRouter account models.",
+            catalog={
+                "main_models": ["openai/gpt-4o", "openrouter/free"],
+                "lite_models": ["google/gemini-2.0-flash-001", "openrouter/free"],
+                "default_main_model": "openai/gpt-4o",
+                "default_lite_model": "google/gemini-2.0-flash-001",
+                "source": "refreshed",
+                "account_models_configured": True,
+                "account_models_url": "https://openrouter.ai/settings",
+            },
+        )
+
     monkeypatch.setattr(
         "app.v1.api.preferences.PreferencesRepository.get_or_create",
         _fake_get_or_create,
@@ -235,6 +448,23 @@ async def test_set_api_key_endpoint_persists_models_and_advanced_settings(monkey
     monkeypatch.setattr(
         "app.v1.api.preferences.SecretStorageService.set_api_key",
         _fake_set_api_key,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences._verify_provider_api_key",
+        _fake_verify_provider_api_key,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences.refresh_provider_model_catalog",
+        _fake_refresh_provider_model_catalog,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences.SecretStorageService.get_api_key_presence_map",
+        lambda _user_id, _providers: {
+            "openrouter": True,
+            "openai": False,
+            "anthropic": False,
+            "ollama": False,
+        },
     )
 
     response = await set_api_key(
@@ -244,7 +474,6 @@ async def test_set_api_key_endpoint_persists_models_and_advanced_settings(monkey
             selected_model="openai/gpt-4o",
             selected_lite_model="google/gemini-2.0-flash-001",
             selected_coding_model="openai/gpt-4o",
-            enabled_models=["openai/gpt-4o"],
             llm_temperature=0.9,
             llm_max_tokens=3072,
             llm_top_p=0.8,
@@ -269,7 +498,108 @@ async def test_set_api_key_endpoint_persists_models_and_advanced_settings(monkey
     assert prefs.llm_presence_penalty == 0.2
     assert prefs.slow_request_warning_seconds == 45
     assert captured_secret_write == {"key": "sk-test", "provider": "openrouter"}
-    assert "Configuration and API key" in response.message
+    assert response.detail == "Refreshed 2 OpenRouter account models."
+    assert response.warning == ""
+
+
+@pytest.mark.asyncio
+async def test_set_api_key_endpoint_warns_when_model_refresh_fails_after_key_save(monkeypatch):
+    prefs = SimpleNamespace(
+        llm_provider="openrouter",
+        selected_model="google/gemini-2.5-flash",
+        selected_lite_model="google/gemini-2.5-flash-lite",
+        selected_coding_model="google/gemini-2.5-flash",
+        enabled_main_models_json='["google/gemini-2.5-flash"]',
+        provider_model_catalogs_json=json.dumps(
+            {
+                "openrouter": {
+                    "main_models": ["google/gemini-2.5-flash", "openrouter/free"],
+                    "lite_models": ["google/gemini-2.5-flash-lite"],
+                    "default_main_model": "google/gemini-2.5-flash",
+                    "default_lite_model": "google/gemini-2.5-flash-lite",
+                    "source": "bundled",
+                    "models": [
+                        {"id": "google/gemini-2.5-flash", "display_name": "Gemini 2.5 Flash"},
+                        {"id": "openrouter/free", "display_name": "OpenRouter Free"},
+                    ],
+                }
+            }
+        ),
+        llm_temperature=0.7,
+        llm_max_tokens=4096,
+        llm_top_p=1.0,
+        llm_top_k=0,
+        llm_frequency_penalty=0.0,
+        llm_presence_penalty=0.0,
+        slow_request_warning_seconds=30,
+        schema_context="",
+        allow_schema_sample_values=False,
+        terminal_risk_acknowledged=False,
+        chat_overlay_width=0.25,
+        is_sidebar_collapsed=True,
+        hide_shortcuts_modal=False,
+        active_workspace_id=None,
+        active_dataset_path=None,
+        active_table_name=None,
+    )
+    captured_secret_write: dict[str, str] = {}
+
+    class _Session:
+        async def commit(self):
+            return None
+
+    async def _fake_get_or_create(_session, _principal_id):
+        return prefs
+
+    def _fake_set_api_key(_user_id, key, provider="openrouter"):
+        captured_secret_write["key"] = key
+        captured_secret_write["provider"] = provider
+
+    async def _fake_verify_provider_api_key(_provider: str, _api_key: str):
+        return ApiKeyVerifyResponse(valid=True, error="")
+
+    async def _fake_refresh_provider_model_catalog(_provider: str, api_key: str | None = None, base_url: str | None = None):
+        _ = api_key, base_url
+        raise ProviderModelRefreshError("provider refresh failed", status_code=502)
+
+    monkeypatch.setattr(
+        "app.v1.api.preferences.PreferencesRepository.get_or_create",
+        _fake_get_or_create,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences.SecretStorageService.set_api_key",
+        _fake_set_api_key,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences._verify_provider_api_key",
+        _fake_verify_provider_api_key,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences.refresh_provider_model_catalog",
+        _fake_refresh_provider_model_catalog,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences.SecretStorageService.get_api_key_presence_map",
+        lambda _user_id, _providers: {
+            "openrouter": True,
+            "openai": False,
+            "anthropic": False,
+            "ollama": False,
+        },
+    )
+
+    response = await set_api_key(
+        ApiKeyUpdateRequest(
+            provider="openrouter",
+            api_key="sk-test",
+        ),
+        session=_Session(),
+        current_user=SimpleNamespace(id="u1"),
+    )
+
+    assert captured_secret_write == {"key": "sk-test", "provider": "openrouter"}
+    assert response.warning == "API key saved, but model refresh failed. Using previous catalog."
+    assert response.detail == "Configuration for provider 'openrouter' saved."
 
 
 @pytest.mark.asyncio
@@ -316,18 +646,45 @@ async def test_set_api_key_endpoint_persists_ollama_base_url(monkeypatch):
     async def _fake_get_or_create(_session, _principal_id):
         return prefs
 
+    async def _fake_refresh_provider_model_catalog(_provider: str, api_key: str | None = None, base_url: str | None = None):
+        _ = api_key, base_url
+        return ProviderRefreshResult(
+            provider="ollama",
+            detail="Refreshed 1 Ollama models.",
+            catalog={
+                "main_models": ["llama3.2"],
+                "lite_models": ["llama3.2:3b"],
+                "default_main_model": "llama3.2",
+                "default_lite_model": "llama3.2:3b",
+                "source": "refreshed",
+                "base_url": "http://localhost:11434/api",
+            },
+        )
+
     monkeypatch.setattr(
         "app.v1.api.preferences.PreferencesRepository.get_or_create",
         _fake_get_or_create,
     )
+    monkeypatch.setattr(
+        "app.v1.api.preferences.refresh_provider_model_catalog",
+        _fake_refresh_provider_model_catalog,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences.SecretStorageService.get_api_key_presence_map",
+        lambda _user_id, _providers: {
+            "openrouter": False,
+            "openai": False,
+            "anthropic": False,
+            "ollama": False,
+        },
+    )
 
-    await set_api_key(
+    response = await set_api_key(
         ApiKeyUpdateRequest(
             provider="ollama",
             base_url="http://localhost:11434/api",
             selected_model="llama3.2",
             selected_lite_model="llama3.2:3b",
-            enabled_models=["llama3.2"],
         ),
         session=_Session(),
         current_user=SimpleNamespace(id="u1"),
@@ -335,6 +692,7 @@ async def test_set_api_key_endpoint_persists_ollama_base_url(monkeypatch):
 
     persisted_catalogs = json.loads(prefs.provider_model_catalogs_json)
     assert persisted_catalogs["ollama"]["base_url"] == "http://localhost:11434/api"
+    assert response.detail == "Refreshed 1 Ollama models."
 
 
 def test_coerce_provider_catalog_coerces_invalid_context_window_values():

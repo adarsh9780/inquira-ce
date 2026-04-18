@@ -25,14 +25,15 @@ _DEFAULT_BASE_URLS: dict[str, str] = {
 _MODEL_CATALOG: dict[str, dict[str, Any]] = {
     "openrouter": {
         "main_models": [
+            "google/gemini-2.5-flash",
             "openai/gpt-4o",
             "anthropic/claude-sonnet-4-5",
         ],
         "lite_models": [
-            "google/gemini-2.0-flash-001",
+            "google/gemini-2.5-flash-lite",
         ],
-        "default_main_model": "openai/gpt-4o",
-        "default_lite_model": "google/gemini-2.0-flash-001",
+        "default_main_model": "google/gemini-2.5-flash",
+        "default_lite_model": "google/gemini-2.5-flash-lite",
     },
     "openai": {
         "main_models": [

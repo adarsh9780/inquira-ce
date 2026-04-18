@@ -1,6 +1,7 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { apiService } from '../services/apiService'
 import { extractApiErrorMessage } from '../utils/apiError'
+import { useAppStore } from '../stores/appStore'
 
 const provider = ref(null)
 const apiKey = ref('')
@@ -34,6 +35,7 @@ const llmPresencePenalty = ref(0)
 const slowRequestWarningSeconds = ref(30)
 
 const modelMetaByProvider = ref({})
+const appStore = useAppStore()
 
 function normalizeProvider(raw) {
   const value = String(raw || '').trim().toLowerCase()
@@ -248,6 +250,13 @@ async function loadPreferences(providerHint = null, preserveSelection = false) {
     }
 
     applyProviderModelState(normalizedProvider, response, preserveSelection)
+    if (normalizeProvider(appStore.llmProvider) === normalizedProvider) {
+      const selectedMain = String(mainModel.value || '').trim()
+      if (selectedMain) {
+        appStore.selectedModel = selectedMain
+        appStore.selectedCodingModel = selectedMain
+      }
+    }
     llmTemperature.value = Number(response?.llm_temperature ?? 0.7)
     llmMaxTokens.value = Number(response?.llm_max_tokens ?? 4096)
     llmTopP.value = Number(response?.llm_top_p ?? 1)
@@ -324,6 +333,14 @@ function setApiKey(value) {
   verifySuccess.value = ''
   verifyError.value = ''
   verifyWarning.value = ''
+}
+
+function setMainModel(value) {
+  const nextValue = String(value || '').trim()
+  mainModel.value = nextValue || null
+  if (appStore && typeof appStore.setSelectedModel === 'function') {
+    appStore.setSelectedModel(nextValue)
+  }
 }
 
 async function verifyKey() {
@@ -448,7 +465,6 @@ async function verifyAndSaveKey() {
   }
 
   verifySuccess.value = 'Key verified'
-  void refreshModels({ background: true })
   return { ok: true }
 }
 
@@ -520,7 +536,6 @@ async function saveConfig() {
       selected_model: String(mainModel.value || '').trim(),
       selected_lite_model: String(liteModel.value || '').trim(),
       selected_coding_model: String(mainModel.value || '').trim(),
-      enabled_models: [...mainModels.value],
       llm_temperature: Number(llmTemperature.value),
       llm_max_tokens: Number(llmMaxTokens.value),
       llm_top_p: Number(llmTopP.value),
@@ -567,6 +582,19 @@ const currentProviderModelMeta = computed(() => (
   modelMetaByProvider.value?.[normalizeProvider(provider.value)] || {}
 ))
 
+watch(
+  () => appStore.selectedModel,
+  (nextValue) => {
+    const normalizedProvider = normalizeProvider(provider.value)
+    if (!normalizedProvider) return
+    if (normalizedProvider !== normalizeProvider(appStore.llmProvider)) return
+    const nextModel = String(nextValue || '').trim()
+    if (nextModel && nextModel !== mainModel.value) {
+      mainModel.value = nextModel
+    }
+  }
+)
+
 export const useLLMConfig = () => {
   return {
     provider,
@@ -602,6 +630,7 @@ export const useLLMConfig = () => {
     loadPreferences,
     setProvider,
     setApiKey,
+    setMainModel,
     verifyKey,
     saveKey,
     verifyAndSaveKey,

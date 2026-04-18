@@ -361,9 +361,9 @@ export const apiService = {
   async setApiKeySettings(apiKey, provider = 'openrouter') {
     const { useAppStore } = await import('../stores/appStore')
     const appStore = useAppStore()
-    await this.v1SetApiKey(apiKey || '', provider)
+    const response = await this.v1SetApiKey(apiKey || '', provider)
     appStore.setApiKeyConfigured(true)
-    return { detail: 'API key saved securely.' }
+    return response || { detail: 'API key saved securely.' }
   },
 
   // Generate schema with context
@@ -786,6 +786,14 @@ export const apiService = {
 
   async v1RefreshProviderModels(payload) {
     return v1Api.preferences.refreshModels(payload)
+  },
+
+  async v1SearchProviderModels(provider, query, limit = 25) {
+    return v1Api.preferences.searchModels({
+      provider,
+      q: query,
+      limit,
+    })
   },
 
   async v1VerifyApiKey(provider, apiKey) {

@@ -19,6 +19,11 @@ OPENROUTER_ACCOUNT_MODELS_URL = "https://openrouter.ai/settings"
 OLLAMA_CLOUD_TAGS_URL = "https://ollama.com/api/tags"
 OLLAMA_CLOUD_API_KEY_ENV = "OLLAMA_API_KEY"
 _REQUEST_TIMEOUT_SECONDS = 20.0
+_CURATED_OPENROUTER_MAIN_MODELS: tuple[str, ...] = (
+    "google/gemini-2.5-flash",
+    "openai/gpt-4o",
+    "anthropic/claude-sonnet-4-5",
+)
 _LITE_MODEL_HINTS: tuple[str, ...] = (
     "nano",
     "mini",
@@ -130,16 +135,22 @@ async def refresh_provider_model_catalog(
                     client,
                     key,
                 )
+                if not account_models_configured:
+                    main_models = list(_CURATED_OPENROUTER_MAIN_MODELS)
                 catalog = _build_catalog(
                     normalized_provider,
                     main_models,
                     account_models_configured=account_models_configured,
                     account_models_url=OPENROUTER_ACCOUNT_MODELS_URL,
                 )
+                if not account_models_configured and catalog.get("main_models"):
+                    catalog["default_main_model"] = str(catalog["main_models"][0]).strip()
+                    if catalog.get("lite_models"):
+                        catalog["default_lite_model"] = str(catalog["lite_models"][0]).strip()
                 if not account_models_configured:
                     detail = (
                         "OpenRouter account-level models are not configured. "
-                        "Using openrouter/free by default."
+                        "Using curated OpenRouter defaults."
                     )
                 else:
                     detail = f"Refreshed {len(catalog['main_models'])} OpenRouter account models."
@@ -303,7 +314,7 @@ async def _fetch_openrouter_account_models(
     )
 
     if not user_models:
-        return ["openrouter/free"], False
+        return [], False
 
     return user_models, True
 
@@ -321,9 +332,6 @@ def _build_catalog(
     cleaned_main = _unique_models(main_models)
     if not cleaned_main:
         cleaned_main = _unique_models(fallback["main_models"])
-
-    if normalized_provider == "openrouter" and account_models_configured is False:
-        cleaned_main = ["openrouter/free"]
 
     if not cleaned_main:
         cleaned_main = [str(fallback["default_main_model"]).strip()]

@@ -16,9 +16,11 @@ from ..schemas.preferences import (
     ApiKeyVerifyRequest,
     ApiKeyVerifyResponse,
     ApiKeyUpdateRequest,
+    ProviderConfigSaveResponse,
     PreferencesResponse,
     PreferencesUpdateRequest,
     ProviderModelCatalog,
+    ProviderModelsSearchResponse,
     ProviderModelsRefreshRequest,
     ProviderModelsRefreshResponse,
 )
@@ -50,6 +52,8 @@ _VERIFY_TIMEOUT_SECONDS = 20.0
 _RECOMMENDED_FOR_ALLOWED = {"main", "lite", "both"}
 _TAGS_ALLOWED = {"recommended", "extended"}
 _DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
+_DEFAULT_PROVIDER_MODEL_LIMIT = 100
+_OPENROUTER_DEFAULT_PREFIXES = ("google/", "openai/", "anthropic/")
 
 
 def _coerce_non_negative_int(raw: Any) -> int:
@@ -163,6 +167,122 @@ def _clean_model_metadata_entries(
         )
 
     return cleaned
+
+
+def _dedupe_models(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    cleaned: list[str] = []
+    for value in values:
+        model_id = str(value or "").strip()
+        if not model_id or model_id in seen:
+            continue
+        seen.add(model_id)
+        cleaned.append(model_id)
+    return cleaned
+
+
+def _provider_display_main_models(
+    provider: str,
+    catalog: dict[str, Any],
+    selected_model: str | None = None,
+    limit: int = _DEFAULT_PROVIDER_MODEL_LIMIT,
+) -> list[str]:
+    normalized_provider = normalize_llm_provider(provider)
+    main_models = _clean_models(catalog.get("main_models", []), normalized_provider)
+    if normalized_provider == "openrouter":
+        display_models = [
+            model_id
+            for model_id in main_models
+            if model_id.lower().startswith(_OPENROUTER_DEFAULT_PREFIXES)
+        ]
+    else:
+        display_models = list(main_models)
+
+    selected = str(selected_model or "").strip()
+    if selected and selected in main_models and selected not in display_models:
+        display_models = [selected, *display_models]
+
+    return _dedupe_models(display_models)[: max(1, int(limit or _DEFAULT_PROVIDER_MODEL_LIMIT))]
+
+
+def _model_entry_matches_query(entry: dict[str, Any], query: str) -> bool:
+    normalized = str(query or "").strip().lower()
+    if not normalized:
+        return False
+
+    candidates = [
+        entry.get("id"),
+        entry.get("display_name"),
+        entry.get("provider"),
+        entry.get("context_window"),
+        entry.get("recommended_for"),
+        entry.get("tags"),
+    ]
+    for candidate in candidates:
+        if isinstance(candidate, list):
+            haystack = " ".join(str(item or "").strip().lower() for item in candidate)
+        else:
+            haystack = str(candidate or "").strip().lower()
+        if haystack and normalized in haystack:
+            return True
+    return False
+
+
+def _search_provider_models(
+    provider: str,
+    query: str,
+    catalog: dict[str, Any],
+    limit: int = 25,
+) -> list[dict[str, Any]]:
+    normalized_provider = normalize_llm_provider(provider)
+    needle = str(query or "").strip().lower()
+    if len(needle) < 2:
+        return []
+
+    max_results = max(1, min(int(limit or 25), 50))
+    raw_entries = catalog.get("models", [])
+    entries: list[dict[str, Any]] = []
+    if isinstance(raw_entries, list):
+        entries = [item for item in raw_entries if isinstance(item, dict)]
+
+    if not entries:
+        entries = [
+            {
+                "id": model_id,
+                "display_name": model_id,
+                "provider": normalized_provider,
+                "context_window": 0,
+                "recommended_for": ["main"],
+                "tags": ["recommended"],
+            }
+            for model_id in _clean_models(catalog.get("main_models", []), normalized_provider)
+        ]
+
+    results: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for entry in entries:
+        model_id = str(entry.get("id") or "").strip()
+        if not model_id or model_id in seen:
+            continue
+        if not _model_allowed_for_provider(normalized_provider, model_id):
+            continue
+        if not _model_entry_matches_query(entry, needle):
+            continue
+        seen.add(model_id)
+        results.append(
+            {
+                "id": model_id,
+                "display_name": str(entry.get("display_name") or model_id).strip() or model_id,
+                "provider": normalize_llm_provider(entry.get("provider") or normalized_provider),
+                "context_window": _coerce_non_negative_int(entry.get("context_window")),
+                "recommended_for": _clean_recommended_for(entry.get("recommended_for")),
+                "tags": _clean_tags(entry.get("tags")),
+            }
+        )
+        if len(results) >= max_results:
+            break
+
+    return results
 
 
 def _coerce_provider_catalog(
@@ -295,12 +415,7 @@ def _normalize_model_preferences(prefs, provider_catalogs: dict[str, dict[str, A
     provider = normalize_llm_provider(getattr(prefs, "llm_provider", "openrouter"))
     catalog = provider_catalogs.get(provider, provider_model_catalog(provider))
 
-    enabled_models = _load_enabled_models(
-        getattr(prefs, "enabled_main_models_json", "[]"),
-        catalog,
-    )
-    if not enabled_models:
-        enabled_models = list(catalog.get("main_models", []))
+    enabled_models = _clean_models(catalog.get("main_models", []), provider)
     prefs.enabled_main_models_json = json.dumps(enabled_models)
 
     selected_model = str(getattr(prefs, "selected_model", "") or "").strip()
@@ -334,10 +449,7 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
     provider_catalogs = _resolve_provider_catalogs(prefs)
     catalog = provider_catalogs.get(provider, provider_model_catalog(provider))
 
-    enabled_models = _load_enabled_models(
-        getattr(prefs, "enabled_main_models_json", "[]"),
-        catalog,
-    )
+    enabled_models = _clean_models(catalog.get("main_models", []), provider)
     selected_model = str(getattr(prefs, "selected_model", "") or "").strip()
     if selected_model not in enabled_models:
         selected_model = str(catalog.get("default_main_model") or "").strip()
@@ -357,6 +469,7 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
     execution_runtime = load_execution_runtime_config()
     requires_api_key = provider_requires_api_key(provider)
     selected_key_present = bool(api_key_presence.get(provider))
+    display_models = _provider_display_main_models(provider, catalog, selected_model=selected_model)
     return PreferencesResponse(
         llm_provider=provider,
         available_providers=list(SUPPORTED_LLM_PROVIDERS),
@@ -372,7 +485,7 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
         slow_request_warning_seconds=int(
             getattr(prefs, "slow_request_warning_seconds", 30)
         ),
-        enabled_models=enabled_models,
+        enabled_models=display_models,
         schema_context=prefs.schema_context,
         allow_schema_sample_values=bool(prefs.allow_schema_sample_values),
         terminal_risk_acknowledged=bool(getattr(prefs, "terminal_risk_acknowledged", False)),
@@ -383,8 +496,8 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
         active_dataset_path=prefs.active_dataset_path,
         active_table_name=prefs.active_table_name,
         api_key_present=selected_key_present,
-        available_models=enabled_models,
-        provider_available_main_models=list(catalog.get("main_models", [])),
+        available_models=display_models,
+        provider_available_main_models=display_models,
         provider_available_lite_models=list(catalog.get("lite_models", [])),
         provider_model_catalogs={
             p: ProviderModelCatalog(**c)
@@ -427,24 +540,7 @@ async def update_preferences(
         prefs.llm_provider = provider
         catalog = provider_catalogs.get(provider, provider_model_catalog(provider))
 
-    if payload.enabled_models is not None:
-        allowed = set(catalog.get("main_models", []))
-        cleaned: list[str] = []
-        seen: set[str] = set()
-        for model in payload.enabled_models:
-            value = str(model or "").strip()
-            if not value or value not in allowed or value in seen:
-                continue
-            seen.add(value)
-            cleaned.append(value)
-        prefs.enabled_main_models_json = json.dumps(
-            cleaned or list(catalog.get("main_models", []))
-        )
-
-    enabled_models = _load_enabled_models(
-        getattr(prefs, "enabled_main_models_json", "[]"),
-        catalog,
-    )
+    enabled_models = _clean_models(catalog.get("main_models", []), provider)
     if payload.selected_model is not None:
         selected_model = str(payload.selected_model or "").strip()
         if selected_model in enabled_models:
@@ -567,21 +663,18 @@ def _verify_error_from_status(status_code: int) -> str:
     return "network_error"
 
 
-@router.post("/verify-key", response_model=ApiKeyVerifyResponse)
-async def verify_api_key(
-    payload: ApiKeyVerifyRequest,
-) -> ApiKeyVerifyResponse:
-    provider = normalize_llm_provider(payload.provider)
-    key = str(payload.api_key or "").strip()
+async def _verify_provider_api_key(provider: str, api_key: str) -> ApiKeyVerifyResponse:
+    normalized_provider = normalize_llm_provider(provider)
+    key = str(api_key or "").strip()
     if not key:
         raise HTTPException(status_code=400, detail="API key cannot be empty.")
-    if provider not in {"openai", "openrouter"}:
+    if normalized_provider not in {"openai", "openrouter"}:
         raise HTTPException(
             status_code=400,
             detail="Only openai and openrouter support API key verification.",
         )
 
-    url = "https://api.openai.com/v1/models" if provider == "openai" else "https://openrouter.ai/api/v1/auth/key"
+    url = "https://api.openai.com/v1/models" if normalized_provider == "openai" else "https://openrouter.ai/api/v1/auth/key"
     headers = {"Authorization": f"Bearer {key}"}
 
     try:
@@ -597,7 +690,36 @@ async def verify_api_key(
     return ApiKeyVerifyResponse(valid=False, error=_verify_error_from_status(status_code))
 
 
-@router.put("/api-key", response_model=MessageResponse)
+@router.post("/verify-key", response_model=ApiKeyVerifyResponse)
+async def verify_api_key(
+    payload: ApiKeyVerifyRequest,
+) -> ApiKeyVerifyResponse:
+    return await _verify_provider_api_key(payload.provider, payload.api_key)
+
+
+@router.get("/models/search", response_model=ProviderModelsSearchResponse)
+async def search_provider_models(
+    provider: str | None = None,
+    q: str = "",
+    limit: int = 25,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    prefs = await PreferencesRepository.get_or_create(session, current_user.id)
+    provider_catalogs = _resolve_provider_catalogs(prefs)
+    normalized_provider = normalize_llm_provider(provider or getattr(prefs, "llm_provider", "openrouter"))
+    catalog = provider_catalogs.get(normalized_provider, provider_model_catalog(normalized_provider))
+    models = _search_provider_models(normalized_provider, q, catalog, limit=limit)
+    return ProviderModelsSearchResponse(
+        provider=normalized_provider,
+        query=str(q or "").strip(),
+        models=models,
+        detail=f"Found {len(models)} models.",
+        error="",
+    )
+
+
+@router.put("/api-key", response_model=ProviderConfigSaveResponse)
 async def set_api_key(
     payload: ApiKeyUpdateRequest,
     session: AsyncSession = Depends(get_appdata_db_session),
@@ -608,7 +730,41 @@ async def set_api_key(
     provider_catalogs = _resolve_provider_catalogs(prefs)
     prefs.llm_provider = provider
     catalog = provider_catalogs.get(provider, provider_model_catalog(provider))
-    if provider == "ollama":
+    api_key = str(payload.api_key or "").strip()
+    stored_api_key = ""
+    if not api_key and provider != "ollama":
+        stored_api_key = str(SecretStorageService.get_api_key(current_user.id, provider=provider) or "").strip()
+
+    refresh_api_key = api_key or stored_api_key
+    refresh_warning = ""
+    refresh_detail = ""
+
+    if provider != "ollama":
+        if api_key:
+            verify_result = await _verify_provider_api_key(provider, api_key)
+            if not verify_result.valid:
+                code = str(verify_result.error or "invalid_key").strip() or "invalid_key"
+                detail = "Invalid API key."
+                if code == "quota_exceeded":
+                    detail = "Key is valid but quota is exceeded for this provider."
+                elif code == "network_error":
+                    detail = "Could not reach provider. Check your connection and try again."
+                raise HTTPException(status_code=400, detail=detail)
+            try:
+                SecretStorageService.set_api_key(current_user.id, api_key, provider=provider)
+            except RuntimeError as exc:
+                raise HTTPException(status_code=501, detail=str(exc)) from exc
+            except Exception as exc:  # noqa: BLE001
+                raise HTTPException(
+                    status_code=500, detail="Failed to persist API key in OS keychain."
+                ) from exc
+            refresh_api_key = api_key
+        elif not refresh_api_key:
+            raise HTTPException(
+                status_code=400,
+                detail=f"API key is required to save configuration for provider '{provider}'.",
+            )
+    else:
         requested_base_url = str(payload.base_url or "").strip().rstrip("/")
         if requested_base_url:
             catalog = {
@@ -620,31 +776,12 @@ async def set_api_key(
                 catalog,
                 provider_model_catalog(provider),
             )
-            prefs.provider_model_catalogs_json = json.dumps(provider_catalogs)
             catalog = provider_catalogs[provider]
-
-    if payload.enabled_models is not None:
-        allowed = set(catalog.get("main_models", []))
-        cleaned: list[str] = []
-        seen: set[str] = set()
-        for model in payload.enabled_models:
-            value = str(model or "").strip()
-            if not value or value not in allowed or value in seen:
-                continue
-            seen.add(value)
-            cleaned.append(value)
-        prefs.enabled_main_models_json = json.dumps(
-            cleaned or list(catalog.get("main_models", []))
-        )
-
-    enabled_models = _load_enabled_models(
-        getattr(prefs, "enabled_main_models_json", "[]"),
-        catalog,
-    )
+        refresh_api_key = ""
 
     if payload.selected_model is not None:
         selected_model = str(payload.selected_model or "").strip()
-        if selected_model in enabled_models:
+        if selected_model in _clean_models(catalog.get("main_models", []), provider):
             prefs.selected_model = selected_model
     if payload.selected_lite_model is not None:
         selected_lite_model = str(payload.selected_lite_model or "").strip()
@@ -652,7 +789,7 @@ async def set_api_key(
             prefs.selected_lite_model = selected_lite_model
     if payload.selected_coding_model is not None:
         selected_coding_model = str(payload.selected_coding_model or "").strip()
-        if selected_coding_model in enabled_models:
+        if selected_coding_model in _clean_models(catalog.get("main_models", []), provider):
             prefs.selected_coding_model = selected_coding_model
 
     if payload.llm_temperature is not None:
@@ -670,26 +807,51 @@ async def set_api_key(
     if payload.slow_request_warning_seconds is not None:
         prefs.slow_request_warning_seconds = int(payload.slow_request_warning_seconds)
 
+    try:
+        refresh_result = await refresh_provider_model_catalog(
+            provider,
+            api_key=refresh_api_key or None,
+            base_url=payload.base_url,
+        )
+    except ProviderModelRefreshError as exc:
+        if provider != "ollama" and refresh_api_key:
+            refresh_warning = "API key saved, but model refresh failed. Using previous catalog."
+            refresh_detail = f"Configuration for provider '{provider}' saved."
+        else:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    else:
+        fallback = provider_catalogs.get(provider, provider_model_catalog(provider))
+        merged_catalog = dict(refresh_result.catalog)
+        if provider == "ollama":
+            requested_base_url = str(payload.base_url or "").strip()
+            fallback_base_url = str(fallback.get("base_url") or _DEFAULT_OLLAMA_BASE_URL).strip()
+            merged_catalog["base_url"] = (requested_base_url or fallback_base_url).rstrip("/") or _DEFAULT_OLLAMA_BASE_URL
+        merged_catalog["models"] = merge_refreshed_model_metadata(
+            provider,
+            fallback.get("models"),
+            merged_catalog.get("main_models", []),
+            merged_catalog.get("lite_models", []),
+        )
+        provider_catalogs[provider] = _coerce_provider_catalog(
+            provider,
+            merged_catalog,
+            fallback,
+        )
+        prefs.provider_model_catalogs_json = json.dumps(provider_catalogs)
+        refresh_detail = refresh_result.detail
+
     _normalize_model_preferences(prefs, provider_catalogs)
 
-    api_key = str(payload.api_key or "").strip()
-    if api_key:
-        try:
-            SecretStorageService.set_api_key(current_user.id, api_key, provider=provider)
-        except RuntimeError as exc:
-            raise HTTPException(status_code=501, detail=str(exc)) from exc
-        except Exception as exc:  # noqa: BLE001
-            raise HTTPException(
-                status_code=500, detail="Failed to persist API key in OS keychain."
-            ) from exc
-
     await session.commit()
-    if api_key:
-        return MessageResponse(
-            message=f"Configuration and API key for provider '{provider}' saved."
-        )
-    return MessageResponse(
-        message=f"Configuration for provider '{provider}' saved."
+    key_presence = SecretStorageService.get_api_key_presence_map(
+        current_user.id, list(SUPPORTED_LLM_PROVIDERS)
+    )
+    response = _to_response(prefs, key_presence)
+    return ProviderConfigSaveResponse(
+        **response.model_dump(),
+        detail=refresh_detail or f"Configuration for provider '{provider}' saved.",
+        warning=refresh_warning,
+        error="",
     )
 
 

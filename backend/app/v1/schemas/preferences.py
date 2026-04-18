@@ -112,6 +112,20 @@ class ProviderModelsRefreshResponse(PreferencesResponse):
     error: str = ""
 
 
+class ProviderConfigSaveResponse(PreferencesResponse):
+    detail: str = ""
+    warning: str = ""
+    error: str = ""
+
+
+class ProviderModelsSearchResponse(BaseModel):
+    provider: str = ""
+    query: str = ""
+    models: list[ProviderModelEntry] = Field(default_factory=list)
+    detail: str = ""
+    error: str = ""
+
+
 class ApiKeyVerifyRequest(BaseModel):
     provider: str = "openrouter"
     api_key: str = Field(min_length=1)

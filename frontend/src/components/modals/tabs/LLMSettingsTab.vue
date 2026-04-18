@@ -118,13 +118,14 @@
               <HeaderDropdown
                 :model-value="mainModel"
                 :options="mainOptions"
+                :backend-search="searchProviderModels"
                 :searchable="true"
                 :max-options-without-search="100"
                 search-placeholder="Search model"
                 placeholder="Select main model"
                 max-width-class="w-full"
                 aria-label="Main model"
-                @update:model-value="mainModel = $event"
+                @update:model-value="setMainModel($event)"
               />
             </div>
 
@@ -291,6 +292,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import HeaderDropdown from '../../ui/HeaderDropdown.vue'
+import { apiService } from '../../../services/apiService'
 import { useLLMConfig } from '../../../composables/useLLMConfig'
 import { useAppStore } from '../../../stores/appStore'
 import { useAuthStore } from '../../../stores/authStore'
@@ -335,6 +337,7 @@ const {
   refreshModels,
   saveConfig,
   getModelMeta,
+  setMainModel,
   clearTransientMessages,
   resetForAuthBoundary,
 } = llm
@@ -406,6 +409,13 @@ function buildModelOptions(type, selectedId) {
   }
 
   return options
+}
+
+async function searchProviderModels(query, limit = 25) {
+  const normalizedProvider = String(provider.value || '').trim()
+  if (!normalizedProvider) return []
+  const response = await apiService.v1SearchProviderModels(normalizedProvider, query, limit)
+  return Array.isArray(response?.models) ? response.models : []
 }
 
 async function handleProviderSelect(nextProvider) {

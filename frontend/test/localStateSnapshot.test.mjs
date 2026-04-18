@@ -17,7 +17,7 @@ test('app store persists local session snapshot via Tauri app data file service'
   assert.equal(source.includes('selected_lite_model: selectedLiteModel.value || \'\''), true)
   assert.equal(source.includes('selected_coding_model: selectedModel.value || \'\''), true)
   assert.equal(source.includes('slow_request_warning_seconds: normalizeSlowRequestWarningSeconds(slowRequestWarningSeconds.value)'), true)
-  assert.equal(source.includes('enabled_models: Array.isArray(providerMainModels.value) ? [...providerMainModels.value] : []'), true)
+  assert.equal(source.includes('enabled_models: Array.isArray(providerMainModels.value) ? [...providerMainModels.value] : []'), false)
   assert.equal(source.includes('terminal_open: !!isTerminalOpen.value'), true)
   assert.equal(source.includes('if (typeof ui.terminal_open === \'boolean\')'), true)
 })

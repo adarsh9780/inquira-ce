@@ -156,6 +156,7 @@
           :model-value="appStore.selectedModel"
           @update:model-value="handleMainModelChange"
           :options="mainModelOptions"
+          :backend-search="searchProviderModels"
           placeholder="Select main model"
           :searchable="true"
           :group-by-provider="true"
@@ -260,19 +261,16 @@ function syncProviderCatalog(provider) {
   const catalog = appStore.providerModelCatalogs?.[provider] || {}
   const mainModels = Array.isArray(catalog.main_models) ? catalog.main_models : []
   const liteModels = Array.isArray(catalog.lite_models) ? catalog.lite_models : []
-  if (mainModels.length) {
-    appStore.setEnabledModels(mainModels)
-  }
+  appStore.providerMainModels = [...mainModels]
+  appStore.availableModels = [...mainModels]
   if (!appStore.providerMainModels.includes(appStore.selectedModel)) {
     appStore.setSelectedModel(appStore.providerMainModels[0] || '')
   }
-  if (liteModels.length) {
-    appStore.providerLiteModels = [...liteModels]
-    const fallbackLite = catalog.default_lite_model || liteModels[0] || ''
-    appStore.setSelectedLiteModel(
-      liteModels.includes(appStore.selectedLiteModel) ? appStore.selectedLiteModel : fallbackLite
-    )
-  }
+  appStore.providerLiteModels = [...liteModels]
+  const fallbackLite = catalog.default_lite_model || liteModels[0] || ''
+  appStore.setSelectedLiteModel(
+    liteModels.includes(appStore.selectedLiteModel) ? appStore.selectedLiteModel : fallbackLite
+  )
 }
 
 function handleApiKeyChange(event) {
@@ -296,6 +294,13 @@ function handleLiteModelChange(event) {
 function handleMainModelChange(event) {
   appStore.setSelectedModel(event?.target?.value ?? event)
   clearMessage()
+}
+
+async function searchProviderModels(query, limit = 25) {
+  const provider = String(appStore.llmProvider || '').trim()
+  if (!provider) return []
+  const response = await apiService.v1SearchProviderModels(provider, query, limit)
+  return Array.isArray(response?.models) ? response.models : []
 }
 
 function clearMessage() {
@@ -372,9 +377,13 @@ async function saveProviderApiKey() {
   clearMessage()
 
   try {
-    await apiService.setApiKeySettings(key, appStore.llmProvider)
-    await appStore.loadUserPreferences()
-    message.value = `API key saved for ${appStore.llmProvider}. You can refresh models now.`
+    const response = await apiService.setApiKeySettings(key, appStore.llmProvider)
+    if (response && typeof appStore.applyPreferencesResponse === 'function') {
+      appStore.applyPreferencesResponse(response)
+    }
+    message.value = response?.warning
+      ? `${response.detail || `API key saved for ${appStore.llmProvider}.`} ${response.warning}`
+      : response?.detail || `API key saved for ${appStore.llmProvider}.`
     messageType.value = 'success'
   } catch (error) {
     console.error('❌ Failed to save provider API key:', error)
@@ -401,7 +410,6 @@ async function saveApiSettings() {
       selected_model: appStore.selectedModel,
       selected_lite_model: appStore.selectedLiteModel,
       selected_coding_model: appStore.selectedModel,
-      enabled_models: appStore.providerMainModels,
     })
     
     // Sync store state with backend response (especially providerRequiresApiKey)
