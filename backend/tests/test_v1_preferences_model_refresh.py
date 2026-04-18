@@ -131,6 +131,7 @@ async def test_preferences_response_injects_selected_openrouter_model_into_displ
                         "anthropic/claude-sonnet-4-5",
                         "mistralai/mixtral-8x7b",
                         "deepseek/deepseek-chat",
+                        "meta-llama/llama-3.3-70b-instruct",
                     ],
                     "lite_models": ["google/gemini-2.5-flash-lite"],
                     "default_main_model": "google/gemini-2.5-flash",
@@ -142,6 +143,7 @@ async def test_preferences_response_injects_selected_openrouter_model_into_displ
                         {"id": "anthropic/claude-sonnet-4-5", "display_name": "Claude Sonnet 4.5"},
                         {"id": "mistralai/mixtral-8x7b", "display_name": "Mixtral 8x7B"},
                         {"id": "deepseek/deepseek-chat", "display_name": "DeepSeek Chat"},
+                        {"id": "meta-llama/llama-3.3-70b-instruct", "display_name": "Llama 3.3 70B"},
                     ],
                 }
             }
@@ -175,6 +177,68 @@ async def test_preferences_response_injects_selected_openrouter_model_into_displ
         "anthropic/claude-sonnet-4-5",
     ]
     assert "deepseek/deepseek-chat" not in response.provider_available_main_models
+    assert "meta-llama/llama-3.3-70b-instruct" not in response.provider_available_main_models
+    assert response.provider_model_catalogs["openrouter"].main_models == [
+        "google/gemini-2.5-flash",
+        "openai/gpt-4o",
+        "anthropic/claude-sonnet-4-5",
+        "mistralai/mixtral-8x7b",
+        "deepseek/deepseek-chat",
+        "meta-llama/llama-3.3-70b-instruct",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_preferences_response_limits_openrouter_display_list_to_100_and_keeps_selected_model():
+    curated_models = [f"google/model-{index:03d}" for index in range(1, 121)]
+    full_catalog = [
+        *curated_models,
+        "mistralai/mixtral-8x7b",
+    ]
+
+    prefs = SimpleNamespace(
+        llm_provider="openrouter",
+        selected_model="mistralai/mixtral-8x7b",
+        selected_lite_model="google/model-001",
+        selected_coding_model="mistralai/mixtral-8x7b",
+        enabled_main_models_json='["google/model-001"]',
+        provider_model_catalogs_json=json.dumps(
+            {
+                "openrouter": {
+                    "main_models": full_catalog,
+                    "lite_models": ["google/model-001"],
+                    "default_main_model": "google/model-001",
+                    "default_lite_model": "google/model-001",
+                    "source": "bundled",
+                    "models": [{"id": model_id, "display_name": model_id} for model_id in full_catalog],
+                }
+            }
+        ),
+        schema_context="",
+        allow_schema_sample_values=False,
+        terminal_risk_acknowledged=False,
+        chat_overlay_width=0.25,
+        is_sidebar_collapsed=True,
+        hide_shortcuts_modal=False,
+        active_workspace_id=None,
+        active_dataset_path=None,
+        active_table_name=None,
+    )
+
+    response = _to_response(
+        prefs,
+        {
+            "openrouter": False,
+            "openai": False,
+            "anthropic": False,
+            "ollama": False,
+        },
+    )
+
+    assert len(response.provider_available_main_models) == 100
+    assert response.provider_available_main_models[0] == "mistralai/mixtral-8x7b"
+    assert "google/model-100" not in response.provider_available_main_models
+    assert response.provider_model_catalogs["openrouter"].main_models == full_catalog
 
 
 @pytest.mark.asyncio

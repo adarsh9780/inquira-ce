@@ -52,8 +52,8 @@ _VERIFY_TIMEOUT_SECONDS = 20.0
 _RECOMMENDED_FOR_ALLOWED = {"main", "lite", "both"}
 _TAGS_ALLOWED = {"recommended", "extended"}
 _DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
-_DEFAULT_PROVIDER_MODEL_LIMIT = 100
-_OPENROUTER_DEFAULT_PREFIXES = ("google/", "openai/", "anthropic/")
+DEFAULT_PROVIDER_MODEL_LIMIT = 100
+OPENROUTER_DEFAULT_PREFIXES = ("google/", "openai/", "anthropic/")
 
 
 def _coerce_non_negative_int(raw: Any) -> int:
@@ -185,24 +185,28 @@ def _provider_display_main_models(
     provider: str,
     catalog: dict[str, Any],
     selected_model: str | None = None,
-    limit: int = _DEFAULT_PROVIDER_MODEL_LIMIT,
+    limit: int = DEFAULT_PROVIDER_MODEL_LIMIT,
 ) -> list[str]:
     normalized_provider = normalize_llm_provider(provider)
     main_models = _clean_models(catalog.get("main_models", []), normalized_provider)
+    max_results = max(1, int(limit or DEFAULT_PROVIDER_MODEL_LIMIT))
+
     if normalized_provider == "openrouter":
         display_models = [
             model_id
             for model_id in main_models
-            if model_id.lower().startswith(_OPENROUTER_DEFAULT_PREFIXES)
+            if model_id.lower().startswith(OPENROUTER_DEFAULT_PREFIXES)
         ]
     else:
         display_models = list(main_models)
+
+    display_models = _dedupe_models(display_models)[:max_results]
 
     selected = str(selected_model or "").strip()
     if selected and selected in main_models and selected not in display_models:
         display_models = [selected, *display_models]
 
-    return _dedupe_models(display_models)[: max(1, int(limit or _DEFAULT_PROVIDER_MODEL_LIMIT))]
+    return _dedupe_models(display_models)[:max_results]
 
 
 def _model_entry_matches_query(entry: dict[str, Any], query: str) -> bool:
