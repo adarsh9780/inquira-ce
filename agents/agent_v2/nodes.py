@@ -1153,6 +1153,8 @@ def _is_recoverable_structured_output_error(exc: Exception) -> bool:
         "expecting value: line 1 column 1",
         "jsondecodeerror",
         "json error injected into sse stream",
+        "outputparserexception",
+        "invalid json output",
     )
     return any(marker in message for marker in markers)
 
