@@ -517,6 +517,35 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
     )
 
 
+def _resolved_ollama_base_url(base_url: str | None) -> str:
+    return str(base_url or "").strip().rstrip("/") or _DEFAULT_OLLAMA_BASE_URL
+
+
+def _apply_refreshed_provider_catalog(
+    provider: str,
+    provider_catalogs: dict[str, dict[str, Any]],
+    refreshed_catalog: dict[str, Any],
+    *,
+    base_url: str | None = None,
+) -> None:
+    fallback = provider_catalogs.get(provider, provider_model_catalog(provider))
+    merged_catalog = dict(refreshed_catalog)
+    if provider == "ollama":
+        merged_catalog["base_url"] = _resolved_ollama_base_url(base_url)
+
+    merged_catalog["models"] = merge_refreshed_model_metadata(
+        provider,
+        fallback.get("models"),
+        merged_catalog.get("main_models", []),
+        merged_catalog.get("lite_models", []),
+    )
+    provider_catalogs[provider] = _coerce_provider_catalog(
+        provider,
+        merged_catalog,
+        fallback,
+    )
+
+
 @router.get("", response_model=PreferencesResponse)
 async def get_preferences(
     session: AsyncSession = Depends(get_appdata_db_session),
@@ -620,31 +649,25 @@ async def refresh_provider_models(
     if not api_key:
         api_key = str(SecretStorageService.get_api_key(current_user.id, provider=provider) or "").strip()
 
+    catalog = provider_catalogs.get(provider, provider_model_catalog(provider))
+    refresh_base_url = payload.base_url
+    if provider == "ollama":
+        refresh_base_url = str(payload.base_url or catalog.get("base_url") or _DEFAULT_OLLAMA_BASE_URL).strip()
+
     try:
         refresh_result = await refresh_provider_model_catalog(
             provider,
             api_key=api_key,
-            base_url=payload.base_url,
+            base_url=refresh_base_url,
         )
     except ProviderModelRefreshError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
-    fallback = provider_catalogs.get(provider, provider_model_catalog(provider))
-    merged_catalog = dict(refresh_result.catalog)
-    if provider == "ollama":
-        requested_base_url = str(payload.base_url or "").strip()
-        fallback_base_url = str(fallback.get("base_url") or _DEFAULT_OLLAMA_BASE_URL).strip()
-        merged_catalog["base_url"] = (requested_base_url or fallback_base_url).rstrip("/") or _DEFAULT_OLLAMA_BASE_URL
-    merged_catalog["models"] = merge_refreshed_model_metadata(
+    _apply_refreshed_provider_catalog(
         provider,
-        fallback.get("models"),
-        merged_catalog.get("main_models", []),
-        merged_catalog.get("lite_models", []),
-    )
-    provider_catalogs[provider] = _coerce_provider_catalog(
-        provider,
-        merged_catalog,
-        fallback,
+        provider_catalogs,
+        refresh_result.catalog,
+        base_url=refresh_base_url,
     )
     prefs.provider_model_catalogs_json = json.dumps(provider_catalogs)
 
@@ -697,6 +720,20 @@ async def _verify_provider_api_key(provider: str, api_key: str) -> ApiKeyVerifyR
     return ApiKeyVerifyResponse(valid=False, error=_verify_error_from_status(status_code))
 
 
+async def _verify_provider_api_key_or_raise(provider: str, api_key: str) -> None:
+    verify_result = await _verify_provider_api_key(provider, api_key)
+    if verify_result.valid:
+        return
+
+    code = str(verify_result.error or "invalid_key").strip() or "invalid_key"
+    detail = "Invalid API key."
+    if code == "quota_exceeded":
+        detail = "Key is valid but quota is exceeded for this provider."
+    elif code == "network_error":
+        detail = "Could not reach provider. Check your connection and try again."
+    raise HTTPException(status_code=400, detail=detail)
+
+
 @router.post("/verify-key", response_model=ApiKeyVerifyResponse)
 async def verify_api_key(
     payload: ApiKeyVerifyRequest,
@@ -743,20 +780,13 @@ async def set_api_key(
         stored_api_key = str(SecretStorageService.get_api_key(current_user.id, provider=provider) or "").strip()
 
     refresh_api_key = api_key or stored_api_key
+    refresh_base_url = payload.base_url
     refresh_warning = ""
     refresh_detail = ""
 
     if provider != "ollama":
         if api_key:
-            verify_result = await _verify_provider_api_key(provider, api_key)
-            if not verify_result.valid:
-                code = str(verify_result.error or "invalid_key").strip() or "invalid_key"
-                detail = "Invalid API key."
-                if code == "quota_exceeded":
-                    detail = "Key is valid but quota is exceeded for this provider."
-                elif code == "network_error":
-                    detail = "Could not reach provider. Check your connection and try again."
-                raise HTTPException(status_code=400, detail=detail)
+            await _verify_provider_api_key_or_raise(provider, api_key)
             try:
                 SecretStorageService.set_api_key(current_user.id, api_key, provider=provider)
             except RuntimeError as exc:
@@ -772,18 +802,7 @@ async def set_api_key(
                 detail=f"API key is required to save configuration for provider '{provider}'.",
             )
     else:
-        requested_base_url = str(payload.base_url or "").strip().rstrip("/")
-        if requested_base_url:
-            catalog = {
-                **catalog,
-                "base_url": requested_base_url,
-            }
-            provider_catalogs[provider] = _coerce_provider_catalog(
-                provider,
-                catalog,
-                provider_model_catalog(provider),
-            )
-            catalog = provider_catalogs[provider]
+        refresh_base_url = _resolved_ollama_base_url(payload.base_url)
         refresh_api_key = ""
 
     if payload.selected_model is not None:
@@ -818,7 +837,7 @@ async def set_api_key(
         refresh_result = await refresh_provider_model_catalog(
             provider,
             api_key=refresh_api_key or None,
-            base_url=payload.base_url,
+            base_url=refresh_base_url,
         )
     except ProviderModelRefreshError as exc:
         if provider != "ollama" and refresh_api_key:
@@ -827,22 +846,13 @@ async def set_api_key(
         else:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     else:
-        fallback = provider_catalogs.get(provider, provider_model_catalog(provider))
-        merged_catalog = dict(refresh_result.catalog)
-        if provider == "ollama":
-            requested_base_url = str(payload.base_url or "").strip()
-            fallback_base_url = str(fallback.get("base_url") or _DEFAULT_OLLAMA_BASE_URL).strip()
-            merged_catalog["base_url"] = (requested_base_url or fallback_base_url).rstrip("/") or _DEFAULT_OLLAMA_BASE_URL
-        merged_catalog["models"] = merge_refreshed_model_metadata(
+        if provider == "ollama" and refresh_result.error:
+            raise HTTPException(status_code=400, detail=refresh_result.detail)
+        _apply_refreshed_provider_catalog(
             provider,
-            fallback.get("models"),
-            merged_catalog.get("main_models", []),
-            merged_catalog.get("lite_models", []),
-        )
-        provider_catalogs[provider] = _coerce_provider_catalog(
-            provider,
-            merged_catalog,
-            fallback,
+            provider_catalogs,
+            refresh_result.catalog,
+            base_url=refresh_base_url,
         )
         prefs.provider_model_catalogs_json = json.dumps(provider_catalogs)
         refresh_detail = refresh_result.detail

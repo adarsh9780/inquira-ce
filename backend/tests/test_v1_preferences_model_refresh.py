@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 import httpx
+from fastapi import HTTPException
 
 from app.services.provider_model_refresh import ProviderModelRefreshError, ProviderRefreshResult, refresh_provider_model_catalog
 from app.v1.api.preferences import (
@@ -714,6 +715,72 @@ async def test_set_api_key_endpoint_persists_models_and_advanced_settings(monkey
 
 
 @pytest.mark.asyncio
+async def test_set_api_key_endpoint_rejects_invalid_openrouter_key_without_saving(monkeypatch):
+    prefs = SimpleNamespace(
+        llm_provider="openrouter",
+        selected_model="google/gemini-2.5-flash",
+        selected_lite_model="google/gemini-2.5-flash-lite",
+        selected_coding_model="google/gemini-2.5-flash",
+        enabled_main_models_json='["google/gemini-2.5-flash"]',
+        provider_model_catalogs_json="{}",
+        llm_temperature=0.7,
+        llm_max_tokens=4096,
+        llm_top_p=1.0,
+        llm_top_k=0,
+        llm_frequency_penalty=0.0,
+        llm_presence_penalty=0.0,
+        slow_request_warning_seconds=30,
+        schema_context="",
+        allow_schema_sample_values=False,
+        terminal_risk_acknowledged=False,
+        chat_overlay_width=0.25,
+        is_sidebar_collapsed=True,
+        hide_shortcuts_modal=False,
+        active_workspace_id=None,
+        active_dataset_path=None,
+        active_table_name=None,
+    )
+    save_called = {"value": False}
+
+    class _Session:
+        async def commit(self):
+            return None
+
+    async def _fake_get_or_create(_session, _principal_id):
+        return prefs
+
+    async def _fake_verify_provider_api_key(_provider: str, _api_key: str):
+        return ApiKeyVerifyResponse(valid=False, error="invalid_key")
+
+    def _fake_set_api_key(_user_id, _key, provider="openrouter"):
+        _ = provider
+        save_called["value"] = True
+
+    monkeypatch.setattr(
+        "app.v1.api.preferences.PreferencesRepository.get_or_create",
+        _fake_get_or_create,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences._verify_provider_api_key",
+        _fake_verify_provider_api_key,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences.SecretStorageService.set_api_key",
+        _fake_set_api_key,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await set_api_key(
+            ApiKeyUpdateRequest(provider="openrouter", api_key="bad-key"),
+            session=_Session(),
+            current_user=SimpleNamespace(id="u1"),
+        )
+
+    assert exc_info.value.status_code == 400
+    assert save_called["value"] is False
+
+
+@pytest.mark.asyncio
 async def test_set_api_key_endpoint_warns_when_model_refresh_fails_after_key_save(monkeypatch):
     prefs = SimpleNamespace(
         llm_provider="openrouter",
@@ -811,6 +878,175 @@ async def test_set_api_key_endpoint_warns_when_model_refresh_fails_after_key_sav
     assert captured_secret_write == {"key": "sk-test", "provider": "openrouter"}
     assert response.warning == "API key saved, but model refresh failed. Using previous catalog."
     assert response.detail == "Configuration for provider 'openrouter' saved."
+
+
+@pytest.mark.asyncio
+async def test_set_api_key_endpoint_uses_default_ollama_base_url_when_empty(monkeypatch):
+    prefs = SimpleNamespace(
+        llm_provider="ollama",
+        selected_model="llama3.2",
+        selected_lite_model="llama3.2:3b",
+        selected_coding_model="llama3.2",
+        enabled_main_models_json='["llama3.2"]',
+        provider_model_catalogs_json=json.dumps(
+            {
+                "ollama": {
+                    "main_models": ["llama3.2"],
+                    "lite_models": ["llama3.2:3b"],
+                    "default_main_model": "llama3.2",
+                    "default_lite_model": "llama3.2:3b",
+                    "base_url": "http://localhost:11434",
+                }
+            }
+        ),
+        llm_temperature=0.7,
+        llm_max_tokens=4096,
+        llm_top_p=1.0,
+        llm_top_k=0,
+        llm_frequency_penalty=0.0,
+        llm_presence_penalty=0.0,
+        slow_request_warning_seconds=30,
+        schema_context="",
+        allow_schema_sample_values=False,
+        terminal_risk_acknowledged=False,
+        chat_overlay_width=0.25,
+        is_sidebar_collapsed=True,
+        hide_shortcuts_modal=False,
+        active_workspace_id=None,
+        active_dataset_path=None,
+        active_table_name=None,
+    )
+    refresh_call = {"base_url": ""}
+
+    class _Session:
+        async def commit(self):
+            return None
+
+    async def _fake_get_or_create(_session, _principal_id):
+        return prefs
+
+    async def _fake_refresh_provider_model_catalog(_provider: str, api_key: str | None = None, base_url: str | None = None):
+        _ = api_key
+        refresh_call["base_url"] = str(base_url or "")
+        return ProviderRefreshResult(
+            provider="ollama",
+            detail="Refreshed 1 Ollama models.",
+            catalog={
+                "main_models": ["llama3.2"],
+                "lite_models": ["llama3.2:3b"],
+                "default_main_model": "llama3.2",
+                "default_lite_model": "llama3.2:3b",
+                "source": "refreshed",
+            },
+        )
+
+    monkeypatch.setattr(
+        "app.v1.api.preferences.PreferencesRepository.get_or_create",
+        _fake_get_or_create,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences.refresh_provider_model_catalog",
+        _fake_refresh_provider_model_catalog,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences.SecretStorageService.get_api_key_presence_map",
+        lambda _user_id, _providers: {
+            "openrouter": False,
+            "openai": False,
+            "anthropic": False,
+            "ollama": False,
+        },
+    )
+
+    await set_api_key(
+        ApiKeyUpdateRequest(provider="ollama"),
+        session=_Session(),
+        current_user=SimpleNamespace(id="u1"),
+    )
+
+    persisted_catalogs = json.loads(prefs.provider_model_catalogs_json)
+    assert refresh_call["base_url"] == "http://localhost:11434"
+    assert persisted_catalogs["ollama"]["base_url"] == "http://localhost:11434"
+
+
+@pytest.mark.asyncio
+async def test_set_api_key_endpoint_rejects_unreachable_ollama_before_catalog_write(monkeypatch):
+    existing_catalog = {
+        "ollama": {
+            "main_models": ["llama3.2"],
+            "lite_models": ["llama3.2:3b"],
+            "default_main_model": "llama3.2",
+            "default_lite_model": "llama3.2:3b",
+            "base_url": "http://localhost:11434",
+            "source": "bundled",
+        }
+    }
+    prefs = SimpleNamespace(
+        llm_provider="ollama",
+        selected_model="llama3.2",
+        selected_lite_model="llama3.2:3b",
+        selected_coding_model="llama3.2",
+        enabled_main_models_json='["llama3.2"]',
+        provider_model_catalogs_json=json.dumps(existing_catalog),
+        llm_temperature=0.7,
+        llm_max_tokens=4096,
+        llm_top_p=1.0,
+        llm_top_k=0,
+        llm_frequency_penalty=0.0,
+        llm_presence_penalty=0.0,
+        slow_request_warning_seconds=30,
+        schema_context="",
+        allow_schema_sample_values=False,
+        terminal_risk_acknowledged=False,
+        chat_overlay_width=0.25,
+        is_sidebar_collapsed=True,
+        hide_shortcuts_modal=False,
+        active_workspace_id=None,
+        active_dataset_path=None,
+        active_table_name=None,
+    )
+
+    class _Session:
+        async def commit(self):
+            return None
+
+    async def _fake_get_or_create(_session, _principal_id):
+        return prefs
+
+    async def _fake_refresh_provider_model_catalog(_provider: str, api_key: str | None = None, base_url: str | None = None):
+        _ = api_key, base_url
+        return ProviderRefreshResult(
+            provider="ollama",
+            detail="Ollama not detected at 'http://localhost:11434'. Is it running?",
+            catalog={
+                "main_models": ["llama3.2"],
+                "lite_models": ["llama3.2:3b"],
+                "default_main_model": "llama3.2",
+                "default_lite_model": "llama3.2:3b",
+                "source": "default",
+            },
+            error="ollama_unreachable",
+        )
+
+    monkeypatch.setattr(
+        "app.v1.api.preferences.PreferencesRepository.get_or_create",
+        _fake_get_or_create,
+    )
+    monkeypatch.setattr(
+        "app.v1.api.preferences.refresh_provider_model_catalog",
+        _fake_refresh_provider_model_catalog,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await set_api_key(
+            ApiKeyUpdateRequest(provider="ollama", base_url="http://localhost:3131"),
+            session=_Session(),
+            current_user=SimpleNamespace(id="u1"),
+        )
+
+    assert exc_info.value.status_code == 400
+    assert "Ollama not detected" in str(exc_info.value.detail)
+    assert json.loads(prefs.provider_model_catalogs_json) == existing_catalog
 
 
 @pytest.mark.asyncio
