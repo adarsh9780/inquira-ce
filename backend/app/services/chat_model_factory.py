@@ -2,45 +2,137 @@
 
 from __future__ import annotations
 
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Callable
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 
 
+@dataclass(frozen=True)
+class ChatModelSettings:
+    provider: str
+    model: str
+    api_key: str
+    base_url: str
+    temperature: float
+    top_p: float | None
+    top_k: int | None
+    frequency_penalty: float | None
+    presence_penalty: float | None
+    max_tokens: int | None
+    max_retries: int
+    timeout: float
+
+
+Builder = Callable[[ChatModelSettings], BaseChatModel]
+
+
+def _with_optional(kwargs: dict[str, Any], **values: Any) -> dict[str, Any]:
+    for key, value in values.items():
+        if value is not None:
+            kwargs[key] = value
+    return kwargs
+
+
+def _positive_int(value: int | None) -> int | None:
+    if value is None or value <= 0:
+        return None
+    return int(value)
+
+
+def _normalize_ollama_base_url(base_url: str) -> str:
+    value = str(base_url or "").strip().rstrip("/") or "http://localhost:11434"
+    lowered = value.lower()
+    suffixes = ("/api", "/v1")
+    for suffix in suffixes:
+        if lowered.endswith(suffix):
+            return value[: -len(suffix)].rstrip("/") or "http://localhost:11434"
+    return value
+
+
 def _build_openai_client(
+    settings: ChatModelSettings,
     *,
-    model: str,
-    api_key: str,
-    base_url: str,
-    temperature: float,
-    top_p: float | None,
-    top_k: int | None,
-    frequency_penalty: float | None,
-    presence_penalty: float | None,
-    max_tokens: int | None,
-    max_retries: int,
-    timeout: float,
+    include_top_k: bool = False,
 ) -> BaseChatModel:
     kwargs: dict[str, Any] = {
-        "model": model,
-        "api_key": api_key,
-        "base_url": base_url,
-        "temperature": temperature,
-        "max_retries": max_retries,
-        "timeout": timeout,
+        "model": settings.model,
+        "api_key": settings.api_key,
+        "base_url": settings.base_url,
+        "temperature": settings.temperature,
+        "max_retries": settings.max_retries,
+        "timeout": settings.timeout,
     }
-    if max_tokens is not None:
-        kwargs["max_tokens"] = max_tokens
-    if top_p is not None:
-        kwargs["top_p"] = top_p
-    if top_k is not None and top_k > 0:
-        kwargs["top_k"] = top_k
-    if frequency_penalty is not None:
-        kwargs["frequency_penalty"] = frequency_penalty
-    if presence_penalty is not None:
-        kwargs["presence_penalty"] = presence_penalty
+    _with_optional(
+        kwargs,
+        max_tokens=settings.max_tokens,
+        top_p=settings.top_p,
+        frequency_penalty=settings.frequency_penalty,
+        presence_penalty=settings.presence_penalty,
+    )
+    if include_top_k:
+        _with_optional(kwargs, top_k=_positive_int(settings.top_k))
     return ChatOpenAI(**kwargs)
+
+
+def _build_openrouter_client(settings: ChatModelSettings) -> BaseChatModel:
+    return _build_openai_client(settings, include_top_k=True)
+
+
+def _build_openai_provider_client(settings: ChatModelSettings) -> BaseChatModel:
+    return _build_openai_client(settings, include_top_k=False)
+
+
+def _build_ollama_client(settings: ChatModelSettings) -> BaseChatModel:
+    try:
+        from langchain_ollama import ChatOllama
+    except ImportError as exc:  # pragma: no cover - depends on install state
+        raise ValueError(
+            "Provider 'ollama' requires langchain-ollama to be installed."
+        ) from exc
+
+    kwargs: dict[str, Any] = {
+        "model": settings.model,
+        "base_url": _normalize_ollama_base_url(settings.base_url),
+        "temperature": settings.temperature,
+        "num_predict": settings.max_tokens,
+        "top_p": settings.top_p,
+        "top_k": _positive_int(settings.top_k),
+    }
+    return ChatOllama(**_with_optional({}, **kwargs))
+
+
+def _build_anthropic_client(settings: ChatModelSettings) -> BaseChatModel:
+    try:
+        from langchain_anthropic import ChatAnthropic
+    except ImportError as exc:  # pragma: no cover - depends on optional install state
+        raise ValueError(
+            "Provider 'anthropic' requires langchain-anthropic to be installed."
+        ) from exc
+
+    kwargs: dict[str, Any] = {
+        "model": settings.model,
+        "api_key": settings.api_key,
+        "temperature": settings.temperature,
+        "max_retries": settings.max_retries,
+        "timeout": settings.timeout,
+    }
+    _with_optional(
+        kwargs,
+        max_tokens=settings.max_tokens,
+        top_p=settings.top_p,
+        top_k=_positive_int(settings.top_k),
+    )
+    return ChatAnthropic(**kwargs)
+
+
+_PROVIDER_BUILDERS: dict[str, Builder] = {
+    "openrouter": _build_openrouter_client,
+    "openai": _build_openai_provider_client,
+    "ollama": _build_ollama_client,
+    "anthropic": _build_anthropic_client,
+}
 
 
 def create_chat_model(
@@ -59,60 +151,22 @@ def create_chat_model(
     timeout: float = 60.0,
 ) -> BaseChatModel:
     provider_name = str(provider or "").strip().lower()
-
-    if provider_name in {"openrouter", "openai"}:
-        return _build_openai_client(
-            model=model,
-            api_key=api_key,
-            base_url=base_url,
-            temperature=temperature,
-            top_p=top_p,
-            top_k=top_k if provider_name == "openrouter" else None,
-            frequency_penalty=frequency_penalty,
-            presence_penalty=presence_penalty,
-            max_tokens=max_tokens,
-            max_retries=max_retries,
-            timeout=timeout,
-        )
-
-    if provider_name == "ollama":
-        return _build_openai_client(
-            model=model,
-            api_key=api_key or "ollama",
-            base_url=base_url or "http://localhost:11434/v1",
-            temperature=temperature,
-            top_p=top_p,
-            top_k=top_k,
-            frequency_penalty=frequency_penalty,
-            presence_penalty=presence_penalty,
-            max_tokens=max_tokens,
-            max_retries=max_retries,
-            timeout=timeout,
-        )
-
-    if provider_name == "anthropic":
-        try:
-            from langchain_anthropic import ChatAnthropic
-        except ImportError as exc:  # pragma: no cover - depends on optional install state
-            raise ValueError(
-                "Provider 'anthropic' requires langchain-anthropic to be installed."
-            ) from exc
-
-        kwargs: dict[str, Any] = {
-            "model": model,
-            "api_key": api_key,
-            "temperature": temperature,
-            "max_retries": max_retries,
-            "timeout": timeout,
-        }
-        if max_tokens is not None:
-            kwargs["max_tokens"] = max_tokens
-        if top_p is not None:
-            kwargs["top_p"] = top_p
-        if top_k is not None and top_k > 0:
-            kwargs["top_k"] = top_k
-        return ChatAnthropic(**kwargs)
-
-    raise ValueError(
-        f"Unsupported LLM provider '{provider}'. Supported providers: openrouter, openai, ollama, anthropic."
+    builder = _PROVIDER_BUILDERS.get(provider_name)
+    if builder is None:
+        supported = ", ".join(sorted(_PROVIDER_BUILDERS))
+        raise ValueError(f"Unsupported LLM provider '{provider}'. Supported providers: {supported}.")
+    settings = ChatModelSettings(
+        provider=provider_name,
+        model=model,
+        api_key=api_key,
+        base_url=base_url,
+        temperature=temperature,
+        top_p=top_p,
+        top_k=top_k,
+        frequency_penalty=frequency_penalty,
+        presence_penalty=presence_penalty,
+        max_tokens=max_tokens,
+        max_retries=max_retries,
+        timeout=timeout,
     )
+    return builder(settings)

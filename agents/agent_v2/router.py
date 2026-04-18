@@ -56,13 +56,6 @@ async def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
     lite_model = normalize_model_id(
         str(configurable.get("lite_model") or runtime.lite_model).strip()
     )
-    if provider == "ollama":
-        analysis_hints = re.compile(
-            r"\b(chart|plot|graph|sql|query|average|sum|count|group by|dataset|table|column)\b",
-            re.IGNORECASE,
-        )
-        return "analysis" if analysis_hints.search(user_text) else "general_chat"
-
     selected_model = normalize_model_id(str(configurable.get("model") or "").strip())
     model_name = lite_model or selected_model or default_model
     api_key = str(configurable.get("api_key") or "").strip()

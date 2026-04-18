@@ -51,16 +51,25 @@ def test_factory_openai(monkeypatch):
 def test_factory_ollama(monkeypatch):
     captured = {}
 
-    class FakeChatOpenAI:
+    class FakeChatOllama:
         def __init__(self, **kwargs):
             captured.update(kwargs)
 
-    monkeypatch.setattr("app.services.chat_model_factory.ChatOpenAI", FakeChatOpenAI)
-    create_chat_model(provider="ollama", model="llama3.2", api_key="", base_url="")
+    fake_module = types.SimpleNamespace(ChatOllama=FakeChatOllama)
+    monkeypatch.setitem(sys.modules, "langchain_ollama", fake_module)
+    create_chat_model(
+        provider="ollama",
+        model="llama3.2",
+        api_key="",
+        base_url="http://localhost:11434/v1",
+        max_tokens=256,
+        top_k=20,
+    )
 
     assert captured["model"] == "llama3.2"
-    assert captured["api_key"] == "ollama"
-    assert captured["base_url"] == "http://localhost:11434/v1"
+    assert captured["base_url"] == "http://localhost:11434"
+    assert captured["num_predict"] == 256
+    assert captured["top_k"] == 20
 
 
 def test_factory_anthropic(monkeypatch):

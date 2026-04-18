@@ -189,3 +189,43 @@ async def test_router_prefers_lite_model_for_route_decision(monkeypatch) -> None
 
     assert route == "analysis"
     assert captured.get("model") == "preferred-lite-model"
+
+
+@pytest.mark.asyncio
+async def test_router_uses_model_for_ollama_route_decision(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakePrompt:
+        def __or__(self, other):
+            return other
+
+    class _FakeModel:
+        def with_structured_output(self, _schema):
+            return self
+
+        async def ainvoke(self, _payload):
+            return SimpleNamespace(route="general_chat")
+
+    monkeypatch.setattr("agent_v2.router.load_llm_runtime_config", _runtime_stub)
+    monkeypatch.setattr("agent_v2.router.ChatPromptTemplate.from_messages", lambda *_args, **_kwargs: _FakePrompt())
+
+    def fake_create_chat_model(**kwargs):
+        captured.update(kwargs)
+        return _FakeModel()
+
+    monkeypatch.setattr("agent_v2.router.create_chat_model", fake_create_chat_model)
+
+    route = await decide_route(
+        [HumanMessage(content="hello")],
+        {
+            "provider": "ollama",
+            "base_url": "http://localhost:11434/v1",
+            "model": "minimax-m2.7:cloud",
+            "lite_model": "minimax-m2.7:cloud",
+            "default_model": "llama3.2",
+        },
+    )
+
+    assert route == "general_chat"
+    assert captured.get("provider") == "ollama"
+    assert captured.get("model") == "minimax-m2.7:cloud"

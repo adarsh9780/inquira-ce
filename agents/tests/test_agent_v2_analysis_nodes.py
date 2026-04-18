@@ -132,6 +132,7 @@ async def test_analysis_enrich_context_node_recovers_from_injected_sse_json_erro
 
 def test_recoverable_structured_output_error_matches_injected_sse_json_error() -> None:
     assert _is_recoverable_structured_output_error(RuntimeError("JSON error injected into SSE stream")) is True
+    assert _is_recoverable_structured_output_error(ValueError("expected value at line 3 column 1")) is True
 
 
 def test_context_enrichment_prompt_includes_prior_search_context() -> None:

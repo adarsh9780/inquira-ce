@@ -1148,6 +1148,7 @@ def _is_recoverable_structured_output_error(exc: Exception) -> bool:
     if not message:
         return False
     markers = (
+        "expected value at line",
         "expected value at line 1 column 1",
         "expecting value: line 1 column 1",
         "jsondecodeerror",

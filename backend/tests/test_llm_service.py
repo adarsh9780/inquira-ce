@@ -65,59 +65,53 @@ def test_llm_service_ask_surfaces_provider_error_message(monkeypatch):
     assert "API_KEY_INVALID" in exc.value.detail
 
 
-def test_llm_service_ask_passes_max_tokens_to_bound_client(monkeypatch):
-    captured = {}
+def test_llm_service_ask_passes_max_tokens_to_factory(monkeypatch):
+    captured = {"calls": []}
 
-    class FakeBoundClient:
+    class FakeChatOpenAI:
         def invoke(self, _query):
             return type("Resp", (), {"content": "OK"})()
 
-    class FakeChatOpenAI:
-        def bind(self, **kwargs):
-            captured["max_tokens"] = kwargs.get("max_tokens")
-            return FakeBoundClient()
+    def fake_create_chat_model(**kwargs):
+        captured["calls"].append(kwargs)
+        return FakeChatOpenAI()
 
-    monkeypatch.setattr("app.services.llm_service.create_chat_model", lambda **_kwargs: FakeChatOpenAI())
+    monkeypatch.setattr("app.services.llm_service.create_chat_model", fake_create_chat_model)
     monkeypatch.setattr("app.services.llm_service.load_llm_runtime_config", lambda: _runtime_stub())
     svc = LLMService(api_key="k")
 
     result = svc.ask("ping", str, max_tokens=8)
     assert result == "OK"
-    assert captured["max_tokens"] == 8
+    assert captured["calls"][-1]["max_tokens"] == 8
 
 
-def test_llm_service_ask_uses_runtime_default_max_tokens(monkeypatch):
-    captured = {}
+def test_llm_service_ask_uses_runtime_default_max_tokens_in_factory(monkeypatch):
+    captured = {"calls": []}
 
-    class FakeBoundClient:
+    class FakeChatOpenAI:
         def invoke(self, _query):
             return type("Resp", (), {"content": "OK"})()
 
-    class FakeChatOpenAI:
-        def bind(self, **kwargs):
-            captured["max_tokens"] = kwargs.get("max_tokens")
-            return FakeBoundClient()
+    def fake_create_chat_model(**kwargs):
+        captured["calls"].append(kwargs)
+        return FakeChatOpenAI()
 
-    monkeypatch.setattr("app.services.llm_service.create_chat_model", lambda **_kwargs: FakeChatOpenAI())
+    monkeypatch.setattr("app.services.llm_service.create_chat_model", fake_create_chat_model)
     monkeypatch.setattr("app.services.llm_service.load_llm_runtime_config", lambda: _runtime_stub())
     svc = LLMService(api_key="k")
 
     result = svc.ask("ping", str)
     assert result == "OK"
-    assert captured["max_tokens"] == 4096
+    assert captured["calls"][-1]["max_tokens"] == 4096
 
 
 def test_llm_service_ask_suppresses_known_pydantic_serializer_warning(monkeypatch):
     class SchemaOutput(BaseModel):
         value: str
 
-    captured = {"max_tokens": None}
+    captured = {"calls": []}
 
     class FakeStructuredChain:
-        def bind(self, **kwargs):
-            captured["max_tokens"] = kwargs.get("max_tokens")
-            return self
-
         def invoke(self, _query):
             import warnings
 
@@ -128,18 +122,15 @@ def test_llm_service_ask_suppresses_known_pydantic_serializer_warning(monkeypatc
             )
             return SchemaOutput(value="ok")
 
-    class FakeBoundClient:
-        def invoke(self, _query):
-            return type("Resp", (), {"content": "OK"})()
-
     class FakeChatOpenAI:
-        def bind(self, **_kwargs):
-            return FakeBoundClient()
-
         def with_structured_output(self, _fmt):
             return FakeStructuredChain()
 
-    monkeypatch.setattr("app.services.llm_service.create_chat_model", lambda **_kwargs: FakeChatOpenAI())
+    def fake_create_chat_model(**kwargs):
+        captured["calls"].append(kwargs)
+        return FakeChatOpenAI()
+
+    monkeypatch.setattr("app.services.llm_service.create_chat_model", fake_create_chat_model)
     monkeypatch.setattr("app.services.llm_service.load_llm_runtime_config", lambda: _runtime_stub())
     svc = LLMService(api_key="k")
 
@@ -150,7 +141,7 @@ def test_llm_service_ask_suppresses_known_pydantic_serializer_warning(monkeypatc
     assert isinstance(result, SchemaOutput)
     assert result.value == "ok"
     assert len(captured_warnings) == 0
-    assert captured["max_tokens"] == 4096
+    assert captured["calls"][-1]["max_tokens"] == 4096
 
 
 def test_llm_service_ollama_no_key(monkeypatch):
@@ -164,10 +155,6 @@ def test_llm_service_ollama_no_key(monkeypatch):
     captured = {}
 
     class FakeModel:
-        def bind(self, **kwargs):
-            captured["max_tokens"] = kwargs.get("max_tokens")
-            return self
-
         def invoke(self, _query):
             return type("Resp", (), {"content": "OK"})()
 

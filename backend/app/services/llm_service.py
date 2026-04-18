@@ -1,7 +1,7 @@
 import os
 import warnings
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from dotenv import load_dotenv
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
@@ -93,13 +93,14 @@ class LLMService:
     @staticmethod
     def _load_provider_api_key(provider: str) -> str:
         provider_name = str(provider or "").strip().lower()
-        if provider_name == "openai":
-            return os.getenv("OPENAI_API_KEY", "").strip()
-        if provider_name == "anthropic":
-            return os.getenv("ANTHROPIC_API_KEY", "").strip()
-        if provider_name == "ollama":
-            return os.getenv("OLLAMA_API_KEY", "").strip()
-        return os.getenv("OPENROUTER_API_KEY", "").strip()
+        env_vars = {
+            "openai": "OPENAI_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
+            "ollama": "OLLAMA_API_KEY",
+            "openrouter": "OPENROUTER_API_KEY",
+        }
+        env_var = env_vars.get(provider_name, "OPENROUTER_API_KEY")
+        return os.getenv(env_var, "").strip()
 
     def create_chat_client(self, system_instruction: str = "", model: str = ""):
         if not self.client:
@@ -119,11 +120,11 @@ class LLMService:
             top_k=self.top_k,
             frequency_penalty=self.frequency_penalty,
             presence_penalty=self.presence_penalty,
+            max_tokens=self.default_max_tokens,
             max_retries=0,  # Fail fast
             timeout=60.0,
         )
-        bounded_model_client = cast(Any, model_client.bind(max_tokens=self.default_max_tokens))
-        self.chat_client = bounded_model_client.with_structured_output(CodeOutput)
+        self.chat_client = model_client.with_structured_output(CodeOutput)
         self.chat_system_instruction = system_instruction or ""
 
         return self.chat_client
@@ -136,7 +137,20 @@ class LLMService:
 
         try:
             effective_max_tokens = max_tokens or self.default_max_tokens
-            client = self.client.bind(max_tokens=effective_max_tokens)
+            client = create_chat_model(
+                provider=self.provider,
+                model=self.model,
+                api_key=self.api_key,
+                base_url=self.base_url,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                top_k=self.top_k,
+                frequency_penalty=self.frequency_penalty,
+                presence_penalty=self.presence_penalty,
+                max_tokens=effective_max_tokens,
+                max_retries=0,
+                timeout=60.0,
+            )
             if structured_output_format is str:
                 response = client.invoke(user_query)
                 return getattr(response, "content", str(response))
@@ -150,11 +164,8 @@ class LLMService:
                     message=r"^Pydantic serializer warnings:",
                     category=UserWarning,
                 )
-                # Bind max_tokens *after* structured-output wrapping. Some LangChain
-                # wrappers can drop pre-bound kwargs otherwise.
-                structured = self.client.with_structured_output(structured_output_format)
-                chain = cast(Any, structured.bind(max_tokens=effective_max_tokens))
-                return chain.invoke(user_query)
+                structured = client.with_structured_output(structured_output_format)
+                return structured.invoke(user_query)
         except HTTPException:
             raise
         except Exception as e:
