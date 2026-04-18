@@ -1143,6 +1143,46 @@ async def _ainvoke_structured_chain(chain: Any, payload: dict[str, Any]) -> Any:
         return await ainvoke(payload)
 
 
+def _structured_output_methods(model: BaseChatModel) -> tuple[str | None, ...]:
+    provider = str(getattr(model, "_inquira_provider", "") or "").strip().lower()
+    if provider == "ollama":
+        return ("json_schema", "function_calling", "json_mode")
+    return (None,)
+
+
+def _bind_structured_chain(prompt: Any, model: BaseChatModel, schema: Any, method: str | None) -> Any:
+    if method is None:
+        return prompt | model.with_structured_output(schema)
+    try:
+        return prompt | model.with_structured_output(schema, method=method, include_raw=False)
+    except TypeError:
+        # Test doubles may not accept kwargs.
+        return prompt | model.with_structured_output(schema)
+
+
+async def _ainvoke_provider_structured_chain(
+    prompt: Any,
+    model: BaseChatModel,
+    schema: Any,
+    payload: dict[str, Any],
+) -> Any:
+    last_exc: Exception | None = None
+    methods = _structured_output_methods(model)
+    for idx, method in enumerate(methods):
+        try:
+            chain = _bind_structured_chain(prompt, model, schema, method)
+            return await _ainvoke_structured_chain(chain, payload)
+        except Exception as exc:
+            last_exc = exc
+            if idx >= len(methods) - 1:
+                raise
+            if not _is_recoverable_structured_output_error(exc):
+                raise
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("Structured output invocation failed without an error.")
+
+
 def _is_recoverable_structured_output_error(exc: Exception) -> bool:
     message = str(exc or "").strip().lower()
     if not message:
@@ -1155,6 +1195,9 @@ def _is_recoverable_structured_output_error(exc: Exception) -> bool:
         "json error injected into sse stream",
         "outputparserexception",
         "invalid json output",
+        "unsupported response_format type",
+        "not support json schema",
+        "structured outputs not supported",
     )
     return any(marker in message for marker in markers)
 
@@ -1779,9 +1822,10 @@ async def _generate_result_explanations(
         ]
     )
     model = _get_model(config, lite=True)
-    chain = prompt | model.with_structured_output(ResultExplanation)
-    output = await _ainvoke_structured_chain(
-        chain,
+    output = await _ainvoke_provider_structured_chain(
+        prompt,
+        model,
+        ResultExplanation,
         {
             "question": question,
             "code": code,
@@ -1905,10 +1949,11 @@ async def analysis_assess_context_node(state: dict[str, Any], config: RunnableCo
         ]
     )
     model = _get_model(config, lite=False)
-    chain = prompt | model.with_structured_output(AnalysisContextAssessment)
     try:
-        output = await _ainvoke_structured_chain(
-            chain,
+        output = await _ainvoke_provider_structured_chain(
+            prompt,
+            model,
+            AnalysisContextAssessment,
             {
                 "user_text": _truncate_text(user_text, limit=400),
                 "conversation_memory": conversation_memory or "none",
@@ -2011,9 +2056,13 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
             ("human", "{tool_request_prompt}"),
         ]
     )
-    chain = prompt | model.with_structured_output(ContextEnrichmentPlan)
     try:
-        output = await _ainvoke_structured_chain(chain, {"tool_request_prompt": prompt_payload})
+        output = await _ainvoke_provider_structured_chain(
+            prompt,
+            model,
+            ContextEnrichmentPlan,
+            {"tool_request_prompt": prompt_payload},
+        )
         plan = output if isinstance(output, ContextEnrichmentPlan) else ContextEnrichmentPlan.model_validate(output)
     except Exception as exc:
         if not _is_recoverable_structured_output_error(exc):
@@ -2694,9 +2743,13 @@ async def chat_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, 
     )
     model = _get_model(config, lite=True)
     messages_payload = {"messages": list(state.get("messages") or [])}
-    chain = prompt | model.with_structured_output(ChatOutput)
     try:
-        output = await _ainvoke_structured_chain(chain, messages_payload)
+        output = await _ainvoke_provider_structured_chain(
+            prompt,
+            model,
+            ChatOutput,
+            messages_payload,
+        )
     except Exception as exc:
         if not _is_recoverable_structured_output_error(exc):
             raise

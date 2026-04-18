@@ -169,4 +169,6 @@ def create_chat_model(
         max_retries=max_retries,
         timeout=timeout,
     )
-    return builder(settings)
+    model_instance = builder(settings)
+    setattr(model_instance, "_inquira_provider", provider_name)
+    return model_instance

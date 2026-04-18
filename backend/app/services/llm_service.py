@@ -102,6 +102,40 @@ class LLMService:
         env_var = env_vars.get(provider_name, "OPENROUTER_API_KEY")
         return os.getenv(env_var, "").strip()
 
+    @staticmethod
+    def _structured_output_methods(client: Any) -> tuple[str | None, ...]:
+        provider = str(getattr(client, "_inquira_provider", "") or "").strip().lower()
+        if provider == "ollama":
+            return ("json_schema", "function_calling", "json_mode")
+        return (None,)
+
+    @staticmethod
+    def _is_recoverable_structured_output_error(exc: Exception) -> bool:
+        message = str(exc or "").strip().lower()
+        if not message:
+            return False
+        markers = (
+            "expected value at line",
+            "expecting value: line 1 column 1",
+            "jsondecodeerror",
+            "json error injected into sse stream",
+            "outputparserexception",
+            "invalid json output",
+            "unsupported response_format type",
+            "not support json schema",
+            "structured outputs not supported",
+        )
+        return any(marker in message for marker in markers)
+
+    @staticmethod
+    def _bind_structured_output(client: Any, schema: Any, method: str | None) -> Any:
+        if method is None:
+            return client.with_structured_output(schema)
+        try:
+            return client.with_structured_output(schema, method=method, include_raw=False)
+        except TypeError:
+            return client.with_structured_output(schema)
+
     def create_chat_client(self, system_instruction: str = "", model: str = ""):
         if not self.client:
             raise HTTPException(
@@ -124,7 +158,18 @@ class LLMService:
             max_retries=0,  # Fail fast
             timeout=60.0,
         )
-        self.chat_client = model_client.with_structured_output(CodeOutput)
+        last_exc: Exception | None = None
+        self.chat_client = None
+        for method in self._structured_output_methods(model_client):
+            try:
+                self.chat_client = self._bind_structured_output(model_client, CodeOutput, method)
+                break
+            except Exception as exc:
+                last_exc = exc
+                if not self._is_recoverable_structured_output_error(exc):
+                    raise
+        if self.chat_client is None and last_exc is not None:
+            raise last_exc
         self.chat_system_instruction = system_instruction or ""
 
         return self.chat_client
@@ -164,8 +209,21 @@ class LLMService:
                     message=r"^Pydantic serializer warnings:",
                     category=UserWarning,
                 )
-                structured = client.with_structured_output(structured_output_format)
-                return structured.invoke(user_query)
+                last_exc: Exception | None = None
+                methods = self._structured_output_methods(client)
+                for idx, method in enumerate(methods):
+                    try:
+                        structured = self._bind_structured_output(client, structured_output_format, method)
+                        return structured.invoke(user_query)
+                    except Exception as exc:
+                        last_exc = exc
+                        if idx >= len(methods) - 1:
+                            raise
+                        if not self._is_recoverable_structured_output_error(exc):
+                            raise
+                if last_exc is not None:
+                    raise last_exc
+                raise RuntimeError("Structured output invocation failed without an error.")
         except HTTPException:
             raise
         except Exception as e:

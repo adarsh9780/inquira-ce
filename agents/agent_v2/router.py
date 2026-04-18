@@ -32,6 +32,31 @@ class RouteDecision(BaseModel):
     route: Literal["analysis", "general_chat", "unsafe"]
 
 
+def _structured_output_methods(model: object) -> tuple[str | None, ...]:
+    provider = str(getattr(model, "_inquira_provider", "") or "").strip().lower()
+    if provider == "ollama":
+        return ("json_schema", "function_calling", "json_mode")
+    return (None,)
+
+
+def _is_recoverable_structured_output_error(exc: Exception) -> bool:
+    message = str(exc or "").strip().lower()
+    if not message:
+        return False
+    markers = (
+        "expected value at line",
+        "expecting value: line 1 column 1",
+        "jsondecodeerror",
+        "json error injected into sse stream",
+        "outputparserexception",
+        "invalid json output",
+        "unsupported response_format type",
+        "not support json schema",
+        "structured outputs not supported",
+    )
+    return any(marker in message for marker in markers)
+
+
 def _latest_user_text(messages: list[AnyMessage]) -> str:
     for msg in reversed(messages):
         msg_type = str(getattr(msg, "type", "") or "").lower()
@@ -91,14 +116,38 @@ async def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
                 MessagesPlaceholder("messages"),
             ]
         )
-        chain = prompt | model.with_structured_output(RouteDecision)
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message=r"^Pydantic serializer warnings:",
-                category=UserWarning,
-            )
-            decision = await chain.ainvoke({"messages": messages})
+        last_exc: Exception | None = None
+        decision = None
+        methods = _structured_output_methods(model)
+        for idx, method in enumerate(methods):
+            try:
+                if method is None:
+                    chain = prompt | model.with_structured_output(RouteDecision)
+                else:
+                    try:
+                        chain = prompt | model.with_structured_output(
+                            RouteDecision,
+                            method=method,
+                            include_raw=False,
+                        )
+                    except TypeError:
+                        chain = prompt | model.with_structured_output(RouteDecision)
+                with warnings.catch_warnings():
+                    warnings.filterwarnings(
+                        "ignore",
+                        message=r"^Pydantic serializer warnings:",
+                        category=UserWarning,
+                    )
+                    decision = await chain.ainvoke({"messages": messages})
+                break
+            except Exception as exc:
+                last_exc = exc
+                if idx >= len(methods) - 1:
+                    raise
+                if not _is_recoverable_structured_output_error(exc):
+                    raise
+        if decision is None and last_exc is not None:
+            raise last_exc
         route = str(getattr(decision, "route", "")).strip().lower()
         if route in {"analysis", "general_chat", "unsafe"}:
             return route

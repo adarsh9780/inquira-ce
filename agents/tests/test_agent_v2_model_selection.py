@@ -229,3 +229,51 @@ async def test_router_uses_model_for_ollama_route_decision(monkeypatch) -> None:
     assert route == "general_chat"
     assert captured.get("provider") == "ollama"
     assert captured.get("model") == "minimax-m2.7:cloud"
+
+
+@pytest.mark.asyncio
+async def test_router_falls_back_structured_output_method_for_ollama(monkeypatch) -> None:
+    class _FakePrompt:
+        def __or__(self, other):
+            return other
+
+    class _FakeChain:
+        def __init__(self, method: str):
+            self.method = method
+
+        async def ainvoke(self, _payload):
+            if self.method == "json_schema":
+                raise ValueError("JSONDecodeError: Expecting value: line 1 column 1 (char 0)")
+            return SimpleNamespace(route="general_chat")
+
+    class _FakeModel:
+        _inquira_provider = "ollama"
+
+        def __init__(self):
+            self.methods: list[str] = []
+
+        def with_structured_output(self, _schema, *, method=None, include_raw=False):
+            _ = include_raw
+            selected_method = str(method or "")
+            self.methods.append(selected_method)
+            return _FakeChain(selected_method)
+
+    fake_model = _FakeModel()
+
+    monkeypatch.setattr("agent_v2.router.load_llm_runtime_config", _runtime_stub)
+    monkeypatch.setattr("agent_v2.router.ChatPromptTemplate.from_messages", lambda *_args, **_kwargs: _FakePrompt())
+    monkeypatch.setattr("agent_v2.router.create_chat_model", lambda **_kwargs: fake_model)
+
+    route = await decide_route(
+        [HumanMessage(content="hello")],
+        {
+            "provider": "ollama",
+            "base_url": "http://localhost:11434/v1",
+            "model": "minimax-m2.7:cloud",
+            "lite_model": "minimax-m2.7:cloud",
+            "default_model": "llama3.2",
+        },
+    )
+
+    assert route == "general_chat"
+    assert fake_model.methods[:2] == ["json_schema", "function_calling"]

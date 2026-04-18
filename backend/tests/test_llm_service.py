@@ -172,3 +172,49 @@ def test_llm_service_ollama_no_key(monkeypatch):
     assert svc.client is not None
     assert captured["kwargs"]["provider"] == "ollama"
     assert captured["kwargs"]["api_key"] == ""
+
+
+def test_llm_service_ask_falls_back_structured_output_method_for_ollama(monkeypatch):
+    class SchemaOutput(BaseModel):
+        value: str
+
+    runtime = SimpleNamespace(
+        provider="ollama",
+        base_url="http://localhost:11434/v1",
+        requires_api_key=False,
+        default_model="llama3.2",
+        default_max_tokens=4096,
+    )
+    seen_methods: list[str] = []
+
+    class FakeStructured:
+        def __init__(self, method: str):
+            self.method = method
+
+        def invoke(self, _query):
+            if self.method == "json_schema":
+                raise ValueError("JSONDecodeError: Expecting value: line 1 column 1 (char 0)")
+            return SchemaOutput(value="ok")
+
+    class FakeOllamaClient:
+        _inquira_provider = "ollama"
+
+        def with_structured_output(self, _fmt, *, method=None, include_raw=False):
+            _ = include_raw
+            selected_method = str(method or "")
+            seen_methods.append(selected_method)
+            return FakeStructured(selected_method)
+
+    monkeypatch.setattr("app.services.llm_service.load_llm_runtime_config", lambda: runtime)
+    monkeypatch.setattr(
+        "app.services.llm_service.create_chat_model",
+        lambda **_kwargs: FakeOllamaClient(),
+    )
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+
+    svc = LLMService(api_key="")
+    result = svc.ask("ping", SchemaOutput)
+
+    assert isinstance(result, SchemaOutput)
+    assert result.value == "ok"
+    assert seen_methods[:2] == ["json_schema", "function_calling"]
