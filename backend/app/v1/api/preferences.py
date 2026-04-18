@@ -268,6 +268,9 @@ def _search_provider_models(
         model_id = str(entry.get("id") or "").strip()
         if not model_id or model_id in seen:
             continue
+        entry_provider = normalize_llm_provider(entry.get("provider") or normalized_provider)
+        if entry_provider != normalized_provider:
+            continue
         if not _model_allowed_for_provider(normalized_provider, model_id):
             continue
         if not _model_entry_matches_query(entry, needle):
@@ -277,7 +280,7 @@ def _search_provider_models(
             {
                 "id": model_id,
                 "display_name": str(entry.get("display_name") or model_id).strip() or model_id,
-                "provider": normalize_llm_provider(entry.get("provider") or normalized_provider),
+                "provider": normalized_provider,
                 "context_window": _coerce_non_negative_int(entry.get("context_window")),
                 "recommended_for": _clean_recommended_for(entry.get("recommended_for")),
                 "tags": _clean_tags(entry.get("tags")),

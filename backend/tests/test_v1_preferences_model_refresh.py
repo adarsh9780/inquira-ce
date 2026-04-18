@@ -365,6 +365,153 @@ async def test_search_provider_models_ignores_short_queries(monkeypatch):
 
     assert response.models == []
 
+    empty_response = await search_provider_models(
+        provider="openrouter",
+        q="",
+        limit=25,
+        session=_Session(),
+        current_user=SimpleNamespace(id="u1"),
+    )
+    assert empty_response.models == []
+
+
+@pytest.mark.asyncio
+async def test_search_provider_models_finds_openrouter_extended_models_from_full_catalog(monkeypatch):
+    prefs = SimpleNamespace(
+        llm_provider="openrouter",
+        selected_model="google/gemini-2.5-flash",
+        selected_lite_model="google/gemini-2.5-flash-lite",
+        selected_coding_model="google/gemini-2.5-flash",
+        enabled_main_models_json='["google/gemini-2.5-flash"]',
+        provider_model_catalogs_json=json.dumps(
+            {
+                "openrouter": {
+                    "main_models": [
+                        "google/gemini-2.5-flash",
+                        "openai/gpt-4o",
+                        "anthropic/claude-sonnet-4-5",
+                        "mistralai/mixtral-8x7b",
+                    ],
+                    "lite_models": ["google/gemini-2.5-flash-lite"],
+                    "default_main_model": "google/gemini-2.5-flash",
+                    "default_lite_model": "google/gemini-2.5-flash-lite",
+                    "source": "bundled",
+                    "models": [
+                        {"id": "google/gemini-2.5-flash", "display_name": "Gemini 2.5 Flash", "provider": "openrouter"},
+                        {"id": "openai/gpt-4o", "display_name": "GPT-4o", "provider": "openrouter"},
+                        {"id": "anthropic/claude-sonnet-4-5", "display_name": "Claude Sonnet 4.5", "provider": "openrouter"},
+                        {"id": "mistralai/mixtral-8x7b", "display_name": "Mixtral 8x7B", "provider": "openrouter"},
+                    ],
+                }
+            }
+        ),
+        schema_context="",
+        allow_schema_sample_values=False,
+        terminal_risk_acknowledged=False,
+        chat_overlay_width=0.25,
+        is_sidebar_collapsed=True,
+        hide_shortcuts_modal=False,
+        active_workspace_id=None,
+        active_dataset_path=None,
+        active_table_name=None,
+    )
+
+    class _Session:
+        async def commit(self):
+            return None
+
+    async def _fake_get_or_create(_session, _principal_id):
+        return prefs
+
+    monkeypatch.setattr(
+        "app.v1.api.preferences.PreferencesRepository.get_or_create",
+        _fake_get_or_create,
+    )
+
+    response = await search_provider_models(
+        provider="openrouter",
+        q="mixtral",
+        limit=25,
+        session=_Session(),
+        current_user=SimpleNamespace(id="u1"),
+    )
+
+    assert [item.id for item in response.models] == ["mistralai/mixtral-8x7b"]
+    assert [item.provider for item in response.models] == ["openrouter"]
+
+
+@pytest.mark.asyncio
+async def test_search_provider_models_enforces_limit_and_filters_cloud_models(monkeypatch):
+    openrouter_models = [
+        {"id": f"openai/model-{index:02d}", "display_name": f"Model {index:02d}", "provider": "openrouter"}
+        for index in range(1, 60)
+    ]
+    openrouter_models.append(
+        {"id": "qwen/qwen3-235b:cloud", "display_name": "Qwen Cloud", "provider": "openrouter"}
+    )
+
+    prefs = SimpleNamespace(
+        llm_provider="openrouter",
+        selected_model="openai/model-01",
+        selected_lite_model="openai/model-01",
+        selected_coding_model="openai/model-01",
+        enabled_main_models_json='["openai/model-01"]',
+        provider_model_catalogs_json=json.dumps(
+            {
+                "openrouter": {
+                    "main_models": [item["id"] for item in openrouter_models],
+                    "lite_models": ["openai/model-01"],
+                    "default_main_model": "openai/model-01",
+                    "default_lite_model": "openai/model-01",
+                    "source": "bundled",
+                    "models": openrouter_models,
+                }
+            }
+        ),
+        schema_context="",
+        allow_schema_sample_values=False,
+        terminal_risk_acknowledged=False,
+        chat_overlay_width=0.25,
+        is_sidebar_collapsed=True,
+        hide_shortcuts_modal=False,
+        active_workspace_id=None,
+        active_dataset_path=None,
+        active_table_name=None,
+    )
+
+    class _Session:
+        async def commit(self):
+            return None
+
+    async def _fake_get_or_create(_session, _principal_id):
+        return prefs
+
+    monkeypatch.setattr(
+        "app.v1.api.preferences.PreferencesRepository.get_or_create",
+        _fake_get_or_create,
+    )
+
+    limited_response = await search_provider_models(
+        provider="openrouter",
+        q="model",
+        limit=5,
+        session=_Session(),
+        current_user=SimpleNamespace(id="u1"),
+    )
+
+    assert len(limited_response.models) == 5
+    assert all(item.provider == "openrouter" for item in limited_response.models)
+
+    cloud_response = await search_provider_models(
+        provider="openrouter",
+        q="cloud",
+        limit=25,
+        session=_Session(),
+        current_user=SimpleNamespace(id="u1"),
+    )
+
+    assert cloud_response.models == []
+
 
 @pytest.mark.asyncio
 async def test_refresh_endpoint_persists_catalog_and_returns_updated_preferences(monkeypatch):
