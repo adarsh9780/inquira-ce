@@ -650,20 +650,55 @@ class ChatService:
 
     @staticmethod
     def _success_explanation_for_artifacts(artifacts: list[dict[str, Any]]) -> str:
-        kinds = {
-            str(item.get("kind") or "").strip().lower()
+        has_dataframe = any(
+            ChatService._artifact_supports_view("dataframe", item)
             for item in artifacts
             if isinstance(item, dict)
-        }
-        has_dataframe = "dataframe" in kinds
-        has_figure = "figure" in kinds
+        )
+        has_figure = any(
+            ChatService._artifact_supports_view("figure", item)
+            for item in artifacts
+            if isinstance(item, dict)
+        )
         if has_dataframe and has_figure:
             return "Analysis completed successfully. Results are available in both table and chart views."
         if has_dataframe:
             return "Analysis completed successfully. Results are available in the table view."
         if has_figure:
             return "Analysis completed successfully. Results are available in the chart view."
-        return "Analysis completed successfully."
+        return ""
+
+    @staticmethod
+    def _artifact_supports_view(kind: str, artifact: dict[str, Any]) -> bool:
+        normalized_kind = str(kind or "").strip().lower()
+        status = str(artifact.get("status") or "").strip().lower()
+        if status and status not in {"ready", "completed"}:
+            return False
+
+        artifact_kind = str(artifact.get("kind") or "").strip().lower()
+        if artifact_kind != normalized_kind:
+            return False
+
+        artifact_id = str(artifact.get("artifact_id") or "").strip()
+        pointer = str(artifact.get("pointer") or "").strip()
+        has_handle = bool(artifact_id or pointer)
+
+        if normalized_kind == "dataframe":
+            preview_rows = artifact.get("preview_rows")
+            return has_handle or (isinstance(preview_rows, list) and len(preview_rows) > 0)
+        if normalized_kind == "figure":
+            payload = artifact.get("payload")
+            return has_handle or isinstance(payload, dict)
+        return False
+
+    @staticmethod
+    def _response_contains_generated_code(result_payload: dict[str, Any]) -> bool:
+        if not isinstance(result_payload, dict):
+            return False
+        return any(
+            bool(str(result_payload.get(field) or "").strip())
+            for field in ("final_code", "final_executed_code", "code")
+        )
 
     @staticmethod
     def _reconcile_success_explanation(response_payload: dict[str, Any]) -> None:
@@ -681,6 +716,8 @@ class ChatService:
 
         artifacts = ChatService._normalize_artifacts(response_payload.get("artifacts"))
         reconciled = ChatService._success_explanation_for_artifacts(artifacts)
+        if not reconciled:
+            return
         response_payload["explanation"] = reconciled
         response_payload["result_explanation"] = reconciled
 
@@ -1295,7 +1332,11 @@ class ChatService:
         response_payload["final_script_artifact_id"] = response_payload.get("final_script_artifact_id")
 
         code_to_execute = str(response_payload.get("code") or "").strip()
-        if code_to_execute:
+        should_execute_runtime = (
+            code_to_execute
+            and ChatService._response_contains_generated_code(result)
+        )
+        if should_execute_runtime:
             if ChatService._agent_execution_is_authoritative(
                 response_payload=response_payload,
                 result_payload=result,
@@ -1606,7 +1647,11 @@ class ChatService:
         response_payload["final_script_artifact_id"] = response_payload.get("final_script_artifact_id")
 
         code_to_execute = str(response_payload.get("code") or "").strip()
-        if code_to_execute:
+        should_execute_runtime = (
+            code_to_execute
+            and ChatService._response_contains_generated_code(aggregated)
+        )
+        if should_execute_runtime:
             if ChatService._agent_execution_is_authoritative(
                 response_payload=response_payload,
                 result_payload=aggregated,
