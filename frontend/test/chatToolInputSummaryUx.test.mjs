@@ -10,7 +10,7 @@ test('tool activity card keeps simple muted summaries without expandable raw-jso
   assert.equal(source.includes('class="tool-activity-toggle"'), false)
   assert.equal(source.includes('Tool input'), false)
   assert.equal(source.includes('Execution logs'), false)
-  assert.equal(source.includes('class="tool-activity-prefix"'), true)
+  assert.equal(source.includes('class="tool-activity-prefix"'), false)
   assert.equal(source.includes(':aria-label="`${summaryText} (${statusLabel})`"'), false)
   assert.equal(source.includes('Looking for ${columnText} in ${table} using ${tool} tool'), true)
   assert.equal(source.includes('Sampling ${limit} rows from ${table} using ${tool} tool'), true)

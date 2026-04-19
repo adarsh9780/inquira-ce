@@ -7,7 +7,6 @@
         'tool-activity-summary-error': toolStatus === 'error'
       }"
     >
-      <span class="tool-activity-prefix" aria-hidden="true">&gt;</span>
       <span>
         {{ summaryText }}
         <span v-if="durationLabel" class="tool-activity-duration">{{ durationLabel }}</span>
@@ -205,32 +204,24 @@ const errorSummary = computed(() => {
 
 <style scoped>
 .tool-activity-row {
-  padding: 4px 0;
+  padding: 0;
 }
 
 .tool-activity-summary {
   margin: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.45rem;
-  font-size: 0.96rem;
-  line-height: 1.55;
+  font-size: 0.9rem;
+  line-height: 1.45;
   color: var(--color-text-muted);
   word-break: break-word;
 }
 
 .tool-activity-summary-static {
   padding: 0;
-}
-
-.tool-activity-prefix {
-  color: color-mix(in srgb, var(--color-text-muted) 88%, var(--color-text-main) 12%);
-  font-weight: 500;
-  line-height: 1.5;
+  color: color-mix(in srgb, var(--color-text-muted) 84%, var(--color-text-main) 16%);
 }
 
 .tool-activity-summary-running {
-  color: var(--color-text-muted);
+  color: color-mix(in srgb, var(--color-text-muted) 84%, var(--color-text-main) 16%);
 }
 
 .tool-activity-summary-error {
@@ -238,16 +229,16 @@ const errorSummary = computed(() => {
 }
 
 .tool-activity-duration {
-  color: color-mix(in srgb, var(--color-text-muted) 82%, var(--color-text-main) 18%);
+  color: color-mix(in srgb, var(--color-text-muted) 90%, var(--color-text-main) 10%);
   font-weight: 400;
   margin-left: 0.2rem;
 }
 
 .tool-activity-error {
-  margin-top: 2px;
+  margin-top: 1px;
   margin-bottom: 0;
-  margin-left: 24px;
-  font-size: 12px;
+  margin-left: 0;
+  font-size: 11px;
   line-height: 1.4;
   color: var(--color-danger);
   word-break: break-word;

@@ -62,12 +62,11 @@
         <div class="px-3 py-2.5 rounded-2xl rounded-tl-sm" style="background-color: transparent">
           <div v-if="SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length" class="space-y-2">
             <p v-for="row in ephemeralRows(message)" :key="row.id" class="ephemeral-trace-row">
-              <span class="ephemeral-trace-prefix" aria-hidden="true">&gt;</span>
               <span>{{ row.text }}</span>
             </p>
           </div>
 
-          <div v-if="toolActivityRows(message).length" class="space-y-3 mt-3">
+          <div v-if="toolActivityRows(message).length" class="space-y-1 mt-2">
             <ToolActivityCard
               v-for="activity in toolActivityRows(message)"
               :key="activity.call_id || activity.started_at"
@@ -849,18 +848,9 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
 
 .ephemeral-trace-row {
   margin: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.4rem;
-  font-size: 0.96rem;
-  line-height: 1.55;
-  color: var(--color-text-muted);
-}
-
-.ephemeral-trace-prefix {
-  color: color-mix(in srgb, var(--color-text-muted) 88%, var(--color-text-main) 12%);
-  font-weight: 500;
-  line-height: 1.5;
+  font-size: 1rem;
+  line-height: 1.62;
+  color: color-mix(in srgb, var(--color-text-main) 92%, var(--color-text-muted) 8%);
 }
 
 .view-code-details {
