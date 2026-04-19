@@ -19,6 +19,7 @@ test('chat trace uses plain muted text rows without expandable output payloads',
   assert.equal(source.includes('class="stream-reasoning-list"'), true)
   assert.equal(source.includes('class="stream-action-section"'), true)
   assert.equal(source.includes('Final response'), true)
+  assert.equal(source.includes("const eventMessage = String(event?.message || '').trim()"), true)
 })
 
 test('tool activity keeps action-detail hierarchy and renders typed output previews', () => {

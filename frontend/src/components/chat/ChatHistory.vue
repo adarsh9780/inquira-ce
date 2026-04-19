@@ -611,6 +611,7 @@ function ephemeralRows(message) {
     const type = String(event?.type || '').toLowerCase()
     const node = normalizeNodeName(event?.node)
     const stage = String(event?.stage || '').trim().toLowerCase()
+    const eventMessage = String(event?.message || '').trim()
 
     let action = 'Progress'
     if (type === 'node') {
