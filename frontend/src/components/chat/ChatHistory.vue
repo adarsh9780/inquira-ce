@@ -61,31 +61,10 @@
       <div v-if="hasAssistantContent(message)" class="w-full group">
         <div class="px-3 py-2.5 rounded-2xl rounded-tl-sm" style="background-color: transparent">
           <div v-if="SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length" class="space-y-2">
-            <div v-for="row in ephemeralRows(message)" :key="row.id" class="thinking-block">
-              <button
-                v-if="row.output"
-                type="button"
-                class="thinking-toggle"
-                @click="toggleEphemeralRow(row.id)"
-              >
-                <span class="thinking-chevron" aria-hidden="true">&gt;</span>
-                <span>{{ row.summary }}</span>
-                <span class="thinking-caret" aria-hidden="true">{{ isEphemeralRowExpanded(row.id) ? '▾' : '▸' }}</span>
-              </button>
-              <p
-                v-else
-                class="thinking-static"
-              >
-                <span class="thinking-chevron" aria-hidden="true">&gt;</span>
-                {{ row.summary }}
-              </p>
-              <div
-                v-if="row.output && isEphemeralRowExpanded(row.id)"
-                class="thinking-output chat-markdown-content text-sm leading-relaxed max-w-none"
-              >
-                <div v-html="renderMarkdown(row.output)"></div>
-              </div>
-            </div>
+            <p v-for="row in ephemeralRows(message)" :key="row.id" class="ephemeral-trace-row">
+              <span class="ephemeral-trace-prefix" aria-hidden="true">&gt;</span>
+              <span>{{ row.text }}</span>
+            </p>
           </div>
 
           <div v-if="toolActivityRows(message).length" class="space-y-3 mt-3">
@@ -244,9 +223,7 @@ const appStore = useAppStore()
 const chatContainer = ref(null)
 const scrollHost = ref(null)
 const end = ref(null)
-const ephemeralExpandedRows = ref(new Set())
 const pendingInterventionIds = ref(new Set())
-const suppressMutationAutoScroll = ref(false)
 const SHOW_EPHEMERAL_TRACE = true
 const showScrollToBottomButton = ref(false)
 let shouldAutoScroll = true
@@ -401,7 +378,6 @@ onMounted(() => {
   // Setup MutationObserver for dynamic content
   if (chatContainer.value) {
     mutationObserver = new MutationObserver(() => {
-      if (suppressMutationAutoScroll.value) return
       if (shouldAutoScroll) {
         scrollToBottom()
       }
@@ -558,6 +534,20 @@ function eventOutputText(event, message) {
   return ''
 }
 
+function normalizeEphemeralText(value) {
+  const text = String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!text) return ''
+  if (
+    (text.startsWith('{') && text.endsWith('}')) ||
+    (text.startsWith('[') && text.endsWith(']'))
+  ) {
+    return ''
+  }
+  return text
+}
+
 function ephemeralRows(message) {
   const events = streamTraceEvents(message)
   return events
@@ -582,11 +572,11 @@ function ephemeralRows(message) {
       summary = describeNode(node) || String(event?.message || 'Processing update')
     }
 
-    const output = eventOutputText(event, message)
+    const output = normalizeEphemeralText(eventOutputText(event, message))
+    const fallbackSummary = normalizeEphemeralText(summary)
     return {
       id: `${message?.id || 'msg'}-${type || 'event'}-${node || stage || index}-${index}`,
-      summary,
-      output
+      text: output || fallbackSummary || 'Processing update'
     }
     })
 }
@@ -627,25 +617,6 @@ function shouldRenderCodeDetails(message) {
 function openCodePane() {
   appStore.setActiveTab('workspace')
   appStore.setWorkspacePane('code')
-}
-
-function isEphemeralRowExpanded(rowId) {
-  if (appStore.isLoading) return true
-  return ephemeralExpandedRows.value.has(String(rowId))
-}
-
-function toggleEphemeralRow(rowId) {
-  if (appStore.isLoading) return
-  suppressMutationAutoScroll.value = true
-  const key = String(rowId)
-  if (ephemeralExpandedRows.value.has(key)) {
-    ephemeralExpandedRows.value.delete(key)
-  } else {
-    ephemeralExpandedRows.value.add(key)
-  }
-  nextTick(() => {
-    suppressMutationAutoScroll.value = false
-  })
 }
 
 async function loadMoreTurns() {
@@ -815,7 +786,6 @@ watch(() => appStore.activeConversationId, () => {
 // Watch for loading state changes
 watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) {
-    ephemeralExpandedRows.value.clear()
     pendingInterventionIds.value.clear()
   }
   if (shouldAutoScroll) {
@@ -877,47 +847,20 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   background-color: color-mix(in srgb, var(--color-surface) 78%, transparent);
 }
 
-.thinking-block {
-  border-left: 2px solid color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
-  padding-left: 0.75rem;
+.ephemeral-trace-row {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.96rem;
+  line-height: 1.55;
+  color: var(--color-text-muted);
 }
 
-.thinking-toggle,
-.thinking-static {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.86rem;
-  font-style: italic;
+.ephemeral-trace-prefix {
   color: color-mix(in srgb, var(--color-text-muted) 88%, var(--color-text-main) 12%);
-}
-
-.thinking-toggle {
-  border: none;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-}
-
-.thinking-toggle:hover {
-  color: var(--color-text-main);
-}
-
-.thinking-chevron {
-  color: color-mix(in srgb, var(--color-accent) 65%, var(--color-text-muted) 35%);
-  font-weight: 700;
-}
-
-.thinking-caret {
-  color: var(--color-text-muted);
-  font-style: normal;
-}
-
-.thinking-output {
-  margin-top: 0.25rem;
-  padding-left: 0.35rem;
-  color: var(--color-text-muted);
-  font-style: italic;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 .view-code-details {
