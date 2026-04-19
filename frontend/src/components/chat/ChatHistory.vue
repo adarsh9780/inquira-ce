@@ -75,7 +75,7 @@
               </div>
             </div>
 
-            <div v-if="toolActivityRows(message).length" class="space-y-2">
+            <div v-if="toolActivityRows(message).length" class="space-y-3">
               <ToolActivityCard
                 v-for="(activity, index) in toolActivityRows(message)"
                 :key="activity.call_id || activity.started_at"
@@ -943,9 +943,9 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
 
 .stream-reasoning-text {
   margin: 0.18rem 0 0;
-  font-size: 0.98rem;
+  font-size: 0.875rem;
   line-height: 1.58;
-  color: var(--color-text-main);
+  color: color-mix(in srgb, var(--color-text-main) 90%, var(--color-text-muted) 10%);
 }
 
 .stream-action-section {

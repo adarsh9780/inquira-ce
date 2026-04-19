@@ -248,9 +248,9 @@ const shouldRenderOutputPreview = computed(() => {
 
 .tool-activity-detail {
   margin: 0.1rem 0 0;
-  font-size: 1rem;
+  font-size: 0.875rem;
   line-height: 1.58;
-  color: var(--color-text-main);
+  color: color-mix(in srgb, var(--color-text-main) 90%, var(--color-text-muted) 10%);
   word-break: break-word;
 }
 
