@@ -471,7 +471,7 @@ function resetAdvancedDefaults() {
   llmTopK.value = 0
   llmFrequencyPenalty.value = 0.0
   llmPresencePenalty.value = 0.0
-  slowRequestWarningSeconds.value = 30
+  slowRequestWarningSeconds.value = 120
 }
 
 async function saveConfiguration() {

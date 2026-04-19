@@ -28,7 +28,7 @@ test('useLLMConfig composable exposes provider-aware save flow and advanced fiel
   assert.equal(source.includes('const llmTopK = ref(0)'), true)
   assert.equal(source.includes('const llmFrequencyPenalty = ref(0)'), true)
   assert.equal(source.includes('const llmPresencePenalty = ref(0)'), true)
-  assert.equal(source.includes('const slowRequestWarningSeconds = ref(30)'), true)
+  assert.equal(source.includes('const slowRequestWarningSeconds = ref(120)'), true)
   assert.equal(source.includes('function syncProviderStateToAppStore(providerName) {'), true)
   assert.equal(source.includes('store.providerMainModels = nextMainModels'), true)
   assert.equal(source.includes('store.providerLiteModels = nextLiteModels'), true)

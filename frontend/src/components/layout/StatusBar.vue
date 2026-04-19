@@ -40,11 +40,11 @@
 
       <div v-if="authStore.isAuthenticated" class="w-px h-3.5 bg-[var(--color-border)]"></div>
 
-      <div v-if="authStore.isAuthenticated && tokenUsageSummaryLabel" class="flex items-center gap-1 h-full px-1 text-[10px] text-[var(--color-text-muted)]" style="font-family: var(--font-mono);" :title="tokenUsageSummaryLabel">
+      <div v-if="authStore.isAuthenticated" class="flex items-center gap-1 h-full px-1 text-[10px] text-[var(--color-text-muted)]" style="font-family: var(--font-mono);" :title="tokenUsageSummaryLabel">
         <span class="truncate">{{ tokenUsageSummaryLabel }}</span>
       </div>
 
-      <div v-if="authStore.isAuthenticated && tokenUsageSummaryLabel" class="w-px h-3.5 bg-[var(--color-border)]"></div>
+      <div v-if="authStore.isAuthenticated" class="w-px h-3.5 bg-[var(--color-border)]"></div>
 
       <!-- Kernel Status -->
       <div class="flex items-center gap-1.5 h-full px-1">
@@ -236,37 +236,43 @@ const dataFocusToggleTitle = computed(() => {
 
 function toNonNegativeInt(value) {
   const parsed = Number(value)
-  if (!Number.isFinite(parsed)) return 0
+  if (!Number.isFinite(parsed)) return null
   return parsed > 0 ? Math.floor(parsed) : 0
 }
 
 function toNonNegativeFloat(value) {
   const parsed = Number(value)
-  if (!Number.isFinite(parsed)) return 0
+  if (!Number.isFinite(parsed)) return null
   return parsed > 0 ? parsed : 0
+}
+
+function formatTokenCount(value) {
+  const parsed = toNonNegativeInt(value)
+  if (!Number.isInteger(parsed)) return '-'
+  return parsed.toLocaleString()
 }
 
 function formatUsd(value) {
   const amount = toNonNegativeFloat(value)
-  if (amount <= 0) return ''
+  if (typeof amount !== 'number') return '$-'
+  if (amount <= 0) return '$-'
   return `$${amount.toFixed(6)}`
 }
 
 const tokenUsageSummaryLabel = computed(() => {
-  const usage = appStore.liveTokenUsage
-  if (!usage || typeof usage !== 'object') return ''
-  const inputTokens = toNonNegativeInt(usage.input_tokens)
-  const cachedInputTokens = toNonNegativeInt(usage.cached_tokens)
-  const outputTokens = toNonNegativeInt(usage.output_tokens)
+  const usage = appStore.liveTokenUsage && typeof appStore.liveTokenUsage === 'object'
+    ? appStore.liveTokenUsage
+    : {}
+  const inputTokens = formatTokenCount(usage.input_tokens)
+  const cachedInputTokens = formatTokenCount(usage.cached_tokens)
+  const outputTokens = formatTokenCount(usage.output_tokens)
   const priceLabel = formatUsd(usage.price_usd)
-  if (inputTokens <= 0 && cachedInputTokens <= 0 && outputTokens <= 0 && !priceLabel) return ''
-
   const parts = [
-    `in ${inputTokens.toLocaleString()}`,
-    `cached ${cachedInputTokens.toLocaleString()}`,
-    `out ${outputTokens.toLocaleString()}`,
+    `in ${inputTokens}`,
+    `cached ${cachedInputTokens}`,
+    `out ${outputTokens}`,
+    priceLabel,
   ]
-  if (priceLabel) parts.push(priceLabel)
   return parts.join(' | ')
 })
 

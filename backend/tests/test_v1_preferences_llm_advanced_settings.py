@@ -25,7 +25,7 @@ async def test_update_preferences_persists_llm_advanced_settings(monkeypatch):
         llm_top_k=0,
         llm_frequency_penalty=0.0,
         llm_presence_penalty=0.0,
-        slow_request_warning_seconds=30,
+        slow_request_warning_seconds=120,
         schema_context="",
         allow_schema_sample_values=False,
         terminal_risk_acknowledged=False,

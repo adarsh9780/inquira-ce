@@ -184,7 +184,7 @@ async def test_v1_chat_stream_retries_ollama_model_with_cloud_suffix_on_not_foun
             "top_k": 0,
             "frequency_penalty": 0.0,
             "presence_penalty": 0.0,
-            "slow_request_warning_seconds": 30,
+            "slow_request_warning_seconds": 120,
         }
 
     stream_payload_models: list[str] = []

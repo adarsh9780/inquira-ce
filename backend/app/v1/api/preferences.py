@@ -491,7 +491,7 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
         llm_frequency_penalty=float(getattr(prefs, "llm_frequency_penalty", 0.0)),
         llm_presence_penalty=float(getattr(prefs, "llm_presence_penalty", 0.0)),
         slow_request_warning_seconds=int(
-            getattr(prefs, "slow_request_warning_seconds", 30)
+            getattr(prefs, "slow_request_warning_seconds", 120)
         ),
         enabled_models=display_models,
         schema_context=prefs.schema_context,

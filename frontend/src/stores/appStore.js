@@ -17,7 +17,7 @@ export const useAppStore = defineStore('app', () => {
   const DEFAULT_PROVIDER = 'openrouter'
   const DEFAULT_LITE_MODEL = 'google/gemini-2.5-flash-lite'
   const DEFAULT_PROVIDER_LIST = ['openrouter', 'openai', 'anthropic', 'ollama']
-  const DEFAULT_SLOW_REQUEST_WARNING_SECONDS = 30
+  const DEFAULT_SLOW_REQUEST_WARNING_SECONDS = 120
 
   // Files
   const dataFilePath = ref('')

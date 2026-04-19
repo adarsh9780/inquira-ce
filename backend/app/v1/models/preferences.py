@@ -40,7 +40,7 @@ class UserPreferences(AppDataBase):
     llm_frequency_penalty: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     llm_presence_penalty: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     slow_request_warning_seconds: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=30
+        Integer, nullable=False, default=120
     )
     schema_context: Mapped[str] = mapped_column(Text, nullable=False, default="")
     allow_schema_sample_values: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

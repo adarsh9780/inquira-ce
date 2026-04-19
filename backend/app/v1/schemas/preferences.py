@@ -38,7 +38,7 @@ class PreferencesResponse(BaseModel):
     llm_top_k: int = 0
     llm_frequency_penalty: float = 0.0
     llm_presence_penalty: float = 0.0
-    slow_request_warning_seconds: int = 30
+    slow_request_warning_seconds: int = 120
     enabled_models: list[str] = Field(default_factory=list)
     schema_context: str = ""
     allow_schema_sample_values: bool = False

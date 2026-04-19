@@ -328,14 +328,61 @@ def _to_non_negative_float(value: Any) -> float:
     return parsed if parsed > 0 else 0.0
 
 
+def _first_positive_int(*values: Any) -> int:
+    for value in values:
+        parsed = _to_non_negative_int(value)
+        if parsed > 0:
+            return parsed
+    return 0
+
+
+def _first_positive_float(*values: Any) -> float:
+    for value in values:
+        parsed = _to_non_negative_float(value)
+        if parsed > 0:
+            return parsed
+    return 0.0
+
+
 def _normalize_token_usage(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
-    input_tokens = _to_non_negative_int(value.get("input_tokens"))
-    output_tokens = _to_non_negative_int(value.get("output_tokens"))
-    cached_tokens = _to_non_negative_int(value.get("cached_tokens"))
-    total_tokens = _to_non_negative_int(value.get("total_tokens"))
-    price_usd = _to_non_negative_float(value.get("price_usd"))
+    prompt_details = value.get("prompt_tokens_details")
+    if not isinstance(prompt_details, dict):
+        prompt_details = value.get("input_tokens_details")
+    if not isinstance(prompt_details, dict):
+        prompt_details = value.get("input_token_details")
+    if not isinstance(prompt_details, dict):
+        prompt_details = {}
+
+    cost_details = value.get("cost_details")
+    if not isinstance(cost_details, dict):
+        cost_details = {}
+
+    input_tokens = _first_positive_int(
+        value.get("input_tokens"),
+        value.get("prompt_tokens"),
+        value.get("prompt_eval_count"),
+    )
+    output_tokens = _first_positive_int(
+        value.get("output_tokens"),
+        value.get("completion_tokens"),
+        value.get("eval_count"),
+    )
+    cached_tokens = _first_positive_int(
+        value.get("cached_tokens"),
+        prompt_details.get("cached_tokens"),
+        prompt_details.get("cache_read"),
+        prompt_details.get("cache_read_tokens"),
+    )
+    total_tokens = _first_positive_int(value.get("total_tokens"))
+    price_usd = _first_positive_float(
+        value.get("price_usd"),
+        value.get("total_cost"),
+        value.get("cost"),
+        value.get("price"),
+        cost_details.get("total"),
+    )
     if total_tokens <= 0:
         total_tokens = input_tokens + output_tokens
     normalized = {
@@ -369,15 +416,23 @@ def _extract_token_usage(value: Any) -> dict[str, Any]:
                 return nested
         response_metadata = value.get("response_metadata")
         if isinstance(response_metadata, dict):
-            token_usage = response_metadata.get("token_usage")
-            nested = _extract_token_usage(token_usage)
+            metadata_price = _first_positive_float(
+                response_metadata.get("price_usd"),
+                response_metadata.get("total_cost"),
+                response_metadata.get("cost"),
+                response_metadata.get("price"),
+            )
+            for key in ("token_usage", "usage_metadata", "usage"):
+                nested = _extract_token_usage(response_metadata.get(key))
+                if nested:
+                    if metadata_price > 0 and _to_non_negative_float(nested.get("price_usd")) <= 0:
+                        nested = {**nested, "price_usd": metadata_price}
+                    return nested
+            nested = _normalize_token_usage(response_metadata)
             if nested:
                 return nested
-            for price_key in ("cost", "total_cost", "price", "price_usd"):
-                price_value = _to_non_negative_float(response_metadata.get(price_key))
-                if price_value > 0:
-                    direct["price_usd"] = price_value
-                    break
+            if metadata_price > 0:
+                direct["price_usd"] = metadata_price
             prompt_details = response_metadata.get("prompt_tokens_details")
             if isinstance(prompt_details, dict):
                 prompt_cached = _to_non_negative_int(prompt_details.get("cached_tokens"))

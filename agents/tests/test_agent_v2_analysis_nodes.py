@@ -62,7 +62,26 @@ def test_resolve_memory_limits_scales_with_context_window() -> None:
     assert scaled_up[1] >= baseline[1]
 
 
-def test_extract_token_usage_reads_openrouter_style_cost_metadata() -> None:
+def test_extract_token_usage_reads_openrouter_usage_and_cost_fields() -> None:
+    usage = _extract_token_usage(
+        {
+            "usage": {
+                "prompt_tokens": 120,
+                "completion_tokens": 34,
+                "total_tokens": 154,
+                "prompt_tokens_details": {"cached_tokens": 80},
+                "cost": 0.000321,
+            }
+        }
+    )
+    assert usage["input_tokens"] == 120
+    assert usage["output_tokens"] == 34
+    assert usage["cached_tokens"] == 80
+    assert usage["total_tokens"] == 154
+    assert usage["price_usd"] == pytest.approx(0.000321)
+
+
+def test_extract_token_usage_merges_response_metadata_cost_with_nested_usage() -> None:
     usage = _extract_token_usage(
         {
             "response_metadata": {
@@ -79,6 +98,41 @@ def test_extract_token_usage_reads_openrouter_style_cost_metadata() -> None:
     assert usage["output_tokens"] == 34
     assert usage["total_tokens"] == 154
     assert usage["price_usd"] == pytest.approx(0.000321)
+
+
+def test_extract_token_usage_reads_openai_chat_usage_shape() -> None:
+    usage = _extract_token_usage(
+        {
+            "response_metadata": {
+                "usage": {
+                    "prompt_tokens": 512,
+                    "completion_tokens": 128,
+                    "prompt_tokens_details": {"cached_tokens": 256},
+                },
+            }
+        }
+    )
+    assert usage["input_tokens"] == 512
+    assert usage["output_tokens"] == 128
+    assert usage["cached_tokens"] == 256
+    assert usage["total_tokens"] == 640
+    assert usage["price_usd"] == pytest.approx(0.0)
+
+
+def test_extract_token_usage_reads_ollama_usage_shape() -> None:
+    usage = _extract_token_usage(
+        {
+            "response_metadata": {
+                "prompt_eval_count": 11,
+                "eval_count": 18,
+            }
+        }
+    )
+    assert usage["input_tokens"] == 11
+    assert usage["output_tokens"] == 18
+    assert usage["cached_tokens"] == 0
+    assert usage["total_tokens"] == 29
+    assert usage["price_usd"] == pytest.approx(0.0)
 
 
 @pytest.mark.asyncio
