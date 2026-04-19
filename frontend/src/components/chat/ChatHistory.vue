@@ -75,7 +75,7 @@
               </div>
             </div>
 
-            <div v-if="toolActivityRows(message).length" class="space-y-3">
+            <div v-if="toolActivityRows(message).length" class="space-y-4">
               <ToolActivityCard
                 v-for="(activity, index) in toolActivityRows(message)"
                 :key="activity.call_id || activity.started_at"
@@ -951,7 +951,7 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
 .stream-action-section {
   position: relative;
   display: grid;
-  gap: 0.75rem;
+  gap: 0.95rem;
   margin-top: 1.15rem;
   padding-top: 1.05rem;
 }
@@ -968,7 +968,7 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
 
 .ephemeral-trace-list {
   display: grid;
-  gap: 0.72rem;
+  gap: 1rem;
 }
 
 .ephemeral-trace-item {
@@ -985,9 +985,9 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
 
 .ephemeral-trace-detail {
   margin: 0.1rem 0 0;
-  font-size: 1rem;
+  font-size: 0.875rem;
   line-height: 1.58;
-  color: var(--color-text-main);
+  color: color-mix(in srgb, var(--color-text-main) 90%, var(--color-text-muted) 10%);
 }
 
 .view-code-details {

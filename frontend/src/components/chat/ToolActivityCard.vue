@@ -255,7 +255,7 @@ const shouldRenderOutputPreview = computed(() => {
 }
 
 .tool-activity-detail-running {
-  color: var(--color-text-main);
+  color: color-mix(in srgb, var(--color-text-main) 90%, var(--color-text-muted) 10%);
 }
 
 .tool-activity-detail-error {
