@@ -17,6 +17,7 @@ from ..schemas.preferences import (
     ApiKeyVerifyResponse,
     ApiKeyUpdateRequest,
     ProviderConfigSaveResponse,
+    ProviderModelEntry,
     PreferencesResponse,
     PreferencesUpdateRequest,
     ProviderModelCatalog,
@@ -237,7 +238,7 @@ def _search_provider_models(
     query: str,
     catalog: dict[str, Any],
     limit: int = 25,
-) -> list[dict[str, Any]]:
+) -> list[ProviderModelEntry]:
     normalized_provider = normalize_llm_provider(provider)
     needle = str(query or "").strip().lower()
     if len(needle) < 2:
@@ -262,7 +263,7 @@ def _search_provider_models(
             for model_id in _clean_models(catalog.get("main_models", []), normalized_provider)
         ]
 
-    results: list[dict[str, Any]] = []
+    results: list[ProviderModelEntry] = []
     seen: set[str] = set()
     for entry in entries:
         model_id = str(entry.get("id") or "").strip()
@@ -277,14 +278,14 @@ def _search_provider_models(
             continue
         seen.add(model_id)
         results.append(
-            {
-                "id": model_id,
-                "display_name": str(entry.get("display_name") or model_id).strip() or model_id,
-                "provider": normalized_provider,
-                "context_window": _coerce_non_negative_int(entry.get("context_window")),
-                "recommended_for": _clean_recommended_for(entry.get("recommended_for")),
-                "tags": _clean_tags(entry.get("tags")),
-            }
+            ProviderModelEntry(
+                id=model_id,
+                display_name=str(entry.get("display_name") or model_id).strip() or model_id,
+                provider=normalized_provider,
+                context_window=_coerce_non_negative_int(entry.get("context_window")),
+                recommended_for=_clean_recommended_for(entry.get("recommended_for")),
+                tags=_clean_tags(entry.get("tags")),
+            )
         )
         if len(results) >= max_results:
             break
@@ -751,7 +752,8 @@ async def search_provider_models(
 ):
     prefs = await PreferencesRepository.get_or_create(session, current_user.id)
     provider_catalogs = _resolve_provider_catalogs(prefs)
-    normalized_provider = normalize_llm_provider(provider or getattr(prefs, "llm_provider", "openrouter"))
+    raw_provider = provider if provider is not None else str(getattr(prefs, "llm_provider", "openrouter") or "openrouter")
+    normalized_provider = normalize_llm_provider(str(raw_provider))
     catalog = provider_catalogs.get(normalized_provider, provider_model_catalog(normalized_provider))
     models = _search_provider_models(normalized_provider, q, catalog, limit=limit)
     return ProviderModelsSearchResponse(

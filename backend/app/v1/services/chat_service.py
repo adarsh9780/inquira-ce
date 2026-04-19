@@ -125,7 +125,8 @@ class ChatService:
             raw_catalogs = {}
         if not isinstance(raw_catalogs, dict):
             raw_catalogs = {}
-        ollama_catalog = raw_catalogs.get("ollama") if isinstance(raw_catalogs.get("ollama"), dict) else {}
+        raw_ollama_catalog = raw_catalogs.get("ollama")
+        ollama_catalog = raw_ollama_catalog if isinstance(raw_ollama_catalog, dict) else {}
         base_url = str(ollama_catalog.get("base_url") or "").strip()
         if not base_url:
             return "http://localhost:11434/v1"
