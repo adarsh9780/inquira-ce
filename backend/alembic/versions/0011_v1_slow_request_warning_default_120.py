@@ -31,11 +31,23 @@ def _db_role() -> str:
 def upgrade() -> None:
     if _db_role() == "auth":
         return
-    op.alter_column(
-        "v1_user_preferences",
-        "slow_request_warning_seconds",
-        server_default="120",
-    )
+    bind = op.get_bind()
+    dialect_name = str(getattr(getattr(bind, "dialect", None), "name", "")).strip().lower()
+    if dialect_name == "sqlite":
+        # SQLite does not support ALTER COLUMN SET DEFAULT directly.
+        with op.batch_alter_table("v1_user_preferences", recreate="auto") as batch_op:
+            batch_op.alter_column(
+                "slow_request_warning_seconds",
+                existing_type=sa.Integer(),
+                nullable=False,
+                server_default=sa.text("120"),
+            )
+    else:
+        op.alter_column(
+            "v1_user_preferences",
+            "slow_request_warning_seconds",
+            server_default="120",
+        )
     op.execute(
         sa.text(
             "UPDATE v1_user_preferences "
@@ -48,11 +60,22 @@ def upgrade() -> None:
 def downgrade() -> None:
     if _db_role() == "auth":
         return
-    op.alter_column(
-        "v1_user_preferences",
-        "slow_request_warning_seconds",
-        server_default="30",
-    )
+    bind = op.get_bind()
+    dialect_name = str(getattr(getattr(bind, "dialect", None), "name", "")).strip().lower()
+    if dialect_name == "sqlite":
+        with op.batch_alter_table("v1_user_preferences", recreate="auto") as batch_op:
+            batch_op.alter_column(
+                "slow_request_warning_seconds",
+                existing_type=sa.Integer(),
+                nullable=False,
+                server_default=sa.text("30"),
+            )
+    else:
+        op.alter_column(
+            "v1_user_preferences",
+            "slow_request_warning_seconds",
+            server_default="30",
+        )
     op.execute(
         sa.text(
             "UPDATE v1_user_preferences "
