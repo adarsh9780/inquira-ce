@@ -2469,26 +2469,9 @@ async def analysis_finalize_context_enrichment_node(
 
 
 async def analysis_prepare_sample_tool_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-    _ = config
-    enrichment_results = state.get("enrichment_results") if isinstance(state.get("enrichment_results"), dict) else {}
-    cached_sample = enrichment_results.get("sample_data")
-    if isinstance(cached_sample, dict):
-        return {"runtime_tool_stage": "", "pending_tools": []}
-
-    analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
-    sample_table = str(analysis_context.get("sample_table") or "").strip()
-    tool_call = {
-        "tool": "sample_data_runtime",
-        "args": {
-            "table_name": sample_table,
-            "limit": 5,
-        },
-        "explanation": "I have the candidate table, so I’m sampling a few rows before generating code.",
-    }
-    return {
-        "pending_tools": [tool_call],
-        "runtime_tool_stage": "sample",
-    }
+    _ = state, config
+    # Sampling must be model-directed via enrichment tool plans, not auto-inserted each turn.
+    return {"runtime_tool_stage": "", "pending_tools": []}
 
 
 def analysis_prepare_sample_to_next(state: dict[str, Any]) -> str:

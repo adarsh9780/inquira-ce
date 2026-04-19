@@ -231,18 +231,15 @@ async def test_analysis_finalize_context_enrichment_merges_search_tool_results()
 
 
 @pytest.mark.asyncio
-async def test_analysis_prepare_sample_tool_creates_pending_runtime_tool_when_sample_missing() -> None:
+async def test_analysis_prepare_sample_tool_does_not_auto_create_runtime_sample_tool() -> None:
     state = {
         "analysis_context": {"sample_table": "orders"},
         "enrichment_results": {},
     }
     result = await analysis_prepare_sample_tool_node(state, {"configurable": {}})
     pending_tools = result.get("pending_tools") or []
-    assert len(pending_tools) == 1
-    assert pending_tools[0].get("tool") == "sample_data_runtime"
-    assert pending_tools[0].get("explanation") == (
-        "I have the candidate table, so I’m sampling a few rows before generating code."
-    )
+    assert pending_tools == []
+    assert result.get("runtime_tool_stage") == ""
 
 
 @pytest.mark.asyncio
