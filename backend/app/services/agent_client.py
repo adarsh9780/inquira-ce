@@ -244,7 +244,6 @@ class AgentClient:
                                 "workspace_id": str(payload.get("workspace_id") or ""),
                                 "conversation_id": str(payload.get("conversation_id") or ""),
                             },
-                            "on_completion": "delete",
                         },
                         headers={**self._headers, "Content-Type": "application/json"},
                     )
@@ -296,7 +295,6 @@ class AgentClient:
                             # Include "values" so we always receive the graph's final
                             # consolidated state (final_code/final_execution/known_columns).
                             "stream_mode": ["updates", "messages", "events", "custom", "values"],
-                            "on_completion": "delete",
                         },
                         headers={**self._headers, "Accept": "text/event-stream", "Content-Type": "application/json"},
                     ) as resp:

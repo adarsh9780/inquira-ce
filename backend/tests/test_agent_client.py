@@ -196,7 +196,7 @@ async def test_agent_client_wraps_connect_error_into_agent_runtime_error(monkeyp
 
 @pytest.mark.asyncio
 async def test_agent_client_stream_passthrough_emits_langgraph_events(monkeypatch):
-    captured = {"stream_mode": None}
+    captured = {"stream_mode": None, "stream_body": None}
 
     class _Resp:
         def __init__(self, status_code: int = 200, payload=None):
@@ -261,6 +261,7 @@ async def test_agent_client_stream_passthrough_emits_langgraph_events(monkeypatc
             _ = method, url, args
             payload = kwargs.get("json") if isinstance(kwargs, dict) else None
             if isinstance(payload, dict):
+                captured["stream_body"] = dict(payload)
                 stream_mode = payload.get("stream_mode")
                 if isinstance(stream_mode, list):
                     captured["stream_mode"] = list(stream_mode)
@@ -292,6 +293,8 @@ async def test_agent_client_stream_passthrough_emits_langgraph_events(monkeypatc
     assert events[2]["data"]["create_plan"]["plan"] == "Plan A"
     assert captured["stream_mode"] is not None
     assert "values" in captured["stream_mode"]
+    assert isinstance(captured["stream_body"], dict)
+    assert "on_completion" not in captured["stream_body"]
 
 
 @pytest.mark.asyncio
@@ -468,6 +471,7 @@ async def test_agent_client_run_sends_redacted_input_but_keeps_configurable_api_
     assert isinstance(run_body["input"].get("llm"), dict)
     assert "api_key" not in run_body["input"]["llm"]
     assert run_body["config"]["configurable"]["api_key"] == "secret-key"
+    assert "on_completion" not in run_body
 
 
 @pytest.mark.asyncio
@@ -540,6 +544,7 @@ async def test_agent_client_run_skips_assistant_management_when_disabled(monkeyp
     run_body = captured["https://agents.example.com/runs/wait"]
     assert run_body["assistant_id"] == "agent_v2"
     assert run_body["config"]["recursion_limit"] == 90
+    assert "on_completion" not in run_body
 
 
 @pytest.mark.asyncio
