@@ -19,7 +19,13 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 from pydantic import BaseModel, ConfigDict, Field
 
-from .coding_subagent import ainvoke_coding_chain, build_coding_chain
+from .coding_subagent import (
+    StructuredOutputEmptyError,
+    ainvoke_coding_chain,
+    ainvoke_coding_tool_call_chain,
+    build_coding_chain,
+    build_coding_tool_call_chain,
+)
 from .services.chat_model_factory import create_chat_model
 from .services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
 from .services.llm_provider_catalog import normalize_llm_provider, provider_requires_api_key
@@ -1150,6 +1156,16 @@ def _structured_output_methods(model: BaseChatModel) -> tuple[str | None, ...]:
     return (None,)
 
 
+def _is_ollama_cloud_model(model: BaseChatModel) -> bool:
+    provider = str(getattr(model, "_inquira_provider", "") or "").strip().lower()
+    if provider != "ollama":
+        return False
+    model_name = str(
+        getattr(model, "model", "") or getattr(model, "model_name", "")
+    ).strip().lower()
+    return model_name.endswith(":cloud")
+
+
 def _bind_structured_chain(prompt: Any, model: BaseChatModel, schema: Any, method: str | None) -> Any:
     if method is None:
         return prompt | model.with_structured_output(schema)
@@ -1184,6 +1200,8 @@ async def _ainvoke_provider_structured_chain(
 
 
 def _is_recoverable_structured_output_error(exc: Exception) -> bool:
+    if isinstance(exc, StructuredOutputEmptyError):
+        return True
     message = str(exc or "").strip().lower()
     if not message:
         return False
@@ -1198,6 +1216,10 @@ def _is_recoverable_structured_output_error(exc: Exception) -> bool:
         "unsupported response_format type",
         "not support json schema",
         "structured outputs not supported",
+        "structured output parser returned no data",
+        "structured output returned no tool call arguments",
+        "input should be a valid dictionary or instance of analysisoutput",
+        "malformed_function_call",
     )
     return any(marker in message for marker in markers)
 
@@ -2354,13 +2376,12 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
 
     model = _get_model(config, lite=False)
     output = None
-    methods = _structured_output_methods(model)
     last_exc: Exception | None = None
-    for idx, method in enumerate(methods):
+    if _is_ollama_cloud_model(model):
         try:
-            chain = build_coding_chain(model=model, method=method)
-            output = await ainvoke_coding_chain(
-                chain=chain,
+            tool_chain = build_coding_tool_call_chain(model=model)
+            output = await ainvoke_coding_tool_call_chain(
+                chain=tool_chain,
                 messages=messages,
                 table_name=table_hint,
                 workspace_tables_json=_safe_json_dumps(table_names),
@@ -2372,13 +2393,35 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
                 context=generation_context,
                 invoke_structured_chain=_ainvoke_structured_chain,
             )
-            break
         except Exception as exc:
             last_exc = exc
-            if idx >= len(methods) - 1:
-                raise
             if not _is_recoverable_structured_output_error(exc):
                 raise
+    if output is None:
+        methods = _structured_output_methods(model)
+        for idx, method in enumerate(methods):
+            try:
+                chain = build_coding_chain(model=model, method=method)
+                output = await ainvoke_coding_chain(
+                    chain=chain,
+                    messages=messages,
+                    table_name=table_hint,
+                    workspace_tables_json=_safe_json_dumps(table_names),
+                    workspace_db_path=str(analysis_context.get("data_path") or ""),
+                    schema_summary=str(analysis_context.get("schema_summary") or ""),
+                    known_columns_json=_safe_json_dumps(known_columns),
+                    sample_table=sample_table or "",
+                    sample_json=_safe_json_dumps(sample),
+                    context=generation_context,
+                    invoke_structured_chain=_ainvoke_structured_chain,
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+                if idx >= len(methods) - 1:
+                    raise
+                if not _is_recoverable_structured_output_error(exc):
+                    raise
     if output is None:
         if last_exc is not None:
             raise last_exc

@@ -32,6 +32,7 @@ from agent_v2.nodes import (
     StructuredToolCall,
 )
 from agent_v2.coding_subagent.schema import AnalysisOutput
+from agent_v2.coding_subagent.generator import StructuredOutputEmptyError
 
 
 @pytest.mark.asyncio
@@ -133,6 +134,7 @@ async def test_analysis_enrich_context_node_recovers_from_injected_sse_json_erro
 def test_recoverable_structured_output_error_matches_injected_sse_json_error() -> None:
     assert _is_recoverable_structured_output_error(RuntimeError("JSON error injected into SSE stream")) is True
     assert _is_recoverable_structured_output_error(ValueError("expected value at line 3 column 1")) is True
+    assert _is_recoverable_structured_output_error(StructuredOutputEmptyError("empty parsed output")) is True
 
 
 def test_context_enrichment_prompt_includes_prior_search_context() -> None:
@@ -596,6 +598,113 @@ async def test_analysis_generate_code_falls_back_structured_output_method_for_ol
     assert result.get("candidate_code") == "print('ok')"
     assert result.get("retry_target") == ""
     assert attempts[:2] == ["json_schema", "function_calling"]
+
+
+@pytest.mark.asyncio
+async def test_analysis_generate_code_prefers_tool_call_path_for_ollama_cloud_models(monkeypatch) -> None:
+    class _FakeModel:
+        _inquira_provider = "ollama"
+        model = "minimax-m2.7:cloud"
+
+    monkeypatch.setattr("agent_v2.nodes._get_model", lambda *_args, **_kwargs: _FakeModel())
+    monkeypatch.setattr("agent_v2.nodes.sample_data", lambda **_kwargs: [])
+    monkeypatch.setattr("agent_v2.nodes.build_coding_tool_call_chain", lambda **_kwargs: {"tool_chain": True})
+
+    async def fake_ainvoke_coding_tool_call_chain(**_kwargs):
+        return AnalysisOutput(
+            code="print('tool-path')",
+            explanation="done",
+            output_contract=[],
+            search_schema_queries=[],
+            selected_tables=[],
+            joins_used=False,
+        )
+
+    async def fake_ainvoke_coding_chain(**_kwargs):
+        raise AssertionError("fallback structured chain should not run when tool-call path succeeds")
+
+    monkeypatch.setattr(
+        "agent_v2.nodes.ainvoke_coding_tool_call_chain",
+        fake_ainvoke_coding_tool_call_chain,
+    )
+    monkeypatch.setattr("agent_v2.nodes.ainvoke_coding_chain", fake_ainvoke_coding_chain)
+
+    state = {
+        "analysis_context": {
+            "messages": [HumanMessage(content="top batsman by runs")],
+            "data_path": "/tmp/ws.db",
+            "table_names": ["batting"],
+            "schema_summary": "",
+            "sample_table": "",
+            "context": "",
+        },
+        "known_columns": [],
+        "attempt_counters": {"generation": 0},
+    }
+
+    result = await analysis_generate_code_node(state, {"configurable": {}})
+    assert result.get("candidate_code") == "print('tool-path')"
+    assert result.get("retry_target") == ""
+
+
+@pytest.mark.asyncio
+async def test_analysis_generate_code_ollama_cloud_tool_call_failure_falls_back_to_structured_chain(
+    monkeypatch,
+) -> None:
+    class _FakeModel:
+        _inquira_provider = "ollama"
+        model = "minimax-m2.7:cloud"
+
+    monkeypatch.setattr("agent_v2.nodes._get_model", lambda *_args, **_kwargs: _FakeModel())
+    monkeypatch.setattr("agent_v2.nodes.sample_data", lambda **_kwargs: [])
+    monkeypatch.setattr("agent_v2.nodes.build_coding_tool_call_chain", lambda **_kwargs: {"tool_chain": True})
+
+    attempts: list[str] = []
+
+    async def fake_ainvoke_coding_tool_call_chain(**_kwargs):
+        attempts.append("tool_call")
+        raise StructuredOutputEmptyError("no tool calls in output")
+
+    def fake_build_coding_chain(**kwargs):
+        return {"method": kwargs.get("method")}
+
+    async def fake_ainvoke_coding_chain(**kwargs):
+        method = str((kwargs.get("chain") or {}).get("method") or "")
+        attempts.append(method)
+        if method == "json_schema":
+            raise ValueError("JSONDecodeError: Expecting value: line 1 column 1 (char 0)")
+        return AnalysisOutput(
+            code="print('structured-fallback')",
+            explanation="done",
+            output_contract=[],
+            search_schema_queries=[],
+            selected_tables=[],
+            joins_used=False,
+        )
+
+    monkeypatch.setattr(
+        "agent_v2.nodes.ainvoke_coding_tool_call_chain",
+        fake_ainvoke_coding_tool_call_chain,
+    )
+    monkeypatch.setattr("agent_v2.nodes.build_coding_chain", fake_build_coding_chain)
+    monkeypatch.setattr("agent_v2.nodes.ainvoke_coding_chain", fake_ainvoke_coding_chain)
+
+    state = {
+        "analysis_context": {
+            "messages": [HumanMessage(content="top batsman by runs")],
+            "data_path": "/tmp/ws.db",
+            "table_names": ["batting"],
+            "schema_summary": "",
+            "sample_table": "",
+            "context": "",
+        },
+        "known_columns": [],
+        "attempt_counters": {"generation": 0},
+    }
+
+    result = await analysis_generate_code_node(state, {"configurable": {}})
+    assert result.get("candidate_code") == "print('structured-fallback')"
+    assert attempts[:3] == ["tool_call", "json_schema", "function_calling"]
 
 
 @pytest.mark.asyncio
