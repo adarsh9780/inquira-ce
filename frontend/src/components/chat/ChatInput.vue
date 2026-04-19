@@ -1198,7 +1198,7 @@ async function handleSubmit() {
                 type: 'node',
                 node: normalizedNode,
                 message: `${normalizedNode} completed`,
-                output: String(payload.plan || payload.answer || payload.code || payload.current_code || '')
+                output: String(payload.plan || '')
               })
             })
             return

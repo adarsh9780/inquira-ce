@@ -1,16 +1,15 @@
 <template>
   <div class="tool-activity-row" :data-status="toolStatus">
+    <p class="tool-activity-action">Tool run</p>
     <p
-      class="tool-activity-summary tool-activity-summary-static"
+      class="tool-activity-detail"
       :class="{
-        'tool-activity-summary-running': toolStatus === 'running',
-        'tool-activity-summary-error': toolStatus === 'error'
+        'tool-activity-detail-running': toolStatus === 'running',
+        'tool-activity-detail-error': toolStatus === 'error'
       }"
     >
-      <span>
-        {{ summaryText }}
-        <span v-if="durationLabel" class="tool-activity-duration">{{ durationLabel }}</span>
-      </span>
+      {{ summaryText }}
+      <span v-if="durationLabel" class="tool-activity-duration">{{ durationLabel }}</span>
     </p>
 
     <p v-if="errorSummary" class="tool-activity-error">
@@ -207,29 +206,32 @@ const errorSummary = computed(() => {
   padding: 0;
 }
 
-.tool-activity-summary {
+.tool-activity-action {
   margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.45;
-  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--color-text-muted) 90%, var(--color-text-main) 10%);
+}
+
+.tool-activity-detail {
+  margin: 0.1rem 0 0;
+  font-size: 1rem;
+  line-height: 1.58;
+  color: var(--color-text-main);
   word-break: break-word;
 }
 
-.tool-activity-summary-static {
-  padding: 0;
-  color: color-mix(in srgb, var(--color-text-muted) 84%, var(--color-text-main) 16%);
+.tool-activity-detail-running {
+  color: var(--color-text-main);
 }
 
-.tool-activity-summary-running {
-  color: color-mix(in srgb, var(--color-text-muted) 84%, var(--color-text-main) 16%);
-}
-
-.tool-activity-summary-error {
+.tool-activity-detail-error {
   color: var(--color-danger);
 }
 
 .tool-activity-duration {
-  color: color-mix(in srgb, var(--color-text-muted) 90%, var(--color-text-main) 10%);
+  color: color-mix(in srgb, var(--color-text-muted) 84%, var(--color-text-main) 16%);
   font-weight: 400;
   margin-left: 0.2rem;
 }

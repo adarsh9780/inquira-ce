@@ -13,6 +13,10 @@ test('chat input handles tool and intervention SSE events', () => {
   assert.equal(source.includes("evt.event === 'intervention_response'"), true)
   assert.equal(source.includes("evt.event === 'agent_status'"), true)
   assert.equal(source.includes("output: evt.data?.detail || evt.data?.output || ''"), true)
+  assert.equal(source.includes("output: String(payload.plan || '')"), true)
+  assert.equal(source.includes('payload.answer'), false)
+  assert.equal(source.includes('payload.code'), false)
+  assert.equal(source.includes('payload.current_code'), false)
 })
 
 test('chat history renders tool cards and intervention component', () => {

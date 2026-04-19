@@ -60,10 +60,11 @@
       <!-- Assistant Response -->
       <div v-if="hasAssistantContent(message)" class="w-full group">
         <div class="px-3 py-2.5 rounded-2xl rounded-tl-sm" style="background-color: transparent">
-          <div v-if="SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length" class="space-y-2">
-            <p v-for="row in ephemeralRows(message)" :key="row.id" class="ephemeral-trace-row">
-              <span>{{ row.text }}</span>
-            </p>
+          <div v-if="SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length" class="ephemeral-trace-list">
+            <div v-for="row in ephemeralRows(message)" :key="row.id" class="ephemeral-trace-item">
+              <p class="ephemeral-trace-action">{{ row.action }}</p>
+              <p v-if="row.detail" class="ephemeral-trace-detail">{{ row.detail }}</p>
+            </div>
           </div>
 
           <div v-if="toolActivityRows(message).length" class="space-y-1 mt-2">
@@ -516,8 +517,6 @@ function eventOutputText(event, message) {
   const eventMessage = String(event?.message || '').trim()
   const explicitOutput = String(event?.output || '').trim()
 
-  if (explicitOutput) return explicitOutput
-
   if (type === 'status' && stage === 'start') {
     return ''
   }
@@ -530,14 +529,38 @@ function eventOutputText(event, message) {
   if (eventMessage && eventMessage !== `${node} completed`) {
     return eventMessage
   }
+  if (type === 'status') {
+    return explicitOutput
+  }
   return ''
+}
+
+function isLikelyCodeText(text) {
+  const normalized = String(text || '').trim().toLowerCase()
+  if (!normalized) return false
+  const markers = [
+    'import ',
+    'select ',
+    ' from ',
+    ' group by ',
+    ' order by ',
+    ' limit ',
+    ' conn.sql(',
+    ' dataframe',
+    'def ',
+    'return ',
+    '```',
+  ]
+  return markers.some((marker) => normalized.includes(marker))
 }
 
 function normalizeEphemeralText(value) {
   const text = String(value || '')
+    .replace(/\r?\n+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
   if (!text) return ''
+  if (isLikelyCodeText(text)) return ''
   if (
     (text.startsWith('{') && text.endsWith('}')) ||
     (text.startsWith('[') && text.endsWith(']'))
@@ -562,22 +585,27 @@ function ephemeralRows(message) {
     const node = normalizeNodeName(event?.node)
     const stage = String(event?.stage || '').trim().toLowerCase()
 
-    let summary = 'Processing update'
-    if (node === 'agent_status') {
-      summary = String(event?.message || 'Processing...')
+    let action = 'Progress'
+    if (type === 'node') {
+      action = describeNode(node) || 'Processing step'
+    } else if (type === 'status' && node === 'agent_status') {
+      action = 'Progress'
     } else if (type === 'status') {
-      summary = String(event?.message || 'Updating analysis status')
-    } else if (type === 'node') {
-      summary = describeNode(node) || String(event?.message || 'Processing update')
+      action = String(stage || 'status')
+        .split('_')
+        .filter(Boolean)
+        .map((part) => part[0].toUpperCase() + part.slice(1))
+        .join(' ') || 'Status'
     }
 
-    const output = normalizeEphemeralText(eventOutputText(event, message))
-    const fallbackSummary = normalizeEphemeralText(summary)
+    const detail = normalizeEphemeralText(eventOutputText(event, message))
     return {
       id: `${message?.id || 'msg'}-${type || 'event'}-${node || stage || index}-${index}`,
-      text: output || fallbackSummary || 'Processing update'
+      action: normalizeEphemeralText(action) || 'Progress',
+      detail,
     }
     })
+    .filter((row) => row.action || row.detail)
 }
 
 function hasStreamTrace(message) {
@@ -846,11 +874,28 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   background-color: color-mix(in srgb, var(--color-surface) 78%, transparent);
 }
 
-.ephemeral-trace-row {
+.ephemeral-trace-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.ephemeral-trace-item {
   margin: 0;
+}
+
+.ephemeral-trace-action {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--color-text-muted) 90%, var(--color-text-main) 10%);
+}
+
+.ephemeral-trace-detail {
+  margin: 0.1rem 0 0;
   font-size: 1rem;
-  line-height: 1.62;
-  color: color-mix(in srgb, var(--color-text-main) 92%, var(--color-text-muted) 8%);
+  line-height: 1.58;
+  color: var(--color-text-main);
 }
 
 .view-code-details {
