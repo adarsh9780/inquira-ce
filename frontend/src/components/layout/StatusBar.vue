@@ -40,7 +40,12 @@
 
       <div v-if="authStore.isAuthenticated" class="w-px h-3.5 bg-[var(--color-border)]"></div>
 
-      <div v-if="authStore.isAuthenticated" class="flex items-center gap-1 h-full px-1 text-[10px] text-[var(--color-text-muted)]" style="font-family: var(--font-mono);" :title="tokenUsageSummaryLabel">
+      <div
+        v-if="authStore.isAuthenticated"
+        class="flex items-center gap-1 h-full px-1 text-[10px] text-[var(--color-text-muted)]"
+        style="font-family: var(--font-mono);"
+        :title="tokenUsageHoverLabel"
+      >
         <span class="truncate">{{ tokenUsageSummaryLabel }}</span>
       </div>
 
@@ -268,12 +273,28 @@ const tokenUsageSummaryLabel = computed(() => {
   const outputTokens = formatTokenCount(usage.output_tokens)
   const priceLabel = formatUsd(usage.price_usd)
   const parts = [
-    `in ${inputTokens}`,
-    `cached ${cachedInputTokens}`,
-    `out ${outputTokens}`,
+    inputTokens,
+    cachedInputTokens,
+    outputTokens,
     priceLabel,
   ]
   return parts.join(' | ')
+})
+
+const tokenUsageHoverLabel = computed(() => {
+  const usage = appStore.liveTokenUsage && typeof appStore.liveTokenUsage === 'object'
+    ? appStore.liveTokenUsage
+    : {}
+  const inputTokens = formatTokenCount(usage.input_tokens)
+  const cachedInputTokens = formatTokenCount(usage.cached_tokens)
+  const outputTokens = formatTokenCount(usage.output_tokens)
+  const priceLabel = formatUsd(usage.price_usd)
+  return [
+    `Input tokens: ${inputTokens}`,
+    `Cached input tokens: ${cachedInputTokens}`,
+    `Output tokens: ${outputTokens}`,
+    `Price (USD): ${priceLabel}`,
+  ].join('\n')
 })
 
 const wsConnectionMeta = computed(() => {

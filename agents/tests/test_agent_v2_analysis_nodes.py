@@ -235,6 +235,7 @@ def test_recoverable_structured_output_error_matches_injected_sse_json_error() -
     assert _is_recoverable_structured_output_error(RuntimeError("JSON error injected into SSE stream")) is True
     assert _is_recoverable_structured_output_error(ValueError("expected value at line 3 column 1")) is True
     assert _is_recoverable_structured_output_error(StructuredOutputEmptyError("empty parsed output")) is True
+    assert _is_recoverable_structured_output_error(RuntimeError("LengthFinishReasonError: An internal error occurred")) is True
 
 
 def test_context_enrichment_prompt_includes_prior_search_context() -> None:
