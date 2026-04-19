@@ -105,6 +105,7 @@
           <div v-if="message.explanation" class="chat-markdown-content final-response-body max-w-none" style="color: var(--color-text-main);">
             <div v-html="renderMarkdown(message.explanation)"></div>
           </div>
+          <p v-if="tokenUsageText(message)" class="token-usage-line">{{ tokenUsageText(message) }}</p>
 
           <details v-if="shouldRenderCodeDetails(message)" class="mt-2 view-code-details">
             <summary class="view-code-toggle">
@@ -272,6 +273,30 @@ function tableUsageSummary(message) {
     return `Tables used: ${tables.join(', ')} · Join keys: ${joinKeys.join(', ')}`
   }
   return `Tables used: ${tables.join(', ')} · Conservative join`
+}
+
+function toNonNegativeInt(value) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 0
+  return parsed > 0 ? Math.floor(parsed) : 0
+}
+
+function tokenUsageText(message) {
+  const metadata = message?.analysisMetadata
+  if (!metadata || typeof metadata !== 'object') return ''
+  const usage = metadata.token_usage
+  if (!usage || typeof usage !== 'object') return ''
+  const inputTokens = toNonNegativeInt(usage.input_tokens)
+  const outputTokens = toNonNegativeInt(usage.output_tokens)
+  const cachedTokens = toNonNegativeInt(usage.cached_tokens)
+  if (inputTokens <= 0 && outputTokens <= 0 && cachedTokens <= 0) return ''
+
+  const parts = []
+  if (inputTokens > 0) parts.push(`in ${inputTokens.toLocaleString()}`)
+  if (outputTokens > 0) parts.push(`out ${outputTokens.toLocaleString()}`)
+  if (cachedTokens > 0) parts.push(`cached ${cachedTokens.toLocaleString()}`)
+  if (parts.length === 0) return ''
+  return `Tokens: ${parts.join(' · ')}`
 }
 
 function escapeHtml(rawValue) {
@@ -964,6 +989,13 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   width: 1.5rem;
   height: 1px;
   background-color: color-mix(in srgb, var(--color-border) 86%, transparent);
+}
+
+.token-usage-line {
+  margin-top: 0.5rem;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--color-text-muted);
 }
 
 .ephemeral-trace-list {

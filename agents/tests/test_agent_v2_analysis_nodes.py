@@ -28,11 +28,37 @@ from agent_v2.nodes import (
     analysis_validate_to_next,
     analysis_retry_decider_node,
     _filter_redundant_context_tools,
+    _resolve_memory_limits,
     ContextEnrichmentPlan,
     StructuredToolCall,
 )
 from agent_v2.coding_subagent.schema import AnalysisOutput
 from agent_v2.coding_subagent.generator import StructuredOutputEmptyError
+
+
+def test_resolve_memory_limits_scales_with_context_window() -> None:
+    runtime = SimpleNamespace(
+        memory_max_recent_messages=10,
+        memory_max_summary_tokens=500,
+    )
+    baseline = _resolve_memory_limits(
+        runtime=runtime,
+        configurable={},
+    )
+    scaled_down = _resolve_memory_limits(
+        runtime=runtime,
+        configurable={"context_window": 8192, "max_tokens": 2048},
+    )
+    scaled_up = _resolve_memory_limits(
+        runtime=runtime,
+        configurable={"context_window": 512000, "max_tokens": 4096},
+    )
+
+    assert baseline == (10, 500)
+    assert scaled_down[0] < baseline[0]
+    assert scaled_down[1] < baseline[1]
+    assert scaled_up[0] >= baseline[0]
+    assert scaled_up[1] >= baseline[1]
 
 
 @pytest.mark.asyncio

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import ast
+import contextvars
 import json
 import re
 import time
@@ -268,6 +269,11 @@ _ROUTE_TERM_SYNONYMS = {
     "wickets": {"wicket", "wickets"},
 }
 
+_LLM_USAGE_TOTALS: contextvars.ContextVar[dict[str, int]] = contextvars.ContextVar(
+    "agent_v2_llm_usage_totals",
+    default={},
+)
+
 
 def _stringify_content(content: Any) -> str:
     if isinstance(content, str):
@@ -304,6 +310,110 @@ def _safe_json_loads(value: Any) -> dict[str, Any]:
     except Exception:
         return {}
     return fallback if isinstance(fallback, dict) else {}
+
+
+def _to_non_negative_int(value: Any) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return parsed if parsed > 0 else 0
+
+
+def _normalize_token_usage(value: Any) -> dict[str, int]:
+    if not isinstance(value, dict):
+        return {}
+    input_tokens = _to_non_negative_int(value.get("input_tokens"))
+    output_tokens = _to_non_negative_int(value.get("output_tokens"))
+    cached_tokens = _to_non_negative_int(value.get("cached_tokens"))
+    total_tokens = _to_non_negative_int(value.get("total_tokens"))
+    if total_tokens <= 0:
+        total_tokens = input_tokens + output_tokens
+    normalized = {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "cached_tokens": cached_tokens,
+        "total_tokens": total_tokens,
+    }
+    if normalized["total_tokens"] <= 0 and normalized["cached_tokens"] <= 0:
+        return {}
+    return normalized
+
+
+def _extract_token_usage(value: Any) -> dict[str, int]:
+    if value is None:
+        return {}
+
+    direct = _normalize_token_usage(value)
+    if direct:
+        return direct
+
+    if isinstance(value, dict):
+        for key in ("usage_metadata", "token_usage", "usage"):
+            nested = _extract_token_usage(value.get(key))
+            if nested:
+                return nested
+        response_metadata = value.get("response_metadata")
+        if isinstance(response_metadata, dict):
+            token_usage = response_metadata.get("token_usage")
+            nested = _extract_token_usage(token_usage)
+            if nested:
+                return nested
+            prompt_details = response_metadata.get("prompt_tokens_details")
+            if isinstance(prompt_details, dict):
+                prompt_cached = _to_non_negative_int(prompt_details.get("cached_tokens"))
+                if prompt_cached > 0:
+                    direct["cached_tokens"] = prompt_cached
+        input_details = value.get("input_token_details")
+        if isinstance(input_details, dict):
+            cache_read = _to_non_negative_int(input_details.get("cache_read"))
+            if cache_read > 0:
+                direct["cached_tokens"] = cache_read
+        return _normalize_token_usage(direct)
+
+    usage_metadata = getattr(value, "usage_metadata", None)
+    nested = _extract_token_usage(usage_metadata)
+    if nested:
+        return nested
+    response_metadata = getattr(value, "response_metadata", None)
+    nested = _extract_token_usage(response_metadata)
+    if nested:
+        return nested
+    return {}
+
+
+def _merge_token_usage(base: Any, incoming: Any) -> dict[str, int]:
+    left = _normalize_token_usage(base)
+    right = _normalize_token_usage(incoming)
+    if not left:
+        return dict(right)
+    if not right:
+        return dict(left)
+    merged = {
+        "input_tokens": int(left.get("input_tokens") or 0) + int(right.get("input_tokens") or 0),
+        "output_tokens": int(left.get("output_tokens") or 0) + int(right.get("output_tokens") or 0),
+        "cached_tokens": int(left.get("cached_tokens") or 0) + int(right.get("cached_tokens") or 0),
+        "total_tokens": int(left.get("total_tokens") or 0) + int(right.get("total_tokens") or 0),
+    }
+    if merged["total_tokens"] <= 0:
+        merged["total_tokens"] = merged["input_tokens"] + merged["output_tokens"]
+    return _normalize_token_usage(merged)
+
+
+def _reset_llm_usage_totals() -> None:
+    _LLM_USAGE_TOTALS.set({})
+
+
+def _accumulate_llm_usage(raw_usage: Any) -> None:
+    incoming = _normalize_token_usage(raw_usage)
+    if not incoming:
+        return
+    current = _LLM_USAGE_TOTALS.get({})
+    _LLM_USAGE_TOTALS.set(_merge_token_usage(current, incoming))
+
+
+def _current_llm_usage_totals() -> dict[str, int]:
+    return _normalize_token_usage(_LLM_USAGE_TOTALS.get({}))
 
 
 def _latest_user_text(messages: list[AnyMessage]) -> str:
@@ -1332,6 +1442,7 @@ RUNTIME_FLOW_TOOLS = [
 
 
 async def route_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+    _reset_llm_usage_totals()
     messages = list(state.get("messages") or [])
     user_text = _latest_user_text(messages)
     table_names = _state_table_names(state, max_items=64)
@@ -1459,9 +1570,12 @@ def _is_ollama_cloud_model(model: BaseChatModel) -> bool:
 
 def _bind_structured_chain(prompt: Any, model: BaseChatModel, schema: Any, method: str | None) -> Any:
     if method is None:
-        return prompt | model.with_structured_output(schema)
+        try:
+            return prompt | model.with_structured_output(schema, include_raw=True)
+        except TypeError:
+            return prompt | model.with_structured_output(schema)
     try:
-        return prompt | model.with_structured_output(schema, method=method, include_raw=False)
+        return prompt | model.with_structured_output(schema, method=method, include_raw=True)
     except TypeError:
         # Test doubles may not accept kwargs.
         return prompt | model.with_structured_output(schema)
@@ -1478,7 +1592,17 @@ async def _ainvoke_provider_structured_chain(
     for idx, method in enumerate(methods):
         try:
             chain = _bind_structured_chain(prompt, model, schema, method)
-            return await _ainvoke_structured_chain(chain, payload)
+            result = await _ainvoke_structured_chain(chain, payload)
+            if isinstance(result, dict):
+                _accumulate_llm_usage(_extract_token_usage(result))
+                raw = result.get("raw")
+                if raw is not None:
+                    _accumulate_llm_usage(_extract_token_usage(raw))
+                parsed = result.get("parsed")
+                if parsed is not None:
+                    return parsed
+            _accumulate_llm_usage(_extract_token_usage(result))
+            return result
         except Exception as exc:
             last_exc = exc
             if idx >= len(methods) - 1:
@@ -1513,6 +1637,28 @@ def _is_recoverable_structured_output_error(exc: Exception) -> bool:
         "malformed_function_call",
     )
     return any(marker in message for marker in markers)
+
+
+def _resolve_memory_limits(
+    *,
+    runtime: Any,
+    configurable: dict[str, Any],
+) -> tuple[int, int]:
+    base_recent = max(1, int(getattr(runtime, "memory_max_recent_messages", 10) or 10))
+    base_summary_tokens = max(64, int(getattr(runtime, "memory_max_summary_tokens", 500) or 500))
+
+    context_window = _to_non_negative_int(configurable.get("context_window"))
+    max_tokens = _to_non_negative_int(configurable.get("max_tokens"))
+    if context_window <= 0:
+        return base_recent, base_summary_tokens
+
+    reserved_output = max(1024, min(16384, max_tokens or 4096))
+    usable_context = max(4096, context_window - reserved_output)
+    scale = max(0.35, min(2.0, usable_context / 128000.0))
+    recent_messages = max(1, min(40, int(round(base_recent * scale))))
+    summary_tokens = max(64, min(4000, int(round(base_summary_tokens * scale))))
+    summary_tokens = min(summary_tokens, max(64, usable_context // 32))
+    return recent_messages, summary_tokens
 
 
 def _extract_chat_text(output: Any) -> str:
@@ -2154,18 +2300,25 @@ async def _generate_result_explanations(
 async def analysis_collect_context_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
     _ = config
     runtime = load_agent_runtime_config()
+    configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
+    if not isinstance(configurable, dict):
+        configurable = {}
+    memory_recent_messages, memory_summary_tokens = _resolve_memory_limits(
+        runtime=runtime,
+        configurable=configurable,
+    )
     raw_messages = list(state.get("messages") or [])
     memory = build_conversation_memory(
         raw_messages,
-        max_recent_messages=max(1, int(runtime.memory_max_recent_messages)),
-        max_summary_chars=max(240, int(runtime.memory_max_summary_tokens) * 4),
+        max_recent_messages=memory_recent_messages,
+        max_summary_chars=max(240, int(memory_summary_tokens) * 4),
     )
     recent_messages = (
         memory.get("recent_messages") if isinstance(memory.get("recent_messages"), list) else raw_messages
     )
     messages = _bounded_messages(
         recent_messages,
-        max_messages=max(1, int(runtime.memory_max_recent_messages)),
+        max_messages=memory_recent_messages,
     )
     table_names = _state_table_names(state, max_items=16)
     data_path = str(state.get("data_path") or "")
@@ -2186,7 +2339,7 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
         )
     conversation_memory = _truncate_text(
         str(memory.get("summary") or ""),
-        limit=max(200, int(runtime.memory_max_summary_tokens) * 4),
+        limit=max(200, int(memory_summary_tokens) * 4),
     )
     user_text = _latest_user_text(messages)
     attempt_counters = state.get("attempt_counters") if isinstance(state.get("attempt_counters"), dict) else {}
@@ -3194,6 +3347,14 @@ def finalize_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, An
     if not result_explanation:
         result_explanation = "Analysis completed."
 
+    metadata = state.get("metadata") if isinstance(state.get("metadata"), dict) else {
+        "is_safe": True,
+        "is_relevant": True,
+    }
+    usage_totals = _current_llm_usage_totals()
+    if usage_totals:
+        metadata = {**metadata, "token_usage": usage_totals}
+
     return {
         "final_code": code,
         "final_explanation": result_explanation,
@@ -3206,6 +3367,6 @@ def finalize_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, An
         "output_contract": state.get("output_contract") or [],
         "known_columns": _normalize_known_columns(state.get("known_columns") or []),
         "route": state.get("route") or "analysis",
-        "metadata": state.get("metadata") or {"is_safe": True, "is_relevant": True},
+        "metadata": metadata,
         "run_id": state.get("run_id"),
     }

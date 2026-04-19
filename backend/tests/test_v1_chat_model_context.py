@@ -29,6 +29,7 @@ async def test_chat_service_passes_model_and_context_to_agent_payload(monkeypatc
         _ = self
         captured["context"] = payload.get("context")
         captured["model"] = payload.get("model")
+        captured["context_window"] = ((payload.get("llm") or {}).get("context_window"))
         return {
             "route": "analysis",
             "metadata": {"is_safe": True, "is_relevant": True},
@@ -62,6 +63,7 @@ async def test_chat_service_passes_model_and_context_to_agent_payload(monkeypatc
             "top_k": 0,
             "frequency_penalty": 0.0,
             "presence_penalty": 0.0,
+            "context_windows": {"gemini-2.5-pro": 128000},
         }
     monkeypatch.setattr(
         "app.v1.services.chat_service.ChatService._resolve_llm_preferences",
@@ -91,6 +93,7 @@ async def test_chat_service_passes_model_and_context_to_agent_payload(monkeypatc
 
     assert captured["model"] == "gemini-2.5-pro"
     assert captured["context"] == "retail demand planning"
+    assert captured["context_window"] == 128000
 
 @pytest.mark.asyncio
 async def test_resolve_llm_preferences_includes_selected_coding_model(monkeypatch):

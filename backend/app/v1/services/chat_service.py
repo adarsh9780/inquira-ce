@@ -133,6 +133,37 @@ class ChatService:
         return ChatService._normalize_ollama_chat_base_url(base_url)
 
     @staticmethod
+    def _provider_context_window_map(prefs: Any | None, provider: str) -> dict[str, int]:
+        if prefs is None:
+            return {}
+        try:
+            raw_catalogs = json.loads(str(getattr(prefs, "provider_model_catalogs_json", "{}") or "{}"))
+        except Exception:  # noqa: BLE001
+            raw_catalogs = {}
+        if not isinstance(raw_catalogs, dict):
+            return {}
+        provider_catalog = raw_catalogs.get(provider)
+        if not isinstance(provider_catalog, dict):
+            return {}
+        raw_models = provider_catalog.get("models")
+        if not isinstance(raw_models, list):
+            return {}
+
+        context_windows: dict[str, int] = {}
+        for item in raw_models:
+            if not isinstance(item, dict):
+                continue
+            model_id = str(item.get("id") or "").strip()
+            if not model_id:
+                continue
+            try:
+                context_window = int(item.get("context_window") or 0)
+            except (TypeError, ValueError):
+                context_window = 0
+            context_windows[model_id] = max(0, context_window)
+        return context_windows
+
+    @staticmethod
     async def _resolve_llm_preferences(session: AsyncSession, user_id: str) -> dict[str, Any]:
         runtime = load_llm_runtime_config()
         prefs: Any | None = None
@@ -174,6 +205,7 @@ class ChatService:
             (getattr(prefs, "selected_model", runtime.default_model) if prefs is not None else runtime.default_model)
             or runtime.default_model
         ).strip()
+        context_windows = ChatService._provider_context_window_map(prefs, provider)
         return {
             "provider": provider,
             "base_url": base_url,
@@ -194,6 +226,7 @@ class ChatService:
             "top_k": int(_advanced_value("llm_top_k", 0)),
             "frequency_penalty": float(_advanced_value("llm_frequency_penalty", 0.0)),
             "presence_penalty": float(_advanced_value("llm_presence_penalty", 0.0)),
+            "context_windows": context_windows,
         }
 
     @staticmethod
@@ -329,6 +362,15 @@ class ChatService:
                 "top_k": llm_prefs["top_k"],
                 "frequency_penalty": llm_prefs["frequency_penalty"],
                 "presence_penalty": llm_prefs["presence_penalty"],
+                "context_window": int(
+                    (
+                        llm_prefs.get("context_windows", {}) or {}
+                    ).get(model)
+                    or (
+                        llm_prefs.get("context_windows", {}) or {}
+                    ).get(llm_prefs.get("selected_main_model"))
+                    or 0
+                ),
             },
         }
 

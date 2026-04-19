@@ -79,6 +79,7 @@ class AgentClient:
             "coding_model": str(llm.get("coding_model") or "").strip(),
             "temperature": llm.get("temperature"),
             "max_tokens": llm.get("max_tokens"),
+            "context_window": llm.get("context_window"),
             "top_p": llm.get("top_p"),
             "top_k": llm.get("top_k"),
             "frequency_penalty": llm.get("frequency_penalty"),

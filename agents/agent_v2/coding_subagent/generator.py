@@ -69,9 +69,12 @@ async def _ainvoke_structured_chain(chain: Any, payload: dict[str, Any]) -> Any:
 def build_coding_chain(*, model: Any, method: str | None = None) -> Any:
     prompt = _build_coding_prompt()
     if method is None:
-        return prompt | model.with_structured_output(AnalysisOutput)
+        try:
+            return prompt | model.with_structured_output(AnalysisOutput, include_raw=True)
+        except TypeError:
+            return prompt | model.with_structured_output(AnalysisOutput)
     try:
-        return prompt | model.with_structured_output(AnalysisOutput, method=method, include_raw=False)
+        return prompt | model.with_structured_output(AnalysisOutput, method=method, include_raw=True)
     except TypeError:
         # Test doubles may not accept provider-specific kwargs.
         return prompt | model.with_structured_output(AnalysisOutput)
@@ -113,6 +116,8 @@ def _build_payload(
 
 
 def _validate_analysis_output(output: Any) -> AnalysisOutput:
+    if isinstance(output, dict) and output.get("parsed") is not None:
+        output = output.get("parsed")
     if output is None:
         raise StructuredOutputEmptyError(
             "Structured output parser returned no data (parsed output is None)."
@@ -123,6 +128,10 @@ def _validate_analysis_output(output: Any) -> AnalysisOutput:
 
 
 def _extract_tool_calls(raw_output: Any) -> list[dict[str, Any]]:
+    if isinstance(raw_output, dict):
+        nested_raw = raw_output.get("raw")
+        if nested_raw is not None:
+            raw_output = nested_raw
     tool_calls = None
     if isinstance(raw_output, AIMessage):
         tool_calls = raw_output.tool_calls
