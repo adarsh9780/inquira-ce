@@ -66,7 +66,7 @@
       </div>
     </div>
 
-    <div v-show="authStore.isAuthenticated && appBootstrap.ready" class="flex flex-col h-screen">
+    <div v-if="authStore.isAuthenticated && appBootstrap.ready" class="flex flex-col h-screen">
       <ConnectionStatusIndicator />
       <div class="flex-1 flex overflow-hidden app-shell-frame relative">
         <div
