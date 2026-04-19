@@ -31,7 +31,7 @@ from .services.llm_runtime_config import load_llm_runtime_config, normalize_mode
 from .services.llm_provider_catalog import normalize_llm_provider, provider_requires_api_key
 from .code_guard import guard_code
 from .events import emit_agent_event
-from .router import decide_route
+from .router import decide_route_details
 from .runtime import load_agent_runtime_config
 from .memory.summarizer import build_conversation_memory
 from .streaming import emit_stream_token
@@ -1117,7 +1117,18 @@ RUNTIME_FLOW_TOOLS = [
 
 
 async def route_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-    route = await decide_route(state.get("messages") or [], config.get("configurable", {}))
+    decision = await decide_route_details(state.get("messages") or [], config.get("configurable", {}))
+    route = str(decision.route or "").strip().lower()
+    reasoning = str(decision.reasoning or "").strip()
+    if reasoning:
+        emit_agent_event(
+            "reasoning",
+            {
+                "stage": "intent",
+                "message": reasoning,
+                "route": route,
+            },
+        )
     if route == "unsafe":
         metadata = {"is_safe": False, "is_relevant": False}
     elif route == "general_chat":

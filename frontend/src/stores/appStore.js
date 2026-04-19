@@ -797,11 +797,14 @@ export const useAppStore = defineStore('app', () => {
 
   function createEmptyStreamTrace() {
     return {
+      reasoning: [],
       planText: '',
       planNode: '',
       events: [],
       toolCalls: [],
-      intervention: null
+      intervention: null,
+      stopped: false,
+      stoppedReason: ''
     }
   }
 
@@ -818,6 +821,9 @@ export const useAppStore = defineStore('app', () => {
     if (!Array.isArray(message.streamTrace.events)) {
       message.streamTrace.events = []
     }
+    if (!Array.isArray(message.streamTrace.reasoning)) {
+      message.streamTrace.reasoning = []
+    }
     if (typeof message.streamTrace.planText !== 'string') {
       message.streamTrace.planText = ''
     }
@@ -829,6 +835,12 @@ export const useAppStore = defineStore('app', () => {
     }
     if (message.streamTrace.intervention !== null && typeof message.streamTrace.intervention !== 'object') {
       message.streamTrace.intervention = null
+    }
+    if (typeof message.streamTrace.stopped !== 'boolean') {
+      message.streamTrace.stopped = false
+    }
+    if (typeof message.streamTrace.stoppedReason !== 'string') {
+      message.streamTrace.stoppedReason = ''
     }
     return message.streamTrace
   }
@@ -845,13 +857,16 @@ export const useAppStore = defineStore('app', () => {
       : []
     const streamTrace = options?.streamTrace && typeof options.streamTrace === 'object'
       ? {
+        reasoning: Array.isArray(options.streamTrace.reasoning) ? options.streamTrace.reasoning : [],
         planText: String(options.streamTrace.planText || ''),
         planNode: String(options.streamTrace.planNode || ''),
         events: Array.isArray(options.streamTrace.events) ? options.streamTrace.events : [],
         toolCalls: Array.isArray(options.streamTrace.toolCalls) ? options.streamTrace.toolCalls : [],
         intervention: options.streamTrace.intervention && typeof options.streamTrace.intervention === 'object'
           ? options.streamTrace.intervention
-          : null
+          : null,
+        stopped: Boolean(options.streamTrace.stopped),
+        stoppedReason: String(options.streamTrace.stoppedReason || '')
       }
       : createEmptyStreamTrace()
 
@@ -925,6 +940,27 @@ export const useAppStore = defineStore('app', () => {
     if (node) trace.planNode = String(node)
   }
 
+  function appendLastMessageReasoningEvent(event) {
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage || !event || typeof event !== 'object') return
+    const trace = ensureMessageStreamTrace(lastMessage)
+    if (!trace) return
+    const message = String(event.message || '').trim()
+    if (!message) return
+    const stage = String(event.stage || 'intent').trim() || 'intent'
+    const route = String(event.route || '').trim()
+    const existing = trace.reasoning.find(
+      (item) => String(item.stage || '') === stage && String(item.message || '') === message
+    )
+    if (existing) return
+    trace.reasoning.push({
+      stage,
+      message,
+      route,
+      timestamp: new Date().toISOString(),
+    })
+  }
+
   function appendLastMessageTraceEvent(event) {
     const lastMessage = getLastChatMessage()
     if (!lastMessage || !event || typeof event !== 'object') return
@@ -936,6 +972,23 @@ export const useAppStore = defineStore('app', () => {
       stage: String(event.stage || ''),
       message: String(event.message || event.node || ''),
       output: String(event.output || ''),
+      timestamp: new Date().toISOString()
+    })
+  }
+
+  function markLastMessageStreamStopped(reason = 'Response generation stopped.') {
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage) return
+    const trace = ensureMessageStreamTrace(lastMessage)
+    if (!trace) return
+    trace.stopped = true
+    trace.stoppedReason = String(reason || 'Response generation stopped.')
+    trace.events.push({
+      type: 'status',
+      node: 'stream_control',
+      stage: 'stopped',
+      message: trace.stoppedReason,
+      output: '',
       timestamp: new Date().toISOString()
     })
   }
@@ -2405,6 +2458,7 @@ export const useAppStore = defineStore('app', () => {
     setLastMessageAnalysisMetadata,
     appendLastMessageExplanationChunk,
     appendLastMessagePlanChunk,
+    appendLastMessageReasoningEvent,
     appendLastMessageTraceEvent,
     appendLastMessageToolCall,
     appendLastMessageToolProgress,
@@ -2412,6 +2466,7 @@ export const useAppStore = defineStore('app', () => {
     setLastMessageInterventionRequest,
     setLastMessageInterventionResponse,
     markLastMessageInterventionError,
+    markLastMessageStreamStopped,
     setLastMessageCodeSnapshot,
     setWorkspaces,
     setWorkspaceDeletionJobs,

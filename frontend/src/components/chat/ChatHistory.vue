@@ -60,19 +60,28 @@
       <!-- Assistant Response -->
       <div v-if="hasAssistantContent(message)" class="w-full group">
         <div class="px-3 py-2.5 rounded-2xl rounded-tl-sm" style="background-color: transparent">
-          <div v-if="SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length" class="ephemeral-trace-list">
-            <div v-for="row in ephemeralRows(message)" :key="row.id" class="ephemeral-trace-item">
-              <p class="ephemeral-trace-action">{{ row.action }}</p>
-              <p v-if="row.detail" class="ephemeral-trace-detail">{{ row.detail }}</p>
+          <div v-if="reasoningRows(message).length" class="stream-reasoning-list">
+            <div v-for="row in reasoningRows(message)" :key="row.id" class="stream-reasoning-item">
+              <p class="stream-reasoning-label">Understanding</p>
+              <p class="stream-reasoning-text">{{ row.message }}</p>
             </div>
           </div>
 
-          <div v-if="toolActivityRows(message).length" class="space-y-1 mt-2">
-            <ToolActivityCard
-              v-for="activity in toolActivityRows(message)"
-              :key="activity.call_id || activity.started_at"
-              :activity="activity"
-            />
+          <div v-if="hasActionProgress(message)" class="stream-action-section">
+            <div v-if="SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length" class="ephemeral-trace-list">
+              <div v-for="row in ephemeralRows(message)" :key="row.id" class="ephemeral-trace-item">
+                <p class="ephemeral-trace-action">{{ row.action }}</p>
+                <p v-if="row.detail" class="ephemeral-trace-detail">{{ row.detail }}</p>
+              </div>
+            </div>
+
+            <div v-if="toolActivityRows(message).length" class="space-y-2">
+              <ToolActivityCard
+                v-for="activity in toolActivityRows(message)"
+                :key="activity.call_id || activity.started_at"
+                :activity="activity"
+              />
+            </div>
           </div>
 
           <AgentIntervention
@@ -477,6 +486,11 @@ function streamTraceEvents(message) {
   return Array.isArray(events) ? events : []
 }
 
+function streamReasoningEvents(message) {
+  const events = message?.streamTrace?.reasoning
+  return Array.isArray(events) ? events : []
+}
+
 function streamToolCalls(message) {
   const calls = message?.streamTrace?.toolCalls
   return Array.isArray(calls) ? calls : []
@@ -490,6 +504,15 @@ function pendingIntervention(message) {
   const intervention = message?.streamTrace?.intervention
   if (!intervention || typeof intervention !== 'object') return null
   return intervention
+}
+
+function reasoningRows(message) {
+  return streamReasoningEvents(message)
+    .map((event, index) => ({
+      id: `${message?.id || 'msg'}-reasoning-${String(event?.stage || 'intent')}-${index}`,
+      message: normalizeEphemeralText(event?.message),
+    }))
+    .filter((row) => row.message)
 }
 
 function normalizeNodeName(nodeName) {
@@ -524,6 +547,10 @@ function eventOutputText(event, message) {
   if (type === 'node' && node === 'create_plan') {
     const plan = streamPlanText(message)
     return plan || ''
+  }
+
+  if (type === 'status' && node === 'agent_status') {
+    return explicitOutput || ''
   }
 
   if (eventMessage && eventMessage !== `${node} completed`) {
@@ -589,7 +616,7 @@ function ephemeralRows(message) {
     if (type === 'node') {
       action = describeNode(node) || 'Processing step'
     } else if (type === 'status' && node === 'agent_status') {
-      action = 'Progress'
+      action = eventMessage || 'Progress'
     } else if (type === 'status') {
       action = String(stage || 'status')
         .split('_')
@@ -609,7 +636,14 @@ function ephemeralRows(message) {
 }
 
 function hasStreamTrace(message) {
-  return ephemeralRows(message).length > 0
+  return reasoningRows(message).length > 0 || ephemeralRows(message).length > 0
+}
+
+function hasActionProgress(message) {
+  return Boolean(
+    (SHOW_EPHEMERAL_TRACE && ephemeralRows(message).length > 0) ||
+    toolActivityRows(message).length > 0
+  )
 }
 
 function hasAssistantContent(message) {
@@ -874,9 +908,54 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
   background-color: color-mix(in srgb, var(--color-surface) 78%, transparent);
 }
 
+.stream-reasoning-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.stream-reasoning-item {
+  border-left: 2px solid var(--color-accent);
+  padding-left: 0.75rem;
+}
+
+.stream-reasoning-label {
+  margin: 0;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.stream-reasoning-text {
+  margin: 0.18rem 0 0;
+  font-size: 0.98rem;
+  line-height: 1.58;
+  color: var(--color-text-main);
+}
+
+.stream-action-section {
+  position: relative;
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.15rem;
+  padding-top: 1.05rem;
+}
+
+.stream-action-section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0.75rem;
+  width: 1.5rem;
+  height: 1px;
+  background-color: color-mix(in srgb, var(--color-border) 86%, transparent);
+}
+
 .ephemeral-trace-list {
   display: grid;
-  gap: 0.65rem;
+  gap: 0.72rem;
 }
 
 .ephemeral-trace-item {

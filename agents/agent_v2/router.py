@@ -9,7 +9,7 @@ from typing import Literal
 
 from langchain_core.messages import AnyMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from .services.chat_model_factory import create_chat_model
 from .services.llm_runtime_config import load_llm_runtime_config, normalize_model_id
@@ -30,6 +30,40 @@ class RouteDecision(BaseModel):
     model_config = ConfigDict(extra="forbid", json_schema_extra=openai_strict_json_schema)
 
     route: Literal["analysis", "general_chat", "unsafe"]
+    reasoning: str = Field(default="")
+
+
+def _summarize_user_text(user_text: str, limit: int = 120) -> str:
+    text = re.sub(r"\s+", " ", str(user_text or "")).strip()
+    if not text:
+        return "your request"
+    if len(text) <= limit:
+        return text
+    return f"{text[: limit - 1].rstrip()}..."
+
+
+def _fallback_reasoning(route: str, user_text: str) -> str:
+    summary = _summarize_user_text(user_text)
+    normalized_route = str(route or "").strip().lower()
+    if normalized_route == "unsafe":
+        return "I understand this request may affect system or data safety, so I need to stop before taking action."
+    if normalized_route == "general_chat":
+        return f"I understand you are asking about {summary}, so I can answer directly."
+    return f"I understand you want to analyze {summary}, so I need to inspect available data context before answering."
+
+
+def _normalize_decision(candidate: object, user_text: str) -> RouteDecision:
+    if isinstance(candidate, RouteDecision):
+        route = str(candidate.route or "").strip().lower()
+        reasoning = str(candidate.reasoning or "").strip()
+    else:
+        route = str(getattr(candidate, "route", "") or "").strip().lower()
+        reasoning = str(getattr(candidate, "reasoning", "") or "").strip()
+    if route not in {"analysis", "general_chat", "unsafe"}:
+        route = "analysis"
+    if not reasoning:
+        reasoning = _fallback_reasoning(route, user_text)
+    return RouteDecision(route=route, reasoning=reasoning)
 
 
 def _structured_output_methods(model: object) -> tuple[str | None, ...]:
@@ -67,10 +101,10 @@ def _latest_user_text(messages: list[AnyMessage]) -> str:
     return ""
 
 
-async def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
+async def decide_route_details(messages: list[AnyMessage], configurable: dict) -> RouteDecision:
     user_text = _latest_user_text(messages)
     if _UNSAFE_RE.search(user_text):
-        return "unsafe"
+        return RouteDecision(route="unsafe", reasoning=_fallback_reasoning("unsafe", user_text))
 
     runtime = load_llm_runtime_config()
     provider = normalize_llm_provider(str(configurable.get("provider") or runtime.provider))
@@ -148,9 +182,9 @@ async def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
                     raise
         if decision is None and last_exc is not None:
             raise last_exc
-        route = str(getattr(decision, "route", "")).strip().lower()
-        if route in {"analysis", "general_chat", "unsafe"}:
-            return route
+        normalized = _normalize_decision(decision, user_text)
+        if normalized.route in {"analysis", "general_chat", "unsafe"}:
+            return normalized
     except Exception:
         pass
 
@@ -158,4 +192,9 @@ async def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
         r"\b(chart|plot|graph|sql|query|average|sum|count|group by|dataset|table|column)\b",
         re.IGNORECASE,
     )
-    return "analysis" if analysis_hints.search(user_text) else "general_chat"
+    fallback_route = "analysis" if analysis_hints.search(user_text) else "general_chat"
+    return RouteDecision(route=fallback_route, reasoning=_fallback_reasoning(fallback_route, user_text))
+
+
+async def decide_route(messages: list[AnyMessage], configurable: dict) -> str:
+    return (await decide_route_details(messages, configurable)).route

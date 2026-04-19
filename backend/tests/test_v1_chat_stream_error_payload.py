@@ -56,3 +56,57 @@ async def test_stream_analyze_preserves_original_error_detail(monkeypatch):
     joined = "".join(chunks)
     assert "synthetic stream failure" in joined
     assert "not associated with a value" not in joined
+
+
+@pytest.mark.asyncio
+async def test_stream_analyze_passes_reasoning_event_through(monkeypatch):
+    async def _reasoning_stream(**_kwargs):
+        yield {
+            "event": "reasoning",
+            "data": {
+                "stage": "intent",
+                "message": "I understand the question, so I need inspect data context.",
+                "route": "analysis",
+            },
+        }
+        yield {
+            "event": "final",
+            "data": {
+                "conversation_id": "conv-1",
+                "turn_id": "turn-1",
+                "is_safe": True,
+                "is_relevant": True,
+                "code": "",
+                "explanation": "done",
+            },
+        }
+
+    monkeypatch.setattr(ChatService, "analyze_and_stream_turns", staticmethod(_reasoning_stream))
+
+    response = await stream_analyze(
+        AnalyzeRequest(
+            workspace_id="ws-1",
+            question="hello",
+            conversation_id="conv-1",
+            current_code="",
+            model="google/gemini-2.5-flash",
+            context=None,
+            table_name=None,
+            preferred_table_name=None,
+            active_schema=None,
+            attachments=[],
+            api_key=None,
+        ),
+        session=None,
+        current_user=SimpleNamespace(id="user-1"),
+        langgraph_manager=None,
+    )
+
+    chunks = []
+    async for part in response.body_iterator:
+        chunks.append(part.decode() if isinstance(part, bytes) else str(part))
+
+    joined = "".join(chunks)
+    assert "event: reasoning" in joined
+    assert "I understand the question" in joined
+    assert "event: final" in joined

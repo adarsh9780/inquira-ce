@@ -13,6 +13,7 @@ test('app store preserves turn code snapshot and supports ephemeral stream trace
   assert.equal(source.includes("codeExplanation: String(turn?.metadata?.code_explanation || '')"), true)
   assert.equal(source.includes('function appendLastMessageExplanationChunk(text)'), true)
   assert.equal(source.includes('function appendLastMessagePlanChunk(text, node = \'\')'), true)
+  assert.equal(source.includes('function appendLastMessageReasoningEvent(event)'), true)
   assert.equal(source.includes('function appendLastMessageTraceEvent(event)'), true)
   assert.equal(source.includes('function setLastMessageCodeSnapshot(code)'), true)
   assert.equal(source.includes('function setLastMessageCodeExplanation(explanation)'), true)

@@ -16,16 +16,20 @@ test('chat trace uses plain muted text rows without expandable output payloads',
   assert.equal(source.includes('normalizeEphemeralText('), true)
   assert.equal(source.includes('function isLikelyCodeText(text)'), true)
   assert.equal(source.includes('if (isLikelyCodeText(text)) return \'\''), true)
+  assert.equal(source.includes('class="stream-reasoning-list"'), true)
+  assert.equal(source.includes('class="stream-action-section"'), true)
+  assert.equal(source.includes('Final response'), true)
 })
 
-test('tool activity keeps action-detail hierarchy and avoids raw json panels', () => {
+test('tool activity keeps action-detail hierarchy and renders typed output previews', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/chat/ToolActivityCard.vue'), 'utf-8')
 
   assert.equal(source.includes('class="tool-activity-action"'), true)
   assert.equal(source.includes('class="tool-activity-detail"'), true)
-  assert.equal(source.includes('Tool run'), true)
+  assert.equal(source.includes('Tool run'), false)
   assert.equal(source.includes('<TerminalRenderer'), false)
   assert.equal(source.includes('Tool input'), false)
   assert.equal(source.includes('Execution logs'), false)
   assert.equal(source.includes('JSON.stringify(toolArgs, null, 2)'), false)
+  assert.equal(source.includes('<ToolOutputPreview'), true)
 })

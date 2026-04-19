@@ -1,6 +1,6 @@
 <template>
   <div class="tool-activity-row" :data-status="toolStatus">
-    <p class="tool-activity-action">Tool run</p>
+    <p class="tool-activity-action">{{ actionLabel }}</p>
     <p
       class="tool-activity-detail"
       :class="{
@@ -15,11 +15,18 @@
     <p v-if="errorSummary" class="tool-activity-error">
       {{ errorSummary }}
     </p>
+
+    <ToolOutputPreview
+      v-if="shouldRenderOutputPreview"
+      :activity="activity"
+    />
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import ToolOutputPreview from './ToolOutputPreview.vue'
+import { toolOutputHasRenderableContent } from '../../utils/toolOutputPreview'
 
 const props = defineProps({
   activity: {
@@ -116,6 +123,17 @@ function numericArg(value) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+const actionLabel = computed(() => {
+  const normalized = normalizedToolName.value
+  if (normalized === 'search_schema' || normalized === 'scan_schema_chunks') return 'Searching data context'
+  if (normalized === 'sample_data' || normalized === 'sample_data_runtime') return 'Sampling data'
+  if (normalized === 'execute_python' || normalized === 'execute_python_runtime') return 'Running generated Python'
+  if (normalized === 'validate_result_runtime') return 'Checking result quality'
+  if (normalized === 'bash') return 'Running shell command'
+  if (normalized === 'pip_install') return 'Installing package'
+  return 'Action'
+})
+
 const summaryText = computed(() => {
   if (toolExplanation.value) return toolExplanation.value
 
@@ -136,7 +154,7 @@ const summaryText = computed(() => {
   }
 
   if (normalized === 'search_schema') {
-    const query = firstText(args.query)
+    const query = firstText(args.query) || summarizeList(listFromArgs(args.queries), 6)
     const output = props.activity?.output
     let count = numericArg(args.match_count)
     if (count === null && output && typeof output === 'object') {
@@ -151,11 +169,11 @@ const summaryText = computed(() => {
     return 'Searching schema'
   }
 
-  if (normalized === 'sample_data') {
+  if (normalized === 'sample_data' || normalized === 'sample_data_runtime') {
     const limit = numericArg(args.limit)
-    if (table && limit !== null) return `Sampling ${limit} rows from ${table} using ${tool} tool`
-    if (table) return `Sampling rows from ${table} using ${tool} tool`
-    return `Sampling data using ${tool} tool`
+    if (table && limit !== null) return `Sampling ${limit} rows from ${table}`
+    if (table) return `Sampling rows from ${table}`
+    return 'Sampling data'
   }
 
   if (normalized === 'pip_install') {
@@ -172,10 +190,14 @@ const summaryText = computed(() => {
     return `${verb} shell command`
   }
 
-  if (normalized === 'execute_python') {
+  if (normalized === 'execute_python' || normalized === 'execute_python_runtime') {
     const timeout = numericArg(args.timeout)
-    if (timeout !== null) return `Running Python validation (timeout ${timeout}s) using ${tool} tool`
-    return `Running Python validation using ${tool} tool`
+    if (timeout !== null) return `Running generated Python (timeout ${timeout}s)`
+    return 'Running generated Python'
+  }
+
+  if (normalized === 'validate_result_runtime') {
+    return 'Checking whether result answers the question'
   }
 
   const entries = Object.entries(args)
@@ -198,6 +220,11 @@ const errorSummary = computed(() => {
     return String(payload.error || payload.stderr || payload.message || 'Tool returned an error.')
   }
   return String(payload)
+})
+
+const shouldRenderOutputPreview = computed(() => {
+  if (toolStatus.value === 'running') return false
+  return toolOutputHasRenderableContent(props.activity)
 })
 </script>
 

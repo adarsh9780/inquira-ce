@@ -1190,17 +1190,7 @@ async function handleSubmit() {
             }
             return
           }
-          if (evt.event === 'updates' && evt.data && typeof evt.data === 'object') {
-            Object.entries(evt.data).forEach(([node, output]) => {
-              const normalizedNode = String(node || '')
-              const payload = (output && typeof output === 'object') ? output : {}
-              appStore.appendLastMessageTraceEvent({
-                type: 'node',
-                node: normalizedNode,
-                message: `${normalizedNode} completed`,
-                output: String(payload.plan || '')
-              })
-            })
+          if (evt.event === 'updates') {
             return
           }
           if (evt.event === 'token' && typeof evt.data?.text === 'string') {
@@ -1221,12 +1211,11 @@ async function handleSubmit() {
             })
             return
           }
-          if (evt.event === 'node' && evt.data?.node) {
-            appStore.appendLastMessageTraceEvent({
-              type: 'node',
-              node: evt.data.node,
-              message: evt.data.message || '',
-              output: evt.data?.output || ''
+          if (evt.event === 'reasoning' && evt.data?.message) {
+            appStore.appendLastMessageReasoningEvent({
+              stage: evt.data?.stage || 'intent',
+              message: evt.data.message,
+              route: evt.data?.route || ''
             })
             return
           }
@@ -1370,6 +1359,9 @@ async function handleSubmit() {
       if (userRequestedStop.value) {
         errorTitle = 'Generation Stopped'
         errorMessage = 'Response generation was stopped.'
+        appStore.markLastMessageStreamStopped(errorMessage)
+        toast.error(errorTitle, errorMessage)
+        return
       } else {
         errorTitle = 'Request Cancelled'
         errorMessage = 'Your query was cancelled due to timeout.'
