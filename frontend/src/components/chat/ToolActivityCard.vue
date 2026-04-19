@@ -19,6 +19,7 @@
     <ToolOutputPreview
       v-if="shouldRenderOutputPreview"
       :activity="activity"
+      :collapsed="collapsed"
     />
   </div>
 </template>
@@ -32,6 +33,10 @@ const props = defineProps({
   activity: {
     type: Object,
     required: true,
+  },
+  collapsed: {
+    type: Boolean,
+    default: false,
   },
 })
 

@@ -34,3 +34,20 @@ test('tool activity keeps action-detail hierarchy and renders typed output previ
   assert.equal(source.includes('JSON.stringify(toolArgs, null, 2)'), false)
   assert.equal(source.includes('<ToolOutputPreview'), true)
 })
+
+test('tool output previews collapse after newer output or final response', () => {
+  const chatHistorySource = readFileSync(resolve(process.cwd(), 'src/components/chat/ChatHistory.vue'), 'utf-8')
+  const toolActivitySource = readFileSync(resolve(process.cwd(), 'src/components/chat/ToolActivityCard.vue'), 'utf-8')
+  const outputPreviewSource = readFileSync(resolve(process.cwd(), 'src/components/chat/ToolOutputPreview.vue'), 'utf-8')
+
+  assert.equal(chatHistorySource.includes(':collapsed="isToolActivityOutputCollapsed(message, index)"'), true)
+  assert.equal(chatHistorySource.includes('function isToolActivityOutputCollapsed(message, activityIndex)'), true)
+  assert.equal(chatHistorySource.includes("if (String(message?.explanation || '').trim()) return true"), true)
+  assert.equal(chatHistorySource.includes('.slice(activityIndex + 1)'), true)
+  assert.equal(chatHistorySource.includes('.some((nextActivity) => toolOutputHasRenderableContent(nextActivity))'), true)
+  assert.equal(toolActivitySource.includes(':collapsed="collapsed"'), true)
+  assert.equal(outputPreviewSource.includes('collapsed: {'), true)
+  assert.equal(outputPreviewSource.includes('const expanded = ref(!props.collapsed)'), true)
+  assert.equal(outputPreviewSource.includes(':data-expanded="expanded ? \'true\' : \'false\'"'), true)
+  assert.equal(outputPreviewSource.includes('function toggleExpanded()'), true)
+})

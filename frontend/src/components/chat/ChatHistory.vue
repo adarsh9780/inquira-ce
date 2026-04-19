@@ -77,9 +77,10 @@
 
             <div v-if="toolActivityRows(message).length" class="space-y-2">
               <ToolActivityCard
-                v-for="activity in toolActivityRows(message)"
+                v-for="(activity, index) in toolActivityRows(message)"
                 :key="activity.call_id || activity.started_at"
                 :activity="activity"
+                :collapsed="isToolActivityOutputCollapsed(message, index)"
               />
             </div>
           </div>
@@ -209,6 +210,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import ToolActivityCard from './ToolActivityCard.vue'
 import AgentIntervention from './AgentIntervention.vue'
+import { toolOutputHasRenderableContent } from '../../utils/toolOutputPreview'
 import MarkdownIt from 'markdown-it'
 import markdownItKatex from 'markdown-it-katex'
 import DOMPurify from 'dompurify'
@@ -498,6 +500,16 @@ function streamToolCalls(message) {
 
 function toolActivityRows(message) {
   return streamToolCalls(message).filter((activity) => String(activity?.tool || '').trim().toLowerCase() !== 'execute_python')
+}
+
+function isToolActivityOutputCollapsed(message, activityIndex) {
+  const rows = toolActivityRows(message)
+  const activity = rows[activityIndex]
+  if (!toolOutputHasRenderableContent(activity)) return false
+  if (String(message?.explanation || '').trim()) return true
+  return rows
+    .slice(activityIndex + 1)
+    .some((nextActivity) => toolOutputHasRenderableContent(nextActivity))
 }
 
 function pendingIntervention(message) {

@@ -1,7 +1,22 @@
 <template>
-  <div v-if="preview.kind !== 'empty'" class="tool-output-preview" :data-kind="preview.kind" :data-error="Boolean(preview.error)">
+  <div
+    v-if="preview.kind !== 'empty'"
+    class="tool-output-preview"
+    :data-kind="preview.kind"
+    :data-error="Boolean(preview.error)"
+    :data-expanded="expanded ? 'true' : 'false'"
+  >
     <div class="tool-output-header">
-      <span class="tool-output-label">{{ outputLabel }}</span>
+      <button
+        type="button"
+        class="tool-output-toggle"
+        :aria-expanded="expanded ? 'true' : 'false'"
+        @click="toggleExpanded"
+      >
+        <span class="tool-output-caret" aria-hidden="true">›</span>
+        <span class="tool-output-label">{{ outputLabel }}</span>
+        <span class="tool-output-state">{{ expanded ? 'Hide' : 'Show' }}</span>
+      </button>
       <button
         v-if="copyText"
         type="button"
@@ -13,45 +28,47 @@
       </button>
     </div>
 
-    <div v-if="isCodePreview" class="tool-output-code">
-      <pre><code :class="`language-${preview.language || 'text'}`" v-html="highlightedCode"></code></pre>
-    </div>
-
-    <div v-else-if="preview.kind === 'markdown'" class="tool-output-markdown" v-html="renderedMarkdown"></div>
-
-    <div v-else-if="preview.kind === 'table'" class="tool-output-table-wrap">
-      <table class="tool-output-table">
-        <thead>
-          <tr>
-            <th v-for="column in preview.columns" :key="column">{{ column }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(row, rowIndex) in preview.rows" :key="rowIndex">
-            <td v-for="(cell, cellIndex) in row" :key="`${rowIndex}-${cellIndex}`">{{ cell }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div v-else-if="preview.kind === 'json'" class="tool-output-json">
-      <div v-if="preview.summary?.length" class="tool-output-json-summary">
-        <p v-for="item in preview.summary" :key="item">{{ item }}</p>
+    <div v-if="expanded" class="tool-output-body">
+      <div v-if="isCodePreview" class="tool-output-code">
+        <pre><code :class="`language-${preview.language || 'text'}`" v-html="highlightedCode"></code></pre>
       </div>
-      <details class="tool-output-json-raw">
-        <summary>Raw output</summary>
-        <pre>{{ preview.text }}</pre>
-      </details>
+
+      <div v-else-if="preview.kind === 'markdown'" class="tool-output-markdown" v-html="renderedMarkdown"></div>
+
+      <div v-else-if="preview.kind === 'table'" class="tool-output-table-wrap">
+        <table class="tool-output-table">
+          <thead>
+            <tr>
+              <th v-for="column in preview.columns" :key="column">{{ column }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, rowIndex) in preview.rows" :key="rowIndex">
+              <td v-for="(cell, cellIndex) in row" :key="`${rowIndex}-${cellIndex}`">{{ cell }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div v-else-if="preview.kind === 'json'" class="tool-output-json">
+        <div v-if="preview.summary?.length" class="tool-output-json-summary">
+          <p v-for="item in preview.summary" :key="item">{{ item }}</p>
+        </div>
+        <details class="tool-output-json-raw">
+          <summary>Raw output</summary>
+          <pre>{{ preview.text }}</pre>
+        </details>
+      </div>
+
+      <pre v-else class="tool-output-logs">{{ preview.text }}</pre>
+
+      <p v-if="preview.truncated" class="tool-output-truncated">Preview truncated. Copy full output for details.</p>
     </div>
-
-    <pre v-else class="tool-output-logs">{{ preview.text }}</pre>
-
-    <p v-if="preview.truncated" class="tool-output-truncated">Preview truncated. Copy full output for details.</p>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import Prism from 'prismjs'
@@ -65,6 +82,10 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  collapsed: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const md = new MarkdownIt({
@@ -74,6 +95,15 @@ const md = new MarkdownIt({
 })
 
 const preview = computed(() => buildToolOutputPreview(props.activity))
+const expanded = ref(!props.collapsed)
+
+watch(
+  () => props.collapsed,
+  (collapsed) => {
+    expanded.value = !collapsed
+  },
+  { immediate: true },
+)
 
 const isCodePreview = computed(() => String(preview.value.kind || '').startsWith('code-'))
 
@@ -144,6 +174,10 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;')
 }
 
+function toggleExpanded() {
+  expanded.value = !expanded.value
+}
+
 async function copyFullOutput() {
   if (!copyText.value) return
   try {
@@ -177,11 +211,60 @@ async function copyFullOutput() {
   border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
 }
 
+.tool-output-preview[data-expanded="false"] .tool-output-header {
+  border-bottom-color: transparent;
+}
+
+.tool-output-toggle {
+  min-width: 0;
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tool-output-toggle:hover {
+  color: var(--color-text-main);
+}
+
+.tool-output-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.7rem;
+  height: 0.7rem;
+  transform: rotate(90deg);
+  transition: transform 130ms ease;
+  font-size: 0.9rem;
+  line-height: 1;
+  color: currentColor;
+}
+
+.tool-output-preview[data-expanded="false"] .tool-output-caret {
+  transform: rotate(0deg);
+}
+
 .tool-output-label {
   font-size: 0.7rem;
   line-height: 1.2;
   color: var(--color-text-muted);
   font-weight: 500;
+}
+
+.tool-output-toggle:hover .tool-output-label {
+  color: var(--color-text-main);
+}
+
+.tool-output-state {
+  font-size: 0.68rem;
+  line-height: 1.2;
+  color: color-mix(in srgb, var(--color-text-muted) 78%, transparent);
 }
 
 .tool-output-copy {
