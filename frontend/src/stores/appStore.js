@@ -948,6 +948,28 @@ export const useAppStore = defineStore('app', () => {
     liveTokenUsage.value = null
   }
 
+  function resolveLatestTokenUsageFromChatHistory() {
+    if (!Array.isArray(chatHistory.value) || chatHistory.value.length === 0) return null
+    for (let index = chatHistory.value.length - 1; index >= 0; index -= 1) {
+      const message = chatHistory.value[index]
+      const metadata = message?.analysisMetadata
+      const tokenUsage = metadata?.token_usage
+      if (tokenUsage && typeof tokenUsage === 'object') {
+        return { ...tokenUsage }
+      }
+    }
+    return null
+  }
+
+  function syncLiveTokenUsageFromChatHistory() {
+    const usage = resolveLatestTokenUsageFromChatHistory()
+    if (usage && typeof usage === 'object') {
+      setLiveTokenUsage(usage)
+      return
+    }
+    clearLiveTokenUsage()
+  }
+
   function appendLastMessagePlanChunk(text, node = '') {
     const lastMessage = getLastChatMessage()
     if (!lastMessage || typeof text !== 'string' || !text) return
@@ -1195,11 +1217,14 @@ export const useAppStore = defineStore('app', () => {
 
 
         chatHistory.value = history
+        syncLiveTokenUsageFromChatHistory()
       } else {
         console.warn("⚠️ fetchChatHistory: No data in response")
+        clearLiveTokenUsage()
       }
     } catch (e) {
       console.error("❌ Failed to fetch chat history", e)
+      clearLiveTokenUsage()
     }
   }
 
@@ -1356,6 +1381,7 @@ export const useAppStore = defineStore('app', () => {
   function setActiveConversationId(conversationId) {
     activeConversationId.value = conversationId || ''
     turnsNextCursor.value = null
+    clearLiveTokenUsage()
     saveLocalConfig()
   }
 
@@ -1377,6 +1403,7 @@ export const useAppStore = defineStore('app', () => {
     }))
     chatHistory.value = [...mapped.reverse(), ...chatHistory.value]
     rehydrateArtifactsFromChatHistory()
+    syncLiveTokenUsageFromChatHistory()
   }
 
   function rehydrateArtifactsFromChatHistory() {
@@ -1450,6 +1477,7 @@ export const useAppStore = defineStore('app', () => {
       activeConversationId.value = ''
       chatHistory.value = []
       turnsNextCursor.value = null
+      clearLiveTokenUsage()
       if (!activeWorkspaceId.value) {
         setTerminalEnabled(false)
       }
@@ -1488,6 +1516,7 @@ export const useAppStore = defineStore('app', () => {
     activeConversationId.value = ''
     chatHistory.value = []
     turnsNextCursor.value = null
+    clearLiveTokenUsage()
     saveLocalConfig()
   }
 
@@ -1554,6 +1583,7 @@ export const useAppStore = defineStore('app', () => {
     activeConversationId.value = conv.id
     chatHistory.value = []
     turnsNextCursor.value = null
+    clearLiveTokenUsage()
     saveLocalConfig()
     return conv
   }
@@ -1568,11 +1598,13 @@ export const useAppStore = defineStore('app', () => {
     const turns = response?.turns || []
     if (reset) {
       chatHistory.value = []
+      clearLiveTokenUsage()
     }
     prependChatHistoryFromTurns(turns)
     if (reset && turns.length === 0) {
       setDataframes([])
       setFigures([])
+      clearLiveTokenUsage()
     }
     turnsNextCursor.value = response?.next_cursor || null
   }
@@ -1582,6 +1614,7 @@ export const useAppStore = defineStore('app', () => {
     await apiService.v1ClearConversation(activeConversationId.value)
     chatHistory.value = []
     turnsNextCursor.value = null
+    clearLiveTokenUsage()
   }
 
   async function deleteConversationById(conversationId) {
@@ -1607,6 +1640,7 @@ export const useAppStore = defineStore('app', () => {
 
     chatHistory.value = []
     turnsNextCursor.value = null
+    clearLiveTokenUsage()
 
     if (fallbackConversationId) {
       await fetchConversationTurns({ reset: true })
@@ -1667,6 +1701,7 @@ export const useAppStore = defineStore('app', () => {
       activeConversationId.value = ''
       chatHistory.value = []
       turnsNextCursor.value = null
+      clearLiveTokenUsage()
       columnCatalog.value = []
       profileData.value = null
       saveLocalConfig()
