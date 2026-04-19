@@ -65,6 +65,7 @@ export const useAppStore = defineStore('app', () => {
   const questionHistory = ref([])
   const currentQuestion = ref('')
   const currentExplanation = ref('')
+  const liveTokenUsage = ref(null)
   const workspaces = ref([])
   const workspaceDeletionJobs = ref([])
   const activeWorkspaceId = ref('')
@@ -928,7 +929,23 @@ export const useAppStore = defineStore('app', () => {
   function setLastMessageAnalysisMetadata(metadata) {
     const lastMessage = getLastChatMessage()
     if (!lastMessage) return
-    lastMessage.analysisMetadata = metadata && typeof metadata === 'object' ? { ...metadata } : {}
+    const normalized = metadata && typeof metadata === 'object' ? { ...metadata } : {}
+    lastMessage.analysisMetadata = normalized
+    if (normalized.token_usage && typeof normalized.token_usage === 'object') {
+      setLiveTokenUsage(normalized.token_usage)
+    }
+  }
+
+  function setLiveTokenUsage(usage) {
+    if (!usage || typeof usage !== 'object') {
+      liveTokenUsage.value = null
+      return
+    }
+    liveTokenUsage.value = { ...usage }
+  }
+
+  function clearLiveTokenUsage() {
+    liveTokenUsage.value = null
   }
 
   function appendLastMessagePlanChunk(text, node = '') {
@@ -2165,6 +2182,7 @@ export const useAppStore = defineStore('app', () => {
 
   function resetSession() {
     chatHistory.value = []
+    liveTokenUsage.value = null
     currentQuestion.value = ''
     currentExplanation.value = ''
     generatedCode.value = ''
@@ -2366,6 +2384,7 @@ export const useAppStore = defineStore('app', () => {
     questionHistory,
     currentQuestion,
     currentExplanation,
+    liveTokenUsage,
     workspaces,
     workspaceDeletionJobs,
     activeWorkspaceId,
@@ -2456,6 +2475,8 @@ export const useAppStore = defineStore('app', () => {
     updateLastMessageExplanation,
     setLastMessageCodeExplanation,
     setLastMessageAnalysisMetadata,
+    setLiveTokenUsage,
+    clearLiveTokenUsage,
     appendLastMessageExplanationChunk,
     appendLastMessagePlanChunk,
     appendLastMessageReasoningEvent,

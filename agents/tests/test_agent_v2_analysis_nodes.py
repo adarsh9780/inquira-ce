@@ -28,6 +28,7 @@ from agent_v2.nodes import (
     analysis_validate_to_next,
     analysis_retry_decider_node,
     _filter_redundant_context_tools,
+    _extract_token_usage,
     _resolve_memory_limits,
     ContextEnrichmentPlan,
     StructuredToolCall,
@@ -59,6 +60,25 @@ def test_resolve_memory_limits_scales_with_context_window() -> None:
     assert scaled_down[1] < baseline[1]
     assert scaled_up[0] >= baseline[0]
     assert scaled_up[1] >= baseline[1]
+
+
+def test_extract_token_usage_reads_openrouter_style_cost_metadata() -> None:
+    usage = _extract_token_usage(
+        {
+            "response_metadata": {
+                "token_usage": {
+                    "input_tokens": 120,
+                    "output_tokens": 34,
+                    "total_tokens": 154,
+                },
+                "total_cost": 0.000321,
+            }
+        }
+    )
+    assert usage["input_tokens"] == 120
+    assert usage["output_tokens"] == 34
+    assert usage["total_tokens"] == 154
+    assert usage["price_usd"] == pytest.approx(0.000321)
 
 
 @pytest.mark.asyncio

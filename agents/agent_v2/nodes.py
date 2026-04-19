@@ -269,7 +269,7 @@ _ROUTE_TERM_SYNONYMS = {
     "wickets": {"wicket", "wickets"},
 }
 
-_LLM_USAGE_TOTALS: contextvars.ContextVar[dict[str, int]] = contextvars.ContextVar(
+_LLM_USAGE_TOTALS: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
     "agent_v2_llm_usage_totals",
     default={},
 )
@@ -320,13 +320,22 @@ def _to_non_negative_int(value: Any) -> int:
     return parsed if parsed > 0 else 0
 
 
-def _normalize_token_usage(value: Any) -> dict[str, int]:
+def _to_non_negative_float(value: Any) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return parsed if parsed > 0 else 0.0
+
+
+def _normalize_token_usage(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
     input_tokens = _to_non_negative_int(value.get("input_tokens"))
     output_tokens = _to_non_negative_int(value.get("output_tokens"))
     cached_tokens = _to_non_negative_int(value.get("cached_tokens"))
     total_tokens = _to_non_negative_int(value.get("total_tokens"))
+    price_usd = _to_non_negative_float(value.get("price_usd"))
     if total_tokens <= 0:
         total_tokens = input_tokens + output_tokens
     normalized = {
@@ -334,13 +343,18 @@ def _normalize_token_usage(value: Any) -> dict[str, int]:
         "output_tokens": output_tokens,
         "cached_tokens": cached_tokens,
         "total_tokens": total_tokens,
+        "price_usd": price_usd,
     }
-    if normalized["total_tokens"] <= 0 and normalized["cached_tokens"] <= 0:
+    if (
+        normalized["total_tokens"] <= 0
+        and normalized["cached_tokens"] <= 0
+        and normalized["price_usd"] <= 0
+    ):
         return {}
     return normalized
 
 
-def _extract_token_usage(value: Any) -> dict[str, int]:
+def _extract_token_usage(value: Any) -> dict[str, Any]:
     if value is None:
         return {}
 
@@ -359,6 +373,11 @@ def _extract_token_usage(value: Any) -> dict[str, int]:
             nested = _extract_token_usage(token_usage)
             if nested:
                 return nested
+            for price_key in ("cost", "total_cost", "price", "price_usd"):
+                price_value = _to_non_negative_float(response_metadata.get(price_key))
+                if price_value > 0:
+                    direct["price_usd"] = price_value
+                    break
             prompt_details = response_metadata.get("prompt_tokens_details")
             if isinstance(prompt_details, dict):
                 prompt_cached = _to_non_negative_int(prompt_details.get("cached_tokens"))
@@ -382,7 +401,7 @@ def _extract_token_usage(value: Any) -> dict[str, int]:
     return {}
 
 
-def _merge_token_usage(base: Any, incoming: Any) -> dict[str, int]:
+def _merge_token_usage(base: Any, incoming: Any) -> dict[str, Any]:
     left = _normalize_token_usage(base)
     right = _normalize_token_usage(incoming)
     if not left:
@@ -394,6 +413,7 @@ def _merge_token_usage(base: Any, incoming: Any) -> dict[str, int]:
         "output_tokens": int(left.get("output_tokens") or 0) + int(right.get("output_tokens") or 0),
         "cached_tokens": int(left.get("cached_tokens") or 0) + int(right.get("cached_tokens") or 0),
         "total_tokens": int(left.get("total_tokens") or 0) + int(right.get("total_tokens") or 0),
+        "price_usd": float(left.get("price_usd") or 0.0) + float(right.get("price_usd") or 0.0),
     }
     if merged["total_tokens"] <= 0:
         merged["total_tokens"] = merged["input_tokens"] + merged["output_tokens"]
@@ -409,10 +429,18 @@ def _accumulate_llm_usage(raw_usage: Any) -> None:
     if not incoming:
         return
     current = _LLM_USAGE_TOTALS.get({})
-    _LLM_USAGE_TOTALS.set(_merge_token_usage(current, incoming))
+    totals = _merge_token_usage(current, incoming)
+    _LLM_USAGE_TOTALS.set(totals)
+    emit_agent_event(
+        "token_usage",
+        {
+            "token_usage": totals,
+            "delta": incoming,
+        },
+    )
 
 
-def _current_llm_usage_totals() -> dict[str, int]:
+def _current_llm_usage_totals() -> dict[str, Any]:
     return _normalize_token_usage(_LLM_USAGE_TOTALS.get({}))
 
 
