@@ -208,6 +208,66 @@ _SCHEMA_QUERY_STOPWORDS = {
     "with",
 }
 
+_ROUTE_RELEVANCE_STOPWORDS = _SCHEMA_QUERY_STOPWORDS | {
+    "best",
+    "bottom",
+    "find",
+    "first",
+    "give",
+    "highest",
+    "last",
+    "list",
+    "lowest",
+    "rank",
+    "ranked",
+    "ranking",
+    "sort",
+    "top",
+    "total",
+    "worst",
+}
+
+_ROUTE_ANALYSIS_HINTS = {
+    "average",
+    "best",
+    "bottom",
+    "chart",
+    "compare",
+    "count",
+    "distribution",
+    "find",
+    "graph",
+    "highest",
+    "list",
+    "lowest",
+    "plot",
+    "rank",
+    "ranked",
+    "ranking",
+    "show",
+    "sort",
+    "sum",
+    "table",
+    "top",
+    "total",
+    "trend",
+}
+
+_ROUTE_TERM_SYNONYMS = {
+    "batsman": {"bat", "batter", "batting", "batsman"},
+    "batter": {"bat", "batter", "batting", "batsman"},
+    "batting": {"bat", "batter", "batting", "batsman"},
+    "bowler": {"bowl", "bowler", "bowling"},
+    "bowling": {"bowl", "bowler", "bowling"},
+    "cricket": {"cricket", "innings", "match", "over", "runs", "wicket", "wickets"},
+    "player": {"batter", "batsman", "bowler", "player"},
+    "runs": {"run", "runs", "score", "scored"},
+    "score": {"run", "runs", "score", "scored"},
+    "scorer": {"run", "runs", "score", "scored", "scorer"},
+    "wicket": {"wicket", "wickets"},
+    "wickets": {"wicket", "wickets"},
+}
+
 
 def _stringify_content(content: Any) -> str:
     if isinstance(content, str):
@@ -603,6 +663,161 @@ def _extract_search_queries_from_code(code: str) -> list[str]:
             if len(recovered) >= 3:
                 return recovered
     return recovered
+
+
+def _route_relevance_tokens(value: Any, *, drop_analysis_hints: bool = False) -> list[str]:
+    text = " ".join(str(value or "").strip().lower().replace("_", " ").split())
+    tokens: list[str] = []
+    seen: set[str] = set()
+    for raw in re.findall(r"[a-zA-Z][a-zA-Z0-9]*", text):
+        token = str(raw or "").strip().lower()
+        if not token or token in seen:
+            continue
+        if len(token) < 2:
+            continue
+        if token in _ROUTE_RELEVANCE_STOPWORDS:
+            continue
+        if drop_analysis_hints and token in _ROUTE_ANALYSIS_HINTS:
+            continue
+        seen.add(token)
+        tokens.append(token)
+    return tokens
+
+
+def _route_term_variants(term: str) -> set[str]:
+    token = str(term or "").strip().lower()
+    if not token:
+        return set()
+    variants = {token}
+    variants.update(_ROUTE_TERM_SYNONYMS.get(token, set()))
+    if token.endswith("ies") and len(token) > 4:
+        variants.add(f"{token[:-3]}y")
+    if token.endswith("s") and len(token) > 3:
+        variants.add(token[:-1])
+    if token.endswith("ing") and len(token) > 5:
+        variants.add(token[:-3])
+    return {item for item in variants if item}
+
+
+def _route_token_matches(term: str, haystack_tokens: set[str]) -> bool:
+    variants = _route_term_variants(term)
+    if variants & haystack_tokens:
+        return True
+    for variant in variants:
+        if len(variant) < 4:
+            continue
+        if any(
+            candidate.startswith(variant) or variant.startswith(candidate)
+            for candidate in haystack_tokens
+            if len(candidate) >= 4
+        ):
+            return True
+    return False
+
+
+def _schema_tables_for_route_relevance(workspace_schema: Any) -> list[dict[str, Any]]:
+    if not isinstance(workspace_schema, dict):
+        return []
+    tables = workspace_schema.get("tables")
+    if isinstance(tables, list):
+        return [table for table in tables if isinstance(table, dict)]
+    table_name = str(workspace_schema.get("table_name") or "").strip()
+    if not table_name:
+        return []
+    return [workspace_schema]
+
+
+def _table_text_tokens(table: dict[str, Any], keys: tuple[str, ...]) -> set[str]:
+    values: list[str] = []
+    for key in keys:
+        value = table.get(key)
+        if isinstance(value, list):
+            values.extend(str(item or "") for item in value)
+        else:
+            values.append(str(value or ""))
+    return set(_route_relevance_tokens(" ".join(values)))
+
+
+def _column_text_tokens(table: dict[str, Any]) -> set[str]:
+    raw_columns = table.get("columns")
+    columns = raw_columns if isinstance(raw_columns, list) else []
+    values: list[str] = []
+    for column in columns:
+        if not isinstance(column, dict):
+            continue
+        values.append(str(column.get("name") or ""))
+        values.append(str(column.get("description") or ""))
+        aliases = column.get("aliases")
+        if isinstance(aliases, list):
+            values.extend(str(alias or "") for alias in aliases)
+    return set(_route_relevance_tokens(" ".join(values)))
+
+
+def _assess_schema_route_relevance(
+    *,
+    user_text: str,
+    workspace_schema: Any,
+    table_names: list[str],
+) -> dict[str, Any]:
+    tables = _schema_tables_for_route_relevance(workspace_schema)
+    if not tables:
+        tables = [{"table_name": table_name, "context": "", "columns": []} for table_name in table_names]
+
+    user_terms = _route_relevance_tokens(user_text, drop_analysis_hints=True)
+    hint_terms = set(re.findall(r"[a-zA-Z][a-zA-Z0-9]*", str(user_text or "").strip().lower())) & _ROUTE_ANALYSIS_HINTS
+    available_tables = [
+        str(table.get("table_name") or "").strip()
+        for table in tables
+        if str(table.get("table_name") or "").strip()
+    ]
+    if not user_terms:
+        return {
+            "has_schema": bool(available_tables),
+            "data_intent": bool(hint_terms),
+            "strong_match": False,
+            "matched_tables": [],
+            "available_tables": available_tables,
+            "reason": "no specific schema terms in request",
+        }
+
+    scored: list[dict[str, Any]] = []
+    for table in tables:
+        table_name = str(table.get("table_name") or "").strip()
+        if not table_name:
+            continue
+        name_tokens = _table_text_tokens(table, ("table_name",))
+        description_tokens = _table_text_tokens(table, ("context", "description"))
+        column_tokens = _column_text_tokens(table)
+
+        name_hits = [term for term in user_terms if _route_token_matches(term, name_tokens)]
+        description_hits = [term for term in user_terms if _route_token_matches(term, description_tokens)]
+        column_hits = [term for term in user_terms if _route_token_matches(term, column_tokens)]
+        score = len(description_hits) * 4 + len(name_hits) * 3 + len(column_hits) * 2
+        if score <= 0:
+            continue
+        source = "table_description" if description_hits else "table_name" if name_hits else "column_metadata"
+        scored.append(
+            {
+                "table_name": table_name,
+                "score": score,
+                "source": source,
+                "matched_terms": sorted(set(description_hits + name_hits + column_hits)),
+            }
+        )
+
+    scored.sort(key=lambda item: int(item.get("score") or 0), reverse=True)
+    best_score = int(scored[0].get("score") or 0) if scored else 0
+    matched_tables = [
+        item for item in scored if int(item.get("score") or 0) >= max(2, best_score - 1)
+    ][:4]
+    return {
+        "has_schema": bool(available_tables),
+        "data_intent": bool(hint_terms or scored),
+        "strong_match": bool(best_score >= 4 or (best_score >= 2 and len(matched_tables) == 1)),
+        "matched_tables": matched_tables,
+        "available_tables": available_tables,
+        "reason": "schema description match" if best_score >= 4 else "column metadata match" if best_score >= 2 else "no strong schema match",
+    }
 
 
 def _schema_memory_md_path(data_path: str | None) -> Path | None:
@@ -1117,7 +1332,44 @@ RUNTIME_FLOW_TOOLS = [
 
 
 async def route_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-    decision = await decide_route_details(state.get("messages") or [], config.get("configurable", {}))
+    messages = list(state.get("messages") or [])
+    user_text = _latest_user_text(messages)
+    table_names = _state_table_names(state, max_items=64)
+    schema_relevance = _assess_schema_route_relevance(
+        user_text=user_text,
+        workspace_schema=state.get("workspace_schema") if isinstance(state.get("workspace_schema"), dict) else {},
+        table_names=table_names,
+    )
+    matched_tables = [
+        str(item.get("table_name") or "").strip()
+        for item in (schema_relevance.get("matched_tables") or [])
+        if isinstance(item, dict) and str(item.get("table_name") or "").strip()
+    ]
+    if bool(schema_relevance.get("strong_match")) and matched_tables:
+        route = "analysis"
+        reasoning = (
+            "I found workspace table descriptions matching your request, "
+            "so I will analyze those tables before answering."
+        )
+        emit_agent_event(
+            "reasoning",
+            {
+                "stage": "intent",
+                "message": reasoning,
+                "route": route,
+            },
+        )
+        return {
+            "route": route,
+            "table_names": matched_tables,
+            "metadata": {
+                "is_safe": True,
+                "is_relevant": True,
+                "schema_relevance": schema_relevance,
+            },
+        }
+
+    decision = await decide_route_details(messages, config.get("configurable", {}))
     route = str(decision.route or "").strip().lower()
     reasoning = str(decision.reasoning or "").strip()
     if reasoning:
@@ -1135,7 +1387,35 @@ async def route_node(state: dict[str, Any], config: RunnableConfig) -> dict[str,
         metadata = {"is_safe": True, "is_relevant": False}
     else:
         metadata = {"is_safe": True, "is_relevant": True}
-    return {"route": route, "metadata": metadata}
+    if bool(schema_relevance.get("has_schema")):
+        metadata["schema_relevance"] = schema_relevance
+
+    available_tables = [
+        str(item or "").strip()
+        for item in (schema_relevance.get("available_tables") or [])
+        if str(item or "").strip()
+    ]
+    should_clarify_table = (
+        route != "unsafe"
+        and bool(schema_relevance.get("has_schema"))
+        and not bool(schema_relevance.get("strong_match"))
+        and len(available_tables) > 1
+        and (route == "analysis" or bool(schema_relevance.get("data_intent")))
+    )
+    if should_clarify_table:
+        route = "general_chat"
+        metadata = {
+            **metadata,
+            "is_relevant": False,
+            "needs_table_clarification": True,
+            "available_tables": available_tables[:12],
+            "clarification_reason": str(schema_relevance.get("reason") or "no strong schema match"),
+        }
+
+    update: dict[str, Any] = {"route": route, "metadata": metadata}
+    if route == "analysis" and len(available_tables) == 1 and not table_names:
+        update["table_names"] = available_tables
+    return update
 
 
 def route_to_next(state: dict[str, Any]) -> str:
@@ -2805,6 +3085,38 @@ async def react_loop_node(state: dict[str, Any], config: RunnableConfig) -> dict
 
 
 async def chat_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+    metadata = state.get("metadata") if isinstance(state.get("metadata"), dict) else {}
+    if bool(metadata.get("needs_table_clarification")):
+        available_tables = [
+            str(item or "").strip()
+            for item in (metadata.get("available_tables") or [])
+            if str(item or "").strip()
+        ][:12]
+        if available_tables:
+            table_list = ", ".join(available_tables)
+            text = (
+                "Which table should I use? "
+                f"I could not match your request strongly to one table description. Available tables: {table_list}."
+            )
+        else:
+            text = "Which table should I use? I could not match your request strongly to one table description."
+        _emit_text_chunks("chat", text)
+        return {
+            "route": "general_chat",
+            "final_code": "",
+            "final_explanation": text,
+            "result_explanation": text,
+            "code_explanation": "",
+            "final_execution": None,
+            "final_artifacts": [],
+            "final_executed_code": "",
+            "output_contract": [],
+            "known_columns": _normalize_known_columns(state.get("known_columns") or []),
+            "metadata": {**metadata, "is_safe": True, "is_relevant": False},
+            "messages": [AIMessage(content=text)],
+            "run_id": str(state.get("run_id") or ""),
+        }
+
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", _GENERAL_CHAT_PROMPT),
@@ -2841,7 +3153,7 @@ async def chat_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, 
         "final_executed_code": "",
         "output_contract": [],
         "known_columns": _normalize_known_columns(state.get("known_columns") or []),
-        "metadata": {"is_safe": True, "is_relevant": False},
+        "metadata": metadata or {"is_safe": True, "is_relevant": False},
         "messages": [AIMessage(content=text)],
         "run_id": str(state.get("run_id") or ""),
     }
