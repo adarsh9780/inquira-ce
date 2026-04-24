@@ -1,5 +1,6 @@
 import os
 import warnings
+import math
 from pathlib import Path
 from typing import Any
 from dotenv import load_dotenv
@@ -40,6 +41,7 @@ class LLMService:
         top_k: int | None = None,
         frequency_penalty: float | None = None,
         presence_penalty: float | None = None,
+        context_window: int | None = None,
     ):
         """Initialize LLM service with API key and OpenAI-compatible base URL."""
         runtime = load_llm_runtime_config()
@@ -69,6 +71,7 @@ class LLMService:
         self.frequency_penalty = frequency_penalty
         self.presence_penalty = presence_penalty
         self.default_max_tokens = int(max_tokens) if max_tokens is not None else runtime.default_max_tokens
+        self.context_window = int(context_window or 0)
         self.client: Any | None
         self.chat_client: Any | None
 
@@ -181,7 +184,7 @@ class LLMService:
             )
 
         try:
-            effective_max_tokens = max_tokens or self.default_max_tokens
+            effective_max_tokens = self._clamp_max_tokens(max_tokens or self.default_max_tokens, user_query)
             client = create_chat_model(
                 provider=self.provider,
                 model=self.model,
@@ -251,3 +254,15 @@ class LLMService:
             raise HTTPException(
                 status_code=500, detail=f"Error in chat conversation: {str(e)}"
             )
+
+    def _clamp_max_tokens(self, requested: int, prompt: Any) -> int:
+        configured = max(1, int(requested or self.default_max_tokens or 1))
+        if self.context_window <= 0:
+            return configured
+        text = str(prompt or "")
+        estimated_input = max(1, math.ceil(len(text) / 4)) if text else 0
+        safety_margin = max(256, min(2048, self.context_window // 32))
+        available = self.context_window - estimated_input - safety_margin
+        if available <= 0:
+            return 1
+        return max(1, min(configured, available))

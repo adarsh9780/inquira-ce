@@ -85,6 +85,27 @@ def test_llm_service_ask_passes_max_tokens_to_factory(monkeypatch):
     assert captured["calls"][-1]["max_tokens"] == 8
 
 
+def test_llm_service_ask_clamps_max_tokens_to_context_budget(monkeypatch):
+    captured = {"calls": []}
+
+    class FakeChatOpenAI:
+        def invoke(self, _query):
+            return type("Resp", (), {"content": "OK"})()
+
+    def fake_create_chat_model(**kwargs):
+        captured["calls"].append(kwargs)
+        return FakeChatOpenAI()
+
+    monkeypatch.setattr("app.services.llm_service.create_chat_model", fake_create_chat_model)
+    monkeypatch.setattr("app.services.llm_service.load_llm_runtime_config", lambda: _runtime_stub())
+    svc = LLMService(api_key="k", max_tokens=4096, context_window=4096)
+
+    result = svc.ask("x" * 8000, str)
+
+    assert result == "OK"
+    assert 1 <= captured["calls"][-1]["max_tokens"] < 4096
+
+
 def test_llm_service_ask_uses_runtime_default_max_tokens_in_factory(monkeypatch):
     captured = {"calls": []}
 

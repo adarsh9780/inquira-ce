@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import time
 from typing import Any, AsyncGenerator
 
@@ -65,9 +66,66 @@ class AgentClient:
         return "apiconnectionerror" in haystack or "connection error" in haystack
 
     @staticmethod
+    def _estimate_token_count(value: Any) -> int:
+        if value is None:
+            return 0
+        if isinstance(value, str):
+            text = value
+        else:
+            try:
+                text = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+            except (TypeError, ValueError):
+                text = str(value)
+        if not text:
+            return 0
+        return max(1, math.ceil(len(text) / 4))
+
+    @classmethod
+    def _estimate_payload_input_tokens(cls, payload: dict[str, Any]) -> int:
+        # Conservative estimate for remote agent prompt material before LangGraph adds
+        # system prompts and tool instructions.
+        estimated = 1800
+        for key in (
+            "question",
+            "current_code",
+            "context",
+            "table_names",
+            "workspace_schema",
+            "attachments",
+        ):
+            estimated += cls._estimate_token_count(payload.get(key))
+        return estimated
+
+    @classmethod
+    def _clamp_max_tokens(cls, payload: dict[str, Any], requested: Any) -> int | None:
+        try:
+            configured = int(requested)
+        except (TypeError, ValueError):
+            return None
+        if configured <= 0:
+            return None
+
+        llm_raw = payload.get("llm")
+        llm: dict[str, Any] = llm_raw if isinstance(llm_raw, dict) else {}
+        try:
+            context_window = int(llm.get("context_window") or 0)
+        except (TypeError, ValueError):
+            context_window = 0
+        if context_window <= 0:
+            return configured
+
+        estimated_input = cls._estimate_payload_input_tokens(payload)
+        safety_margin = max(256, min(2048, context_window // 32))
+        available = context_window - estimated_input - safety_margin
+        if available <= 0:
+            return 1
+        return max(1, min(configured, available))
+
+    @staticmethod
     def _configurable(payload: dict[str, Any]) -> dict[str, Any]:
         llm_raw = payload.get("llm")
         llm: dict[str, Any] = llm_raw if isinstance(llm_raw, dict) else {}
+        max_tokens = AgentClient._clamp_max_tokens(payload, llm.get("max_tokens"))
         return {
             "thread_id": f"{payload.get('user_id', '')}:{payload.get('workspace_id', '')}:{payload.get('conversation_id', '')}",
             "api_key": str(llm.get("api_key") or "").strip(),
@@ -78,7 +136,7 @@ class AgentClient:
             "lite_model": str(llm.get("lite_model") or "").strip(),
             "coding_model": str(llm.get("coding_model") or "").strip(),
             "temperature": llm.get("temperature"),
-            "max_tokens": llm.get("max_tokens"),
+            "max_tokens": max_tokens,
             "context_window": llm.get("context_window"),
             "top_p": llm.get("top_p"),
             "top_k": llm.get("top_k"),

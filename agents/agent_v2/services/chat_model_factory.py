@@ -51,11 +51,7 @@ def _normalize_ollama_base_url(base_url: str) -> str:
     return value
 
 
-def _build_openai_client(
-    settings: ChatModelSettings,
-    *,
-    include_top_k: bool = False,
-) -> BaseChatModel:
+def _build_openai_client(settings: ChatModelSettings) -> BaseChatModel:
     kwargs: dict[str, Any] = {
         "model": settings.model,
         "api_key": settings.api_key,
@@ -71,17 +67,29 @@ def _build_openai_client(
         frequency_penalty=settings.frequency_penalty,
         presence_penalty=settings.presence_penalty,
     )
-    if include_top_k:
-        _with_optional(kwargs, top_k=_positive_int(settings.top_k))
     return ChatOpenAI(**kwargs)
 
 
 def _build_openrouter_client(settings: ChatModelSettings) -> BaseChatModel:
-    return _build_openai_client(settings, include_top_k=True)
+    kwargs: dict[str, Any] = {
+        "model": settings.model,
+        "api_key": settings.api_key,
+        "base_url": settings.base_url,
+        "temperature": settings.temperature,
+        "max_retries": settings.max_retries,
+        "timeout": settings.timeout,
+    }
+    _with_optional(
+        kwargs,
+        max_tokens=settings.max_tokens,
+        top_p=settings.top_p,
+        top_k=_positive_int(settings.top_k),
+    )
+    return ChatOpenAI(**kwargs)
 
 
 def _build_openai_provider_client(settings: ChatModelSettings) -> BaseChatModel:
-    return _build_openai_client(settings, include_top_k=False)
+    return _build_openai_client(settings)
 
 
 def _build_ollama_client(settings: ChatModelSettings) -> BaseChatModel:

@@ -186,7 +186,7 @@
 
           <div
             class="overflow-hidden transition-all duration-200 ease-in-out"
-            :style="{ maxHeight: showAdvanced ? '520px' : '0px' }"
+            :style="{ maxHeight: showAdvanced ? '620px' : '0px' }"
           >
             <div class="grid grid-cols-2 gap-3 pt-1">
               <label class="space-y-1">
@@ -212,7 +212,7 @@
                 />
               </label>
 
-              <label class="space-y-1">
+              <label v-if="advancedFields.topK" class="space-y-1">
                 <span class="block text-xs text-[var(--color-text-sub)]">Top K</span>
                 <input
                   v-model.number="llmTopK"
@@ -223,7 +223,7 @@
                 />
               </label>
 
-              <label class="space-y-1">
+              <label v-if="advancedFields.temperature" class="space-y-1">
                 <div class="flex items-center justify-between">
                   <span class="block text-xs text-[var(--color-text-sub)]">Temperature</span>
                   <span class="text-xs text-[var(--color-text-muted)]">{{ llmTemperature.toFixed(1) }}</span>
@@ -231,7 +231,7 @@
                 <input v-model.number="llmTemperature" type="range" min="0" max="2" step="0.1" class="w-full accent-[var(--color-accent)]" />
               </label>
 
-              <label class="space-y-1">
+              <label v-if="advancedFields.topP" class="space-y-1">
                 <div class="flex items-center justify-between">
                   <span class="block text-xs text-[var(--color-text-sub)]">Top P</span>
                   <span class="text-xs text-[var(--color-text-muted)]">{{ llmTopP.toFixed(2) }}</span>
@@ -239,7 +239,7 @@
                 <input v-model.number="llmTopP" type="range" min="0" max="1" step="0.05" class="w-full accent-[var(--color-accent)]" />
               </label>
 
-              <label class="space-y-1">
+              <label v-if="advancedFields.frequencyPenalty" class="space-y-1">
                 <div class="flex items-center justify-between">
                   <span class="block text-xs text-[var(--color-text-sub)]">Frequency penalty</span>
                   <span class="text-xs text-[var(--color-text-muted)]">{{ llmFrequencyPenalty.toFixed(1) }}</span>
@@ -247,7 +247,7 @@
                 <input v-model.number="llmFrequencyPenalty" type="range" min="0" max="2" step="0.1" class="w-full accent-[var(--color-accent)]" />
               </label>
 
-              <label class="space-y-1">
+              <label v-if="advancedFields.presencePenalty" class="space-y-1">
                 <div class="flex items-center justify-between">
                   <span class="block text-xs text-[var(--color-text-sub)]">Presence penalty</span>
                   <span class="text-xs text-[var(--color-text-muted)]">{{ llmPresencePenalty.toFixed(1) }}</span>
@@ -364,6 +364,16 @@ const providerApiKeyPortal = computed(() => {
 })
 const mainOptions = computed(() => buildModelOptions('main', mainModel.value))
 const liteOptions = computed(() => buildModelOptions('lite', liteModel.value))
+const advancedFields = computed(() => {
+  const selectedProvider = String(provider.value || '').trim().toLowerCase()
+  return {
+    temperature: true,
+    topP: true,
+    topK: selectedProvider === 'openrouter' || selectedProvider === 'ollama',
+    frequencyPenalty: selectedProvider === 'openai',
+    presencePenalty: selectedProvider === 'openai',
+  }
+})
 
 onMounted(async () => {
   await loadPreferences(null, false)

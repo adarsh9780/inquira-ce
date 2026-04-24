@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.services.agent_client import AgentClient
 from app.v1.services.chat_service import ChatService
 
 
@@ -129,3 +130,37 @@ def test_build_remote_agent_payload_normalizes_windows_paths():
 
     assert payload["data_path"] == "C:/tmp/ws.db"
     assert payload["scratchpad_path"] == "C:/tmp/scratchpad/artifacts.duckdb"
+
+
+def test_agent_client_configurable_clamps_max_tokens_to_context_budget():
+    payload = {
+        "user_id": "user-1",
+        "workspace_id": "ws-1",
+        "conversation_id": "conv-1",
+        "question": "x" * 8000,
+        "current_code": "",
+        "context": "",
+        "workspace_schema": {},
+        "attachments": [],
+        "model": "google/gemini-2.5-flash",
+        "llm": {
+            "api_key": "key",
+            "provider": "openrouter",
+            "base_url": "https://openrouter.ai/api/v1",
+            "default_model": "google/gemini-2.5-flash",
+            "lite_model": "google/gemini-2.5-flash-lite",
+            "coding_model": "google/gemini-2.5-flash",
+            "temperature": 0.0,
+            "max_tokens": 4096,
+            "context_window": 4096,
+            "top_p": 1.0,
+            "top_k": 0,
+            "frequency_penalty": 0.0,
+            "presence_penalty": 0.0,
+        },
+    }
+
+    config = AgentClient._configurable(payload)
+
+    assert config["max_tokens"] < 4096
+    assert config["max_tokens"] >= 1

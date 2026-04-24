@@ -401,6 +401,28 @@ def _build_schema_generation_prompt(
     return get_prompt("schema_generation", context=context, columns_text=columns_text)
 
 
+def _model_context_window_from_preferences(prefs: Any, provider: str, model: str) -> int:
+    try:
+        catalogs = json.loads(str(getattr(prefs, "provider_model_catalogs_json", "{}") or "{}"))
+    except json.JSONDecodeError:
+        catalogs = {}
+    catalog = catalogs.get(provider) if isinstance(catalogs, dict) else None
+    models = catalog.get("models", []) if isinstance(catalog, dict) else []
+    if not isinstance(models, list):
+        return 0
+    target = str(model or "").strip()
+    for item in models:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("id") or "").strip() != target:
+            continue
+        try:
+            return max(0, int(item.get("context_window") or 0))
+        except (TypeError, ValueError):
+            return 0
+    return 0
+
+
 def _is_length_limit_error(exc: BaseException) -> bool:
     detail = getattr(exc, "detail", None)
     text = str(detail if detail is not None else exc).lower()
@@ -1877,6 +1899,7 @@ async def regenerate_workspace_dataset_schema(
     top_k = int(advanced_values["llm_top_k"])
     frequency_penalty = float(advanced_values["llm_frequency_penalty"])
     presence_penalty = float(advanced_values["llm_presence_penalty"])
+    context_window = _model_context_window_from_preferences(prefs, provider, model)
 
     try:
         llm_service = LLMService(
@@ -1889,6 +1912,7 @@ async def regenerate_workspace_dataset_schema(
             top_k=top_k,
             frequency_penalty=frequency_penalty,
             presence_penalty=presence_penalty,
+            context_window=context_window,
         )
     except TypeError as exc:
         if "unexpected keyword argument" not in str(exc):
