@@ -1127,7 +1127,7 @@ async function handleSubmit() {
   }
 
   appStore.addChatMessage(questionText, '', { attachments: attachmentsPayload })
-  appStore.clearLiveTokenUsage()
+  appStore.syncLiveTokenUsageFromChatHistory()
   appStore.setLoading(true)
 
   const abortController = new AbortController()
@@ -1253,7 +1253,7 @@ async function handleSubmit() {
           if (evt.event === 'token_usage' && evt.data && typeof evt.data === 'object') {
             const tokenUsage = evt.data?.token_usage
             if (tokenUsage && typeof tokenUsage === 'object') {
-              appStore.setLiveTokenUsage(tokenUsage)
+              appStore.setLiveTokenUsageForCurrentTurn(tokenUsage)
             }
           }
         }

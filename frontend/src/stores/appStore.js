@@ -932,8 +932,29 @@ export const useAppStore = defineStore('app', () => {
     const normalized = metadata && typeof metadata === 'object' ? { ...metadata } : {}
     lastMessage.analysisMetadata = normalized
     if (normalized.token_usage && typeof normalized.token_usage === 'object') {
-      setLiveTokenUsage(normalized.token_usage)
+      syncLiveTokenUsageFromChatHistory()
     }
+  }
+
+  function toTokenUsageNumber(value) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
+  }
+
+  function mergeTokenUsageTotals(base, incoming) {
+    const left = base && typeof base === 'object' ? base : {}
+    const right = incoming && typeof incoming === 'object' ? incoming : {}
+    const merged = {
+      input_tokens: toTokenUsageNumber(left.input_tokens) + toTokenUsageNumber(right.input_tokens),
+      output_tokens: toTokenUsageNumber(left.output_tokens) + toTokenUsageNumber(right.output_tokens),
+      cached_tokens: toTokenUsageNumber(left.cached_tokens) + toTokenUsageNumber(right.cached_tokens),
+      total_tokens: toTokenUsageNumber(left.total_tokens) + toTokenUsageNumber(right.total_tokens),
+      price_usd: toTokenUsageNumber(left.price_usd) + toTokenUsageNumber(right.price_usd),
+    }
+    if (merged.total_tokens <= 0) {
+      merged.total_tokens = merged.input_tokens + merged.output_tokens
+    }
+    return merged
   }
 
   function setLiveTokenUsage(usage) {
@@ -944,21 +965,34 @@ export const useAppStore = defineStore('app', () => {
     liveTokenUsage.value = { ...usage }
   }
 
+  function setLiveTokenUsageForCurrentTurn(usage) {
+    if (!usage || typeof usage !== 'object') return
+    const prior = resolveTokenUsageFromChatHistory({ excludeLast: true })
+    setLiveTokenUsage(mergeTokenUsageTotals(prior, usage))
+  }
+
   function clearLiveTokenUsage() {
     liveTokenUsage.value = null
   }
 
-  function resolveLatestTokenUsageFromChatHistory() {
+  function resolveTokenUsageFromChatHistory(options = {}) {
+    const excludeLast = Boolean(options?.excludeLast)
     if (!Array.isArray(chatHistory.value) || chatHistory.value.length === 0) return null
-    for (let index = chatHistory.value.length - 1; index >= 0; index -= 1) {
+    let totals = null
+    const end = excludeLast ? chatHistory.value.length - 1 : chatHistory.value.length
+    for (let index = 0; index < end; index += 1) {
       const message = chatHistory.value[index]
       const metadata = message?.analysisMetadata
       const tokenUsage = metadata?.token_usage
       if (tokenUsage && typeof tokenUsage === 'object') {
-        return { ...tokenUsage }
+        totals = mergeTokenUsageTotals(totals, tokenUsage)
       }
     }
-    return null
+    return totals
+  }
+
+  function resolveLatestTokenUsageFromChatHistory() {
+    return resolveTokenUsageFromChatHistory()
   }
 
   function syncLiveTokenUsageFromChatHistory() {
@@ -2511,7 +2545,9 @@ export const useAppStore = defineStore('app', () => {
     setLastMessageCodeExplanation,
     setLastMessageAnalysisMetadata,
     setLiveTokenUsage,
+    setLiveTokenUsageForCurrentTurn,
     clearLiveTokenUsage,
+    syncLiveTokenUsageFromChatHistory,
     appendLastMessageExplanationChunk,
     appendLastMessagePlanChunk,
     appendLastMessageReasoningEvent,
