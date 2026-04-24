@@ -2064,6 +2064,113 @@ def _deterministic_context_prefetch_tools(
     ][: max(1, int(max_items))]
 
 
+def _score_schema_context_confidence(
+    *,
+    enrichment_results: dict[str, Any] | None,
+    known_columns: list[dict[str, str]],
+    table_names: list[str],
+) -> dict[str, Any]:
+    results = enrichment_results if isinstance(enrichment_results, dict) else {}
+    columns = _normalize_known_columns(known_columns, max_items=80)
+    covered_queries: set[str] = set()
+    missing_queries: set[str] = set()
+
+    for key in ("search_schema", "scan_schema_chunks"):
+        rows = results.get(key)
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            for item in row.get("covered_queries") or []:
+                value = str(item or "").strip().lower()
+                if value:
+                    covered_queries.add(value)
+            for item in row.get("missing_queries") or []:
+                value = str(item or "").strip().lower()
+                if value:
+                    missing_queries.add(value)
+
+    by_table: dict[str, int] = {}
+    for column in columns:
+        table = str(column.get("table_name") or "").strip()
+        key = table.lower()
+        if not key:
+            continue
+        by_table[key] = by_table.get(key, 0) + 1
+
+    preferred_tables = {str(item or "").strip().lower() for item in table_names if str(item or "").strip()}
+    strong_table = ""
+    strong_column_count = 0
+    for table, count in by_table.items():
+        if count < strong_column_count:
+            continue
+        if preferred_tables and table not in preferred_tables:
+            continue
+        strong_table = table
+        strong_column_count = count
+
+    has_strong_table = strong_column_count >= 2
+    has_query_coverage = len(covered_queries) >= 2 or not missing_queries
+    status = "strong" if has_strong_table and has_query_coverage else "weak"
+    if len(by_table) > 1 and not preferred_tables and strong_column_count < 2:
+        status = "ambiguous"
+
+    return {
+        "status": status,
+        "strong_table": strong_table,
+        "strong_column_count": strong_column_count,
+        "covered_queries": sorted(covered_queries),
+        "missing_queries": sorted(missing_queries),
+        "table_match_counts": by_table,
+    }
+
+
+def _deterministic_scan_after_weak_prefetch_tool(
+    *,
+    user_text: str,
+    enrichment_results: dict[str, Any] | None,
+    table_names: list[str],
+    max_items: int,
+) -> list[dict[str, Any]]:
+    results = enrichment_results if isinstance(enrichment_results, dict) else {}
+    if results.get("scan_schema_chunks"):
+        return []
+    query_terms: list[str] = []
+    search_rows = results.get("search_schema")
+    if isinstance(search_rows, list):
+        for row in search_rows:
+            if not isinstance(row, dict):
+                continue
+            row_queries = row.get("queries") if isinstance(row.get("queries"), list) else []
+            row_missing = row.get("missing_queries") if isinstance(row.get("missing_queries"), list) else []
+            for item in [*row_queries, *row_missing]:
+                value = str(item or "").strip()
+                if value and value.lower() not in {term.lower() for term in query_terms}:
+                    query_terms.append(value)
+                if len(query_terms) >= 6:
+                    break
+            if len(query_terms) >= 6:
+                break
+    if not query_terms:
+        query_terms = _extract_schema_query_keywords(user_text, max_items=6)
+    if not query_terms:
+        return []
+    return [
+        {
+            "tool": "scan_schema_chunks",
+            "args": {
+                "query_terms": query_terms[:6],
+                "table_names": table_names[:8],
+                "chunk_size": 4,
+                "max_chunks": 12,
+            },
+            "explanation": "The schema search was weak, so I’m scanning table metadata before involving the planner.",
+            "source": "deterministic_confidence_gate",
+        }
+    ][: max(1, int(max_items))]
+
+
 def _latest_tool_payload(
     *,
     messages: list[AnyMessage],
@@ -2659,16 +2766,84 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
         }
 
     table_names = _normalize_table_names(analysis_context.get("table_names"), max_items=16)
+    cursor = max(0, int(state.get("enrichment_tool_cursor") or 0))
+    updates, discovered_columns, relevant_tables = _collect_enrichment_updates(
+        messages=existing_messages,
+        start_index=cursor,
+    )
+    known_columns_for_planning = known_columns
+    if discovered_columns:
+        known_columns_for_planning = _merge_known_columns_lru(
+            known_columns,
+            discovered_columns,
+            max_items=50,
+        )
+    merged_results_for_planning = _merge_enrichment_results(
+        current=existing_results,
+        incoming=updates,
+    )
+    if updates:
+        confidence = _score_schema_context_confidence(
+            enrichment_results=merged_results_for_planning,
+            known_columns=known_columns_for_planning,
+            table_names=table_names,
+        )
+        if str(confidence.get("status") or "") == "strong":
+            decision = ContextEnrichmentDecision(
+                enough_context=True,
+                missing_context=[],
+                notes="Deterministic schema prefetch found enough table and column matches.",
+            )
+            return {
+                "known_columns": known_columns_for_planning,
+                "enrichment_results": merged_results_for_planning,
+                "analysis_tool_messages": [AIMessage(content=_safe_json_dumps(decision.model_dump()))],
+                "retry_target": "",
+                "tool_plan": [],
+                "pending_tools": [],
+                "metadata": {
+                    **(state.get("metadata") if isinstance(state.get("metadata"), dict) else {}),
+                    "schema_context_confidence": confidence,
+                },
+            }
+        scan_tools = _filter_redundant_context_tools(
+            _deterministic_scan_after_weak_prefetch_tool(
+                user_text=str(analysis_context.get("user_text") or ""),
+                enrichment_results=merged_results_for_planning,
+                table_names=table_names,
+                max_items=tool_budget_remaining,
+            ),
+            merged_results_for_planning,
+        )
+        if scan_tools:
+            decision = ContextEnrichmentDecision(
+                enough_context=False,
+                missing_context=missing_context or ["strong schema matches"],
+                notes="Schema prefetch was weak; scanning schema chunks before model-planned enrichment.",
+            )
+            return {
+                "known_columns": known_columns_for_planning,
+                "enrichment_results": merged_results_for_planning,
+                "analysis_tool_messages": [AIMessage(content=_safe_json_dumps(decision.model_dump()))],
+                "retry_target": "",
+                "tool_plan": [],
+                "pending_tools": scan_tools,
+                "metadata": {
+                    **(state.get("metadata") if isinstance(state.get("metadata"), dict) else {}),
+                    "schema_context_confidence": confidence,
+                },
+            }
+
     deterministic_tools = _filter_redundant_context_tools(
         _deterministic_context_prefetch_tools(
             user_text=str(analysis_context.get("user_text") or ""),
             table_names=table_names,
-            known_columns=known_columns,
-            existing_results=existing_results,
+            known_columns=known_columns_for_planning,
+            existing_results=merged_results_for_planning,
             enrichment_hints=hints,
             max_items=tool_budget_remaining,
         ),
-        existing_results,
+        merged_results_for_planning,
     )
     if deterministic_tools:
         decision = ContextEnrichmentDecision(
@@ -2682,6 +2857,21 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
             "tool_plan": [],
             "pending_tools": deterministic_tools,
         }
+
+    known_columns = known_columns_for_planning
+    existing_results = merged_results_for_planning
+    prior_search_summary = _summarize_prior_search_context(existing_results)
+    prompt_payload = _build_context_enrichment_user_prompt(
+        user_text=str(analysis_context.get("user_text") or ""),
+        conversation_memory=str(analysis_context.get("conversation_memory") or ""),
+        schema_summary=str(analysis_context.get("schema_summary") or ""),
+        known_columns=known_columns,
+        missing_context=missing_context,
+        retry_feedback=retry_feedback,
+        enrichment_hints=hints,
+        prior_search_summary=prior_search_summary,
+        tool_budget_remaining=tool_budget_remaining,
+    )
 
     _emit_agent_status(
         step="assessing_context",

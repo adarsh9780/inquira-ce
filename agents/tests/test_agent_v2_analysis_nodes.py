@@ -12,6 +12,7 @@ from agent_v2.nodes import (
     _CONTEXT_ENRICHMENT_TOOL_PROMPT,
     _build_context_enrichment_user_prompt,
     _deterministic_context_prefetch_tools,
+    _score_schema_context_confidence,
     _is_recoverable_structured_output_error,
     finalize_node,
     analysis_assess_context_node,
@@ -301,6 +302,111 @@ async def test_analysis_enrich_context_node_prefetches_schema_before_model_plann
     pending_tools = result.get("pending_tools") or []
     assert pending_tools[0]["tool"] == "search_schema"
     assert pending_tools[0]["source"] == "deterministic_prefetch"
+
+
+def test_schema_context_confidence_scores_strong_prefetch_matches() -> None:
+    confidence = _score_schema_context_confidence(
+        enrichment_results={
+            "search_schema": [
+                {
+                    "covered_queries": ["revenue", "customer"],
+                    "missing_queries": [],
+                    "columns": [
+                        {"table_name": "orders", "name": "revenue"},
+                        {"table_name": "orders", "name": "customer_id"},
+                    ],
+                }
+            ]
+        },
+        known_columns=[
+            {"table_name": "orders", "name": "revenue", "dtype": "DOUBLE", "description": ""},
+            {"table_name": "orders", "name": "customer_id", "dtype": "VARCHAR", "description": ""},
+        ],
+        table_names=["orders"],
+    )
+
+    assert confidence["status"] == "strong"
+    assert confidence["strong_table"] == "orders"
+    assert confidence["strong_column_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_analysis_enrich_context_node_skips_planner_after_strong_prefetch(monkeypatch) -> None:
+    def fail_model(*_args, **_kwargs):
+        raise AssertionError("model planner should be skipped after strong schema prefetch")
+
+    monkeypatch.setattr("agent_v2.nodes._get_model", fail_model)
+    state = {
+        "known_columns": [],
+        "analysis_context": {
+            "data_path": "",
+            "table_names": ["orders"],
+            "sample_table": "orders",
+            "user_text": "show revenue by customer",
+            "schema_summary": "orders(customer_id, revenue)",
+        },
+        "analysis_tool_messages": [
+            ToolMessage(
+                name="search_schema",
+                tool_call_id="c1",
+                content=(
+                    '{"query":"revenue","queries":["revenue","customer"],'
+                    '"covered_queries":["revenue","customer"],"missing_queries":[],'
+                    '"columns":['
+                    '{"table_name":"orders","name":"revenue","dtype":"DOUBLE","description":"Revenue"},'
+                    '{"table_name":"orders","name":"customer_id","dtype":"VARCHAR","description":"Customer key"}'
+                    "],\"match_count\":2}"
+                ),
+            ),
+            AIMessage(content='{"enough_context": false, "missing_context": ["schema matches"], "notes": "prefetch"}'),
+        ],
+        "enrichment_results": {},
+        "attempt_counters": {"enrichment": 0, "max_tool_calls": 5},
+        "enrichment_tool_cursor": 0,
+        "messages": [HumanMessage(content="show revenue by customer")],
+    }
+
+    result = await analysis_enrich_context_node(state, {"configurable": {}})
+    assert result.get("pending_tools") == []
+    assert result.get("context_sufficiency") is None
+    assert result["metadata"]["schema_context_confidence"]["status"] == "strong"
+    assert any(item["name"] == "revenue" for item in result["known_columns"])
+
+
+@pytest.mark.asyncio
+async def test_analysis_enrich_context_node_scans_chunks_after_weak_prefetch(monkeypatch) -> None:
+    def fail_model(*_args, **_kwargs):
+        raise AssertionError("model planner should wait until deterministic scan runs")
+
+    monkeypatch.setattr("agent_v2.nodes._get_model", fail_model)
+    state = {
+        "known_columns": [],
+        "analysis_context": {
+            "data_path": "",
+            "table_names": ["orders"],
+            "sample_table": "orders",
+            "user_text": "show revenue by customer",
+            "schema_summary": "orders(customer_id, revenue)",
+        },
+        "analysis_tool_messages": [
+            ToolMessage(
+                name="search_schema",
+                tool_call_id="c1",
+                content='{"query":"revenue","queries":["revenue","customer"],"covered_queries":[],"missing_queries":["revenue","customer"],"columns":[],"match_count":0}',
+            ),
+            AIMessage(content='{"enough_context": false, "missing_context": ["schema matches"], "notes": "prefetch"}'),
+        ],
+        "enrichment_results": {},
+        "attempt_counters": {"enrichment": 0, "max_tool_calls": 5},
+        "enrichment_tool_cursor": 0,
+        "messages": [HumanMessage(content="show revenue by customer")],
+    }
+
+    result = await analysis_enrich_context_node(state, {"configurable": {}})
+    pending_tools = result.get("pending_tools") or []
+    assert pending_tools[0]["tool"] == "scan_schema_chunks"
+    assert pending_tools[0]["source"] == "deterministic_confidence_gate"
+    assert result["metadata"]["schema_context_confidence"]["status"] == "weak"
 
 
 def test_context_enrichment_prompt_requires_tool_explanations() -> None:
