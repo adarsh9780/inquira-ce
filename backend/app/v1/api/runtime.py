@@ -1901,27 +1901,31 @@ async def regenerate_workspace_dataset_schema(
     presence_penalty = float(advanced_values["llm_presence_penalty"])
     context_window = _model_context_window_from_preferences(prefs, provider, model)
 
-    try:
-        llm_service = LLMService(
-            api_key=api_key or "",
-            provider=provider,
-            model=model,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            top_p=top_p,
-            top_k=top_k,
-            frequency_penalty=frequency_penalty,
-            presence_penalty=presence_penalty,
-            context_window=context_window,
-        )
-    except TypeError as exc:
-        if "unexpected keyword argument" not in str(exc):
-            raise
-        llm_service = LLMService(
-            api_key=api_key or "",
-            provider=provider,
-            model=model,
-        )
+    llm_kwargs: dict[str, Any] = {
+        "api_key": api_key or "",
+        "provider": provider,
+        "model": model,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "top_p": top_p,
+        "top_k": top_k,
+        "frequency_penalty": frequency_penalty,
+        "presence_penalty": presence_penalty,
+        "context_window": context_window,
+    }
+    llm_signature = inspect.signature(LLMService)
+    llm_parameters = llm_signature.parameters
+    accepts_extra_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in llm_parameters.values()
+    )
+    if not accepts_extra_kwargs:
+        llm_kwargs = {
+            key: value
+            for key, value in llm_kwargs.items()
+            if key in llm_parameters
+        }
+    llm_service = LLMService(**llm_kwargs)
     try:
         generated_items = await _generate_schema_items_with_split_fallback(
             llm_service=llm_service,
