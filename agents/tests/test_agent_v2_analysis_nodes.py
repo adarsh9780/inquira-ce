@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -10,7 +11,9 @@ from agent_v2.nodes import (
     _ASSESS_CONTEXT_PROMPT,
     _CONTEXT_ENRICHMENT_TOOL_PROMPT,
     _build_context_enrichment_user_prompt,
+    _deterministic_context_prefetch_tools,
     _is_recoverable_structured_output_error,
+    finalize_node,
     analysis_assess_context_node,
     analysis_collect_context_node,
     analysis_prepare_sample_to_next,
@@ -35,6 +38,7 @@ from agent_v2.nodes import (
 )
 from agent_v2.coding_subagent.schema import AnalysisOutput
 from agent_v2.coding_subagent.generator import StructuredOutputEmptyError
+import agent_v2.nodes as nodes_module
 
 
 def test_resolve_memory_limits_scales_with_context_window() -> None:
@@ -174,6 +178,7 @@ async def test_analysis_enrich_context_node_produces_structured_pending_tools(mo
             "user_text": "show customer totals",
             "schema_summary": "orders(customer_id, amount)",
         },
+        "enrichment_results": {"scan_schema_chunks": [{"query_terms": ["orders"], "relevant_table_count": 1}]},
         "attempt_counters": {"enrichment": 0, "max_tool_calls": 5},
         "messages": [HumanMessage(content="show customer totals")],
     }
@@ -252,6 +257,50 @@ def test_context_enrichment_prompt_includes_prior_search_context() -> None:
     )
     assert "Prior search context:" in rendered
     assert "matches=4" in rendered
+
+
+def test_deterministic_context_prefetch_builds_batched_schema_search() -> None:
+    tools = _deterministic_context_prefetch_tools(
+        user_text="show revenue by customer segment",
+        table_names=["orders"],
+        known_columns=[],
+        existing_results={},
+        enrichment_hints=[],
+        max_items=2,
+    )
+
+    assert len(tools) == 1
+    assert tools[0]["tool"] == "search_schema"
+    assert tools[0]["source"] == "deterministic_prefetch"
+    assert tools[0]["args"]["table_name"] == "orders"
+    assert "revenue" in tools[0]["args"]["queries"]
+    assert "customer" in tools[0]["args"]["queries"]
+
+
+@pytest.mark.asyncio
+async def test_analysis_enrich_context_node_prefetches_schema_before_model_planning(monkeypatch) -> None:
+    def fail_model(*_args, **_kwargs):
+        raise AssertionError("model planner should be skipped for deterministic prefetch")
+
+    monkeypatch.setattr("agent_v2.nodes._get_model", fail_model)
+    state = {
+        "known_columns": [],
+        "analysis_context": {
+            "data_path": "",
+            "table_names": ["orders"],
+            "sample_table": "orders",
+            "user_text": "show revenue by customer segment",
+            "schema_summary": "orders(customer_id, revenue)",
+        },
+        "enrichment_results": {},
+        "attempt_counters": {"enrichment": 0, "max_tool_calls": 5},
+        "messages": [HumanMessage(content="show revenue by customer segment")],
+    }
+
+    result = await analysis_enrich_context_node(state, {"configurable": {}})
+    pending_tools = result.get("pending_tools") or []
+    assert pending_tools[0]["tool"] == "search_schema"
+    assert pending_tools[0]["source"] == "deterministic_prefetch"
 
 
 def test_context_enrichment_prompt_requires_tool_explanations() -> None:
@@ -419,6 +468,50 @@ async def test_analysis_runtime_tools_node_emits_tool_messages_and_trace_hooks(m
     assert result.get("pending_tools") == []
     assert [event for event, _payload in events] == ["tool_call", "tool_result"]
     assert [item[0] for item in span_events] == ["agent.tool_call", "agent.tool_result"]
+    timings = result["metadata"]["agent_timings"]["tools"]
+    assert timings[0]["tool"] == "sample_data_runtime"
+    assert timings[0]["duration_ms"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_analysis_runtime_tools_node_runs_independent_tools_concurrently(monkeypatch) -> None:
+    started: list[str] = []
+    release = asyncio.Event()
+
+    async def fake_sample(state, args, explanation):
+        _ = state, args, explanation
+        started.append("sample")
+        await release.wait()
+        return {"rows": [], "columns": [], "row_count": 0}
+
+    async def fake_validate(state, args, explanation):
+        _ = state, args, explanation
+        started.append("validate")
+        await release.wait()
+        return {"success": True, "result_kind": "scalar", "has_signal": True}
+
+    async def release_after_start():
+        while len(started) < 2:
+            await asyncio.sleep(0)
+        release.set()
+
+    monkeypatch.setitem(nodes_module._CUSTOM_RUNTIME_TOOL_REGISTRY, "sample_data_runtime", fake_sample)
+    monkeypatch.setitem(nodes_module._CUSTOM_RUNTIME_TOOL_REGISTRY, "validate_result_runtime", fake_validate)
+
+    releaser = asyncio.create_task(release_after_start())
+    result = await analysis_runtime_tools_node(
+        {
+            "pending_tools": [
+                {"tool": "sample_data_runtime", "args": {}, "explanation": "Sample first."},
+                {"tool": "validate_result_runtime", "args": {}, "explanation": "Validate too."},
+            ],
+        },
+        {"configurable": {}},
+    )
+    await releaser
+
+    assert set(started) == {"sample", "validate"}
+    assert len(result.get("analysis_runtime_tool_messages") or []) == 2
 
 
 def test_analysis_runtime_tools_to_next_routes_by_stage() -> None:
@@ -979,3 +1072,24 @@ def test_analysis_validate_to_next_routes_to_failure_after_retry_cap() -> None:
         "attempt_counters": {"generation": 3, "max_code_executions": 3},
     }
     assert analysis_validate_to_next(state) == "analysis_finalize_failure"
+
+
+def test_finalize_node_adds_final_response_metadata() -> None:
+    result = finalize_node(
+        {
+            "final_code": "result = 1",
+            "result_explanation": "Revenue increased.",
+            "code_explanation": "Computed revenue.",
+            "final_execution": {"result_kind": "scalar", "result_name": "result"},
+            "final_artifacts": [{"artifact_id": "a1"}],
+            "metadata": {"is_safe": True, "is_relevant": True},
+        },
+        {"configurable": {}},
+    )
+
+    final_response = result["metadata"]["final_response"]
+    assert final_response["answer"] == "Revenue increased."
+    assert final_response["has_code"] is True
+    assert final_response["has_execution"] is True
+    assert final_response["artifact_count"] == 1
+    assert final_response["result_kind"] == "scalar"

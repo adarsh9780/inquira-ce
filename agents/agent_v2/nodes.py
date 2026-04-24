@@ -2023,6 +2023,47 @@ def _filter_redundant_context_tools(
     return filtered
 
 
+def _deterministic_context_prefetch_tools(
+    *,
+    user_text: str,
+    table_names: list[str],
+    known_columns: list[dict[str, str]],
+    existing_results: dict[str, Any] | None,
+    enrichment_hints: list[str],
+    max_items: int,
+) -> list[dict[str, Any]]:
+    if known_columns:
+        return []
+    results = existing_results if isinstance(existing_results, dict) else {}
+    if results.get("search_schema") or results.get("scan_schema_chunks"):
+        return []
+
+    query_terms = _normalize_broad_search_queries(
+        query=" ".join(_extract_schema_query_keywords(user_text, max_items=8)),
+        queries=enrichment_hints,
+        max_items=6,
+    )
+    if not query_terms:
+        return []
+
+    args: dict[str, Any] = {
+        "query": query_terms[0],
+        "queries": query_terms,
+        "limit": 20,
+    }
+    if len(table_names) == 1:
+        args["table_name"] = table_names[0]
+
+    return [
+        {
+            "tool": "search_schema",
+            "args": args,
+            "explanation": "I have the user question, so I’m checking likely schema matches before planning code.",
+            "source": "deterministic_prefetch",
+        }
+    ][: max(1, int(max_items))]
+
+
 def _latest_tool_payload(
     *,
     messages: list[AnyMessage],
@@ -2185,15 +2226,14 @@ async def execute_pending_tools_node(
 ) -> dict[str, Any]:
     _ = config
     pending_tools = state.get("pending_tools") if isinstance(state.get("pending_tools"), list) else []
-    tool_messages: list[ToolMessage] = []
 
-    for item in pending_tools:
+    async def _execute_one(item: dict[str, Any]) -> tuple[ToolMessage | None, dict[str, Any] | None]:
         if not isinstance(item, dict):
-            continue
+            return None, None
         tool_name = str(item.get("tool") or "").strip()
         executor = registry.get(tool_name)
         if executor is None:
-            continue
+            return None, None
         args = item.get("args") if isinstance(item.get("args"), dict) else {}
         explanation = str(item.get("explanation") or "").strip()
         call_id = str(item.get("call_id") or "").strip() or new_tool_call_id(tool_name)
@@ -2229,13 +2269,14 @@ async def execute_pending_tools_node(
             status = "error"
             payload = {"success": False, "error": str(exc)}
 
+        duration_ms = max(1, int((time.perf_counter() - started) * 1000))
         emit_agent_event(
             "tool_result",
             {
                 "call_id": call_id,
                 "output": payload,
                 "status": status,
-                "duration_ms": max(1, int((time.perf_counter() - started) * 1000)),
+                "duration_ms": duration_ms,
             },
         )
         _record_tool_span_event(
@@ -2245,17 +2286,39 @@ async def execute_pending_tools_node(
             explanation=explanation,
             status=status,
         )
-        tool_messages.append(
+        return (
             ToolMessage(
                 name=tool_name,
                 tool_call_id=call_id,
                 content=_safe_json_dumps(payload),
-            )
+            ),
+            {
+                "tool": tool_name,
+                "call_id": call_id,
+                "status": status,
+                "duration_ms": duration_ms,
+            },
         )
+
+    executed = await asyncio.gather(
+        *[_execute_one(item) for item in pending_tools if isinstance(item, dict)]
+    )
+    tool_messages = [message for message, _timing in executed if message is not None]
+    tool_timings = [timing for _message, timing in executed if isinstance(timing, dict)]
+    metadata = state.get("metadata") if isinstance(state.get("metadata"), dict) else {}
+    timings = metadata.get("agent_timings") if isinstance(metadata.get("agent_timings"), dict) else {}
+    existing_tools = timings.get("tools") if isinstance(timings.get("tools"), list) else []
 
     return {
         message_key: tool_messages,
         "pending_tools": [],
+        "metadata": {
+            **metadata,
+            "agent_timings": {
+                **timings,
+                "tools": [*existing_tools, *tool_timings],
+            },
+        },
     }
 
 
@@ -2593,6 +2656,31 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
             "tool_plan": [],
             "enrichment_hints": [],
             "pending_tools": [],
+        }
+
+    table_names = _normalize_table_names(analysis_context.get("table_names"), max_items=16)
+    deterministic_tools = _filter_redundant_context_tools(
+        _deterministic_context_prefetch_tools(
+            user_text=str(analysis_context.get("user_text") or ""),
+            table_names=table_names,
+            known_columns=known_columns,
+            existing_results=existing_results,
+            enrichment_hints=hints,
+            max_items=tool_budget_remaining,
+        ),
+        existing_results,
+    )
+    if deterministic_tools:
+        decision = ContextEnrichmentDecision(
+            enough_context=False,
+            missing_context=missing_context or ["schema matches"],
+            notes="Running deterministic schema prefetch before model-planned enrichment.",
+        )
+        return {
+            "analysis_tool_messages": [AIMessage(content=_safe_json_dumps(decision.model_dump()))],
+            "retry_target": "",
+            "tool_plan": [],
+            "pending_tools": deterministic_tools,
         }
 
     _emit_agent_status(
@@ -3437,6 +3525,20 @@ def finalize_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, An
     metadata = state.get("metadata") if isinstance(state.get("metadata"), dict) else {
         "is_safe": True,
         "is_relevant": True,
+    }
+    execution = state.get("final_execution") if isinstance(state.get("final_execution"), dict) else {}
+    artifacts = state.get("final_artifacts") if isinstance(state.get("final_artifacts"), list) else []
+    metadata = {
+        **metadata,
+        "final_response": {
+            "answer": result_explanation,
+            "has_code": bool(code.strip()),
+            "has_code_explanation": bool(code_explanation.strip()),
+            "has_execution": bool(execution),
+            "artifact_count": len([item for item in artifacts if isinstance(item, dict)]),
+            "result_kind": str(execution.get("result_kind") or ""),
+            "result_name": str(execution.get("result_name") or ""),
+        },
     }
     usage_totals = _current_llm_usage_totals()
     if usage_totals:

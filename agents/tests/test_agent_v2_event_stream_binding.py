@@ -22,12 +22,17 @@ def test_agent_v2_stream_event_binding_emits_custom_payload(monkeypatch):
     wrapped = _with_stream_event_emitter(_node)
     result = wrapped({}, {})
 
-    assert result == {"ok": True}
-    assert captured == [{"event": "agent_status", "data": {"message": "searching schema"}}]
+    assert result["ok"] is True
+    node_duration = result["metadata"]["agent_timings"]["nodes"]["_node"]
+    assert node_duration >= 1
+    assert captured == [
+        {"event": "agent_status", "data": {"message": "searching schema"}},
+        {"event": "node_timing", "data": {"node": "_node", "duration_ms": node_duration}},
+    ]
 
     # Emitter is request-scoped and should not leak outside the wrapped node call.
     emit_agent_event("tool_call", {"call_id": "outside"})
-    assert len(captured) == 1
+    assert len(captured) == 2
 
 
 @pytest.mark.asyncio

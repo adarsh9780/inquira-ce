@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import wraps
 import inspect
+import time
 from typing import Any, TypedDict
 
 from langchain_core.runnables import RunnableConfig
@@ -122,6 +123,38 @@ def _with_stream_event_emitter(fn):
     target = fn
     if not inspect.isfunction(fn) and not inspect.ismethod(fn) and callable(fn):
         target = getattr(fn, "__call__", fn)
+    node_name = str(getattr(target, "__name__", "") or getattr(fn, "__class__", type(fn)).__name__)
+
+    def _attach_node_timing(result: Any, args: tuple[Any, ...], duration_ms: int) -> Any:
+        if not isinstance(result, dict):
+            return result
+        state = args[0] if args and isinstance(args[0], dict) else {}
+        state_metadata = state.get("metadata") if isinstance(state.get("metadata"), dict) else {}
+        result_metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
+        metadata = {**state_metadata, **result_metadata}
+        state_timings = (
+            state_metadata.get("agent_timings")
+            if isinstance(state_metadata.get("agent_timings"), dict)
+            else {}
+        )
+        result_timings = (
+            result_metadata.get("agent_timings")
+            if isinstance(result_metadata.get("agent_timings"), dict)
+            else {}
+        )
+        timings = {**state_timings, **result_timings}
+        nodes = dict(timings.get("nodes") or {}) if isinstance(timings.get("nodes"), dict) else {}
+        nodes[node_name] = duration_ms
+        return {
+            **result,
+            "metadata": {
+                **metadata,
+                "agent_timings": {
+                    **timings,
+                    "nodes": nodes,
+                },
+            },
+        }
 
     @wraps(fn)
     async def _async_wrapped(*args, **kwargs):
@@ -131,8 +164,17 @@ def _with_stream_event_emitter(fn):
         token = set_agent_event_emitter(
             lambda event, payload: writer({"event": str(event), "data": dict(payload or {})})
         )
+        started = time.perf_counter()
         try:
-            return await fn(*args, **kwargs)
+            result = await fn(*args, **kwargs)
+            duration_ms = max(1, int((time.perf_counter() - started) * 1000))
+            writer(
+                {
+                    "event": "node_timing",
+                    "data": {"node": node_name, "duration_ms": duration_ms},
+                }
+            )
+            return _attach_node_timing(result, args, duration_ms)
         finally:
             reset_agent_event_emitter(token)
 
@@ -144,8 +186,17 @@ def _with_stream_event_emitter(fn):
         token = set_agent_event_emitter(
             lambda event, payload: writer({"event": str(event), "data": dict(payload or {})})
         )
+        started = time.perf_counter()
         try:
-            return fn(*args, **kwargs)
+            result = fn(*args, **kwargs)
+            duration_ms = max(1, int((time.perf_counter() - started) * 1000))
+            writer(
+                {
+                    "event": "node_timing",
+                    "data": {"node": node_name, "duration_ms": duration_ms},
+                }
+            )
+            return _attach_node_timing(result, args, duration_ms)
         finally:
             reset_agent_event_emitter(token)
 
