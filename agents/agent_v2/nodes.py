@@ -62,7 +62,7 @@ _ASSESS_CONTEXT_PROMPT = (
     "- {{tool: \"scan_schema_chunks\", query: string, table_name?: string, limit?: int, explanation: string}}\n"
     "- {{tool: \"sample_data\", table_name?: string, limit?: int, explanation: string}}\n"
     "- {{tool: \"bash\", command: string, explanation: string}}\n"
-    "Never emit pip_install. Keep tool_plan empty when enough_context=true.\n"
+    "Keep tool_plan empty when enough_context=true.\n"
     "For search_schema and scan_schema_chunks, query must be a single keyword token (no spaces).\n"
     "Start with 1-3 broad keyword queries, then narrow only after seeing matches.\n"
     "If search_schema results are weak, include scan_schema_chunks to inspect schema metadata in chunks."

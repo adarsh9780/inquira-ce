@@ -21,7 +21,6 @@
     "execute_python_runtime",
     "validate_result_runtime",
     "bash",
-    "pip_install",
     "finish_analysis"
   ]
 }

@@ -135,7 +135,6 @@ const actionLabel = computed(() => {
   if (normalized === 'execute_python' || normalized === 'execute_python_runtime') return 'Running generated Python'
   if (normalized === 'validate_result_runtime') return 'Checking result quality'
   if (normalized === 'bash') return 'Running shell command'
-  if (normalized === 'pip_install') return 'Installing package'
   return 'Action'
 })
 
@@ -179,12 +178,6 @@ const summaryText = computed(() => {
     if (table && limit !== null) return `Sampling ${limit} rows from ${table}`
     if (table) return `Sampling rows from ${table}`
     return 'Sampling data'
-  }
-
-  if (normalized === 'pip_install') {
-    const packages = listFromArgs(args.packages)
-    if (packages.length > 0) return `Installing ${summarizeList(packages)} using ${tool} tool`
-    return `Installing packages using ${tool} tool`
   }
 
   if (normalized === 'bash') {

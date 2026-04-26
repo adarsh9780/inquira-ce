@@ -123,15 +123,6 @@ locked = true
 # Docs: docs/admin-policy.md#tools-bash-allowed-commands
 allowed_commands = ["rg", "grep", "wc", "head", "tail", "ls", "cat", "find"]
 
-[tools.pip_install]
-# Allow/deny runtime package installation from prompts.
-# Docs: docs/admin-policy.md#tools-pip-install-allow
-allow = false
-
-# Lock user control for pip install tool.
-# Docs: docs/admin-policy.md#tools-pip-install-locked
-locked = true
-
 [execution]
 # Hard limits for runtime safety/cost.
 # Docs: docs/admin-policy.md#execution
@@ -171,4 +162,3 @@ max_artifact_hours = 72
 # Emit audit logs when user attempts to override managed policy.
 # Docs: docs/admin-policy.md#audit-log-policy-violations
 log_policy_violations = true
-
