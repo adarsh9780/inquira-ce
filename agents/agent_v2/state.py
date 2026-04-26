@@ -89,6 +89,7 @@ class AgentState(AgentInput, total=False):
     attempt_counters: dict[str, int]
     analysis_output: dict[str, Any]
     result_summary: dict[str, Any]
+    tool_result_cache: dict[str, Any]
 
 
 def default_system_info() -> SystemInfo:

@@ -2334,6 +2334,62 @@ _CUSTOM_RUNTIME_TOOL_REGISTRY: dict[str, Any] = {
     "validate_result_runtime": _run_validate_result_runtime,
 }
 
+_CACHEABLE_TOOL_NAMES = {
+    "search_schema",
+    "scan_schema_chunks",
+    "sample_data",
+    "sample_data_runtime",
+}
+
+
+def _normalized_tool_cache_key(state: dict[str, Any], tool_name: str, args: dict[str, Any]) -> str:
+    analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
+    schema_manifest = (
+        analysis_context.get("schema_manifest")
+        if isinstance(analysis_context.get("schema_manifest"), dict)
+        else {}
+    )
+    schema_version = str(schema_manifest.get("schema_version") or "v1")
+    normalized_args = json.dumps(args, sort_keys=True, separators=(",", ":"), default=str)
+    return "::".join(
+        [
+            str(state.get("workspace_id") or ""),
+            schema_version,
+            str(tool_name or ""),
+            normalized_args,
+        ]
+    )
+
+
+def _tool_cache_message(
+    *,
+    tool_name: str,
+    call_id: str,
+    payload: dict[str, Any],
+    cache_key: str,
+) -> tuple[ToolMessage, dict[str, Any]]:
+    emit_agent_event(
+        "tool_cache_hit",
+        {
+            "tool": tool_name,
+            "call_id": call_id,
+            "cache_key": cache_key,
+        },
+    )
+    return (
+        ToolMessage(
+            name=tool_name,
+            tool_call_id=call_id,
+            content=_safe_json_dumps(payload),
+        ),
+        {
+            "tool": tool_name,
+            "call_id": call_id,
+            "status": "cache_hit",
+            "duration_ms": 1,
+        },
+    )
+
 
 async def execute_pending_tools_node(
     state: dict[str, Any],
@@ -2344,17 +2400,32 @@ async def execute_pending_tools_node(
 ) -> dict[str, Any]:
     _ = config
     pending_tools = state.get("pending_tools") if isinstance(state.get("pending_tools"), list) else []
+    existing_cache = state.get("tool_result_cache") if isinstance(state.get("tool_result_cache"), dict) else {}
+    tool_result_cache = dict(existing_cache)
 
-    async def _execute_one(item: dict[str, Any]) -> tuple[ToolMessage | None, dict[str, Any] | None]:
+    async def _execute_one(item: dict[str, Any]) -> tuple[ToolMessage | None, dict[str, Any] | None, str | None, dict[str, Any] | None]:
         if not isinstance(item, dict):
-            return None, None
+            return None, None, None, None
         tool_name = str(item.get("tool") or "").strip()
         executor = registry.get(tool_name)
         if executor is None:
-            return None, None
+            return None, None, None, None
         args = item.get("args") if isinstance(item.get("args"), dict) else {}
         explanation = str(item.get("explanation") or "").strip()
         call_id = str(item.get("call_id") or "").strip() or new_tool_call_id(tool_name)
+        cache_key = (
+            _normalized_tool_cache_key(state, tool_name, args)
+            if tool_name in _CACHEABLE_TOOL_NAMES
+            else ""
+        )
+        if cache_key and isinstance(tool_result_cache.get(cache_key), dict):
+            message, timing = _tool_cache_message(
+                tool_name=tool_name,
+                call_id=call_id,
+                payload=tool_result_cache[cache_key],
+                cache_key=cache_key,
+            )
+            return message, timing, None, None
         event_args = {**args}
         if explanation:
             event_args["explanation"] = explanation
@@ -2416,13 +2487,52 @@ async def execute_pending_tools_node(
                 "status": status,
                 "duration_ms": duration_ms,
             },
+            cache_key or None,
+            payload if cache_key and status == "success" else None,
         )
 
-    executed = await asyncio.gather(
-        *[_execute_one(item) for item in pending_tools if isinstance(item, dict)]
-    )
-    tool_messages = [message for message, _timing in executed if message is not None]
-    tool_timings = [timing for _message, timing in executed if isinstance(timing, dict)]
+    unique_pending: list[dict[str, Any]] = []
+    duplicate_items: list[tuple[dict[str, Any], str]] = []
+    seen_batch_keys: set[str] = set()
+    for item in pending_tools:
+        if not isinstance(item, dict):
+            continue
+        tool_name = str(item.get("tool") or "").strip()
+        args = item.get("args") if isinstance(item.get("args"), dict) else {}
+        cache_key = (
+            _normalized_tool_cache_key(state, tool_name, args)
+            if tool_name in _CACHEABLE_TOOL_NAMES
+            else ""
+        )
+        if cache_key and cache_key in seen_batch_keys:
+            duplicate_items.append((item, cache_key))
+            continue
+        if cache_key:
+            seen_batch_keys.add(cache_key)
+        unique_pending.append(item)
+
+    executed = await asyncio.gather(*[_execute_one(item) for item in unique_pending])
+    for _message, _timing, cache_key, payload in executed:
+        if cache_key and isinstance(payload, dict):
+            tool_result_cache[cache_key] = payload
+
+    duplicate_executed: list[tuple[ToolMessage | None, dict[str, Any] | None, str | None, dict[str, Any] | None]] = []
+    for item, cache_key in duplicate_items:
+        tool_name = str(item.get("tool") or "").strip()
+        call_id = str(item.get("call_id") or "").strip() or new_tool_call_id(tool_name)
+        cached_payload = tool_result_cache.get(cache_key)
+        if isinstance(cached_payload, dict):
+            message, timing = _tool_cache_message(
+                tool_name=tool_name,
+                call_id=call_id,
+                payload=cached_payload,
+                cache_key=cache_key,
+            )
+            duplicate_executed.append((message, timing, None, None))
+
+    all_executed = [*executed, *duplicate_executed]
+    tool_messages = [message for message, _timing, _cache_key, _payload in all_executed if message is not None]
+    tool_timings = [timing for _message, timing, _cache_key, _payload in all_executed if isinstance(timing, dict)]
     metadata = state.get("metadata") if isinstance(state.get("metadata"), dict) else {}
     timings = metadata.get("agent_timings") if isinstance(metadata.get("agent_timings"), dict) else {}
     existing_tools = timings.get("tools") if isinstance(timings.get("tools"), list) else []
@@ -2430,6 +2540,7 @@ async def execute_pending_tools_node(
     return {
         message_key: tool_messages,
         "pending_tools": [],
+        "tool_result_cache": tool_result_cache,
         "metadata": {
             **metadata,
             "agent_timings": {
