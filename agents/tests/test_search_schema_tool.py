@@ -52,6 +52,10 @@ def test_search_schema_supports_multiple_query_patterns_in_one_call(tmp_path) ->
     assert "total_amount" in names
     first = columns[0] if columns else {}
     assert isinstance(first.get("matched_queries"), list)
+    assert set(result["results_by_query"]) == {"customer", "amount"}
+    assert any(item["name"] == "customer_name" for item in result["results_by_query"]["customer"])
+    assert any(item["name"] == "total_amount" for item in result["results_by_query"]["amount"])
+    assert result["merged_ranked_results"] == result["columns"]
 
 
 def test_search_schema_reports_query_coverage(tmp_path) -> None:
@@ -75,3 +79,25 @@ def test_search_schema_reports_query_coverage(tmp_path) -> None:
     missing = result.get("missing_queries") if isinstance(result, dict) else []
     assert "customer" in (covered or [])
     assert "missing_metric" in (missing or [])
+    assert "missing_metric" in result.get("unmatched_queries", [])
+
+
+def test_search_schema_limits_each_query_bucket(tmp_path) -> None:
+    db_path = tmp_path / "workspace.duckdb"
+    con = duckdb.connect(str(db_path))
+    try:
+        con.execute("CREATE TABLE sales (customer_name VARCHAR, customer_id VARCHAR, customer_segment VARCHAR)")
+    finally:
+        con.close()
+
+    result = search_schema(
+        data_path=str(db_path),
+        table_names=["sales"],
+        query="",
+        queries=["customer"],
+        table_name=None,
+        max_results=10,
+        limit_per_query=2,
+    )
+
+    assert len(result["results_by_query"]["customer"]) == 2

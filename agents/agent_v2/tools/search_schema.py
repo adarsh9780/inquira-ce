@@ -246,6 +246,7 @@ def search_schema(
     queries: list[str] | None = None,
     table_name: str | None,
     max_results: int = 20,
+    limit_per_query: int | None = None,
     explanation: str = "",
     emit_tool_events: bool = True,
 ) -> dict[str, Any]:
@@ -253,6 +254,7 @@ def search_schema(
     call_id = new_tool_call_id("search_schema") if emit_tool_events else ""
     normalized_queries = _normalize_queries(query=query, queries=queries, max_items=12)
     safe_max = max(1, min(100, int(max_results)))
+    safe_per_query = max(1, min(50, int(limit_per_query or max_results or 20)))
 
     if emit_tool_events:
         emit_agent_event(
@@ -265,6 +267,7 @@ def search_schema(
                     "table_name": str(table_name or "").strip(),
                     "table_names": [str(item).strip() for item in (table_names or []) if str(item).strip()],
                     "max_results": safe_max,
+                    "limit_per_query": safe_per_query,
                     "explanation": str(explanation or "").strip(),
                 },
                 "call_id": call_id,
@@ -276,28 +279,62 @@ def search_schema(
     if not rows:
         rows = _iter_db_columns(data_path=data_path, table_name=table_name, table_names=table_names)
     ranked: list[tuple[int, int, str, str, dict[str, Any]]] = []
+    results_by_query: dict[str, list[dict[str, Any]]] = {item: [] for item in normalized_queries}
     for column in rows:
         matched = _best_match_rank(column=column, normalized_queries=normalized_queries)
         if matched is None:
             continue
         rank, matched_queries = matched
+        column_payload = {
+            "table_name": str(column.get("table_name") or "").strip(),
+            "name": str(column.get("name") or "").strip(),
+            "dtype": str(column.get("dtype") or "").strip(),
+            "description": str(column.get("description") or "").strip(),
+        }
+        for query_value in matched_queries:
+            query_rank = _match_rank(column, query_value)
+            if query_rank is None:
+                continue
+            bucket = results_by_query.setdefault(query_value, [])
+            bucket.append(
+                {
+                    **column_payload,
+                    "matched_queries": [query_value],
+                    "rank": query_rank,
+                }
+            )
         ranked.append(
             (
                 rank,
                 -len(matched_queries),
                 _normalize_text(column.get("table_name")),
                 _normalize_text(column.get("name")),
-                {
-                    "table_name": str(column.get("table_name") or "").strip(),
-                    "name": str(column.get("name") or "").strip(),
-                    "dtype": str(column.get("dtype") or "").strip(),
-                    "description": str(column.get("description") or "").strip(),
-                    "matched_queries": matched_queries,
-                },
+                {**column_payload, "matched_queries": matched_queries},
             )
         )
 
     ranked.sort(key=lambda item: (item[0], item[1], item[2], item[3]))
+    for query_value, bucket in list(results_by_query.items()):
+        bucket.sort(
+            key=lambda item: (
+                int(item.get("rank") or 999),
+                _normalize_text(item.get("table_name")),
+                _normalize_text(item.get("name")),
+            )
+        )
+        deduped_bucket: list[dict[str, Any]] = []
+        seen_bucket: set[str] = set()
+        for item in bucket:
+            key = f"{_normalize_text(item.get('table_name'))}:{_normalize_text(item.get('name'))}"
+            if key in seen_bucket:
+                continue
+            seen_bucket.add(key)
+            clean = dict(item)
+            clean.pop("rank", None)
+            deduped_bucket.append(clean)
+            if len(deduped_bucket) >= safe_per_query:
+                break
+        results_by_query[query_value] = deduped_bucket
 
     deduped: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -323,9 +360,12 @@ def search_schema(
         "queries": normalized_queries,
         "covered_queries": covered_queries,
         "missing_queries": missing_queries,
+        "unmatched_queries": missing_queries,
         "table_name": str(table_name or "").strip(),
         "match_count": len(deduped),
         "columns": deduped,
+        "results_by_query": results_by_query,
+        "merged_ranked_results": deduped,
     }
     if emit_tool_events:
         emit_agent_event(
