@@ -759,7 +759,8 @@ class ChatService:
             return False
 
         artifacts = ChatService._normalize_artifacts(response_payload.get("artifacts"))
-        if not artifacts:
+        execution_success = bool(execution.get("success")) or str(execution.get("status") or "").lower() == "success"
+        if not artifacts and not execution_success:
             return False
 
         executed_code = str(result_payload.get("final_executed_code") or "").strip()

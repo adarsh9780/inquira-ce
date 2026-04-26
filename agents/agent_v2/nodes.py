@@ -1552,18 +1552,6 @@ async def route_node(state: dict[str, Any], config: RunnableConfig) -> dict[str,
     ]
     if bool(schema_relevance.get("strong_match")) and matched_tables:
         route = "analysis"
-        reasoning = (
-            "I found workspace table descriptions matching your request, "
-            "so I will analyze those tables before answering."
-        )
-        emit_agent_event(
-            "reasoning",
-            {
-                "stage": "intent",
-                "message": reasoning,
-                "route": route,
-            },
-        )
         return {
             "route": route,
             "table_names": matched_tables,
@@ -2042,7 +2030,10 @@ def _deterministic_context_prefetch_tools(
     existing_results: dict[str, Any] | None,
     enrichment_hints: list[str],
     max_items: int,
+    has_schema_context_pack: bool = False,
 ) -> list[dict[str, Any]]:
+    if has_schema_context_pack and not enrichment_hints:
+        return []
     if known_columns:
         return []
     results = existing_results if isinstance(existing_results, dict) else {}
@@ -2996,6 +2987,10 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
             existing_results=merged_results_for_planning,
             enrichment_hints=hints,
             max_items=tool_budget_remaining,
+            has_schema_context_pack=bool(
+                isinstance(analysis_context.get("schema_context_pack"), dict)
+                and (analysis_context.get("schema_context_pack") or {}).get("tables")
+            ),
         ),
         merged_results_for_planning,
     )
@@ -3234,6 +3229,10 @@ async def analysis_capture_execute_tool_result_node(
         "final_executed_code": str(state.get("candidate_code") or "").strip(),
         "runtime_tool_cursor": len(runtime_messages),
         "runtime_tool_stage": "",
+        "metadata": {
+            **(state.get("metadata") if isinstance(state.get("metadata"), dict) else {}),
+            "execution_source": "workspace_runtime",
+        },
         "attempt_counters": {
             **attempt_counters,
             "execution": int(attempt_counters.get("execution") or 0) + 1,

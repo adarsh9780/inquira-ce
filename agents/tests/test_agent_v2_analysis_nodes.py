@@ -304,6 +304,45 @@ async def test_analysis_enrich_context_node_prefetches_schema_before_model_plann
     assert pending_tools[0]["source"] == "deterministic_prefetch"
 
 
+@pytest.mark.asyncio
+async def test_analysis_enrich_context_node_skips_prefetch_when_context_pack_exists(monkeypatch) -> None:
+    async def _fake_structured_chain(*_args, **_kwargs):
+        return ContextEnrichmentPlan(enough_context=True, notes="context pack is enough", tools=[])
+
+    monkeypatch.setattr("agent_v2.nodes._ainvoke_provider_structured_chain", _fake_structured_chain)
+    monkeypatch.setattr("agent_v2.nodes._get_model", lambda *_args, **_kwargs: object())
+    state = {
+        "known_columns": [],
+        "analysis_context": {
+            "data_path": "",
+            "table_names": ["orders"],
+            "sample_table": "orders",
+            "user_text": "show revenue by customer segment",
+            "schema_summary": "orders(customer_id, revenue)",
+            "schema_context_pack": {
+                "mode": "compact",
+                "tables": [
+                    {
+                        "table_name": "orders",
+                        "columns": [
+                            {"name": "customer_id", "dtype": "VARCHAR"},
+                            {"name": "revenue", "dtype": "DOUBLE"},
+                        ],
+                    }
+                ],
+            },
+        },
+        "enrichment_results": {},
+        "attempt_counters": {"enrichment": 0, "max_tool_calls": 5},
+        "messages": [HumanMessage(content="show revenue by customer segment")],
+    }
+
+    result = await analysis_enrich_context_node(state, {"configurable": {}})
+
+    assert result.get("pending_tools") == []
+    assert "analysis_tool_messages" in result
+
+
 def test_schema_context_confidence_scores_strong_prefetch_matches() -> None:
     confidence = _score_schema_context_confidence(
         enrichment_results={

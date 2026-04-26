@@ -66,10 +66,13 @@ async def test_route_node_emits_user_facing_reasoning(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_route_node_prefers_workspace_table_description_before_router(monkeypatch):
+    captured: list[tuple[str, dict]] = []
+
     async def _should_not_call_router(_messages, _configurable):
         raise AssertionError("router should be skipped for strong schema description matches")
 
     monkeypatch.setattr("agent_v2.nodes.decide_route_details", _should_not_call_router)
+    monkeypatch.setattr("agent_v2.nodes.emit_agent_event", lambda event, payload: captured.append((event, payload)))
 
     result = await route_node(
         {
@@ -98,6 +101,7 @@ async def test_route_node_prefers_workspace_table_description_before_router(monk
     relevance = result["metadata"]["schema_relevance"]
     assert relevance["strong_match"] is True
     assert relevance["matched_tables"][0]["source"] == "table_description"
+    assert captured == []
 
 
 @pytest.mark.asyncio
