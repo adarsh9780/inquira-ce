@@ -411,6 +411,7 @@ async def test_analysis_enrich_context_node_scans_chunks_after_weak_prefetch(mon
 
 def test_context_enrichment_prompt_requires_tool_explanations() -> None:
     assert "what I got, what I will do next" in _CONTEXT_ENRICHMENT_TOOL_PROMPT
+    assert "ONE batched search_schema call" in _CONTEXT_ENRICHMENT_TOOL_PROMPT
 
 
 def test_context_enrichment_prompt_escapes_literal_tool_examples() -> None:
