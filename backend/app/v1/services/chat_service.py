@@ -316,7 +316,7 @@ class ChatService:
         table_names: list[str],
         data_path: str,
         workspace_schema: dict[str, Any],
-        schema_folder_path: str,
+        schema_folder_path: str = "",
         scratchpad_path: str,
         attachments: list[dict[str, Any]],
         llm_prefs: dict[str, Any],
