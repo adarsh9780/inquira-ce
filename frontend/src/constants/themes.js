@@ -16,6 +16,18 @@ export const THEME_OPTIONS = [
     label: 'Midnight Dark',
     description: 'Deep slate dark palette with warm brand accent and softer glare.',
     preview: ['#101722', '#151E2B', '#C96A2E']
+  },
+  {
+    id: 'daddylight',
+    label: "Daddy's Light Theme",
+    description: 'Warm neutral cream base with orange primary and mauve accent.',
+    preview: ['#e9eae1', '#f4f5f0', '#ed9912']
+  },
+  {
+    id: 'daddydark',
+    label: "Daddy's Dark Theme",
+    description: 'Inverted warm neutral base with orange primary and mauve accent.',
+    preview: ['#d2d5c3', '#e9eae1', '#ed9912']
   }
 ]
 
