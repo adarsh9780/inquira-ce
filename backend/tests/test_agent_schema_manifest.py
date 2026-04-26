@@ -1,6 +1,5 @@
 import importlib.util
 from pathlib import Path
-
 MODULE_PATH = Path(__file__).resolve().parents[2] / "agents" / "agent_v2" / "schema_manifest.py"
 spec = importlib.util.spec_from_file_location("agent_schema_manifest", MODULE_PATH)
 schema_manifest = importlib.util.module_from_spec(spec)
@@ -46,7 +45,7 @@ def test_schema_context_pack_loads_full_schema_when_under_budget():
 
     assert pack["mode"] == "full"
     assert pack["schema_version"] == "test-v1"
-    assert pack["schema_folder_path"] == "/tmp/meta"
+    assert Path(pack["schema_folder_path"]) == Path("/tmp/workspace.duckdb").parent / "meta"
     column = pack["tables"][0]["columns"][0]
     assert column["description"] == "Revenue before discounts"
     assert column["sample_values"] == [100.5, 220.0]
