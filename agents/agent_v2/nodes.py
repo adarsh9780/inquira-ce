@@ -34,6 +34,7 @@ from .code_guard import guard_code
 from .events import emit_agent_event
 from .router import decide_route_details
 from .runtime import load_agent_runtime_config
+from .schema_manifest import build_schema_context_pack, build_schema_manifest
 from .memory.summarizer import build_conversation_memory
 from .streaming import emit_stream_token
 from .structured_schema import openai_strict_json_schema
@@ -310,6 +311,16 @@ def _safe_json_loads(value: Any) -> dict[str, Any]:
     except Exception:
         return {}
     return fallback if isinstance(fallback, dict) else {}
+
+
+def _config_context_window(config: RunnableConfig) -> int:
+    configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
+    if not isinstance(configurable, dict):
+        return 0
+    try:
+        return int(configurable.get("context_window") or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _to_non_negative_int(value: Any) -> int:
@@ -2582,6 +2593,17 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
     sample_table = table_names[0] if len(table_names) == 1 else None
     workspace_schema = state.get("workspace_schema") if isinstance(state.get("workspace_schema"), dict) else {}
+    schema_folder_path = str(state.get("schema_folder_path") or "").strip()
+    if schema_folder_path:
+        workspace_schema = {**workspace_schema, "schema_folder_path": schema_folder_path}
+    schema_manifest = build_schema_manifest(
+        workspace_schema=workspace_schema,
+        data_path=data_path,
+    )
+    schema_context_pack = build_schema_context_pack(
+        manifest=schema_manifest,
+        context_window=_config_context_window(config),
+    )
     schema_memory = await asyncio.to_thread(_load_schema_memory_markdown, data_path)
     schema_summary = _build_schema_summary(
         table_names=table_names,
@@ -2624,6 +2646,8 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
             "data_path": data_path,
             "context": str(state.get("context") or ""),
             "workspace_schema": workspace_schema,
+            "schema_manifest": schema_manifest,
+            "schema_context_pack": schema_context_pack,
             "schema_memory": schema_memory,
             "conversation_memory": conversation_memory,
         },
@@ -3140,8 +3164,20 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
 
     retry_feedback = str(state.get("retry_feedback") or "").strip()
     schema_memory = str(analysis_context.get("schema_memory") or "").strip()
+    schema_context_pack = (
+        analysis_context.get("schema_context_pack")
+        if isinstance(analysis_context.get("schema_context_pack"), dict)
+        else {}
+    )
     conversation_memory = str(analysis_context.get("conversation_memory") or "").strip()
     generation_context = str(analysis_context.get("context") or "")
+    if schema_context_pack:
+        generation_context = (
+            f"{generation_context}\n\n"
+            "Schema context pack already loaded for this turn. Use it before requesting schema tools. "
+            "Request more schema details only for specific ambiguous columns.\n"
+            f"{_safe_json_dumps(schema_context_pack)[:9000]}"
+        ).strip()
     if schema_memory:
         generation_context = (
             f"{generation_context}\n\n"

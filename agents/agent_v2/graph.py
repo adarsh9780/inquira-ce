@@ -58,6 +58,7 @@ class RuntimeInput(TypedDict, total=False):
     scratchpad_path: str
     context: str
     workspace_schema: dict[str, Any]
+    schema_folder_path: str
     current_code: str
     previous_code: str
     run_id: str
@@ -94,6 +95,7 @@ def _prepare_input_node(state: dict[str, Any], config: RunnableConfig) -> dict[s
             "system_info": state.get("system_info") if isinstance(state.get("system_info"), dict) else {},
             "context": str(state.get("context") or ""),
             "workspace_schema": state.get("workspace_schema") if isinstance(state.get("workspace_schema"), dict) else {},
+            "schema_folder_path": str(state.get("schema_folder_path") or ""),
             "previous_code": str(state.get("previous_code") or state.get("current_code") or ""),
             "current_code": str(state.get("current_code") or ""),
             "known_columns": state.get("known_columns") if isinstance(state.get("known_columns"), list) else [],
@@ -107,6 +109,7 @@ def _prepare_input_node(state: dict[str, Any], config: RunnableConfig) -> dict[s
         data_path=str(state.get("data_path") or ""),
         context=str(state.get("context") or ""),
         workspace_schema=state.get("workspace_schema") if isinstance(state.get("workspace_schema"), dict) else {},
+        schema_folder_path=str(state.get("schema_folder_path") or ""),
         workspace_id=str(state.get("workspace_id") or ""),
         user_id=str(state.get("user_id") or ""),
         scratchpad_path=str(state.get("scratchpad_path") or ""),

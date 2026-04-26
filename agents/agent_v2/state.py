@@ -30,6 +30,7 @@ class AgentInput(TypedDict):
     system_info: SystemInfo
     context: str
     workspace_schema: dict[str, Any]
+    schema_folder_path: str
     previous_code: str
     current_code: str
     known_columns: list[dict[str, str]]
@@ -107,6 +108,7 @@ def build_input_state(
     data_path: str,
     context: str,
     workspace_schema: dict[str, Any] | None = None,
+    schema_folder_path: str = "",
     workspace_id: str,
     user_id: str,
     scratchpad_path: str,
@@ -186,6 +188,7 @@ def build_input_state(
         system_info=default_system_info(),
         context=str(context or ""),
         workspace_schema=workspace_schema if isinstance(workspace_schema, dict) else {},
+        schema_folder_path=str(schema_folder_path or ""),
         previous_code=str(current_code or ""),
         current_code=str(current_code or ""),
         known_columns=normalized_known_columns,
