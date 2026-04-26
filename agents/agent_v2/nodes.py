@@ -2341,6 +2341,13 @@ _CACHEABLE_TOOL_NAMES = {
     "sample_data_runtime",
 }
 
+_PARALLEL_READ_ONLY_TOOL_NAMES = {
+    "search_schema",
+    "scan_schema_chunks",
+    "sample_data",
+    "sample_data_runtime",
+}
+
 
 def _normalized_tool_cache_key(state: dict[str, Any], tool_name: str, args: dict[str, Any]) -> str:
     analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
@@ -2511,7 +2518,19 @@ async def execute_pending_tools_node(
             seen_batch_keys.add(cache_key)
         unique_pending.append(item)
 
-    executed = await asyncio.gather(*[_execute_one(item) for item in unique_pending])
+    parallel_pending = [
+        item
+        for item in unique_pending
+        if str(item.get("tool") or "").strip() in _PARALLEL_READ_ONLY_TOOL_NAMES
+    ]
+    serial_pending = [
+        item
+        for item in unique_pending
+        if str(item.get("tool") or "").strip() not in _PARALLEL_READ_ONLY_TOOL_NAMES
+    ]
+    executed = list(await asyncio.gather(*[_execute_one(item) for item in parallel_pending]))
+    for item in serial_pending:
+        executed.append(await _execute_one(item))
     for _message, _timing, cache_key, payload in executed:
         if cache_key and isinstance(payload, dict):
             tool_result_cache[cache_key] = payload

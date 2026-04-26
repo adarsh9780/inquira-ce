@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from agent_v2 import nodes
@@ -67,3 +69,37 @@ async def test_execute_pending_tools_reuses_existing_cache(monkeypatch) -> None:
     assert len(result["analysis_tool_messages"]) == 1
     assert result["tool_result_cache"] == state["tool_result_cache"]
     assert any(event == "tool_cache_hit" for event, _payload in events)
+
+
+@pytest.mark.asyncio
+async def test_execute_pending_tools_keeps_runtime_tools_sequential(monkeypatch) -> None:
+    active = 0
+    max_active = 0
+
+    async def fake_runtime(_state, _args, _explanation):
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        await asyncio.sleep(0.01)
+        active -= 1
+        return {"success": True}
+
+    monkeypatch.setattr(nodes, "emit_agent_event", lambda _event, _payload: None)
+    state = {
+        "workspace_id": "ws-1",
+        "analysis_context": {"schema_manifest": {"schema_version": "schema-v1"}},
+        "pending_tools": [
+            {"tool": "execute_python_runtime", "args": {"code": "print(1)"}},
+            {"tool": "execute_python_runtime", "args": {"code": "print(2)"}},
+        ],
+    }
+
+    result = await nodes.execute_pending_tools_node(
+        state,
+        {},
+        message_key="analysis_runtime_tool_messages",
+        registry={"execute_python_runtime": fake_runtime},
+    )
+
+    assert len(result["analysis_runtime_tool_messages"]) == 2
+    assert max_active == 1
