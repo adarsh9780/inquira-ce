@@ -2332,12 +2332,30 @@ _CACHEABLE_TOOL_NAMES = {
     "sample_data_runtime",
 }
 
+_DATA_DEPENDENT_CACHEABLE_TOOL_NAMES = {
+    "search_schema",
+    "scan_schema_chunks",
+    "sample_data",
+    "sample_data_runtime",
+}
+
 _PARALLEL_READ_ONLY_TOOL_NAMES = {
     "search_schema",
     "scan_schema_chunks",
     "sample_data",
     "sample_data_runtime",
 }
+
+
+def _analysis_data_mtime_ns(state: dict[str, Any]) -> int:
+    analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
+    data_path = str(analysis_context.get("data_path") or "").strip()
+    if not data_path:
+        return 0
+    try:
+        return int(Path(data_path).expanduser().stat().st_mtime_ns)
+    except Exception:
+        return 0
 
 
 def _normalized_tool_cache_key(state: dict[str, Any], tool_name: str, args: dict[str, Any]) -> str:
@@ -2348,11 +2366,17 @@ def _normalized_tool_cache_key(state: dict[str, Any], tool_name: str, args: dict
         else {}
     )
     schema_version = str(schema_manifest.get("schema_version") or "v1")
+    data_mtime_ns = (
+        _analysis_data_mtime_ns(state)
+        if str(tool_name or "").strip() in _DATA_DEPENDENT_CACHEABLE_TOOL_NAMES
+        else 0
+    )
     normalized_args = json.dumps(args, sort_keys=True, separators=(",", ":"), default=str)
     return "::".join(
         [
             str(state.get("workspace_id") or ""),
             schema_version,
+            str(data_mtime_ns),
             str(tool_name or ""),
             normalized_args,
         ]

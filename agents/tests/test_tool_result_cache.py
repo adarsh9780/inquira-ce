@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 import pytest
 
@@ -103,3 +104,24 @@ async def test_execute_pending_tools_keeps_runtime_tools_sequential(monkeypatch)
 
     assert len(result["analysis_runtime_tool_messages"]) == 2
     assert max_active == 1
+
+
+def test_sample_data_cache_key_changes_when_dataset_mtime_changes(tmp_path) -> None:
+    db_path = tmp_path / "workspace.duckdb"
+    db_path.write_text("db", encoding="utf-8")
+    state = {
+        "workspace_id": "ws-1",
+        "analysis_context": {
+            "data_path": str(db_path),
+            "schema_manifest": {"schema_version": "schema-v1"},
+        },
+    }
+    args = {"table_name": "orders", "limit": 5}
+
+    first_key = nodes._normalized_tool_cache_key(state, "sample_data", args)
+    initial_mtime = db_path.stat().st_mtime_ns
+    updated_mtime = initial_mtime + 1_000_000
+    os.utime(db_path, ns=(updated_mtime, updated_mtime))
+    second_key = nodes._normalized_tool_cache_key(state, "sample_data", args)
+
+    assert first_key != second_key
