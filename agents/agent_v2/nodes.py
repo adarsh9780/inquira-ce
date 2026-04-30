@@ -3623,10 +3623,17 @@ async def analysis_validate_result_node(state: dict[str, Any], config: RunnableC
             result_explanation = "Analysis completed successfully."
 
     result_kind = str(result_summary.get("result_kind") or "").strip().lower()
+    expected_output_kinds = {
+        str(item.get("kind") or "").strip().lower()
+        for item in (state.get("output_contract") or [])
+        if isinstance(item, dict) and str(item.get("kind") or "").strip()
+    }
     artifact_count = int(result_summary.get("artifact_count") or 0)
     has_stdout_signal = bool(str(result_summary.get("stdout") or "").strip())
     has_result_signal = result_kind in {"dataframe", "figure", "scalar"}
     has_summary_signal = bool(result_summary.get("has_signal"))
+    has_tabular_signal = bool(result_summary.get("has_tabular_signal"))
+    is_empty_result = bool(result_summary.get("is_empty_result"))
     validation_outcome = {"status": "ok", "reason": ""}
     retry_feedback = ""
     retry_target = ""
@@ -3636,6 +3643,27 @@ async def analysis_validate_result_node(state: dict[str, Any], config: RunnableC
             "reason": (
                 "Execution produced no analyzable output. "
                 "Generate code that returns a dataframe, figure, or scalar result."
+            ),
+        }
+        retry_feedback = str(validation_outcome["reason"])
+        retry_target = "analysis_generate_code"
+    elif has_tabular_signal and is_empty_result:
+        validation_outcome = {
+            "status": "retry",
+            "reason": (
+                "Execution returned an empty dataframe-like result. "
+                "Adjust the analysis so it produces a non-empty result when data exists."
+            ),
+        }
+        retry_feedback = str(validation_outcome["reason"])
+        retry_target = "analysis_generate_code"
+    elif expected_output_kinds and result_kind not in expected_output_kinds and result_kind == "none":
+        expected_list = ", ".join(sorted(expected_output_kinds))
+        validation_outcome = {
+            "status": "retry",
+            "reason": (
+                "Execution did not produce the expected output kind. "
+                f"Expected one of: {expected_list}."
             ),
         }
         retry_feedback = str(validation_outcome["reason"])

@@ -84,6 +84,16 @@ def _result_preview(value: Any, *, max_rows: int = 5, limit: int = 1800) -> str:
     return _json_preview(value, limit=limit)
 
 
+def _row_count_preview(value: Any) -> int | None:
+    if isinstance(value, list):
+        return len(value)
+    if isinstance(value, dict):
+        rows = value.get("rows")
+        if isinstance(rows, list):
+            return len(rows)
+    return None
+
+
 async def validate_and_summarize_result(
     *,
     workspace_id: str,
@@ -110,6 +120,9 @@ async def validate_and_summarize_result(
         max_rows=safe_max_rows,
         limit=1800,
     )
+    row_count_preview = _row_count_preview(execution_result.get("result"))
+    has_tabular_signal = result_kind == "dataframe" or row_count_preview is not None
+    is_empty_result = bool(has_tabular_signal and row_count_preview == 0)
     has_signal = bool(stdout or artifacts or (result_kind not in {"", "none"}))
 
     return {
@@ -120,7 +133,11 @@ async def validate_and_summarize_result(
         "result_kind": result_kind,
         "result_name": str(execution_result.get("result_name") or ""),
         "result_preview": result_preview,
+        "row_count_preview": row_count_preview,
+        "has_tabular_signal": has_tabular_signal,
+        "is_empty_result": is_empty_result,
         "artifact_count": len(artifacts),
         "artifacts": artifacts,
+        "artifact_kinds": [str(item.get("kind") or "").strip().lower() for item in artifacts],
         "has_signal": has_signal,
     }

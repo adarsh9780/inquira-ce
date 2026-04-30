@@ -1174,6 +1174,44 @@ async def test_analysis_validate_result_retries_when_execution_has_no_signal(mon
 
 
 @pytest.mark.asyncio
+async def test_analysis_validate_result_retries_when_dataframe_preview_is_empty(monkeypatch) -> None:
+    async def fake_generate_result_explanations(**_kwargs):
+        class _Payload:
+            result_explanation = "The query ran, but it came back empty."
+            code_explanation = "Returned an empty dataframe."
+
+        return _Payload()
+
+    monkeypatch.setattr("agent_v2.nodes._generate_result_explanations", fake_generate_result_explanations)
+
+    state = {
+        "workspace_id": "ws1",
+        "run_id": "r1",
+        "execution_result": {"success": True, "stdout": "", "stderr": "", "artifacts": []},
+        "analysis_context": {"user_text": "top customers"},
+        "candidate_code": "result = conn.sql('select * from customers where 1 = 0').fetchdf()",
+        "analysis_output": {"explanation": "Returned the filtered customers dataframe."},
+        "analysis_runtime_tool_messages": [
+            ToolMessage(
+                content=(
+                    '{"success": true, "stdout": "", "stderr": "", "result_kind": "dataframe", '
+                    '"result_preview": "{\\"rows\\": []}", "row_count_preview": 0, '
+                    '"has_tabular_signal": true, "is_empty_result": true, '
+                    '"artifact_count": 0, "artifacts": [], "has_signal": true}'
+                ),
+                tool_call_id="call_1",
+                name="validate_result_runtime",
+            )
+        ],
+    }
+
+    result = await analysis_validate_result_node(state, {"configurable": {}})
+    assert result.get("retry_target") == "analysis_generate_code"
+    assert "empty dataframe-like result" in str(result.get("retry_feedback") or "").lower()
+    assert analysis_validate_to_next(result) == "analysis_generate_code"
+
+
+@pytest.mark.asyncio
 async def test_generate_result_explanations_uses_lite_model(monkeypatch) -> None:
     captured: dict[str, object] = {}
 
