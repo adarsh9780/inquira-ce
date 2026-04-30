@@ -3514,8 +3514,14 @@ async def analysis_retry_decider_node(state: dict[str, Any], config: RunnableCon
 
     guard_result = state.get("guard_result") if isinstance(state.get("guard_result"), dict) else {}
     if bool(guard_result.get("blocked")):
+        guard_reason = str(guard_result.get("reason") or "Generated code failed validation.").strip()
+        if "select *" in guard_reason.lower() or "bounded final result" in guard_reason.lower():
+            guard_reason = (
+                f"{guard_reason} Regenerate the code so DuckDB filters, aggregates, or limits the data "
+                "before converting the final result to pandas."
+            )
         return {
-            "retry_feedback": str(guard_result.get("reason") or "Generated code failed validation."),
+            "retry_feedback": guard_reason,
             "retry_target": "analysis_generate_code",
         }
 
@@ -3549,12 +3555,17 @@ async def analysis_retry_decider_node(state: dict[str, Any], config: RunnableCon
         }
 
     lowered = error_text.lower()
-    if any(token in lowered for token in ["column", "table", "schema", "not found"]):
+    if any(token in lowered for token in ["column", "table", "schema", "not found", "binder error", "catalog error"]):
         hints = _extract_schema_query_keywords(error_text, max_items=3)
         return {
             "retry_feedback": f"Execution failed due to missing schema context: {error_text[:1200]}",
             "retry_target": "analysis_enrich_context",
             "enrichment_hints": hints,
+        }
+    if "empty dataframe-like result" in lowered or "did not produce the expected output kind" in lowered:
+        return {
+            "retry_feedback": error_text[:1200],
+            "retry_target": "analysis_generate_code",
         }
     return {
         "retry_feedback": f"Execution failed. Regenerate code that fixes this runtime error: {error_text[:1200]}",

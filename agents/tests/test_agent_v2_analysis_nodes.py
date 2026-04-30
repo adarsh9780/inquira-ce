@@ -1301,6 +1301,27 @@ def test_analysis_validate_to_next_routes_to_failure_after_retry_cap() -> None:
     assert analysis_validate_to_next(state) == "analysis_finalize_failure"
 
 
+@pytest.mark.asyncio
+async def test_analysis_retry_decider_retries_guarded_unbounded_load_with_specific_feedback() -> None:
+    result = await analysis_retry_decider_node(
+        {
+            "guard_result": {
+                "blocked": True,
+                "reason": (
+                    "Do not materialize an unbounded SELECT * workspace query into pandas. "
+                    "Filter, aggregate, or limit the DuckDB query first, then convert only the bounded final result."
+                ),
+            },
+            "candidate_code": "result_df = conn.sql(\"SELECT * FROM orders\").fetchdf()",
+            "attempt_counters": {"generation": 1, "execution": 0, "max_code_executions": 3},
+        },
+        {"configurable": {}},
+    )
+
+    assert result["retry_target"] == "analysis_generate_code"
+    assert "duckdb filters, aggregates, or limits the data" in str(result["retry_feedback"]).lower()
+
+
 def test_finalize_node_adds_final_response_metadata() -> None:
     result = finalize_node(
         {
