@@ -743,7 +743,7 @@ onUnmounted(() => {
 }
 
 .app-nav-pane {
-  width: 240px;
+  width: 360px;
   transition: width var(--motion-duration-standard) var(--motion-ease-standard);
   overflow: hidden;
   border-right: 1px solid var(--color-border);

@@ -49,7 +49,7 @@ test('sidebar icons keep fixed size to avoid toggle jitter', () => {
   // New design uses shrink-0 on icons
   assert.equal(sidebarSource.includes('FolderOpenIcon v-if="workspacesExpanded"'), true)
   assert.equal(sidebarSource.includes('class="section-label truncate"'), true)
-  assert.equal(sidebarSource.includes('FolderIcon v-else class="w-4 h-4 shrink-0"'), true)
+  assert.equal(sidebarSource.includes('FolderIcon v-else class="h-4 w-4 shrink-0"'), true)
   assert.equal(sidebarSource.includes('class="sidebar-brand-shell h-14 shrink-0 border-b"'), true)
   assert.equal(sidebarSource.includes('sidebar-brand-wordmark-collapsed'), true)
   // No scale animations on workspace/schema tabs

@@ -1,5 +1,17 @@
 export const THEME_OPTIONS = [
   {
+    id: 'classiclight',
+    label: 'Classic Light',
+    description: 'Neutral white application shell with graphite text and restrained slate accents.',
+    preview: ['#FFFFFF', '#E5E7EB', '#3B82F6']
+  },
+  {
+    id: 'classicdark',
+    label: 'Classic Dark',
+    description: 'Standard charcoal dark mode with balanced panels and cool slate highlights.',
+    preview: ['#111827', '#253046', '#7C93C8']
+  },
+  {
     id: 'warm',
     label: 'Warm Light',
     description: 'Editorial parchment light theme with clay actions and cooler data accents.',

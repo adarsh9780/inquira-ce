@@ -12,13 +12,13 @@ test('workspace/schema toggle is in status bar, not sidebar', () => {
   // Sidebar no longer has workspace/schema tab buttons
   assert.equal(sidebarSource.includes("@click=\"handleTabClick('workspace')\""), false)
   assert.equal(sidebarSource.includes("@click=\"handleTabClick('schema-editor')\""), false)
-  assert.equal(sidebarSource.includes("if (normalized === 'workspace')"), true)
-  assert.equal(sidebarSource.includes("if (normalized === 'schema-editor')"), false)
+  assert.equal(sidebarSource.includes("if (normalized === 'workspace' || normalized === 'data')"), true)
+  assert.equal(sidebarSource.includes("appStore.activeTab === 'schema-editor'"), true)
 
   // Sidebar no longer has workspace/schema specific collapse logic
   // (it still has toggleSidebar for header click, but not for tab switching)
-  assert.equal(sidebarSource.includes("if (appStore.activeTab === 'workspace')"), false)
-  assert.equal(sidebarSource.includes("if (appStore.activeTab === 'schema-editor')"), false)
+  assert.equal(sidebarSource.includes('function openWorkspaceRail(target = \'\') {'), true)
+  assert.equal(sidebarSource.includes('function openSchemaFromRail() {'), true)
 
   // Workspace/schema toggle is now in status bar
   assert.equal(statusBarSource.includes('switchToWorkspace'), true)
@@ -27,19 +27,20 @@ test('workspace/schema toggle is in status bar, not sidebar', () => {
   assert.equal(statusBarSource.includes("appStore.activeTab === 'schema-editor'"), true)
 })
 
-test('sidebar has settings and terms (CE: no logout)', () => {
+test('sidebar replaces direct settings/terms buttons with llm rail and profile menu (CE: no logout)', () => {
   const sidebarPath = resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue')
   const sidebarSource = readFileSync(sidebarPath, 'utf-8')
 
-  // Settings button instead of workspace/schema tabs
+  // LLM entry button replaces dedicated settings icon
   assert.equal(sidebarSource.includes('@click="openSettings'), true)
-  assert.equal(sidebarSource.includes('title="Settings"'), true)
-  assert.equal(sidebarSource.includes('aria-label="Settings"'), true)
+  assert.equal(sidebarSource.includes('title="LLM & API Keys"'), true)
+  assert.equal(sidebarSource.includes('aria-label="LLM & API Keys"'), true)
 
-  // Terms button
-  assert.equal(sidebarSource.includes('@click="openTerms'), true)
-  assert.equal(sidebarSource.includes('title="Terms & Conditions"'), true)
-  assert.equal(sidebarSource.includes('aria-label="Terms & Conditions"'), true)
+  // Profile menu owns terms/account/theme shortcuts
+  assert.equal(sidebarSource.includes('title="User Profile"'), true)
+  assert.equal(sidebarSource.includes('Terms and Conditions'), true)
+  assert.equal(sidebarSource.includes('Account'), true)
+  assert.equal(sidebarSource.includes('Theme'), true)
 
   // CE: Logout removed — no auth needed
   assert.equal(sidebarSource.includes('@click="promptLogout'), false)

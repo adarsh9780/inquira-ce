@@ -67,15 +67,14 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
   assert.equal(statusBarSource.includes('Right Section: Editor Toggle, Data Focus, Terminal & Version'), false)
   assert.equal(statusBarSource.includes('Right Section: Data Focus, Terminal & Version'), true)
 
-  // Settings and Terms in sidebar (CE: no logout)
-  assert.equal(sidebarSource.includes('CogIcon'), true)
-  // Terms uses ScaleIcon (balance/legal icon), not DocumentIcon
-  assert.equal(sidebarSource.includes('ScaleIcon'), true)
+  // Sidebar now uses llm rail action plus profile menu (CE: no logout)
+  assert.equal(sidebarSource.includes('KeyIcon'), true)
+  assert.equal(sidebarSource.includes('UserCircleIcon'), true)
   assert.equal(sidebarSource.includes('openSettings'), true)
-  assert.equal(sidebarSource.includes('openTerms'), true)
-  assert.equal(sidebarSource.includes('isTermsDialogOpen'), true)
-  assert.equal(sidebarSource.includes('title="Settings"'), true)
-  assert.equal(sidebarSource.includes('title="Terms & Conditions"'), true)
+  assert.equal(sidebarSource.includes('openProfileSection'), true)
+  assert.equal(sidebarSource.includes('profileMenuOpen'), true)
+  assert.equal(sidebarSource.includes('title="LLM & API Keys"'), true)
+  assert.equal(sidebarSource.includes('title="User Profile"'), true)
 
   // CE: auth/logout elements removed from sidebar
   assert.equal(sidebarSource.includes('ArrowRightOnRectangleIcon'), false)
@@ -84,9 +83,9 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
   // ConfirmationModal is used for delete confirmations (new feature in redesign)
   assert.equal(sidebarSource.includes('ConfirmationModal'), true)
 
-  // Sidebar no longer has legacy Workspace/Schema top toggle handlers
+  // Sidebar keeps schema navigation in the modern rail
   assert.equal(sidebarSource.includes('handleTabClick'), false)
-  assert.equal(sidebarSource.includes('DocumentTextIcon'), true) // Used in collapsed icon rail
+  assert.equal(sidebarSource.includes('DocumentTextIcon'), true)
 
   // StatusBar no longer has Settings/Confirmation modal directly
   assert.equal(statusBarSource.includes('<SettingsModal'), false)
@@ -99,30 +98,30 @@ test('status bar account name opens sidebar, workspace/schema toggle is next to 
   assert.equal(statusBarSource.includes('backdrop-blur-[1.5px]'), false)
 })
 
-test('sidebar has settings and terms buttons (CE: no logout)', () => {
+test('sidebar has llm and profile launchers instead of direct settings and terms buttons (CE: no logout)', () => {
   const sidebarSource = readFileSync(
     resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'),
     'utf-8',
   )
 
-  // Settings button in sidebar
+  // LLM button in sidebar
   assert.equal(sidebarSource.includes('@click="openSettings'), true)
-  assert.equal(sidebarSource.includes('title="Settings"'), true)
-  assert.equal(sidebarSource.includes('aria-label="Settings"'), true)
+  assert.equal(sidebarSource.includes('title="LLM & API Keys"'), true)
+  assert.equal(sidebarSource.includes('aria-label="LLM & API Keys"'), true)
 
-  // Terms & Conditions button in sidebar
-  assert.equal(sidebarSource.includes('@click="openTerms'), true)
-  assert.equal(sidebarSource.includes('title="Terms & Conditions"'), true)
-  assert.equal(sidebarSource.includes('aria-label="Terms & Conditions"'), true)
+  // Profile menu contains the user shortcuts
+  assert.equal(sidebarSource.includes('title="User Profile"'), true)
+  assert.equal(sidebarSource.includes('Terms and Conditions'), true)
+  assert.equal(sidebarSource.includes('Account'), true)
+  assert.equal(sidebarSource.includes('Theme'), true)
 
   // CE: logout removed — no auth needed
   assert.equal(sidebarSource.includes('@click="promptLogout'), false)
   assert.equal(sidebarSource.includes('title="Logout"'), false)
   assert.equal(sidebarSource.includes('Confirm Logout'), false)
 
-  // Terms dialog
-  assert.equal(sidebarSource.includes('Terms & Conditions'), true)
-  assert.equal(sidebarSource.includes('Last updated:'), true)
+  // Terms now live inside settings modal instead of a sidebar dialog
+  assert.equal(sidebarSource.includes('Last updated:'), false)
 })
 
 test('workspace/schema toggle buttons use correct icons and styling', () => {

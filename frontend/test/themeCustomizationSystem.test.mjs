@@ -11,6 +11,8 @@ test('theme catalog exposes supported ids and normalizer helpers', () => {
   const source = read('src/constants/themes.js')
 
   assert.equal(source.includes("id: 'warm'"), true)
+  assert.equal(source.includes("id: 'classiclight'"), true)
+  assert.equal(source.includes("id: 'classicdark'"), true)
   assert.equal(source.includes("id: 'evergreen'"), true)
   assert.equal(source.includes("id: 'midnight'"), true)
   assert.equal(source.includes("export const DEFAULT_THEME_ID = 'warm'"), true)
@@ -64,6 +66,8 @@ test('style sheet declares theme presets and shared token aliases', () => {
   const source = read('src/style.css')
 
   assert.equal(source.includes(':root[data-theme="warm"]'), true)
+  assert.equal(source.includes(':root[data-theme="classiclight"]'), true)
+  assert.equal(source.includes(':root[data-theme="classicdark"]'), true)
   assert.equal(source.includes(':root[data-theme="evergreen"]'), true)
   assert.equal(source.includes(':root[data-theme="midnight"]'), true)
   assert.equal(source.includes('--color-text-sub: var(--color-text-muted);'), true)

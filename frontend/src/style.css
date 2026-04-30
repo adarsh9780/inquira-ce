@@ -157,6 +157,74 @@
   --color-chart-accent: #4F6FAF;
 }
 
+:root[data-theme="classiclight"],
+[data-theme="classiclight"] {
+  color-scheme: light;
+  --color-shell-backdrop: #F3F4F6;
+  --color-sidebar-surface: #F8FAFC;
+  --color-workspace-surface: #FFFFFF;
+  --color-base: #FFFFFF;
+  --color-surface: #F8FAFC;
+  --color-primary-900: #C96A2E;
+  --color-primary-800: #B85F28;
+  --color-secondary-accent: #3B82F6;
+  --color-border: #E5E7EB;
+  --color-border-hover: #CBD5E1;
+  --color-text-main: #111827;
+  --color-text-muted: #64748B;
+  --color-accent: #334155;
+  --color-accent-hover: #1F2937;
+  --color-accent-text: #1E293B;
+  --color-accent-soft: #EEF2FF;
+  --color-accent-border: #CBD5F5;
+  --color-success: #16A34A;
+  --color-error: #DC2626;
+  --color-warning: #D97706;
+  --color-info: #3B82F6;
+  --color-chat-user-bubble: #F1F5F9;
+  --color-panel-elevated: #FFFFFF;
+  --color-panel-muted: #F8FAFC;
+  --color-selected-surface: #EEF2FF;
+  --color-selected-border: #BFDBFE;
+  --color-icon-muted: #64748B;
+  --color-control-surface: #FFFFFF;
+  --color-chart-accent: #3B82F6;
+}
+
+:root[data-theme="classicdark"],
+[data-theme="classicdark"] {
+  color-scheme: dark;
+  --color-shell-backdrop: #0B1120;
+  --color-sidebar-surface: #0F172A;
+  --color-workspace-surface: #111827;
+  --color-base: #111827;
+  --color-surface: #172033;
+  --color-primary-900: #C96A2E;
+  --color-primary-800: #B85F28;
+  --color-secondary-accent: #7C93C8;
+  --color-border: #253046;
+  --color-border-hover: #3A4966;
+  --color-text-main: #E5E7EB;
+  --color-text-muted: #94A3B8;
+  --color-accent: #7C93C8;
+  --color-accent-hover: #93A9D6;
+  --color-accent-text: #D9E3FF;
+  --color-accent-soft: #1B2436;
+  --color-accent-border: #334155;
+  --color-success: #22C55E;
+  --color-error: #F87171;
+  --color-warning: #F59E0B;
+  --color-info: #7C93C8;
+  --color-chat-user-bubble: #182132;
+  --color-panel-elevated: #1B2436;
+  --color-panel-muted: #141D2D;
+  --color-selected-surface: #1E293B;
+  --color-selected-border: #475569;
+  --color-icon-muted: #94A3B8;
+  --color-control-surface: #172033;
+  --color-chart-accent: #7C93C8;
+}
+
 :root[data-theme="evergreen"],
 [data-theme="evergreen"] {
   color-scheme: light;

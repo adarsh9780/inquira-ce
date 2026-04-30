@@ -59,6 +59,15 @@
             <button
               type="button"
               class="mb-1"
+              :class="activeSection === 'terms' ? activeNavClass : inactiveNavClass"
+              @click="openLeafSection('terms')"
+            >
+              <span>Terms &amp; Conditions</span>
+            </button>
+
+            <button
+              type="button"
+              class="mb-1"
               :class="activeSection === 'account' ? activeNavClass : inactiveNavClass"
               @click="openLeafSection('account')"
             >
@@ -105,6 +114,10 @@
               <AppearanceTab />
             </section>
 
+            <section :class="panelClass('terms')" class="absolute inset-0 overflow-y-auto px-5 py-5">
+              <TermsTab :active="currentPanel === 'terms'" />
+            </section>
+
             <section :class="panelClass('account')" class="absolute inset-0 overflow-y-auto px-5 py-5">
               <AccountTab />
             </section>
@@ -123,6 +136,7 @@ import LLMSettingsTab from './tabs/LLMSettingsTab.vue'
 import WorkspaceTab from './tabs/WorkspaceTab.vue'
 import AppearanceTab from './tabs/AppearanceTab.vue'
 import AccountTab from './tabs/AccountTab.vue'
+import TermsTab from './tabs/TermsTab.vue'
 
 const props = defineProps({
   modelValue: {
@@ -187,7 +201,8 @@ function normalizeTab(tab) {
   const candidate = String(tab || '').toLowerCase()
   if (candidate === 'api') return 'llm'
   if (candidate === 'data') return 'workspace'
-  if (candidate === 'llm' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'account') {
+  if (candidate === 'legal') return 'terms'
+  if (candidate === 'llm' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'account' || candidate === 'terms') {
     return candidate
   }
   return 'llm'

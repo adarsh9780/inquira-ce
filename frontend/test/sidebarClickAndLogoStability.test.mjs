@@ -12,9 +12,10 @@ test('collapsed sidebar expands only on explicit icon click (never on hover)', (
   assert.equal(sidebarSource.includes('@mouseenter='), false)
   assert.equal(sidebarSource.includes('@mouseleave='), false)
   assert.equal(sidebarSource.includes('class="sidebar-rail-btn"'), true)
-  assert.equal(sidebarSource.includes("expandSidebarFromIcon('datasets')"), true)
-  assert.equal(sidebarSource.includes("expandSidebarFromIcon('conversations')"), true)
-  assert.equal(sidebarSource.includes("expandSidebarFromIcon('settings')"), false)
+  assert.equal(sidebarSource.includes('function openWorkspaceRail(target = \'\') {'), true)
+  assert.equal(sidebarSource.includes("title=\"Datasets\""), true)
+  assert.equal(sidebarSource.includes("title=\"Conversations\""), true)
+  assert.equal(sidebarSource.includes("title=\"LLM & API Keys\""), true)
 })
 
 test('sidebar keeps logo mounted and uses width transition to avoid layout jerk', () => {
