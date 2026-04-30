@@ -1,23 +1,8 @@
 <template>
   <div class="h-7 w-full bg-[var(--color-surface)] border-t border-[var(--color-border)] flex items-center justify-between px-3 text-[12px] text-[var(--color-text-muted)] select-none z-50 shrink-0">
 
-    <!-- Left Section: Account, Editor Toggle, Kernel Status, and Editor Position -->
+    <!-- Left Section: Editor Toggle, Kernel Status, and Editor Position -->
     <div class="flex items-center gap-3 h-full">
-      <!-- Account Name with Sidebar Toggle (chevron beside username) -->
-      <button
-        v-if="authStore.isAuthenticated"
-        @click.stop="toggleSidebarFromStatusBar"
-        class="flex items-center gap-1 max-w-[150px] truncate px-1 text-[var(--color-accent)] text-left rounded hover:bg-[var(--color-base)] transition-colors"
-        :title="sidebarToggleTitle"
-        :aria-label="sidebarToggleTitle"
-      >
-        <span class="truncate">{{ accountDisplayLabel }}</span>
-        <ChevronLeftIcon v-if="!appStore.isSidebarCollapsed" class="w-3.5 h-3.5 shrink-0" />
-        <ChevronRightIcon v-else class="w-3.5 h-3.5 shrink-0" />
-      </button>
-
-      <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
-
       <!-- Workspace/Schema Editor Toggle -->
       <div v-if="authStore.isAuthenticated" class="flex items-center gap-0.5 h-full">
         <button
@@ -176,8 +161,6 @@ import { settingsWebSocket } from '../../services/websocketService'
 import {
   CommandLineIcon,
   ViewColumnsIcon,
-  ChevronRightIcon,
-  ChevronLeftIcon,
   ExclamationTriangleIcon,
   FolderOpenIcon,
   DocumentTextIcon,
@@ -208,30 +191,6 @@ const artifactUsage = ref({
   duckdbWarning: false,
   figureWarning: false,
   warning: false,
-})
-
-const accountLabel = computed(() => {
-  const username = String(authStore.username || '').trim()
-  return username || 'Account'
-})
-
-const accountDisplayLabel = computed(() => {
-  const value = String(accountLabel.value || '').trim()
-  if (!value) return 'Account'
-  if (value.includes('@')) return value
-  if (!value.includes(' ')) {
-    return value.charAt(0).toUpperCase() + value.slice(1)
-  }
-  return value
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase())
-    .join(' ')
-})
-
-const sidebarToggleTitle = computed(() => {
-  if (appStore.isSidebarCollapsed) return 'Show sidebar (Cmd/Ctrl+B)'
-  return 'Hide sidebar (Cmd/Ctrl+B)'
 })
 
 const dataFocusToggleTitle = computed(() => {
@@ -393,10 +352,6 @@ const artifactUsageWarningTitle = computed(() => {
   if (!details.length) return 'Scratchpad artifact usage is within safe limits.'
   return `Scratchpad usage warning. ${details.join(' | ')}. Delete unused artifacts to avoid performance issues.`
 })
-
-function toggleSidebarFromStatusBar() {
-  appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
-}
 
 function switchToWorkspace() {
   appStore.setActiveTab('workspace')

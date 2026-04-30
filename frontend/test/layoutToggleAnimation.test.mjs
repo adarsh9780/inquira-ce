@@ -25,16 +25,11 @@ test('sidebar and explorer sections use animated collapse transitions', () => {
     resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'),
     'utf-8',
   )
-  // New redesign uses v-show with workspacesExpanded/datasetsExpanded/conversationsExpanded
-  // instead of <Transition> components for collapse animations
-  assert.equal(sidebarSource.includes('workspacesExpanded = ref(true)'), true)
-  assert.equal(sidebarSource.includes('v-show="workspacesExpanded"'), true)
-  assert.equal(sidebarSource.includes('v-show="datasetsExpanded"'), true)
-  assert.equal(sidebarSource.includes('v-show="conversationsExpanded"'), true)
-  // Folder open/closed icon states are used for collapse indicator
-  assert.equal(sidebarSource.includes('FolderOpenIcon v-if="workspacesExpanded"'), true)
-  assert.equal(sidebarSource.includes('FolderOpenIcon v-if="datasetsExpanded"'), false)
-  assert.equal(sidebarSource.includes('FolderOpenIcon v-if="conversationsExpanded"'), false)
+  // Current redesign keeps a single top content area and fixed bottom stack
+  assert.equal(sidebarSource.includes('activeWorkspaceName'), true)
+  assert.equal(sidebarSource.includes('activeWorkspaceCaption'), true)
+  assert.equal(sidebarSource.includes('custom-scrollbar flex-1 overflow-y-auto overflow-x-hidden'), true)
+  assert.equal(sidebarSource.includes('sidebar-conversation-row'), true)
   // No old transition patterns
   assert.equal(sidebarSource.includes('<Transition name="sidebar-section">'), false)
   assert.equal(sidebarSource.includes('<Transition name="sidebar-brand">'), false)
@@ -47,9 +42,9 @@ test('sidebar icons keep fixed size to avoid toggle jitter', () => {
     'utf-8',
   )
   // New design uses shrink-0 on icons
-  assert.equal(sidebarSource.includes('FolderOpenIcon v-if="workspacesExpanded"'), true)
-  assert.equal(sidebarSource.includes('class="section-label truncate"'), true)
-  assert.equal(sidebarSource.includes('FolderIcon v-else class="h-4 w-4 shrink-0"'), true)
+  assert.equal(sidebarSource.includes('FolderPlusIcon class="h-4 w-4 shrink-0"'), true)
+  assert.equal(sidebarSource.includes('KeyIcon class="h-4 w-4 shrink-0"'), true)
+  assert.equal(sidebarSource.includes('UserCircleIcon class="h-5 w-5 shrink-0"'), true)
   assert.equal(sidebarSource.includes('class="sidebar-brand-shell h-14 shrink-0 border-b"'), true)
   assert.equal(sidebarSource.includes('sidebar-brand-wordmark-collapsed'), true)
   // No scale animations on workspace/schema tabs

@@ -28,13 +28,148 @@
       </button>
     </div>
 
-    <div class="flex min-h-0 flex-1 overflow-hidden">
+    <div class="flex min-h-0 flex-1 flex-col">
+      <div v-show="!appStore.isSidebarCollapsed" class="flex min-h-0 flex-1 flex-col">
+        <div class="border-b px-4 py-4" style="border-color: var(--color-border);">
+          <p class="text-[11px] font-semibold uppercase tracking-[0.16em]" style="color: var(--color-text-muted);">Workspace</p>
+          <button
+            type="button"
+            class="mt-3 flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors hover:bg-[var(--color-panel-muted)]"
+            style="border-color: var(--color-border); background-color: var(--color-panel-elevated);"
+            title="Open workspace settings"
+            @click="openSettings('workspace', 1)"
+          >
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style="background-color: var(--color-selected-surface); color: var(--color-accent);">
+              <FolderOpenIcon class="h-4 w-4" />
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-[16px] font-semibold leading-[1.3]" style="color: var(--color-text-main);">
+                {{ activeWorkspaceName }}
+              </span>
+              <span class="mt-0.5 block truncate text-[12px]" style="color: var(--color-text-muted);">
+                {{ activeWorkspaceCaption }}
+              </span>
+            </span>
+          </button>
+        </div>
+
+        <div class="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-4">
+          <div class="flex items-center justify-between px-1 pb-2">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em]" style="color: var(--color-text-muted);">Conversations</p>
+            <button
+              v-if="appStore.hasWorkspace"
+              type="button"
+              class="btn-icon h-7 w-7 shrink-0 rounded-lg"
+              title="New Conversation"
+              aria-label="New Conversation"
+              @click.stop="createConversation"
+            >
+              <PlusIcon class="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div class="custom-scrollbar flex-1 overflow-y-auto overflow-x-hidden">
+            <div
+              v-if="appStore.workspaceDeletionJobs.length > 0"
+              class="mb-3 flex items-center gap-2 rounded-xl px-3 py-2 text-[11px]"
+              style="background-color: var(--color-warning-bg); color: var(--color-warning-text);"
+            >
+              <svg class="h-3 w-3 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-90" d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="4" />
+              </svg>
+              <span class="truncate">Deleting workspace...</span>
+            </div>
+
+            <div v-if="!appStore.hasWorkspace" class="px-3 py-3 text-sm" style="color: var(--color-text-muted);">
+              Create a workspace to start a conversation.
+            </div>
+
+            <div v-else-if="filteredConversations.length === 0 && appStore.conversations.length > 0" class="px-3 py-3 text-sm" style="color: var(--color-text-muted);">
+              No conversation matches found.
+            </div>
+
+            <div v-else-if="appStore.conversations.length === 0" class="px-3 py-3 text-sm" style="color: var(--color-text-muted);">
+              No conversations yet.
+            </div>
+
+            <div v-else class="space-y-1">
+              <div
+                v-for="conv in filteredConversations"
+                :key="conv.id"
+                class="group sidebar-conversation-row"
+                :class="{ 'sidebar-conversation-row-active': appStore.activeConversationId === conv.id }"
+                @click="selectConversation(conv.id)"
+              >
+                <div class="flex min-w-0 flex-1 items-center pr-2" @dblclick="startEditing(conv)">
+                  <div class="min-w-0 flex-1">
+                    <div v-if="editingId === conv.id" class="relative z-10 flex w-full items-center gap-1">
+                      <input
+                        :ref="(el) => { if (el) editInputs[conv.id] = el }"
+                        v-model="editingTitleValue"
+                        class="input-base px-1 py-0.5 text-[13px] font-medium"
+                        @keydown.enter.prevent="saveTitle(conv.id)"
+                        @keydown.esc.prevent="cancelEditing"
+                        @blur="saveTitle(conv.id)"
+                        @click.stop
+                      />
+                    </div>
+                    <template v-else>
+                      <p
+                        class="truncate text-[15px] leading-[1.35]"
+                        :class="conv.id === appStore.activeConversationId ? 'font-semibold text-[var(--color-text-main)]' : 'font-medium text-[var(--color-text-main)]'"
+                        :title="conv.title || 'Untitled'"
+                      >
+                        {{ conv.title || 'Untitled' }}
+                      </p>
+                    </template>
+                  </div>
+                </div>
+                <div v-if="editingId !== conv.id" class="relative flex flex-shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
+                  <button
+                    type="button"
+                    class="btn-icon rounded-lg p-1 hover:text-[var(--color-accent)]"
+                    style="color: var(--color-text-muted);"
+                    title="Conversation actions"
+                    @click.stop="toggleConversationMenu(conv.id)"
+                  >
+                    <EllipsisHorizontalIcon class="h-3.5 w-3.5" />
+                  </button>
+                  <div
+                    v-if="conversationMenuId === conv.id"
+                    class="absolute right-0 top-7 z-20 w-32 overflow-hidden rounded-lg border shadow-lg"
+                    style="border-color: var(--color-border-strong); background-color: var(--color-surface);"
+                    data-conversation-actions-menu
+                  >
+                    <button
+                      type="button"
+                      class="w-full px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-[var(--color-base-soft)]"
+                      style="color: var(--color-text-main);"
+                      @click.stop="startEditingFromMenu(conv)"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      type="button"
+                      class="sidebar-menu-danger w-full px-3 py-2 text-left text-xs font-medium transition-colors"
+                      style="color: var(--color-danger);"
+                      @click.stop="confirmDeleteConversation(conv.id)"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <nav
-        class="sidebar-rail shrink-0 border-r px-2 py-3"
-        :class="appStore.isSidebarCollapsed ? 'sidebar-rail-collapsed' : 'sidebar-rail-expanded'"
+        class="mt-auto border-t px-2 py-3"
         style="border-color: var(--color-border);"
       >
-        <div class="flex min-h-0 flex-1 flex-col gap-1">
+        <div class="flex flex-col gap-1">
           <button
             type="button"
             class="sidebar-rail-btn"
@@ -50,51 +185,6 @@
           <button
             type="button"
             class="sidebar-rail-btn"
-            :class="[
-              appStore.isSidebarCollapsed ? 'sidebar-rail-btn-collapsed' : 'sidebar-rail-btn-expanded',
-              appStore.activeTab === 'workspace' ? 'sidebar-rail-btn-active' : '',
-            ]"
-            title="Datasets"
-            aria-label="Datasets"
-            @click="openWorkspaceRail('datasets')"
-          >
-            <CircleStackIcon class="h-4 w-4 shrink-0" />
-            <span v-if="!appStore.isSidebarCollapsed" class="truncate text-sm font-medium">Datasets</span>
-          </button>
-
-          <button
-            type="button"
-            class="sidebar-rail-btn"
-            :class="[
-              appStore.isSidebarCollapsed ? 'sidebar-rail-btn-collapsed' : 'sidebar-rail-btn-expanded',
-              appStore.activeTab === 'workspace' ? 'sidebar-rail-btn-active' : '',
-            ]"
-            title="Conversations"
-            aria-label="Conversations"
-            @click="openWorkspaceRail('conversations')"
-          >
-            <ChatBubbleLeftRightIcon class="h-4 w-4 shrink-0" />
-            <span v-if="!appStore.isSidebarCollapsed" class="truncate text-sm font-medium">Conversations</span>
-          </button>
-
-          <button
-            type="button"
-            class="sidebar-rail-btn"
-            :class="[
-              appStore.isSidebarCollapsed ? 'sidebar-rail-btn-collapsed' : 'sidebar-rail-btn-expanded',
-              appStore.activeTab === 'schema-editor' ? 'sidebar-rail-btn-active' : '',
-            ]"
-            title="Schema Editor"
-            aria-label="Schema Editor"
-            @click="openSchemaFromRail"
-          >
-            <DocumentTextIcon class="h-4 w-4 shrink-0" />
-            <span v-if="!appStore.isSidebarCollapsed" class="truncate text-sm font-medium">Schema Editor</span>
-          </button>
-
-          <button
-            type="button"
-            class="sidebar-rail-btn"
             :class="appStore.isSidebarCollapsed ? 'sidebar-rail-btn-collapsed' : 'sidebar-rail-btn-expanded'"
             title="LLM & API Keys"
             aria-label="LLM & API Keys"
@@ -103,343 +193,59 @@
             <KeyIcon class="h-4 w-4 shrink-0" />
             <span v-if="!appStore.isSidebarCollapsed" class="truncate text-sm font-medium">LLM &amp; API Keys</span>
           </button>
-        </div>
 
-        <div class="relative mt-2 pt-2" style="border-top: 1px solid var(--color-border);">
-          <button
-            ref="profileMenuButtonRef"
-            type="button"
-            class="sidebar-rail-btn"
-            :class="[
-              appStore.isSidebarCollapsed ? 'sidebar-rail-btn-collapsed' : 'sidebar-rail-btn-expanded',
-              profileMenuOpen ? 'sidebar-rail-btn-active' : '',
-            ]"
-            title="User Profile"
-            aria-label="User Profile"
-            @click="toggleProfileMenu"
-          >
-            <UserCircleIcon class="h-5 w-5 shrink-0" />
-            <span v-if="!appStore.isSidebarCollapsed" class="truncate text-sm font-medium">User Profile</span>
-          </button>
+          <div class="relative">
+            <button
+              ref="profileMenuButtonRef"
+              type="button"
+              class="sidebar-rail-btn"
+              :class="[
+                appStore.isSidebarCollapsed ? 'sidebar-rail-btn-collapsed' : 'sidebar-rail-btn-expanded',
+                profileMenuOpen ? 'sidebar-rail-btn-active' : '',
+              ]"
+              title="User Profile"
+              aria-label="User Profile"
+              @click="toggleProfileMenu"
+            >
+              <UserCircleIcon class="h-5 w-5 shrink-0" />
+              <span v-if="!appStore.isSidebarCollapsed" class="truncate text-sm font-medium">User Profile</span>
+            </button>
 
-          <div
-            v-if="profileMenuOpen"
-            ref="profileMenuRef"
-            class="absolute bottom-0 left-full z-[var(--z-dropdown)] ml-2 w-52 overflow-hidden rounded-xl border shadow-lg"
-            style="border-color: var(--color-border-strong); background-color: var(--color-panel-elevated);"
-            data-profile-menu
-          >
-            <button
-              type="button"
-              class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-base-soft)]"
-              style="color: var(--color-text-main);"
-              @click="openProfileSection('terms')"
+            <div
+              v-if="profileMenuOpen"
+              ref="profileMenuRef"
+              class="absolute bottom-0 left-full z-[var(--z-dropdown)] ml-2 w-52 overflow-hidden rounded-xl border shadow-lg"
+              style="border-color: var(--color-border-strong); background-color: var(--color-panel-elevated);"
+              data-profile-menu
             >
-              Terms and Conditions
-            </button>
-            <button
-              type="button"
-              class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-base-soft)]"
-              style="color: var(--color-text-main);"
-              @click="openProfileSection('account')"
-            >
-              Account
-            </button>
-            <button
-              type="button"
-              class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-base-soft)]"
-              style="color: var(--color-text-main);"
-              @click="openProfileSection('appearance')"
-            >
-              Theme
-            </button>
+              <button
+                type="button"
+                class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-base-soft)]"
+                style="color: var(--color-text-main);"
+                @click="openProfileSection('terms')"
+              >
+                Terms and Conditions
+              </button>
+              <button
+                type="button"
+                class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-base-soft)]"
+                style="color: var(--color-text-main);"
+                @click="openProfileSection('account')"
+              >
+                Account
+              </button>
+              <button
+                type="button"
+                class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-base-soft)]"
+                style="color: var(--color-text-main);"
+                @click="openProfileSection('appearance')"
+              >
+                Theme
+              </button>
+            </div>
           </div>
         </div>
       </nav>
-
-      <div v-show="!appStore.isSidebarCollapsed" class="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div class="border-b px-3 py-3" style="border-color: var(--color-border);">
-          <div class="relative">
-            <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style="color: var(--color-text-muted);" />
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="Search workspaces, datasets, or conversations"
-              class="w-full rounded-lg border py-2 pl-9 pr-9 text-[14px] transition-all duration-150 placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2"
-              style="background-color: var(--color-surface); border-color: var(--color-border); color: var(--color-text-main); --tw-ring-color: var(--color-accent);"
-            />
-            <button
-              v-if="searchQuery"
-              type="button"
-              class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 transition-colors hover:bg-[var(--color-border)]"
-              title="Clear sidebar search"
-              aria-label="Clear sidebar search"
-              @click="searchQuery = ''"
-            >
-              <XMarkIcon class="h-3.5 w-3.5" style="color: var(--color-text-muted);" />
-            </button>
-          </div>
-        </div>
-
-        <div class="custom-scrollbar flex-1 overflow-y-auto overflow-x-hidden px-3 py-3">
-          <div class="space-y-3">
-            <div class="space-y-1">
-              <div class="flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors hover:bg-[var(--color-surface)]">
-                <div class="flex min-w-0 items-center gap-2">
-                  <button
-                    type="button"
-                    class="flex min-w-0 items-center gap-2 text-left"
-                    @click="workspacesExpanded = !workspacesExpanded"
-                  >
-                    <FolderOpenIcon v-if="workspacesExpanded" class="h-4 w-4 shrink-0" style="color: var(--color-text-main);" />
-                    <FolderIcon v-else class="h-4 w-4 shrink-0" style="color: var(--color-text-muted);" />
-                    <span class="truncate text-[15px] font-bold leading-[1.3]" style="color: var(--color-text-main);">Workspaces</span>
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  class="btn-icon shrink-0"
-                  title="Create Workspace"
-                  aria-label="Create Workspace"
-                  @click.stop="openSettings('workspace', 1)"
-                >
-                  <PlusIcon class="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              <div v-show="workspacesExpanded" class="pl-2">
-                <div
-                  v-if="appStore.workspaceDeletionJobs.length > 0"
-                  class="mb-2 flex items-center gap-2 rounded-lg px-2.5 py-2 text-[11px]"
-                  style="background-color: color-mix(in srgb, var(--color-warning) 15%, transparent); color: var(--color-warning);"
-                >
-                  <svg class="h-3 w-3 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                    <path class="opacity-90" d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="4" />
-                  </svg>
-                  <span class="truncate">Deleting workspace...</span>
-                </div>
-
-                <div v-if="appStore.workspaces.length === 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
-                  No workspaces yet
-                </div>
-
-                <div v-else-if="filteredWorkspaces.length === 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
-                  No workspace matches found
-                </div>
-
-                <div v-else class="space-y-0.5 pb-0.5">
-                  <div
-                    v-for="workspace in filteredWorkspaces"
-                    :key="workspace.id"
-                    class="group sidebar-item-row"
-                    :class="{ 'sidebar-item-row-active': String(appStore.activeWorkspaceId || '').trim() === workspace.id }"
-                    @click="selectWorkspace(workspace.id)"
-                  >
-                    <div class="min-w-0 flex-1">
-                      <p
-                        class="truncate text-[13px] leading-[1.4]"
-                        :class="String(appStore.activeWorkspaceId || '').trim() === workspace.id ? 'text-[var(--color-accent)] font-medium' : 'font-medium'"
-                        :title="workspace.name || 'Untitled workspace'"
-                      >
-                        {{ workspace.name || 'Untitled workspace' }}
-                      </p>
-                      <p class="truncate text-[12px] leading-[1.3]" style="color: var(--color-text-muted);" :title="workspace.duckdb_path || 'workspace.duckdb'">
-                        {{ workspaceFilename(workspace.duckdb_path) }}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      class="btn-icon shrink-0 rounded p-1 opacity-0 transition-all duration-150 group-hover:opacity-100"
-                      style="color: var(--color-text-muted);"
-                      title="Delete Workspace"
-                      @click.stop="confirmDeleteWorkspace(workspace.id)"
-                    >
-                      <TrashIcon class="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="appStore.hasWorkspace && workspacesExpanded" class="space-y-1">
-              <div class="group flex items-center justify-between px-2 py-1">
-                <button
-                  type="button"
-                  class="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  @click="datasetsExpanded = !datasetsExpanded"
-                >
-                  <CircleStackIcon class="h-4 w-4 shrink-0" style="color: var(--color-text-muted);" />
-                  <p class="section-label truncate">Datasets</p>
-                </button>
-                <button
-                  type="button"
-                  class="btn-icon shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-                  title="Add Dataset"
-                  @click.stop="openSettings('workspace', 2)"
-                >
-                  <PlusIcon class="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              <div v-show="datasetsExpanded" class="pl-4">
-                <div v-if="isLoadingDatasets" class="flex items-center justify-center gap-2 px-2 py-2 text-center text-xs" style="color: var(--color-text-muted);">
-                  <div class="h-3 w-3 animate-spin rounded-full border-2" style="border-color: var(--color-border); border-top-color: var(--color-text-muted);"></div>
-                  <span>Loading datasets...</span>
-                </div>
-
-                <div v-else-if="filteredDatasets.length === 0 && localDatasets.length > 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
-                  No dataset matches found
-                </div>
-
-                <div v-else-if="localDatasets.length === 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
-                  No datasets yet
-                </div>
-
-                <div v-else class="space-y-0.5 pb-0.5">
-                  <div
-                    v-for="ds in filteredDatasets"
-                    :key="ds.table_name"
-                    class="group sidebar-item-row"
-                    :class="{ 'sidebar-item-row-active': isSelectedDataset(ds) }"
-                    :title="datasetRowTitle(ds)"
-                    @click="selectDataset(ds)"
-                  >
-                    <div class="min-w-0 flex-1">
-                      <p
-                        class="truncate text-[13px] font-medium leading-[1.4]"
-                        :class="isSelectedDataset(ds) ? 'text-[var(--color-accent)]' : ''"
-                        style="color: var(--color-text-main);"
-                      >
-                        {{ datasetFriendlyName(ds.table_name) }}
-                      </p>
-                      <p
-                        v-if="ds.file_path"
-                        class="truncate text-[12px] font-normal leading-[1.3]"
-                        :class="isSelectedDataset(ds) ? 'text-[var(--color-accent)] opacity-75' : ''"
-                        style="color: var(--color-text-muted);"
-                        :title="ds.file_path"
-                      >
-                        {{ datasetSourceCaption(ds.file_path) }}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      class="btn-icon shrink-0 rounded p-1 opacity-0 transition-all duration-150 group-hover:opacity-100"
-                      style="color: var(--color-text-muted);"
-                      title="Delete Dataset"
-                      @click.stop="confirmDeleteDataset(ds.table_name)"
-                    >
-                      <TrashIcon class="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="appStore.hasWorkspace && workspacesExpanded" class="space-y-1">
-              <div class="group flex items-center justify-between px-2 py-1">
-                <button
-                  type="button"
-                  class="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  @click="conversationsExpanded = !conversationsExpanded"
-                >
-                  <ChatBubbleLeftRightIcon class="h-4 w-4 shrink-0" style="color: var(--color-text-muted);" />
-                  <p class="section-label truncate">Conversations</p>
-                </button>
-                <button
-                  v-if="appStore.hasWorkspace"
-                  type="button"
-                  class="btn-icon shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-                  title="New Conversation"
-                  @click.stop="createConversation"
-                >
-                  <PlusIcon class="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              <div v-show="conversationsExpanded" class="pl-4">
-                <div v-if="filteredConversations.length === 0 && appStore.conversations.length > 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
-                  No conversation matches found
-                </div>
-
-                <div v-else-if="appStore.conversations.length === 0" class="px-2 py-2 text-xs" style="color: var(--color-text-muted);">
-                  No conversations yet
-                </div>
-
-                <div v-else class="space-y-0.5 pb-0.5">
-                  <div
-                    v-for="conv in filteredConversations"
-                    :key="conv.id"
-                    class="group sidebar-item-row"
-                    :class="{ 'sidebar-item-row-active': appStore.activeConversationId === conv.id }"
-                    @click="selectConversation(conv.id)"
-                  >
-                    <div class="flex min-w-0 flex-1 items-center pr-2" @dblclick="startEditing(conv)">
-                      <div class="min-w-0 flex-1">
-                        <div v-if="editingId === conv.id" class="relative z-10 flex w-full items-center gap-1">
-                          <input
-                            :ref="(el) => { if (el) editInputs[conv.id] = el }"
-                            v-model="editingTitleValue"
-                            class="input-base px-1 py-0.5 text-[13px] font-medium"
-                            @keydown.enter.prevent="saveTitle(conv.id)"
-                            @keydown.esc.prevent="cancelEditing"
-                            @blur="saveTitle(conv.id)"
-                            @click.stop
-                          />
-                        </div>
-                        <template v-else>
-                          <p
-                            class="truncate text-[13px] leading-[1.4]"
-                            :class="conv.id === appStore.activeConversationId ? 'text-[var(--color-accent)] font-medium' : 'font-normal'"
-                            :title="conv.title || 'Untitled'"
-                          >
-                            {{ conv.title || 'Untitled' }}
-                          </p>
-                        </template>
-                      </div>
-                    </div>
-                    <div v-if="editingId !== conv.id" class="relative flex flex-shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
-                      <button
-                        type="button"
-                        class="btn-icon rounded p-1 hover:text-[var(--color-accent)]"
-                        style="color: var(--color-text-muted);"
-                        title="Conversation actions"
-                        @click.stop="toggleConversationMenu(conv.id)"
-                      >
-                        <EllipsisHorizontalIcon class="h-3.5 w-3.5" />
-                      </button>
-                      <div
-                        v-if="conversationMenuId === conv.id"
-                        class="absolute right-0 top-7 z-20 w-32 overflow-hidden rounded-lg border shadow-lg"
-                        style="border-color: var(--color-border-strong); background-color: var(--color-surface);"
-                        data-conversation-actions-menu
-                      >
-                        <button
-                          type="button"
-                          class="w-full px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-[var(--color-base-soft)]"
-                          style="color: var(--color-text-main);"
-                          @click.stop="startEditingFromMenu(conv)"
-                        >
-                          Rename
-                        </button>
-                        <button
-                          type="button"
-                          class="w-full px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-red-50"
-                          style="color: var(--color-danger);"
-                          @click.stop="confirmDeleteConversation(conv.id)"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <SettingsModal
@@ -473,17 +279,10 @@ import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 
 import {
-  FolderIcon,
   FolderOpenIcon,
   FolderPlusIcon,
   PlusIcon,
-  TrashIcon,
   EllipsisHorizontalIcon,
-  XMarkIcon,
-  MagnifyingGlassIcon,
-  CircleStackIcon,
-  ChatBubbleLeftRightIcon,
-  DocumentTextIcon,
   KeyIcon,
   UserCircleIcon,
 } from '@heroicons/vue/24/outline'
@@ -528,6 +327,20 @@ const filteredWorkspaces = computed(() => {
   })
 })
 
+const activeWorkspaceName = computed(() => {
+  const activeId = String(appStore.activeWorkspaceId || '').trim()
+  if (!activeId) return 'No active workspace'
+  const activeWorkspace = appStore.workspaces.find((workspace) => workspace.id === activeId)
+  return String(activeWorkspace?.name || '').trim() || 'Untitled workspace'
+})
+
+const activeWorkspaceCaption = computed(() => {
+  if (!appStore.hasWorkspace) return 'Create a workspace to begin'
+  const activeId = String(appStore.activeWorkspaceId || '').trim()
+  const activeWorkspace = appStore.workspaces.find((workspace) => workspace.id === activeId)
+  return workspaceFilename(activeWorkspace?.duckdb_path)
+})
+
 const filteredDatasets = computed(() => {
   if (!searchQuery.value) return localDatasets.value
   const query = searchQuery.value.toLowerCase()
@@ -553,30 +366,6 @@ function workspaceFilename(duckdbPath) {
 
 function handleBrandClick() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
-}
-
-function openWorkspaceRail(target = '') {
-  closeProfileMenu()
-  appStore.setActiveTab('workspace')
-  if (appStore.isSidebarCollapsed) {
-    appStore.setSidebarCollapsed(false)
-  }
-  workspacesExpanded.value = true
-  const normalized = String(target || '').trim().toLowerCase()
-  if (normalized === 'datasets') {
-    datasetsExpanded.value = true
-  }
-  if (normalized === 'conversations') {
-    conversationsExpanded.value = true
-  }
-}
-
-function openSchemaFromRail() {
-  closeProfileMenu()
-  appStore.setActiveTab('schema-editor')
-  if (appStore.isSidebarCollapsed) {
-    appStore.setSidebarCollapsed(false)
-  }
 }
 
 function toggleProfileMenu() {
@@ -1105,5 +894,29 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 
 .sidebar-item-row-active {
   background-color: var(--color-chat-user-bubble);
+}
+
+.sidebar-conversation-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 3.5rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: 1rem;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.sidebar-conversation-row:hover {
+  background-color: var(--color-panel-muted);
+}
+
+.sidebar-conversation-row-active {
+  background-color: var(--color-selected-surface);
+  box-shadow: inset 0 0 0 1px var(--color-selected-border);
+}
+
+.sidebar-menu-danger:hover {
+  background-color: var(--color-danger-bg);
 }
 </style>

@@ -25,13 +25,13 @@ test('layout defines elevated light surfaces for sidebar and active workspace pa
   assert.equal(sidebarSource.includes('background-color: var(--color-sidebar-surface);'), true)
 })
 
-test('sidebar datasets use friendly labels while preserving full identifiers', () => {
+test('sidebar still keeps dataset naming helpers even after moving datasets out of the main sidebar surface', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
   assert.equal(source.includes('function datasetFriendlyName(tableName) {'), true)
   assert.equal(source.includes('/_[0-9a-f]{6,}(?=_|$)/i'), true)
-  assert.equal(source.includes('{{ datasetFriendlyName(ds.table_name) }}'), true)
-  assert.equal(source.includes(':title="datasetRowTitle(ds)"'), true)
+  assert.equal(source.includes('const sourceName = datasetSourceCaption(ds?.file_path).toLowerCase()'), true)
+  assert.equal(source.includes(':title="datasetRowTitle(ds)"'), false)
   assert.equal(source.includes(':title="ds.table_name"'), false)
   assert.equal(source.includes('function datasetSourceCaption(filePath) {'), true)
   assert.equal(source.includes('return parts[parts.length - 1] || normalized'), true)

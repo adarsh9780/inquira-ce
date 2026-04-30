@@ -10,9 +10,8 @@ test('sidebar rail uses native title tooltips for modern navigation actions', ()
   )
 
   assert.equal(sidebarSource.includes('title="Create Workspace"'), true)
-  assert.equal(sidebarSource.includes('title="Datasets"'), true)
-  assert.equal(sidebarSource.includes('title="Conversations"'), true)
-  assert.equal(sidebarSource.includes('title="Schema Editor"'), true)
+  assert.equal(sidebarSource.includes('title="Open workspace settings"'), true)
+  assert.equal(sidebarSource.includes('title="New Conversation"'), true)
   assert.equal(sidebarSource.includes('title="LLM & API Keys"'), true)
   assert.equal(sidebarSource.includes('title="User Profile"'), true)
 

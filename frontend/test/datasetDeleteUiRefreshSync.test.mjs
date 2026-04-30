@@ -22,7 +22,7 @@ test('dataset delete entry points clear active selection and broadcast catalog r
   assert.equal(sidebarSource.includes('appStore.handleDatasetRemoved(deletedTableName)'), true)
   assert.equal(sidebarSource.includes("window.dispatchEvent(new CustomEvent('dataset-switched', { detail: null }))"), true)
   assert.equal(sidebarSource.includes("appStore.activeDatasetId === ds.table_name"), false)
-  assert.equal(sidebarSource.includes(":class=\"{ 'sidebar-item-row-active': isSelectedDataset(ds) }\""), true)
+  assert.equal(sidebarSource.includes("deleteDialogTitle.value = 'Delete Dataset'"), true)
 
   assert.equal(workspaceTabSource.includes('appStore.handleDatasetRemoved(tableName)'), true)
   assert.equal(workspaceTabSource.includes("window.dispatchEvent(new CustomEvent('dataset-switched', { detail: null }))"), true)

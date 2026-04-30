@@ -3,28 +3,23 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('sidebar nests collapsible datasets and conversations under the selected workspace', () => {
+test('sidebar shows active workspace context with conversations beneath it', () => {
   const unifiedSource = readFileSync(
     resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'),
     'utf-8',
   )
 
-  // Unified sidebar has datasets and conversations sections inline
-  // No separate SidebarDatasets or SidebarConversations components
+  // Unified sidebar keeps the single-file implementation
   assert.equal(unifiedSource.includes('SidebarDatasets'), false)
   assert.equal(unifiedSource.includes('SidebarConversations'), false)
-  
-  // Workspace check still present
+
+  // Workspace context still drives the top section
   assert.equal(unifiedSource.includes('appStore.hasWorkspace'), true)
-  
-  // Expansion state refs exist for workspaces, datasets, conversations
-  assert.equal(unifiedSource.includes('const workspacesExpanded = ref(true)'), true)
-  assert.equal(unifiedSource.includes('const datasetsExpanded = ref(true)'), true)
-  assert.equal(unifiedSource.includes('const conversationsExpanded = ref(true)'), true)
-  
-  // Only outer workspace uses folder open/closed icon state
-  assert.equal(unifiedSource.includes('FolderOpenIcon v-if="workspacesExpanded"'), true)
-  assert.equal(unifiedSource.includes('FolderOpenIcon v-if="datasetsExpanded"'), false)
-  assert.equal(unifiedSource.includes('FolderOpenIcon v-if="conversationsExpanded"'), false)
-  assert.equal(unifiedSource.includes("v-if=\"appStore.hasWorkspace && workspacesExpanded\""), true)
+
+  // The top section shows workspace details and the conversation list
+  assert.equal(unifiedSource.includes('activeWorkspaceName'), true)
+  assert.equal(unifiedSource.includes('activeWorkspaceCaption'), true)
+  assert.equal(unifiedSource.includes('Open workspace settings'), true)
+  assert.equal(unifiedSource.includes('No conversations yet.'), true)
+  assert.equal(unifiedSource.includes('Datasets</p>'), false)
 })

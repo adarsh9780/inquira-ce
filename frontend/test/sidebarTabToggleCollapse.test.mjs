@@ -13,12 +13,12 @@ test('workspace/schema toggle is in status bar, not sidebar', () => {
   assert.equal(sidebarSource.includes("@click=\"handleTabClick('workspace')\""), false)
   assert.equal(sidebarSource.includes("@click=\"handleTabClick('schema-editor')\""), false)
   assert.equal(sidebarSource.includes("if (normalized === 'workspace' || normalized === 'data')"), true)
-  assert.equal(sidebarSource.includes("appStore.activeTab === 'schema-editor'"), true)
+  assert.equal(sidebarSource.includes("appStore.activeTab === 'schema-editor'"), false)
 
   // Sidebar no longer has workspace/schema specific collapse logic
   // (it still has toggleSidebar for header click, but not for tab switching)
-  assert.equal(sidebarSource.includes('function openWorkspaceRail(target = \'\') {'), true)
-  assert.equal(sidebarSource.includes('function openSchemaFromRail() {'), true)
+  assert.equal(sidebarSource.includes('function openWorkspaceRail(target = \'\') {'), false)
+  assert.equal(sidebarSource.includes('function openSchemaFromRail() {'), false)
 
   // Workspace/schema toggle is now in status bar
   assert.equal(statusBarSource.includes('switchToWorkspace'), true)
@@ -41,6 +41,7 @@ test('sidebar replaces direct settings/terms buttons with llm rail and profile m
   assert.equal(sidebarSource.includes('Terms and Conditions'), true)
   assert.equal(sidebarSource.includes('Account'), true)
   assert.equal(sidebarSource.includes('Theme'), true)
+  assert.equal(sidebarSource.includes('Open workspace settings'), true)
 
   // CE: Logout removed — no auth needed
   assert.equal(sidebarSource.includes('@click="promptLogout'), false)

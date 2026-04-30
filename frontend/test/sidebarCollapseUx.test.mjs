@@ -13,13 +13,13 @@ test('sidebar uses file explorer layout with unified design', () => {
   assert.equal(source.includes('@mouseenter='), false)
   assert.equal(source.includes('appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)'), true)
 
-  // Persistent rail handles navigation in both sidebar states
+  // Fixed bottom action stack handles navigation in both sidebar states
   assert.equal(source.includes('class="sidebar-rail-btn"'), true)
-  assert.equal(source.includes('function openWorkspaceRail(target = \'\') {'), true)
-  assert.equal(source.includes('sidebar-rail-collapsed'), true)
-  assert.equal(source.includes('sidebar-rail-expanded'), true)
+  assert.equal(source.includes('function openWorkspaceRail(target = \'\') {'), false)
   assert.equal(source.includes('Expand sidebar'), true)
   assert.equal(source.includes('Collapse sidebar'), true)
+  assert.equal(source.includes('Open workspace settings'), true)
+  assert.equal(source.includes('No conversations yet.'), true)
 
   // No old separate sidebar components - unified design
   assert.equal(source.includes('SidebarWorkspaces'), false)

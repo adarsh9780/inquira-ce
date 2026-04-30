@@ -7,15 +7,15 @@ function read(relativePath) {
   return readFileSync(resolve(process.cwd(), relativePath), 'utf-8')
 }
 
-test('sidebar keeps a vertical rail in both modes and shows labels only when expanded', () => {
+test('sidebar keeps a fixed bottom action stack and shows labels only when expanded', () => {
   const source = read('src/components/layout/UnifiedSidebar.vue')
 
-  assert.equal(source.includes("class=\"sidebar-rail shrink-0 border-r px-2 py-3\""), true)
-  assert.equal(source.includes("appStore.isSidebarCollapsed ? 'sidebar-rail-collapsed' : 'sidebar-rail-expanded'"), true)
   assert.equal(source.includes("appStore.isSidebarCollapsed ? 'sidebar-rail-btn-collapsed' : 'sidebar-rail-btn-expanded'"), true)
-  assert.equal(source.includes('v-if="!appStore.isSidebarCollapsed" class="truncate text-sm font-medium">Datasets</span>'), true)
-  assert.equal(source.includes('v-if="!appStore.isSidebarCollapsed" class="truncate text-sm font-medium">Conversations</span>'), true)
+  assert.equal(source.includes('v-if="!appStore.isSidebarCollapsed" class="truncate text-sm font-medium">Create Workspace</span>'), true)
   assert.equal(source.includes('v-if="!appStore.isSidebarCollapsed" class="truncate text-sm font-medium">LLM &amp; API Keys</span>'), true)
+  assert.equal(source.includes('v-if="!appStore.isSidebarCollapsed" class="truncate text-sm font-medium">User Profile</span>'), true)
+  assert.equal(source.includes('Open workspace settings'), true)
+  assert.equal(source.includes('Conversations'), true)
 })
 
 test('sidebar profile menu routes terms account and theme through settings modal', () => {
