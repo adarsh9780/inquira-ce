@@ -1174,6 +1174,49 @@ async def test_analysis_validate_result_retries_when_execution_has_no_signal(mon
 
 
 @pytest.mark.asyncio
+async def test_generate_result_explanations_uses_lite_model(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_get_model(config, lite=False):
+        captured["config"] = config
+        captured["lite"] = lite
+        return object()
+
+    async def fake_invoke(prompt, model, schema, payload):
+        captured["prompt"] = prompt
+        captured["model"] = model
+        captured["schema"] = schema
+        captured["payload"] = payload
+        return {
+            "result_explanation": (
+                "I looked at the result and it shows revenue increased over the selected period.\n\n"
+                "The main takeaway is that the increase is steady enough to treat it as a real trend."
+            ),
+            "code_explanation": "Aggregated revenue by period and summarized the final output.",
+        }
+
+    monkeypatch.setattr("agent_v2.nodes._get_model", fake_get_model)
+    monkeypatch.setattr("agent_v2.nodes._ainvoke_provider_structured_chain", fake_invoke)
+
+    result = await nodes_module._generate_result_explanations(
+        question="Did revenue increase?",
+        code="print('ok')",
+        code_explanation="Grouped revenue by month.",
+        result_summary={"success": True, "result_kind": "scalar", "result_preview": "{\"value\": 10}"},
+        config={"configurable": {"model": "test-model"}},
+    )
+
+    assert captured["lite"] is True
+    assert captured["payload"] == {
+        "question": "Did revenue increase?",
+        "code": "print('ok')",
+        "code_explanation": "Grouped revenue by month.",
+        "result_summary_json": "{\"success\": true, \"result_kind\": \"scalar\", \"result_preview\": \"{\\\"value\\\": 10}\"}",
+    }
+    assert "revenue increased" in str(result.result_explanation).lower()
+
+
+@pytest.mark.asyncio
 async def test_analysis_assess_context_falls_back_when_length_limit_error(monkeypatch) -> None:
     class _LengthErr(Exception):
         pass
