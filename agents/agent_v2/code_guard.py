@@ -55,6 +55,49 @@ def _contains_duckdb_connect(raw: str) -> bool:
     return False
 
 
+def _is_literal_string(node: ast.AST) -> bool:
+    return isinstance(node, ast.Constant) and isinstance(node.value, str)
+
+
+def _materializes_unbounded_select_all(raw: str) -> bool:
+    try:
+        tree = ast.parse(raw)
+    except SyntaxError:
+        return False
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        fn = node.func
+        if not isinstance(fn, ast.Attribute) or fn.attr not in {"fetchdf", "df"}:
+            continue
+        relation_call = fn.value
+        if not isinstance(relation_call, ast.Call):
+            continue
+        relation_fn = relation_call.func
+        if not (
+            isinstance(relation_fn, ast.Attribute)
+            and relation_fn.attr == "sql"
+            and isinstance(relation_fn.value, ast.Name)
+            and relation_fn.value.id == "conn"
+        ):
+            continue
+        if not relation_call.args or not _is_literal_string(relation_call.args[0]):
+            continue
+        sql = str(relation_call.args[0].value or "")
+        normalized = " ".join(sql.strip().lower().split())
+        if not normalized.startswith("select * from "):
+            continue
+        if any(
+            token in normalized
+            for token in (" limit ", " where ", " group by ", " count(", " sum(", " avg(", " min(", " max(")
+        ):
+            continue
+        return True
+
+    return False
+
+
 def guard_code(
     code: str, table_name: str | None = None, allow_fallback: bool = True
 ) -> CodeGuardResult:
@@ -126,6 +169,18 @@ def guard_code(
             reason=(
                 "Do not convert dataframe outputs to list/dict JSON (for example, `df.to_dict(orient='records')`). "
                 "Keep dataframe variables as dataframe objects and reference them in `output_contract`."
+            ),
+        )
+
+    if _materializes_unbounded_select_all(raw):
+        return CodeGuardResult(
+            code=raw,
+            changed=False,
+            blocked=True,
+            should_retry=True,
+            reason=(
+                "Do not materialize an unbounded `SELECT *` workspace query into pandas. "
+                "Filter, aggregate, or limit the DuckDB query first, then convert only the bounded final result."
             ),
         )
 
