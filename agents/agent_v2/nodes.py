@@ -3688,29 +3688,6 @@ async def analysis_validate_result_node(state: dict[str, Any], config: RunnableC
     code = str(state.get("candidate_code") or "").strip()
     analysis_output = state.get("analysis_output") if isinstance(state.get("analysis_output"), dict) else {}
     code_explanation = str(analysis_output.get("explanation") or "").strip()
-    result_explanation = ""
-    try:
-        explained = await _generate_result_explanations(
-            question=str(analysis_context.get("user_text") or ""),
-            code=code,
-            code_explanation=code_explanation,
-            result_summary=result_summary,
-            config=config,
-        )
-        result_explanation = str(explained.result_explanation or "").strip()
-        code_explanation = str(explained.code_explanation or code_explanation).strip()
-    except Exception:
-        result_explanation = ""
-
-    if not result_explanation:
-        stdout = str(execution.get("stdout") or "").strip()
-        if stdout:
-            result_explanation = stdout[:1200]
-        elif code_explanation:
-            result_explanation = code_explanation
-        else:
-            result_explanation = "Analysis completed successfully."
-
     result_kind = str(result_summary.get("result_kind") or "").strip().lower()
     expected_output_kinds = {
         str(item.get("kind") or "").strip().lower()
@@ -3726,6 +3703,7 @@ async def analysis_validate_result_node(state: dict[str, Any], config: RunnableC
     validation_outcome = {"status": "ok", "reason": ""}
     retry_feedback = ""
     retry_target = ""
+    result_explanation = ""
     if not (artifact_count > 0 or has_result_signal or has_stdout_signal or has_summary_signal):
         validation_outcome = {
             "status": "retry",
@@ -3757,6 +3735,39 @@ async def analysis_validate_result_node(state: dict[str, Any], config: RunnableC
         }
         retry_feedback = str(validation_outcome["reason"])
         retry_target = "analysis_generate_code"
+
+    if retry_target:
+        stdout = str(execution.get("stdout") or "").strip()
+        if stdout:
+            result_explanation = stdout[:1200]
+        elif retry_feedback:
+            result_explanation = retry_feedback
+        elif code_explanation:
+            result_explanation = code_explanation
+        else:
+            result_explanation = "Analysis needs another attempt."
+    else:
+        try:
+            explained = await _generate_result_explanations(
+                question=str(analysis_context.get("user_text") or ""),
+                code=code,
+                code_explanation=code_explanation,
+                result_summary=result_summary,
+                config=config,
+            )
+            result_explanation = str(explained.result_explanation or "").strip()
+            code_explanation = str(explained.code_explanation or code_explanation).strip()
+        except Exception:
+            result_explanation = ""
+
+        if not result_explanation:
+            stdout = str(execution.get("stdout") or "").strip()
+            if stdout:
+                result_explanation = stdout[:1200]
+            elif code_explanation:
+                result_explanation = code_explanation
+            else:
+                result_explanation = "Analysis completed successfully."
 
     return {
         "final_execution": execution,

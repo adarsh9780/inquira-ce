@@ -1289,6 +1289,39 @@ async def test_generate_result_explanations_uses_lite_model(monkeypatch) -> None
 
 
 @pytest.mark.asyncio
+async def test_analysis_validate_result_skips_explanation_model_for_retryable_result(monkeypatch) -> None:
+    async def fail_generate_result_explanations(**_kwargs):
+        raise AssertionError("result explanation model should be skipped for retryable outputs")
+
+    monkeypatch.setattr("agent_v2.nodes._generate_result_explanations", fail_generate_result_explanations)
+
+    state = {
+        "workspace_id": "ws1",
+        "run_id": "r1",
+        "execution_result": {"success": True, "stdout": "", "stderr": "", "artifacts": []},
+        "analysis_context": {"user_text": "top customers"},
+        "candidate_code": "result = conn.sql('select * from customers where 1 = 0').fetchdf()",
+        "analysis_output": {"explanation": "Returned the filtered customers dataframe."},
+        "analysis_runtime_tool_messages": [
+            ToolMessage(
+                content=(
+                    '{"success": true, "stdout": "", "stderr": "", "result_kind": "dataframe", '
+                    '"result_preview": "{\\"rows\\": []}", "row_count_preview": 0, '
+                    '"has_tabular_signal": true, "is_empty_result": true, '
+                    '"artifact_count": 0, "artifacts": [], "has_signal": true}'
+                ),
+                tool_call_id="call_retry",
+                name="validate_result_runtime",
+            )
+        ],
+    }
+
+    result = await analysis_validate_result_node(state, {"configurable": {}})
+    assert result.get("retry_target") == "analysis_generate_code"
+    assert "another attempt" not in str(result.get("result_explanation") or "").lower()
+
+
+@pytest.mark.asyncio
 async def test_analysis_assess_context_falls_back_when_length_limit_error(monkeypatch) -> None:
     class _LengthErr(Exception):
         pass
