@@ -986,6 +986,53 @@ async def test_analysis_generate_code_prefers_tool_call_path_for_ollama_cloud_mo
 
 
 @pytest.mark.asyncio
+async def test_analysis_generate_code_does_not_append_full_schema_memory_when_context_pack_exists(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("agent_v2.nodes._get_model", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr("agent_v2.nodes.build_coding_chain", lambda **kwargs: {"method": kwargs.get("method")})
+    captured: dict[str, str] = {}
+
+    async def fake_ainvoke_coding_chain(**kwargs):
+        captured["context"] = str(kwargs.get("context") or "")
+        return AnalysisOutput(
+            code="print('ok')",
+            explanation="done",
+            output_contract=[],
+            search_schema_queries=[],
+            selected_tables=[],
+            joins_used=False,
+        )
+
+    monkeypatch.setattr("agent_v2.nodes.ainvoke_coding_chain", fake_ainvoke_coding_chain)
+
+    large_schema_memory = "Schema Analysis Memory\n" + ("very long note\n" * 800)
+    state = {
+        "analysis_context": {
+            "messages": [HumanMessage(content="top batsman by runs")],
+            "data_path": "/tmp/ws.db",
+            "table_names": ["batting"],
+            "schema_summary": "",
+            "sample_table": "",
+            "context": "workspace context",
+            "schema_memory": large_schema_memory,
+            "conversation_memory": "earlier we focused on batting",
+            "schema_context_pack": {
+                "mode": "compact",
+                "tables": [{"table_name": "batting", "columns": [{"name": "runs", "dtype": "INTEGER"}]}],
+            },
+        },
+        "known_columns": [],
+        "attempt_counters": {"generation": 0},
+    }
+
+    result = await analysis_generate_code_node(state, {"configurable": {}})
+    assert result.get("candidate_code") == "print('ok')"
+    assert "Schema Analysis Memory" not in captured["context"]
+    assert "Schema context pack already loaded for this turn" in captured["context"]
+
+
+@pytest.mark.asyncio
 async def test_analysis_generate_code_ollama_cloud_tool_call_failure_falls_back_to_structured_chain(
     monkeypatch,
 ) -> None:

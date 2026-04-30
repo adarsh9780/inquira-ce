@@ -2462,6 +2462,48 @@ def _tool_cache_message(
     )
 
 
+def _build_generation_context(
+    *,
+    base_context: str,
+    schema_context_pack: dict[str, Any],
+    schema_memory: str,
+    conversation_memory: str,
+    known_columns: list[dict[str, str]],
+) -> str:
+    context_sections: list[str] = []
+    normalized_base = str(base_context or "").strip()
+    if normalized_base:
+        context_sections.append(normalized_base)
+
+    pack_tables = schema_context_pack.get("tables") if isinstance(schema_context_pack, dict) else None
+    has_context_pack = isinstance(pack_tables, list) and bool(pack_tables)
+    if has_context_pack:
+        context_sections.append(
+            (
+                "Schema context pack already loaded for this turn. Use it before requesting schema tools. "
+                "Request more schema details only for specific ambiguous columns.\n"
+                f"{_safe_json_dumps(schema_context_pack)[:7000]}"
+            ).strip()
+        )
+    elif schema_memory:
+        context_sections.append(
+            (
+                "Use this schema memory as analyst notes before writing code:\n"
+                f"{schema_memory[:2000]}"
+            ).strip()
+        )
+
+    if conversation_memory:
+        context_sections.append(
+            (
+                "Conversation memory summary:\n"
+                f"{conversation_memory[:1200]}"
+            ).strip()
+        )
+
+    return "\n\n".join(section for section in context_sections if section).strip()
+
+
 async def execute_pending_tools_node(
     state: dict[str, Any],
     config: RunnableConfig,
@@ -3377,26 +3419,13 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
         else {}
     )
     conversation_memory = str(analysis_context.get("conversation_memory") or "").strip()
-    generation_context = str(analysis_context.get("context") or "")
-    if schema_context_pack:
-        generation_context = (
-            f"{generation_context}\n\n"
-            "Schema context pack already loaded for this turn. Use it before requesting schema tools. "
-            "Request more schema details only for specific ambiguous columns.\n"
-            f"{_safe_json_dumps(schema_context_pack)[:9000]}"
-        ).strip()
-    if schema_memory:
-        generation_context = (
-            f"{generation_context}\n\n"
-            "Use this schema memory as analyst notes before writing code:\n"
-            f"{schema_memory[:5000]}"
-        ).strip()
-    if conversation_memory:
-        generation_context = (
-            f"{generation_context}\n\n"
-            "Conversation memory summary:\n"
-            f"{conversation_memory[:3000]}"
-        ).strip()
+    generation_context = _build_generation_context(
+        base_context=str(analysis_context.get("context") or ""),
+        schema_context_pack=schema_context_pack,
+        schema_memory=schema_memory,
+        conversation_memory=conversation_memory,
+        known_columns=known_columns,
+    )
     if retry_feedback:
         messages = list(messages) + [HumanMessage(content=f"Fix the previous issue: {retry_feedback}")]
     table_names = _normalize_table_names(analysis_context.get("table_names"), max_items=16)
