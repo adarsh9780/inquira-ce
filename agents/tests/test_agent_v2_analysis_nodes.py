@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -1051,7 +1052,12 @@ async def test_analysis_collect_context_reads_schema_memory(tmp_path) -> None:
     memory_dir = tmp_path / "context"
     memory_dir.mkdir(parents=True, exist_ok=True)
     memory_file = memory_dir / "schema_analysis_memory.md"
-    memory_file.write_text("# Schema Analysis Memory\n\n- Question focus: top batsman\n", encoding="utf-8")
+    memory_file.write_text(
+        f"<!-- data_mtime_ns={workspace_db.stat().st_mtime_ns} -->\n"
+        "<!-- schema_version=v1 -->\n\n"
+        "# Schema Analysis Memory\n\n- Question focus: top batsman\n",
+        encoding="utf-8",
+    )
 
     state = {
         "messages": [HumanMessage(content="show top scorers")],
@@ -1064,6 +1070,34 @@ async def test_analysis_collect_context_reads_schema_memory(tmp_path) -> None:
     assert isinstance(analysis_context, dict)
     assert "schema_memory" in analysis_context
     assert "Schema Analysis Memory" in str(analysis_context.get("schema_memory") or "")
+
+
+@pytest.mark.asyncio
+async def test_analysis_collect_context_ignores_stale_schema_memory_when_dataset_mtime_changes(tmp_path) -> None:
+    workspace_db = tmp_path / "workspace.duckdb"
+    workspace_db.write_text("", encoding="utf-8")
+    initial_mtime_ns = workspace_db.stat().st_mtime_ns
+    memory_dir = tmp_path / "context"
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    memory_file = memory_dir / "schema_analysis_memory.md"
+    memory_file.write_text(
+        f"<!-- data_mtime_ns={initial_mtime_ns} -->\n"
+        "<!-- schema_version=v1 -->\n\n"
+        "# Schema Analysis Memory\n\n- Question focus: top batsman\n",
+        encoding="utf-8",
+    )
+    os.utime(workspace_db, ns=(initial_mtime_ns + 1_000_000, initial_mtime_ns + 1_000_000))
+
+    state = {
+        "messages": [HumanMessage(content="show top scorers")],
+        "table_names": ["batting"],
+        "known_columns": [],
+        "data_path": str(workspace_db),
+    }
+    result = await analysis_collect_context_node(state, {"configurable": {}})
+    analysis_context = result.get("analysis_context") if isinstance(result, dict) else {}
+    assert isinstance(analysis_context, dict)
+    assert str(analysis_context.get("schema_memory") or "") == ""
 
 
 @pytest.mark.asyncio

@@ -1034,7 +1034,42 @@ def _schema_memory_md_path(data_path: str | None) -> Path | None:
     return candidate.parent / "context" / "schema_analysis_memory.md"
 
 
-def _load_schema_memory_markdown(data_path: str | None) -> str:
+def _data_path_mtime_ns(data_path: str | None) -> int:
+    path = str(data_path or "").strip()
+    if not path:
+        return 0
+    try:
+        return int(Path(path).expanduser().stat().st_mtime_ns)
+    except Exception:
+        return 0
+
+
+def _parse_schema_memory_header(text: str) -> tuple[dict[str, str], str]:
+    metadata: dict[str, str] = {}
+    lines = text.splitlines()
+    body_start = 0
+    for idx, line in enumerate(lines):
+        normalized = str(line or "").strip()
+        if not normalized:
+            continue
+        if normalized.startswith("<!-- ") and normalized.endswith(" -->"):
+            payload = normalized[5:-4].strip()
+            if "=" in payload:
+                key, value = payload.split("=", 1)
+                metadata[str(key).strip()] = str(value).strip()
+            body_start = idx + 1
+            continue
+        body_start = idx
+        break
+    body = "\n".join(lines[body_start:]).strip()
+    return metadata, body
+
+
+def _load_schema_memory_markdown(
+    data_path: str | None,
+    *,
+    schema_version: str = "",
+) -> str:
     path = _schema_memory_md_path(data_path)
     if path is None or not path.exists():
         return ""
@@ -1044,12 +1079,23 @@ def _load_schema_memory_markdown(data_path: str | None) -> str:
         return ""
     if not text:
         return ""
-    return text[:12000]
+    metadata, body = _parse_schema_memory_header(text)
+    if not body:
+        return ""
+    expected_mtime_ns = _data_path_mtime_ns(data_path)
+    recorded_mtime_ns = str(metadata.get("data_mtime_ns") or "").strip()
+    recorded_schema_version = str(metadata.get("schema_version") or "").strip()
+    if recorded_mtime_ns and str(expected_mtime_ns) != recorded_mtime_ns:
+        return ""
+    if schema_version and recorded_schema_version and recorded_schema_version != schema_version:
+        return ""
+    return body[:12000]
 
 
 def _write_schema_memory_markdown(
     *,
     data_path: str | None,
+    schema_version: str = "",
     user_text: str,
     known_columns: list[dict[str, str]],
     relevant_tables: list[dict[str, Any]] | None = None,
@@ -1074,6 +1120,9 @@ def _write_schema_memory_markdown(
         )
 
     lines: list[str] = [
+        f"<!-- data_mtime_ns={_data_path_mtime_ns(data_path)} -->",
+        f"<!-- schema_version={schema_version or 'v1'} -->",
+        "",
         "# Schema Analysis Memory",
         "",
         f"- Question focus: {_truncate_line(user_text, limit=220)}",
@@ -2749,7 +2798,11 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
         manifest=schema_manifest,
         context_window=_config_context_window(config),
     )
-    schema_memory = await asyncio.to_thread(_load_schema_memory_markdown, data_path)
+    schema_memory = await asyncio.to_thread(
+        _load_schema_memory_markdown,
+        data_path,
+        schema_version=str(schema_manifest.get("schema_version") or ""),
+    )
     schema_summary = _build_schema_summary(
         table_names=table_names,
         workspace_schema=workspace_schema,
@@ -3133,6 +3186,7 @@ async def analysis_finalize_context_enrichment_node(
     schema_memory_path = await asyncio.to_thread(
         _write_schema_memory_markdown,
         data_path=str(analysis_context.get("data_path") or "") or None,
+        schema_version=str((analysis_context.get("schema_manifest") or {}).get("schema_version") or "v1"),
         user_text=str(analysis_context.get("user_text") or ""),
         known_columns=known_columns,
         relevant_tables=relevant_tables,
