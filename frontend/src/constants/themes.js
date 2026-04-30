@@ -2,32 +2,32 @@ export const THEME_OPTIONS = [
   {
     id: 'warm',
     label: 'Warm Light',
-    description: 'Current default palette with warm neutrals.',
-    preview: ['#FAF9F6', '#F5F4EF', '#C96A2E']
+    description: 'Editorial parchment light theme with clay actions and cooler data accents.',
+    preview: ['#FBF8F2', '#F4EEE5', '#B86A3D']
   },
   {
     id: 'evergreen',
     label: 'Evergreen',
-    description: 'Calm green-forward light palette for extended sessions.',
-    preview: ['#F4F8F5', '#EAF3ED', '#1F7A5A']
+    description: 'Quiet sage palette with deeper contrast for long analytical sessions.',
+    preview: ['#F7FAF7', '#ECF2ED', '#21684F']
   },
   {
     id: 'midnight',
     label: 'Midnight Dark',
-    description: 'Deep slate dark palette with warm brand accent and softer glare.',
-    preview: ['#101722', '#151E2B', '#C96A2E']
+    description: 'Layered graphite dark mode with restrained copper accents and softer contrast.',
+    preview: ['#111A24', '#182230', '#C97443']
   },
   {
     id: 'daddylight',
     label: "Daddy's Light Theme",
-    description: 'Warm neutral cream base with orange primary and mauve accent.',
-    preview: ['#e9eae1', '#f4f5f0', '#ed9912']
+    description: 'Cream-and-plum light theme with toasted gold highlights and softer neutrals.',
+    preview: ['#FBF6EF', '#F4EDE3', '#7B6178']
   },
   {
     id: 'daddydark',
     label: "Daddy's Dark Theme",
-    description: 'Inverted warm neutral base with orange primary and mauve accent.',
-    preview: ['#d2d5c3', '#e9eae1', '#ed9912']
+    description: 'Moss-charcoal dark theme with old-gold primaries and muted plum accents.',
+    preview: ['#1C231F', '#222B26', '#C08B3A']
   }
 ]
 

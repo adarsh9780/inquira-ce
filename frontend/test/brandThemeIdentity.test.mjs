@@ -3,24 +3,24 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('app theme uses Ubuntu and the orange brand accent from the public site', () => {
+test('app theme uses Manrope with semantic theme surfaces and restrained warm brand accents', () => {
   const styleSource = readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf-8')
 
-  assert.equal(styleSource.includes("family=Ubuntu:ital,wght@0,400;0,500;0,700"), true)
-  assert.equal(styleSource.includes("family=Ubuntu+Mono:wght@400;700"), true)
-  assert.equal(styleSource.includes('--font-ui: "Ubuntu"'), true)
-  assert.equal(styleSource.includes('--font-display: "Ubuntu"'), true)
-  assert.equal(styleSource.includes('--font-mono: "JetBrainsMono Nerd Font", "JetBrains Mono", "Ubuntu Mono", monospace;'), true)
-  assert.equal(styleSource.includes('--color-base: #FAF9F6;'), true)
-  assert.equal(styleSource.includes('--color-sidebar-surface: #EFEDE8;'), true)
-  assert.equal(styleSource.includes('--color-text-main: #1A1F2E;'), true)
-  assert.equal(styleSource.includes('--color-text-muted: #6B7280;'), true)
-  assert.equal(styleSource.includes('--color-accent: #C96A2E;'), true)
-  assert.equal(styleSource.includes('--color-secondary-accent: #5B7FD4;'), true)
-  assert.equal(styleSource.includes('--color-accent-text: #8B4C22;'), true)
-  assert.equal(styleSource.includes('--color-accent-soft: #F3E8DF;'), true)
-  assert.equal(styleSource.includes('--color-primary-900: #C96A2E;'), true)
-  assert.equal(styleSource.includes('--color-chat-user-bubble: #F3E8DF;'), true)
+  assert.equal(styleSource.includes("family=Manrope:wght@400;500;600;700;800"), true)
+  assert.equal(styleSource.includes('--font-ui: "Manrope", "Avenir Next", "Segoe UI", sans-serif;'), true)
+  assert.equal(styleSource.includes('--font-display: "Manrope", "Avenir Next", "Segoe UI", sans-serif;'), true)
+  assert.equal(styleSource.includes('--font-mono: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;'), true)
+  assert.equal(styleSource.includes('--color-base: #FBF8F2;'), true)
+  assert.equal(styleSource.includes('--color-sidebar-surface: #ECE6DD;'), true)
+  assert.equal(styleSource.includes('--color-text-main: #1E2430;'), true)
+  assert.equal(styleSource.includes('--color-text-muted: #6D726F;'), true)
+  assert.equal(styleSource.includes('--color-accent: #B86A3D;'), true)
+  assert.equal(styleSource.includes('--color-secondary-accent: #4F6FAF;'), true)
+  assert.equal(styleSource.includes('--color-accent-text: #7A4729;'), true)
+  assert.equal(styleSource.includes('--color-accent-soft: #F2E5D9;'), true)
+  assert.equal(styleSource.includes('--color-primary-900: #B86A3D;'), true)
+  assert.equal(styleSource.includes('--color-panel-elevated: #FFFDF8;'), true)
+  assert.equal(styleSource.includes('--color-selected-surface: #F5E7DB;'), true)
 })
 
 test('desktop favicon follows the blue-orange Inquira brand mark', () => {
@@ -38,8 +38,8 @@ test('desktop favicon follows the blue-orange Inquira brand mark', () => {
 test('native splash screen mirrors the branded font and accent', () => {
   const splashSource = readFileSync(resolve(process.cwd(), 'public/splash.html'), 'utf-8')
 
-  assert.equal(splashSource.includes('font-family: "Ubuntu"'), true)
-  assert.equal(splashSource.includes('--color-text-main: #1A1F2E;'), true)
-  assert.equal(splashSource.includes('--color-accent: #C96A2E;'), true)
+  assert.equal(splashSource.includes('font-family: "Manrope"'), true)
+  assert.equal(splashSource.includes('--color-text-main: #1E2430;'), true)
+  assert.equal(splashSource.includes('--color-accent: #B86A3D;'), true)
   assert.equal(splashSource.includes('background: var(--color-accent);'), true)
 })

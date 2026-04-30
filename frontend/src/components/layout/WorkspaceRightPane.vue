@@ -14,39 +14,42 @@
           aria-label="Select data pane"
           max-width-class="w-[150px]"
         />
-        <div v-else class="inline-flex rounded-lg border p-1" style="border-color: var(--color-border); background-color: var(--color-workspace-surface);">
+        <div v-else class="inline-flex rounded-xl border p-1" style="border-color: var(--color-border); background-color: var(--color-control-surface);">
           <button
             @click="appStore.setDataPane('table')"
-            class="rounded-md p-2 transition-colors flex items-center justify-center"
-            :class="appStore.dataPane === 'table' ? 'bg-white shadow-sm' : ''"
-            :style="appStore.dataPane === 'table' ? 'color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
+            class="rounded-lg px-3 py-2 transition-colors flex items-center justify-center gap-1.5"
+            :style="appStore.dataPane === 'table'
+              ? 'background-color: var(--color-selected-surface); color: var(--color-text-main); box-shadow: inset 0 0 0 1px var(--color-selected-border);'
+              : 'color: var(--color-text-muted);'"
             title="Table"
             aria-label="Table"
           >
             <TableCellsIcon class="w-4 h-4" />
-            <span class="sr-only">Table</span>
+            <span class="text-xs font-medium">Table</span>
           </button>
           <button
             @click="appStore.setDataPane('figure')"
-            class="rounded-md p-2 transition-colors flex items-center justify-center"
-            :class="appStore.dataPane === 'figure' ? 'bg-white shadow-sm' : ''"
-            :style="appStore.dataPane === 'figure' ? 'color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
+            class="rounded-lg px-3 py-2 transition-colors flex items-center justify-center gap-1.5"
+            :style="appStore.dataPane === 'figure'
+              ? 'background-color: var(--color-selected-surface); color: var(--color-text-main); box-shadow: inset 0 0 0 1px var(--color-selected-border);'
+              : 'color: var(--color-text-muted);'"
             title="Chart"
             aria-label="Chart"
           >
             <ChartBarIcon class="w-4 h-4" />
-            <span class="sr-only">Chart</span>
+            <span class="text-xs font-medium">Chart</span>
           </button>
           <button
             @click="appStore.setDataPane('output')"
-            class="rounded-md p-2 transition-colors flex items-center justify-center"
-            :class="appStore.dataPane === 'output' ? 'bg-white shadow-sm' : ''"
-            :style="appStore.dataPane === 'output' ? 'color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
+            class="rounded-lg px-3 py-2 transition-colors flex items-center justify-center gap-1.5"
+            :style="appStore.dataPane === 'output'
+              ? 'background-color: var(--color-selected-surface); color: var(--color-text-main); box-shadow: inset 0 0 0 1px var(--color-selected-border);'
+              : 'color: var(--color-text-muted);'"
             title="Output"
             aria-label="Output"
           >
             <CommandLineIcon class="w-4 h-4" />
-            <span class="sr-only">Output</span>
+            <span class="text-xs font-medium">Output</span>
           </button>
         </div>
       </div>

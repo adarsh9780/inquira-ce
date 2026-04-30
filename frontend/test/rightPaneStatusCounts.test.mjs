@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('workspace right pane supports icon tabs and compact dropdown switcher without inline count badges', () => {
+test('workspace right pane supports labeled tabs and compact dropdown switcher without inline count badges', () => {
   const rightPanePath = resolve(process.cwd(), 'src/components/layout/WorkspaceRightPane.vue')
   const source = readFileSync(rightPanePath, 'utf-8')
 
@@ -14,9 +14,9 @@ test('workspace right pane supports icon tabs and compact dropdown switcher with
   assert.equal(source.includes('title="Table"'), true)
   assert.equal(source.includes('title="Chart"'), true)
   assert.equal(source.includes('title="Output"'), true)
-  assert.equal(source.includes('<span class="sr-only">Table</span>'), true)
-  assert.equal(source.includes('<span class="sr-only">Chart</span>'), true)
-  assert.equal(source.includes('<span class="sr-only">Output</span>'), true)
+  assert.equal(source.includes('<span class="text-xs font-medium">Table</span>'), true)
+  assert.equal(source.includes('<span class="text-xs font-medium">Chart</span>'), true)
+  assert.equal(source.includes('<span class="text-xs font-medium">Output</span>'), true)
   assert.equal(source.includes('appStore.dataframes.length'), false)
   assert.equal(source.includes('appStore.figures.length'), false)
   assert.equal(source.includes('appStore.scalars.length'), false)

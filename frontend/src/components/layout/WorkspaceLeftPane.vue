@@ -1,20 +1,22 @@
 <template>
   <div class="flex h-full flex-col" style="background-color: var(--color-workspace-surface);">
     <div class="flex-shrink-0 h-16 px-4 flex items-center gap-4" style="background-color: var(--color-workspace-surface);">
-      <div class="inline-flex rounded-lg border p-1 flex-shrink-0" style="border-color: var(--color-border); background-color: var(--color-workspace-surface);">
+      <div class="inline-flex rounded-xl border p-1 flex-shrink-0" style="border-color: var(--color-border); background-color: var(--color-control-surface);">
         <button
           @click="appStore.setWorkspacePane('code')"
-          class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
-          :class="appStore.workspacePane === 'code' ? 'bg-white shadow-sm' : ''"
-          :style="appStore.workspacePane === 'code' ? 'color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
+          class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+          :style="appStore.workspacePane === 'code'
+            ? 'background-color: var(--color-selected-surface); color: var(--color-text-main); box-shadow: inset 0 0 0 1px var(--color-selected-border);'
+            : 'color: var(--color-text-muted);'"
         >
           Code
         </button>
         <button
           @click="appStore.setWorkspacePane('chat')"
-          class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
-          :class="appStore.workspacePane === 'chat' ? 'bg-white shadow-sm' : ''"
-          :style="appStore.workspacePane === 'chat' ? 'color: var(--color-text-main);' : 'color: var(--color-text-muted);'"
+          class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+          :style="appStore.workspacePane === 'chat'
+            ? 'background-color: var(--color-selected-surface); color: var(--color-text-main); box-shadow: inset 0 0 0 1px var(--color-selected-border);'
+            : 'color: var(--color-text-muted);'"
         >
           Chat
         </button>

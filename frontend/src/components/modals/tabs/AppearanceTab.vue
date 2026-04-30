@@ -2,7 +2,7 @@
   <section class="h-full">
     <h2 class="mb-2 text-lg font-bold text-[var(--color-text-main)]">Appearance</h2>
     <p class="mb-4 text-sm text-[var(--color-text-muted)]">
-      Pick a UI theme. Changes apply instantly and persist for future sessions.
+      Pick a UI theme. Each preview mirrors the shell hierarchy, not just the accent color.
     </p>
 
     <div class="space-y-2">
@@ -27,6 +27,35 @@
           >
             Active
           </span>
+        </div>
+
+        <div
+          class="mt-3 rounded-xl border p-2"
+          :style="{ borderColor: theme.preview[1], backgroundColor: theme.preview[0] }"
+        >
+          <div class="flex h-20 overflow-hidden rounded-lg border" :style="{ borderColor: theme.preview[1] }">
+            <div class="w-12 border-r px-2 py-2" :style="{ borderColor: theme.preview[1], backgroundColor: theme.preview[1] }">
+              <div class="h-2 w-6 rounded-full" :style="{ backgroundColor: theme.preview[2] }"></div>
+              <div class="mt-2 h-1.5 w-7 rounded-full bg-black/10"></div>
+              <div class="mt-1.5 h-1.5 w-5 rounded-full bg-black/10"></div>
+            </div>
+            <div class="flex-1 px-3 py-2" :style="{ backgroundColor: theme.preview[0] }">
+              <div class="flex items-center justify-between">
+                <div class="h-2 w-16 rounded-full bg-black/10"></div>
+                <div class="h-5 w-12 rounded-full" :style="{ backgroundColor: theme.preview[2] }"></div>
+              </div>
+              <div class="mt-3 grid grid-cols-2 gap-2">
+                <div class="rounded-md border p-2" :style="{ borderColor: theme.preview[1], backgroundColor: 'color-mix(in srgb, white 35%, transparent)' }">
+                  <div class="h-1.5 w-10 rounded-full bg-black/10"></div>
+                  <div class="mt-2 h-4 w-full rounded-md" :style="{ backgroundColor: theme.preview[2] }"></div>
+                </div>
+                <div class="rounded-md border p-2" :style="{ borderColor: theme.preview[1], backgroundColor: 'color-mix(in srgb, black 4%, transparent)' }">
+                  <div class="h-1.5 w-8 rounded-full bg-black/10"></div>
+                  <div class="mt-2 h-4 w-full rounded-md bg-black/10"></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="mt-3 flex items-center gap-1.5">

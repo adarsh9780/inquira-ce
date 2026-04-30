@@ -3,20 +3,24 @@
     <div class="flex-1 min-w-0 flex flex-col">
     <Teleport to="#workspace-left-pane-toolbar" v-if="isMounted && appStore.workspacePane === 'chat'">
       <div class="flex items-center w-full justify-end">
-          <div class="flex items-center gap-1 bg-zinc-50 p-1 rounded-xl border border-zinc-200">
+          <div
+            class="flex items-center gap-1 rounded-xl border p-1"
+            style="background-color: var(--color-control-surface); border-color: var(--color-border);"
+          >
             <button
               type="button"
-              class="btn-icon hover:text-[var(--color-accent)] hover:bg-white hover:shadow-sm"
+              class="btn-icon hover:text-[var(--color-accent)]"
+              style="--chat-toolbar-selected-surface: var(--color-selected-surface);"
               @click="createConversation"
               :disabled="!appStore.hasWorkspace"
               title="New Conversation"
             >
               <PlusIcon class="h-4 w-4" />
             </button>
-            <div class="w-px h-4 bg-zinc-200 mx-0.5"></div>
+            <div class="mx-0.5 h-4 w-px" style="background-color: var(--color-border);"></div>
             <button
               type="button"
-              class="btn-icon hover:text-amber-600 hover:bg-white hover:shadow-sm"
+              class="btn-icon hover:text-[var(--color-warning)]"
               :disabled="!appStore.activeConversationId"
               @click="clearConversation"
               title="Clear Conversation"
@@ -30,8 +34,11 @@
       <div class="chat-scroll-shell flex-1 min-h-0 overflow-y-auto" style="background-color: var(--color-base);" data-chat-scroll-container>
         <div v-if="!appStore.hasWorkspace" class="flex items-center justify-center h-full px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-2 sm:pb-3 lg:pb-4">
           <div class="text-center max-w-md">
-            <div class="mx-auto flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 mb-4 sm:mb-6 shadow-lg">
-              <ChatBubbleLeftRightIcon class="h-8 w-8 sm:h-10 sm:w-10 text-amber-700" />
+            <div
+              class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg sm:mb-6 sm:h-20 sm:w-20"
+              style="background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 20%, var(--color-base)) 0%, color-mix(in srgb, var(--color-chart-accent) 18%, var(--color-base)) 100%);"
+            >
+              <ChatBubbleLeftRightIcon class="h-8 w-8 sm:h-10 sm:w-10" style="color: var(--color-accent-text);" />
             </div>
             <h3 class="text-xl sm:text-2xl font-bold mb-2 sm:mb-3" style="color: var(--color-text-main);">Create a Workspace First</h3>
             <p class="text-sm sm:text-base leading-relaxed" style="color: var(--color-text-muted);">
@@ -42,8 +49,11 @@
 
         <div v-else-if="appStore.chatHistory.length === 0" class="flex items-center justify-center h-full px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-2 sm:pb-3 lg:pb-4">
           <div class="text-center max-w-md">
-            <div class="mx-auto flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 mb-4 sm:mb-6 shadow-lg">
-              <ChatBubbleLeftRightIcon class="h-8 w-8 sm:h-10 sm:w-10 text-[var(--color-accent)]" />
+            <div
+              class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg sm:mb-6 sm:h-20 sm:w-20"
+              style="background: linear-gradient(135deg, color-mix(in srgb, var(--color-chart-accent) 20%, var(--color-base)) 0%, color-mix(in srgb, var(--color-accent) 16%, var(--color-base)) 100%);"
+            >
+              <ChatBubbleLeftRightIcon class="h-8 w-8 sm:h-10 sm:w-10" style="color: var(--color-chart-accent);" />
             </div>
             <h3 class="text-xl sm:text-2xl font-bold mb-2 sm:mb-3" style="color: var(--color-text-main);">Start Your Analysis</h3>
             <p class="text-sm sm:text-base leading-relaxed" style="color: var(--color-text-muted);">

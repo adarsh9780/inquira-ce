@@ -70,6 +70,19 @@ test('style sheet declares theme presets and shared token aliases', () => {
   assert.equal(source.includes('--color-base-soft: var(--color-surface);'), true)
   assert.equal(source.includes('--color-base-muted:'), true)
   assert.equal(source.includes('--color-border-strong: var(--color-border-hover);'), true)
+  assert.equal(source.includes('--color-panel-elevated:'), true)
+  assert.equal(source.includes('--color-selected-surface:'), true)
+  assert.equal(source.includes('--color-control-surface:'), true)
+  assert.equal(source.includes('--color-chart-accent:'), true)
   assert.equal(source.includes('--color-danger: var(--color-error);'), true)
   assert.equal(source.includes('--color-info-bg:'), true)
+})
+
+test('appearance tab previews a miniature shell instead of only color swatches', () => {
+  const source = read('src/components/modals/tabs/AppearanceTab.vue')
+
+  assert.equal(source.includes('Each preview mirrors the shell hierarchy'), true)
+  assert.equal(source.includes('class="mt-3 rounded-xl border p-2"'), true)
+  assert.equal(source.includes('class="flex h-20 overflow-hidden rounded-lg border"'), true)
+  assert.equal(source.includes("backgroundColor: theme.preview[0]"), true)
 })

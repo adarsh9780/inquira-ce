@@ -24,5 +24,5 @@ test('code editor uses JetBrains font stack with design tokens for editor colors
   assert.equal(codeTabSource.includes('hover:bg-white'), false)
   assert.equal(codeTabSource.includes('hover:text-green-600'), false)
   assert.equal(styleSource.includes('family=JetBrains+Mono:wght@400;500;700'), true)
-  assert.equal(styleSource.includes('--font-mono: "JetBrainsMono Nerd Font", "JetBrains Mono", "Ubuntu Mono", monospace;'), true)
+  assert.equal(styleSource.includes('--font-mono: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;'), true)
 })

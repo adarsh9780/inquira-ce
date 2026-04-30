@@ -27,15 +27,17 @@ test('midnight dark theme keeps brand accent while using deep slate surfaces', (
 
   assert.equal(source.includes(':root[data-theme="midnight"]'), true)
   assert.equal(source.includes('color-scheme: dark;'), true)
-  assert.equal(source.includes('--color-base: #101722;'), true)
-  assert.equal(source.includes('--color-surface: #151E2B;'), true)
-  assert.equal(source.includes('--color-sidebar-surface: #0A1018;'), true)
-  assert.equal(source.includes('--color-workspace-surface: #121A24;'), true)
-  assert.equal(source.includes('--color-accent: #C96A2E;'), true)
-  assert.equal(source.includes('--color-primary-900: #C96A2E;'), true)
-  assert.equal(source.includes('--color-accent-soft: #312418;'), true)
-  assert.equal(source.includes('--color-border: #263346;'), true)
-  assert.equal(source.includes('--color-text-main: #E8EDF5;'), true)
+  assert.equal(source.includes('--color-base: #111A24;'), true)
+  assert.equal(source.includes('--color-surface: #182230;'), true)
+  assert.equal(source.includes('--color-sidebar-surface: #0F1721;'), true)
+  assert.equal(source.includes('--color-workspace-surface: #141E29;'), true)
+  assert.equal(source.includes('--color-accent: #C97443;'), true)
+  assert.equal(source.includes('--color-primary-900: #C97443;'), true)
+  assert.equal(source.includes('--color-accent-soft: #34261D;'), true)
+  assert.equal(source.includes('--color-border: #293748;'), true)
+  assert.equal(source.includes('--color-text-main: #E7EDF7;'), true)
+  assert.equal(source.includes('--color-panel-elevated: #1C2735;'), true)
+  assert.equal(source.includes('--color-selected-surface: #222E3C;'), true)
 })
 
 test('theme catalog presents midnight dark with brand-accent preview chip', () => {
@@ -43,5 +45,5 @@ test('theme catalog presents midnight dark with brand-accent preview chip', () =
 
   assert.equal(source.includes("id: 'midnight'"), true)
   assert.equal(source.includes("label: 'Midnight Dark'"), true)
-  assert.equal(source.includes("preview: ['#101722', '#151E2B', '#C96A2E']"), true)
+  assert.equal(source.includes("preview: ['#111A24', '#182230', '#C97443']"), true)
 })

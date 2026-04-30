@@ -2,14 +2,16 @@
   <!-- Only show when disconnected -->
   <div
     v-if="!isConnected && showIndicator"
-    class="fixed top-4 right-4 z-50 bg-red-50 border border-red-200 rounded-lg p-4 shadow-lg max-w-sm"
+    class="fixed top-4 right-4 z-50 max-w-sm rounded-lg border p-4 shadow-lg"
+    style="background-color: var(--color-danger-bg); border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border));"
   >
     <div class="flex items-center space-x-3">
       <!-- Animated warning icon -->
       <div class="flex-shrink-0">
-        <div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+        <div class="flex h-8 w-8 items-center justify-center rounded-full" style="background-color: color-mix(in srgb, var(--color-danger) 12%, var(--color-base));">
           <svg
-            class="w-5 h-5 text-red-600 animate-pulse"
+            class="h-5 w-5 animate-pulse"
+            style="color: var(--color-danger);"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -26,13 +28,13 @@
 
       <!-- Status text -->
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium text-red-800">
+        <p class="text-sm font-medium" style="color: var(--color-danger-text);">
           Backend Connection Lost
         </p>
-        <p class="text-xs text-red-600 mt-1">
+        <p class="mt-1 text-xs" style="color: var(--color-danger-text);">
           Attempting to reconnect...
         </p>
-        <p class="text-xs text-red-500 mt-1 font-mono">
+        <p class="mt-1 text-xs font-mono" style="color: var(--color-danger-text);">
           {{ formattedTimeSinceDisconnect }}
         </p>
       </div>
@@ -43,8 +45,11 @@
           <div
             v-for="n in 3"
             :key="n"
-            class="w-2 h-2 bg-red-400 rounded-full animate-pulse"
-            :style="{ animationDelay: `${n * 0.2}s` }"
+            class="h-2 w-2 rounded-full animate-pulse"
+            :style="{
+              backgroundColor: 'color-mix(in srgb, var(--color-danger) 70%, var(--color-base))',
+              animationDelay: `${n * 0.2}s`,
+            }"
           />
         </div>
       </div>
@@ -52,13 +57,13 @@
 
     <!-- Progress bar for retry attempts -->
     <div class="mt-3">
-      <div class="w-full bg-red-200 rounded-full h-1.5">
+      <div class="h-1.5 w-full rounded-full" style="background-color: color-mix(in srgb, var(--color-danger) 18%, var(--color-base));">
         <div
-          class="bg-red-600 h-1.5 rounded-full transition-all duration-1000 ease-out"
-          :style="{ width: `${retryProgress}%` }"
+          class="h-1.5 rounded-full transition-all duration-1000 ease-out"
+          :style="{ width: `${retryProgress}%`, backgroundColor: 'var(--color-danger)' }"
         />
       </div>
-      <p class="text-xs text-red-600 mt-1 text-center">
+      <p class="mt-1 text-center text-xs" style="color: var(--color-danger-text);">
         Next retry in {{ secondsUntilRetry }}s
       </p>
     </div>
