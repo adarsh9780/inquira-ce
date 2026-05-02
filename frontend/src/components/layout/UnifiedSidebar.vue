@@ -207,46 +207,53 @@
               aria-label="User Profile"
               @click="toggleProfileMenu"
             >
-              <UserCircleIcon class="h-5 w-5 shrink-0" />
+              <span
+                class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold uppercase"
+                style="background-color: var(--color-selected-surface); color: var(--color-accent-text);"
+              >
+                {{ profileInitials }}
+              </span>
               <span v-if="!appStore.isSidebarCollapsed" class="truncate text-sm font-medium">User Profile</span>
             </button>
-
-            <div
-              v-if="profileMenuOpen"
-              ref="profileMenuRef"
-              class="absolute bottom-full left-0 z-[var(--z-dropdown)] mb-2 w-52 overflow-hidden rounded-xl border shadow-lg"
-              style="border-color: var(--color-border-strong); background-color: var(--color-panel-elevated);"
-              data-profile-menu
-            >
-              <button
-                type="button"
-                class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-base-soft)]"
-                style="color: var(--color-text-main);"
-                @click="openProfileSection('terms')"
-              >
-                Terms and Conditions
-              </button>
-              <button
-                type="button"
-                class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-base-soft)]"
-                style="color: var(--color-text-main);"
-                @click="openProfileSection('account')"
-              >
-                Account
-              </button>
-              <button
-                type="button"
-                class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-base-soft)]"
-                style="color: var(--color-text-main);"
-                @click="openProfileSection('appearance')"
-              >
-                Theme
-              </button>
-            </div>
           </div>
         </div>
       </nav>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="profileMenuOpen"
+        ref="profileMenuRef"
+        class="layer-modal-dropdown fixed overflow-hidden rounded-xl border shadow-lg"
+        :style="profileMenuStyle"
+        data-profile-menu
+      >
+        <button
+          type="button"
+          class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-base-soft)]"
+          style="color: var(--color-text-main);"
+          @click="openProfileSection('terms')"
+        >
+          Terms and Conditions
+        </button>
+        <button
+          type="button"
+          class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-base-soft)]"
+          style="color: var(--color-text-main);"
+          @click="openProfileSection('account')"
+        >
+          Account
+        </button>
+        <button
+          type="button"
+          class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-base-soft)]"
+          style="color: var(--color-text-main);"
+          @click="openProfileSection('appearance')"
+        >
+          Theme
+        </button>
+      </div>
+    </Teleport>
 
     <SettingsModal
       v-model="isSettingsOpen"
@@ -267,8 +274,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
+import { useAuthStore } from '../../stores/authStore'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { inferTableNameFromDataPath } from '../../utils/chatBootstrap'
@@ -284,10 +292,10 @@ import {
   PlusIcon,
   EllipsisHorizontalIcon,
   KeyIcon,
-  UserCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 
 const searchQuery = ref('')
 const editingId = ref(null)
@@ -297,6 +305,14 @@ const conversationMenuId = ref('')
 const profileMenuOpen = ref(false)
 const profileMenuRef = ref(null)
 const profileMenuButtonRef = ref(null)
+const profileMenuStyle = ref({
+  left: '0px',
+  top: '0px',
+  minWidth: '13rem',
+  transform: 'translateY(-100%)',
+  backgroundColor: 'var(--color-panel-elevated)',
+  borderColor: 'var(--color-border-strong)',
+})
 
 const workspacesExpanded = ref(true)
 const datasetsExpanded = ref(true)
@@ -357,6 +373,12 @@ const filteredConversations = computed(() => {
   const query = searchQuery.value.toLowerCase()
   return appStore.conversations.filter((conv) => String(conv?.title || '').toLowerCase().includes(query))
 })
+const profileInitials = computed(() => {
+  const raw = String(authStore.username || 'User').trim()
+  const parts = raw.split(/\s+/).filter(Boolean)
+  const initials = parts.slice(0, 2).map((part) => part[0] || '').join('')
+  return (initials || raw.slice(0, 2) || 'U').toUpperCase()
+})
 
 function workspaceFilename(duckdbPath) {
   const normalized = String(duckdbPath || '').trim()
@@ -368,8 +390,25 @@ function handleBrandClick() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
 }
 
-function toggleProfileMenu() {
+function updateProfileMenuPosition() {
+  const button = profileMenuButtonRef.value
+  if (!button || typeof button.getBoundingClientRect !== 'function') return
+  const rect = button.getBoundingClientRect()
+  profileMenuStyle.value = {
+    left: `${rect.left}px`,
+    top: `${Math.max(0, rect.top - 8)}px`,
+    minWidth: `${Math.max(rect.width, 208)}px`,
+    transform: 'translateY(-100%)',
+    backgroundColor: 'var(--color-panel-elevated)',
+    borderColor: 'var(--color-border-strong)',
+  }
+}
+
+async function toggleProfileMenu() {
   profileMenuOpen.value = !profileMenuOpen.value
+  if (!profileMenuOpen.value) return
+  await nextTick()
+  updateProfileMenuPosition()
 }
 
 function closeProfileMenu() {
@@ -394,6 +433,11 @@ function handleGlobalClick(event) {
   if (profileMenuRef.value?.contains(target) || profileMenuButtonRef.value?.contains(target)) return
   closeConversationMenu()
   closeProfileMenu()
+}
+
+function handleViewportChange() {
+  if (!profileMenuOpen.value) return
+  updateProfileMenuPosition()
 }
 
 function datasetFriendlyName(tableName) {
@@ -754,12 +798,16 @@ onMounted(async () => {
   window.addEventListener('dataset-switched', handleDatasetCatalogChanged)
   window.addEventListener('sidebar-open-settings', handleOpenSettingsRequest)
   window.addEventListener('click', handleGlobalClick)
+  window.addEventListener('resize', handleViewportChange)
+  window.addEventListener('scroll', handleViewportChange, true)
 })
 
 onUnmounted(() => {
   window.removeEventListener('dataset-switched', handleDatasetCatalogChanged)
   window.removeEventListener('sidebar-open-settings', handleOpenSettingsRequest)
   window.removeEventListener('click', handleGlobalClick)
+  window.removeEventListener('resize', handleViewportChange)
+  window.removeEventListener('scroll', handleViewportChange, true)
   stopDatasetDeletionPollers()
 })
 
@@ -777,6 +825,14 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
     searchQuery.value = ''
     closeProfileMenu()
     closeConversationMenu()
+  }
+})
+
+watch(() => authStore.username, () => {
+  if (profileMenuOpen.value) {
+    void nextTick().then(() => {
+      updateProfileMenuPosition()
+    })
   }
 })
 </script>
