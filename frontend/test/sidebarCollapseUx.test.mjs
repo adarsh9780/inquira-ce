@@ -7,11 +7,13 @@ test('sidebar uses file explorer layout with unified design', () => {
   const sidebarPath = resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue')
   const source = readFileSync(sidebarPath, 'utf-8')
 
-  // Brand click toggles the same sidebar, with no hover-open behavior
+  // Dedicated top toggle controls the sidebar, with no hover-open behavior
   assert.equal(source.includes('function handleBrandClick() {'), true)
   assert.equal(source.includes('@click="handleBrandClick"'), true)
   assert.equal(source.includes('@mouseenter='), false)
   assert.equal(source.includes('appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)'), true)
+  assert.equal(source.includes('sidebar-brand-toggle'), true)
+  assert.equal(source.includes('sidebar-brand-initial'), true)
 
   // Fixed bottom action stack handles navigation in both sidebar states
   assert.equal(source.includes('class="sidebar-rail-btn"'), true)

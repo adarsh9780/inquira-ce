@@ -18,14 +18,16 @@ test('collapsed sidebar expands only on explicit icon click (never on hover)', (
   assert.equal(sidebarSource.includes("title=\"LLM & API Keys\""), true)
 })
 
-test('sidebar keeps logo mounted and uses width transition to avoid layout jerk', () => {
+test('sidebar keeps a fixed top rail and uses width transition to avoid layout jerk', () => {
   const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
   assert.equal(appSource.includes('transition: width var(--motion-duration-standard) var(--motion-ease-standard);'), true)
   assert.equal(appSource.includes('.app-nav-pane-collapsed {'), true)
-  assert.equal(sidebarSource.includes('class="sidebar-brand-shell h-14 shrink-0 border-b"'), true)
-  assert.equal(sidebarSource.includes('<img :src="logo" alt="Inquira" class="h-8 w-8 rounded-lg shadow-sm" />'), true)
+  assert.equal(sidebarSource.includes('class="sidebar-brand-shell h-16 shrink-0 border-b"'), true)
+  assert.equal(sidebarSource.includes('sidebar-brand-rail'), true)
+  assert.equal(sidebarSource.includes('Bars3Icon class="h-4 w-4 shrink-0"'), true)
+  assert.equal(sidebarSource.includes('{{ projectInitial }}'), true)
   assert.equal(sidebarSource.includes('sidebar-brand-wordmark-collapsed'), true)
   assert.equal(sidebarSource.includes('sidebar-brand-wordmark-expanded'), true)
 })

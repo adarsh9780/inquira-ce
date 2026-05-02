@@ -4,28 +4,31 @@
     style="background-color: var(--color-sidebar-surface);"
   >
     <div
-      class="sidebar-brand-shell h-14 shrink-0 border-b"
+      class="sidebar-brand-shell h-16 shrink-0 border-b"
       style="border-color: var(--color-border);"
     >
-      <button
-        class="h-full w-full px-2 transition-colors duration-150"
-        :class="appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start'"
-        style="color: var(--color-text-main);"
-        :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-        @click="handleBrandClick"
-      >
-        <span class="flex h-full w-full items-center gap-2">
-          <span class="flex h-8 w-8 shrink-0 items-center justify-center">
-            <img :src="logo" alt="Inquira" class="h-8 w-8 rounded-lg shadow-sm" />
-          </span>
-          <span
-            class="sidebar-brand-wordmark min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-linear"
-            :class="appStore.isSidebarCollapsed ? 'sidebar-brand-wordmark-collapsed' : 'sidebar-brand-wordmark-expanded'"
+      <div class="sidebar-brand-layout" :class="appStore.isSidebarCollapsed ? 'sidebar-brand-layout-collapsed' : 'sidebar-brand-layout-expanded'">
+        <div class="sidebar-brand-rail">
+          <button
+            type="button"
+            class="sidebar-brand-toggle"
+            style="color: var(--color-text-main);"
+            :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+            @click="handleBrandClick"
           >
-            <span class="block text-[15px] font-bold leading-[1.3]" style="color: var(--color-text-main);">Inquira</span>
+            <Bars3Icon class="h-4 w-4 shrink-0" />
+          </button>
+          <span class="sidebar-brand-initial" aria-hidden="true">
+            {{ projectInitial }}
           </span>
+        </div>
+        <span
+          class="sidebar-brand-wordmark"
+          :class="appStore.isSidebarCollapsed ? 'sidebar-brand-wordmark-collapsed' : 'sidebar-brand-wordmark-expanded'"
+        >
+          <span class="sidebar-brand-title" style="color: var(--color-text-main);">Inquira</span>
         </span>
-      </button>
+      </div>
     </div>
 
     <div class="flex min-h-0 flex-1 flex-col">
@@ -43,10 +46,10 @@
               <FolderOpenIcon class="h-4 w-4" />
             </span>
             <span class="min-w-0 flex-1">
-              <span class="block truncate text-[16px] font-semibold leading-[1.3]" style="color: var(--color-text-main);">
+              <span class="sidebar-workspace-title block truncate" style="color: var(--color-text-main);">
                 {{ activeWorkspaceName }}
               </span>
-              <span class="mt-0.5 block truncate text-[12px]" style="color: var(--color-text-muted);">
+              <span class="sidebar-workspace-caption mt-0.5 block truncate" style="color: var(--color-text-muted);">
                 {{ activeWorkspaceCaption }}
               </span>
             </span>
@@ -81,15 +84,15 @@
               <span class="truncate">Deleting workspace...</span>
             </div>
 
-            <div v-if="!appStore.hasWorkspace" class="px-3 py-3 text-sm" style="color: var(--color-text-muted);">
+            <div v-if="!appStore.hasWorkspace" class="sidebar-empty-state px-3 py-3" style="color: var(--color-text-muted);">
               Create a workspace to start a conversation.
             </div>
 
-            <div v-else-if="filteredConversations.length === 0 && appStore.conversations.length > 0" class="px-3 py-3 text-sm" style="color: var(--color-text-muted);">
+            <div v-else-if="filteredConversations.length === 0 && appStore.conversations.length > 0" class="sidebar-empty-state px-3 py-3" style="color: var(--color-text-muted);">
               No conversation matches found.
             </div>
 
-            <div v-else-if="appStore.conversations.length === 0" class="px-3 py-3 text-sm" style="color: var(--color-text-muted);">
+            <div v-else-if="appStore.conversations.length === 0" class="sidebar-empty-state px-3 py-3" style="color: var(--color-text-muted);">
               No conversations yet.
             </div>
 
@@ -107,7 +110,7 @@
                       <input
                         :ref="(el) => { if (el) editInputs[conv.id] = el }"
                         v-model="editingTitleValue"
-                        class="input-base px-1 py-0.5 text-[13px] font-medium"
+                        class="input-base sidebar-inline-edit px-1 py-0.5"
                         @keydown.enter.prevent="saveTitle(conv.id)"
                         @keydown.esc.prevent="cancelEditing"
                         @blur="saveTitle(conv.id)"
@@ -116,7 +119,7 @@
                     </div>
                     <template v-else>
                       <p
-                        class="truncate text-[15px] leading-[1.35]"
+                        class="sidebar-conversation-title truncate"
                         :class="conv.id === appStore.activeConversationId ? 'font-semibold text-[var(--color-text-main)]' : 'font-medium text-[var(--color-text-main)]'"
                         :title="conv.title || 'Untitled'"
                       >
@@ -179,7 +182,7 @@
             @click="openSettings('workspace', 1)"
           >
             <FolderPlusIcon class="h-4 w-4 shrink-0" />
-            <span v-if="!appStore.isSidebarCollapsed" class="truncate text-sm font-medium">Create Workspace</span>
+            <span v-if="!appStore.isSidebarCollapsed" class="sidebar-rail-label truncate">Create Workspace</span>
           </button>
 
           <button
@@ -191,7 +194,7 @@
             @click="openSettings('llm')"
           >
             <KeyIcon class="h-4 w-4 shrink-0" />
-            <span v-if="!appStore.isSidebarCollapsed" class="truncate text-sm font-medium">LLM &amp; API Keys</span>
+            <span v-if="!appStore.isSidebarCollapsed" class="sidebar-rail-label truncate">LLM &amp; API Keys</span>
           </button>
 
           <div class="relative">
@@ -213,7 +216,7 @@
               >
                 {{ profileInitials }}
               </span>
-              <span v-if="!appStore.isSidebarCollapsed" class="truncate text-sm font-medium">User Profile</span>
+              <span v-if="!appStore.isSidebarCollapsed" class="sidebar-rail-label truncate">User Profile</span>
             </button>
           </div>
         </div>
@@ -283,10 +286,10 @@ import { inferTableNameFromDataPath } from '../../utils/chatBootstrap'
 import { previewService } from '../../services/previewService'
 import SettingsModal from '../modals/SettingsModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
-import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 
 import {
+  Bars3Icon,
   FolderOpenIcon,
   FolderPlusIcon,
   PlusIcon,
@@ -379,6 +382,7 @@ const profileInitials = computed(() => {
   const initials = parts.slice(0, 2).map((part) => part[0] || '').join('')
   return (initials || raw.slice(0, 2) || 'U').toUpperCase()
 })
+const projectInitial = computed(() => 'I')
 
 function workspaceFilename(duckdbPath) {
   const normalized = String(duckdbPath || '').trim()
@@ -857,19 +861,72 @@ watch(() => authStore.username, () => {
 }
 
 .sidebar-brand-shell button {
-  display: flex;
-  align-items: center;
   border: 0;
   background: transparent;
 }
 
-.sidebar-brand-shell button:hover {
+.sidebar-brand-layout {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  padding-inline: 0.5rem;
+}
+
+.sidebar-brand-layout-collapsed {
+  justify-content: center;
+}
+
+.sidebar-brand-layout-expanded {
+  justify-content: flex-start;
+}
+
+.sidebar-brand-rail {
+  display: flex;
+  width: 2.5rem;
+  min-width: 2.5rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+}
+
+.sidebar-brand-toggle {
+  display: flex;
+  height: 1.75rem;
+  width: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-standard),
+    color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.sidebar-brand-toggle:hover {
   background-color: color-mix(in srgb, var(--color-text-main) 4%, transparent);
+}
+
+.sidebar-brand-initial {
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  background-color: var(--color-selected-surface);
+  color: var(--color-accent-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
 }
 
 .sidebar-brand-wordmark {
   overflow: hidden;
   text-align: left;
+  transition:
+    max-width var(--motion-duration-standard) var(--motion-ease-standard),
+    opacity var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 .sidebar-brand-wordmark-expanded {
@@ -880,6 +937,13 @@ watch(() => authStore.username, () => {
 .sidebar-brand-wordmark-collapsed {
   max-width: 0;
   opacity: 0;
+}
+
+.sidebar-brand-title {
+  display: block;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
 }
 
 .sidebar-rail {
@@ -918,6 +982,30 @@ watch(() => authStore.username, () => {
   gap: 0.75rem;
   padding: 0.5rem 0.75rem;
   justify-content: flex-start;
+}
+
+.sidebar-rail-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-tight);
+}
+
+.sidebar-workspace-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+
+.sidebar-workspace-caption,
+.sidebar-empty-state,
+.sidebar-inline-edit,
+.sidebar-conversation-title {
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-body);
+}
+
+.sidebar-inline-edit {
+  font-weight: var(--font-weight-medium);
 }
 
 .sidebar-rail-btn:hover {

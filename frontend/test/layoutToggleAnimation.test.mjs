@@ -42,10 +42,13 @@ test('sidebar icons keep fixed size to avoid toggle jitter', () => {
     'utf-8',
   )
   // New design uses shrink-0 on icons
+  assert.equal(sidebarSource.includes('Bars3Icon class="h-4 w-4 shrink-0"'), true)
   assert.equal(sidebarSource.includes('FolderPlusIcon class="h-4 w-4 shrink-0"'), true)
   assert.equal(sidebarSource.includes('KeyIcon class="h-4 w-4 shrink-0"'), true)
-  assert.equal(sidebarSource.includes('UserCircleIcon class="h-5 w-5 shrink-0"'), true)
-  assert.equal(sidebarSource.includes('class="sidebar-brand-shell h-14 shrink-0 border-b"'), true)
+  assert.equal(sidebarSource.includes('class="sidebar-brand-shell h-16 shrink-0 border-b"'), true)
+  assert.equal(sidebarSource.includes('.sidebar-brand-rail {'), true)
+  assert.equal(sidebarSource.includes('width: 2.5rem;'), true)
+  assert.equal(sidebarSource.includes('min-width: 2.5rem;'), true)
   assert.equal(sidebarSource.includes('sidebar-brand-wordmark-collapsed'), true)
   // No scale animations on workspace/schema tabs
   assert.equal(sidebarSource.includes("appStore.activeTab === 'workspace' ? 'scale-110' : ''"), false)
