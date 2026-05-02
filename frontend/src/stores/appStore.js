@@ -1453,6 +1453,76 @@ export const useAppStore = defineStore('app', () => {
     activeTurnCode.value = String(turn?.code_snapshot || '')
   }
 
+  function hydrateArtifactsFromToolEvents(toolEvents) {
+    const normalizedEvents = Array.isArray(toolEvents) ? toolEvents : []
+    const dataframeArtifacts = []
+    const figureArtifacts = []
+
+    for (const event of normalizedEvents) {
+      if (!event || typeof event !== 'object' || String(event.type || '') !== 'artifact') continue
+      const artifact = event.data
+      if (!artifact || typeof artifact !== 'object') continue
+
+      const kind = String(artifact.kind || '').toLowerCase()
+      const logicalName = String(artifact.logical_name || kind || 'artifact')
+
+      if (kind === 'dataframe') {
+        dataframeArtifacts.push({
+          name: logicalName || 'dataframe',
+          data: {
+            artifact_id: artifact?.artifact_id || null,
+            row_count: Number(artifact?.row_count || 0),
+            columns: Array.isArray(artifact?.schema)
+              ? artifact.schema.map((col) => String(col?.name || '')).filter(Boolean)
+              : [],
+            data: Array.isArray(artifact?.preview_rows) ? artifact.preview_rows : [],
+            created_at: String(artifact?.created_at || ''),
+          }
+        })
+        continue
+      }
+
+      if (kind === 'figure') {
+        const figure = normalizePlotlyFigure(artifact?.payload?.figure ?? artifact?.payload)
+        if (!figure) continue
+        figureArtifacts.push({
+          name: logicalName || 'figure',
+          artifact_id: artifact?.artifact_id || null,
+          created_at: String(artifact?.created_at || ''),
+          data: figure,
+        })
+      }
+    }
+
+    setDataframes(dataframeArtifacts)
+    setFigures(figureArtifacts)
+
+    const previousDataPane = String(dataPane.value || '').trim().toLowerCase()
+    if (previousDataPane === 'figure' && figureArtifacts.length > 0) {
+      setPlotlyFigure(figureArtifacts[0].data)
+      setResultData(null)
+      return
+    }
+    if (previousDataPane === 'table' && dataframeArtifacts.length > 0) {
+      setResultData(dataframeArtifacts[0].data)
+      setPlotlyFigure(null)
+      return
+    }
+    if (dataframeArtifacts.length > 0) {
+      setResultData(dataframeArtifacts[0].data)
+      setPlotlyFigure(null)
+      return
+    }
+    if (figureArtifacts.length > 0) {
+      setPlotlyFigure(figureArtifacts[0].data)
+      setResultData(null)
+      return
+    }
+
+    setResultData(null)
+    setPlotlyFigure(null)
+  }
+
   function setActiveTurnRelations(payload) {
     activeTurnRelations.value = payload && typeof payload === 'object' ? { ...payload } : null
     activeTurnArtifacts.value = Array.isArray(payload?.current?.tool_events)
@@ -1460,6 +1530,7 @@ export const useAppStore = defineStore('app', () => {
           .filter((event) => event && event.type === 'artifact' && event.data)
           .map((event) => ({ ...event.data }))
       : []
+    hydrateArtifactsFromToolEvents(payload?.current?.tool_events)
   }
 
   async function loadActiveTurn(turnId = activeTurnId.value) {
