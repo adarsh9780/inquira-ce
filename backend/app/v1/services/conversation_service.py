@@ -238,6 +238,41 @@ class ConversationService:
         return ConversationService._turn_to_dict(turn)
 
     @staticmethod
+    async def mark_final_turn(
+        session: AsyncSession,
+        principal_id: str,
+        conversation_id: str,
+        turn_id: str,
+    ) -> dict:
+        conversation = await ConversationRepository.get_conversation(session, conversation_id)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
+
+        turn = await ConversationRepository.get_turn(session, turn_id)
+        if turn is None or turn.conversation_id != conversation_id:
+            raise HTTPException(status_code=404, detail="Turn not found")
+
+        try:
+            execution_summary = json.loads(turn.execution_summary_json) if turn.execution_summary_json else {}
+        except json.JSONDecodeError:
+            execution_summary = {}
+        success = bool(execution_summary.get("success")) or str(execution_summary.get("status") or "").lower() == "success"
+        if not success:
+            raise HTTPException(status_code=400, detail="Only successful turns can be marked final")
+
+        previous_final_id = str(getattr(conversation, "final_turn_id", "") or "").strip()
+        if previous_final_id and previous_final_id != turn.id:
+            previous_turn = await ConversationRepository.get_turn(session, previous_final_id)
+            if previous_turn is not None and previous_turn.conversation_id == conversation_id:
+                previous_turn.is_final = False
+
+        turn.is_final = True
+        conversation.final_turn_id = turn.id
+        await session.commit()
+        return ConversationService._turn_to_dict(turn)
+
+    @staticmethod
     async def create_root_turn(
         session: AsyncSession,
         principal_id: str,

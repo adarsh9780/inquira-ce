@@ -199,3 +199,20 @@ async def get_final_turn(
         conversation_id=conversation_id,
     )
     return TurnResponse(**turn) if turn else None
+
+
+@router.post("/conversations/{conversation_id}/turns/{turn_id}/final", response_model=TurnResponse)
+async def mark_final_turn(
+    conversation_id: str,
+    turn_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Mark one successful turn as the final reproducible turn."""
+    turn = await ConversationService.mark_final_turn(
+        session=session,
+        principal_id=current_user.id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+    )
+    return TurnResponse(**turn)
