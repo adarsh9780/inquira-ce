@@ -75,6 +75,16 @@ class ConversationRepository:
         return list(result.scalars().all())
 
     @staticmethod
+    async def list_turns_in_sequence(session: AsyncSession, conversation_id: str) -> list[Turn]:
+        """List turns oldest-first for migration and lineage rebuilds."""
+        result = await session.execute(
+            select(Turn)
+            .where(Turn.conversation_id == conversation_id)
+            .order_by(Turn.seq_no.asc(), Turn.created_at.asc(), Turn.id.asc())
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
     async def delete_conversation(session: AsyncSession, conversation: Conversation) -> None:
         """Delete conversation and cascaded turns."""
         await session.delete(conversation)
