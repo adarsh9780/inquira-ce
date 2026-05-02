@@ -71,6 +71,13 @@ export const useAppStore = defineStore('app', () => {
   const activeWorkspaceId = ref('')
   const conversations = ref([])
   const activeConversationId = ref('')
+  const turnViewEnabled = ref(false)
+  const activeTurnId = ref('')
+  const activeTurn = ref(null)
+  const activeTurnCode = ref('')
+  const activeTurnArtifacts = ref([])
+  const activeTurnRelations = ref(null)
+  const finalTurnId = ref('')
   const turnsNextCursor = ref(null)
   const workspaceKernelStatusById = ref({})
 
@@ -1414,9 +1421,69 @@ export const useAppStore = defineStore('app', () => {
 
   function setActiveConversationId(conversationId) {
     activeConversationId.value = conversationId || ''
+    activeTurnId.value = ''
+    activeTurn.value = null
+    activeTurnCode.value = ''
+    activeTurnArtifacts.value = []
+    activeTurnRelations.value = null
+    finalTurnId.value = ''
     turnsNextCursor.value = null
     clearLiveTokenUsage()
     saveLocalConfig()
+  }
+
+  function setTurnViewEnabled(enabled) {
+    turnViewEnabled.value = Boolean(enabled)
+  }
+
+  function setActiveTurnId(turnId) {
+    activeTurnId.value = String(turnId || '').trim()
+  }
+
+  function setActiveTurnPayload(turn) {
+    activeTurn.value = turn && typeof turn === 'object' ? { ...turn } : null
+    activeTurnCode.value = String(turn?.code_snapshot || '')
+  }
+
+  function setActiveTurnRelations(payload) {
+    activeTurnRelations.value = payload && typeof payload === 'object' ? { ...payload } : null
+    activeTurnArtifacts.value = Array.isArray(payload?.current?.tool_events)
+      ? payload.current.tool_events
+          .filter((event) => event && event.type === 'artifact' && event.data)
+          .map((event) => ({ ...event.data }))
+      : []
+  }
+
+  async function loadActiveTurn(turnId = activeTurnId.value) {
+    const conversationId = String(activeConversationId.value || '').trim()
+    const targetTurnId = String(turnId || '').trim()
+    if (!conversationId || !targetTurnId) return null
+    const turn = await apiService.v1GetTurn(conversationId, targetTurnId)
+    setActiveTurnId(targetTurnId)
+    setActiveTurnPayload(turn)
+    return turn
+  }
+
+  async function loadActiveTurnRelations(turnId = activeTurnId.value) {
+    const conversationId = String(activeConversationId.value || '').trim()
+    const targetTurnId = String(turnId || '').trim()
+    if (!conversationId || !targetTurnId) return null
+    const relations = await apiService.v1GetTurnRelations(conversationId, targetTurnId)
+    setActiveTurnId(targetTurnId)
+    setActiveTurnPayload(relations?.current || null)
+    setActiveTurnRelations(relations)
+    return relations
+  }
+
+  async function loadFinalTurn(conversationId = activeConversationId.value) {
+    const targetConversationId = String(conversationId || '').trim()
+    if (!targetConversationId) {
+      finalTurnId.value = ''
+      return null
+    }
+    const turn = await apiService.v1GetFinalTurn(targetConversationId)
+    finalTurnId.value = String(turn?.id || '').trim()
+    return turn
   }
 
   function prependChatHistoryFromTurns(turns) {
@@ -1635,6 +1702,18 @@ export const useAppStore = defineStore('app', () => {
       clearLiveTokenUsage()
     }
     prependChatHistoryFromTurns(turns)
+    if (reset) {
+      const newestTurnId = String(turns[0]?.id || '').trim()
+      if (newestTurnId) {
+        setActiveTurnId(newestTurnId)
+        await loadActiveTurnRelations(newestTurnId)
+      } else {
+        setActiveTurnId('')
+        setActiveTurnPayload(null)
+        setActiveTurnRelations(null)
+      }
+      await loadFinalTurn(activeConversationId.value)
+    }
     if (reset && turns.length === 0) {
       setDataframes([])
       setFigures([])
@@ -2459,6 +2538,13 @@ export const useAppStore = defineStore('app', () => {
     activeWorkspaceId,
     conversations,
     activeConversationId,
+    turnViewEnabled,
+    activeTurnId,
+    activeTurn,
+    activeTurnCode,
+    activeTurnArtifacts,
+    activeTurnRelations,
+    finalTurnId,
     turnsNextCursor,
     workspaceKernelStatusById,
     generatedCode,
@@ -2566,6 +2652,13 @@ export const useAppStore = defineStore('app', () => {
     ensureWorkspaceKernelConnected,
     setConversations,
     setActiveConversationId,
+    setTurnViewEnabled,
+    setActiveTurnId,
+    setActiveTurnPayload,
+    setActiveTurnRelations,
+    loadActiveTurn,
+    loadActiveTurnRelations,
+    loadFinalTurn,
     fetchWorkspaces,
     fetchColumnCatalog,
     fetchWorkspaceDeletionJobs,

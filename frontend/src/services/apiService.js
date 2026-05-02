@@ -892,6 +892,26 @@ export const apiService = {
     return v1Api.conversations.turns(conversationId, params)
   },
 
+  async v1GetTurn(conversationId, turnId) {
+    return axios.get(`/api/v1/conversations/${conversationId}/turns/${turnId}`).then((response) => response.data)
+  },
+
+  async v1GetTurnRelations(conversationId, turnId) {
+    return axios.get(`/api/v1/conversations/${conversationId}/turns/${turnId}/relations`).then((response) => response.data)
+  },
+
+  async v1GetFinalTurn(conversationId) {
+    return axios.get(`/api/v1/conversations/${conversationId}/final-turn`).then((response) => response.data)
+  },
+
+  async v1MarkFinalTurn(conversationId, turnId) {
+    return axios.post(`/api/v1/conversations/${conversationId}/turns/${turnId}/final`).then((response) => response.data)
+  },
+
+  async v1RerunFinalTurn(conversationId) {
+    return axios.post(`/api/v1/conversations/${conversationId}/final-turn/rerun`).then((response) => response.data)
+  },
+
   async v1Analyze(payload) {
     return v1Api.chat.analyze(payload)
   },
