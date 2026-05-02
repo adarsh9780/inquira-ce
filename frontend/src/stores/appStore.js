@@ -1190,6 +1190,14 @@ export const useAppStore = defineStore('app', () => {
     lastMessage.codeUpdated = Boolean(codeSnapshot.trim())
   }
 
+  function setLastMessageTurnId(turnId) {
+    const lastMessage = getLastChatMessage()
+    if (!lastMessage) return
+    const normalizedTurnId = String(turnId || '').trim()
+    if (!normalizedTurnId) return
+    lastMessage.id = normalizedTurnId
+  }
+
   async function fetchChatHistory() {
     try {
       const response = await apiService.getHistory()
@@ -2690,6 +2698,7 @@ export const useAppStore = defineStore('app', () => {
     markLastMessageInterventionError,
     markLastMessageStreamStopped,
     setLastMessageCodeSnapshot,
+    setLastMessageTurnId,
     setWorkspaces,
     setWorkspaceDeletionJobs,
     setActiveWorkspaceId,

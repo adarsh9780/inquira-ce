@@ -183,13 +183,11 @@
         </div>
 
         <div class="max-h-72 overflow-y-auto px-2 py-2">
-          <button
+          <div
             v-for="node in branchNodes"
             :key="node.id"
-            type="button"
             class="mb-2 flex w-full items-start justify-between gap-3 rounded-xl border px-3 py-3 text-left transition-colors hover:bg-[var(--color-surface)]"
             :style="node.id === appStore.activeTurnId ? activeBranchNodeStyle : branchNodeStyle"
-            @click="selectBranchNode(node.id)"
           >
             <span class="min-w-0 flex-1">
               <span class="flex items-center gap-2">
@@ -206,15 +204,25 @@
                 {{ node.title }}
               </span>
             </span>
-            <button
-              type="button"
-              class="rounded-lg border px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--color-base-soft)]"
-              style="border-color: var(--color-border); color: var(--color-text-main);"
-              @click.stop="markTurnFinal(node.id)"
-            >
-              Mark Final
-            </button>
-          </button>
+            <div class="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                class="rounded-lg border px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--color-base-soft)]"
+                style="border-color: var(--color-border); color: var(--color-text-main);"
+                @click="selectBranchNode(node.id)"
+              >
+                Open
+              </button>
+              <button
+                type="button"
+                class="rounded-lg border px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--color-base-soft)]"
+                style="border-color: var(--color-border); color: var(--color-text-main);"
+                @click="markTurnFinal(node.id)"
+              >
+                Mark Final
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="flex items-center justify-between gap-3 border-t px-4 py-3" style="border-color: var(--color-border);">
@@ -1429,6 +1437,7 @@ async function handleSubmit() {
 
     const responseTurnId = String(response?.turn_id || '').trim()
     if (responseTurnId) {
+      appStore.setLastMessageTurnId(responseTurnId)
       await appStore.loadActiveTurnRelations(responseTurnId)
       await appStore.loadFinalTurn()
     }

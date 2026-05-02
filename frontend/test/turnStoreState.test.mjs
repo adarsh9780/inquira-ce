@@ -8,7 +8,7 @@ test('app store exposes active turn state and loaders', () => {
   const testDir = dirname(fileURLToPath(import.meta.url))
   const source = readFileSync(resolve(testDir, '../src/stores/appStore.js'), 'utf-8')
 
-  assert.equal(source.includes('const turnViewEnabled = ref(false)'), true)
+  assert.equal(source.includes('const turnViewEnabled = ref(true)'), true)
   assert.equal(source.includes('const activeTurnId = ref(\'\')'), true)
   assert.equal(source.includes('const activeTurn = ref(null)'), true)
   assert.equal(source.includes('const activeTurnCode = ref(\'\')'), true)
@@ -18,4 +18,5 @@ test('app store exposes active turn state and loaders', () => {
   assert.equal(source.includes('async function loadActiveTurn('), true)
   assert.equal(source.includes('async function loadActiveTurnRelations('), true)
   assert.equal(source.includes('async function loadFinalTurn('), true)
+  assert.equal(source.includes('function setLastMessageTurnId(turnId)'), true)
 })

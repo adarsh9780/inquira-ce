@@ -1,6 +1,6 @@
 <template>
   <div ref="chatContainer" class="space-y-4" style="min-height: 200px;" role="log" aria-live="polite" aria-relevant="additions" :aria-busy="appStore.isLoading">
-    <div v-if="appStore.activeConversationId && appStore.turnsNextCursor" class="flex justify-center">
+    <div v-if="!appStore.turnViewEnabled && appStore.activeConversationId && appStore.turnsNextCursor" class="flex justify-center">
       <button
         type="button"
         class="text-xs px-3 py-1.5 rounded-full border transition-colors"
@@ -12,7 +12,7 @@
     </div>
 
     <!-- Loading indicator for first message when no history yet -->
-    <div v-if="appStore.isLoading && appStore.chatHistory.length === 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
+    <div v-if="appStore.isLoading && displayedChatHistory.length === 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
       <div class="analyzing-status">
         <div class="analyzing-spinner" aria-hidden="true"></div>
         <span class="analyzing-status-text">Analyzing your question...</span>
@@ -20,7 +20,7 @@
     </div>
 
     <div
-      v-for="message in appStore.chatHistory"
+      v-for="message in displayedChatHistory"
       :key="message.id"
       class="group"
     >
@@ -160,7 +160,7 @@
     </div>
 
     <!-- Loading indicator when analyzing - shown below last message -->
-    <div v-if="appStore.isLoading && appStore.chatHistory.length > 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
+    <div v-if="appStore.isLoading && displayedChatHistory.length > 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
       <div class="analyzing-status">
         <div class="analyzing-spinner" aria-hidden="true"></div>
         <span class="analyzing-status-text">Analyzing your question...</span>
@@ -168,7 +168,7 @@
     </div>
 
     <!-- Placeholder message when no chat history -->
-    <div v-once v-if="appStore.chatHistory.length === 0 && !appStore.isLoading" class="flex items-center justify-center py-12">
+    <div v-once v-if="displayedChatHistory.length === 0 && !appStore.isLoading" class="flex items-center justify-center py-12">
       <div class="text-center">
         <div class="mb-4" style="color: var(--color-border-hover);">
           <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -241,7 +241,50 @@ let shouldAutoScroll = true
 let mutationObserver = null
 let lastScrollTop = 0
 
-const lastMessageId = computed(() => appStore.chatHistory.at(-1)?.id)
+function mapTurnToMessage(turn) {
+  if (!turn || typeof turn !== 'object') return null
+  return {
+    id: turn.id,
+    question: String(turn.user_text || ''),
+    explanation: String(turn.assistant_text || ''),
+    resultExplanation: String(turn?.metadata?.result_explanation || turn.assistant_text || ''),
+    codeExplanation: String(turn?.metadata?.code_explanation || ''),
+    analysisMetadata: turn?.metadata && typeof turn.metadata === 'object' ? { ...turn.metadata } : {},
+    attachments: Array.isArray(turn?.metadata?.user_attachments) ? turn.metadata.user_attachments.map((item) => ({ ...item })) : [],
+    toolEvents: Array.isArray(turn?.tool_events) ? turn.tool_events.map((event) => ({ ...event })) : null,
+    streamTrace: null,
+    codeSnapshot: String(turn.code_snapshot || ''),
+    codeUpdated: Boolean(String(turn.code_snapshot || '').trim()),
+    timestamp: turn.created_at || new Date().toISOString(),
+  }
+}
+
+const displayedChatHistory = computed(() => {
+  if (!appStore.turnViewEnabled) {
+    return Array.isArray(appStore.chatHistory) ? appStore.chatHistory : []
+  }
+
+  const localHistory = Array.isArray(appStore.chatHistory) ? appStore.chatHistory : []
+  if (appStore.isLoading && localHistory.length > 0) {
+    const pendingMessage = localHistory[localHistory.length - 1]
+    const pendingId = String(pendingMessage?.id || '').trim()
+    const activeId = String(appStore.activeTurnId || '').trim()
+    if (!activeId || pendingId !== activeId) {
+      return [pendingMessage]
+    }
+  }
+
+  const activeTurnId = String(appStore.activeTurnId || '').trim()
+  if (activeTurnId) {
+    const existing = localHistory.find((message) => String(message?.id || '').trim() === activeTurnId)
+    if (existing) return [existing]
+  }
+
+  const syntheticMessage = mapTurnToMessage(appStore.activeTurn)
+  return syntheticMessage ? [syntheticMessage] : []
+})
+
+const lastMessageId = computed(() => displayedChatHistory.value.at(-1)?.id)
 
 const SCROLL_THRESHOLD_PX = 100
 const SHOW_SCROLL_BUTTON_THRESHOLD_PX = 220
@@ -398,7 +441,7 @@ onMounted(() => {
   }
 
   // Hydrated conversations mount with existing messages, so force initial bottom alignment.
-  if (appStore.chatHistory.length > 0) {
+  if (displayedChatHistory.value.length > 0) {
     nextTick(() => scrollToBottom())
     window.setTimeout(() => scrollToBottom({ behavior: 'auto', force: true, hardAlign: true }), 32)
   }
@@ -846,7 +889,7 @@ function handleChatContainerClick(event) {
 }
 
 // Watch for chat history changes and auto-scroll if user is near bottom
-watch([() => appStore.chatHistory.length, lastMessageId], ([newLength], [oldLength]) => {
+watch([() => displayedChatHistory.value.length, lastMessageId], ([newLength], [oldLength]) => {
   const previousLength = Number.isFinite(oldLength) ? oldLength : 0
   if (shouldAutoScroll && newLength > previousLength) {
     nextTick(() => scrollToBottom())
