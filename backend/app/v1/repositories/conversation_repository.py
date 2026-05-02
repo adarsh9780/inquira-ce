@@ -59,6 +59,12 @@ class ConversationRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_turn(session: AsyncSession, turn_id: str) -> Turn | None:
+        """Get turn by id."""
+        result = await session.execute(select(Turn).where(Turn.id == turn_id))
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def delete_conversation(session: AsyncSession, conversation: Conversation) -> None:
         """Delete conversation and cascaded turns."""
         await session.delete(conversation)
@@ -96,10 +102,12 @@ class ConversationRepository:
         tool_events: list[dict] | None,
         metadata: dict | None,
         code_snapshot: str | None,
+        parent_turn_id: str | None = None,
     ) -> Turn:
         """Create and persist one turn."""
         turn = Turn(
             conversation_id=conversation_id,
+            parent_turn_id=parent_turn_id,
             seq_no=seq_no,
             user_text=user_text,
             assistant_text=assistant_text,

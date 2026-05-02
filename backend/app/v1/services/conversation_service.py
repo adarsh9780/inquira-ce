@@ -152,3 +152,73 @@ class ConversationService:
             next_cursor = encode_cursor(last.created_at, last.id)
 
         return mapped, next_cursor
+
+    @staticmethod
+    async def create_root_turn(
+        session: AsyncSession,
+        principal_id: str,
+        conversation_id: str,
+        user_text: str,
+        assistant_text: str,
+        *,
+        tool_events: list[dict] | None = None,
+        metadata: dict | None = None,
+        code_snapshot: str | None = None,
+    ) -> Turn:
+        """Create a new root turn without a parent pointer."""
+        conversation = await ConversationRepository.get_conversation(session, conversation_id)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
+        seq_no = await ConversationRepository.next_seq_no(session, conversation_id)
+        turn = await ConversationRepository.create_turn(
+            session=session,
+            conversation_id=conversation_id,
+            seq_no=seq_no,
+            user_text=user_text,
+            assistant_text=assistant_text,
+            tool_events=tool_events,
+            metadata=metadata,
+            code_snapshot=code_snapshot,
+            parent_turn_id=None,
+        )
+        await session.commit()
+        return turn
+
+    @staticmethod
+    async def create_child_turn(
+        session: AsyncSession,
+        principal_id: str,
+        conversation_id: str,
+        parent_turn_id: str,
+        user_text: str,
+        assistant_text: str,
+        *,
+        tool_events: list[dict] | None = None,
+        metadata: dict | None = None,
+        code_snapshot: str | None = None,
+    ) -> Turn:
+        """Create a child turn linked to a selected parent turn."""
+        conversation = await ConversationRepository.get_conversation(session, conversation_id)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
+
+        parent_turn = await ConversationRepository.get_turn(session, parent_turn_id)
+        if parent_turn is None or parent_turn.conversation_id != conversation_id:
+            raise HTTPException(status_code=404, detail="Parent turn not found")
+
+        seq_no = await ConversationRepository.next_seq_no(session, conversation_id)
+        turn = await ConversationRepository.create_turn(
+            session=session,
+            conversation_id=conversation_id,
+            seq_no=seq_no,
+            user_text=user_text,
+            assistant_text=assistant_text,
+            tool_events=tool_events,
+            metadata=metadata,
+            code_snapshot=code_snapshot,
+            parent_turn_id=parent_turn_id,
+        )
+        await session.commit()
+        return turn
