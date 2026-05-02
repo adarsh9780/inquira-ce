@@ -380,6 +380,42 @@ class ChatService:
         }
 
     @staticmethod
+    def _selected_turn_context_block(
+        *,
+        base_context: str | None,
+        selected_turn: Any | None,
+        branch_summary_json: str | None,
+        schema_memory_json: str | None,
+    ) -> str:
+        sections: list[str] = []
+        base = str(base_context or "").strip()
+        if base:
+            sections.append(base)
+
+        if selected_turn is not None:
+            sections.append(
+                "\n".join(
+                    [
+                        "Selected parent turn context:",
+                        f"- Turn ID: {str(getattr(selected_turn, 'id', '') or '').strip()}",
+                        f"- Prior user question: {str(getattr(selected_turn, 'user_text', '') or '').strip()}",
+                        f"- Prior assistant answer: {str(getattr(selected_turn, 'assistant_text', '') or '').strip()}",
+                        f"- Prior code snapshot:\n{str(getattr(selected_turn, 'code_snapshot', '') or '').strip()}",
+                    ]
+                ).strip()
+            )
+
+        branch_summary = str(branch_summary_json or "").strip()
+        if branch_summary:
+            sections.append(f"Branch summary JSON:\n{branch_summary}")
+
+        schema_memory = str(schema_memory_json or "").strip()
+        if schema_memory:
+            sections.append(f"Conversation schema memory JSON:\n{schema_memory}")
+
+        return "\n\n".join(section for section in sections if section).strip()
+
+    @staticmethod
     def _ollama_cloud_model_id(model_id: str) -> str:
         value = str(model_id or "").strip()
         if not value or ":" in value:
@@ -1273,6 +1309,8 @@ class ChatService:
         current_code: str,
         model: str,
         context: str | None,
+        use_selected_turn_context: bool = False,
+        selected_parent_turn_id: str | None = None,
         table_name_override: str | None = None,
         preferred_table_name: str | None = None,
         active_schema_override: dict[str, Any] | None = None,
@@ -1305,6 +1343,18 @@ class ChatService:
                 detail="The selected model does not support image attachments.",
             )
 
+        selected_turn = None
+        effective_context = context or ""
+        if use_selected_turn_context and conversation_id and selected_parent_turn_id:
+            selected_turn = await ConversationRepository.get_turn(session, selected_parent_turn_id)
+            if selected_turn is not None and selected_turn.conversation_id == conversation_id:
+                effective_context = ChatService._selected_turn_context_block(
+                    base_context=context,
+                    selected_turn=selected_turn,
+                    branch_summary_json=getattr(conversation, "branch_summary_json", None),
+                    schema_memory_json=getattr(conversation, "schema_memory_json", None),
+                )
+
         payload = ChatService._build_remote_agent_payload(
             request_id=thread_id,
             user_id=str(user.id),
@@ -1313,7 +1363,7 @@ class ChatService:
             question=question,
             current_code=current_code,
             model=model,
-            context=context or "",
+            context=effective_context,
             table_names=ChatService._extract_schema_table_names(schema),
             data_path=data_path,
             workspace_schema=schema if isinstance(schema, dict) else {},
@@ -1589,6 +1639,8 @@ class ChatService:
         current_code: str,
         model: str,
         context: str | None,
+        use_selected_turn_context: bool = False,
+        selected_parent_turn_id: str | None = None,
         table_name_override: str | None = None,
         preferred_table_name: str | None = None,
         active_schema_override: dict[str, Any] | None = None,
@@ -1624,6 +1676,18 @@ class ChatService:
                 detail="The selected model does not support image attachments.",
             )
 
+        selected_turn = None
+        effective_context = context or ""
+        if use_selected_turn_context and resolved_conversation_id and selected_parent_turn_id:
+            selected_turn = await ConversationRepository.get_turn(session, selected_parent_turn_id)
+            if selected_turn is not None and selected_turn.conversation_id == resolved_conversation_id:
+                effective_context = ChatService._selected_turn_context_block(
+                    base_context=context,
+                    selected_turn=selected_turn,
+                    branch_summary_json=getattr(conversation, "branch_summary_json", None),
+                    schema_memory_json=getattr(conversation, "schema_memory_json", None),
+                )
+
         payload = ChatService._build_remote_agent_payload(
             request_id=thread_id,
             user_id=str(user.id),
@@ -1632,7 +1696,7 @@ class ChatService:
             question=question,
             current_code=current_code,
             model=model,
-            context=context or "",
+            context=effective_context,
             table_names=ChatService._extract_schema_table_names(schema),
             data_path=data_path,
             workspace_schema=schema if isinstance(schema, dict) else {},

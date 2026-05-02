@@ -21,6 +21,8 @@ class AnalyzeRequest(BaseModel):
     current_code: str = ""
     model: str = "google/gemini-2.5-flash"
     context: str | None = None
+    use_selected_turn_context: bool = False
+    selected_parent_turn_id: str | None = None
     table_name: str | None = None
     preferred_table_name: str | None = None
     active_schema: dict | None = None
