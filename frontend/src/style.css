@@ -119,6 +119,8 @@
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
+  --space-overlay-gap: 0.5rem;
+  --size-profile-menu-min-width: 13rem;
 }
 
 /* Theme presets: switch by setting `data-theme` on <html>. */

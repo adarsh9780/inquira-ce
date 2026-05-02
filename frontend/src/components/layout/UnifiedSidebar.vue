@@ -308,7 +308,7 @@ const profileMenuButtonRef = ref(null)
 const profileMenuStyle = ref({
   left: '0px',
   top: '0px',
-  minWidth: '13rem',
+  minWidth: 'var(--size-profile-menu-min-width)',
   transform: 'translateY(-100%)',
   backgroundColor: 'var(--color-panel-elevated)',
   borderColor: 'var(--color-border-strong)',
@@ -396,8 +396,8 @@ function updateProfileMenuPosition() {
   const rect = button.getBoundingClientRect()
   profileMenuStyle.value = {
     left: `${rect.left}px`,
-    top: `${Math.max(0, rect.top - 8)}px`,
-    minWidth: `${Math.max(rect.width, 208)}px`,
+    top: `calc(${Math.max(0, rect.top)}px - var(--space-overlay-gap))`,
+    minWidth: `max(${Math.ceil(rect.width)}px, var(--size-profile-menu-min-width))`,
     transform: 'translateY(-100%)',
     backgroundColor: 'var(--color-panel-elevated)',
     borderColor: 'var(--color-border-strong)',

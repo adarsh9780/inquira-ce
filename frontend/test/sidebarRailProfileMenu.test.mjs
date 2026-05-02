@@ -24,6 +24,8 @@ test('sidebar profile menu routes terms account and theme through settings modal
   assert.equal(source.includes('ref="profileMenuButtonRef"'), true)
   assert.equal(source.includes('data-profile-menu'), true)
   assert.equal(source.includes("function openProfileSection(tab) {"), true)
+  assert.equal(source.includes('const profileInitials = computed(() => {'), true)
+  assert.equal(source.includes('class="layer-modal-dropdown fixed overflow-hidden rounded-xl border shadow-lg"'), true)
   assert.equal(source.includes("@click=\"openProfileSection('terms')\""), true)
   assert.equal(source.includes("@click=\"openProfileSection('account')\""), true)
   assert.equal(source.includes("@click=\"openProfileSection('appearance')\""), true)

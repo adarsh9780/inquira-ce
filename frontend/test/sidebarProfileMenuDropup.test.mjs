@@ -4,10 +4,14 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
-test('profile menu opens as an in-sidebar dropup instead of being clipped outside the rail', () => {
+test('profile menu is rendered in a modal dropdown layer with initials badge trigger', () => {
   const testDir = dirname(fileURLToPath(import.meta.url))
   const source = readFileSync(resolve(testDir, '../src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
-  assert.equal(source.includes('class="absolute bottom-full left-0 z-[var(--z-dropdown)] mb-2 w-52 overflow-hidden rounded-xl border shadow-lg"'), true)
-  assert.equal(source.includes('left-full'), false)
+  assert.equal(source.includes('<Teleport to="body">'), true)
+  assert.equal(source.includes('class="layer-modal-dropdown fixed overflow-hidden rounded-xl border shadow-lg"'), true)
+  assert.equal(source.includes('{{ profileInitials }}'), true)
+  assert.equal(source.includes("minWidth: 'var(--size-profile-menu-min-width)'"), true)
+  assert.equal(source.includes("top: `calc(${Math.max(0, rect.top)}px - var(--space-overlay-gap))`"), true)
+  assert.equal(source.includes('UserCircleIcon'), false)
 })
