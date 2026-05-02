@@ -37,6 +37,7 @@ from ..repositories.dataset_repository import DatasetRepository
 from ..repositories.preferences_repository import PreferencesRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .conversation_service import ConversationService
+from .schema_memory_service import SchemaMemoryService
 from .secret_storage_service import SecretStorageService
 from .turn_bundle_service import TurnBundleService
 from ...core.logger import logprint
@@ -1373,6 +1374,8 @@ class ChatService:
             conversation=conversation,
             username=str(user.username),
             workspace_id=workspace_id,
+            workspace_schema=schema if isinstance(schema, dict) else {},
+            data_path=data_path,
             conversation_id=conversation_id,
             question=question,
             attachments=normalized_attachments,
@@ -1485,6 +1488,8 @@ class ChatService:
         conversation: Any,
         username: str,
         workspace_id: str,
+        workspace_schema: dict[str, Any] | None,
+        data_path: str | None,
         conversation_id: str,
         question: str,
         attachments: list[dict[str, str]] | None,
@@ -1546,6 +1551,18 @@ class ChatService:
         execution_summary = response_payload.get("execution")
         if isinstance(execution_summary, dict):
             turn.execution_summary_json = json.dumps(execution_summary)
+        turn_schema_usage = SchemaMemoryService.build_turn_schema_usage(
+            workspace_schema=workspace_schema,
+            data_path=data_path,
+        )
+        turn.schema_usage_json = json.dumps(turn_schema_usage)
+        merged_schema_memory_json, merged_schema_memory_version = SchemaMemoryService.merge_conversation_schema_memory(
+            getattr(conversation, "schema_memory_json", None),
+            getattr(conversation, "schema_memory_version", None),
+            turn_schema_usage,
+        )
+        conversation.schema_memory_json = merged_schema_memory_json
+        conversation.schema_memory_version = merged_schema_memory_version
         await session.commit()
         return turn.id
 
@@ -1730,6 +1747,8 @@ class ChatService:
             conversation=conversation,
             username=str(user.username),
             workspace_id=workspace_id,
+            workspace_schema=schema if isinstance(schema, dict) else {},
+            data_path=data_path,
             conversation_id=resolved_conversation_id,
             question=question,
             attachments=normalized_attachments,
