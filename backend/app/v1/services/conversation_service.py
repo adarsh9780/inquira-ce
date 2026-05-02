@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,14 @@ from .cursor_service import decode_cursor, encode_cursor
 
 class ConversationService:
     """Business logic for conversations and turns."""
+
+    @staticmethod
+    def _has_turn_bundle(turn: Turn) -> bool:
+        code_path = str(getattr(turn, "code_path", "") or "").strip()
+        manifest_path = str(getattr(turn, "manifest_path", "") or "").strip()
+        if not code_path or not manifest_path:
+            return False
+        return Path(code_path).is_file() and Path(manifest_path).is_file()
 
     @staticmethod
     def _turn_to_dict(turn: Turn) -> dict:
@@ -260,6 +269,8 @@ class ConversationService:
         success = bool(execution_summary.get("success")) or str(execution_summary.get("status") or "").lower() == "success"
         if not success:
             raise HTTPException(status_code=400, detail="Only successful turns can be marked final")
+        if not ConversationService._has_turn_bundle(turn):
+            raise HTTPException(status_code=400, detail="Only persisted turn bundles can be marked final")
 
         previous_final_id = str(getattr(conversation, "final_turn_id", "") or "").strip()
         if previous_final_id and previous_final_id != turn.id:
