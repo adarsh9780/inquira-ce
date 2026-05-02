@@ -1496,6 +1496,7 @@ class ChatService:
         attachments: list[dict[str, str]] | None,
         response_payload: dict[str, Any],
         result: dict[str, Any],
+        parent_turn_id: str | None = None,
     ) -> str:
         """Helper to persist a conversation turn in the database."""
         seq_no = await ConversationRepository.next_seq_no(session, conversation_id)
@@ -1515,6 +1516,7 @@ class ChatService:
             tool_events=[{"type": "artifact", "data": item} for item in artifacts],
             metadata=metadata,
             code_snapshot=response_payload["code"],
+            parent_turn_id=parent_turn_id,
         )
         turn_dir = await TurnBundleService.create_turn_bundle(
             username=username,
@@ -1773,3 +1775,93 @@ class ChatService:
             }
         )
         yield {"event": "final", "data": response_payload}
+
+    @staticmethod
+    async def rerun_final_turn(
+        session: AsyncSession,
+        user,
+        conversation_id: str,
+    ) -> dict[str, Any]:
+        """Rerun the conversation's selected final turn from stored code and persist a child turn."""
+        conversation = await ConversationRepository.get_conversation(session, conversation_id)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        workspace = await WorkspaceRepository.get_by_id(session, conversation.workspace_id, user.id)
+        if workspace is None:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        final_turn_id = str(getattr(conversation, "final_turn_id", "") or "").strip()
+        if not final_turn_id:
+            raise HTTPException(status_code=404, detail="Final turn not found")
+
+        final_turn = await ConversationRepository.get_turn(session, final_turn_id)
+        if final_turn is None or final_turn.conversation_id != conversation_id:
+            raise HTTPException(status_code=404, detail="Final turn not found")
+
+        code_path = str(getattr(final_turn, "code_path", "") or "").strip()
+        stored_code = ""
+        if code_path:
+            try:
+                stored_code = Path(code_path).read_text(encoding="utf-8")
+            except OSError:
+                stored_code = ""
+        if not stored_code.strip():
+            stored_code = str(getattr(final_turn, "code_snapshot", "") or "").strip()
+        if not stored_code:
+            raise HTTPException(status_code=400, detail="Final turn has no stored code to rerun")
+
+        data_path = str(workspace.duckdb_path or "")
+        schema = await ChatService._load_workspace_schema(
+            session=session,
+            workspace_id=workspace.id,
+            duckdb_path=data_path,
+            preferred_table_name=None,
+            active_schema_override=None,
+        )
+        run_id = str(uuid.uuid4())
+        response_payload = {
+            "is_safe": True,
+            "is_relevant": True,
+            "code": stored_code,
+            "explanation": "Reran the selected final turn from its stored code snapshot.",
+            "result_explanation": "Reran the selected final turn from its stored code snapshot.",
+            "code_explanation": "",
+            "metadata": {"execution_source": "workspace_kernel", "rerun_source_turn_id": final_turn.id},
+            "output_contract": [],
+            "run_id": run_id,
+            "execution": None,
+            "artifacts": [],
+            "final_script_artifact_id": None,
+            "result_kind": str(getattr(final_turn, "result_kind", "") or ""),
+        }
+        await ChatService._apply_authoritative_execution_to_response(
+            workspace_id=workspace.id,
+            workspace_duckdb_path=data_path,
+            question=str(final_turn.user_text or ""),
+            run_id=run_id,
+            generated_code=stored_code,
+            output_contract=[],
+            response_payload=response_payload,
+        )
+        ChatService._reconcile_success_explanation(response_payload)
+        child_turn_id = await ChatService._persist_turn(
+            session=session,
+            conversation=conversation,
+            username=str(user.username),
+            workspace_id=workspace.id,
+            workspace_schema=schema if isinstance(schema, dict) else {},
+            data_path=data_path,
+            conversation_id=conversation_id,
+            question=str(final_turn.user_text or ""),
+            attachments=None,
+            response_payload=response_payload,
+            result={},
+            parent_turn_id=final_turn.id,
+        )
+        return {
+            "conversation_id": conversation_id,
+            "turn_id": child_turn_id,
+            "execution": response_payload.get("execution"),
+            "artifacts": response_payload.get("artifacts") or [],
+        }

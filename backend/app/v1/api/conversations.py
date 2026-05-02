@@ -11,12 +11,14 @@ from ..schemas.conversation import (
     ConversationCreateRequest,
     ConversationListResponse,
     ConversationResponse,
+    FinalTurnRerunResponse,
     TurnRelationsResponse,
     ConversationUpdateRequest,
     TurnPageResponse,
     TurnResponse,
 )
 from ..services.conversation_service import ConversationService
+from ..services.chat_service import ChatService
 from .deps import ensure_appdata_principal, get_current_user
 
 router = APIRouter(
@@ -216,3 +218,18 @@ async def mark_final_turn(
         turn_id=turn_id,
     )
     return TurnResponse(**turn)
+
+
+@router.post("/conversations/{conversation_id}/final-turn/rerun", response_model=FinalTurnRerunResponse)
+async def rerun_final_turn(
+    conversation_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Rerun the selected final turn from its stored code snapshot."""
+    payload = await ChatService.rerun_final_turn(
+        session=session,
+        user=current_user,
+        conversation_id=conversation_id,
+    )
+    return FinalTurnRerunResponse(**payload)

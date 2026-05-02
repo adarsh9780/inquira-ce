@@ -66,3 +66,12 @@ class TurnRelationsResponse(BaseModel):
     children: list[TurnResponse]
     previous_turn: TurnResponse | None
     next_turn: TurnResponse | None
+
+
+class FinalTurnRerunResponse(BaseModel):
+    """Response for rerunning the selected final turn."""
+
+    conversation_id: str
+    turn_id: str
+    execution: dict | None
+    artifacts: list[dict]
