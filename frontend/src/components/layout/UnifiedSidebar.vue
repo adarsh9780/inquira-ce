@@ -10,7 +10,7 @@
       <div class="sidebar-brand-layout" :class="appStore.isSidebarCollapsed ? 'sidebar-brand-layout-collapsed' : 'sidebar-brand-layout-expanded'">
         <div class="sidebar-brand-stack">
           <span class="sidebar-brand-logo-shell" aria-hidden="true">
-            <img :src="logo" alt="Inquira Asset logo" class="sidebar-brand-logo" />
+            <img :src="logo" alt="Inquira logo" class="sidebar-brand-logo" />
           </span>
           <button
             type="button"
@@ -22,49 +22,41 @@
             <Bars3Icon class="h-4 w-4 shrink-0" />
           </button>
         </div>
-        <div
-          class="sidebar-brand-copy"
-          :class="appStore.isSidebarCollapsed ? 'sidebar-brand-copy-collapsed' : 'sidebar-brand-copy-expanded'"
-        >
-          <span class="sidebar-brand-kicker" style="color: var(--color-text-muted);">Workspace</span>
-          <span class="sidebar-brand-title" style="color: var(--color-text-main);">Inquira Asset</span>
-          <span class="sidebar-brand-subtitle" style="color: var(--color-text-muted);">Analysis console</span>
-        </div>
       </div>
     </div>
 
     <div class="flex min-h-0 flex-1 flex-col">
       <div v-show="!appStore.isSidebarCollapsed" class="flex min-h-0 flex-1 flex-col">
-        <div class="border-b px-4 py-4" style="border-color: var(--color-border);">
-          <p class="sidebar-section-label" style="color: var(--color-text-muted);">Workspace</p>
+        <div class="sidebar-workspace-section">
+          <p class="sidebar-section-title" style="color: var(--color-text-muted);">Projects</p>
           <button
             type="button"
-            class="sidebar-workspace-card mt-3 flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors hover:bg-[var(--color-panel-muted)]"
-            style="border-color: var(--color-border); background-color: var(--color-panel-elevated);"
+            class="sidebar-workspace-row"
+            style="color: var(--color-text-main);"
             title="Open workspace settings"
             @click="openSettings('workspace', 1)"
           >
-            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style="background-color: var(--color-selected-surface); color: var(--color-accent);">
+            <span class="sidebar-workspace-icon" style="color: var(--color-text-muted);">
               <FolderOpenIcon class="h-4 w-4" />
             </span>
             <span class="min-w-0 flex-1">
               <span class="sidebar-workspace-title block truncate" style="color: var(--color-text-main);">
                 {{ activeWorkspaceName }}
               </span>
-              <span class="sidebar-workspace-caption mt-0.5 block truncate" style="color: var(--color-text-muted);">
-                {{ activeWorkspaceCaption }}
-              </span>
+            </span>
+            <span class="sidebar-workspace-action" aria-hidden="true">
+              <PencilSquareIcon class="h-4 w-4" />
             </span>
           </button>
         </div>
 
-        <div class="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-4">
-          <div class="flex items-center justify-between px-1 pb-2">
+        <div class="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-2">
+          <div class="sidebar-conversation-header">
             <p class="sidebar-section-label" style="color: var(--color-text-muted);">Conversations</p>
             <button
               v-if="appStore.hasWorkspace"
               type="button"
-              class="btn-icon h-7 w-7 shrink-0 rounded-lg"
+              class="sidebar-new-conversation-btn"
               title="New Conversation"
               aria-label="New Conversation"
               @click.stop="createConversation"
@@ -106,7 +98,7 @@
                 :class="{ 'sidebar-conversation-row-active': appStore.activeConversationId === conv.id }"
                 @click="selectConversation(conv.id)"
               >
-                <div class="flex min-w-0 flex-1 items-center pr-2" @dblclick="startEditing(conv)">
+                <div class="flex min-w-0 flex-1 items-center" @dblclick="startEditing(conv)">
                   <div class="min-w-0 flex-1">
                     <div v-if="editingId === conv.id" class="relative z-10 flex w-full items-center gap-1">
                       <input
@@ -133,7 +125,7 @@
                 <div v-if="editingId !== conv.id" class="relative flex flex-shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
                   <button
                     type="button"
-                    class="btn-icon rounded-lg p-1 hover:text-[var(--color-accent)]"
+                    class="sidebar-conversation-action"
                     style="color: var(--color-text-muted);"
                     title="Conversation actions"
                     @click.stop="toggleConversationMenu(conv.id)"
@@ -296,6 +288,7 @@ import {
   FolderOpenIcon,
   FolderPlusIcon,
   PlusIcon,
+  PencilSquareIcon,
   EllipsisHorizontalIcon,
   KeyIcon,
 } from '@heroicons/vue/24/outline'
@@ -350,13 +343,6 @@ const activeWorkspaceName = computed(() => {
   if (!activeId) return 'No active workspace'
   const activeWorkspace = appStore.workspaces.find((workspace) => workspace.id === activeId)
   return String(activeWorkspace?.name || '').trim() || 'Untitled workspace'
-})
-
-const activeWorkspaceCaption = computed(() => {
-  if (!appStore.hasWorkspace) return 'Create a workspace to begin'
-  const activeId = String(appStore.activeWorkspaceId || '').trim()
-  const activeWorkspace = appStore.workspaces.find((workspace) => workspace.id === activeId)
-  return workspaceFilename(activeWorkspace?.duckdb_path)
 })
 
 const filteredDatasets = computed(() => {
@@ -872,7 +858,7 @@ watch(() => authStore.username, () => {
   height: 100%;
   align-items: center;
   gap: var(--space-sidebar-brand-gap);
-  padding-inline: 0.75rem;
+  padding-inline: var(--space-sidebar-panel-inline);
 }
 
 .sidebar-brand-layout-collapsed {
@@ -880,7 +866,7 @@ watch(() => authStore.username, () => {
 }
 
 .sidebar-brand-layout-expanded {
-  justify-content: flex-start;
+  justify-content: center;
 }
 
 .sidebar-brand-stack {
@@ -890,7 +876,7 @@ watch(() => authStore.username, () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: var(--space-sidebar-brand-gap);
 }
 
 .sidebar-brand-logo-shell {
@@ -899,14 +885,13 @@ watch(() => authStore.username, () => {
   width: var(--size-sidebar-brand-rail);
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-xl);
-  background-color: color-mix(in srgb, var(--color-panel-elevated) 84%, white 16%);
-  box-shadow: var(--shadow-button);
+  border-radius: var(--radius-lg);
 }
 
 .sidebar-brand-logo {
   height: var(--size-sidebar-brand-logo);
   width: var(--size-sidebar-brand-logo);
+  display: block;
 }
 
 .sidebar-brand-toggle {
@@ -916,7 +901,7 @@ watch(() => authStore.username, () => {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-lg);
-  background-color: color-mix(in srgb, var(--color-panel-elevated) 72%, transparent);
+  color: var(--color-text-muted);
   transition:
     background-color var(--motion-duration-fast) var(--motion-ease-standard),
     color var(--motion-duration-fast) var(--motion-ease-standard);
@@ -924,49 +909,6 @@ watch(() => authStore.username, () => {
 
 .sidebar-brand-toggle:hover {
   background-color: color-mix(in srgb, var(--color-text-main) 6%, transparent);
-}
-
-.sidebar-brand-copy {
-  overflow: hidden;
-  min-width: 0;
-  text-align: left;
-  transition:
-    max-width var(--motion-duration-standard) var(--motion-ease-standard),
-    opacity var(--motion-duration-standard) var(--motion-ease-standard);
-}
-
-.sidebar-brand-copy-expanded {
-  max-width: 180px;
-  opacity: 1;
-}
-
-.sidebar-brand-copy-collapsed {
-  max-width: 0;
-  opacity: 0;
-}
-
-.sidebar-brand-kicker {
-  display: block;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.08em;
-  line-height: var(--line-height-tight);
-  text-transform: uppercase;
-}
-
-.sidebar-brand-title {
-  display: block;
-  margin-top: 0.125rem;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-tight);
-}
-
-.sidebar-brand-subtitle {
-  display: block;
-  margin-top: 0.125rem;
-  font-size: var(--font-size-xs);
-  line-height: var(--line-height-tight);
 }
 
 .sidebar-rail {
@@ -1025,12 +967,83 @@ watch(() => authStore.username, () => {
   line-height: var(--line-height-tight);
 }
 
+.sidebar-workspace-section {
+  padding: var(--space-sidebar-section-block-start) var(--space-sidebar-panel-inline) var(--space-sidebar-section-block-end);
+}
+
+.sidebar-section-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0;
+  line-height: var(--line-height-tight);
+}
+
 .sidebar-section-label {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.08em;
   line-height: var(--line-height-tight);
   text-transform: uppercase;
+}
+
+.sidebar-workspace-row {
+  display: flex;
+  min-height: var(--size-sidebar-row-height);
+  width: 100%;
+  align-items: center;
+  gap: var(--space-sidebar-row-gap);
+  margin-top: var(--space-sidebar-section-block-start);
+  border-radius: var(--radius-lg);
+  text-align: left;
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-standard),
+    color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.sidebar-workspace-row:hover {
+  background-color: color-mix(in srgb, var(--color-text-main) 5%, transparent);
+}
+
+.sidebar-workspace-icon,
+.sidebar-workspace-action,
+.sidebar-new-conversation-btn,
+.sidebar-conversation-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-workspace-icon {
+  width: var(--size-sidebar-inline-icon);
+}
+
+.sidebar-workspace-action {
+  width: var(--size-sidebar-inline-icon);
+  color: var(--color-text-muted);
+}
+
+.sidebar-conversation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--size-sidebar-header-height);
+  padding-inline: var(--space-sidebar-panel-inline);
+}
+
+.sidebar-new-conversation-btn {
+  height: var(--size-sidebar-small-action);
+  width: var(--size-sidebar-small-action);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-standard),
+    color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.sidebar-new-conversation-btn:hover,
+.sidebar-conversation-action:hover {
+  background-color: color-mix(in srgb, var(--color-text-main) 6%, transparent);
+  color: var(--color-text-main);
 }
 
 .sidebar-status-note,
@@ -1041,8 +1054,8 @@ watch(() => authStore.username, () => {
 }
 
 .sidebar-workspace-title {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
   line-height: var(--line-height-tight);
 }
 
@@ -1093,21 +1106,28 @@ watch(() => authStore.username, () => {
 .sidebar-conversation-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  min-height: 3.5rem;
-  padding: 0.75rem 0.875rem;
-  border-radius: 1rem;
+  gap: var(--space-sidebar-row-gap);
+  min-height: var(--size-sidebar-row-height);
+  padding: 0 var(--space-sidebar-row-inline-end) 0 var(--space-sidebar-list-indent);
+  border-radius: var(--radius-xl);
   cursor: pointer;
-  transition: background-color 150ms ease, color 150ms ease;
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-standard),
+    color var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .sidebar-conversation-row:hover {
-  background-color: var(--color-panel-muted);
+  background-color: color-mix(in srgb, var(--color-text-main) 5%, transparent);
 }
 
 .sidebar-conversation-row-active {
-  background-color: var(--color-selected-surface);
-  box-shadow: inset 0 0 0 1px var(--color-selected-border);
+  background-color: color-mix(in srgb, var(--color-text-main) 7%, transparent);
+}
+
+.sidebar-conversation-action {
+  height: var(--size-sidebar-small-action);
+  width: var(--size-sidebar-small-action);
+  border-radius: var(--radius-md);
 }
 
 .sidebar-menu-danger:hover {

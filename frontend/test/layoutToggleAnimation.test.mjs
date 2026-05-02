@@ -27,7 +27,7 @@ test('sidebar and explorer sections use animated collapse transitions', () => {
   )
   // Current redesign keeps a single top content area and fixed bottom stack
   assert.equal(sidebarSource.includes('activeWorkspaceName'), true)
-  assert.equal(sidebarSource.includes('activeWorkspaceCaption'), true)
+  assert.equal(sidebarSource.includes('sidebar-workspace-row'), true)
   assert.equal(sidebarSource.includes('custom-scrollbar flex-1 overflow-y-auto overflow-x-hidden'), true)
   assert.equal(sidebarSource.includes('sidebar-conversation-row'), true)
   // No old transition patterns
@@ -49,7 +49,7 @@ test('sidebar icons keep fixed size to avoid toggle jitter', () => {
   assert.equal(sidebarSource.includes('.sidebar-brand-stack {'), true)
   assert.equal(sidebarSource.includes('width: var(--size-sidebar-brand-rail);'), true)
   assert.equal(sidebarSource.includes('min-width: var(--size-sidebar-brand-rail);'), true)
-  assert.equal(sidebarSource.includes('sidebar-brand-copy-collapsed'), true)
+  assert.equal(sidebarSource.includes('sidebar-brand-copy'), false)
   // No scale animations on workspace/schema tabs
   assert.equal(sidebarSource.includes("appStore.activeTab === 'workspace' ? 'scale-110' : ''"), false)
   assert.equal(sidebarSource.includes("appStore.activeTab === 'schema-editor' ? 'scale-110' : ''"), false)

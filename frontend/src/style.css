@@ -121,12 +121,22 @@
   --radius-xl: 1rem;
   --space-overlay-gap: 0.5rem;
   --size-profile-menu-min-width: 13rem;
-  --size-sidebar-brand-height: 5.5rem;
-  --size-sidebar-brand-rail: 2.75rem;
+  --size-sidebar-brand-height: 5.75rem;
+  --size-sidebar-brand-rail: 3rem;
   --size-sidebar-brand-logo: 2.25rem;
   --size-sidebar-brand-toggle: 2rem;
   --size-sidebar-profile-badge: 1.5rem;
-  --space-sidebar-brand-gap: 0.875rem;
+  --space-sidebar-brand-gap: 0.625rem;
+  --space-sidebar-panel-inline: 1rem;
+  --space-sidebar-list-indent: 3rem;
+  --space-sidebar-row-inline-end: 0.75rem;
+  --space-sidebar-section-block-start: 1.25rem;
+  --space-sidebar-section-block-end: 1rem;
+  --space-sidebar-row-gap: 0.75rem;
+  --size-sidebar-row-height: 2.75rem;
+  --size-sidebar-header-height: 2rem;
+  --size-sidebar-inline-icon: 2rem;
+  --size-sidebar-small-action: 1.75rem;
 }
 
 /* Theme presets: switch by setting `data-theme` on <html>. */

@@ -18,7 +18,8 @@ test('sidebar shows active workspace context with conversations beneath it', () 
 
   // The top section shows workspace details and the conversation list
   assert.equal(unifiedSource.includes('activeWorkspaceName'), true)
-  assert.equal(unifiedSource.includes('activeWorkspaceCaption'), true)
+  assert.equal(unifiedSource.includes('sidebar-workspace-row'), true)
+  assert.equal(unifiedSource.includes('Projects'), true)
   assert.equal(unifiedSource.includes('Open workspace settings'), true)
   assert.equal(unifiedSource.includes('No conversations yet.'), true)
   assert.equal(unifiedSource.includes('Datasets</p>'), false)
