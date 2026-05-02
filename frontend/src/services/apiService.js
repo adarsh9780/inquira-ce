@@ -893,23 +893,23 @@ export const apiService = {
   },
 
   async v1GetTurn(conversationId, turnId) {
-    return axios.get(`/api/v1/conversations/${conversationId}/turns/${turnId}`).then((response) => response.data)
+    return axios.get(`/api/v1/conversations/${conversationId}/turns/${turnId}`)
   },
 
   async v1GetTurnRelations(conversationId, turnId) {
-    return axios.get(`/api/v1/conversations/${conversationId}/turns/${turnId}/relations`).then((response) => response.data)
+    return axios.get(`/api/v1/conversations/${conversationId}/turns/${turnId}/relations`)
   },
 
   async v1GetFinalTurn(conversationId) {
-    return axios.get(`/api/v1/conversations/${conversationId}/final-turn`).then((response) => response.data)
+    return axios.get(`/api/v1/conversations/${conversationId}/final-turn`)
   },
 
   async v1MarkFinalTurn(conversationId, turnId) {
-    return axios.post(`/api/v1/conversations/${conversationId}/turns/${turnId}/final`).then((response) => response.data)
+    return axios.post(`/api/v1/conversations/${conversationId}/turns/${turnId}/final`)
   },
 
   async v1RerunFinalTurn(conversationId) {
-    return axios.post(`/api/v1/conversations/${conversationId}/final-turn/rerun`).then((response) => response.data)
+    return axios.post(`/api/v1/conversations/${conversationId}/final-turn/rerun`)
   },
 
   async v1Analyze(payload) {

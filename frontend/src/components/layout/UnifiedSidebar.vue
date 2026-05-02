@@ -214,7 +214,7 @@
             <div
               v-if="profileMenuOpen"
               ref="profileMenuRef"
-              class="absolute bottom-0 left-full z-[var(--z-dropdown)] ml-2 w-52 overflow-hidden rounded-xl border shadow-lg"
+              class="absolute bottom-full left-0 z-[var(--z-dropdown)] mb-2 w-52 overflow-hidden rounded-xl border shadow-lg"
               style="border-color: var(--color-border-strong); background-color: var(--color-panel-elevated);"
               data-profile-menu
             >

@@ -1505,12 +1505,16 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function markActiveTurnFinal() {
+    return markTurnFinal(activeTurnId.value)
+  }
+
+  async function markTurnFinal(turnId) {
     const conversationId = String(activeConversationId.value || '').trim()
-    const turnId = String(activeTurnId.value || '').trim()
-    if (!conversationId || !turnId) return null
-    const turn = await apiService.v1MarkFinalTurn(conversationId, turnId)
+    const targetTurnId = String(turnId || '').trim()
+    if (!conversationId || !targetTurnId) return null
+    const turn = await apiService.v1MarkFinalTurn(conversationId, targetTurnId)
     finalTurnId.value = String(turn?.id || '').trim()
-    await loadActiveTurnRelations(turnId)
+    await loadActiveTurnRelations(targetTurnId)
     return turn
   }
 
@@ -2703,6 +2707,7 @@ export const useAppStore = defineStore('app', () => {
     goToNextTurn,
     selectBranchChildTurn,
     markActiveTurnFinal,
+    markTurnFinal,
     rerunSelectedFinalTurn,
     fetchWorkspaces,
     fetchColumnCatalog,

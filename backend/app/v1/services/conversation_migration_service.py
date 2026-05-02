@@ -114,6 +114,10 @@ class ConversationMigrationService:
             migrated_turn_ids.append(turn.id)
             previous_turn = turn
 
+        if turns and not str(getattr(conversation, "final_turn_id", "") or "").strip():
+            latest_turn = turns[-1]
+            latest_turn.is_final = True
+            conversation.final_turn_id = latest_turn.id
         conversation.migration_version = ConversationMigrationService.CURRENT_MIGRATION_VERSION
         await session.commit()
         return {

@@ -1625,6 +1625,9 @@ class ChatService:
             result_kind=str(response_payload.get("result_kind") or ""),
             artifacts=artifacts,
         )
+        if not str(getattr(conversation, "final_turn_id", "") or "").strip():
+            conversation.final_turn_id = turn.id
+            turn.is_final = True
         await session.commit()
         return turn.id
 
