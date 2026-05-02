@@ -38,6 +38,7 @@ from ..repositories.preferences_repository import PreferencesRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .conversation_service import ConversationService
 from .secret_storage_service import SecretStorageService
+from .turn_bundle_service import TurnBundleService
 from ...core.logger import logprint
 
 
@@ -1370,6 +1371,8 @@ class ChatService:
         turn_id = await ChatService._persist_turn(
             session=session,
             conversation=conversation,
+            username=str(user.username),
+            workspace_id=workspace_id,
             conversation_id=conversation_id,
             question=question,
             attachments=normalized_attachments,
@@ -1480,6 +1483,8 @@ class ChatService:
     async def _persist_turn(
         session: AsyncSession,
         conversation: Any,
+        username: str,
+        workspace_id: str,
         conversation_id: str,
         question: str,
         attachments: list[dict[str, str]] | None,
@@ -1493,6 +1498,7 @@ class ChatService:
         
         metadata = dict(response_payload.get("metadata", {}) or {})
         metadata["user_attachments"] = attachments or []
+        artifacts = ChatService._normalize_artifacts(response_payload.get("artifacts"))
 
         turn = await ConversationRepository.create_turn(
             session=session,
@@ -1500,10 +1506,46 @@ class ChatService:
             seq_no=seq_no,
             user_text=question,
             assistant_text=response_payload["explanation"],
-            tool_events=[{"type": "artifact", "data": item} for item in (response_payload.get("artifacts") or [])],
+            tool_events=[{"type": "artifact", "data": item} for item in artifacts],
             metadata=metadata,
             code_snapshot=response_payload["code"],
         )
+        turn_dir = await TurnBundleService.create_turn_bundle(
+            username=username,
+            workspace_id=workspace_id,
+            conversation_id=conversation_id,
+            turn_id=turn.id,
+            user_text=question,
+            assistant_text=response_payload["explanation"],
+            code=response_payload["code"],
+            manifest={
+                "seq_no": seq_no,
+                "result_kind": str(response_payload.get("result_kind") or ""),
+                "artifacts": [
+                    {
+                        "artifact_id": str(item.get("artifact_id") or ""),
+                        "kind": str(item.get("kind") or ""),
+                        "path": str(item.get("path") or ""),
+                    }
+                    for item in artifacts
+                ],
+            },
+        )
+        turn.code_path = str(turn_dir / "analysis.py")
+        turn.manifest_path = str(turn_dir / "turn.json")
+        turn.artifact_summary_json = json.dumps(
+            [
+                {
+                    "artifact_id": str(item.get("artifact_id") or ""),
+                    "kind": str(item.get("kind") or ""),
+                    "path": str(item.get("path") or ""),
+                }
+                for item in artifacts
+            ]
+        )
+        execution_summary = response_payload.get("execution")
+        if isinstance(execution_summary, dict):
+            turn.execution_summary_json = json.dumps(execution_summary)
         await session.commit()
         return turn.id
 
@@ -1686,6 +1728,8 @@ class ChatService:
         turn_id = await ChatService._persist_turn(
             session=session,
             conversation=conversation,
+            username=str(user.username),
+            workspace_id=workspace_id,
             conversation_id=resolved_conversation_id,
             question=question,
             attachments=normalized_attachments,
