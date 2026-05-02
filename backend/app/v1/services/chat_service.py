@@ -36,6 +36,7 @@ from ..repositories.conversation_repository import ConversationRepository
 from ..repositories.dataset_repository import DatasetRepository
 from ..repositories.preferences_repository import PreferencesRepository
 from ..repositories.workspace_repository import WorkspaceRepository
+from .branch_summary_service import BranchSummaryService
 from .conversation_service import ConversationService
 from .schema_memory_service import SchemaMemoryService
 from .secret_storage_service import SecretStorageService
@@ -1563,6 +1564,15 @@ class ChatService:
         )
         conversation.schema_memory_json = merged_schema_memory_json
         conversation.schema_memory_version = merged_schema_memory_version
+        conversation.branch_summary_json = BranchSummaryService.merge_branch_summary(
+            getattr(conversation, "branch_summary_json", None),
+            turn_id=turn.id,
+            parent_turn_id=getattr(turn, "parent_turn_id", None),
+            question=question,
+            assistant_text=response_payload["explanation"],
+            result_kind=str(response_payload.get("result_kind") or ""),
+            artifacts=artifacts,
+        )
         await session.commit()
         return turn.id
 
