@@ -71,7 +71,7 @@ export const useAppStore = defineStore('app', () => {
   const activeWorkspaceId = ref('')
   const conversations = ref([])
   const activeConversationId = ref('')
-  const turnViewEnabled = ref(false)
+  const turnViewEnabled = ref(true)
   const activeTurnId = ref('')
   const activeTurn = ref(null)
   const activeTurnCode = ref('')

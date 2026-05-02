@@ -1167,9 +1167,7 @@ async function handleSubmit() {
 
     let response
     const schemaPayload = buildActiveSchemaPayload()
-    const selectedParentTurnId = appStore.turnViewEnabled
-      ? String(appStore.activeTurnId || '').trim()
-      : ''
+    const selectedParentTurnId = String(appStore.activeTurnId || '').trim()
     response = await apiService.v1AnalyzeStream(
       {
         workspace_id: workspaceId,
