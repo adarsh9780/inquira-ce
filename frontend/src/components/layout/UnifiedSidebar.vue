@@ -4,11 +4,14 @@
     style="background-color: var(--color-sidebar-surface);"
   >
     <div
-      class="sidebar-brand-shell h-16 shrink-0 border-b"
+      class="sidebar-brand-shell shrink-0 border-b"
       style="border-color: var(--color-border);"
     >
       <div class="sidebar-brand-layout" :class="appStore.isSidebarCollapsed ? 'sidebar-brand-layout-collapsed' : 'sidebar-brand-layout-expanded'">
-        <div class="sidebar-brand-rail">
+        <div class="sidebar-brand-stack">
+          <span class="sidebar-brand-logo-shell" aria-hidden="true">
+            <img :src="logo" alt="Inquira Asset logo" class="sidebar-brand-logo" />
+          </span>
           <button
             type="button"
             class="sidebar-brand-toggle"
@@ -18,26 +21,25 @@
           >
             <Bars3Icon class="h-4 w-4 shrink-0" />
           </button>
-          <span class="sidebar-brand-initial" aria-hidden="true">
-            {{ projectInitial }}
-          </span>
         </div>
-        <span
-          class="sidebar-brand-wordmark"
-          :class="appStore.isSidebarCollapsed ? 'sidebar-brand-wordmark-collapsed' : 'sidebar-brand-wordmark-expanded'"
+        <div
+          class="sidebar-brand-copy"
+          :class="appStore.isSidebarCollapsed ? 'sidebar-brand-copy-collapsed' : 'sidebar-brand-copy-expanded'"
         >
-          <span class="sidebar-brand-title" style="color: var(--color-text-main);">Inquira</span>
-        </span>
+          <span class="sidebar-brand-kicker" style="color: var(--color-text-muted);">Workspace</span>
+          <span class="sidebar-brand-title" style="color: var(--color-text-main);">Inquira Asset</span>
+          <span class="sidebar-brand-subtitle" style="color: var(--color-text-muted);">Analysis console</span>
+        </div>
       </div>
     </div>
 
     <div class="flex min-h-0 flex-1 flex-col">
       <div v-show="!appStore.isSidebarCollapsed" class="flex min-h-0 flex-1 flex-col">
         <div class="border-b px-4 py-4" style="border-color: var(--color-border);">
-          <p class="text-[11px] font-semibold uppercase tracking-[0.16em]" style="color: var(--color-text-muted);">Workspace</p>
+          <p class="sidebar-section-label" style="color: var(--color-text-muted);">Workspace</p>
           <button
             type="button"
-            class="mt-3 flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors hover:bg-[var(--color-panel-muted)]"
+            class="sidebar-workspace-card mt-3 flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors hover:bg-[var(--color-panel-muted)]"
             style="border-color: var(--color-border); background-color: var(--color-panel-elevated);"
             title="Open workspace settings"
             @click="openSettings('workspace', 1)"
@@ -58,7 +60,7 @@
 
         <div class="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-4">
           <div class="flex items-center justify-between px-1 pb-2">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em]" style="color: var(--color-text-muted);">Conversations</p>
+            <p class="sidebar-section-label" style="color: var(--color-text-muted);">Conversations</p>
             <button
               v-if="appStore.hasWorkspace"
               type="button"
@@ -74,7 +76,7 @@
           <div class="custom-scrollbar flex-1 overflow-y-auto overflow-x-hidden">
             <div
               v-if="appStore.workspaceDeletionJobs.length > 0"
-              class="mb-3 flex items-center gap-2 rounded-xl px-3 py-2 text-[11px]"
+              class="sidebar-status-note mb-3 flex items-center gap-2 rounded-xl px-3 py-2"
               style="background-color: var(--color-warning-bg); color: var(--color-warning-text);"
             >
               <svg class="h-3 w-3 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -146,7 +148,7 @@
                   >
                     <button
                       type="button"
-                      class="w-full px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-[var(--color-base-soft)]"
+                        class="sidebar-menu-item w-full px-3 py-2 text-left transition-colors hover:bg-[var(--color-base-soft)]"
                       style="color: var(--color-text-main);"
                       @click.stop="startEditingFromMenu(conv)"
                     >
@@ -154,7 +156,7 @@
                     </button>
                     <button
                       type="button"
-                      class="sidebar-menu-danger w-full px-3 py-2 text-left text-xs font-medium transition-colors"
+                        class="sidebar-menu-item sidebar-menu-danger w-full px-3 py-2 text-left transition-colors"
                       style="color: var(--color-danger);"
                       @click.stop="confirmDeleteConversation(conv.id)"
                     >
@@ -211,7 +213,7 @@
               @click="toggleProfileMenu"
             >
               <span
-                class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold uppercase"
+                class="sidebar-profile-badge shrink-0 uppercase"
                 style="background-color: var(--color-selected-surface); color: var(--color-accent-text);"
               >
                 {{ profileInitials }}
@@ -233,7 +235,7 @@
       >
         <button
           type="button"
-          class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-base-soft)]"
+          class="sidebar-menu-item w-full px-3 py-2 text-left transition-colors hover:bg-[var(--color-base-soft)]"
           style="color: var(--color-text-main);"
           @click="openProfileSection('terms')"
         >
@@ -241,7 +243,7 @@
         </button>
         <button
           type="button"
-          class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-base-soft)]"
+          class="sidebar-menu-item w-full px-3 py-2 text-left transition-colors hover:bg-[var(--color-base-soft)]"
           style="color: var(--color-text-main);"
           @click="openProfileSection('account')"
         >
@@ -249,7 +251,7 @@
         </button>
         <button
           type="button"
-          class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-base-soft)]"
+          class="sidebar-menu-item w-full px-3 py-2 text-left transition-colors hover:bg-[var(--color-base-soft)]"
           style="color: var(--color-text-main);"
           @click="openProfileSection('appearance')"
         >
@@ -286,6 +288,7 @@ import { inferTableNameFromDataPath } from '../../utils/chatBootstrap'
 import { previewService } from '../../services/previewService'
 import SettingsModal from '../modals/SettingsModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
+import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 
 import {
@@ -316,10 +319,6 @@ const profileMenuStyle = ref({
   backgroundColor: 'var(--color-panel-elevated)',
   borderColor: 'var(--color-border-strong)',
 })
-
-const workspacesExpanded = ref(true)
-const datasetsExpanded = ref(true)
-const conversationsExpanded = ref(true)
 
 const localDatasets = ref([])
 const isLoadingDatasets = ref(false)
@@ -382,7 +381,6 @@ const profileInitials = computed(() => {
   const initials = parts.slice(0, 2).map((part) => part[0] || '').join('')
   return (initials || raw.slice(0, 2) || 'U').toUpperCase()
 })
-const projectInitial = computed(() => 'I')
 
 function workspaceFilename(duckdbPath) {
   const normalized = String(duckdbPath || '').trim()
@@ -865,12 +863,16 @@ watch(() => authStore.username, () => {
   background: transparent;
 }
 
+.sidebar-brand-shell {
+  min-height: var(--size-sidebar-brand-height);
+}
+
 .sidebar-brand-layout {
   display: flex;
   height: 100%;
   align-items: center;
-  gap: 0.75rem;
-  padding-inline: 0.5rem;
+  gap: var(--space-sidebar-brand-gap);
+  padding-inline: 0.75rem;
 }
 
 .sidebar-brand-layout-collapsed {
@@ -881,68 +883,89 @@ watch(() => authStore.username, () => {
   justify-content: flex-start;
 }
 
-.sidebar-brand-rail {
+.sidebar-brand-stack {
   display: flex;
-  width: 2.5rem;
-  min-width: 2.5rem;
+  width: var(--size-sidebar-brand-rail);
+  min-width: var(--size-sidebar-brand-rail);
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.375rem;
+  gap: 0.5rem;
+}
+
+.sidebar-brand-logo-shell {
+  display: flex;
+  height: var(--size-sidebar-brand-rail);
+  width: var(--size-sidebar-brand-rail);
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xl);
+  background-color: color-mix(in srgb, var(--color-panel-elevated) 84%, white 16%);
+  box-shadow: var(--shadow-button);
+}
+
+.sidebar-brand-logo {
+  height: var(--size-sidebar-brand-logo);
+  width: var(--size-sidebar-brand-logo);
 }
 
 .sidebar-brand-toggle {
   display: flex;
-  height: 1.75rem;
-  width: 1.75rem;
+  height: var(--size-sidebar-brand-toggle);
+  width: var(--size-sidebar-brand-toggle);
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-lg);
+  background-color: color-mix(in srgb, var(--color-panel-elevated) 72%, transparent);
   transition:
     background-color var(--motion-duration-fast) var(--motion-ease-standard),
     color var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .sidebar-brand-toggle:hover {
-  background-color: color-mix(in srgb, var(--color-text-main) 4%, transparent);
+  background-color: color-mix(in srgb, var(--color-text-main) 6%, transparent);
 }
 
-.sidebar-brand-initial {
-  display: flex;
-  height: 2rem;
-  width: 2rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-lg);
-  background-color: var(--color-selected-surface);
-  color: var(--color-accent-text);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-tight);
-}
-
-.sidebar-brand-wordmark {
+.sidebar-brand-copy {
   overflow: hidden;
+  min-width: 0;
   text-align: left;
   transition:
     max-width var(--motion-duration-standard) var(--motion-ease-standard),
     opacity var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
-.sidebar-brand-wordmark-expanded {
-  max-width: 160px;
+.sidebar-brand-copy-expanded {
+  max-width: 180px;
   opacity: 1;
 }
 
-.sidebar-brand-wordmark-collapsed {
+.sidebar-brand-copy-collapsed {
   max-width: 0;
   opacity: 0;
 }
 
+.sidebar-brand-kicker {
+  display: block;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  line-height: var(--line-height-tight);
+  text-transform: uppercase;
+}
+
 .sidebar-brand-title {
   display: block;
+  margin-top: 0.125rem;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+}
+
+.sidebar-brand-subtitle {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: var(--font-size-xs);
   line-height: var(--line-height-tight);
 }
 
@@ -988,6 +1011,33 @@ watch(() => authStore.username, () => {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   line-height: var(--line-height-tight);
+}
+
+.sidebar-profile-badge {
+  display: flex;
+  height: var(--size-sidebar-profile-badge);
+  width: var(--size-sidebar-profile-badge);
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+
+.sidebar-section-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  line-height: var(--line-height-tight);
+  text-transform: uppercase;
+}
+
+.sidebar-status-note,
+.sidebar-menu-item {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-body);
 }
 
 .sidebar-workspace-title {

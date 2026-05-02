@@ -121,6 +121,12 @@
   --radius-xl: 1rem;
   --space-overlay-gap: 0.5rem;
   --size-profile-menu-min-width: 13rem;
+  --size-sidebar-brand-height: 5.5rem;
+  --size-sidebar-brand-rail: 2.75rem;
+  --size-sidebar-brand-logo: 2.25rem;
+  --size-sidebar-brand-toggle: 2rem;
+  --size-sidebar-profile-badge: 1.5rem;
+  --space-sidebar-brand-gap: 0.875rem;
 }
 
 /* Theme presets: switch by setting `data-theme` on <html>. */
