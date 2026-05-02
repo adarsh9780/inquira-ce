@@ -1167,6 +1167,9 @@ async function handleSubmit() {
 
     let response
     const schemaPayload = buildActiveSchemaPayload()
+    const selectedParentTurnId = appStore.turnViewEnabled
+      ? String(appStore.activeTurnId || '').trim()
+      : ''
     response = await apiService.v1AnalyzeStream(
       {
         workspace_id: workspaceId,
@@ -1178,6 +1181,8 @@ async function handleSubmit() {
         table_name: null,
         preferred_table_name: schemaPayload.tableName,
         active_schema: schemaPayload.activeSchema,
+        use_selected_turn_context: Boolean(selectedParentTurnId),
+        selected_parent_turn_id: selectedParentTurnId || null,
         attachments: attachmentsPayload,
         api_key: null
       },
@@ -1263,6 +1268,12 @@ async function handleSubmit() {
     if (response?.conversation_id && response.conversation_id !== appStore.activeConversationId) {
       appStore.setActiveConversationId(response.conversation_id)
       await appStore.fetchConversations()
+    }
+
+    const responseTurnId = String(response?.turn_id || '').trim()
+    if (responseTurnId) {
+      await appStore.loadActiveTurnRelations(responseTurnId)
+      await appStore.loadFinalTurn()
     }
 
     const { is_safe, code, current_code, explanation, result_explanation, code_explanation } = response
