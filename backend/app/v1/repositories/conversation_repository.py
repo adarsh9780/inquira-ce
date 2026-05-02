@@ -65,6 +65,16 @@ class ConversationRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def list_child_turns(session: AsyncSession, conversation_id: str, parent_turn_id: str) -> list[Turn]:
+        """List direct child turns in sequence order."""
+        result = await session.execute(
+            select(Turn)
+            .where(Turn.conversation_id == conversation_id, Turn.parent_turn_id == parent_turn_id)
+            .order_by(Turn.seq_no.asc(), Turn.created_at.asc(), Turn.id.asc())
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
     async def delete_conversation(session: AsyncSession, conversation: Conversation) -> None:
         """Delete conversation and cascaded turns."""
         await session.delete(conversation)

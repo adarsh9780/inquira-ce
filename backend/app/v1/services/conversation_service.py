@@ -7,7 +7,7 @@ import json
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Conversation, Workspace
+from ..models import Conversation, Turn, Workspace
 from ..repositories.conversation_repository import ConversationRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .cursor_service import decode_cursor, encode_cursor
@@ -15,6 +15,23 @@ from .cursor_service import decode_cursor, encode_cursor
 
 class ConversationService:
     """Business logic for conversations and turns."""
+
+    @staticmethod
+    def _turn_to_dict(turn: Turn) -> dict:
+        return {
+            "id": turn.id,
+            "parent_turn_id": turn.parent_turn_id,
+            "result_kind": turn.result_kind,
+            "code_path": turn.code_path,
+            "manifest_path": turn.manifest_path,
+            "seq_no": turn.seq_no,
+            "user_text": turn.user_text,
+            "assistant_text": turn.assistant_text,
+            "tool_events": json.loads(turn.tool_events_json) if turn.tool_events_json else None,
+            "metadata": json.loads(turn.metadata_json) if turn.metadata_json else None,
+            "code_snapshot": turn.code_snapshot,
+            "created_at": turn.created_at,
+        }
 
     @staticmethod
     async def ensure_workspace_access(
@@ -133,18 +150,7 @@ class ConversationService:
 
         mapped: list[dict] = []
         for turn in turns:
-            mapped.append(
-                {
-                    "id": turn.id,
-                    "seq_no": turn.seq_no,
-                    "user_text": turn.user_text,
-                    "assistant_text": turn.assistant_text,
-                    "tool_events": json.loads(turn.tool_events_json) if turn.tool_events_json else None,
-                    "metadata": json.loads(turn.metadata_json) if turn.metadata_json else None,
-                    "code_snapshot": turn.code_snapshot,
-                    "created_at": turn.created_at,
-                }
-            )
+            mapped.append(ConversationService._turn_to_dict(turn))
 
         next_cursor = None
         if len(turns) == max(1, min(limit, 50)):
@@ -152,6 +158,84 @@ class ConversationService:
             next_cursor = encode_cursor(last.created_at, last.id)
 
         return mapped, next_cursor
+
+    @staticmethod
+    async def get_turn(
+        session: AsyncSession,
+        principal_id: str,
+        conversation_id: str,
+        turn_id: str,
+    ) -> dict:
+        conversation = await ConversationRepository.get_conversation(session, conversation_id)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
+        turn = await ConversationRepository.get_turn(session, turn_id)
+        if turn is None or turn.conversation_id != conversation_id:
+            raise HTTPException(status_code=404, detail="Turn not found")
+        return ConversationService._turn_to_dict(turn)
+
+    @staticmethod
+    async def get_turn_relations(
+        session: AsyncSession,
+        principal_id: str,
+        conversation_id: str,
+        turn_id: str,
+    ) -> dict:
+        conversation = await ConversationRepository.get_conversation(session, conversation_id)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
+
+        current_turn = await ConversationRepository.get_turn(session, turn_id)
+        if current_turn is None or current_turn.conversation_id != conversation_id:
+            raise HTTPException(status_code=404, detail="Turn not found")
+
+        parent = None
+        if current_turn.parent_turn_id:
+            parent_turn = await ConversationRepository.get_turn(session, current_turn.parent_turn_id)
+            if parent_turn is not None and parent_turn.conversation_id == conversation_id:
+                parent = ConversationService._turn_to_dict(parent_turn)
+
+        children = [
+            ConversationService._turn_to_dict(turn)
+            for turn in await ConversationRepository.list_child_turns(session, conversation_id, current_turn.id)
+        ]
+        next_turn = children[0] if children else None
+
+        final_turn = None
+        final_turn_id = str(getattr(conversation, "final_turn_id", "") or "").strip()
+        if final_turn_id:
+            turn = await ConversationRepository.get_turn(session, final_turn_id)
+            if turn is not None and turn.conversation_id == conversation_id:
+                final_turn = ConversationService._turn_to_dict(turn)
+
+        return {
+            "current": ConversationService._turn_to_dict(current_turn),
+            "parent": parent,
+            "children": children,
+            "previous_turn": parent,
+            "next_turn": next_turn,
+            "final_turn": final_turn,
+        }
+
+    @staticmethod
+    async def get_final_turn(
+        session: AsyncSession,
+        principal_id: str,
+        conversation_id: str,
+    ) -> dict | None:
+        conversation = await ConversationRepository.get_conversation(session, conversation_id)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
+        final_turn_id = str(getattr(conversation, "final_turn_id", "") or "").strip()
+        if not final_turn_id:
+            return None
+        turn = await ConversationRepository.get_turn(session, final_turn_id)
+        if turn is None or turn.conversation_id != conversation_id:
+            return None
+        return ConversationService._turn_to_dict(turn)
 
     @staticmethod
     async def create_root_turn(

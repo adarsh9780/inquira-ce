@@ -38,6 +38,10 @@ class TurnResponse(BaseModel):
     """Turn response entry."""
 
     id: str
+    parent_turn_id: str | None = None
+    result_kind: str | None = None
+    code_path: str | None = None
+    manifest_path: str | None = None
     seq_no: int
     user_text: str
     assistant_text: str
@@ -52,3 +56,13 @@ class TurnPageResponse(BaseModel):
 
     turns: list[TurnResponse]
     next_cursor: str | None
+
+
+class TurnRelationsResponse(BaseModel):
+    """Turn lineage and navigation payload."""
+
+    current: TurnResponse
+    parent: TurnResponse | None
+    children: list[TurnResponse]
+    previous_turn: TurnResponse | None
+    next_turn: TurnResponse | None

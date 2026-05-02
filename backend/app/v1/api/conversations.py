@@ -11,6 +11,7 @@ from ..schemas.conversation import (
     ConversationCreateRequest,
     ConversationListResponse,
     ConversationResponse,
+    TurnRelationsResponse,
     ConversationUpdateRequest,
     TurnPageResponse,
     TurnResponse,
@@ -143,3 +144,58 @@ async def list_turns(
         turns=[TurnResponse(**turn) for turn in turns],
         next_cursor=next_cursor,
     )
+
+
+@router.get("/conversations/{conversation_id}/turns/{turn_id}", response_model=TurnResponse)
+async def get_turn(
+    conversation_id: str,
+    turn_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Fetch one turn by id."""
+    turn = await ConversationService.get_turn(
+        session=session,
+        principal_id=current_user.id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+    )
+    return TurnResponse(**turn)
+
+
+@router.get("/conversations/{conversation_id}/turns/{turn_id}/relations", response_model=TurnRelationsResponse)
+async def get_turn_relations(
+    conversation_id: str,
+    turn_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Fetch turn lineage and branch navigation details."""
+    payload = await ConversationService.get_turn_relations(
+        session=session,
+        principal_id=current_user.id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+    )
+    return TurnRelationsResponse(
+        current=TurnResponse(**payload["current"]),
+        parent=TurnResponse(**payload["parent"]) if payload["parent"] else None,
+        children=[TurnResponse(**turn) for turn in payload["children"]],
+        previous_turn=TurnResponse(**payload["previous_turn"]) if payload["previous_turn"] else None,
+        next_turn=TurnResponse(**payload["next_turn"]) if payload["next_turn"] else None,
+    )
+
+
+@router.get("/conversations/{conversation_id}/final-turn", response_model=TurnResponse | None)
+async def get_final_turn(
+    conversation_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Fetch the selected final turn for a conversation."""
+    turn = await ConversationService.get_final_turn(
+        session=session,
+        principal_id=current_user.id,
+        conversation_id=conversation_id,
+    )
+    return TurnResponse(**turn) if turn else None
