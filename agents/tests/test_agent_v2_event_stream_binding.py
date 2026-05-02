@@ -165,6 +165,35 @@ async def test_route_node_marks_table_clarification_when_no_schema_match(monkeyp
 
 
 @pytest.mark.asyncio
+async def test_route_node_uses_preferred_workspace_table_instead_of_clarifying(monkeypatch):
+    async def _fake_decide_route_details(_messages, _configurable):
+        return RouteDecision(route="analysis", reasoning="This is a data analysis request.")
+
+    monkeypatch.setattr("agent_v2.nodes.decide_route_details", _fake_decide_route_details)
+
+    result = await route_node(
+        {
+            "messages": [HumanMessage(content="show me the top 10 rows")],
+            "table_names": ["orders", "customers"],
+            "workspace_schema": {
+                "table_name": "orders",
+                "tables": [
+                    {"table_name": "orders", "context": "Retail orders.", "columns": []},
+                    {"table_name": "customers", "context": "Customer profiles.", "columns": []},
+                ],
+            },
+        },
+        {"configurable": {}},
+    )
+
+    assert result["route"] == "analysis"
+    assert result["table_names"] == ["orders"]
+    assert result["metadata"]["is_relevant"] is True
+    assert result["metadata"]["schema_relevance"]["preferred_table_used"] == "orders"
+    assert "needs_table_clarification" not in result["metadata"]
+
+
+@pytest.mark.asyncio
 async def test_chat_node_returns_table_clarification_without_model_call(monkeypatch):
     def _should_not_get_model(_config, *, lite):
         _ = lite
