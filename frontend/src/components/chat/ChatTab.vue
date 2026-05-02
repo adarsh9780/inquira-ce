@@ -63,7 +63,8 @@
         </div>
 
         <div v-else class="px-2 sm:px-2 pt-2 pb-1 space-y-2">
-          <ChatHistory />
+          <TurnViewer v-if="appStore.turnViewEnabled" />
+          <ChatHistory v-else />
         </div>
       </div>
 
@@ -75,6 +76,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import ChatHistory from './ChatHistory.vue'
+import TurnViewer from './TurnViewer.vue'
 import { 
   ChatBubbleLeftRightIcon, 
   ArrowPathIcon,

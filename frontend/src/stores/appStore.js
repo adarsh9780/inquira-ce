@@ -1486,6 +1486,46 @@ export const useAppStore = defineStore('app', () => {
     return turn
   }
 
+  async function goToPreviousTurn() {
+    const previousTurnId = String(activeTurnRelations.value?.previous_turn?.id || '').trim()
+    if (!previousTurnId) return null
+    return loadActiveTurnRelations(previousTurnId)
+  }
+
+  async function goToNextTurn() {
+    const nextTurnId = String(activeTurnRelations.value?.next_turn?.id || '').trim()
+    if (!nextTurnId) return null
+    return loadActiveTurnRelations(nextTurnId)
+  }
+
+  async function selectBranchChildTurn(turnId) {
+    const targetTurnId = String(turnId || '').trim()
+    if (!targetTurnId) return null
+    return loadActiveTurnRelations(targetTurnId)
+  }
+
+  async function markActiveTurnFinal() {
+    const conversationId = String(activeConversationId.value || '').trim()
+    const turnId = String(activeTurnId.value || '').trim()
+    if (!conversationId || !turnId) return null
+    const turn = await apiService.v1MarkFinalTurn(conversationId, turnId)
+    finalTurnId.value = String(turn?.id || '').trim()
+    await loadActiveTurnRelations(turnId)
+    return turn
+  }
+
+  async function rerunSelectedFinalTurn() {
+    const conversationId = String(activeConversationId.value || '').trim()
+    if (!conversationId) return null
+    const result = await apiService.v1RerunFinalTurn(conversationId)
+    const rerunTurnId = String(result?.turn_id || '').trim()
+    if (rerunTurnId) {
+      await fetchConversationTurns({ reset: true })
+      await loadActiveTurnRelations(rerunTurnId)
+    }
+    return result
+  }
+
   function prependChatHistoryFromTurns(turns) {
     if (!Array.isArray(turns) || turns.length === 0) return
     const mapped = turns.map((turn) => ({
@@ -2659,6 +2699,11 @@ export const useAppStore = defineStore('app', () => {
     loadActiveTurn,
     loadActiveTurnRelations,
     loadFinalTurn,
+    goToPreviousTurn,
+    goToNextTurn,
+    selectBranchChildTurn,
+    markActiveTurnFinal,
+    rerunSelectedFinalTurn,
     fetchWorkspaces,
     fetchColumnCatalog,
     fetchWorkspaceDeletionJobs,
