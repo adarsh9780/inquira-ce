@@ -18,7 +18,8 @@ test('chat submit path enforces workspace dataset sync without legacy setDataPat
 
   assert.equal(source.includes('async function ensureWorkspaceForChat()'), false)
   assert.equal(source.includes('const workspaceId = appStore.activeWorkspaceId'), true)
-  assert.equal(source.includes('await ensureWorkspaceDatasetReady(workspaceId)'), true)
+  assert.equal(source.includes('preferred_table_name:'), false)
+  assert.equal(source.includes('active_schema:'), false)
   assert.equal(source.includes('ensureBackendSchemaReadyForChat'), false)
   assert.equal(source.includes('apiService.setDataPathSimple('), false)
   assert.equal(source.includes('apiService.analyzeDataStream('), false)

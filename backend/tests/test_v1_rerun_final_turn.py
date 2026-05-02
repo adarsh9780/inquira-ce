@@ -33,9 +33,9 @@ async def test_rerun_final_turn_uses_stored_code_and_creates_child_turn(monkeypa
     async def fake_get_turn(_session, _turn_id):
         return final_turn
 
-    async def fake_load_workspace_schema(*, session, workspace_id, duckdb_path, preferred_table_name, active_schema_override):
-        _ = session, workspace_id, duckdb_path, preferred_table_name, active_schema_override
-        return {"table_name": "orders", "tables": [{"table_name": "orders", "context": "", "columns": []}]}
+    async def fake_load_workspace_schema(*, session, workspace_id, duckdb_path, active_schema_override):
+        _ = session, workspace_id, duckdb_path, active_schema_override
+        return {"table_name": "", "tables": [{"table_name": "orders", "context": "", "columns": []}]}
 
     async def fake_apply_execution(*, workspace_id, workspace_duckdb_path, question, run_id, generated_code, output_contract, response_payload):
         _ = workspace_id, workspace_duckdb_path, question, run_id, output_contract

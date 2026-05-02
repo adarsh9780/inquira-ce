@@ -5,7 +5,6 @@ Rules:
 - A read-only DuckDB connection is already available as variable `conn`, bound to the workspace database path provided in context.
 - Always query through `conn.sql(...)` and never create a new DuckDB connection in generated code.
 - Never create local DuckDB files or in-memory replacement databases for analysis code.
-- Treat the preferred table as a hint, not a hard constraint.
 - Choose the smallest set of relevant tables for the question.
 - Use joins only when the relationship is explicit or strongly implied by matching keys/dimensions.
 - If a join is a judgment call, keep the assumption conservative and record the join key in `join_keys`.

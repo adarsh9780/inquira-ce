@@ -1130,32 +1130,6 @@ async function ensureWorkspaceDatasetReady(workspaceId) {
   }
 }
 
-function buildActiveSchemaPayload() {
-  const tableName = (
-    appStore.ingestedTableName ||
-    inferTableNameFromDataPath(appStore.dataFilePath)
-  ).trim()
-
-  if (!tableName) return { tableName: null, activeSchema: null }
-
-  const columns = (Array.isArray(appStore.ingestedColumns) ? appStore.ingestedColumns : [])
-    .filter((col) => col?.name)
-    .map((col) => ({
-      name: col.name,
-      dtype: col.type || col.dtype || 'VARCHAR',
-      description: col.description || '',
-      samples: appStore.allowSchemaSampleValues && Array.isArray(col.samples) ? col.samples : []
-    }))
-
-  return {
-    tableName,
-    activeSchema: {
-      table_name: tableName,
-      columns
-    }
-  }
-}
-
 function applyCommandResultToStore(commandResult) {
   const payload = commandResult?.result && typeof commandResult.result === 'object'
     ? commandResult.result
@@ -1306,20 +1280,10 @@ async function handleSubmit() {
   let cancelTimer = null
 
   try {
-    const expectedTableName = (
-      appStore.ingestedTableName ||
-      inferTableNameFromDataPath(appStore.dataFilePath)
-    ).trim()
-    if (expectedTableName && expectedTableName !== appStore.ingestedTableName) {
-      appStore.setIngestedTableName(expectedTableName)
-    }
-
     const workspaceId = appStore.activeWorkspaceId
     if (!workspaceId) {
       throw new Error('Create/select a workspace before analysis.')
     }
-
-    await ensureWorkspaceDatasetReady(workspaceId)
 
     const warningAfterMs = resolveSlowRequestWarningTimeoutMs(appStore.slowRequestWarningSeconds)
     warningTimer = setTimeout(() => {
@@ -1333,7 +1297,6 @@ async function handleSubmit() {
     }, cancelAfterMs)
 
     let response
-    const schemaPayload = buildActiveSchemaPayload()
     const selectedParentTurnId = String(appStore.activeTurnId || '').trim()
     response = await apiService.v1AnalyzeStream(
       {
@@ -1343,9 +1306,6 @@ async function handleSubmit() {
         current_code: appStore.pythonFileContent || '',
         model: appStore.selectedModel,
         context: appStore.schemaContext.trim() || null,
-        table_name: null,
-        preferred_table_name: schemaPayload.tableName,
-        active_schema: schemaPayload.activeSchema,
         use_selected_turn_context: Boolean(selectedParentTurnId),
         selected_parent_turn_id: selectedParentTurnId || null,
         attachments: attachmentsPayload,

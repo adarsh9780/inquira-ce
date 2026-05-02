@@ -931,22 +931,6 @@ def _schema_tables_for_route_relevance(workspace_schema: Any) -> list[dict[str, 
     return [workspace_schema]
 
 
-def _preferred_schema_table_name(workspace_schema: Any) -> str:
-    if not isinstance(workspace_schema, dict):
-        return ""
-    preferred = str(workspace_schema.get("table_name") or "").strip()
-    if not preferred:
-        return ""
-    tables = _schema_tables_for_route_relevance(workspace_schema)
-    if not tables:
-        return preferred
-    for table in tables:
-        table_name = str(table.get("table_name") or "").strip()
-        if table_name.lower() == preferred.lower():
-            return table_name
-    return ""
-
-
 def _table_text_tokens(table: dict[str, Any], keys: tuple[str, ...]) -> set[str]:
     values: list[str] = []
     for key in keys:
@@ -1606,7 +1590,6 @@ async def route_node(state: dict[str, Any], config: RunnableConfig) -> dict[str,
     user_text = _latest_user_text(messages)
     table_names = _state_table_names(state, max_items=64)
     workspace_schema = state.get("workspace_schema") if isinstance(state.get("workspace_schema"), dict) else {}
-    preferred_table_name = _preferred_schema_table_name(workspace_schema)
     schema_relevance = _assess_schema_route_relevance(
         user_text=user_text,
         workspace_schema=workspace_schema,
@@ -1655,35 +1638,15 @@ async def route_node(state: dict[str, Any], config: RunnableConfig) -> dict[str,
         for item in (schema_relevance.get("available_tables") or [])
         if str(item or "").strip()
     ]
-    should_clarify_table = (
-        route != "unsafe"
+    if (
+        route == "general_chat"
         and bool(schema_relevance.get("has_schema"))
-        and not bool(schema_relevance.get("strong_match"))
-        and not preferred_table_name
-        and len(available_tables) > 1
-        and (route == "analysis" or bool(schema_relevance.get("data_intent")))
-    )
-    if should_clarify_table:
-        route = "general_chat"
-        metadata = {
-            **metadata,
-            "is_relevant": False,
-            "needs_table_clarification": True,
-            "available_tables": available_tables[:12],
-            "clarification_reason": str(schema_relevance.get("reason") or "no strong schema match"),
-        }
+        and bool(schema_relevance.get("data_intent"))
+    ):
+        route = "analysis"
+        metadata = {**metadata, "is_relevant": True}
 
     update: dict[str, Any] = {"route": route, "metadata": metadata}
-    if route == "analysis" and preferred_table_name and not bool(schema_relevance.get("strong_match")):
-        update["table_names"] = [preferred_table_name]
-        update["metadata"] = {
-            **metadata,
-            "schema_relevance": {
-                **(schema_relevance if isinstance(schema_relevance, dict) else {}),
-                "preferred_table_used": preferred_table_name,
-            },
-        }
-        return update
     if route == "analysis" and len(available_tables) == 1 and not table_names:
         update["table_names"] = available_tables
     return update

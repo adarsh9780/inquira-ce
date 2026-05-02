@@ -1076,10 +1076,7 @@ class ChatService:
         return merged
 
     @staticmethod
-    def _merge_workspace_schema_tables(
-        tables: list[dict[str, Any]],
-        preferred_table_name: str | None,
-    ) -> dict[str, Any]:
+    def _merge_workspace_schema_tables(tables: list[dict[str, Any]]) -> dict[str, Any]:
         normalized_tables: list[dict[str, Any]] = []
         seen: set[str] = set()
         for table in tables:
@@ -1100,9 +1097,8 @@ class ChatService:
                 }
             )
 
-        preferred_table = str(preferred_table_name or "").strip()
         return {
-            "table_name": preferred_table,
+            "table_name": "",
             "tables": normalized_tables,
         }
 
@@ -1112,7 +1108,6 @@ class ChatService:
         session: AsyncSession,
         workspace_id: str,
         duckdb_path: str,
-        preferred_table_name: str | None,
         active_schema_override: dict[str, Any] | None,
     ) -> dict[str, Any]:
         datasets = await DatasetRepository.list_for_workspace(session, workspace_id)
@@ -1149,7 +1144,7 @@ class ChatService:
                     or {"table_name": override_table, "context": "", "columns": []}
                 )
 
-        return ChatService._merge_workspace_schema_tables(tables, preferred_table_name)
+        return ChatService._merge_workspace_schema_tables(tables)
 
     @staticmethod
     def _normalize_chat_attachments(raw: Any) -> list[dict[str, str]]:
@@ -1208,7 +1203,6 @@ class ChatService:
         conversation_id: str | None,
         question: str,
         table_name_override: str | None,
-        preferred_table_name: str | None,
         active_schema_override: dict[str, Any] | None,
     ) -> tuple[Any, str, dict[str, Any], str, str]:
         """Shared logic to validate workspace, conversation, and dataset before analysis."""
@@ -1271,15 +1265,6 @@ class ChatService:
                         "Re-select your dataset and try again."
                     ),
                 )
-        elif preferred_table_name and str(preferred_table_name).strip():
-            preferred = _normalize_table_name(str(preferred_table_name))
-            selected_dataset = await DatasetRepository.get_for_workspace_table(
-                session=session,
-                workspace_id=workspace_id,
-                table_name=preferred,
-            )
-            if selected_dataset is not None:
-                table_name = selected_dataset.table_name
         else:
             datasets = await DatasetRepository.list_for_workspace(session, workspace_id)
             if len(datasets) == 1:
@@ -1289,7 +1274,6 @@ class ChatService:
             session=session,
             workspace_id=workspace_id,
             duckdb_path=workspace_duckdb_path,
-            preferred_table_name=table_name,
             active_schema_override=active_schema_override,
         )
 
@@ -1312,7 +1296,6 @@ class ChatService:
         use_selected_turn_context: bool = False,
         selected_parent_turn_id: str | None = None,
         table_name_override: str | None = None,
-        preferred_table_name: str | None = None,
         active_schema_override: dict[str, Any] | None = None,
         attachments: list[dict[str, str]] | None = None,
         api_key: str | None = None,
@@ -1325,7 +1308,6 @@ class ChatService:
             conversation_id=conversation_id,
             question=question,
             table_name_override=table_name_override,
-            preferred_table_name=preferred_table_name,
             active_schema_override=active_schema_override,
         )
 
@@ -1645,7 +1627,6 @@ class ChatService:
         use_selected_turn_context: bool = False,
         selected_parent_turn_id: str | None = None,
         table_name_override: str | None = None,
-        preferred_table_name: str | None = None,
         active_schema_override: dict[str, Any] | None = None,
         attachments: list[dict[str, str]] | None = None,
         api_key: str | None = None,
@@ -1660,7 +1641,6 @@ class ChatService:
                 conversation_id=conversation_id,
                 question=question,
                 table_name_override=table_name_override,
-                preferred_table_name=preferred_table_name,
                 active_schema_override=active_schema_override,
             )
         )
@@ -1883,7 +1863,6 @@ class ChatService:
             session=session,
             workspace_id=workspace.id,
             duckdb_path=data_path,
-            preferred_table_name=None,
             active_schema_override=None,
         )
         run_id = str(uuid.uuid4())

@@ -139,7 +139,7 @@ async def test_route_node_uses_column_metadata_when_table_description_is_ambiguo
 
 
 @pytest.mark.asyncio
-async def test_route_node_marks_table_clarification_when_no_schema_match(monkeypatch):
+async def test_route_node_routes_ambiguous_data_request_to_analysis(monkeypatch):
     async def _fake_decide_route_details(_messages, _configurable):
         return RouteDecision(route="general_chat", reasoning="I can answer directly.")
 
@@ -159,13 +159,14 @@ async def test_route_node_marks_table_clarification_when_no_schema_match(monkeyp
         {"configurable": {}},
     )
 
-    assert result["route"] == "general_chat"
-    assert result["metadata"]["needs_table_clarification"] is True
-    assert result["metadata"]["available_tables"] == ["orders", "customers"]
+    assert result["route"] == "analysis"
+    assert result["metadata"]["is_relevant"] is True
+    assert result["metadata"]["schema_relevance"]["available_tables"] == ["orders", "customers"]
+    assert "needs_table_clarification" not in result["metadata"]
 
 
 @pytest.mark.asyncio
-async def test_route_node_uses_preferred_workspace_table_instead_of_clarifying(monkeypatch):
+async def test_route_node_does_not_use_preferred_workspace_table_as_answer(monkeypatch):
     async def _fake_decide_route_details(_messages, _configurable):
         return RouteDecision(route="analysis", reasoning="This is a data analysis request.")
 
@@ -187,9 +188,9 @@ async def test_route_node_uses_preferred_workspace_table_instead_of_clarifying(m
     )
 
     assert result["route"] == "analysis"
-    assert result["table_names"] == ["orders"]
+    assert "table_names" not in result
     assert result["metadata"]["is_relevant"] is True
-    assert result["metadata"]["schema_relevance"]["preferred_table_used"] == "orders"
+    assert "preferred_table_used" not in result["metadata"]["schema_relevance"]
     assert "needs_table_clarification" not in result["metadata"]
 
 
