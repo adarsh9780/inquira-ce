@@ -9,12 +9,14 @@ class WorkspaceCreateRequest(BaseModel):
     """Workspace creation payload."""
 
     name: str = Field(min_length=1, max_length=120)
+    schema_context: str = ""
 
 
 class WorkspaceRenameRequest(BaseModel):
     """Workspace rename payload."""
 
-    name: str = Field(min_length=1, max_length=120)
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    schema_context: str | None = None
 
 
 class WorkspaceResponse(BaseModel):
@@ -24,6 +26,7 @@ class WorkspaceResponse(BaseModel):
     name: str
     is_active: bool
     duckdb_path: str
+    schema_context: str = ""
     created_at: datetime
     updated_at: datetime
 
@@ -40,6 +43,7 @@ class WorkspaceSummaryResponse(BaseModel):
     id: str
     name: str
     is_active: bool
+    schema_context: str = ""
     created_at: datetime
     updated_at: datetime
     table_count: int

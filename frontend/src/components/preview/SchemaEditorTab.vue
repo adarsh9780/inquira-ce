@@ -120,6 +120,39 @@
       </div>
     </div>
 
+    <div class="schema-workspace-context relative z-10 mx-4 mt-3 rounded-xl border px-4 py-3">
+      <div class="mb-2 flex items-start justify-between gap-3">
+        <div>
+          <label class="schema-context-label">Workspace context</label>
+          <p class="mt-1 text-xs" style="color: var(--color-text-muted);">
+            Shared across every dataset in this workspace for schema generation.
+          </p>
+        </div>
+        <button
+          @click="openEditDialog(-1, 'context')"
+          class="schema-context-edit-link"
+        >
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+          </svg>
+          Edit
+        </button>
+      </div>
+
+      <div
+        v-if="schemaContext && schemaContext.trim()"
+        class="schema-context-body prose prose-sm max-w-none"
+      >
+        <div v-html="renderedContext"></div>
+      </div>
+      <div
+        v-else
+        class="schema-context-empty"
+      >
+        Click edit to add shared workspace context...
+      </div>
+    </div>
+
     <!-- Main Content -->
     <div class="relative z-10 min-h-0 flex-1 overflow-hidden">
       <!-- Empty State -->
@@ -195,35 +228,6 @@
               </div>
             </div>
           </Transition>
-
-          <!-- Context Section -->
-          <div class="schema-context-card">
-            <div class="mb-2 flex items-start justify-between gap-3">
-              <label class="schema-context-label">Context</label>
-              <button
-                @click="openEditDialog(-1, 'context')"
-                class="schema-context-edit-link"
-              >
-                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-                </svg>
-                Edit
-              </button>
-            </div>
-
-            <div
-              v-if="schemaContext && schemaContext.trim()"
-              class="schema-context-body prose prose-sm max-w-none"
-            >
-              <div v-html="renderedContext"></div>
-            </div>
-            <div
-              v-else
-              class="schema-context-empty"
-            >
-              Click edit to add context for this dataset...
-            </div>
-          </div>
 
           <!-- Schema Table -->
           <div class="schema-table-wrap overflow-hidden">
@@ -345,7 +349,7 @@
                     <div class="flex items-start justify-between gap-4">
                       <div>
                         <h3 class="text-lg font-semibold tracking-tight" id="edit-dialog-title" style="color: var(--color-text-main);">
-                          Edit {{ editDialog.field === 'description' ? 'Description' : editDialog.field === 'aliases' ? 'Aliases' : 'Context' }}
+                          Edit {{ editDialog.field === 'description' ? 'Description' : editDialog.field === 'aliases' ? 'Aliases' : 'Workspace Context' }}
                         </h3>
                         <div class="mt-2 inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-xs font-medium" style="border-color: color-mix(in srgb, var(--color-border) 40%, transparent); color: var(--color-text-muted); background: color-mix(in srgb, var(--color-base) 50%, transparent);">
                           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -392,7 +396,7 @@
                       ></textarea>
                     </div>
                     <div v-else-if="editDialog.field === 'context'">
-                      <label class="mb-2 block text-xs font-medium" style="color: var(--color-text-muted);">Context Description</label>
+                      <label class="mb-2 block text-xs font-medium" style="color: var(--color-text-muted);">Workspace Context</label>
                       <textarea
                         v-model="editDialog.value"
                         rows="6"
@@ -622,7 +626,7 @@ function openEditDialog(index, field) {
       isOpen: true,
       index: -1,
       field: 'context',
-      columnName: 'LLM Context Hint',
+      columnName: 'Workspace',
       value: schemaContext.value || ''
     }
     return
@@ -644,13 +648,11 @@ function closeEditDialog() {
   editDialog.value.isOpen = false
 }
 
-function saveEditDialog() {
+async function saveEditDialog() {
   const { index, field, value } = editDialog.value
   
   if (field === 'context') {
-    schemaContext.value = value
-    schemaEdited.value = true
-    closeEditDialog()
+    await saveWorkspaceContext(value)
     return
   }
   
@@ -676,6 +678,53 @@ function getSelectedDatasetEntry() {
   const tableName = String(selectedDatasetTable.value || '').trim()
   if (!tableName) return null
   return datasetOptions.value.find((item) => item.tableName === tableName) || null
+}
+
+function resolveWorkspaceContextFromStore() {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (!workspaceId) return ''
+  const workspace = (Array.isArray(appStore.workspaces) ? appStore.workspaces : [])
+    .find((item) => String(item?.id || '').trim() === workspaceId)
+  return String(workspace?.schema_context || '').trim()
+}
+
+async function loadWorkspaceContext() {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (!workspaceId) {
+    schemaContext.value = ''
+    return ''
+  }
+  try {
+    const summary = await apiService.v1GetWorkspaceSummary(workspaceId)
+    const context = String(summary?.schema_context || '').trim()
+    schemaContext.value = context
+    return context
+  } catch (_error) {
+    const fallback = resolveWorkspaceContextFromStore()
+    schemaContext.value = fallback
+    return fallback
+  }
+}
+
+async function saveWorkspaceContext(value) {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (!workspaceId) {
+    schemaContext.value = String(value || '').trim()
+    closeEditDialog()
+    return
+  }
+  try {
+    const context = String(value || '').trim()
+    const workspace = (Array.isArray(appStore.workspaces) ? appStore.workspaces : [])
+      .find((item) => String(item?.id || '').trim() === workspaceId)
+    await apiService.v1RenameWorkspace(workspaceId, workspace?.name ?? null, context)
+    schemaContext.value = context
+    await appStore.fetchWorkspaces()
+    closeEditDialog()
+    toast.success('Workspace context saved', 'Schema generation context updated.')
+  } catch (error) {
+    toast.error('Context save failed', error?.message || 'Unable to save workspace context.')
+  }
 }
 
 function ensureDatasetOption(tableName, sourcePath = '') {
@@ -771,7 +820,9 @@ async function fetchSchemaData(forceRefresh = false) {
     )
     if (existingSchema && existingSchema.columns) {
       schema.value = normalizeSchemaColumns(existingSchema.columns)
-      schemaContext.value = existingSchema.context || ''
+      if (!schemaContext.value) {
+        schemaContext.value = existingSchema.context || ''
+      }
       schemaEdited.value = false
       return true
     } else {
@@ -803,7 +854,9 @@ async function fetchSchemaDataForPath(dataPath, tableNameOverride = null) {
     )
     if (existingSchema && existingSchema.columns) {
       schema.value = normalizeSchemaColumns(existingSchema.columns)
-      schemaContext.value = existingSchema.context || ''
+      if (!schemaContext.value) {
+        schemaContext.value = existingSchema.context || ''
+      }
       schemaEdited.value = false
       return true
     } else {
@@ -935,7 +988,9 @@ async function regenerateSchemaForPath(dataPath, tableName = null, options = {})
       regenerationProgress.value = 95
       previewService.clearSchemaCache()
       schema.value = normalizeSchemaColumns(generatedSchema.columns)
-      schemaContext.value = generatedSchema.context || ''
+      if (!schemaContext.value) {
+        schemaContext.value = generatedSchema.context || ''
+      }
       schemaEdited.value = false
       regenerationProgress.value = 100
       regenerationStatus.value = `Generated ${generatedSchema.columns.length} descriptions`
@@ -965,7 +1020,6 @@ async function handleDatasetSelection(value) {
   const selected = applyDatasetSelection(value)
   schemaEdited.value = false
   schema.value = []
-  schemaContext.value = ''
   schemaError.value = ''
   previewService.clearSchemaCache()
 
@@ -986,7 +1040,6 @@ async function handleDatasetSwitch(event) {
 
   schemaEdited.value = false
   schema.value = []
-  schemaContext.value = ''
   schemaError.value = ''
   previewService.clearSchemaCache()
 
@@ -1020,6 +1073,7 @@ async function handleDatasetSwitch(event) {
 }
 
 onMounted(async () => {
+  await loadWorkspaceContext()
   await loadSchemaDatasets()
   if (selectedDatasetTable.value) {
     await fetchSchemaData()
@@ -1037,8 +1091,8 @@ watch(
   async () => {
     schemaEdited.value = false
     schema.value = []
-    schemaContext.value = ''
     schemaError.value = ''
+    await loadWorkspaceContext()
     await loadSchemaDatasets()
     if (selectedDatasetTable.value) {
       await fetchSchemaData()
@@ -1255,6 +1309,12 @@ async function exportSchema() {
   border-left: 3px solid var(--color-accent);
   border-radius: 6px;
   padding: 12px 16px;
+}
+
+.schema-workspace-context {
+  background: var(--color-base-muted);
+  border-color: var(--color-border);
+  border-left: 3px solid var(--color-accent);
 }
 
 .schema-context-label {

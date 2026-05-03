@@ -77,3 +77,11 @@ def get_dataset_deletion_service(request: Request):
     if service is None:
         raise HTTPException(status_code=500, detail="Dataset deletion service not initialized")
     return service
+
+
+def get_dataset_ingestion_service(request: Request):
+    """Return shared dataset ingestion service from app state."""
+    service = getattr(request.app.state, "dataset_ingestion_service", None)
+    if service is None:
+        raise HTTPException(status_code=500, detail="Dataset ingestion service not initialized")
+    return service

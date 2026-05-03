@@ -10,6 +10,7 @@ from .workspace import (
     WorkspaceDataset,
     WorkspaceDeletionJob,
     WorkspaceDatasetDeletionJob,
+    WorkspaceDatasetIngestionJob,
 )
 
 __all__ = [
@@ -21,6 +22,7 @@ __all__ = [
     "WorkspaceDataset",
     "WorkspaceDeletionJob",
     "WorkspaceDatasetDeletionJob",
+    "WorkspaceDatasetIngestionJob",
     "Conversation",
     "Turn",
 ]

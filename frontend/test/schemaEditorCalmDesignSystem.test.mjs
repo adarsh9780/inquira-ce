@@ -11,7 +11,9 @@ test('schema editor uses calm border-light design system and readable dataset la
   assert.equal(source.includes("raw.replace(/__\\d{6,}(?=__|$)/g, '')"), true)
 
   assert.equal(source.includes('class="schema-top-bar relative z-10"'), true)
-  assert.equal(source.includes('class="schema-context-card"'), true)
+  assert.equal(source.includes('class="schema-workspace-context relative z-10 mx-4 mt-3 rounded-xl border px-4 py-3"'), true)
+  assert.equal(source.includes('Workspace context'), true)
+  assert.equal(source.includes('Click edit to add context for this dataset'), false)
   assert.equal(source.includes('border-left: 3px solid var(--color-accent);'), true)
 
   assert.equal(source.includes('class="schema-table-header-row"'), true)

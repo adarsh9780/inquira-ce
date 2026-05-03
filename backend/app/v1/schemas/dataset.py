@@ -11,6 +11,12 @@ class DatasetAddRequest(BaseModel):
     source_path: str = Field(min_length=1)
 
 
+class DatasetBatchAddRequest(BaseModel):
+    """Add multiple datasets to a workspace via an async ingestion job."""
+
+    source_paths: list[str] = Field(min_length=1)
+
+
 class BrowserDatasetSyncRequest(BaseModel):
     """Sync browser-loaded table metadata into workspace dataset catalog."""
 
@@ -31,6 +37,37 @@ class DatasetResponse(BaseModel):
     file_type: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class DatasetIngestionJobItem(BaseModel):
+    """Per-file status inside a dataset ingestion job."""
+
+    source_path: str
+    status: str = "queued"
+    table_name: str | None = None
+    row_count: int | None = None
+    error_message: str | None = None
+
+
+class DatasetIngestionJobResponse(BaseModel):
+    """Batch dataset ingestion job status payload."""
+
+    job_id: str
+    workspace_id: str
+    status: str
+    total_count: int
+    completed_count: int
+    failed_count: int
+    items: list[DatasetIngestionJobItem] = Field(default_factory=list)
+    error_message: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class DatasetIngestionJobListResponse(BaseModel):
+    """List active dataset ingestion jobs response."""
+
+    jobs: list[DatasetIngestionJobResponse]
 
 
 class DatasetListResponse(BaseModel):

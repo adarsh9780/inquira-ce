@@ -46,6 +46,7 @@ async def list_workspaces(
                 name=ws.name,
                 is_active=bool(ws.is_active),
                 duckdb_path=ws.duckdb_path,
+                schema_context=ws.schema_context or "",
                 created_at=ws.created_at,
                 updated_at=ws.updated_at,
             )
@@ -61,12 +62,18 @@ async def create_workspace(
     current_user=Depends(get_current_user),
 ):
     """Create a workspace for the authenticated user."""
-    ws = await WorkspaceService.create_workspace(session, current_user, payload.name)
+    ws = await WorkspaceService.create_workspace(
+        session,
+        current_user,
+        payload.name,
+        schema_context=payload.schema_context,
+    )
     return WorkspaceResponse(
         id=ws.id,
         name=ws.name,
         is_active=bool(ws.is_active),
         duckdb_path=ws.duckdb_path,
+        schema_context=ws.schema_context or "",
         created_at=ws.created_at,
         updated_at=ws.updated_at,
     )
@@ -85,6 +92,7 @@ async def activate_workspace(
         name=ws.name,
         is_active=bool(ws.is_active),
         duckdb_path=ws.duckdb_path,
+        schema_context=ws.schema_context or "",
         created_at=ws.created_at,
         updated_at=ws.updated_at,
     )
@@ -108,13 +116,20 @@ async def rename_workspace(
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
-    """Rename a workspace owned by the authenticated user."""
-    ws = await WorkspaceService.rename_workspace(session, current_user, workspace_id, payload.name)
+    """Update a workspace owned by the authenticated user."""
+    ws = await WorkspaceService.update_workspace(
+        session,
+        current_user,
+        workspace_id,
+        name=payload.name,
+        schema_context=payload.schema_context,
+    )
     return WorkspaceResponse(
         id=ws.id,
         name=ws.name,
         is_active=bool(ws.is_active),
         duckdb_path=ws.duckdb_path,
+        schema_context=ws.schema_context or "",
         created_at=ws.created_at,
         updated_at=ws.updated_at,
     )

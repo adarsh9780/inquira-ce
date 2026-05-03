@@ -749,8 +749,8 @@ export const apiService = {
     return v1Api.workspaces.list()
   },
 
-  async v1CreateWorkspace(name) {
-    return v1Api.workspaces.create(name)
+  async v1CreateWorkspace(name, schemaContext = '') {
+    return v1Api.workspaces.create(name, schemaContext)
   },
 
   async v1ActivateWorkspace(workspaceId) {
@@ -761,8 +761,8 @@ export const apiService = {
     return v1Api.workspaces.summary(workspaceId)
   },
 
-  async v1RenameWorkspace(workspaceId, name) {
-    return v1Api.workspaces.rename(workspaceId, name)
+  async v1RenameWorkspace(workspaceId, name, schemaContext = undefined) {
+    return v1Api.workspaces.rename(workspaceId, name, schemaContext)
   },
 
   async v1ClearWorkspaceDatabase(workspaceId) {
@@ -833,6 +833,18 @@ export const apiService = {
 
   async v1AddDataset(workspaceId, sourcePath) {
     return v1Api.datasets.add(workspaceId, sourcePath)
+  },
+
+  async v1AddDatasetsBatch(workspaceId, sourcePaths) {
+    return v1Api.datasets.addBatch(workspaceId, sourcePaths)
+  },
+
+  async v1ListDatasetIngestionJobs(workspaceId) {
+    return v1Api.datasets.ingestions(workspaceId)
+  },
+
+  async v1GetDatasetIngestionJob(workspaceId, jobId) {
+    return v1Api.datasets.ingestionById(workspaceId, jobId)
   },
 
   async v1DeleteDataset(workspaceId, tableName) {

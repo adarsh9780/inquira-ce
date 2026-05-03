@@ -1733,8 +1733,8 @@ export const useAppStore = defineStore('app', () => {
 
   }
 
-  async function createWorkspace(name) {
-    const ws = await apiService.v1CreateWorkspace(name)
+  async function createWorkspace(name, schemaContext = '') {
+    const ws = await apiService.v1CreateWorkspace(name, schemaContext)
     if (ws?.id) {
       await activateWorkspace(ws.id)
     }
@@ -1754,8 +1754,8 @@ export const useAppStore = defineStore('app', () => {
     saveLocalConfig()
   }
 
-  async function renameWorkspace(workspaceId, name) {
-    const updated = await apiService.v1RenameWorkspace(workspaceId, name)
+  async function renameWorkspace(workspaceId, name, schemaContext = undefined) {
+    const updated = await apiService.v1RenameWorkspace(workspaceId, name, schemaContext)
     const idx = workspaces.value.findIndex((ws) => ws.id === workspaceId)
     if (idx >= 0) {
       workspaces.value[idx] = { ...workspaces.value[idx], ...updated }

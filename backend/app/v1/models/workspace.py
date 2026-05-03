@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..db.base import AppDataBase
@@ -27,6 +27,7 @@ class Principal(AppDataBase):
     preferences = relationship("UserPreferences", back_populates="principal", cascade="all, delete-orphan", uselist=False)
     deletion_jobs = relationship("WorkspaceDeletionJob", back_populates="owner_principal", cascade="all, delete-orphan")
     dataset_deletion_jobs = relationship("WorkspaceDatasetDeletionJob", back_populates="owner_principal", cascade="all, delete-orphan")
+    dataset_ingestion_jobs = relationship("WorkspaceDatasetIngestionJob", back_populates="owner_principal", cascade="all, delete-orphan")
 
 
 class Workspace(AppDataBase):
@@ -47,6 +48,7 @@ class Workspace(AppDataBase):
     name_normalized: Mapped[str] = mapped_column(String(120), nullable=False)
     is_active: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     duckdb_path: Mapped[str] = mapped_column(String(512), nullable=False)
+    schema_context: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -127,3 +129,31 @@ class WorkspaceDatasetDeletionJob(AppDataBase):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     owner_principal = relationship("Principal", back_populates="dataset_deletion_jobs")
+
+
+class WorkspaceDatasetIngestionJob(AppDataBase):
+    """Asynchronous batch dataset ingestion tracker."""
+
+    __tablename__ = "v1_dataset_ingestion_jobs"
+    __table_args__ = (
+        Index("ix_v1_ds_ingest_jobs_owner_created", "owner_principal_id", "created_at"),
+        Index("ix_v1_ds_ingest_jobs_workspace_status", "workspace_id", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    owner_principal_id: Mapped[str] = mapped_column(
+        ForeignKey("v1_principals.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    workspace_id: Mapped[str] = mapped_column(String(36), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued")
+    total_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    items_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    error_message: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    owner_principal = relationship("Principal", back_populates="dataset_ingestion_jobs")

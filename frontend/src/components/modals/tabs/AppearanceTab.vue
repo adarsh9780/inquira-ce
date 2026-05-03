@@ -1,5 +1,5 @@
 <template>
-  <section class="h-full">
+  <section class="scrollbar-hidden h-full overflow-y-auto">
     <h2 class="mb-2 text-lg font-bold text-[var(--color-text-main)]">Appearance</h2>
     <p class="mb-4 text-sm text-[var(--color-text-muted)]">
       Pick a UI theme. Each preview mirrors the shell hierarchy, not just the accent color.

@@ -1,6 +1,6 @@
 <template>
-  <section class="relative h-full">
-    <div class="h-full overflow-y-auto pb-24" :class="showAdvanced ? 'scrollbar-hidden' : ''">
+  <section class="scrollbar-hidden relative h-full overflow-y-auto">
+    <div class="scrollbar-hidden h-full overflow-y-auto pb-24">
       <h2 class="mb-4 text-lg font-bold text-[var(--color-text-main)]">LLM &amp; API Keys</h2>
 
       <div class="space-y-5">

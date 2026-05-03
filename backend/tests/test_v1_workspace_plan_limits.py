@@ -13,7 +13,17 @@ async def test_free_plan_can_create_a_second_workspace(monkeypatch):
     async def fake_count_for_principal(_session, _principal_id):
         return 1
 
-    async def fake_create(*, session, principal_id, name, name_normalized, duckdb_path, is_active):
+    async def fake_create(
+        *,
+        session,
+        principal_id,
+        name,
+        name_normalized,
+        duckdb_path,
+        is_active,
+        schema_context,
+    ):
+        calls["schema_context"] = schema_context
         return SimpleNamespace(
             id="ws-2",
             owner_principal_id=principal_id,
@@ -93,3 +103,4 @@ async def test_free_plan_can_create_a_second_workspace(monkeypatch):
     assert calls["manifest"][1] == "ws-2"
     assert calls["manifest"][2] == "Analytics"
     assert calls["manifest"][3] == "analytics"
+    assert calls["schema_context"] == ""

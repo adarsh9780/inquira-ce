@@ -50,6 +50,7 @@ class WorkspaceService:
             "id": workspace.id,
             "name": workspace.name,
             "is_active": bool(workspace.is_active),
+            "schema_context": str(getattr(workspace, "schema_context", "") or ""),
             "created_at": workspace.created_at,
             "updated_at": workspace.updated_at,
             "table_count": len(datasets),
@@ -58,7 +59,7 @@ class WorkspaceService:
         }
 
     @staticmethod
-    async def create_workspace(session: AsyncSession, user, name: str) -> Workspace:
+    async def create_workspace(session: AsyncSession, user, name: str, schema_context: str = "") -> Workspace:
         """Create workspace while enforcing unique-name rules."""
         normalized = WorkspaceService.normalize_name(name)
         if not normalized:
@@ -80,6 +81,7 @@ class WorkspaceService:
             name_normalized=normalized,
             duckdb_path=duckdb_path,
             is_active=is_active,
+            schema_context=str(schema_context or ""),
         )
 
         await WorkspaceStorageService.ensure_workspace_dirs(user.username, workspace.id)
@@ -146,23 +148,30 @@ class WorkspaceService:
         return workspace
 
     @staticmethod
-    async def rename_workspace(session: AsyncSession, user, workspace_id: str, name: str) -> Workspace:
-        """Rename workspace while preserving normalized uniqueness rules."""
-        normalized = WorkspaceService.normalize_name(name)
-        if not normalized:
-            raise HTTPException(status_code=400, detail="Workspace name cannot be empty")
-
+    async def update_workspace(
+        session: AsyncSession,
+        user,
+        workspace_id: str,
+        name: str | None = None,
+        schema_context: str | None = None,
+    ) -> Workspace:
+        """Update workspace metadata while preserving normalized uniqueness rules."""
         workspace = await WorkspaceRepository.get_by_id(session, workspace_id, user.id)
         if workspace is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
 
-        if workspace.name_normalized != normalized:
-            existing = await WorkspaceRepository.get_by_name_normalized(session, user.id, normalized)
-            if existing is not None and existing.id != workspace.id:
-                raise HTTPException(status_code=409, detail="Workspace name already exists")
-
-        workspace.name = name.strip()
-        workspace.name_normalized = normalized
+        if name is not None:
+            normalized = WorkspaceService.normalize_name(name)
+            if not normalized:
+                raise HTTPException(status_code=400, detail="Workspace name cannot be empty")
+            if workspace.name_normalized != normalized:
+                existing = await WorkspaceRepository.get_by_name_normalized(session, user.id, normalized)
+                if existing is not None and existing.id != workspace.id:
+                    raise HTTPException(status_code=409, detail="Workspace name already exists")
+            workspace.name = name.strip()
+            workspace.name_normalized = normalized
+        if schema_context is not None:
+            workspace.schema_context = str(schema_context or "")
         await session.commit()
         await session.refresh(workspace)
         await WorkspaceStorageService.write_workspace_manifest(
@@ -174,6 +183,11 @@ class WorkspaceService:
             updated_at=workspace.updated_at,
         )
         return workspace
+
+    @staticmethod
+    async def rename_workspace(session: AsyncSession, user, workspace_id: str, name: str) -> Workspace:
+        """Rename workspace while preserving normalized uniqueness rules."""
+        return await WorkspaceService.update_workspace(session, user, workspace_id, name=name)
 
     @staticmethod
     async def clear_workspace_database(session: AsyncSession, user, workspace_id: str) -> tuple[bool, str]:

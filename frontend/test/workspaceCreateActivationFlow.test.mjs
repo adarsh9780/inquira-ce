@@ -16,13 +16,25 @@ test('workspace creation activates the new workspace centrally in the store', ()
   const source = readFileSync(storePath, 'utf-8')
   const createBlock = extractBlock(
     source,
-    'async function createWorkspace(name) {',
+    'async function createWorkspace(name, schemaContext = \'\') {',
     'async function activateWorkspace(workspaceId) {',
   )
 
-  assert.equal(createBlock.includes('const ws = await apiService.v1CreateWorkspace(name)'), true)
+  assert.equal(createBlock.includes('const ws = await apiService.v1CreateWorkspace(name, schemaContext)'), true)
   assert.equal(createBlock.includes('await activateWorkspace(ws.id)'), true)
   assert.equal(createBlock.includes('await fetchWorkspaces()'), true)
+})
+
+test('workspace setup stepper captures shared context before dataset selection', () => {
+  const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue')
+  const source = readFileSync(tabPath, 'utf-8')
+
+  assert.equal(source.includes('A workspace is meant for related datasets that share business meaning, terminology, and schema context.'), true)
+  assert.equal(source.includes('{ id: 1, label: \'Workspace context\' }'), true)
+  assert.equal(source.includes('{ id: 2, label: \'Select data\' }'), true)
+  assert.equal(source.includes('{ id: 3, label: \'Generate schema\' }'), true)
+  assert.equal(source.includes('await appStore.createWorkspace(name, context)'), true)
+  assert.equal(source.includes('await appStore.renameWorkspace(workspaceId, name, context)'), true)
 })
 
 test('workspace flow routes through settings panels and workspace list/detail/create modes', () => {

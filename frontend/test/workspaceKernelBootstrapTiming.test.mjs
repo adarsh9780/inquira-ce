@@ -18,11 +18,11 @@ test('workspace listing no longer bootstraps kernels as a side effect', () => {
   const fetchBlock = extractBlock(
     source,
     'async function fetchWorkspaces() {',
-    'async function createWorkspace(name) {',
+    'async function createWorkspace(name, schemaContext = \'\') {',
   )
   const createBlock = extractBlock(
     source,
-    'async function createWorkspace(name) {',
+    'async function createWorkspace(name, schemaContext = \'\') {',
     'async function activateWorkspace(workspaceId) {',
   )
   const activateBlock = extractBlock(

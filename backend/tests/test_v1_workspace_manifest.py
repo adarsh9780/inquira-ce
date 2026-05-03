@@ -45,7 +45,17 @@ async def test_create_workspace_writes_manifest(monkeypatch):
     async def fake_count_for_principal(_session, _principal_id):
         return 0
 
-    async def fake_create(*, session, principal_id, name, name_normalized, duckdb_path, is_active):
+    async def fake_create(
+        *,
+        session,
+        principal_id,
+        name,
+        name_normalized,
+        duckdb_path,
+        is_active,
+        schema_context,
+    ):
+        calls["schema_context"] = schema_context
         return SimpleNamespace(
             id="ws-123",
             owner_principal_id=principal_id,
@@ -120,6 +130,7 @@ async def test_create_workspace_writes_manifest(monkeypatch):
     assert calls["manifest"][1] == "ws-123"
     assert calls["manifest"][2] == "Data Lab"
     assert calls["manifest"][3] == "data lab"
+    assert calls["schema_context"] == ""
 
 
 @pytest.mark.asyncio

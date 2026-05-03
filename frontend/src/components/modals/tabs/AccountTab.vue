@@ -1,5 +1,5 @@
 <template>
-  <section class="h-full">
+  <section class="scrollbar-hidden h-full overflow-y-auto">
     <h2 class="mb-4 text-lg font-bold text-[var(--color-text-main)]">Account</h2>
 
     <div class="mb-5 flex items-center gap-3 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] p-4">

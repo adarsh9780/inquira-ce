@@ -68,3 +68,23 @@ test('workspace tab now uses list/detail/create panels instead of stepper flow',
   assert.equal(tabSource.includes('const savingStep = ref(0)'), false)
   assert.equal(tabSource.includes("setInlineToast('Dataset added')"), false)
 })
+
+test('settings tab nested scroll containers hide scrollbars while keeping overflow active', () => {
+  const tabPaths = [
+    'src/components/modals/tabs/AccountTab.vue',
+    'src/components/modals/tabs/AppearanceTab.vue',
+    'src/components/modals/tabs/LLMSettingsTab.vue',
+    'src/components/modals/tabs/TermsTab.vue',
+    'src/components/modals/tabs/WorkspaceTab.vue',
+  ]
+
+  for (const path of tabPaths) {
+    const source = read(path)
+    assert.equal(source.includes('scrollbar-hidden'), true, `${path} should hide native scrollbars`)
+    assert.equal(source.includes('overflow-y-auto'), true, `${path} should keep scroll behavior active`)
+  }
+
+  const llmSource = read('src/components/modals/tabs/LLMSettingsTab.vue')
+  assert.equal(llmSource.includes('class="scrollbar-hidden h-full overflow-y-auto pb-24"'), true)
+  assert.equal(llmSource.includes(":class=\"showAdvanced ? 'scrollbar-hidden' : ''\""), false)
+})

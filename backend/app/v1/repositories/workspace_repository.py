@@ -80,6 +80,7 @@ class WorkspaceRepository:
         name_normalized: str,
         duckdb_path: str,
         is_active: int,
+        schema_context: str = "",
     ) -> Workspace:
         """Create workspace row."""
         workspace = Workspace(
@@ -88,6 +89,7 @@ class WorkspaceRepository:
             name_normalized=name_normalized,
             duckdb_path=duckdb_path,
             is_active=is_active,
+            schema_context=schema_context,
         )
         session.add(workspace)
         await session.flush()

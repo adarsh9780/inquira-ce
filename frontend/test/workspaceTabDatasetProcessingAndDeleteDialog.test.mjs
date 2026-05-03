@@ -15,7 +15,8 @@ test('workspace tab shows inline dataset processing card and consumes websocket 
   assert.equal(source.includes('datasetIngestPercent !== null'), true)
   assert.equal(source.includes('settingsWebSocket.subscribeProgress(handleSettingsProgressUpdate)'), true)
   assert.equal(source.includes('function handleSettingsProgressUpdate(data) {'), true)
-  assert.equal(source.includes('startDatasetIngest(selectedPath)'), true)
+  assert.equal(source.includes('startDatasetIngest(sourcePaths.length === 1 ? sourcePaths[0] : `${sourcePaths.length} selected files`)'), true)
+  assert.equal(source.includes('trackDatasetIngestionJob(workspaceId, jobId)'), true)
 })
 
 test('workspace tab uses modal confirmation for dataset deletion and polls cleanup job', () => {

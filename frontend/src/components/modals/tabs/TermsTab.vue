@@ -1,5 +1,5 @@
 <template>
-  <section class="h-full">
+  <section class="scrollbar-hidden h-full overflow-y-auto">
     <div class="mb-4">
       <h2 class="text-lg font-bold text-[var(--color-text-main)]">Terms &amp; Conditions</h2>
       <p class="mt-1 text-sm text-[var(--color-text-muted)]">
