@@ -102,7 +102,7 @@
 
           <div v-else class="space-y-0.5 mt-1">
             <div
-              v-for="conv in filteredConversations"
+              v-for="conv in appStore.conversations"
               :key="conv.id"
               class="group relative flex items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
               :class="[
@@ -328,7 +328,6 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 
 // ─── UI State ────────────────────────────────────────────────────────────────
-const searchQuery       = ref('')
 const editingId         = ref(null)
 const editingTitleValue = ref('')
 const editInputs        = ref({})
@@ -393,14 +392,6 @@ const profileMenuStyle = computed(() => ({
   left: `${profileMenuPosition.value.left}px`,
   top: `${profileMenuPosition.value.top}px`,
 }))
-
-const filteredConversations = computed(() => {
-  if (!searchQuery.value) return appStore.conversations
-  const q = searchQuery.value.toLowerCase()
-  return appStore.conversations.filter((c) =>
-    String(c?.title || '').toLowerCase().includes(q)
-  )
-})
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function readDatasetSizeBytes(dataset) {
@@ -712,7 +703,6 @@ watch(() => appStore.activeWorkspaceId, async (newId) => {
 
 watch(() => appStore.isSidebarCollapsed, (collapsed) => {
   if (collapsed) {
-    searchQuery.value = ''
     closeProfileMenu()
     closeConversationMenu()
   }
