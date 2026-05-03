@@ -163,6 +163,105 @@ async def test_v1_chat_stream_passthrough_langgraph_events_and_finalize(monkeypa
 
 
 @pytest.mark.asyncio
+async def test_v1_chat_stream_persists_selected_turn_as_parent(monkeypatch):
+    captured: dict[str, object] = {}
+
+    async def _fake_preflight(**_kwargs):
+        conversation = SimpleNamespace(
+            title="Conversation",
+            branch_summary_json=None,
+            schema_memory_json=None,
+        )
+        return (conversation, "conv-parent", {}, "", "/tmp/ws.db")
+
+    async def _fake_get_turn(_session, turn_id):
+        return SimpleNamespace(
+            id=turn_id,
+            conversation_id="conv-parent",
+            user_text="previous question",
+            assistant_text="previous answer",
+            code_snapshot="print('previous')",
+        )
+
+    async def _fake_persist_turn(**kwargs):
+        captured["parent_turn_id"] = kwargs.get("parent_turn_id")
+        return "turn-child"
+
+    async def _fake_resolve_llm_preferences(_session, _user_id):
+        return {
+            "provider": "openrouter",
+            "base_url": "https://openrouter.ai/api/v1",
+            "requires_api_key": True,
+            "selected_main_model": "google/gemini-2.5-flash",
+            "selected_lite_model": "google/gemini-2.5-flash-lite",
+            "selected_coding_model": "google/gemini-2.5-flash",
+            "temperature": 0.0,
+            "max_tokens": 2048,
+            "top_p": 1.0,
+            "top_k": 0,
+            "frequency_penalty": 0.0,
+            "presence_penalty": 0.0,
+            "context_windows": {},
+        }
+
+    async def _fake_health():
+        return {"status": "ok", "api_major": 1}
+
+    async def _fake_stream():
+        yield {
+            "event": "values",
+            "data": {
+                "run_id": "run-parent",
+                "metadata": {"is_safe": True, "is_relevant": True},
+                "final_code": "",
+                "final_explanation": "done",
+                "messages": [],
+            },
+        }
+
+    monkeypatch.setattr(ChatService, "_preflight_check", staticmethod(_fake_preflight))
+    monkeypatch.setattr(ChatService, "_persist_turn", staticmethod(_fake_persist_turn))
+    monkeypatch.setattr(ChatService, "_resolve_llm_preferences", staticmethod(_fake_resolve_llm_preferences))
+    monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.get_turn", _fake_get_turn)
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.SecretStorageService.get_api_key",
+        lambda _uid, provider="openrouter": "key",
+    )
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.AgentClient.assert_health",
+        lambda _self: _fake_health(),
+    )
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.AgentClient.stream",
+        lambda _self, _payload: _fake_stream(),
+    )
+
+    user = SimpleNamespace(id="user-parent", username="dana")
+    events = []
+    async for event in ChatService.analyze_and_stream_turns(
+        session=None,
+        langgraph_manager=None,
+        user=user,
+        workspace_id="ws-1",
+        conversation_id="conv-parent",
+        question="continue from here",
+        current_code="",
+        model="google/gemini-2.5-flash",
+        context=None,
+        use_selected_turn_context=True,
+        selected_parent_turn_id="turn-parent",
+        table_name_override=None,
+        active_schema_override=None,
+        api_key=None,
+    ):
+        events.append(event)
+
+    assert captured["parent_turn_id"] == "turn-parent"
+    final_events = [evt for evt in events if evt.get("event") == "final"]
+    assert final_events[-1]["data"]["turn_id"] == "turn-child"
+
+
+@pytest.mark.asyncio
 async def test_v1_chat_stream_retries_ollama_model_with_cloud_suffix_on_not_found(monkeypatch):
     async def _fake_preflight(**_kwargs):
         return (SimpleNamespace(title="New Conversation"), "conv-3", {}, "tbl", "/tmp/ws.db")

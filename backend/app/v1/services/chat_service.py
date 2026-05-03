@@ -1326,10 +1326,12 @@ class ChatService:
             )
 
         selected_turn = None
+        parent_turn_id = None
         effective_context = context or ""
         if use_selected_turn_context and conversation_id and selected_parent_turn_id:
             selected_turn = await ConversationRepository.get_turn(session, selected_parent_turn_id)
             if selected_turn is not None and selected_turn.conversation_id == conversation_id:
+                parent_turn_id = selected_turn.id
                 effective_context = ChatService._selected_turn_context_block(
                     base_context=context,
                     selected_turn=selected_turn,
@@ -1414,6 +1416,7 @@ class ChatService:
             attachments=normalized_attachments,
             response_payload=response_payload,
             result=result,
+            parent_turn_id=parent_turn_id,
         )
 
         return response_payload, conversation_id, turn_id
@@ -1660,10 +1663,12 @@ class ChatService:
             )
 
         selected_turn = None
+        parent_turn_id = None
         effective_context = context or ""
         if use_selected_turn_context and resolved_conversation_id and selected_parent_turn_id:
             selected_turn = await ConversationRepository.get_turn(session, selected_parent_turn_id)
             if selected_turn is not None and selected_turn.conversation_id == resolved_conversation_id:
+                parent_turn_id = selected_turn.id
                 effective_context = ChatService._selected_turn_context_block(
                     base_context=context,
                     selected_turn=selected_turn,
@@ -1813,6 +1818,7 @@ class ChatService:
             attachments=normalized_attachments,
             response_payload=response_payload,
             result=aggregated,
+            parent_turn_id=parent_turn_id,
         )
 
         response_payload.update(
