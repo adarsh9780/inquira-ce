@@ -11,6 +11,12 @@ class SchemaMemoryService:
     """Build and merge compact schema memory snapshots."""
 
     @staticmethod
+    def _string_list(value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        return [str(item or "").strip() for item in value if str(item or "").strip()]
+
+    @staticmethod
     def _workspace_tables(workspace_schema: dict[str, Any] | None) -> list[dict[str, Any]]:
         if not isinstance(workspace_schema, dict):
             return []
@@ -56,7 +62,8 @@ class SchemaMemoryService:
                 continue
             tables_loaded.append(table_name)
             column_names: list[str] = []
-            for column in table.get("columns") if isinstance(table.get("columns"), list) else []:
+            raw_columns = table.get("columns")
+            for column in raw_columns if isinstance(raw_columns, list) else []:
                 if not isinstance(column, dict):
                     continue
                 name = str(column.get("name") or "").strip()
@@ -101,7 +108,10 @@ class SchemaMemoryService:
 
         merged_tables: list[str] = []
         seen_tables: set[str] = set()
-        for table_name in list(current.get("tables_loaded") or []) + list(turn_usage.get("tables_loaded") or []):
+        for table_name in (
+            SchemaMemoryService._string_list(current.get("tables_loaded"))
+            + SchemaMemoryService._string_list(turn_usage.get("tables_loaded"))
+        ):
             candidate = str(table_name or "").strip()
             if not candidate or candidate.lower() in seen_tables:
                 continue
@@ -127,7 +137,10 @@ class SchemaMemoryService:
 
         merged_notes: list[str] = []
         seen_notes: set[str] = set()
-        for note in list(current.get("important_notes") or []) + list(turn_usage.get("important_notes") or []):
+        for note in (
+            SchemaMemoryService._string_list(current.get("important_notes"))
+            + SchemaMemoryService._string_list(turn_usage.get("important_notes"))
+        ):
             candidate = str(note or "").strip()
             if not candidate or candidate.lower() in seen_notes:
                 continue
@@ -136,12 +149,15 @@ class SchemaMemoryService:
             if len(merged_notes) >= 20:
                 break
 
-        merged = {
+        current_join_paths = SchemaMemoryService._string_list(current.get("join_paths"))
+        turn_join_paths = SchemaMemoryService._string_list(turn_usage.get("join_paths"))
+
+        merged: dict[str, Any] = {
             "schema_version": int(turn_usage.get("schema_version") or current.get("schema_version") or 1),
             "data_fingerprint": str(turn_usage.get("data_fingerprint") or current.get("data_fingerprint") or ""),
             "tables_loaded": merged_tables,
             "columns_loaded": merged_columns,
-            "join_paths": list(current.get("join_paths") or []) or list(turn_usage.get("join_paths") or []),
+            "join_paths": current_join_paths or turn_join_paths,
             "important_notes": merged_notes,
             "token_estimate": int(current.get("token_estimate") or 0) + int(turn_usage.get("token_estimate") or 0),
         }

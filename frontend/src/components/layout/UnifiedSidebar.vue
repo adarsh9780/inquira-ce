@@ -1,8 +1,6 @@
 <template>
   <div
-    class="relative z-40 flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r border-[var(--color-border)] sidebar-root transition-[width] duration-300 ease-in-out"
-    :class="appStore.isSidebarCollapsed ? 'w-[64px]' : 'w-[260px]'"
-    style="background-color: var(--color-sidebar-surface);"
+    class="relative z-40 flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden sidebar-root"
   >
     <!-- ─── Brand / Collapse Toggle ─── -->
     <div class="h-14 shrink-0 border-b border-[var(--color-border)] flex items-center pl-[20px] pr-4">
@@ -594,7 +592,7 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 
 <style scoped>
 .sidebar-root {
-  will-change: width;
+  min-width: 0;
 }
 
 .custom-scrollbar::-webkit-scrollbar {

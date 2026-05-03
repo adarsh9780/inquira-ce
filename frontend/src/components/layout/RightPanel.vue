@@ -10,7 +10,7 @@
       <!-- Left Pane (Chat / Code) -->
       <div 
         v-if="!appStore.isDataFocusMode"
-        class="flex flex-col h-full border-r workspace-center-pane" 
+        class="flex h-full min-w-0 flex-col border-r workspace-center-pane" 
         :style="{ width: appStore.leftPaneWidth + '%', borderColor: 'var(--color-border)' }"
       >
         <WorkspaceLeftPane />
@@ -25,7 +25,7 @@
 
       <!-- Right Pane (Table / Figure / Output) -->
       <div 
-        class="flex flex-col h-full workspace-data-pane"
+        class="flex h-full min-w-0 flex-col workspace-data-pane"
         :style="{ width: rightPaneWidth + '%' }"
       >
         <WorkspaceRightPane />

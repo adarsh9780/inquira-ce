@@ -743,7 +743,8 @@ onUnmounted(() => {
 }
 
 .app-nav-pane {
-  width: 260px; /* <--- FIXED: Now matches UnifiedSidebar expanded width */
+  /* App shell owns the structural sidebar rail width. */
+  width: 260px;
   transition: width var(--motion-duration-standard) var(--motion-ease-standard);
   overflow: hidden;
   border-right: 1px solid var(--color-border);
@@ -752,7 +753,7 @@ onUnmounted(() => {
 }
 
 .app-nav-pane-collapsed {
-  width: 64px; /* <--- FIXED: Now matches UnifiedSidebar collapsed width */
+  width: 64px;
 }
 
 .app-workspace-pane {

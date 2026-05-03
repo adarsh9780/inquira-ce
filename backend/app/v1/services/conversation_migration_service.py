@@ -84,7 +84,7 @@ class ConversationMigrationService:
                 turn.parent_turn_id = previous_turn.id
 
             artifact_summary = ConversationMigrationService._artifact_summary(turn)
-            manifest = {
+            manifest: dict[str, Any] = {
                 "seq_no": turn.seq_no,
                 "parent_turn_id": turn.parent_turn_id,
                 "result_kind": str(turn.result_kind or ""),

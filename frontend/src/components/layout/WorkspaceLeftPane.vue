@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-full flex-col" style="background-color: var(--color-workspace-surface);">
+  <div class="flex h-full w-full min-h-0 min-w-0 flex-col" style="background-color: var(--color-workspace-surface);">
     <div class="flex-shrink-0 h-16 px-4 flex items-center gap-4" style="background-color: var(--color-workspace-surface);">
       <div class="inline-flex rounded-xl border p-1 flex-shrink-0" style="border-color: var(--color-border); background-color: var(--color-control-surface);">
         <button

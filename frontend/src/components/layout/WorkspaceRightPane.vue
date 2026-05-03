@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-full flex-col" style="background-color: var(--color-workspace-surface);">
+  <div class="flex h-full w-full min-h-0 min-w-0 flex-col" style="background-color: var(--color-workspace-surface);">
     <div
       ref="headerRef"
       class="workspace-toolbar-shell flex-shrink-0 h-16 px-3 flex items-center border-b"
