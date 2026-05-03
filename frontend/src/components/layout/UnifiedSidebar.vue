@@ -1,244 +1,240 @@
 <template>
   <div
-    class="relative z-40 flex h-full min-h-0 shrink-0 flex-col overflow-hidden sidebar-root"
+    class="relative z-40 flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r border-[var(--color-border)] sidebar-root transition-[width] duration-300 ease-in-out"
+    :class="appStore.isSidebarCollapsed ? 'w-[64px]' : 'w-[260px]'"
     style="background-color: var(--color-sidebar-surface);"
   >
     <!-- Brand / Collapse Toggle -->
-    <div class="sidebar-brand-shell h-14 shrink-0">
+    <!-- Fixed: Changed pl-[20px] to pl-5 (standard Tailwind) -->
+    <div class="h-14 shrink-0 border-b border-[var(--color-border)] flex items-center pl-5 pr-4">
       <button
-        class="brand-btn h-full w-full px-3"
-        :class="appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start'"
+        class="flex h-full w-full items-center transition-opacity hover:opacity-70 focus:outline-none"
         :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         @click="handleBrandClick"
       >
-        <span class="flex h-full w-full items-center gap-2.5">
-          <span class="flex h-7 w-7 shrink-0 items-center justify-center">
-            <img :src="logo" alt="Inquira" class="h-7 w-7 rounded-md" />
+        <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+          <img :src="logo" alt="Inquira" class="h-full w-full rounded-md" />
+        </div>
+        
+        <div
+          class="flex items-center overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+          :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[160px] opacity-100 ml-3'"
+        >
+          <span class="text-[14px] font-semibold tracking-tight text-[var(--color-text-main)]">
+            Inquira
           </span>
-          <span
-            class="sidebar-brand-wordmark"
-            :class="appStore.isSidebarCollapsed ? 'sidebar-brand-wordmark-collapsed' : 'sidebar-brand-wordmark-expanded'"
-          >
-            <span class="block text-[14px] font-semibold tracking-tight leading-none" style="color: var(--color-text-main);">Inquira</span>
-          </span>
-        </span>
+        </div>
       </button>
     </div>
 
-    <div class="flex min-h-0 flex-1 flex-col">
-      <div v-show="!appStore.isSidebarCollapsed" class="flex min-h-0 flex-1 flex-col">
-
-        <!-- Active Workspace -->
-        <div class="px-3 pt-3 pb-2">
-          <button
-            type="button"
-            class="workspace-btn w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left"
-            title="Open workspace settings"
-            @click="openSettings('workspace', 1)"
+    <!-- Main Navigation Content -->
+    <!-- Global px-2 wrapper enforces the 8px outer margin for all pills -->
+    <div class="flex min-h-0 flex-1 flex-col overflow-x-hidden px-2 custom-scrollbar">
+      
+      <!-- Active Workspace Section -->
+      <div class="pt-3 pb-2">
+        <!-- px-3 (12px) + outer px-2 (8px) = 20px perfect center offset -->
+        <button
+          type="button"
+          class="flex w-full items-center rounded-lg px-3 py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
+          :title="appStore.isSidebarCollapsed ? activeWorkspaceName : ''"
+          @click="openSettings('workspace', 1)"
+        >
+          <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--color-accent)]/10 text-[var(--color-accent)]">
+            <FolderOpenIcon class="h-4 w-4" />
+          </div>
+          <div
+            class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[160px] opacity-100 ml-3'"
           >
-            <span class="workspace-icon flex h-6 w-6 shrink-0 items-center justify-center rounded-md">
-              <FolderOpenIcon class="h-3.5 w-3.5" />
+            <span class="block truncate text-[13px] font-semibold leading-snug text-[var(--color-text-main)]">
+              {{ activeWorkspaceName }}
             </span>
-            <span class="min-w-0 flex-1">
-              <span class="block truncate text-[13px] font-semibold leading-snug" style="color: var(--color-text-main);">
-                {{ activeWorkspaceName }}
-              </span>
-              <span class="block truncate text-[11px] leading-snug" style="color: var(--color-text-muted);">
-                {{ activeWorkspaceCaption }}
-              </span>
+            <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
+              {{ activeWorkspaceCaption }}
             </span>
-          </button>
-        </div>
+          </div>
+        </button>
+      </div>
 
-        <div class="sidebar-divider mx-3" />
+      <!-- Fixed: Changed opacity-60 to opacity-100 for better visibility -->
+      <div class="mx-2 mb-2 h-px bg-[var(--color-border)] opacity-100" />
 
-        <!-- Conversations -->
-        <div class="flex min-h-0 flex-1 flex-col px-2 pb-2 pt-2">
-          <div class="flex items-center justify-between px-1.5 pb-1.5">
-            <span class="text-[10px] font-semibold uppercase tracking-widest" style="color: var(--color-text-muted); opacity: 0.6;">Chats</span>
+      <!-- Conversations Section -->
+      <div class="flex min-h-0 flex-1 flex-col">
+        <!-- Section Header -->
+        <!-- Fixed: Changed h-10 to h-8 to match list item height better -->
+        <div class="flex h-8 w-full items-center px-3">
+          <!-- Collapsed State: Plus icon mathematically locked to the center axis -->
+          <div class="flex h-6 w-6 shrink-0 items-center justify-center transition-opacity duration-200"
+               :class="appStore.isSidebarCollapsed ? 'opacity-100 pointer-events-auto' : 'opacity-0 absolute pointer-events-none'">
+            <button @click.stop="createConversation" class="flex h-full w-full items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none" title="New Conversation">
+              <PlusIcon class="h-4 w-4" />
+            </button>
+          </div>
+          
+          <!-- Expanded State -->
+          <div
+            class="flex flex-1 items-center justify-between overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[160px] opacity-100 ml-0'"
+          >
+            <!-- Fixed: Removed tracking-widest to prevent stretched text at small size -->
+            <span class="text-[11px] font-semibold uppercase text-[var(--color-text-muted)] opacity-80">Chats</span>
             <button
               v-if="appStore.hasWorkspace"
               type="button"
-              class="new-conv-btn flex h-5 w-5 items-center justify-center rounded-md"
+              class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none"
               title="New Conversation"
-              aria-label="New Conversation"
               @click.stop="createConversation"
             >
-              <PlusIcon class="h-3 w-3" />
+              <PlusIcon class="h-4 w-4" />
             </button>
           </div>
+        </div>
 
-          <!-- Workspace deletion banner -->
-          <div
-            v-if="appStore.workspaceDeletionJobs.length > 0"
-            class="deletion-banner mb-2 flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px]"
-          >
-            <svg class="h-2.5 w-2.5 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-90" d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="4" />
-            </svg>
-            <span class="truncate">Deleting workspace…</span>
+        <!-- Conversation List -->
+        <div class="flex-1 overflow-y-auto overflow-x-hidden pb-2">
+          <div v-if="!appStore.hasWorkspace" class="px-3 py-2 text-[12px] text-[var(--color-text-muted)] transition-opacity" :class="appStore.isSidebarCollapsed ? 'opacity-0' : 'opacity-100'">
+            Create a workspace to start.
           </div>
-
-          <div class="custom-scrollbar flex-1 overflow-y-auto overflow-x-hidden">
-            <div v-if="!appStore.hasWorkspace" class="px-2 py-2 text-[12px]" style="color: var(--color-text-muted);">
-              Create a workspace to start.
-            </div>
-            <div v-else-if="filteredConversations.length === 0 && appStore.conversations.length > 0" class="px-2 py-2 text-[12px]" style="color: var(--color-text-muted);">
-              No matches found.
-            </div>
-            <div v-else-if="appStore.conversations.length === 0" class="px-2 py-2 text-[12px]" style="color: var(--color-text-muted);">
-              No conversations yet.
-            </div>
-
-            <div v-else class="space-y-0.5">
+          
+          <div v-else class="space-y-0.5 mt-1">
+            <div
+              v-for="conv in filteredConversations"
+              :key="conv.id"
+              class="group relative flex items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5 px-3 py-2"
+              :class="appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : ''"
+              @click="selectConversation(conv.id)"
+            >
+              <!-- Active Indicator Line -->
               <div
-                v-for="conv in filteredConversations"
-                :key="conv.id"
-                class="group conv-row"
-                :class="{ 'conv-row-active': appStore.activeConversationId === conv.id }"
-                @click="selectConversation(conv.id)"
-              >
-                <!-- Inline edit mode -->
-                <div v-if="editingId === conv.id" class="flex w-full items-center gap-1 px-0.5" @click.stop>
-                  <input
-                    :ref="(el) => { if (el) editInputs[conv.id] = el }"
-                    v-model="editingTitleValue"
-                    class="conv-edit-input flex-1 px-1.5 py-0.5 text-[13px]"
-                    @keydown.enter.prevent="saveTitle(conv.id)"
-                    @keydown.esc.prevent="cancelEditing"
-                    @blur="saveTitle(conv.id)"
-                  />
+                v-if="appStore.activeConversationId === conv.id"
+                class="absolute left-0 top-1/2 -translate-y-1/2 h-1/2 w-[3px] rounded-r-full bg-[var(--color-accent)] transition-all"
+              />
+
+              <!-- Editing State -->
+              <!-- Fixed: Changed py-1 to py-1.5 to align vertically with the text -->
+              <div v-if="editingId === conv.id" class="flex w-full items-center pl-9" @click.stop>
+                <input
+                  :ref="(el) => { if (el) editInputs[conv.id] = el }"
+                  v-model="editingTitleValue"
+                  class="w-full rounded border border-[var(--color-accent)] bg-[var(--color-surface)] px-2 py-1.5 text-[13px] text-[var(--color-text-main)] outline-none"
+                  @keydown.enter.prevent="saveTitle(conv.id)"
+                  @keydown.esc.prevent="cancelEditing"
+                  @blur="saveTitle(conv.id)"
+                />
+              </div>
+
+              <!-- Display State -->
+              <template v-else>
+                <!-- Universal Dot Indicator -->
+                <div class="flex h-6 w-6 shrink-0 items-center justify-center text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]">
+                  <div class="h-[6px] w-[6px] rounded-full transition-colors duration-200" :class="appStore.activeConversationId === conv.id ? 'bg-[var(--color-accent)]' : 'bg-current opacity-40 group-hover:opacity-100'" />
                 </div>
 
-                <!-- Display mode -->
-                <template v-else>
+                <!-- Fixed: Reduced max-w to 160px to prevent overflow (Icon 24 + Gap 12 + Text 160 + Gap 8 + Menu 24 = 228px < 236px available) -->
+                <div
+                  class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+                  :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[160px] opacity-100 ml-3'"
+                >
                   <p
-                    class="min-w-0 flex-1 truncate text-[13px] leading-snug"
-                    :class="conv.id === appStore.activeConversationId
-                      ? 'font-medium conv-title-active'
-                      : 'conv-title-idle'"
+                    class="truncate text-[13px]"
+                    :class="appStore.activeConversationId === conv.id ? 'font-medium text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
                     :title="conv.title || 'Untitled'"
-                    @dblclick="startEditing(conv)"
                   >
                     {{ conv.title || 'Untitled' }}
                   </p>
+                </div>
 
-                  <div class="relative flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
-                    <button
-                      type="button"
-                      class="conv-action-btn rounded-md p-0.5"
-                      title="Conversation actions"
-                      @click.stop="toggleConversationMenu(conv.id)"
-                    >
-                      <EllipsisHorizontalIcon class="h-3.5 w-3.5" />
-                    </button>
+                <!-- Ellipsis Menu Button -->
+                <div class="relative shrink-0 transition-opacity pl-2" :class="appStore.isSidebarCollapsed ? 'hidden' : 'opacity-0 group-hover:opacity-100'">
+                  <button
+                    type="button"
+                    class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
+                    @click.stop="toggleConversationMenu(conv.id)"
+                  >
+                    <EllipsisHorizontalIcon class="h-4 w-4" />
+                  </button>
 
-                    <div
-                      v-if="conversationMenuId === conv.id"
-                      class="conv-menu absolute right-0 top-6 z-20 w-28 overflow-hidden rounded-lg border shadow-md"
-                      data-conversation-actions-menu
-                    >
-                      <button
-                        type="button"
-                        class="conv-menu-item w-full px-3 py-1.5 text-left text-[12px] font-medium"
-                        @click.stop="startEditingFromMenu(conv)"
-                      >
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        class="conv-menu-item conv-menu-danger w-full px-3 py-1.5 text-left text-[12px] font-medium"
-                        @click.stop="confirmDeleteConversation(conv.id)"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                  <!-- Floating Menu -->
+                  <div
+                    v-if="conversationMenuId === conv.id"
+                    class="absolute right-0 top-7 z-50 w-32 rounded-lg border border-[var(--color-border)] bg-[var(--color-panel-elevated)] py-1 shadow-lg"
+                  >
+                    <button @click.stop="startEditingFromMenu(conv)" class="w-full px-3 py-1.5 text-left text-[12px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors">Rename</button>
+                    <button @click.stop="confirmDeleteConversation(conv.id)" class="w-full px-3 py-1.5 text-left text-[12px] font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors">Delete</button>
                   </div>
-                </template>
-              </div>
+                </div>
+              </template>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Bottom Nav -->
-      <nav class="mt-auto px-2 pb-3 pt-2">
-        <div class="sidebar-divider mb-3" />
-        <div class="flex flex-col gap-0.5">
+      <!-- Footer Navigation -->
+      <nav class="mt-auto pb-4 pt-2">
+        <!-- Fixed: Changed opacity-60 to opacity-100 -->
+        <div class="mx-2 mb-2 h-px bg-[var(--color-border)] opacity-100" />
+        <div class="flex flex-col space-y-0.5">
+          <!-- API Keys -->
           <button
             type="button"
-            class="nav-btn"
-            :class="appStore.isSidebarCollapsed ? 'nav-btn-collapsed' : 'nav-btn-expanded'"
-            title="Create Workspace"
-            aria-label="Create Workspace"
-            @click="openSettings('workspace', 1)"
-          >
-            <FolderPlusIcon class="h-4 w-4 shrink-0" />
-            <span v-if="!appStore.isSidebarCollapsed" class="truncate text-[13px] font-medium">New Workspace</span>
-          </button>
-
-          <div class="sidebar-divider my-1" />
-
-          <button
-            type="button"
-            class="nav-btn"
-            :class="appStore.isSidebarCollapsed ? 'nav-btn-collapsed' : 'nav-btn-expanded'"
-            title="LLM & API Keys"
-            aria-label="LLM & API Keys"
+            class="flex w-full items-center rounded-lg px-3 py-2 text-left text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/5 hover:text-[var(--color-text-main)] focus:outline-none"
+            title="API Keys"
             @click="openSettings('llm')"
           >
-            <KeyIcon class="h-4 w-4 shrink-0" />
-            <span v-if="!appStore.isSidebarCollapsed" class="truncate text-[13px] font-medium">API Keys</span>
+            <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+              <KeyIcon class="h-5 w-5" />
+            </div>
+            <div
+              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+              :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[160px] opacity-100 ml-3'"
+            >
+              <span class="text-[13px] font-medium">API Keys</span>
+            </div>
           </button>
 
+          <!-- Profile -->
           <div class="relative">
             <button
               ref="profileMenuButtonRef"
               type="button"
-              class="nav-btn"
-              :class="[
-                appStore.isSidebarCollapsed ? 'nav-btn-collapsed' : 'nav-btn-expanded',
-                profileMenuOpen ? 'nav-btn-active' : '',
-              ]"
-              title="User Profile"
-              aria-label="User Profile"
+              class="flex w-full items-center rounded-lg px-3 py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
+              :class="profileMenuOpen ? 'bg-[var(--color-text-main)]/5 text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
+              title="Profile Settings"
               @click="toggleProfileMenu"
             >
-              <UserCircleIcon class="h-4 w-4 shrink-0" />
-              <span v-if="!appStore.isSidebarCollapsed" class="truncate text-[13px] font-medium">Profile</span>
+              <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+                <UserCircleIcon class="h-5 w-5" />
+              </div>
+              <div
+                class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+                :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[160px] opacity-100 ml-3'"
+              >
+                <span class="text-[13px] font-medium">Profile</span>
+              </div>
             </button>
 
+            <!-- Profile Popup -->
+            <!-- Fixed: Replaced left-[60px] with centered positioning logic -->
             <div
               v-if="profileMenuOpen"
               ref="profileMenuRef"
-              class="profile-menu absolute bottom-0 left-full z-[var(--z-dropdown)] ml-2 w-48 overflow-hidden rounded-xl border shadow-lg"
-              data-profile-menu
+              class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-48 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-lg"
             >
-              <button type="button" class="profile-menu-item w-full px-3 py-2 text-left text-[13px]" @click="openProfileSection('terms')">Terms &amp; Conditions</button>
-              <button type="button" class="profile-menu-item w-full px-3 py-2 text-left text-[13px]" @click="openProfileSection('account')">Account</button>
-              <button type="button" class="profile-menu-item w-full px-3 py-2 text-left text-[13px]" @click="openProfileSection('appearance')">Theme</button>
+              <button @click="openProfileSection('account')" class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors">Account Settings</button>
+              <button @click="openProfileSection('appearance')" class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors">Theme Preference</button>
+              <!-- Fixed: Changed opacity-60 to opacity-100 -->
+              <div class="h-px bg-[var(--color-border)] my-1 opacity-100" />
+              <button @click="openProfileSection('terms')" class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors">Legal & Terms</button>
             </div>
           </div>
         </div>
       </nav>
     </div>
 
-    <SettingsModal
-      v-model="isSettingsOpen"
-      :initial-tab="settingsInitialTab"
-      :initial-step="settingsInitialStep"
-    />
-
-    <ConfirmationModal
-      :is-open="isDeleteDialogOpen"
-      :title="deleteDialogTitle"
-      :message="deleteDialogMessage"
-      confirm-text="Delete"
-      cancel-text="Cancel"
-      @close="closeDeleteDialog"
-      @confirm="confirmDelete"
-    />
+    <SettingsModal v-model="isSettingsOpen" :initial-tab="settingsInitialTab" :initial-step="settingsInitialStep" />
+    <ConfirmationModal :is-open="isDeleteDialogOpen" :title="deleteDialogTitle" :message="deleteDialogMessage" confirm-text="Delete" @close="closeDeleteDialog" @confirm="confirmDelete" />
   </div>
 </template>
 
@@ -256,7 +252,6 @@ import apiService from '../../services/apiService'
 
 import {
   FolderOpenIcon,
-  FolderPlusIcon,
   PlusIcon,
   EllipsisHorizontalIcon,
   KeyIcon,
@@ -264,6 +259,7 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
+const isSaving = ref(false)
 
 const searchQuery = ref('')
 const editingId = ref(null)
@@ -273,10 +269,6 @@ const conversationMenuId = ref('')
 const profileMenuOpen = ref(false)
 const profileMenuRef = ref(null)
 const profileMenuButtonRef = ref(null)
-
-const workspacesExpanded = ref(true)
-const datasetsExpanded = ref(true)
-const conversationsExpanded = ref(true)
 
 const localDatasets = ref([])
 const isLoadingDatasets = ref(false)
@@ -290,18 +282,6 @@ const deleteDialogTitle = ref('')
 const deleteDialogMessage = ref('')
 const pendingDeleteType = ref('')
 const pendingDeleteId = ref('')
-const datasetDeletionPollers = new Map()
-
-const filteredWorkspaces = computed(() => {
-  const items = Array.isArray(appStore.workspaces) ? appStore.workspaces : []
-  const query = String(searchQuery.value || '').trim().toLowerCase()
-  if (!query) return items
-  return items.filter((workspace) => {
-    const name = String(workspace?.name || '').toLowerCase()
-    const filename = workspaceFilename(workspace?.duckdb_path).toLowerCase()
-    return name.includes(query) || filename.includes(query)
-  })
-})
 
 const activeWorkspaceName = computed(() => {
   const activeId = String(appStore.activeWorkspaceId || '').trim()
@@ -315,17 +295,6 @@ const activeWorkspaceCaption = computed(() => {
   const activeId = String(appStore.activeWorkspaceId || '').trim()
   const activeWorkspace = appStore.workspaces.find((workspace) => workspace.id === activeId)
   return workspaceFilename(activeWorkspace?.duckdb_path)
-})
-
-const filteredDatasets = computed(() => {
-  if (!searchQuery.value) return localDatasets.value
-  const query = searchQuery.value.toLowerCase()
-  return localDatasets.value.filter((ds) => {
-    const rawName = String(ds?.table_name || '').toLowerCase()
-    const friendlyName = datasetFriendlyName(ds?.table_name).toLowerCase()
-    const sourceName = datasetSourceCaption(ds?.file_path).toLowerCase()
-    return rawName.includes(query) || friendlyName.includes(query) || sourceName.includes(query)
-  })
 })
 
 const filteredConversations = computed(() => {
@@ -372,45 +341,6 @@ function handleGlobalClick(event) {
   closeProfileMenu()
 }
 
-function datasetFriendlyName(tableName) {
-  const raw = String(tableName || '').trim()
-  if (!raw) return 'Untitled dataset'
-  const hashSegmentIndex = raw.search(/_[0-9a-f]{6,}(?=_|$)/i)
-  const withoutHashSuffix = hashSegmentIndex >= 0 ? raw.slice(0, hashSegmentIndex) : raw
-  const compacted = withoutHashSuffix.replace(/_{2,}/g, '_').replace(/^_+|_+$/g, '')
-  if (compacted) return compacted
-  const firstToken = raw.split('_')[0]?.trim()
-  return firstToken || 'Untitled dataset'
-}
-
-function datasetSourceCaption(filePath) {
-  const normalized = String(filePath || '').trim().replace(/\\/g, '/')
-  if (!normalized) return ''
-  const parts = normalized.split('/').filter(Boolean)
-  return parts[parts.length - 1] || normalized
-}
-
-function normalizeDatasetPath(path) {
-  return String(path || '')
-    .trim()
-    .replace(/\\/g, '/')
-    .replace(/\/{2,}/g, '/')
-    .toLowerCase()
-}
-
-function isSelectedDataset(dataset) {
-  const datasetPath = normalizeDatasetPath(dataset?.file_path)
-  const activePath = normalizeDatasetPath(appStore.dataFilePath)
-  if (datasetPath && activePath && datasetPath === activePath) return true
-  const datasetTable = String(dataset?.table_name || '').trim().toLowerCase()
-  const activeTable = String(appStore.ingestedTableName || '').trim().toLowerCase()
-  return Boolean(datasetTable && activeTable && datasetTable === activeTable)
-}
-
-function datasetRowTitle(dataset) {
-  return String(dataset?.file_path || '').trim()
-}
-
 async function fetchDatasets() {
   const activeWorkspace = appStore.workspaces.find((ws) => ws.id === appStore.activeWorkspaceId)
   if (!activeWorkspace) { localDatasets.value = []; return }
@@ -434,68 +364,29 @@ function handleDatasetCatalogChanged() {
   void fetchDatasets()
 }
 
-async function selectWorkspace(id) {
-  if (!id || id === appStore.activeWorkspaceId) return
-  try {
-    await appStore.activateWorkspace(id)
-    await appStore.fetchConversations()
-    if (appStore.activeConversationId) await appStore.fetchConversationTurns({ reset: true })
-  } catch (error) {
-    toast.error('Workspace Error', error.message || 'Failed to activate workspace')
-  }
-}
-
-async function selectDataset(ds) {
-  if (!ds || !ds.table_name) return
-  try {
-    let selectedPath = ds.file_path
-    let selectedTableName = String(ds.table_name || inferTableNameFromDataPath(ds.file_path || '')).trim()
-    if (appStore.activeWorkspaceId && ds.file_path && !String(ds.file_path).startsWith('browser://')) {
-      const syncedDataset = await apiService.v1AddDataset(appStore.activeWorkspaceId, ds.file_path)
-      selectedPath = syncedDataset?.source_path || selectedPath
-      selectedTableName = String(syncedDataset?.table_name || selectedTableName).trim()
+    async function createConversation() {
+      try {
+        const conversation = await appStore.createConversation()
+        if (conversation?.id) {
+          appStore.setActiveConversationId(conversation.id)
+          await appStore.fetchConversationTurns({ reset: true })
+        }
+      } catch (error) {
+        toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to create conversation'))
+      }
     }
-    previewService.clearSchemaCache()
-    appStore.setDataFilePath(selectedPath || '')
-    appStore.setIngestedTableName(selectedTableName)
-    appStore.setIngestedColumns([])
-    appStore.setSchemaFileId(selectedPath || selectedTableName)
-    appStore.setGeneratedCode('')
-    appStore.setPythonFileContent('')
-    appStore.setResultData(null)
-    appStore.setPlotlyFigure(null)
-    appStore.setDataframes([])
-    appStore.setFigures([])
-    appStore.setTerminalOutput('')
-    window.dispatchEvent(new CustomEvent('dataset-switched', { detail: { tableName: selectedTableName, dataPath: selectedPath } }))
-  } catch (error) {
-    console.error('Failed to switch dataset:', error)
-  }
-}
 
-async function createConversation() {
-  try {
-    const conversation = await appStore.createConversation()
-    if (conversation?.id) {
-      appStore.setActiveConversationId(conversation.id)
-      await appStore.fetchConversationTurns({ reset: true })
+    async function selectConversation(id) {
+      conversationMenuId.value = ''
+      const targetConversationId = String(id || '').trim()
+      if (!targetConversationId || targetConversationId === String(appStore.activeConversationId || '').trim()) return
+      try {
+        appStore.setActiveConversationId(targetConversationId)
+        await appStore.fetchConversationTurns({ reset: true })
+      } catch (error) {
+        toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to load conversation'))
+      }
     }
-  } catch (error) {
-    toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to create conversation'))
-  }
-}
-
-async function selectConversation(id) {
-  conversationMenuId.value = ''
-  const targetConversationId = String(id || '').trim()
-  if (!targetConversationId || targetConversationId === String(appStore.activeConversationId || '').trim()) return
-  try {
-    appStore.setActiveConversationId(targetConversationId)
-    await appStore.fetchConversationTurns({ reset: true })
-  } catch (error) {
-    toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to load conversation'))
-  }
-}
 
 function startEditing(conv) {
   conversationMenuId.value = ''
@@ -528,10 +419,16 @@ function closeConversationMenu() {
 }
 
 async function saveTitle(id) {
-  if (editingId.value !== id) return
+  if (editingId.value !== id || isSaving.value) return
   const newTitle = editingTitleValue.value.trim()
   const conv = appStore.conversations.find((c) => c.id === id)
-  if (!newTitle || newTitle === (conv?.title || 'Untitled')) { cancelEditing(); return }
+  
+  if (!newTitle || newTitle === (conv?.title || 'Untitled')) {
+    cancelEditing()
+    return
+  }
+
+  isSaving.value = true
   try {
     if (id === appStore.activeConversationId) {
       await appStore.updateConversationTitle(newTitle)
@@ -540,10 +437,10 @@ async function saveTitle(id) {
       const idx = appStore.conversations.findIndex((c) => c.id === id)
       if (idx !== -1) appStore.conversations[idx] = { ...appStore.conversations[idx], title: updated.title }
     }
-    toast.success('Renamed', 'Conversation title updated')
   } catch (error) {
     toast.error('Rename Failed', extractApiErrorMessage(error, 'Failed to update title'))
   } finally {
+    isSaving.value = false
     cancelEditing()
   }
 }
@@ -559,24 +456,6 @@ function openSettings(tab = 'llm', step = 1) {
   const parsedStep = Number(step)
   settingsInitialStep.value = Number.isFinite(parsedStep) && parsedStep >= 1 ? Math.floor(parsedStep) : 1
   isSettingsOpen.value = true
-}
-
-function confirmDeleteWorkspace(workspaceId) {
-  const target = appStore.workspaces.find((ws) => ws.id === workspaceId)
-  pendingDeleteType.value = 'workspace'
-  pendingDeleteId.value = workspaceId
-  deleteDialogTitle.value = 'Delete Workspace'
-  deleteDialogMessage.value = `Are you sure you want to delete "${target?.name || 'this workspace'}"? Cleanup will run in the background and cannot be undone.`
-  isDeleteDialogOpen.value = true
-}
-
-function confirmDeleteDataset(tableName) {
-  const target = localDatasets.value.find((ds) => ds.table_name === tableName)
-  pendingDeleteType.value = 'dataset'
-  pendingDeleteId.value = tableName
-  deleteDialogTitle.value = 'Delete Dataset'
-  deleteDialogMessage.value = `Are you sure you want to delete "${target?.table_name || 'this dataset'}"? This action cannot be undone.`
-  isDeleteDialogOpen.value = true
 }
 
 function confirmDeleteConversation(conversationId) {
@@ -597,68 +476,10 @@ function closeDeleteDialog() {
   deleteDialogMessage.value = ''
 }
 
-function stopDatasetDeletionPollers() {
-  datasetDeletionPollers.forEach((timerId) => clearTimeout(timerId))
-  datasetDeletionPollers.clear()
-}
-
-function trackDatasetDeletionJob(workspaceId, jobId, datasetLabel, timeoutMs = 300000) {
-  const normalizedWorkspaceId = String(workspaceId || '').trim()
-  const normalizedJobId = String(jobId || '').trim()
-  if (!normalizedWorkspaceId || !normalizedJobId) return
-  if (datasetDeletionPollers.has(normalizedJobId)) return
-  const startedAt = Date.now()
-  const displayName = String(datasetLabel || '').trim() || 'dataset'
-
-  const poll = async () => {
-    try {
-      const job = await apiService.v1GetDatasetDeletionJob(normalizedWorkspaceId, normalizedJobId)
-      const status = String(job?.status || '').trim().toLowerCase()
-      if (status === 'completed') {
-        datasetDeletionPollers.delete(normalizedJobId)
-        toast.success('Dataset deletion completed', `"${displayName}" cleanup finished.`)
-        return
-      }
-      if (status === 'failed') {
-        datasetDeletionPollers.delete(normalizedJobId)
-        toast.error('Dataset deletion failed', String(job?.error_message || '').trim() || `Background cleanup failed for "${displayName}".`)
-        return
-      }
-      if (Date.now() - startedAt > timeoutMs) { datasetDeletionPollers.delete(normalizedJobId); return }
-      const timer = setTimeout(poll, 2000)
-      datasetDeletionPollers.set(normalizedJobId, timer)
-    } catch {
-      datasetDeletionPollers.delete(normalizedJobId)
-    }
-  }
-
-  poll()
-}
-
 async function confirmDelete() {
   if (!pendingDeleteId.value) return
   try {
-    if (pendingDeleteType.value === 'workspace') {
-      const job = await appStore.deleteWorkspaceAsync(pendingDeleteId.value)
-      toast.info('Workspace Deletion Started', `Deleting workspace in background (job: ${job.job_id.slice(0, 8)}...).`)
-    } else if (pendingDeleteType.value === 'dataset') {
-      const workspaceId = appStore.activeWorkspaceId
-      if (workspaceId) {
-        const deletedTableName = String(pendingDeleteId.value || '').trim()
-        const job = await apiService.v1DeleteDataset(workspaceId, deletedTableName)
-        const deletedActiveDataset = appStore.handleDatasetRemoved(deletedTableName)
-        previewService.clearSchemaCache()
-        window.dispatchEvent(new CustomEvent('dataset-switched', { detail: null }))
-        await fetchDatasets()
-        const jobId = String(job?.job_id || '').trim()
-        if (jobId) {
-          toast.info('Dataset deletion started', deletedActiveDataset ? 'Dataset removed. Active selection cleared. Background cleanup started.' : 'Dataset removed from workspace. Background cleanup started.')
-          trackDatasetDeletionJob(workspaceId, jobId, datasetFriendlyName(deletedTableName))
-        } else {
-          toast.success('Dataset Deleted', deletedActiveDataset ? 'Dataset removed. Active selection cleared.' : 'Dataset has been removed.')
-        }
-      }
-    } else if (pendingDeleteType.value === 'conversation') {
+    if (pendingDeleteType.value === 'conversation') {
       await appStore.deleteConversationById(pendingDeleteId.value)
       toast.success('Conversation Deleted', 'Conversation has been removed.')
     }
@@ -676,9 +497,7 @@ onMounted(async () => {
       await fetchDatasets()
       await appStore.fetchConversations()
     }
-  } catch {
-    // Ignore bootstrap failures - parent app handles global state recovery.
-  }
+  } catch { /* recovery handled by parent */ }
   window.addEventListener('dataset-switched', handleDatasetCatalogChanged)
   window.addEventListener('sidebar-open-settings', handleOpenSettingsRequest)
   window.addEventListener('click', handleGlobalClick)
@@ -688,7 +507,6 @@ onUnmounted(() => {
   window.removeEventListener('dataset-switched', handleDatasetCatalogChanged)
   window.removeEventListener('sidebar-open-settings', handleOpenSettingsRequest)
   window.removeEventListener('click', handleGlobalClick)
-  stopDatasetDeletionPollers()
 })
 
 watch(() => appStore.activeWorkspaceId, async (newId) => {
@@ -702,175 +520,21 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 </script>
 
 <style scoped>
-/* -- Scrollbar -- */
-.custom-scrollbar::-webkit-scrollbar { width: 3px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.sidebar-root {
+  will-change: width;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--color-border) 50%, transparent);
+  background: color-mix(in srgb,var(--color-border) 70%,transparent);
   border-radius: 4px;
 }
 .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--color-border) 75%, transparent);
-}
-
-/* -- Divider -- */
-.sidebar-divider {
-  height: 1px;
-  background: var(--color-border);
-  opacity: 0.5;
-}
-
-/* -- Brand -- */
-.brand-btn {
-  display: flex;
-  align-items: center;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: 0;
-  transition: background-color 120ms ease;
-}
-.brand-btn:hover {
-  background-color: color-mix(in srgb, var(--color-text-main) 4%, transparent);
-}
-.sidebar-brand-wordmark {
-  overflow: hidden;
-  text-align: left;
-  transition: max-width 200ms ease, opacity 200ms ease;
-}
-.sidebar-brand-wordmark-expanded { max-width: 160px; opacity: 1; }
-.sidebar-brand-wordmark-collapsed { max-width: 0; opacity: 0; }
-
-/* -- Workspace button -- */
-.workspace-btn {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: background-color 120ms ease;
-  border-radius: 8px;
-}
-.workspace-btn:hover {
-  background-color: color-mix(in srgb, var(--color-text-main) 5%, transparent);
-}
-.workspace-icon {
-  color: var(--color-accent);
-  background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
-}
-
-/* -- New conversation button -- */
-.new-conv-btn {
-  border: none;
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
-}
-.new-conv-btn:hover {
-  background-color: color-mix(in srgb, var(--color-text-main) 6%, transparent);
-  color: var(--color-text-main);
-}
-
-/* -- Conversation rows -- */
-.conv-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 32px;
-  padding: 5px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 120ms ease;
-}
-.conv-row:hover { background-color: color-mix(in srgb, var(--color-text-main) 5%, transparent); }
-.conv-row-active { background-color: var(--color-selected-surface); }
-
-.conv-title-idle { color: var(--color-text-muted); }
-.conv-title-active { color: var(--color-text-main); }
-
-/* -- Conversation action button -- */
-.conv-action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
-}
-.conv-action-btn:hover {
-  background-color: color-mix(in srgb, var(--color-text-main) 8%, transparent);
-  color: var(--color-text-main);
-}
-
-/* -- Conversation context menu -- */
-.conv-menu {
-  border-color: var(--color-border);
-  background-color: var(--color-surface);
-}
-.conv-menu-item {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--color-text-main);
-  transition: background-color 100ms ease;
-}
-.conv-menu-item:hover { background-color: var(--color-panel-muted); }
-.conv-menu-danger { color: var(--color-danger) !important; }
-.conv-menu-danger:hover { background-color: var(--color-danger-bg) !important; }
-
-/* -- Inline edit input -- */
-.conv-edit-input {
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background-color: var(--color-surface);
-  color: var(--color-text-main);
-  outline: none;
-  width: 100%;
-  font-size: 13px;
-  transition: border-color 120ms ease;
-}
-.conv-edit-input:focus { border-color: var(--color-accent); }
-
-/* -- Bottom nav buttons -- */
-.nav-btn {
-  border-radius: 8px;
-  border: none;
-  color: var(--color-text-muted);
-  background: transparent;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
-}
-.nav-btn-collapsed { width: 32px; height: 32px; justify-content: center; }
-.nav-btn-expanded { width: 100%; min-height: 32px; gap: 10px; padding: 6px 10px; justify-content: flex-start; }
-.nav-btn:hover {
-  background-color: color-mix(in srgb, var(--color-text-main) 6%, transparent);
-  color: var(--color-text-main);
-}
-.nav-btn-active {
-  color: var(--color-accent);
-  background-color: color-mix(in srgb, var(--color-accent) 10%, transparent);
-}
-
-/* -- Profile menu -- */
-.profile-menu {
-  border-color: var(--color-border);
-  background-color: var(--color-panel-elevated);
-}
-.profile-menu-item {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--color-text-main);
-  transition: background-color 100ms ease;
-}
-.profile-menu-item:hover { background-color: var(--color-panel-muted); }
-
-/* -- Deletion banner -- */
-.deletion-banner {
-  background-color: var(--color-warning-bg);
-  color: var(--color-warning-text);
+  background: color-mix(in srgb,var(--color-border) 100%,transparent);
 }
 </style>
