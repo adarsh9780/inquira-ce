@@ -7,11 +7,11 @@
     <!-- Brand / Collapse Toggle -->
     <div
       class="h-14 shrink-0 border-b border-[var(--color-border)] flex items-center"
-      :class="appStore.isSidebarCollapsed ? 'px-0' : 'pl-[20px] pr-4'"
+      :class="appStore.isSidebarCollapsed ? 'px-0 justify-center' : 'pl-[20px] pr-4'"
     >
       <button
-        class="flex h-full w-full items-center transition-opacity hover:opacity-70 focus:outline-none"
-        :class="appStore.isSidebarCollapsed ? 'justify-center' : ''"
+        class="flex h-full items-center transition-opacity hover:opacity-70 focus:outline-none"
+        :class="appStore.isSidebarCollapsed ? 'justify-center' : 'w-full'"
         :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         @click="handleBrandClick"
       >
@@ -20,8 +20,8 @@
         </div>
         
         <div
-          class="flex items-center overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-          :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+          v-if="!appStore.isSidebarCollapsed"
+          class="flex items-center overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out max-w-[200px] opacity-100 ml-3"
         >
           <span class="text-[14px] font-semibold tracking-tight text-[var(--color-text-main)]">
             Inquira
@@ -51,8 +51,8 @@
             <FolderOpenIcon class="h-4 w-4" />
           </div>
           <div
-            class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+            v-if="!appStore.isSidebarCollapsed"
+            class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out max-w-[200px] opacity-100 ml-3"
           >
             <span class="block truncate text-[13px] font-semibold leading-snug text-[var(--color-text-main)]">
               {{ activeWorkspaceName }}
@@ -73,8 +73,7 @@
             :class="appStore.isSidebarCollapsed ? 'justify-center' : 'px-3'"
           >
           <!-- Collapsed State: Plus icon mathematically locked to the center axis -->
-          <div class="flex h-6 w-6 shrink-0 items-center justify-center transition-opacity duration-200"
-               :class="appStore.isSidebarCollapsed ? 'opacity-100 pointer-events-auto' : 'opacity-0 absolute pointer-events-none'">
+          <div v-if="appStore.isSidebarCollapsed" class="flex h-6 w-6 shrink-0 items-center justify-center">
             <button @click.stop="createConversation" class="flex h-full w-full items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none" title="New Conversation">
               <PlusIcon class="h-4 w-4" />
             </button>
@@ -82,8 +81,8 @@
           
           <!-- Expanded State -->
           <div
-            class="flex flex-1 items-center justify-between overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-0'"
+            v-else
+            class="flex flex-1 items-center justify-between overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out max-w-[200px] opacity-100 ml-0"
           >
             <span class="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] opacity-80">Chats</span>
             <button
@@ -141,8 +140,8 @@
                 </div>
 
                 <div
-                  class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-                  :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[200px] opacity-100 ml-3'"
+                  v-if="!appStore.isSidebarCollapsed"
+                  class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out flex-1 max-w-[200px] opacity-100 ml-3"
                 >
                   <p
                     class="truncate text-[13px]"
@@ -154,7 +153,7 @@
                 </div>
 
                 <!-- Ellipsis Menu Button -->
-                <div class="relative shrink-0 transition-opacity pl-2" :class="appStore.isSidebarCollapsed ? 'hidden' : 'opacity-0 group-hover:opacity-100'">
+                <div v-if="!appStore.isSidebarCollapsed" class="relative shrink-0 transition-opacity pl-2 opacity-0 group-hover:opacity-100">
                   <button
                     type="button"
                     class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
@@ -194,8 +193,8 @@
               <KeyIcon class="h-5 w-5" />
             </div>
             <div
-              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-              :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+              v-if="!appStore.isSidebarCollapsed"
+              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out max-w-[200px] opacity-100 ml-3"
             >
               <span class="text-[13px] font-medium">API Keys</span>
             </div>
@@ -215,8 +214,8 @@
                 <UserCircleIcon class="h-5 w-5" />
               </div>
               <div
-                class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-                :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+                v-if="!appStore.isSidebarCollapsed"
+                class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out max-w-[200px] opacity-100 ml-3"
               >
                 <span class="text-[13px] font-medium">Profile</span>
               </div>
