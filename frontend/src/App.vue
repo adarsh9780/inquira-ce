@@ -743,7 +743,7 @@ onUnmounted(() => {
 }
 
 .app-nav-pane {
-  width: 360px;
+  width: 260px; /* <--- FIXED: Now matches UnifiedSidebar expanded width */
   transition: width var(--motion-duration-standard) var(--motion-ease-standard);
   overflow: hidden;
   border-right: 1px solid var(--color-border);
@@ -752,7 +752,7 @@ onUnmounted(() => {
 }
 
 .app-nav-pane-collapsed {
-  width: 48px;
+  width: 64px; /* <--- FIXED: Now matches UnifiedSidebar collapsed width */
 }
 
 .app-workspace-pane {
