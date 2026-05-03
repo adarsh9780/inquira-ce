@@ -1625,7 +1625,7 @@ dependencies = [
 
 [[package]]
 name = "inquira"
-version = "0.5.33"
+version = "0.5.34"
 dependencies = [
  "dirs-next",
  "log",

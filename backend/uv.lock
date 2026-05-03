@@ -813,7 +813,7 @@ wheels = [
 
 [[package]]
 name = "inquira-ce"
-version = "0.5.33"
+version = "0.5.34"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
