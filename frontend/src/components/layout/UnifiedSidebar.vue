@@ -5,10 +5,13 @@
     style="background-color: var(--color-sidebar-surface);"
   >
     <!-- Brand / Collapse Toggle -->
-    <!-- 20px explicit left padding + 24px icon = perfect 64px center -->
-    <div class="h-14 shrink-0 border-b border-[var(--color-border)] flex items-center pl-[20px] pr-4">
+    <div
+      class="h-14 shrink-0 border-b border-[var(--color-border)] flex items-center"
+      :class="appStore.isSidebarCollapsed ? 'px-0' : 'pl-[20px] pr-4'"
+    >
       <button
         class="flex h-full w-full items-center transition-opacity hover:opacity-70 focus:outline-none"
+        :class="appStore.isSidebarCollapsed ? 'justify-center' : ''"
         :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         @click="handleBrandClick"
       >
@@ -28,16 +31,19 @@
     </div>
 
     <!-- Main Navigation Content -->
-    <!-- Global px-2 wrapper enforces the 8px outer margin for all pills -->
-    <div class="flex min-h-0 flex-1 flex-col overflow-x-hidden px-2 custom-scrollbar">
+    <!-- When collapsed: no horizontal padding so items can perfectly center within 64px.
+         When expanded: 8px outer padding for pill margins. -->
+    <div
+      class="flex min-h-0 flex-1 flex-col overflow-x-hidden"
+      :class="appStore.isSidebarCollapsed ? 'px-0 scrollbar-hidden' : 'px-2 custom-scrollbar'"
+    >
       
       <!-- Active Workspace Section -->
       <div class="pt-3 pb-2">
-        <!-- px-3 (12px) + outer px-2 (8px) = 20px perfect center offset -->
         <button
           type="button"
           class="flex w-full items-center rounded-lg text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
-          :class="appStore.isSidebarCollapsed ? 'px-[20px]' : 'px-3 py-2'"
+          :class="appStore.isSidebarCollapsed ? 'justify-center py-2' : 'px-3 py-2'"
           :title="appStore.isSidebarCollapsed ? activeWorkspaceName : ''"
           @click="openSettings('workspace', 1)"
         >
@@ -64,7 +70,7 @@
       <div class="flex min-h-0 flex-1 flex-col">
         <!-- Section Header -->
         <div class="flex h-10 w-full items-center"
-            :class="appStore.isSidebarCollapsed ? 'justify-center px-[20px]' : 'px-3'"
+            :class="appStore.isSidebarCollapsed ? 'justify-center' : 'px-3'"
           >
           <!-- Collapsed State: Plus icon mathematically locked to the center axis -->
           <div class="flex h-6 w-6 shrink-0 items-center justify-center transition-opacity duration-200"
@@ -93,7 +99,10 @@
         </div>
 
         <!-- Conversation List -->
-        <div class="flex-1 overflow-y-auto overflow-x-hidden pb-2">
+        <div
+          class="flex-1 overflow-y-auto overflow-x-hidden pb-2"
+          :class="appStore.isSidebarCollapsed ? 'scrollbar-hidden' : ''"
+        >
           <div v-if="!appStore.hasWorkspace" class="px-3 py-2 text-[12px] text-[var(--color-text-muted)] transition-opacity" :class="appStore.isSidebarCollapsed ? 'opacity-0' : 'opacity-100'">
             Create a workspace to start.
           </div>
@@ -103,7 +112,7 @@
               v-for="conv in filteredConversations"
               :key="conv.id"
               class="group relative flex items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5 text-left"
-              :class="[appStore.isSidebarCollapsed ? 'justify-center px-[20px]' : 'px-3 py-2', appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : '']"
+              :class="[appStore.isSidebarCollapsed ? 'justify-center py-2' : 'px-3 py-2', appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : '']"
               @click="selectConversation(conv.id)"
             >
               <!-- Active Indicator Line -->
@@ -177,7 +186,7 @@
           <button
             type="button"
             class="flex w-full items-center rounded-lg text-left text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/5 hover:text-[var(--color-text-main)] focus:outline-none"
-            :class="appStore.isSidebarCollapsed ? 'justify-center px-[20px]' : 'px-3 py-2'"
+            :class="appStore.isSidebarCollapsed ? 'justify-center py-2' : 'px-3 py-2'"
             title="API Keys"
             @click="openSettings('llm')"
           >
@@ -198,7 +207,7 @@
               ref="profileMenuButtonRef"
               type="button"
               class="flex w-full items-center rounded-lg text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
-              :class="[profileMenuOpen ? 'bg-[var(--color-text-main)]/5 text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]', appStore.isSidebarCollapsed ? 'justify-center px-[20px]' : 'px-3 py-2']"
+              :class="[profileMenuOpen ? 'bg-[var(--color-text-main)]/5 text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]', appStore.isSidebarCollapsed ? 'justify-center py-2' : 'px-3 py-2']"
               title="Profile Settings"
               @click="toggleProfileMenu"
             >
@@ -532,5 +541,17 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 }
 .custom-scrollbar:hover::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--color-border) 100%, transparent);
+}
+
+/* When the sidebar is collapsed, hide the scrollbar entirely so it
+   doesn't visually shift icons off-center within the 64px column. */
+.scrollbar-hidden {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 </style>
