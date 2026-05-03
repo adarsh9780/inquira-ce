@@ -1,37 +1,42 @@
 <template>
   <div class="flex flex-col h-full">
     <!-- Figure Header (Teleported) -->
+    <Teleport to="#workspace-right-pane-toolbar-center" v-if="isMounted && appStore.dataPane === 'figure'">
+      <div v-if="orderedFigures && orderedFigures.length > 0" class="flex min-w-[10rem] max-w-full flex-1 items-center">
+        <HeaderDropdown
+          id="figure-select"
+          v-model="selectedArtifactId"
+          :options="figureDropdownOptions"
+          placeholder="Select chart"
+          aria-label="Select chart"
+          :fit-to-longest-label="true"
+          :min-chars="12"
+          :max-chars="36"
+          max-width-class="w-full"
+        />
+      </div>
+    </Teleport>
+
     <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && appStore.dataPane === 'figure'">
       <div class="flex min-w-0 items-center justify-end w-full gap-3">
-        <div class="mr-auto flex min-w-0 items-center space-x-3 text-sm">
-          <span v-if="appStore.isCodeRunning" class="text-xs px-2 py-1 rounded text-orange-600 bg-orange-100">
+        <div class="flex min-w-0 items-center space-x-3 text-sm">
+          <span
+            v-if="appStore.isCodeRunning"
+            class="rounded px-2 py-1 text-xs"
+            style="background-color: var(--color-warning-bg); color: var(--color-warning);"
+          >
             Processing
           </span>
-          <span v-else-if="isLoadingArtifacts || isLoadingFigure || isDeletingArtifact" class="text-xs px-2 py-1 rounded text-gray-700 bg-gray-100">
+          <span
+            v-else-if="isLoadingArtifacts || isLoadingFigure || isDeletingArtifact"
+            class="rounded px-2 py-1 text-xs"
+            style="background-color: var(--color-panel-muted); color: var(--color-text-main);"
+          >
             {{ isDeletingArtifact ? 'Deleting chart...' : 'Loading charts...' }}
           </span>
         </div>
-        
-        <div class="flex min-w-0 flex-1 items-center justify-end gap-2">
-          <!-- Figure Selector -->
-          <div
-            v-if="orderedFigures && orderedFigures.length > 1"
-            class="flex min-w-[10rem] flex-1 items-center"
-            style="max-width: min(34vw, 20rem);"
-          >
-            <HeaderDropdown
-              id="figure-select"
-              v-model="selectedArtifactId"
-              :options="figureDropdownOptions"
-              placeholder="Select figure"
-              aria-label="Select figure"
-              :fit-to-longest-label="true"
-              :min-chars="12"
-              :max-chars="36"
-              max-width-class="w-full"
-            />
-          </div>
 
+        <div class="flex min-w-0 items-center justify-end gap-2">
           <!-- Delete Figure -->
           <button
             @click="openDeleteDialog"
@@ -45,7 +50,8 @@
           >
             <div
               v-if="isDeletingArtifact"
-              class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-red-500"
+              class="h-4 w-4 animate-spin rounded-full border-2"
+              style="border-color: var(--color-border); border-top-color: var(--color-danger);"
             ></div>
             <TrashIcon v-else class="h-4 w-4" />
           </button>
@@ -61,7 +67,11 @@
               :aria-label="isDownloading ? 'Exporting chart' : 'Export chart'"
             >
               <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4" />
-              <div v-else class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"></div>
+              <div
+                v-else
+                class="h-4 w-4 animate-spin rounded-full border-2"
+                style="border-color: var(--color-border); border-top-color: var(--color-text-main);"
+              ></div>
             </MenuButton>
             <transition
               enter-active-class="transition duration-100 ease-out"
@@ -128,7 +138,8 @@
           <p class="text-sm" style="color: var(--color-text-muted);">No chart to display</p>
           <p
             v-if="artifactListError"
-            class="mt-3 rounded-md px-4 py-3 text-sm text-red-700 bg-red-100"
+            class="mt-3 rounded-md px-4 py-3 text-sm"
+            style="background-color: var(--color-danger-bg); color: var(--color-danger);"
           >
             {{ artifactListError }}
           </p>

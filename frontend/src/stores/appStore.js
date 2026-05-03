@@ -106,7 +106,7 @@ export const useAppStore = defineStore('app', () => {
   const terminalEnabled = ref(false)
   const runtimeError = ref('')
   const activeTab = ref('workspace')
-  const workspacePane = ref('code') // 'code' | 'chat'
+  const workspacePane = ref('chat') // 'code' | 'chat'
   const dataPane = ref('table') // 'table' | 'figure' | 'output'
   const leftPaneWidth = ref(50) // percentage
   const terminalConsentGranted = ref(false)
@@ -116,7 +116,7 @@ export const useAppStore = defineStore('app', () => {
   const isChatOverlayOpen = ref(true)
   const chatOverlayWidth = ref(0.25) // 25% of area
   const isSidebarCollapsed = ref(false)
-  const isDataFocusMode = ref(false)
+  const workspaceLayoutMode = ref('chat') // 'chat' | 'split' | 'data'
   const hideShortcutsModal = ref(false)
 
   // Editor State
@@ -138,6 +138,9 @@ export const useAppStore = defineStore('app', () => {
     if (!activeId) return false
     return workspaces.value.some((ws) => ws.id === activeId)
   })
+  const isDataFocusMode = computed(() => workspaceLayoutMode.value === 'data')
+  const showLeftPane = computed(() => workspaceLayoutMode.value !== 'data')
+  const showRightPane = computed(() => workspaceLayoutMode.value !== 'chat')
   const canAnalyze = computed(() => {
     const hasProviderAccess = providerRequiresApiKey.value
       ? selectedProviderApiKeyPresent.value
@@ -255,7 +258,7 @@ export const useAppStore = defineStore('app', () => {
       ui: {
         ui_theme: uiTheme.value,
         active_tab: activeTab.value || 'workspace',
-        workspace_pane: workspacePane.value || 'code',
+        workspace_pane: workspacePane.value || 'chat',
         data_pane: dataPane.value || 'table',
         left_pane_width: Number(leftPaneWidth.value || 50),
         chat_overlay_open: !!isChatOverlayOpen.value,
@@ -263,7 +266,8 @@ export const useAppStore = defineStore('app', () => {
         terminal_open: !!isTerminalOpen.value,
         terminal_height: Number(terminalHeight.value || 30),
         is_sidebar_collapsed: !!isSidebarCollapsed.value,
-        data_focus_mode: !!isDataFocusMode.value,
+        workspace_layout_mode: workspaceLayoutMode.value || 'chat',
+        data_focus_mode: workspaceLayoutMode.value === 'data',
         hide_shortcuts_modal: !!hideShortcutsModal.value,
         table_row_count: Number(tableRowCount.value || 0),
         table_window_start: Number(tableWindowStart.value || 0),
@@ -372,8 +376,11 @@ export const useAppStore = defineStore('app', () => {
     if (typeof ui.is_sidebar_collapsed === 'boolean') {
       isSidebarCollapsed.value = ui.is_sidebar_collapsed
     }
-    if (typeof ui.data_focus_mode === 'boolean') {
-      isDataFocusMode.value = ui.data_focus_mode
+    if (typeof ui.workspace_layout_mode === 'string' && ui.workspace_layout_mode.trim()) {
+      const restoredMode = ui.workspace_layout_mode.trim().toLowerCase()
+      workspaceLayoutMode.value = ['chat', 'split', 'data'].includes(restoredMode) ? restoredMode : 'chat'
+    } else if (typeof ui.data_focus_mode === 'boolean') {
+      workspaceLayoutMode.value = ui.data_focus_mode ? 'data' : 'split'
     }
     if (typeof ui.hide_shortcuts_modal === 'boolean') {
       hideShortcutsModal.value = ui.hide_shortcuts_modal
@@ -578,7 +585,7 @@ export const useAppStore = defineStore('app', () => {
     runtimeError.value = ''
     terminalConsentGranted.value = false
     terminalCwd.value = ''
-    isDataFocusMode.value = false
+    workspaceLayoutMode.value = 'chat'
     historicalCodeBlocks.value = []
   }
 
@@ -1503,28 +1510,18 @@ export const useAppStore = defineStore('app', () => {
     setDataframes(dataframeArtifacts)
     setFigures(figureArtifacts)
 
-    const previousDataPane = String(dataPane.value || '').trim().toLowerCase()
-    if (previousDataPane === 'figure' && figureArtifacts.length > 0) {
+    if (figureArtifacts.length > 0) {
       setPlotlyFigure(figureArtifacts[0].data)
       setResultData(null)
-      return
-    }
-    if (previousDataPane === 'table' && dataframeArtifacts.length > 0) {
-      setResultData(dataframeArtifacts[0].data)
-      setPlotlyFigure(null)
+      revealArtifactsPane({ hasFigures: true })
       return
     }
     if (dataframeArtifacts.length > 0) {
       setResultData(dataframeArtifacts[0].data)
       setPlotlyFigure(null)
+      revealArtifactsPane({ hasDataframes: true })
       return
     }
-    if (figureArtifacts.length > 0) {
-      setPlotlyFigure(figureArtifacts[0].data)
-      setResultData(null)
-      return
-    }
-
     setResultData(null)
     setPlotlyFigure(null)
   }
@@ -1690,6 +1687,13 @@ export const useAppStore = defineStore('app', () => {
 
     setDataframes(dataframeArtifacts)
     setFigures(figureArtifacts)
+    if (figureArtifacts.length > 0) {
+      setPlotlyFigure(figureArtifacts[0].data)
+      revealArtifactsPane({ hasFigures: true })
+    } else if (dataframeArtifacts.length > 0) {
+      setResultData(dataframeArtifacts[0].data)
+      revealArtifactsPane({ hasDataframes: true })
+    }
   }
 
   async function fetchWorkspaces() {
@@ -1999,6 +2003,33 @@ export const useAppStore = defineStore('app', () => {
 
   function setPlotlyFigure(figure) {
     plotlyFigure.value = figure
+  }
+
+  function selectDataPaneForArtifacts({ hasFigures = false, hasDataframes = false, hasOutput = false } = {}) {
+    if (hasFigures) {
+      setDataPane('figure')
+      return 'figure'
+    }
+    if (hasDataframes) {
+      setDataPane('table')
+      return 'table'
+    }
+    if (hasOutput) {
+      setDataPane('output')
+      return 'output'
+    }
+    return dataPane.value
+  }
+
+  function revealArtifactsPane(payload = {}) {
+    const hasFigures = Boolean(payload.hasFigures)
+    const hasDataframes = Boolean(payload.hasDataframes)
+    const hasOutput = Boolean(payload.hasOutput)
+    if (!hasFigures && !hasDataframes && !hasOutput) return dataPane.value
+    if (workspaceLayoutMode.value === 'chat') {
+      workspaceLayoutMode.value = 'split'
+    }
+    return selectDataPaneForArtifacts({ hasFigures, hasDataframes, hasOutput })
   }
 
   function setDataframes(dfs) {
@@ -2427,13 +2458,25 @@ export const useAppStore = defineStore('app', () => {
     isSidebarCollapsed.value = !!collapsed
     saveLocalConfig()
   }
-  function setDataFocusMode(enabled) {
-    isDataFocusMode.value = !!enabled
+  function setWorkspaceLayoutMode(mode) {
+    const normalizedMode = String(mode || '').trim().toLowerCase()
+    workspaceLayoutMode.value = ['chat', 'split', 'data'].includes(normalizedMode) ? normalizedMode : 'chat'
     activeTab.value = 'workspace'
     saveLocalConfig()
   }
+
+  function setDataFocusMode(enabled) {
+    setWorkspaceLayoutMode(enabled ? 'data' : 'split')
+  }
+
   function toggleDataFocusMode() {
     setDataFocusMode(!isDataFocusMode.value)
+  }
+
+  function cycleWorkspaceLayoutMode() {
+    const current = String(workspaceLayoutMode.value || 'chat')
+    const nextMode = current === 'chat' ? 'split' : current === 'split' ? 'data' : 'chat'
+    setWorkspaceLayoutMode(nextMode)
   }
   function setHideShortcutsModal(hide) {
     hideShortcutsModal.value = !!hide
@@ -2477,9 +2520,10 @@ export const useAppStore = defineStore('app', () => {
     selectedTableArtifactsByWorkspace.value = {}
     selectedFigureArtifactsByWorkspace.value = {}
     activeTab.value = 'workspace'
-    workspacePane.value = 'code'
+    workspacePane.value = 'chat'
     dataPane.value = 'table'
     leftPaneWidth.value = 50
+    workspaceLayoutMode.value = 'chat'
     isTerminalOpen.value = false
     terminalConsentGranted.value = false
     terminalCwd.value = ''
@@ -2703,6 +2747,9 @@ export const useAppStore = defineStore('app', () => {
     workspacePane,
     dataPane,
     leftPaneWidth,
+    workspaceLayoutMode,
+    showLeftPane,
+    showRightPane,
     isTerminalOpen,
     terminalHeight,
     terminalConsentGranted,
@@ -2844,6 +2891,8 @@ export const useAppStore = defineStore('app', () => {
     setActiveTab,
     setWorkspacePane,
     setDataPane,
+    selectDataPaneForArtifacts,
+    revealArtifactsPane,
     setLeftPaneWidth,
     setTerminalHeight,
     toggleTerminal,
@@ -2855,6 +2904,8 @@ export const useAppStore = defineStore('app', () => {
     setSidebarCollapsed,
     setDataFocusMode,
     toggleDataFocusMode,
+    setWorkspaceLayoutMode,
+    cycleWorkspaceLayoutMode,
     setHideShortcutsModal,
     setEditorPosition,
     setEditorFocused,

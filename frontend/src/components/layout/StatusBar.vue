@@ -107,17 +107,17 @@
       </template>
     </div>
 
-    <!-- Right Section: Data Focus, Terminal & Version -->
+    <!-- Right Section: Layout, Terminal & Version -->
     <div class="flex items-center gap-3 h-full">
-      <!-- Data Focus Toggle -->
+      <!-- Workspace Layout Toggle -->
       <button
-        @click="appStore.toggleDataFocusMode()"
+        @click="appStore.cycleWorkspaceLayoutMode()"
         class="flex items-center gap-1.5 h-full px-1.5 hover:bg-[var(--color-base)] transition-colors"
-        :class="appStore.isDataFocusMode ? 'text-[var(--color-accent)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
-        :title="dataFocusToggleTitle"
+        :class="appStore.workspaceLayoutMode !== 'chat' ? 'text-[var(--color-accent)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
+        :title="workspaceLayoutTitle"
       >
         <ViewColumnsIcon class="w-3.5 h-3.5" />
-        <span>Data Focus</span>
+        <span>{{ workspaceLayoutLabel }}</span>
       </button>
 
       <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
@@ -193,9 +193,14 @@ const artifactUsage = ref({
   warning: false,
 })
 
-const dataFocusToggleTitle = computed(() => {
-  if (appStore.isDataFocusMode) return 'Exit data focus mode (Cmd/Ctrl+Shift+D)'
-  return 'Enter data focus mode (Cmd/Ctrl+Shift+D)'
+const workspaceLayoutLabel = computed(() => {
+  if (appStore.workspaceLayoutMode === 'data') return 'Data Only'
+  if (appStore.workspaceLayoutMode === 'split') return 'Split'
+  return 'Chat Only'
+})
+
+const workspaceLayoutTitle = computed(() => {
+  return 'Cycle workspace layout: Chat Only, Split, Data Only (Cmd/Ctrl+Shift+D)'
 })
 
 function toNonNegativeInt(value) {

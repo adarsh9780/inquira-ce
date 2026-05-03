@@ -7,9 +7,9 @@ test('figure toolbar uses flexible selector width and icon-only actions', () => 
   const figureTabPath = resolve(process.cwd(), 'src/components/analysis/FigureTab.vue')
   const source = readFileSync(figureTabPath, 'utf-8')
 
-  assert.equal(source.includes('class="flex min-w-0 flex-1 items-center justify-end gap-2"'), true)
-  assert.equal(source.includes('class="flex min-w-[10rem] flex-1 items-center"'), true)
-  assert.equal(source.includes('style="max-width: min(34vw, 20rem);"'), true)
+  assert.equal(source.includes('to="#workspace-right-pane-toolbar-center"'), true)
+  assert.equal(source.includes('v-if="orderedFigures && orderedFigures.length > 0"'), true)
+  assert.equal(source.includes('class="flex min-w-[10rem] max-w-full flex-1 items-center"'), true)
   assert.equal(source.includes(`:title="isDeletingArtifact ? 'Deleting chart' : 'Delete chart'"`), true)
   assert.equal(source.includes(`:title="isDownloading ? 'Exporting chart' : 'Export chart'"`), true)
   assert.equal(source.includes('ChevronDownIcon'), false)

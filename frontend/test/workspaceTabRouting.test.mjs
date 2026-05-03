@@ -8,7 +8,7 @@ test('app store maps legacy code/chat tabs into workspace pane routing', () => {
   const source = readFileSync(storePath, 'utf-8')
 
   assert.equal(source.includes("const activeTab = ref('workspace')"), true)
-  assert.equal(source.includes("const workspacePane = ref('code')"), true)
+  assert.equal(source.includes("const workspacePane = ref('chat')"), true)
   assert.equal(source.includes("if (normalized === 'code')"), true)
   assert.equal(source.includes("if (normalized === 'chat')"), true)
   assert.equal(source.includes("activeTab.value = 'workspace'"), true)

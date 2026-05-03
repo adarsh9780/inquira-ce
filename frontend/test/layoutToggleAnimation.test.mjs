@@ -11,8 +11,10 @@ test('right panel animates terminal open and close via height and opacity transi
   assert.equal(panelSource.includes('transition-[height] motion-slow'), true)
   assert.equal(panelSource.includes('transition-[height,opacity,border-color] motion-slow'), true)
   assert.equal(panelSource.includes('h-0 pointer-events-none opacity-0'), true)
-  assert.equal(panelSource.includes('v-if="!appStore.isDataFocusMode"'), true)
-  assert.equal(panelSource.includes('const rightPaneWidth = computed(() => appStore.isDataFocusMode ? 100 : (100 - appStore.leftPaneWidth))'), true)
+  assert.equal(panelSource.includes('v-if="appStore.showLeftPane"'), true)
+  assert.equal(panelSource.includes('v-if="appStore.showRightPane"'), true)
+  assert.equal(panelSource.includes('const leftPaneWidth = computed(() => appStore.showRightPane ? appStore.leftPaneWidth : 100)'), true)
+  assert.equal(panelSource.includes('const rightPaneWidth = computed(() => appStore.showLeftPane ? (100 - appStore.leftPaneWidth) : 100)'), true)
   assert.equal(panelSource.includes(':style="{ width: rightPaneWidth + \'%\' }"'), true)
 })
 
@@ -30,7 +32,7 @@ test('sidebar icons keep fixed sizing during collapse/expand', () => {
 
   assert.equal(sidebarSource.includes('h-6 w-6 shrink-0 items-center justify-center'), true)
   assert.equal(sidebarSource.includes('KeyIcon class="h-5 w-5"'), true)
-  assert.equal(sidebarSource.includes('UserCircleIcon class="h-5 w-5"'), true)
+  assert.equal(sidebarSource.includes('sidebar-initials-avatar'), true)
   assert.equal(sidebarSource.includes('class="h-14 shrink-0 border-b border-[var(--color-border)] flex items-center pl-[20px] pr-4"'), true)
   assert.equal(sidebarSource.includes("appStore.activeTab === 'workspace' ? 'scale-110' : ''"), false)
   assert.equal(sidebarSource.includes("appStore.activeTab === 'schema-editor' ? 'scale-110' : ''"), false)

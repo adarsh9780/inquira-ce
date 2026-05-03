@@ -76,11 +76,11 @@
           </aside>
 
           <main class="relative flex-1 overflow-hidden">
-            <section :class="panelClass('llm')" class="absolute inset-0 overflow-y-auto px-5 py-5">
+            <section :class="panelClass('llm')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-5">
               <LLMSettingsTab @close-request="closeModal" />
             </section>
 
-            <section :class="panelClass('ws-list')" class="absolute inset-0 overflow-y-auto pb-5 pl-5 pr-12 pt-5">
+            <section :class="panelClass('ws-list')" class="scrollbar-hidden absolute inset-0 overflow-y-auto pb-5 pl-5 pr-12 pt-5">
               <WorkspaceTab
                 panel-mode="ws-list"
                 :active-workspace-id="activeWorkspaceId"
@@ -90,7 +90,7 @@
               />
             </section>
 
-            <section :class="panelClass('ws-detail')" class="absolute inset-0 overflow-y-auto pb-5 pl-5 pr-12 pt-5">
+            <section :class="panelClass('ws-detail')" class="scrollbar-hidden absolute inset-0 overflow-y-auto pb-5 pl-5 pr-12 pt-5">
               <WorkspaceTab
                 panel-mode="ws-detail"
                 :active-workspace-id="activeWorkspaceId"
@@ -100,7 +100,7 @@
               />
             </section>
 
-            <section :class="panelClass('ws-create')" class="absolute inset-0 overflow-y-auto pb-5 pl-5 pr-12 pt-5">
+            <section :class="panelClass('ws-create')" class="scrollbar-hidden absolute inset-0 overflow-y-auto pb-5 pl-5 pr-12 pt-5">
               <WorkspaceTab
                 panel-mode="ws-create"
                 :active-workspace-id="activeWorkspaceId"
@@ -110,15 +110,15 @@
               />
             </section>
 
-            <section :class="panelClass('appearance')" class="absolute inset-0 overflow-y-auto px-5 py-5">
+            <section :class="panelClass('appearance')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-5">
               <AppearanceTab />
             </section>
 
-            <section :class="panelClass('terms')" class="absolute inset-0 overflow-y-auto px-5 py-5">
+            <section :class="panelClass('terms')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-5">
               <TermsTab :active="currentPanel === 'terms'" />
             </section>
 
-            <section :class="panelClass('account')" class="absolute inset-0 overflow-y-auto px-5 py-5">
+            <section :class="panelClass('account')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-5 py-5">
               <AccountTab />
             </section>
           </main>

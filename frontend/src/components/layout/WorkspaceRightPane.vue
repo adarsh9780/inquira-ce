@@ -2,8 +2,8 @@
   <div class="flex h-full w-full min-h-0 min-w-0 flex-col" style="background-color: var(--color-workspace-surface);">
     <div
       ref="headerRef"
-      class="workspace-toolbar-shell flex-shrink-0 h-16 px-3 flex items-center border-b"
-      style="background-color: var(--color-workspace-surface); border-color: var(--color-border);"
+      class="workspace-toolbar-shell flex-shrink-0 h-16 px-3 flex items-center"
+      style="background-color: var(--color-workspace-surface);"
     >
       <div class="workspace-toolbar-zone workspace-toolbar-zone-left">
         <HeaderDropdown
@@ -54,12 +54,8 @@
         </div>
       </div>
 
-      <div class="workspace-toolbar-divider" aria-hidden="true"></div>
-
       <!-- Teleport Target: centered selector slot -->
       <div id="workspace-right-pane-toolbar-center" class="workspace-toolbar-zone workspace-toolbar-zone-center"></div>
-
-      <div class="workspace-toolbar-divider" aria-hidden="true"></div>
 
       <!-- Teleport Target: right controls slot -->
       <div id="workspace-right-pane-toolbar-right" class="workspace-toolbar-zone workspace-toolbar-zone-right"></div>
@@ -149,18 +145,12 @@ onUnmounted(() => {
 }
 
 .workspace-toolbar-zone-center {
-  justify-content: center;
-  flex: 1 1 auto;
+  justify-content: flex-start;
+  flex: 1 1 12rem;
 }
 
 .workspace-toolbar-zone-right {
   justify-content: flex-end;
-  flex: 1 1 auto;
-}
-
-.workspace-toolbar-divider {
-  width: 1px;
-  height: 1.75rem;
-  background-color: var(--color-border);
+  flex: 0 1 auto;
 }
 </style>

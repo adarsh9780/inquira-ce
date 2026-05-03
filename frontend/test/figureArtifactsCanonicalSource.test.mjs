@@ -22,7 +22,8 @@ test('FigureTab renders artifact load errors inside the centered empty state ins
 
   assert.equal(source.includes("v-if=\"artifactListError\""), true)
   assert.equal(source.includes("{{ artifactListError }}"), true)
-  assert.equal(source.includes("class=\"mt-3 rounded-md px-4 py-3 text-sm text-red-700 bg-red-100\""), true)
+  assert.equal(source.includes("class=\"mt-3 rounded-md px-4 py-3 text-sm\""), true)
+  assert.equal(source.includes("background-color: var(--color-danger-bg); color: var(--color-danger);"), true)
   assert.equal(source.includes("v-else-if=\"artifactListError\""), false)
 })
 

@@ -510,7 +510,13 @@ async function executeSnippet(code, successLine, options = {}) {
   const hasConsoleOutput = Boolean(outputStdout || outputStderr)
 
   applyExecutionArtifactsToStore(orderedViewModel)
-  const targetTab = decideExecutionTabWithSelection({
+  const targetTab = hasArtifacts || hasConsoleOutput
+    ? appStore.selectDataPaneForArtifacts({
+        hasFigures: orderedViewModel.figures.length > 0,
+        hasDataframes: orderedViewModel.dataframes.length > 0,
+        hasOutput: hasConsoleOutput,
+      })
+    : decideExecutionTabWithSelection({
     resultType: normalized?.result_type,
     resultKind: normalized?.result_kind,
     resultName: normalized?.result_name,
@@ -522,15 +528,19 @@ async function executeSnippet(code, successLine, options = {}) {
     figureNames: orderedViewModel.figures.map((fig) => String(fig?.name || '')),
   })
   if (preferOutputPane) {
-    appStore.setActiveTab('output')
+    appStore.revealArtifactsPane({ hasOutput: true })
   } else if (targetTab) {
-    appStore.setActiveTab(targetTab)
+    appStore.revealArtifactsPane({
+      hasFigures: targetTab === 'figure',
+      hasDataframes: targetTab === 'table',
+      hasOutput: targetTab === 'output',
+    })
   } else if (hasConsoleOutput) {
-    appStore.setActiveTab('output')
+    appStore.revealArtifactsPane({ hasOutput: true })
   } else if (preserveActiveTabOnNoOutput) {
     // Selection-style no-op execution (e.g. assignment only): keep current pane.
   } else {
-    appStore.setActiveTab('output')
+    appStore.revealArtifactsPane({ hasOutput: true })
   }
   if (!preserveActiveTabOnNoOutput || hasArtifacts || hasConsoleOutput) {
     appStore.setTerminalOutput(viewModel.output)

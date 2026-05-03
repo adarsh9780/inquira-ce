@@ -33,7 +33,7 @@ test('workspace shell owns pane sizing while child panes stay fluid', () => {
     true,
   )
   assert.equal(
-    panelSource.includes(`:style="{ width: appStore.leftPaneWidth + '%', borderColor: 'var(--color-border)' }"`),
+    panelSource.includes(`:style="{ width: leftPaneWidth + '%', borderColor: appStore.showRightPane ? 'var(--color-border)' : 'transparent' }"`),
     true,
   )
   assert.equal(
@@ -44,6 +44,8 @@ test('workspace shell owns pane sizing while child panes stay fluid', () => {
     panelSource.includes(`:style="{ width: rightPaneWidth + '%' }"`),
     true,
   )
+  assert.equal(panelSource.includes('v-if="appStore.showLeftPane"'), true)
+  assert.equal(panelSource.includes('v-if="appStore.showRightPane"'), true)
 
   assert.equal(
     leftPaneSource.includes('class="flex h-full w-full min-h-0 min-w-0 flex-col"'),

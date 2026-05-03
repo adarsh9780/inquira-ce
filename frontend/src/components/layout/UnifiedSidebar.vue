@@ -238,45 +238,18 @@
               @click="toggleProfileMenu"
             >
               <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-                <UserCircleIcon class="h-5 w-5" />
+                <span class="sidebar-initials-avatar">
+                  {{ profileInitials }}
+                </span>
               </div>
               <div
                 class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
                 :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
               >
-                <span class="text-[13px] font-medium">Profile</span>
+                <span class="text-[13px] font-medium">{{ profileDisplayName }}</span>
               </div>
             </button>
 
-            <!-- Profile popup — always floats above, anchored to sidebar left edge -->
-            <div
-              v-if="profileMenuOpen"
-              ref="profileMenuRef"
-              class="absolute bottom-full left-0 mb-2 z-50 w-48 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-lg"
-            >
-              <button
-                type="button"
-                class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
-                @click="openProfileSection('account')"
-              >
-                Account Settings
-              </button>
-              <button
-                type="button"
-                class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
-                @click="openProfileSection('appearance')"
-              >
-                Theme Preference
-              </button>
-              <div class="h-px bg-[var(--color-border)] my-1 opacity-60" />
-              <button
-                type="button"
-                class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
-                @click="openProfileSection('terms')"
-              >
-                Legal &amp; Terms
-              </button>
-            </div>
           </div>
 
         </div>
@@ -298,12 +271,44 @@
       @close="closeDeleteDialog"
       @confirm="confirmDelete"
     />
+    <Teleport to="body">
+      <div
+        v-if="profileMenuOpen"
+        ref="profileMenuRef"
+        class="sidebar-profile-menu layer-dropdown fixed w-48 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-lg"
+        :style="profileMenuStyle"
+      >
+        <button
+          type="button"
+          class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
+          @click="openProfileSection('account')"
+        >
+          Account Settings
+        </button>
+        <button
+          type="button"
+          class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
+          @click="openProfileSection('appearance')"
+        >
+          Theme Preference
+        </button>
+        <div class="h-px bg-[var(--color-border)] my-1 opacity-60" />
+        <button
+          type="button"
+          class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
+          @click="openProfileSection('terms')"
+        >
+          Legal &amp; Terms
+        </button>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
+import { useAuthStore } from '../../stores/authStore'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import SettingsModal from '../modals/SettingsModal.vue'
@@ -316,11 +321,11 @@ import {
   PlusIcon,
   EllipsisHorizontalIcon,
   KeyIcon,
-  UserCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 // ─── Store ───────────────────────────────────────────────────────────────────
 const appStore = useAppStore()
+const authStore = useAuthStore()
 
 // ─── UI State ────────────────────────────────────────────────────────────────
 const searchQuery       = ref('')
@@ -333,6 +338,7 @@ const conversationMenuId   = ref(null)
 const profileMenuOpen      = ref(false)
 const profileMenuRef       = ref(null)
 const profileMenuButtonRef = ref(null)
+const profileMenuPosition  = ref({ left: 0, top: 0 })
 
 // ─── Settings Modal ───────────────────────────────────────────────────────────
 const isSettingsOpen      = ref(false)
@@ -345,6 +351,12 @@ const deleteDialogTitle   = ref('')
 const deleteDialogMessage = ref('')
 const pendingDeleteType   = ref('')
 const pendingDeleteId     = ref('')
+const workspaceDatasetSummary = ref({
+  workspaceId: '',
+  count: 0,
+  bytes: null,
+  loading: false,
+})
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const activeWorkspaceName = computed(() => {
@@ -356,10 +368,31 @@ const activeWorkspaceName = computed(() => {
 
 const activeWorkspaceCaption = computed(() => {
   if (!appStore.hasWorkspace) return 'Create a workspace to begin'
-  const activeId = String(appStore.activeWorkspaceId || '').trim()
-  const ws = appStore.workspaces.find((w) => w.id === activeId)
-  return workspaceFilename(ws?.duckdb_path)
+  if (workspaceDatasetSummary.value.loading) return 'Loading datasets'
+  const count = workspaceDatasetSummary.value.count
+  const label = count === 1 ? '1 dataset' : `${count} datasets`
+  const bytes = workspaceDatasetSummary.value.bytes
+  const usage = Number.isFinite(bytes) ? `${formatStorage(bytes)} used` : 'storage used'
+  return `${label} | ${usage}`
 })
+
+const profileDisplayName = computed(() => {
+  return String(authStore.username || 'Local User').trim() || 'Local User'
+})
+
+const profileInitials = computed(() => {
+  const parts = profileDisplayName.value
+    .split(/\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+  return (parts[0] || 'LU').slice(0, 2).toUpperCase()
+})
+
+const profileMenuStyle = computed(() => ({
+  left: `${profileMenuPosition.value.left}px`,
+  top: `${profileMenuPosition.value.top}px`,
+}))
 
 const filteredConversations = computed(() => {
   if (!searchQuery.value) return appStore.conversations
@@ -370,10 +403,78 @@ const filteredConversations = computed(() => {
 })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function workspaceFilename(duckdbPath) {
-  const v = String(duckdbPath || '').trim()
-  if (!v) return 'workspace.duckdb'
-  return v.split('/').pop() || 'workspace.duckdb'
+function readDatasetSizeBytes(dataset) {
+  const candidates = [
+    dataset?.file_size,
+    dataset?.file_size_bytes,
+    dataset?.size_bytes,
+    dataset?.bytes,
+  ]
+  for (const value of candidates) {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed
+  }
+  return null
+}
+
+function formatStorage(bytes) {
+  const value = Number(bytes)
+  if (!Number.isFinite(value) || value < 0) return 'storage'
+  if (value < 1024) return `${Math.round(value)} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let size = value / 1024
+  let unitIndex = 0
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024
+    unitIndex += 1
+  }
+  const precision = size >= 10 ? 0 : 1
+  return `${size.toFixed(precision)} ${units[unitIndex]}`
+}
+
+async function refreshWorkspaceDatasetSummary() {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (!workspaceId) {
+    workspaceDatasetSummary.value = { workspaceId: '', count: 0, bytes: null, loading: false }
+    return
+  }
+
+  workspaceDatasetSummary.value = {
+    ...workspaceDatasetSummary.value,
+    workspaceId,
+    loading: true,
+  }
+
+  try {
+    const response = await apiService.v1ListDatasets(workspaceId)
+    if (workspaceId !== String(appStore.activeWorkspaceId || '').trim()) return
+    const datasets = Array.isArray(response?.datasets) ? response.datasets : []
+    let totalBytes = 0
+    let hasSize = false
+    for (const dataset of datasets) {
+      const bytes = readDatasetSizeBytes(dataset)
+      if (bytes === null) continue
+      totalBytes += bytes
+      hasSize = true
+    }
+    workspaceDatasetSummary.value = {
+      workspaceId,
+      count: datasets.length,
+      bytes: hasSize ? totalBytes : null,
+      loading: false,
+    }
+  } catch (_error) {
+    workspaceDatasetSummary.value = {
+      workspaceId,
+      count: 0,
+      bytes: null,
+      loading: false,
+    }
+  }
+}
+
+function handleDatasetsChanged() {
+  void refreshWorkspaceDatasetSummary()
 }
 
 // ─── Brand / collapse ─────────────────────────────────────────────────────────
@@ -382,8 +483,28 @@ function handleBrandClick() {
 }
 
 // ─── Profile menu ─────────────────────────────────────────────────────────────
-function toggleProfileMenu() {
+function updateProfileMenuPosition() {
+  const rect = profileMenuButtonRef.value?.getBoundingClientRect?.()
+  if (!rect) return
+  const menuWidth = 192
+  const gap = 8
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
+  const left = Math.min(
+    Math.max(rect.left, gap),
+    Math.max(gap, viewportWidth - menuWidth - gap),
+  )
+  const fallbackHeight = 124
+  const top = Math.max(gap, Math.min(rect.top - fallbackHeight - gap, viewportHeight - fallbackHeight - gap))
+  profileMenuPosition.value = { left, top }
+}
+
+async function toggleProfileMenu() {
   profileMenuOpen.value = !profileMenuOpen.value
+  if (profileMenuOpen.value) {
+    await nextTick()
+    updateProfileMenuPosition()
+  }
 }
 
 function closeProfileMenu() {
@@ -570,14 +691,22 @@ onMounted(async () => {
   }
   window.addEventListener('sidebar-open-settings', handleOpenSettingsRequest)
   window.addEventListener('click', handleGlobalClick)
+  window.addEventListener('dataset-switched', handleDatasetsChanged)
+  window.addEventListener('resize', updateProfileMenuPosition)
+  window.addEventListener('scroll', updateProfileMenuPosition, true)
+  void refreshWorkspaceDatasetSummary()
 })
 
 onUnmounted(() => {
   window.removeEventListener('sidebar-open-settings', handleOpenSettingsRequest)
   window.removeEventListener('click', handleGlobalClick)
+  window.removeEventListener('dataset-switched', handleDatasetsChanged)
+  window.removeEventListener('resize', updateProfileMenuPosition)
+  window.removeEventListener('scroll', updateProfileMenuPosition, true)
 })
 
 watch(() => appStore.activeWorkspaceId, async (newId) => {
+  void refreshWorkspaceDatasetSummary()
   if (newId) await appStore.fetchConversations()
 })
 
@@ -607,5 +736,20 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 }
 .custom-scrollbar:hover::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--color-border) 100%, transparent);
+}
+
+.sidebar-initials-avatar {
+  display: inline-flex;
+  height: 1.5rem;
+  width: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--color-selected-surface);
+  color: var(--color-text-main);
+  box-shadow: inset 0 0 0 1px var(--color-selected-border);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 </style>

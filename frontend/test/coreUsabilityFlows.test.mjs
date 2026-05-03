@@ -18,11 +18,11 @@ test('chat tab exposes conversation lifecycle controls for usable analysis sessi
   const source = readFileSync(resolve(process.cwd(), 'src/components/chat/ChatTab.vue'), 'utf-8')
 
   assert.equal(source.includes('title="New Conversation"'), true)
-  assert.equal(source.includes('title="Clear Conversation"'), true)
+  assert.equal(source.includes('title="Clear Conversation"'), false)
   assert.equal(source.includes('title="Delete Conversation"'), false)
   assert.equal(source.includes('await appStore.createConversation()'), true)
   assert.equal(source.includes('await appStore.fetchConversationTurns({ reset: true })'), true)
-  assert.equal(source.includes('await appStore.clearActiveConversation()'), true)
+  assert.equal(source.includes('await appStore.clearActiveConversation()'), false)
   assert.equal(source.includes('await appStore.deleteActiveConversation()'), false)
 })
 

@@ -922,3 +922,14 @@ p {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
 }
+
+.scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}

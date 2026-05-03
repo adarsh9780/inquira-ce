@@ -82,10 +82,10 @@
       </div>
 
       <!-- Bottom Action Row -->
-      <div class="flex items-center justify-between px-3 pb-3 pt-1">
+      <div class="flex flex-wrap items-center justify-between gap-2 px-3 pb-3 pt-1">
 
         <!-- Left: Add button + turn controls -->
-        <div class="flex items-center gap-1.5">
+        <div class="flex min-w-0 flex-wrap items-center gap-1.5">
           <button
             type="button"
             class="btn-icon"
@@ -126,17 +126,19 @@
         </div>
 
         <!-- Right: Model selector + action button -->
-        <div class="flex items-center gap-3">
-          <ModelSelector
-            :selected-model="appStore.selectedModel"
-            :model-options="appStore.availableModels"
-            :provider="appStore.llmProvider"
-            :backend-search="searchProviderModels"
-            :search-loading="appStore.providerModelSearchLoading"
-            :search-debounce-ms="250"
-            :max-options-without-search="10"
-            @model-changed="handleModelChange"
-          />
+        <div class="flex min-w-[12rem] flex-1 items-center justify-end gap-3">
+          <div class="min-w-[10rem] max-w-full flex-1 sm:max-w-[22rem]">
+            <ModelSelector
+              :selected-model="appStore.selectedModel"
+              :model-options="appStore.availableModels"
+              :provider="appStore.llmProvider"
+              :backend-search="searchProviderModels"
+              :search-loading="appStore.providerModelSearchLoading"
+              :search-debounce-ms="250"
+              :max-options-without-search="10"
+              @model-changed="handleModelChange"
+            />
+          </div>
 
           <!-- Mic (empty) → ArrowUp (has text) -->
           <button
@@ -1154,14 +1156,14 @@ function applyCommandResultToStore(commandResult) {
     appStore.setResultData(tableResult)
     appStore.setFigures([])
     appStore.setPlotlyFigure(null)
-    appStore.setDataPane('table')
+    appStore.revealArtifactsPane({ hasDataframes: true })
     appStore.setActiveTab('table')
   } else {
     appStore.setDataframes([])
     appStore.setResultData(null)
     appStore.setFigures([])
     appStore.setPlotlyFigure(null)
-    appStore.setDataPane('output')
+    appStore.revealArtifactsPane({ hasOutput: true })
     appStore.setActiveTab('output')
   }
 
@@ -1420,7 +1422,6 @@ async function handleSubmit() {
       appStore.setPythonFileContent(finalCode)
     }
 
-    const previousDataPane = String(appStore.dataPane || '').trim().toLowerCase()
     if (finalCode && finalCode.trim()) {
       const executionStderr = response?.execution?.stderr || ''
       const executionStdout = response?.execution?.stdout || ''
@@ -1430,11 +1431,11 @@ async function handleSubmit() {
       if (inlineFigure) {
         appStore.setPlotlyFigure(inlineFigure)
         appStore.setResultData(null)
-        appStore.setDataPane('figure')
+        appStore.revealArtifactsPane({ hasFigures: true })
       } else if (response.result?.columns && response.result?.data) {
         appStore.setResultData(response.result)
         appStore.setPlotlyFigure(null)
-        appStore.setDataPane('table')
+        appStore.revealArtifactsPane({ hasDataframes: true })
       }
     }
 
@@ -1468,18 +1469,14 @@ async function handleSubmit() {
 
       appStore.setDataframes(dataframeArtifacts)
       appStore.setFigures(figureArtifacts)
-      if (previousDataPane === 'table' && dataframeArtifacts.length > 0) {
-        appStore.setResultData(dataframeArtifacts[0].data)
-        appStore.setDataPane('table')
-      } else if (previousDataPane === 'figure' && figureArtifacts.length > 0) {
+      if (figureArtifacts.length > 0) {
         appStore.setPlotlyFigure(figureArtifacts[0].data)
-        appStore.setDataPane('figure')
+        appStore.revealArtifactsPane({ hasFigures: true })
       } else if (dataframeArtifacts.length > 0) {
         appStore.setResultData(dataframeArtifacts[0].data)
-        appStore.setDataPane('table')
-      } else if (figureArtifacts.length > 0) {
-        appStore.setPlotlyFigure(figureArtifacts[0].data)
-        appStore.setDataPane('figure')
+        appStore.revealArtifactsPane({ hasDataframes: true })
+      } else if (artifactItems.length > 0) {
+        appStore.revealArtifactsPane({ hasOutput: true })
       }
     }
 

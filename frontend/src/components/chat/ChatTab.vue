@@ -17,16 +17,6 @@
             >
               <PlusIcon class="h-4 w-4" />
             </button>
-            <div class="mx-0.5 h-4 w-px" style="background-color: var(--color-border);"></div>
-            <button
-              type="button"
-              class="btn-icon hover:text-[var(--color-warning)]"
-              :disabled="!appStore.activeConversationId"
-              @click="clearConversation"
-              title="Clear Conversation"
-            >
-              <ArrowPathIcon class="h-4 w-4" />
-            </button>
           </div>
       </div>
     </Teleport>
@@ -77,7 +67,6 @@ import { useAppStore } from '../../stores/appStore'
 import ChatHistory from './ChatHistory.vue'
 import { 
   ChatBubbleLeftRightIcon, 
-  ArrowPathIcon,
   PlusIcon
 } from '@heroicons/vue/24/outline'
 import { toast } from '../../composables/useToast'
@@ -92,15 +81,6 @@ async function createConversation() {
     await appStore.fetchConversationTurns({ reset: true })
   } catch (error) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to create conversation'))
-  }
-}
-
-async function clearConversation() {
-  if (!appStore.activeConversationId) return
-  try {
-    await appStore.clearActiveConversation()
-  } catch (error) {
-    toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to clear conversation'))
   }
 }
 

@@ -405,7 +405,7 @@ function handleGlobalShortcuts(event) {
 
   if (key === 'd' && event.shiftKey) {
     event.preventDefault()
-    appStore.toggleDataFocusMode()
+    appStore.cycleWorkspaceLayoutMode()
   }
 }
 

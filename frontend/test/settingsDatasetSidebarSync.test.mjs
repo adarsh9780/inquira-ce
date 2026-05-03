@@ -13,6 +13,6 @@ test('dataset selection from settings emits shared switch event and the dataset 
   assert.equal(sidebarSource.includes("window.addEventListener('dataset-switched', handleDatasetSwitched)"), true)
   assert.equal(sidebarSource.includes('function isSelectedDataset(ds) {'), true)
   assert.equal(sidebarSource.includes('datasetTable === activeTable'), true)
-  assert.equal(unifiedSidebarSource.includes("window.addEventListener('dataset-switched'"), false)
-  assert.equal(unifiedSidebarSource.includes('fetchDatasets'), false)
+  assert.equal(unifiedSidebarSource.includes("window.addEventListener('dataset-switched', handleDatasetsChanged)"), true)
+  assert.equal(unifiedSidebarSource.includes('refreshWorkspaceDatasetSummary'), true)
 })
