@@ -42,6 +42,8 @@ async def test_persist_turn_shadow_writes_turn_bundle(monkeypatch) -> None:
         conversation=conversation,
         username="alice",
         workspace_id="workspace-1",
+        workspace_schema={"table_name": "orders", "columns": [{"name": "revenue"}]},
+        data_path="/tmp/workspace.db",
         conversation_id="conversation-1",
         question="Find monthly revenue",
         attachments=None,

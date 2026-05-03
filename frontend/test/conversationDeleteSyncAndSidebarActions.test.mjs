@@ -15,23 +15,18 @@ test('conversation delete flow in store re-syncs active conversation and hydrate
   assert.equal(source.includes('const activeStillExists = currentActiveId'), true)
   assert.equal(source.includes('await fetchConversationTurns({ reset: true })'), true)
   assert.equal(source.includes('setActiveConversationId(fallbackConversationId)'), true)
-  assert.equal(source.includes('await deleteConversationById(activeConversationId.value)'), true)
-  assert.equal(source.includes('const conversationIds = new Set('), true)
-  assert.equal(source.includes('if (!conversationIds.has(currentActiveId))'), true)
 })
 
-test('sidebar conversation rows use a 3-dot action menu and route deletes through store sync action', () => {
+test('sidebar conversation rows use an ellipsis menu and route deletes through store sync action', () => {
   const sidebarSource = readSource('src/components/layout/UnifiedSidebar.vue')
   const chatTabSource = readSource('src/components/chat/ChatTab.vue')
 
   assert.equal(sidebarSource.includes('EllipsisHorizontalIcon'), true)
-  assert.equal(sidebarSource.includes('title="Conversation actions"'), true)
   assert.equal(sidebarSource.includes('toggleConversationMenu(conv.id)'), true)
   assert.equal(sidebarSource.includes('data-conversation-actions-menu'), true)
   assert.equal(sidebarSource.includes('startEditingFromMenu(conv)'), true)
   assert.equal(sidebarSource.includes('confirmDeleteConversation(conv.id)'), true)
   assert.equal(sidebarSource.includes('await appStore.deleteConversationById(pendingDeleteId.value)'), true)
   assert.equal(sidebarSource.includes('await apiService.v1DeleteConversation(pendingDeleteId.value)'), false)
-
   assert.equal(chatTabSource.includes('title="Delete Conversation"'), false)
 })

@@ -119,10 +119,19 @@ class SchemaMemoryService:
             merged_tables.append(candidate)
 
         merged_columns: dict[str, list[str]] = {}
-        raw_columns = current.get("columns_loaded") if isinstance(current.get("columns_loaded"), dict) else {}
-        raw_turn_columns = (
-            turn_usage.get("columns_loaded") if isinstance(turn_usage.get("columns_loaded"), dict) else {}
-        )
+        current_columns_value = current.get("columns_loaded")
+        raw_columns: dict[str, Any]
+        if isinstance(current_columns_value, dict):
+            raw_columns = current_columns_value
+        else:
+            raw_columns = {}
+
+        turn_columns_value = turn_usage.get("columns_loaded")
+        raw_turn_columns: dict[str, Any]
+        if isinstance(turn_columns_value, dict):
+            raw_turn_columns = turn_columns_value
+        else:
+            raw_turn_columns = {}
         for table_name in merged_tables:
             names: list[str] = []
             seen_names: set[str] = set()

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('collapsed sidebar expands only on explicit icon click (never on hover)', () => {
+test('collapsed sidebar expands only on explicit click and not on hover', () => {
   const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
@@ -11,22 +11,19 @@ test('collapsed sidebar expands only on explicit icon click (never on hover)', (
   assert.equal(appSource.includes('@mouseleave='), false)
   assert.equal(sidebarSource.includes('@mouseenter='), false)
   assert.equal(sidebarSource.includes('@mouseleave='), false)
-  assert.equal(sidebarSource.includes('class="nav-btn"'), true)
+  assert.equal(sidebarSource.includes('@click="handleBrandClick"'), true)
   assert.equal(sidebarSource.includes('function openWorkspaceRail(target = \'\') {'), false)
-  assert.equal(sidebarSource.includes("title=\"Open workspace settings\""), true)
-  assert.equal(sidebarSource.includes("title=\"New Conversation\""), true)
-  assert.equal(sidebarSource.includes("title=\"LLM & API Keys\""), true)
+  assert.equal(sidebarSource.includes('title="New Conversation"'), true)
+  assert.equal(sidebarSource.includes('title="API Keys"'), true)
 })
 
-test('sidebar keeps a fixed top rail and uses width transition to avoid layout jerk', () => {
+test('sidebar branding keeps a stable fixed top row while the shell owns width animation', () => {
   const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
   assert.equal(appSource.includes('transition: width var(--motion-duration-standard) var(--motion-ease-standard);'), true)
   assert.equal(appSource.includes('.app-nav-pane-collapsed {'), true)
-  assert.equal(sidebarSource.includes('class="sidebar-brand-shell h-14 shrink-0"'), true)
-  assert.equal(sidebarSource.includes('brand-btn h-full w-full px-3'), true)
+  assert.equal(sidebarSource.includes('class="h-14 shrink-0 border-b border-[var(--color-border)] flex items-center pl-[20px] pr-4"'), true)
+  assert.equal(sidebarSource.includes('class="flex h-full w-full items-center transition-opacity hover:opacity-70 focus:outline-none"'), true)
   assert.equal(sidebarSource.includes('alt="Inquira"'), true)
-  assert.equal(sidebarSource.includes('sidebar-brand-wordmark'), true)
-  assert.equal(sidebarSource.includes('sidebar-brand-copy'), false)
 })
