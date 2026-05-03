@@ -496,6 +496,7 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
         enabled_models=display_models,
         schema_context=prefs.schema_context,
         allow_schema_sample_values=bool(prefs.allow_schema_sample_values),
+        allow_llm_data_samples=bool(getattr(prefs, "allow_llm_data_samples", False)),
         terminal_risk_acknowledged=bool(getattr(prefs, "terminal_risk_acknowledged", False)),
         chat_overlay_width=float(prefs.chat_overlay_width),
         is_sidebar_collapsed=bool(prefs.is_sidebar_collapsed),
@@ -608,6 +609,8 @@ async def update_preferences(
         prefs.schema_context = payload.schema_context
     if payload.allow_schema_sample_values is not None:
         prefs.allow_schema_sample_values = payload.allow_schema_sample_values
+    if payload.allow_llm_data_samples is not None:
+        prefs.allow_llm_data_samples = bool(payload.allow_llm_data_samples)
     if payload.terminal_risk_acknowledged is not None:
         prefs.terminal_risk_acknowledged = bool(payload.terminal_risk_acknowledged)
     if payload.chat_overlay_width is not None:
@@ -834,6 +837,8 @@ async def set_api_key(
         prefs.llm_presence_penalty = float(payload.llm_presence_penalty)
     if payload.slow_request_warning_seconds is not None:
         prefs.slow_request_warning_seconds = int(payload.slow_request_warning_seconds)
+    if payload.allow_llm_data_samples is not None:
+        prefs.allow_llm_data_samples = bool(payload.allow_llm_data_samples)
 
     try:
         refresh_result = await refresh_provider_model_catalog(

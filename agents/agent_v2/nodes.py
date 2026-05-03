@@ -1477,6 +1477,14 @@ def sample_data_context_tool(
 ) -> dict[str, Any]:
     """Sample rows from a table to confirm data shape and value patterns."""
     context = analysis_context if isinstance(analysis_context, dict) else {}
+    if not _allow_llm_data_samples_from_context(context):
+        return {
+            "rows": [],
+            "columns": [],
+            "row_count": 0,
+            "disabled": True,
+            "disabled_reason": "LLM data samples are disabled for this workspace analysis.",
+        }
     fallback_table = str(context.get("sample_table") or "").strip()
     return sample_data(
         data_path=str(context.get("data_path") or "") or None,
@@ -1503,6 +1511,14 @@ def sample_data_runtime_tool(
 ) -> dict[str, Any]:
     """Sample table data during generation/execution flow."""
     context = analysis_context if isinstance(analysis_context, dict) else {}
+    if not _allow_llm_data_samples_from_context(context):
+        return {
+            "rows": [],
+            "columns": [],
+            "row_count": 0,
+            "disabled": True,
+            "disabled_reason": "LLM data samples are disabled for this workspace analysis.",
+        }
     fallback_table = str(context.get("sample_table") or "").strip()
     return sample_data(
         data_path=str(context.get("data_path") or "") or None,
@@ -1831,6 +1847,25 @@ def _truncate_text(value: Any, *, limit: int = 2400) -> str:
     return text[: max(0, limit - 3)].rstrip() + "..."
 
 
+def _allow_llm_data_samples_from_context(context: dict[str, Any]) -> bool:
+    privacy = context.get("privacy") if isinstance(context.get("privacy"), dict) else {}
+    return bool(privacy.get("allow_llm_data_samples"))
+
+
+def _sanitize_result_summary_for_llm(
+    result_summary: dict[str, Any],
+    *,
+    allow_llm_data_samples: bool,
+) -> dict[str, Any]:
+    summary = dict(result_summary or {})
+    if allow_llm_data_samples:
+        return summary
+    summary.pop("result_preview", None)
+    summary["result_preview_redacted"] = True
+    summary["privacy_note"] = "Row-level result previews are withheld because LLM data samples are disabled."
+    return summary
+
+
 def _build_context_enrichment_user_prompt(
     *,
     user_text: str,
@@ -1842,6 +1877,7 @@ def _build_context_enrichment_user_prompt(
     enrichment_hints: list[str],
     prior_search_summary: str,
     tool_budget_remaining: int,
+    allow_llm_data_samples: bool = False,
 ) -> str:
     known_columns_json = _safe_json_dumps(known_columns[:20])
     missing_json = _safe_json_dumps(missing_context[:6])
@@ -1861,7 +1897,13 @@ def _build_context_enrichment_user_prompt(
         f"Prior search context:\n{_truncate_text(prior_search_summary, limit=1200) or 'none'}\n\n"
         f"Retry feedback:\n{feedback or 'none'}\n\n"
         f"Tool call budget remaining: {max(0, int(tool_budget_remaining))}\n"
-        "If context is sufficient, do not call tools and return final JSON immediately."
+        f"LLM data samples allowed: {'yes' if allow_llm_data_samples else 'no'}\n"
+        + (
+            "You may use sample_data only when it is necessary and bounded.\n"
+            if allow_llm_data_samples
+            else "Do not call sample_data; use schema metadata and generated aggregate code instead.\n"
+        )
+        + "If context is sufficient, do not call tools and return final JSON immediately."
     )
 
 
@@ -2311,6 +2353,14 @@ async def _run_context_schema_chunks(state: dict[str, Any], args: dict[str, Any]
 
 async def _run_sample_data(state: dict[str, Any], args: dict[str, Any], explanation: str) -> dict[str, Any]:
     analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
+    if not _allow_llm_data_samples_from_context(analysis_context):
+        return {
+            "rows": [],
+            "columns": [],
+            "row_count": 0,
+            "disabled": True,
+            "disabled_reason": "LLM data samples are disabled for this workspace analysis.",
+        }
     fallback_table = str(analysis_context.get("sample_table") or "").strip()
     return await asyncio.to_thread(
         sample_data,
@@ -2760,8 +2810,23 @@ async def _generate_result_explanations(
     code: str,
     code_explanation: str,
     result_summary: dict[str, Any],
+    allow_llm_data_samples: bool,
     config: RunnableConfig,
 ) -> ResultExplanation:
+    explanation_mode = (
+        "Insight-first mode is enabled. Use the bounded result preview when present. "
+        "Start with the main finding, compare important rows/groups, identify strongest or weakest performers when visible, "
+        "then mention caveats. Do not open with a task-completion sentence like 'I have compiled'."
+        if allow_llm_data_samples
+        else (
+            "Private metadata-only mode is enabled. Row-level result previews are not available to the LLM. "
+            "Use stdout, artifact metadata, and aggregate summaries only; do not invent values."
+        )
+    )
+    llm_result_summary = _sanitize_result_summary_for_llm(
+        result_summary,
+        allow_llm_data_samples=allow_llm_data_samples,
+    )
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", _RESULT_EXPLANATION_PROMPT),
@@ -2771,6 +2836,7 @@ async def _generate_result_explanations(
                     "User question:\n{question}\n\n"
                     "Generated code:\n```python\n{code}\n```\n\n"
                     "Existing technical explanation:\n{code_explanation}\n\n"
+                    "Explanation mode:\n{explanation_mode}\n\n"
                     "Execution summary JSON:\n{result_summary_json}"
                 ),
             ),
@@ -2785,7 +2851,8 @@ async def _generate_result_explanations(
             "question": question,
             "code": code,
             "code_explanation": code_explanation,
-            "result_summary_json": _safe_json_dumps(result_summary),
+            "explanation_mode": explanation_mode,
+            "result_summary_json": _safe_json_dumps(llm_result_summary),
         },
     )
     if isinstance(output, ResultExplanation):
@@ -2882,6 +2949,7 @@ async def analysis_collect_context_node(state: dict[str, Any], config: RunnableC
             "schema_context_pack": schema_context_pack,
             "schema_memory": schema_memory,
             "conversation_memory": conversation_memory,
+            "privacy": state.get("privacy") if isinstance(state.get("privacy"), dict) else {},
         },
         "known_columns": known_columns,
         "attempt_counters": {
@@ -2978,6 +3046,7 @@ def analysis_assess_to_next(state: dict[str, Any]) -> str:
 
 async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
     analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
+    allow_llm_data_samples = _allow_llm_data_samples_from_context(analysis_context)
     known_columns = _normalize_known_columns(state.get("known_columns") or [], max_items=50)
     context_sufficiency = state.get("context_sufficiency") if isinstance(state.get("context_sufficiency"), dict) else {}
     missing_context = [
@@ -3005,6 +3074,7 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
         enrichment_hints=hints,
         prior_search_summary=prior_search_summary,
         tool_budget_remaining=tool_budget_remaining,
+        allow_llm_data_samples=allow_llm_data_samples,
     )
 
     if tool_budget_remaining <= 0:
@@ -3131,6 +3201,7 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
         enrichment_hints=hints,
         prior_search_summary=prior_search_summary,
         tool_budget_remaining=tool_budget_remaining,
+        allow_llm_data_samples=allow_llm_data_samples,
     )
 
     _emit_agent_status(
@@ -3174,6 +3245,8 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
         [item.model_dump() for item in (plan.tools or [])],
         max_items=max(1, tool_budget_remaining),
     )
+    if not allow_llm_data_samples:
+        pending_tools = [item for item in pending_tools if str(item.get("tool") or "") != "sample_data"]
     pending_tools = _filter_redundant_context_tools(pending_tools, existing_results)
     if decision.enough_context:
         pending_tools = []
@@ -3774,6 +3847,7 @@ async def analysis_validate_result_node(state: dict[str, Any], config: RunnableC
                 code=code,
                 code_explanation=code_explanation,
                 result_summary=result_summary,
+                allow_llm_data_samples=_allow_llm_data_samples_from_context(analysis_context),
                 config=config,
             )
             result_explanation = str(explained.result_explanation or "").strip()

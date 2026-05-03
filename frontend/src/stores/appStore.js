@@ -52,6 +52,7 @@ export const useAppStore = defineStore('app', () => {
   // Schema Context
   const schemaContext = ref('')
   const allowSchemaSampleValues = ref(false)
+  const allowLlmDataSamples = ref(false)
   const plotlyThemeMode = ref('soft')
   const uiTheme = ref(DEFAULT_THEME_ID)
   const availableThemes = THEME_OPTIONS.map((theme) => ({ ...theme }))
@@ -247,6 +248,7 @@ export const useAppStore = defineStore('app', () => {
         selected_lite_model: selectedLiteModel.value || '',
         selected_coding_model: selectedModel.value || '',
         slow_request_warning_seconds: normalizeSlowRequestWarningSeconds(slowRequestWarningSeconds.value),
+        allow_llm_data_samples: allowLlmDataSamples.value,
         provider_main_models: Array.isArray(providerMainModels.value) ? [...providerMainModels.value] : [],
         provider_lite_models: Array.isArray(providerLiteModels.value) ? [...providerLiteModels.value] : [],
       },
@@ -327,6 +329,9 @@ export const useAppStore = defineStore('app', () => {
     selectedCodingModel.value = selectedModel.value || selectedCodingModel.value
     if (llm.slow_request_warning_seconds !== undefined && llm.slow_request_warning_seconds !== null) {
       slowRequestWarningSeconds.value = normalizeSlowRequestWarningSeconds(llm.slow_request_warning_seconds)
+    }
+    if (typeof llm.allow_llm_data_samples === 'boolean') {
+      allowLlmDataSamples.value = llm.allow_llm_data_samples
     }
 
     if (typeof ui.active_tab === 'string' && ui.active_tab.trim()) {
@@ -485,6 +490,7 @@ export const useAppStore = defineStore('app', () => {
         slow_request_warning_seconds: normalizeSlowRequestWarningSeconds(slowRequestWarningSeconds.value),
         schema_context: schemaContext.value,
         allow_schema_sample_values: allowSchemaSampleValues.value,
+        allow_llm_data_samples: allowLlmDataSamples.value,
         terminal_risk_acknowledged: terminalConsentGranted.value,
         chat_overlay_width: chatOverlayWidth.value,
         ui_theme: uiTheme.value,
@@ -2555,6 +2561,9 @@ export const useAppStore = defineStore('app', () => {
     if (typeof prefs?.allow_schema_sample_values === 'boolean') {
       allowSchemaSampleValues.value = prefs.allow_schema_sample_values
     }
+    if (typeof prefs?.allow_llm_data_samples === 'boolean') {
+      allowLlmDataSamples.value = prefs.allow_llm_data_samples
+    }
     if (typeof prefs?.terminal_risk_acknowledged === 'boolean') {
       terminalConsentGranted.value = prefs.terminal_risk_acknowledged
     }
@@ -2647,6 +2656,7 @@ export const useAppStore = defineStore('app', () => {
     apiKeyConfigured,
     schemaContext,
     allowSchemaSampleValues,
+    allowLlmDataSamples,
     plotlyThemeMode,
     uiTheme,
     availableThemes,

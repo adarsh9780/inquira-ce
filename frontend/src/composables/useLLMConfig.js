@@ -33,6 +33,7 @@ const llmTopK = ref(0)
 const llmFrequencyPenalty = ref(0)
 const llmPresencePenalty = ref(0)
 const slowRequestWarningSeconds = ref(120)
+const allowLlmDataSamples = ref(false)
 
 const modelMetaByProvider = ref({})
 let appStore = null
@@ -306,6 +307,7 @@ async function loadPreferences(providerHint = null, preserveSelection = false) {
     llmFrequencyPenalty.value = Number(response?.llm_frequency_penalty ?? 0)
     llmPresencePenalty.value = Number(response?.llm_presence_penalty ?? 0)
     slowRequestWarningSeconds.value = Number(response?.slow_request_warning_seconds ?? 120)
+    allowLlmDataSamples.value = Boolean(response?.allow_llm_data_samples)
     keyVerified.value = normalizedProvider === 'ollama' || !!selectedProviderApiKeyPresent.value
 
     return response
@@ -586,6 +588,7 @@ async function saveConfig() {
       llm_frequency_penalty: Number(llmFrequencyPenalty.value),
       llm_presence_penalty: Number(llmPresencePenalty.value),
       slow_request_warning_seconds: Number(slowRequestWarningSeconds.value),
+      allow_llm_data_samples: Boolean(allowLlmDataSamples.value),
     }
     if (selectedProvider === 'ollama') {
       payload.base_url = String(ollamaBaseUrl.value || '').trim() || 'http://localhost:11434'
@@ -670,6 +673,7 @@ export const useLLMConfig = () => {
     llmFrequencyPenalty,
     llmPresencePenalty,
     slowRequestWarningSeconds,
+    allowLlmDataSamples,
     providerLabel,
     maskedKeySuffix,
     currentProviderModelMeta,

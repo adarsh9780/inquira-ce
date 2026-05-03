@@ -64,6 +64,7 @@ class RuntimeInput(TypedDict, total=False):
     run_id: str
     known_columns: list[dict[str, str]]
     attachments: list[dict[str, str]]
+    privacy: dict[str, Any]
 
 
 class CustomToolNode:
@@ -100,6 +101,7 @@ def _prepare_input_node(state: dict[str, Any], config: RunnableConfig) -> dict[s
             "current_code": str(state.get("current_code") or ""),
             "known_columns": state.get("known_columns") if isinstance(state.get("known_columns"), list) else [],
             "attachments": state.get("attachments") if isinstance(state.get("attachments"), list) else [],
+            "privacy": state.get("privacy") if isinstance(state.get("privacy"), dict) else {},
         }
 
     prepared = build_input_state(
@@ -115,6 +117,7 @@ def _prepare_input_node(state: dict[str, Any], config: RunnableConfig) -> dict[s
         scratchpad_path=str(state.get("scratchpad_path") or ""),
         known_columns=state.get("known_columns") if isinstance(state.get("known_columns"), list) else [],
         attachments=state.get("attachments") if isinstance(state.get("attachments"), list) else [],
+        privacy=state.get("privacy") if isinstance(state.get("privacy"), dict) else {},
         run_id=str(state.get("run_id") or "").strip() or None,
     )
     return dict(prepared)

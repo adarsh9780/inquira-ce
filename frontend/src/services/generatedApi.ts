@@ -94,6 +94,7 @@ export interface ApiKeyUpdateRequest {
   llm_frequency_penalty?: number;
   llm_presence_penalty?: number;
   slow_request_warning_seconds?: number;
+  allow_llm_data_samples?: boolean;
 }
 
 export interface ArtifactDeleteResponse {
@@ -423,6 +424,7 @@ export interface PreferencesResponse {
   enabled_models?: string[];
   schema_context?: string;
   allow_schema_sample_values?: boolean;
+  allow_llm_data_samples?: boolean;
   terminal_risk_acknowledged?: boolean;
   chat_overlay_width?: number;
   is_sidebar_collapsed?: boolean;
@@ -455,6 +457,8 @@ export type PreferencesUpdateRequestSchemaContext = string | null;
 
 export type PreferencesUpdateRequestAllowSchemaSampleValues = boolean | null;
 
+export type PreferencesUpdateRequestAllowLlmDataSamples = boolean | null;
+
 export type PreferencesUpdateRequestTerminalRiskAcknowledged = boolean | null;
 
 export type PreferencesUpdateRequestChatOverlayWidth = number | null;
@@ -477,6 +481,7 @@ export interface PreferencesUpdateRequest {
   enabled_models?: PreferencesUpdateRequestEnabledModels;
   schema_context?: PreferencesUpdateRequestSchemaContext;
   allow_schema_sample_values?: PreferencesUpdateRequestAllowSchemaSampleValues;
+  allow_llm_data_samples?: PreferencesUpdateRequestAllowLlmDataSamples;
   terminal_risk_acknowledged?: PreferencesUpdateRequestTerminalRiskAcknowledged;
   chat_overlay_width?: PreferencesUpdateRequestChatOverlayWidth;
   is_sidebar_collapsed?: PreferencesUpdateRequestIsSidebarCollapsed;

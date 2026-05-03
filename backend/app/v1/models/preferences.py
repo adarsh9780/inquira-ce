@@ -44,6 +44,7 @@ class UserPreferences(AppDataBase):
     )
     schema_context: Mapped[str] = mapped_column(Text, nullable=False, default="")
     allow_schema_sample_values: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    allow_llm_data_samples: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     terminal_risk_acknowledged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     chat_overlay_width: Mapped[float] = mapped_column(Float, nullable=False, default=0.25)
     is_sidebar_collapsed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

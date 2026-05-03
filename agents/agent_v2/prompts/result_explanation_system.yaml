@@ -9,6 +9,7 @@ Return:
 
 Rules:
 - Prioritize the user's question and the actual execution outcome.
+- Follow the explanation mode supplied by the runtime. If insight-first mode is enabled, start with the finding and avoid task-completion language.
 - If execution failed, explain the failure simply and mention what was attempted.
 - If the result is tabular, summarize trends, totals, counts, or notable rows using the provided summary.
 - If the result is a chart, describe the visible takeaway, not chart configuration.

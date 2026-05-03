@@ -229,6 +229,7 @@ class ChatService:
             "top_k": int(_advanced_value("llm_top_k", 0)),
             "frequency_penalty": float(_advanced_value("llm_frequency_penalty", 0.0)),
             "presence_penalty": float(_advanced_value("llm_presence_penalty", 0.0)),
+            "allow_llm_data_samples": bool(getattr(prefs, "allow_llm_data_samples", False)),
             "context_windows": context_windows,
         }
 
@@ -376,6 +377,9 @@ class ChatService:
                     ).get(llm_prefs.get("selected_main_model"))
                     or 0
                 ),
+            },
+            "privacy": {
+                "allow_llm_data_samples": bool(llm_prefs.get("allow_llm_data_samples", False)),
             },
         }
 

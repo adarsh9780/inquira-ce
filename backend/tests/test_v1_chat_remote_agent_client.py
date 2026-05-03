@@ -61,6 +61,7 @@ async def test_analyze_and_persist_turn_uses_remote_agent_client(monkeypatch):
             "top_k": 0,
             "frequency_penalty": 0.0,
             "presence_penalty": 0.0,
+            "allow_llm_data_samples": True,
         }
     monkeypatch.setattr(
         "app.v1.services.chat_service.ChatService._resolve_llm_preferences",
@@ -91,6 +92,7 @@ async def test_analyze_and_persist_turn_uses_remote_agent_client(monkeypatch):
     assert "table_name" not in captured_payload
     assert "preferred_table_name" not in captured_payload
     assert "active_schema" not in captured_payload
+    assert captured_payload["privacy"] == {"allow_llm_data_samples": True}
     assert captured_payload["agent_profile"] == "agent_v2"
     assert captured_payload["llm"]["api_key"] == "key"
     assert captured_payload["llm"]["top_k"] == 0
@@ -123,6 +125,7 @@ def test_build_remote_agent_payload_normalizes_windows_paths():
             "top_k": 0,
             "frequency_penalty": 0.0,
             "presence_penalty": 0.0,
+            "allow_llm_data_samples": False,
         },
         resolved_api_key="key",
         agent_profile="agent_v2",

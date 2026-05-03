@@ -28,6 +28,7 @@ async def test_update_preferences_persists_llm_advanced_settings(monkeypatch):
         slow_request_warning_seconds=120,
         schema_context="",
         allow_schema_sample_values=False,
+        allow_llm_data_samples=False,
         terminal_risk_acknowledged=False,
         chat_overlay_width=0.25,
         is_sidebar_collapsed=True,
@@ -67,6 +68,7 @@ async def test_update_preferences_persists_llm_advanced_settings(monkeypatch):
             llm_frequency_penalty=0.4,
             llm_presence_penalty=-0.2,
             slow_request_warning_seconds=75,
+            allow_llm_data_samples=True,
         ),
         session=_Session(),
         current_user=SimpleNamespace(id="user-1"),
@@ -79,6 +81,7 @@ async def test_update_preferences_persists_llm_advanced_settings(monkeypatch):
     assert prefs.llm_frequency_penalty == 0.4
     assert prefs.llm_presence_penalty == -0.2
     assert prefs.slow_request_warning_seconds == 75
+    assert prefs.allow_llm_data_samples is True
     assert response.llm_temperature == 0.3
     assert response.llm_max_tokens == 1024
     assert response.llm_top_p == 0.85
@@ -86,6 +89,7 @@ async def test_update_preferences_persists_llm_advanced_settings(monkeypatch):
     assert response.llm_frequency_penalty == 0.4
     assert response.llm_presence_penalty == -0.2
     assert response.slow_request_warning_seconds == 75
+    assert response.allow_llm_data_samples is True
 
 
 @pytest.mark.asyncio

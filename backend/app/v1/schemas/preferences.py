@@ -42,6 +42,7 @@ class PreferencesResponse(BaseModel):
     enabled_models: list[str] = Field(default_factory=list)
     schema_context: str = ""
     allow_schema_sample_values: bool = False
+    allow_llm_data_samples: bool = False
     terminal_risk_acknowledged: bool = False
     chat_overlay_width: float = 0.25
     is_sidebar_collapsed: bool = True
@@ -75,6 +76,7 @@ class PreferencesUpdateRequest(BaseModel):
     enabled_models: list[str] | None = None
     schema_context: str | None = None
     allow_schema_sample_values: bool | None = None
+    allow_llm_data_samples: bool | None = None
     terminal_risk_acknowledged: bool | None = None
     chat_overlay_width: float | None = Field(default=None, ge=0.1, le=0.9)
     is_sidebar_collapsed: bool | None = None
@@ -99,6 +101,7 @@ class ApiKeyUpdateRequest(BaseModel):
     llm_frequency_penalty: float | None = Field(default=None, ge=-2.0, le=2.0)
     llm_presence_penalty: float | None = Field(default=None, ge=-2.0, le=2.0)
     slow_request_warning_seconds: int | None = Field(default=None, ge=5, le=600)
+    allow_llm_data_samples: bool | None = None
 
 
 class ProviderModelsRefreshRequest(BaseModel):

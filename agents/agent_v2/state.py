@@ -35,6 +35,7 @@ class AgentInput(TypedDict):
     current_code: str
     known_columns: list[dict[str, str]]
     attachments: list[dict[str, str]]
+    privacy: dict[str, Any]
 
 
 class AgentOutput(TypedDict):
@@ -115,6 +116,7 @@ def build_input_state(
     scratchpad_path: str,
     known_columns: list[dict[str, str]] | None = None,
     attachments: list[dict[str, str]] | None = None,
+    privacy: dict[str, Any] | None = None,
     run_id: str | None = None,
     **_: Any,
 ) -> AgentInput:
@@ -194,4 +196,5 @@ def build_input_state(
         current_code=str(current_code or ""),
         known_columns=normalized_known_columns,
         attachments=normalized_attachments,
+        privacy=privacy if isinstance(privacy, dict) else {},
     )

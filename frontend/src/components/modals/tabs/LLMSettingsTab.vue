@@ -175,6 +175,28 @@
         <div class="border-t border-[var(--color-border)]"></div>
 
         <div class="space-y-3">
+          <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-base-soft)]/40 px-3 py-3">
+            <label class="flex cursor-pointer items-start gap-3">
+              <input
+                v-model="allowLlmDataSamples"
+                type="checkbox"
+                class="mt-1 rounded border-[var(--color-border-strong)]"
+              />
+              <span class="min-w-0">
+                <span class="block text-sm font-medium text-[var(--color-text-main)]">
+                  Allow bounded data samples in LLM prompts
+                </span>
+                <span class="mt-1 block text-xs leading-relaxed text-[var(--color-text-muted)]">
+                  Off keeps row previews local. On allows small table samples and result previews to be sent to your selected LLM provider, and enables insight-first result explanations.
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="border-t border-[var(--color-border)]"></div>
+
+        <div class="space-y-3">
           <button
             type="button"
             class="inline-flex items-center gap-2 text-xs text-[var(--color-text-muted)]"
@@ -329,6 +351,7 @@ const {
   llmFrequencyPenalty,
   llmPresencePenalty,
   slowRequestWarningSeconds,
+  allowLlmDataSamples,
   loadPreferences,
   setProvider,
   setApiKey,

@@ -1322,6 +1322,7 @@ async def test_generate_result_explanations_uses_lite_model(monkeypatch) -> None
         code="print('ok')",
         code_explanation="Grouped revenue by month.",
         result_summary={"success": True, "result_kind": "scalar", "result_preview": "{\"value\": 10}"},
+        allow_llm_data_samples=True,
         config={"configurable": {"model": "test-model"}},
     )
 
@@ -1330,9 +1331,79 @@ async def test_generate_result_explanations_uses_lite_model(monkeypatch) -> None
         "question": "Did revenue increase?",
         "code": "print('ok')",
         "code_explanation": "Grouped revenue by month.",
+        "explanation_mode": (
+            "Insight-first mode is enabled. Use the bounded result preview when present. "
+            "Start with the main finding, compare important rows/groups, identify strongest or weakest performers when visible, "
+            "then mention caveats. Do not open with a task-completion sentence like 'I have compiled'."
+        ),
         "result_summary_json": "{\"success\": true, \"result_kind\": \"scalar\", \"result_preview\": \"{\\\"value\\\": 10}\"}",
     }
     assert "revenue increased" in str(result.result_explanation).lower()
+
+
+@pytest.mark.asyncio
+async def test_generate_result_explanations_redacts_preview_when_samples_disabled(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_get_model(config, lite=False):
+        _ = config
+        captured["lite"] = lite
+        return object()
+
+    async def fake_invoke(prompt, model, schema, payload):
+        _ = prompt, model, schema
+        captured["payload"] = payload
+        return {
+            "result_explanation": "The analysis completed. Review the attached table for the detailed rows.",
+            "code_explanation": "Captured a dataframe result.",
+        }
+
+    monkeypatch.setattr("agent_v2.nodes._get_model", fake_get_model)
+    monkeypatch.setattr("agent_v2.nodes._ainvoke_provider_structured_chain", fake_invoke)
+
+    await nodes_module._generate_result_explanations(
+        question="Show top customers",
+        code="result = df",
+        code_explanation="Returned the top customers.",
+        result_summary={
+            "success": True,
+            "result_kind": "dataframe",
+            "result_preview": "{\"rows\": [{\"customer\": \"Acme\", \"revenue\": 100}]}",
+            "row_count_preview": 1,
+        },
+        allow_llm_data_samples=False,
+        config={"configurable": {"model": "test-model"}},
+    )
+
+    payload = captured["payload"]
+    assert captured["lite"] is True
+    assert '"result_preview":' not in str(payload["result_summary_json"])
+    assert "Acme" not in str(payload["result_summary_json"])
+    assert "result_preview_redacted" in str(payload["result_summary_json"])
+    assert "Private metadata-only mode is enabled" in str(payload["explanation_mode"])
+
+
+@pytest.mark.asyncio
+async def test_sample_data_tool_is_disabled_when_llm_data_samples_are_off(monkeypatch) -> None:
+    def fail_sample_data(**_kwargs):
+        raise AssertionError("sample_data should not read rows when LLM data samples are disabled")
+
+    monkeypatch.setattr("agent_v2.nodes.sample_data", fail_sample_data)
+
+    result = await nodes_module._run_sample_data(
+        {
+            "analysis_context": {
+                "data_path": "/tmp/workspace.duckdb",
+                "sample_table": "orders",
+                "privacy": {"allow_llm_data_samples": False},
+            }
+        },
+        {"table_name": "orders", "limit": 5},
+        "Check sample rows.",
+    )
+
+    assert result["disabled"] is True
+    assert result["rows"] == []
 
 
 @pytest.mark.asyncio
