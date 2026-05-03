@@ -5,7 +5,6 @@
     style="background-color: var(--color-sidebar-surface);"
   >
     <!-- Brand / Collapse Toggle -->
-    <!-- Fixed: Changed pl-[20px] to pl-5 (standard Tailwind) -->
     <div class="h-14 shrink-0 border-b border-[var(--color-border)] flex items-center pl-5 pr-4">
       <button
         class="flex h-full w-full items-center transition-opacity hover:opacity-70 focus:outline-none"
@@ -16,10 +15,10 @@
           <img :src="logo" alt="Inquira" class="h-full w-full rounded-md" />
         </div>
         
-        <div
-          class="flex items-center overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-          :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[160px] opacity-100 ml-3'"
-        >
+           <div
+             class="flex items-center overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+             :class="appStore.isSidebarCollapsed ? collapsedTransitionClass : expandedTransitionClass"
+           >
           <span class="text-[14px] font-semibold tracking-tight text-[var(--color-text-main)]">
             Inquira
           </span>
@@ -43,10 +42,10 @@
           <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--color-accent)]/10 text-[var(--color-accent)]">
             <FolderOpenIcon class="h-4 w-4" />
           </div>
-          <div
-            class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[160px] opacity-100 ml-3'"
-          >
+               <div
+                 class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+                 :class="appStore.isSidebarCollapsed ? collapsedTransitionClass : expandedTransitionClass"
+               >
             <span class="block truncate text-[13px] font-semibold leading-snug text-[var(--color-text-main)]">
               {{ activeWorkspaceName }}
             </span>
@@ -57,18 +56,16 @@
         </button>
       </div>
 
-      <!-- Fixed: Changed opacity-60 to opacity-100 for better visibility -->
-      <div class="mx-2 mb-2 h-px bg-[var(--color-border)] opacity-100" />
+       <div class="mx-2 mb-2 h-px bg-[var(--color-border)] opacity-100" />
 
       <!-- Conversations Section -->
       <div class="flex min-h-0 flex-1 flex-col">
-        <!-- Section Header -->
-        <!-- Fixed: Changed h-10 to h-8 to match list item height better -->
-        <div class="flex h-8 w-full items-center px-3">
+         <!-- Section Header -->
+         <div class="flex h-8 w-full items-center px-3">
           <!-- Collapsed State: Plus icon mathematically locked to the center axis -->
           <div class="flex h-6 w-6 shrink-0 items-center justify-center transition-opacity duration-200"
                :class="appStore.isSidebarCollapsed ? 'opacity-100 pointer-events-auto' : 'opacity-0 absolute pointer-events-none'">
-            <button @click.stop="createConversation" class="flex h-full w-full items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none" title="New Conversation">
+            <button @click.stop="createConversation" class="flex h-full w-full items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none" title="New Conversation" aria-label="New Conversation">
               <PlusIcon class="h-4 w-4" />
             </button>
           </div>
@@ -78,15 +75,15 @@
             class="flex flex-1 items-center justify-between overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
             :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[160px] opacity-100 ml-0'"
           >
-            <!-- Fixed: Removed tracking-widest to prevent stretched text at small size -->
-            <span class="text-[11px] font-semibold uppercase text-[var(--color-text-muted)] opacity-80">Chats</span>
-            <button
-              v-if="appStore.hasWorkspace"
-              type="button"
-              class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none"
-              title="New Conversation"
-              @click.stop="createConversation"
-            >
+             <span class="text-[11px] font-semibold uppercase text-[var(--color-text-muted)] opacity-80">Chats</span>
+             <button
+               v-if="appStore.hasWorkspace"
+               type="button"
+               class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none"
+               title="New Conversation"
+               aria-label="New Conversation"
+               @click.stop="createConversation"
+             >
               <PlusIcon class="h-4 w-4" />
             </button>
           </div>
@@ -112,9 +109,8 @@
                 class="absolute left-0 top-1/2 -translate-y-1/2 h-1/2 w-[3px] rounded-r-full bg-[var(--color-accent)] transition-all"
               />
 
-              <!-- Editing State -->
-              <!-- Fixed: Changed py-1 to py-1.5 to align vertically with the text -->
-              <div v-if="editingId === conv.id" class="flex w-full items-center pl-9" @click.stop>
+               <!-- Editing State -->
+               <div v-if="editingId === conv.id" class="flex w-full items-center pl-9" @click.stop>
                 <input
                   :ref="(el) => { if (el) editInputs[conv.id] = el }"
                   v-model="editingTitleValue"
@@ -132,11 +128,10 @@
                   <div class="h-[6px] w-[6px] rounded-full transition-colors duration-200" :class="appStore.activeConversationId === conv.id ? 'bg-[var(--color-accent)]' : 'bg-current opacity-40 group-hover:opacity-100'" />
                 </div>
 
-                <!-- Fixed: Reduced max-w to 160px to prevent overflow (Icon 24 + Gap 12 + Text 160 + Gap 8 + Menu 24 = 228px < 236px available) -->
-                <div
-                  class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-                  :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[160px] opacity-100 ml-3'"
-                >
+             <div
+               class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+               :class="appStore.isSidebarCollapsed ? collapsedTransitionClass : 'flex-1 max-w-[160px] opacity-100 ml-3'"
+             >
                   <p
                     class="truncate text-[13px]"
                     :class="appStore.activeConversationId === conv.id ? 'font-medium text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
@@ -148,11 +143,13 @@
 
                 <!-- Ellipsis Menu Button -->
                 <div class="relative shrink-0 transition-opacity pl-2" :class="appStore.isSidebarCollapsed ? 'hidden' : 'opacity-0 group-hover:opacity-100'">
-                  <button
-                    type="button"
-                    class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
-                    @click.stop="toggleConversationMenu(conv.id)"
-                  >
+                   <button
+                     type="button"
+                     class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
+                     @click.stop="toggleConversationMenu(conv.id)"
+                     :aria-label="`Menu for ${conv.title || 'Untitled'}`"
+                     :aria-expanded="conversationMenuId === conv.id"
+                   >
                     <EllipsisHorizontalIcon class="h-4 w-4" />
                   </button>
 
@@ -171,10 +168,9 @@
         </div>
       </div>
 
-      <!-- Footer Navigation -->
-      <nav class="mt-auto pb-4 pt-2">
-        <!-- Fixed: Changed opacity-60 to opacity-100 -->
-        <div class="mx-2 mb-2 h-px bg-[var(--color-border)] opacity-100" />
+       <!-- Footer Navigation -->
+       <nav class="mt-auto pb-4 pt-2">
+         <div class="mx-2 mb-2 h-px bg-[var(--color-border)] opacity-100" />
         <div class="flex flex-col space-y-0.5">
           <!-- API Keys -->
           <button
@@ -186,10 +182,10 @@
             <div class="flex h-6 w-6 shrink-0 items-center justify-center">
               <KeyIcon class="h-5 w-5" />
             </div>
-            <div
-              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-              :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[160px] opacity-100 ml-3'"
-            >
+               <div
+                 class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+                 :class="appStore.isSidebarCollapsed ? collapsedTransitionClass : expandedTransitionClass"
+               >
               <span class="text-[13px] font-medium">API Keys</span>
             </div>
           </button>
@@ -216,16 +212,14 @@
             </button>
 
             <!-- Profile Popup -->
-            <!-- Fixed: Replaced left-[60px] with centered positioning logic -->
-            <div
-              v-if="profileMenuOpen"
-              ref="profileMenuRef"
-              class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-48 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-lg"
-            >
+               <div
+                 v-if="profileMenuOpen"
+                 ref="profileMenuRef"
+                 class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-48 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-lg"
+               >
               <button @click="openProfileSection('account')" class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors">Account Settings</button>
               <button @click="openProfileSection('appearance')" class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors">Theme Preference</button>
-              <!-- Fixed: Changed opacity-60 to opacity-100 -->
-              <div class="h-px bg-[var(--color-border)] my-1 opacity-100" />
+               <div class="h-px bg-[var(--color-border)] my-1 opacity-100" />
               <button @click="openProfileSection('terms')" class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors">Legal & Terms</button>
             </div>
           </div>
@@ -243,8 +237,6 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { inferTableNameFromDataPath } from '../../utils/chatBootstrap'
-import { previewService } from '../../services/previewService'
 import SettingsModal from '../modals/SettingsModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import logo from '../../assets/favicon.svg'
@@ -270,9 +262,6 @@ const profileMenuOpen = ref(false)
 const profileMenuRef = ref(null)
 const profileMenuButtonRef = ref(null)
 
-const localDatasets = ref([])
-const isLoadingDatasets = ref(false)
-
 const isSettingsOpen = ref(false)
 const settingsInitialTab = ref('llm')
 const settingsInitialStep = ref(1)
@@ -282,6 +271,21 @@ const deleteDialogTitle = ref('')
 const deleteDialogMessage = ref('')
 const pendingDeleteType = ref('')
 const pendingDeleteId = ref('')
+
+const SETTINGS_TAB_MAP = {
+  api: 'llm',
+  llm: 'llm',
+  workspace: 'workspace',
+  data: 'workspace',
+  account: 'account',
+  appearance: 'appearance',
+  theme: 'appearance',
+  terms: 'terms',
+  legal: 'terms'
+}
+
+const collapsedTransitionClass = 'max-w-0 opacity-0 ml-0'
+const expandedTransitionClass = 'max-w-[160px] opacity-100 ml-3'
 
 const activeWorkspaceName = computed(() => {
   const activeId = String(appStore.activeWorkspaceId || '').trim()
@@ -341,22 +345,15 @@ function handleGlobalClick(event) {
   closeProfileMenu()
 }
 
-async function fetchDatasets() {
-  const activeWorkspace = appStore.workspaces.find((ws) => ws.id === appStore.activeWorkspaceId)
-  if (!activeWorkspace) { localDatasets.value = []; return }
-  isLoadingDatasets.value = true
-  try {
-    const response = await apiService.v1ListDatasets(activeWorkspace.id)
-    const workspaceDatasets = response?.datasets || []
-    localDatasets.value = workspaceDatasets
-      .map((item) => ({ table_name: item.table_name, file_path: item.source_path }))
-      .filter((item) => Boolean(String(item.table_name || '').trim()))
-  } catch (error) {
-    console.error('Failed to load datasets:', error)
-    localDatasets.value = []
-  } finally {
-    isLoadingDatasets.value = false
-  }
+function workspaceFilename(duckdbPath) {
+  const normalized = String(duckdbPath || '').trim()
+  if (!normalized) return 'workspace.duckdb'
+  return normalized.split('/').pop() || 'workspace.duckdb'
+}
+
+function handleBrandClick() {
+  appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+}
 }
 
 function handleDatasetCatalogChanged() {
@@ -364,154 +361,145 @@ function handleDatasetCatalogChanged() {
   void fetchDatasets()
 }
 
-    async function createConversation() {
-      try {
-        const conversation = await appStore.createConversation()
-        if (conversation?.id) {
-          appStore.setActiveConversationId(conversation.id)
-          await appStore.fetchConversationTurns({ reset: true })
-        }
-      } catch (error) {
-        toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to create conversation'))
-      }
-    }
-
-    async function selectConversation(id) {
-      conversationMenuId.value = ''
-      const targetConversationId = String(id || '').trim()
-      if (!targetConversationId || targetConversationId === String(appStore.activeConversationId || '').trim()) return
-      try {
-        appStore.setActiveConversationId(targetConversationId)
+  async function createConversation() {
+    try {
+      const conversation = await appStore.createConversation()
+      if (conversation?.id) {
+        appStore.setActiveConversationId(conversation.id)
         await appStore.fetchConversationTurns({ reset: true })
-      } catch (error) {
-        toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to load conversation'))
       }
+    } catch (error) {
+      toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to create conversation'))
     }
-
-function startEditing(conv) {
-  conversationMenuId.value = ''
-  editingId.value = conv.id
-  editingTitleValue.value = conv.title || 'Untitled'
-  setTimeout(() => {
-    const inputEl = editInputs.value[conv.id]
-    if (inputEl) { inputEl.focus(); inputEl.select() }
-  }, 50)
-}
-
-function cancelEditing() {
-  editingId.value = null
-  editingTitleValue.value = ''
-}
-
-function toggleConversationMenu(conversationId) {
-  const targetConversationId = String(conversationId || '').trim()
-  if (!targetConversationId) return
-  conversationMenuId.value = conversationMenuId.value === targetConversationId ? '' : targetConversationId
-}
-
-function startEditingFromMenu(conv) {
-  conversationMenuId.value = ''
-  startEditing(conv)
-}
-
-function closeConversationMenu() {
-  conversationMenuId.value = ''
-}
-
-async function saveTitle(id) {
-  if (editingId.value !== id || isSaving.value) return
-  const newTitle = editingTitleValue.value.trim()
-  const conv = appStore.conversations.find((c) => c.id === id)
-  
-  if (!newTitle || newTitle === (conv?.title || 'Untitled')) {
-    cancelEditing()
-    return
   }
 
-  isSaving.value = true
-  try {
-    if (id === appStore.activeConversationId) {
-      await appStore.updateConversationTitle(newTitle)
-    } else {
-      const updated = await apiService.v1UpdateConversation(id, newTitle)
-      const idx = appStore.conversations.findIndex((c) => c.id === id)
-      if (idx !== -1) appStore.conversations[idx] = { ...appStore.conversations[idx], title: updated.title }
+  async function selectConversation(id) {
+    conversationMenuId.value = ''
+    const targetConversationId = String(id || '').trim()
+    if (!targetConversationId || targetConversationId === String(appStore.activeConversationId || '').trim()) return
+    try {
+      appStore.setActiveConversationId(targetConversationId)
+      await appStore.fetchConversationTurns({ reset: true })
+    } catch (error) {
+      toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to load conversation'))
     }
-  } catch (error) {
-    toast.error('Rename Failed', extractApiErrorMessage(error, 'Failed to update title'))
-  } finally {
-    isSaving.value = false
-    cancelEditing()
   }
-}
 
-function openSettings(tab = 'llm', step = 1) {
-  const normalized = String(tab || '').trim().toLowerCase()
-  if (normalized === 'api' || normalized === 'llm') settingsInitialTab.value = 'llm'
-  else if (normalized === 'workspace' || normalized === 'data') settingsInitialTab.value = 'workspace'
-  else if (normalized === 'account') settingsInitialTab.value = 'account'
-  else if (normalized === 'appearance' || normalized === 'theme') settingsInitialTab.value = 'appearance'
-  else if (normalized === 'terms' || normalized === 'legal') settingsInitialTab.value = 'terms'
-  else settingsInitialTab.value = 'llm'
-  const parsedStep = Number(step)
-  settingsInitialStep.value = Number.isFinite(parsedStep) && parsedStep >= 1 ? Math.floor(parsedStep) : 1
-  isSettingsOpen.value = true
-}
+  function startEditing(conv) {
+    conversationMenuId.value = ''
+    editingId.value = conv.id
+    editingTitleValue.value = conv.title || 'Untitled'
+    setTimeout(() => {
+      const inputEl = editInputs.value[conv.id]
+      if (inputEl) { inputEl.focus(); inputEl.select() }
+    }, 50)
+  }
 
-function confirmDeleteConversation(conversationId) {
-  const target = appStore.conversations.find((c) => c.id === conversationId)
-  closeConversationMenu()
-  pendingDeleteType.value = 'conversation'
-  pendingDeleteId.value = conversationId
-  deleteDialogTitle.value = 'Delete Conversation'
-  deleteDialogMessage.value = `Are you sure you want to delete "${target?.title || 'Untitled'}"? This action cannot be undone.`
-  isDeleteDialogOpen.value = true
-}
+  function cancelEditing() {
+    editingId.value = null
+    editingTitleValue.value = ''
+  }
 
-function closeDeleteDialog() {
-  isDeleteDialogOpen.value = false
-  pendingDeleteType.value = ''
-  pendingDeleteId.value = ''
-  deleteDialogTitle.value = ''
-  deleteDialogMessage.value = ''
-}
+  function toggleConversationMenu(conversationId) {
+    const targetConversationId = String(conversationId || '').trim()
+    if (!targetConversationId) return
+    conversationMenuId.value = conversationMenuId.value === targetConversationId ? '' : targetConversationId
+  }
 
-async function confirmDelete() {
-  if (!pendingDeleteId.value) return
-  try {
-    if (pendingDeleteType.value === 'conversation') {
-      await appStore.deleteConversationById(pendingDeleteId.value)
-      toast.success('Conversation Deleted', 'Conversation has been removed.')
+  function startEditingFromMenu(conv) {
+    conversationMenuId.value = ''
+    startEditing(conv)
+  }
+
+  function closeConversationMenu() {
+    conversationMenuId.value = ''
+  }
+
+  async function saveTitle(id) {
+    if (editingId.value !== id || isSaving.value) return
+    const newTitle = editingTitleValue.value.trim()
+    const conv = appStore.conversations.find((c) => c.id === id)
+
+    if (!newTitle || newTitle === (conv?.title || 'Untitled')) {
+      cancelEditing()
+      return
     }
-    closeDeleteDialog()
-  } catch (error) {
-    toast.error('Delete Error', extractApiErrorMessage(error, 'Failed to delete'))
+
+    isSaving.value = true
+    try {
+      if (id === appStore.activeConversationId) {
+        await appStore.updateConversationTitle(newTitle)
+      } else {
+        const updated = await apiService.v1UpdateConversation(id, newTitle)
+        const idx = appStore.conversations.findIndex((c) => c.id === id)
+        if (idx !== -1) appStore.conversations[idx] = { ...appStore.conversations[idx], title: updated.title }
+      }
+    } catch (error) {
+      toast.error('Rename Failed', extractApiErrorMessage(error, 'Failed to update title'))
+    } finally {
+      isSaving.value = false
+      cancelEditing()
+    }
   }
-}
+
+  function openSettings(tab = 'llm', step = 1) {
+    const normalized = String(tab || '').trim().toLowerCase()
+    settingsInitialTab.value = SETTINGS_TAB_MAP[normalized] || 'llm'
+    const parsedStep = Number(step)
+    settingsInitialStep.value = Number.isFinite(parsedStep) && parsedStep >= 1 ? Math.floor(parsedStep) : 1
+    isSettingsOpen.value = true
+  }
+
+  function confirmDeleteConversation(conversationId) {
+    const target = appStore.conversations.find((c) => c.id === conversationId)
+    closeConversationMenu()
+    pendingDeleteType.value = 'conversation'
+    pendingDeleteId.value = conversationId
+    deleteDialogTitle.value = 'Delete Conversation'
+    deleteDialogMessage.value = `Are you sure you want to delete "${target?.title || 'Untitled'}"? This action cannot be undone.`
+    isDeleteDialogOpen.value = true
+  }
+
+  function closeDeleteDialog() {
+    isDeleteDialogOpen.value = false
+    pendingDeleteType.value = ''
+    pendingDeleteId.value = ''
+    deleteDialogTitle.value = ''
+    deleteDialogMessage.value = ''
+  }
+
+  async function confirmDelete() {
+    if (!pendingDeleteId.value) return
+    try {
+      if (pendingDeleteType.value === 'conversation') {
+        await appStore.deleteConversationById(pendingDeleteId.value)
+        toast.success('Conversation Deleted', 'Conversation has been removed.')
+      }
+      closeDeleteDialog()
+    } catch (error) {
+      toast.error('Delete Error', extractApiErrorMessage(error, 'Failed to delete'))
+    }
+  }
 
 onMounted(async () => {
   try {
     await appStore.fetchWorkspaces()
     await appStore.fetchWorkspaceDeletionJobs()
     if (appStore.activeWorkspaceId) {
-      await fetchDatasets()
       await appStore.fetchConversations()
     }
   } catch { /* recovery handled by parent */ }
-  window.addEventListener('dataset-switched', handleDatasetCatalogChanged)
   window.addEventListener('sidebar-open-settings', handleOpenSettingsRequest)
   window.addEventListener('click', handleGlobalClick)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('dataset-switched', handleDatasetCatalogChanged)
   window.removeEventListener('sidebar-open-settings', handleOpenSettingsRequest)
   window.removeEventListener('click', handleGlobalClick)
 })
 
 watch(() => appStore.activeWorkspaceId, async (newId) => {
-  if (newId) { await fetchDatasets(); await appStore.fetchConversations() }
-  else localDatasets.value = []
+  if (newId) { await appStore.fetchConversations() }
 })
 
 watch(() => appStore.isSidebarCollapsed, (collapsed) => {
