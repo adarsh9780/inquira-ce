@@ -14,8 +14,8 @@ test('sidebar communicates active workspace context with conversations and fixed
   assert.equal(source.includes('Multiple conversations per workspace.'), false)
   assert.equal(source.includes('Open workspace settings'), true)
   assert.equal(source.includes('activeWorkspaceName'), true)
-  assert.equal(source.includes('sidebar-workspace-row'), true)
-  assert.equal(source.includes('Projects'), true)
+  assert.equal(source.includes('workspace-btn'), true)
+  assert.equal(source.includes('Chats'), true)
   assert.equal(source.includes('title="Create Workspace"'), true)
   assert.equal(source.includes('aria-label="Create Workspace"'), true)
   assert.equal(source.includes('ListboxButton'), false)
@@ -24,7 +24,7 @@ test('sidebar communicates active workspace context with conversations and fixed
   assert.equal(source.includes('{{ appStore.conversations.length }}'), false)
   assert.equal(source.includes('group-hover:opacity-100'), true)
   assert.equal(source.includes('Datasets</p>'), false)
-  assert.equal(source.includes('Conversations'), true)
+  assert.equal(source.includes('Chats'), true)
 })
 
 test('global typography uses shared font tokens for consistent UI text styling', () => {

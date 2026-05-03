@@ -17,7 +17,7 @@ test('app keeps a single sidebar container and relies on click-only collapse sta
   assert.equal(appSource.includes('.app-nav-pane-collapsed {'), true)
   assert.equal(appSource.includes('<StatusBar />'), true)
 
-  assert.equal(sidebarSource.includes('class="sidebar-rail-btn"'), true)
+  assert.equal(sidebarSource.includes('class="nav-btn"'), true)
   assert.equal(sidebarSource.includes('Open workspace settings'), true)
   assert.equal(sidebarSource.includes('function openWorkspaceRail(target = \'\') {'), false)
   assert.equal(sidebarSource.includes("title=\"Conversations\""), false)

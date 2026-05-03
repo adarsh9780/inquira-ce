@@ -38,7 +38,7 @@ test('sidebar replaces direct settings/terms buttons with llm rail and profile m
 
   // Profile menu owns terms/account/theme shortcuts
   assert.equal(sidebarSource.includes('title="User Profile"'), true)
-  assert.equal(sidebarSource.includes('Terms and Conditions'), true)
+  assert.equal(sidebarSource.includes('Terms &amp; Conditions'), true)
   assert.equal(sidebarSource.includes('Account'), true)
   assert.equal(sidebarSource.includes('Theme'), true)
   assert.equal(sidebarSource.includes('Open workspace settings'), true)

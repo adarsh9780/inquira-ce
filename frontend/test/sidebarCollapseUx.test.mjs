@@ -12,14 +12,14 @@ test('sidebar uses file explorer layout with unified design', () => {
   assert.equal(source.includes('@click="handleBrandClick"'), true)
   assert.equal(source.includes('@mouseenter='), false)
   assert.equal(source.includes('appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)'), true)
-  assert.equal(source.includes('sidebar-brand-toggle'), true)
-  assert.equal(source.includes('sidebar-brand-logo-shell'), true)
+  assert.equal(source.includes('brand-btn h-full w-full px-3'), true)
+  assert.equal(source.includes('sidebar-brand-wordmark'), true)
   assert.equal(source.includes('Inquira Asset'), false)
   assert.equal(source.includes('Analysis console'), false)
   assert.equal(source.includes('sidebar-brand-copy'), false)
 
   // Fixed bottom action stack handles navigation in both sidebar states
-  assert.equal(source.includes('class="sidebar-rail-btn"'), true)
+  assert.equal(source.includes('class="nav-btn"'), true)
   assert.equal(source.includes('function openWorkspaceRail(target = \'\') {'), false)
   assert.equal(source.includes('Expand sidebar'), true)
   assert.equal(source.includes('Collapse sidebar'), true)

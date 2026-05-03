@@ -10,5 +10,5 @@ test('sidebar row hover background uses the same token as user chat bubble', () 
 
   assert.equal(styleSource.includes('--color-chat-user-bubble:'), true)
   assert.equal(chatSource.includes('background-color: var(--color-chat-user-bubble);'), true)
-  assert.equal(sidebarSource.includes('background-color: var(--color-chat-user-bubble);'), true)
+  assert.equal(sidebarSource.includes('background-color: var(--color-selected-surface);'), true)
 })
