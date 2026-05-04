@@ -388,7 +388,19 @@
         leave-to-class="dialog-fade-leave-to"
         mode="out-in"
       >
-        <div v-if="setupStep === 1" key="create-step-1" class="rounded-xl border border-[var(--color-border)] bg-[var(--color-base)] px-4 py-4">
+        <div v-if="setupStep === 1" key="create-step-1" class="relative overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-base)] px-4 py-4">
+          <div
+            v-if="isCreatingWorkspace"
+            class="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-base)]/85 px-6 text-center backdrop-blur-sm"
+            role="status"
+            aria-live="polite"
+          >
+            <div class="max-w-sm">
+              <span class="mx-auto mb-4 block h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-accent-border)] border-t-[var(--color-accent)]"></span>
+              <p class="text-sm font-semibold text-[var(--color-text-main)]">Creating workspace inside Settings...</p>
+              <p class="mt-1 text-xs text-[var(--color-text-muted)]">Saving the workspace name and shared context. You will move to dataset selection next.</p>
+            </div>
+          </div>
           <p class="mb-4 text-sm text-[var(--color-text-muted)]">
             A workspace is meant for related datasets that share business meaning, terminology, and schema context.
           </p>
@@ -399,6 +411,7 @@
               type="text"
               class="input-base"
               placeholder="e.g. Sales analysis"
+              :disabled="isCreatingWorkspace"
             />
           </label>
 
@@ -412,6 +425,7 @@
               rows="5"
               class="input-base"
               placeholder="Describe shared business meaning, terminology, units, and schema guidance..."
+              :disabled="isCreatingWorkspace"
             ></textarea>
           </label>
         </div>
@@ -1149,6 +1163,7 @@ async function createWorkspace() {
     return
   }
   isCreatingWorkspace.value = true
+  appStore.setWorkspaceRuntimeOverlaySuppressed(true)
   try {
     const context = String(newWorkspaceContext.value || '').trim()
     const workspace = await appStore.createWorkspace(name, context)
@@ -1166,6 +1181,9 @@ async function createWorkspace() {
     toast.error('Create failed', extractApiErrorMessage(error, 'Failed to create workspace.'))
   } finally {
     isCreatingWorkspace.value = false
+    window.setTimeout(() => {
+      appStore.setWorkspaceRuntimeOverlaySuppressed(false)
+    }, 500)
   }
 }
 

@@ -5,6 +5,7 @@ import { localStateService } from '../services/localStateService'
 import { useAuthStore } from './authStore'
 import { normalizePlotlyFigure } from '../utils/figurePayload'
 import { DEFAULT_THEME_ID, THEME_OPTIONS, normalizeThemeId } from '../constants/themes'
+import { DEFAULT_FONT_ID, FONT_OPTIONS, normalizeFontId } from '../constants/fonts'
 
 export const useAppStore = defineStore('app', () => {
   const authStore = useAuthStore()
@@ -56,6 +57,8 @@ export const useAppStore = defineStore('app', () => {
   const plotlyThemeMode = ref('soft')
   const uiTheme = ref(DEFAULT_THEME_ID)
   const availableThemes = THEME_OPTIONS.map((theme) => ({ ...theme }))
+  const uiFont = ref(DEFAULT_FONT_ID)
+  const availableFonts = FONT_OPTIONS.map((font) => ({ ...font }))
 
 
   // Single Python File per Session (simplified)
@@ -81,6 +84,7 @@ export const useAppStore = defineStore('app', () => {
   const finalTurnId = ref('')
   const turnsNextCursor = ref(null)
   const workspaceKernelStatusById = ref({})
+  const suppressWorkspaceRuntimeOverlay = ref(false)
 
   // Wasm Execution State
   const historicalCodeBlocks = ref([]) // Tracks successfully executed code snippets
@@ -257,6 +261,7 @@ export const useAppStore = defineStore('app', () => {
       },
       ui: {
         ui_theme: uiTheme.value,
+        ui_font: uiFont.value,
         active_tab: activeTab.value || 'workspace',
         workspace_pane: workspacePane.value || 'chat',
         data_pane: dataPane.value || 'table',
@@ -387,6 +392,9 @@ export const useAppStore = defineStore('app', () => {
     }
     if (typeof ui.ui_theme === 'string' && ui.ui_theme.trim()) {
       uiTheme.value = normalizeThemeId(ui.ui_theme)
+    }
+    if (typeof ui.ui_font === 'string' && ui.ui_font.trim()) {
+      uiFont.value = normalizeFontId(ui.ui_font)
     }
     if (typeof ui.table_row_count === 'number' && ui.table_row_count >= 0) {
       tableRowCount.value = Math.max(0, Math.floor(ui.table_row_count))
@@ -550,6 +558,8 @@ export const useAppStore = defineStore('app', () => {
     profileData.value = null
     schemaContext.value = ''
     allowSchemaSampleValues.value = false
+    uiTheme.value = DEFAULT_THEME_ID
+    uiFont.value = DEFAULT_FONT_ID
     pythonFileContent.value = ''
 
     chatHistory.value = []
@@ -803,6 +813,15 @@ export const useAppStore = defineStore('app', () => {
     const normalized = normalizeThemeId(themeId)
     if (uiTheme.value === normalized) return
     uiTheme.value = normalized
+    if (options?.persist !== false) {
+      saveLocalConfig()
+    }
+  }
+
+  function setUiFont(fontId, options = {}) {
+    const normalized = normalizeFontId(fontId)
+    if (uiFont.value === normalized) return
+    uiFont.value = normalized
     if (options?.persist !== false) {
       saveLocalConfig()
     }
@@ -2235,6 +2254,10 @@ export const useAppStore = defineStore('app', () => {
     ensuredKernelWorkspaceIds.delete(normalizedWorkspaceId)
   }
 
+  function setWorkspaceRuntimeOverlaySuppressed(suppressed) {
+    suppressWorkspaceRuntimeOverlay.value = Boolean(suppressed)
+  }
+
   function getWorkspaceKernelStatus(workspaceId = activeWorkspaceId.value) {
     const normalizedWorkspaceId = String(workspaceId || '').trim()
     if (!normalizedWorkspaceId) return 'missing'
@@ -2704,6 +2727,8 @@ export const useAppStore = defineStore('app', () => {
     plotlyThemeMode,
     uiTheme,
     availableThemes,
+    uiFont,
+    availableFonts,
     pythonFileContent,
     chatHistory,
     questionHistory,
@@ -2724,6 +2749,7 @@ export const useAppStore = defineStore('app', () => {
     finalTurnId,
     turnsNextCursor,
     workspaceKernelStatusById,
+    suppressWorkspaceRuntimeOverlay,
     generatedCode,
     resultData,
     plotlyFigure,
@@ -2804,6 +2830,7 @@ export const useAppStore = defineStore('app', () => {
     setSchemaContext,
     setAllowSchemaSampleValues,
     setUiTheme,
+    setUiFont,
     setPythonFileContent,
     addChatMessage,
     addQuestionHistoryEntry,
@@ -2883,6 +2910,7 @@ export const useAppStore = defineStore('app', () => {
     setTerminalEnabled,
     setRuntimeError,
     setWorkspaceKernelStatus,
+    setWorkspaceRuntimeOverlaySuppressed,
     getWorkspaceKernelStatus,
     clearWorkspaceKernelStatus,
     appendTerminalEntry,

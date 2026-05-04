@@ -85,9 +85,9 @@
     <Teleport to="body">
       <div
         data-testid="startup-overlay"
-        :data-active="(workspaceRuntimeStatus.active || appBootstrap.active) ? 'true' : 'false'"
+        :data-active="startupOverlayActive ? 'true' : 'false'"
         class="layer-blocking fixed inset-0 flex items-center justify-center bg-[var(--color-base)] transition-opacity duration-300"
-        :class="(workspaceRuntimeStatus.active || appBootstrap.active) ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
+        :class="startupOverlayActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
       >
         <div class="w-full max-w-md px-6 text-center">
           <!-- Logo -->
@@ -135,8 +135,10 @@ import { previewService } from './services/previewService'
 import { walkthroughService } from './services/walkthroughService'
 import { apiService } from './services/apiService'
 import { themeService } from './services/themeService'
+import { fontService } from './services/fontService'
 import { toast } from './composables/useToast'
 import { normalizeThemeId } from './constants/themes'
+import { normalizeFontId } from './constants/fonts'
 import logo from './assets/favicon.svg'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
@@ -171,6 +173,8 @@ const desktopStartupTimeline = ref([])
 const startupClock = ref(Date.now())
 const hasLoadedThemePreference = ref(false)
 const applyingThemePreference = ref(false)
+const hasLoadedFontPreference = ref(false)
+const applyingFontPreference = ref(false)
 let startupClockTimer = null
 const isE2EMode = import.meta.env.VITE_E2E === '1'
 
@@ -280,6 +284,10 @@ const currentStartupStage = computed(() => {
   }
 })
 
+const startupOverlayActive = computed(() => {
+  return Boolean(appBootstrap.active || (workspaceRuntimeStatus.active && !appStore.suppressWorkspaceRuntimeOverlay))
+})
+
 const currentStartupElapsedLabel = computed(() => {
   const current = startupTimeline.value[startupTimeline.value.length - 1]
   if (!current) return 'Waiting for first startup checkpoint...'
@@ -376,6 +384,12 @@ function applyDocumentTheme(themeId) {
   if (typeof document === 'undefined') return
   const normalized = normalizeThemeId(themeId)
   document.documentElement.setAttribute('data-theme', normalized)
+}
+
+function applyDocumentFont(fontId) {
+  if (typeof document === 'undefined') return
+  const normalized = normalizeFontId(fontId)
+  document.documentElement.setAttribute('data-font', normalized)
 }
 
 function toggleSidebarVisibility() {
@@ -577,19 +591,39 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => appStore.uiFont,
+  (fontId) => {
+    const normalized = normalizeFontId(fontId)
+    applyDocumentFont(normalized)
+    if (!hasLoadedFontPreference.value || applyingFontPreference.value) return
+    void fontService.saveFontPreference(normalized)
+  },
+  { immediate: true },
+)
+
 onMounted(async () => {
   if (typeof window !== 'undefined') {
     applyingThemePreference.value = true
+    applyingFontPreference.value = true
     try {
-      const storedTheme = await themeService.loadThemePreference()
+      const [storedTheme, storedFont] = await Promise.all([
+        themeService.loadThemePreference(),
+        fontService.loadFontPreference(),
+      ])
       appStore.setUiTheme(storedTheme, { persist: false })
+      appStore.setUiFont(storedFont, { persist: false })
       applyDocumentTheme(storedTheme)
+      applyDocumentFont(storedFont)
     } finally {
       applyingThemePreference.value = false
       hasLoadedThemePreference.value = true
+      applyingFontPreference.value = false
+      hasLoadedFontPreference.value = true
     }
   } else {
     hasLoadedThemePreference.value = true
+    hasLoadedFontPreference.value = true
   }
 
   startupClockTimer = window.setInterval(() => {
@@ -600,6 +634,7 @@ onMounted(async () => {
     settingsWebSocket.subscribeProgress((data) => {
       const stage = String(data?.stage || '')
       if (!stage.startsWith('workspace_runtime')) return
+      if (appStore.suppressWorkspaceRuntimeOverlay) return
       workspaceRuntimeStatus.active = true
       workspaceRuntimeStatus.message = data?.message || 'Preparing workspace runtime...'
     }),

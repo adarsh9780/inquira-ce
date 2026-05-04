@@ -1,9 +1,24 @@
 <template>
   <section class="scrollbar-hidden h-full overflow-y-auto">
     <h2 class="mb-2 text-lg font-bold text-[var(--color-text-main)]">Appearance</h2>
-    <p class="mb-4 text-sm text-[var(--color-text-muted)]">
+    <p class="mb-6 text-sm text-[var(--color-text-muted)]">
       Pick a UI theme. Each preview mirrors the shell hierarchy, not just the accent color.
     </p>
+
+    <div class="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-base)] p-4">
+      <label class="mb-2 block text-sm font-semibold text-[var(--color-text-main)]">Font</label>
+      <p class="mb-3 text-xs text-[var(--color-text-muted)]">
+        Switch between the current default font and Ubuntu Mono.
+      </p>
+      <HeaderDropdown
+        :model-value="activeFont"
+        :options="fontOptions"
+        placeholder="Select font"
+        aria-label="UI font"
+        max-width-class="w-full max-w-[260px]"
+        @update:model-value="selectFont"
+      />
+    </div>
 
     <div class="space-y-2">
       <button
@@ -74,13 +89,26 @@
 <script setup>
 import { computed } from 'vue'
 import { useAppStore } from '../../../stores/appStore'
+import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 
 const appStore = useAppStore()
 
 const activeTheme = computed(() => appStore.uiTheme)
 const themes = computed(() => appStore.availableThemes)
+const activeFont = computed(() => appStore.uiFont)
+const fontOptions = computed(() => {
+  const options = Array.isArray(appStore.availableFonts) ? appStore.availableFonts : []
+  return options.map((font) => ({
+    value: font.id,
+    label: font.label,
+  }))
+})
 
 function selectTheme(themeId) {
   appStore.setUiTheme(themeId)
+}
+
+function selectFont(fontId) {
+  appStore.setUiFont(fontId)
 }
 </script>

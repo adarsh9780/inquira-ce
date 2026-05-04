@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Ubuntu+Mono:wght@400;700&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -400,6 +400,12 @@
   --shadow-button: 0 1px 2px color-mix(in srgb, var(--color-text-main) 10%, transparent);
   --shadow-modal: 0 24px 48px color-mix(in srgb, var(--color-text-main) 20%, transparent);
   --shadow-lifted: 0 12px 32px color-mix(in srgb, var(--color-text-main) 14%, transparent);
+}
+
+:root[data-font="ubuntu-mono"],
+[data-font="ubuntu-mono"] {
+  --font-ui: "Ubuntu Mono", "JetBrains Mono", monospace;
+  --font-display: "Ubuntu Mono", "JetBrains Mono", monospace;
 }
 
 /* Global styles */

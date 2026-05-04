@@ -27,7 +27,11 @@ test('workspace creation activates the new workspace centrally in the store', ()
 
 test('workspace setup stepper captures shared context before dataset selection', () => {
   const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue')
+  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
+  const appPath = resolve(process.cwd(), 'src/App.vue')
   const source = readFileSync(tabPath, 'utf-8')
+  const storeSource = readFileSync(storePath, 'utf-8')
+  const appSource = readFileSync(appPath, 'utf-8')
 
   assert.equal(source.includes('A workspace is meant for related datasets that share business meaning, terminology, and schema context.'), true)
   assert.equal(source.includes('{ id: 1, label: \'Workspace context\' }'), true)
@@ -35,6 +39,11 @@ test('workspace setup stepper captures shared context before dataset selection',
   assert.equal(source.includes('{ id: 3, label: \'Generate schema\' }'), true)
   assert.equal(source.includes('await appStore.createWorkspace(name, context)'), true)
   assert.equal(source.includes('await appStore.renameWorkspace(workspaceId, name, context)'), true)
+  assert.equal(source.includes('Creating workspace inside Settings...'), true)
+  assert.equal(source.includes('appStore.setWorkspaceRuntimeOverlaySuppressed(true)'), true)
+  assert.equal(source.includes('appStore.setWorkspaceRuntimeOverlaySuppressed(false)'), true)
+  assert.equal(storeSource.includes('const suppressWorkspaceRuntimeOverlay = ref(false)'), true)
+  assert.equal(appSource.includes('workspaceRuntimeStatus.active && !appStore.suppressWorkspaceRuntimeOverlay'), true)
 })
 
 test('workspace flow routes through settings panels and workspace list/detail/create modes', () => {
