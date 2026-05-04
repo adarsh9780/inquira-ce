@@ -17,6 +17,7 @@
         <button
           type="button"
           class="btn-icon absolute right-3 top-3 z-20"
+          :disabled="workspaceCreationLocked"
           aria-label="Close settings"
           @click="closeModal"
         >
@@ -32,6 +33,7 @@
             <button
               type="button"
               class="mb-1"
+              :disabled="workspaceCreationLocked"
               :class="activeSection === 'llm' ? activeNavClass : inactiveNavClass"
               @click="openLeafSection('llm')"
             >
@@ -41,6 +43,7 @@
             <button
               type="button"
               class="mb-1"
+              :disabled="workspaceCreationLocked"
               :class="activeSection === 'workspace' ? activeNavClass : inactiveNavClass"
               @click="openWorkspaceSection"
             >
@@ -50,6 +53,7 @@
             <button
               type="button"
               class="mb-1"
+              :disabled="workspaceCreationLocked"
               :class="activeSection === 'appearance' ? activeNavClass : inactiveNavClass"
               @click="openLeafSection('appearance')"
             >
@@ -59,6 +63,7 @@
             <button
               type="button"
               class="mb-1"
+              :disabled="workspaceCreationLocked"
               :class="activeSection === 'terms' ? activeNavClass : inactiveNavClass"
               @click="openLeafSection('terms')"
             >
@@ -68,6 +73,7 @@
             <button
               type="button"
               class="mb-1"
+              :disabled="workspaceCreationLocked"
               :class="activeSection === 'account' ? activeNavClass : inactiveNavClass"
               @click="openLeafSection('account')"
             >
@@ -86,6 +92,7 @@
                 :active-workspace-id="activeWorkspaceId"
                 :workspaces="workspaceItems"
                 @navigate="navigateTo"
+                @creation-lock-change="setWorkspaceCreationLocked"
                 @set-active-workspace="setActiveWorkspace"
               />
             </section>
@@ -96,6 +103,7 @@
                 :active-workspace-id="activeWorkspaceId"
                 :workspaces="workspaceItems"
                 @navigate="navigateTo"
+                @creation-lock-change="setWorkspaceCreationLocked"
                 @set-active-workspace="setActiveWorkspace"
               />
             </section>
@@ -106,6 +114,7 @@
                 :active-workspace-id="activeWorkspaceId"
                 :workspaces="workspaceItems"
                 @navigate="navigateTo"
+                @creation-lock-change="setWorkspaceCreationLocked"
                 @set-active-workspace="setActiveWorkspace"
               />
             </section>
@@ -158,6 +167,7 @@ const activeSection = ref('llm')
 const activeWorkspaceId = ref('')
 const currentPanel = ref('llm')
 const panelDirection = ref('forward')
+const workspaceCreationLocked = ref(false)
 
 const activeNavClass = 'nav-tab-active'
 const inactiveNavClass = 'nav-tab'
@@ -229,6 +239,7 @@ function panelClass(panelId) {
 }
 
 function navigateTo(panel, direction = 'forward') {
+  if (workspaceCreationLocked.value) return
   panelDirection.value = direction
   currentPanel.value = panel
   if (panel.startsWith('ws-')) {
@@ -237,16 +248,19 @@ function navigateTo(panel, direction = 'forward') {
 }
 
 function openLeafSection(section) {
+  if (workspaceCreationLocked.value) return
   activeSection.value = section
   navigateTo(section, 'forward')
 }
 
 function openWorkspaceSection() {
+  if (workspaceCreationLocked.value) return
   activeSection.value = 'workspace'
   navigateTo('ws-list', 'forward')
 }
 
 async function setActiveWorkspace(workspaceId) {
+  if (workspaceCreationLocked.value) return
   const nextId = String(workspaceId || '').trim()
   if (!nextId) return
   if (activeWorkspaceId.value !== nextId) {
@@ -258,7 +272,12 @@ async function setActiveWorkspace(workspaceId) {
 }
 
 function closeModal() {
+  if (workspaceCreationLocked.value) return
   emit('update:modelValue', false)
+}
+
+function setWorkspaceCreationLocked(locked) {
+  workspaceCreationLocked.value = Boolean(locked)
 }
 </script>
 

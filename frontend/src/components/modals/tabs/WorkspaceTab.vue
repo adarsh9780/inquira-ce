@@ -123,6 +123,7 @@
             :key="step.id"
             type="button"
             class="min-w-0 flex-1 rounded-lg px-3 py-2 text-left transition-all"
+            :disabled="isCreatingWorkspace"
             :class="setupStep === step.id
               ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
               : 'text-[var(--color-text-muted)] hover:bg-[var(--color-base)] hover:text-[var(--color-text-main)]'"
@@ -487,7 +488,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['navigate', 'set-active-workspace'])
+const emit = defineEmits(['navigate', 'set-active-workspace', 'creation-lock-change'])
 
 const appStore = useAppStore()
 
@@ -611,6 +612,14 @@ watch(
   },
 )
 
+watch(
+  isCreatingWorkspace,
+  (locked) => {
+    emit('creation-lock-change', Boolean(locked))
+  },
+  { immediate: true },
+)
+
 onMounted(async () => {
   unsubscribeProgress = settingsWebSocket.subscribeProgress(handleSettingsProgressUpdate)
   unsubscribeComplete = settingsWebSocket.subscribeComplete(handleSettingsComplete)
@@ -638,6 +647,7 @@ onUnmounted(() => {
     unsubscribeError = null
   }
   resolvePendingCreateRuntime()
+  emit('creation-lock-change', false)
   stopDatasetDeletionPollers()
   stopDatasetIngestionPollers()
 })
@@ -700,6 +710,7 @@ function syncSetupIdentity() {
 }
 
 function goToSetupStep(stepId) {
+  if (isCreatingWorkspace.value) return
   const normalized = Number(stepId)
   if (![1, 2, 3].includes(normalized)) return
   if (props.panelMode === 'ws-create' && normalized !== 1) {
