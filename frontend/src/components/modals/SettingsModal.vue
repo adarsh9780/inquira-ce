@@ -284,6 +284,9 @@ function setActiveWorkspaceOperation(payload) {
 
 function notifyWorkspaceOperationBlocked() {
   if (!activeWorkspaceOperation.value) return false
+  if (activeSection.value === 'workspace') {
+    return true
+  }
   toast.info(
     'Workspace setup in progress',
     activeWorkspaceOperationMessage.value || 'Wait for the current workspace setup step to finish.',

@@ -55,6 +55,7 @@ test('workspace setup stepper captures shared context before dataset selection',
   assert.equal(settingsSource.includes("const activeWorkspaceOperation = ref('')"), true)
   assert.equal(settingsSource.includes('@workspace-operation-change="setActiveWorkspaceOperation"'), true)
   assert.equal(settingsSource.includes('notifyWorkspaceOperationBlocked()'), true)
+  assert.equal(settingsSource.includes("if (activeSection.value === 'workspace')"), true)
   assert.equal(settingsSource.includes("toast.info(\n    'Workspace setup in progress'"), true)
   assert.equal(appSource.includes('data-testid="workspace-runtime-dialog"'), false)
   assert.equal(appSource.includes('const startupOverlayActive = computed(() => {'), true)

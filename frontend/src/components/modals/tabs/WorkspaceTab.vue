@@ -39,10 +39,16 @@
               </span>
               <button
                 type="button"
-                class="rounded px-2 py-1 text-xs text-[var(--color-danger)] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[var(--color-danger-bg)]"
+                class="rounded p-1.5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger)]"
+                title="Delete workspace"
+                aria-label="Delete workspace"
                 @click.stop="requestDeleteWorkspace(workspace.id)"
               >
-                Delete
+                <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M5 7h14" />
+                  <path d="M9 7V5h6v2" />
+                  <path d="M8 7l1 12h6l1-12" />
+                </svg>
               </button>
             </div>
           </div>
@@ -220,24 +226,34 @@
 
             <div
               v-if="isDatasetIngesting"
-              class="rounded-lg bg-[var(--color-accent-soft)] px-4 py-3"
+              class="rounded-lg px-4 py-3"
+              :class="datasetIngestHasError ? 'bg-[var(--color-danger-bg)]' : 'bg-[var(--color-accent-soft)]'"
               aria-live="polite"
             >
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <p class="truncate text-sm font-medium text-[var(--color-accent)]">{{ datasetIngestFilename || 'Selected dataset' }}</p>
-                  <p class="mt-1 text-xs text-[var(--color-accent)]/90">{{ datasetIngestStatusLabel }}</p>
+                  <p class="truncate text-sm font-medium" :class="datasetIngestHasError ? 'text-[var(--color-danger)]' : 'text-[var(--color-accent)]'">{{ datasetIngestFilename || 'Selected dataset' }}</p>
+                  <p class="mt-1 text-xs" :class="datasetIngestHasError ? 'text-[var(--color-danger)]/90' : 'text-[var(--color-accent)]/90'">{{ datasetIngestStatusLabel }}</p>
                 </div>
-                <span class="mt-0.5 h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-accent)]/40 border-t-[var(--color-accent)]"></span>
+                <button
+                  v-if="datasetIngestHasError"
+                  type="button"
+                  class="rounded-md border border-[var(--color-danger)]/30 bg-[var(--color-danger-bg)] px-2 py-1 text-xs font-medium text-[var(--color-danger)] transition-colors hover:border-[var(--color-danger)]/45"
+                  @click="retryLastDatasetIngestion"
+                >
+                  Retry
+                </button>
+                <span v-else class="mt-0.5 h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-accent)]/40 border-t-[var(--color-accent)]"></span>
               </div>
               <div v-if="datasetIngestPercent !== null" class="mt-2">
-                <div class="h-1.5 overflow-hidden rounded-full bg-[var(--color-accent-border)]/80">
+                <div class="h-1.5 overflow-hidden rounded-full" :class="datasetIngestHasError ? 'bg-[var(--color-danger)]/25' : 'bg-[var(--color-accent-border)]/80'">
                   <div
-                    class="h-full rounded-full bg-[var(--color-accent)] transition-all duration-300"
+                    class="h-full rounded-full transition-all duration-300"
+                    :class="datasetIngestHasError ? 'bg-[var(--color-danger)]' : 'bg-[var(--color-accent)]'"
                     :style="{ width: `${datasetIngestPercent}%` }"
                   ></div>
                 </div>
-                <p class="mt-1 text-right text-[11px] text-[var(--color-accent)]">{{ datasetIngestPercent }}%</p>
+                <p class="mt-1 text-right text-[11px]" :class="datasetIngestHasError ? 'text-[var(--color-danger)]' : 'text-[var(--color-accent)]'">{{ datasetIngestPercent }}%</p>
               </div>
             </div>
 
@@ -404,6 +420,8 @@ const isDatasetIngesting = ref(false)
 const datasetIngestFilename = ref('')
 const datasetIngestMessage = ref('')
 const datasetIngestPercent = ref(null)
+const datasetIngestError = ref('')
+const lastSelectedDatasetPaths = ref([])
 const isDatasetDeleteDialogOpen = ref(false)
 const pendingRemovalDataset = ref(null)
 const isDeletingDataset = ref(false)
@@ -461,6 +479,7 @@ const detailCreatedAt = computed(() => formatCreatedDate(workspaceDetail.value?.
 const detailConversationCount = computed(() => Number(workspaceDetail.value?.conversation_count || 0))
 const detailLastActive = computed(() => formatRelativeTime(workspaceDetail.value?.updated_at || activeWorkspace.value?.updated_at))
 const datasetIngestStatusLabel = computed(() => String(datasetIngestMessage.value || 'Processing dataset...').trim() || 'Processing dataset...')
+const datasetIngestHasError = computed(() => Boolean(String(datasetIngestError.value || '').trim()))
 const workspaceCreateTitle = computed(() => (
   isCreatingWorkspaceRuntime.value
     ? 'Preparing workspace runtime inside Settings...'
@@ -659,6 +678,7 @@ function startDatasetIngest(path) {
   datasetIngestFilename.value = formatFilename(normalizedPath)
   datasetIngestMessage.value = 'Preparing dataset ingestion...'
   datasetIngestPercent.value = null
+  datasetIngestError.value = ''
 }
 
 function applyDatasetSelectionFromUpload(uploadResult, fallbackPath = '') {
@@ -685,6 +705,15 @@ function finishDatasetIngest() {
   datasetIngestFilename.value = ''
   datasetIngestMessage.value = ''
   datasetIngestPercent.value = null
+  datasetIngestError.value = ''
+  lastSelectedDatasetPaths.value = []
+}
+
+function markDatasetIngestFailed(message) {
+  isDatasetIngesting.value = true
+  datasetIngestError.value = String(message || 'Failed to import dataset.').trim() || 'Failed to import dataset.'
+  datasetIngestMessage.value = datasetIngestError.value
+  datasetIngestPercent.value = 100
 }
 
 function handleSettingsProgressUpdate(data) {
@@ -817,9 +846,14 @@ function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = Infinity) {
         datasetIngestionPollers.delete(normalizedJobId)
         applyDatasetSelectionFromIngestionJob(job)
         await loadWorkspaceDatasets()
-        finishDatasetIngest()
         const failedCount = Number(job?.failed_count || 0)
         const completedCount = Number(job?.completed_count || 0)
+        datasetIngestPercent.value = 100
+        datasetIngestMessage.value = failedCount > 0
+          ? `Completed with ${failedCount} failed import${failedCount === 1 ? '' : 's'}.`
+          : 'Import complete.'
+        await new Promise((resolve) => setTimeout(resolve, 700))
+        finishDatasetIngest()
         if (completedCount > 0) {
           setupStep.value = 3
         }
@@ -860,6 +894,7 @@ async function startBatchDatasetIngestion(paths) {
   if (!workspaceId || sourcePaths.length === 0) return
 
   startDatasetIngest(sourcePaths.length === 1 ? sourcePaths[0] : `${sourcePaths.length} selected files`)
+  lastSelectedDatasetPaths.value = [...sourcePaths]
   setWorkspaceOperation('ingest', 'Importing selected datasets into the workspace.')
   datasetIngestMessage.value = 'Preparing workspace runtime...'
   try {
@@ -878,10 +913,22 @@ async function startBatchDatasetIngestion(paths) {
     }
     trackDatasetIngestionJob(workspaceId, jobId)
   } catch (error) {
-    finishDatasetIngest()
+    markDatasetIngestFailed(extractApiErrorMessage(error, 'Backend still initializing. Please retry.'))
     clearWorkspaceOperation()
     toast.error('Dataset Error', extractApiErrorMessage(error, 'Failed to add datasets.'))
   }
+}
+
+async function retryLastDatasetIngestion() {
+  const paths = Array.isArray(lastSelectedDatasetPaths.value)
+    ? lastSelectedDatasetPaths.value.map((item) => String(item || '').trim()).filter(Boolean)
+    : []
+  if (!paths.length) {
+    toast.info('Retry unavailable', 'Select files again to retry import.')
+    finishDatasetIngest()
+    return
+  }
+  await startBatchDatasetIngestion(paths)
 }
 
 async function loadActiveDatasetDeletionJobs() {
