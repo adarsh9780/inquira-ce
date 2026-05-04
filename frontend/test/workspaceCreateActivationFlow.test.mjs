@@ -47,8 +47,9 @@ test('workspace setup stepper captures shared context before dataset selection',
   assert.equal(source.includes('waitForCreateRuntimeToSettle'), false)
   assert.equal(source.includes("toast.success('Workspace ready', 'Workspace is ready for dataset selection.')"), true)
   assert.equal(source.includes('settingsWebSocket.subscribeComplete'), false)
-  assert.equal(source.includes("const emit = defineEmits(['navigate', 'set-active-workspace', 'workspace-operation-change'])"), true)
+  assert.equal(source.includes("const emit = defineEmits(['navigate', 'set-active-workspace', 'workspace-operation-change', 'workspace-created'])"), true)
   assert.equal(source.includes("emit('workspace-operation-change', {"), true)
+  assert.equal(source.includes("emit('workspace-created', {"), true)
   assert.equal(source.includes("setWorkspaceOperation('create', 'Creating workspace and preparing its runtime.')"), true)
   assert.equal(source.includes("setWorkspaceOperation('ingest', 'Importing selected datasets into the workspace.')"), true)
   assert.equal(source.includes("setWorkspaceOperation('schema', 'Generating workspace schemas from the selected datasets.')"), true)
@@ -62,6 +63,34 @@ test('workspace setup stepper captures shared context before dataset selection',
   assert.equal(appSource.includes('return Boolean(appBootstrap.active)'), true)
   assert.equal(storeSource.includes('suppressWorkspaceRuntimeOverlay'), false)
   assert.equal(appSource.includes('suppressWorkspaceRuntimeOverlay'), false)
+})
+
+test('workspace creation carries step one identity into dataset selection automatically', () => {
+  const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue')
+  const settingsPath = resolve(process.cwd(), 'src/components/modals/SettingsModal.vue')
+  const source = readFileSync(tabPath, 'utf-8')
+  const settingsSource = readFileSync(settingsPath, 'utf-8')
+  const createBlock = extractBlock(
+    source,
+    'async function createWorkspace({ setupStep: targetSetupStep = 2 } = {}) {',
+    'function schemaGenerationLabel(tableName) {',
+  )
+
+  assert.equal(source.includes('@click="continueFromWorkspaceIdentity()"'), true)
+  assert.equal(source.includes('async function continueFromWorkspaceIdentity() {'), true)
+  assert.equal(source.includes("await createWorkspace({ setupStep: normalized })"), true)
+  assert.equal(source.includes("toast.info('Create workspace first'"), false)
+  assert.equal(source.includes('requestedSetupStep'), true)
+  assert.equal(source.includes('workspaceIdentityDraft'), true)
+  assert.equal(source.includes('function resolveWorkspaceIdentityDraft() {'), true)
+  assert.equal(createBlock.includes("emit('workspace-created', {"), true)
+  assert.equal(createBlock.includes('setupWorkspaceName.value = \'\''), false)
+  assert.equal(createBlock.includes('setupWorkspaceContext.value = \'\''), false)
+  assert.equal(settingsSource.includes(':requested-setup-step="workspaceDetailSetupStep"'), true)
+  assert.equal(settingsSource.includes(':workspace-identity-draft="workspaceIdentityDraft"'), true)
+  assert.equal(settingsSource.includes('@workspace-created="handleWorkspaceCreated"'), true)
+  assert.equal(settingsSource.includes('function handleWorkspaceCreated(payload) {'), true)
+  assert.equal(settingsSource.includes("navigateTo('ws-detail', 'forward')"), true)
 })
 
 test('workspace flow routes through settings panels and workspace list/detail/create modes', () => {

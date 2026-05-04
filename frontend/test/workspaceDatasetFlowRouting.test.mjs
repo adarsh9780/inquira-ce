@@ -17,12 +17,11 @@ test('unified sidebar routes workspace entry points to settings workspace tab an
 })
 
 test('workspace stepper state-b flow renders inline dataset actions and remove confirmation UX', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/components/modals/WorkspaceStepper.vue'), 'utf-8')
+  const source = readFileSync(resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue'), 'utf-8')
 
-  assert.equal(source.includes('pendingRemovalTable === dataset.table_name'), true)
-  assert.equal(source.includes('Remove {{ formatDatasetName(dataset.table_name) }}?'), true)
-  assert.equal(source.includes("@click=\"emit('confirm-remove-dataset', dataset)\""), true)
-  assert.equal(source.includes("@click=\"emit('cancel-remove-dataset')\""), true)
-  assert.equal(source.includes('title="Refresh from source file"'), true)
-  assert.equal(source.includes('title="Remove dataset from workspace"'), true)
+  assert.equal(source.includes('pendingRemovalDataset'), true)
+  assert.equal(source.includes('datasetDeleteDialogMessage'), true)
+  assert.equal(source.includes('title="Refresh dataset"'), true)
+  assert.equal(source.includes('title="Remove dataset"'), true)
+  assert.equal(source.includes('@confirm="confirmRemoveDataset"'), true)
 })

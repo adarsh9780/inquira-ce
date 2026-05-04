@@ -96,9 +96,12 @@
                 panel-mode="ws-detail"
                 :active-workspace-id="activeWorkspaceId"
                 :workspaces="workspaceItems"
+                :requested-setup-step="workspaceDetailSetupStep"
+                :workspace-identity-draft="workspaceIdentityDraft"
                 @navigate="navigateTo"
                 @workspace-operation-change="setActiveWorkspaceOperation"
                 @set-active-workspace="setActiveWorkspace"
+                @workspace-created="handleWorkspaceCreated"
               />
             </section>
 
@@ -110,6 +113,7 @@
                 @navigate="navigateTo"
                 @workspace-operation-change="setActiveWorkspaceOperation"
                 @set-active-workspace="setActiveWorkspace"
+                @workspace-created="handleWorkspaceCreated"
               />
             </section>
 
@@ -164,6 +168,8 @@ const currentPanel = ref('llm')
 const panelDirection = ref('forward')
 const activeWorkspaceOperation = ref('')
 const activeWorkspaceOperationMessage = ref('')
+const workspaceDetailSetupStep = ref(1)
+const workspaceIdentityDraft = ref(null)
 
 const activeNavClass = 'nav-tab-active'
 const inactiveNavClass = 'nav-tab'
@@ -259,12 +265,26 @@ async function setActiveWorkspace(workspaceId) {
   if (notifyWorkspaceOperationBlocked()) return
   const nextId = String(workspaceId || '').trim()
   if (!nextId) return
+  workspaceIdentityDraft.value = null
   if (activeWorkspaceId.value !== nextId) {
     activeWorkspaceId.value = nextId
   }
   if (String(appStore.activeWorkspaceId || '').trim() !== nextId) {
     await appStore.activateWorkspace(nextId)
   }
+}
+
+function handleWorkspaceCreated(payload) {
+  const workspaceId = String(payload?.workspaceId || '').trim()
+  if (!workspaceId) return
+  activeWorkspaceId.value = workspaceId
+  workspaceIdentityDraft.value = {
+    workspaceId,
+    name: String(payload?.name || '').trim(),
+    context: String(payload?.context || '').trim(),
+  }
+  workspaceDetailSetupStep.value = Number(payload?.setupStep || 2)
+  navigateTo('ws-detail', 'forward')
 }
 
 function closeModal() {

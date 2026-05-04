@@ -63,7 +63,7 @@ test('workspace tab now uses list/detail/create panels instead of stepper flow',
   assert.equal(tabSource.includes('Delete workspace'), true)
   assert.equal(tabSource.includes('+ Add dataset'), true)
   assert.equal(tabSource.includes('title="Delete Dataset"'), true)
-  assert.equal(tabSource.includes('Create workspace'), true)
+  assert.equal(tabSource.includes('Continue'), true)
   assert.equal(tabSource.includes('workspace-stepper'), true)
   assert.equal(tabSource.includes('workspace-stepper-line'), true)
   assert.equal(tabSource.includes('workspace-stepper-dot'), true)

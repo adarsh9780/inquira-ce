@@ -196,10 +196,10 @@
               type="button"
               class="btn-primary px-5 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="isCreatingWorkspace || isSavingWorkspaceIdentity || !setupWorkspaceName.trim()"
-              @click="isCreatingMode ? createWorkspace() : saveWorkspaceIdentityAndContinue()"
+              @click="continueFromWorkspaceIdentity()"
             >
               <span v-if="isCreatingWorkspace || isSavingWorkspaceIdentity">{{ isCreatingMode ? 'Creating...' : 'Saving...' }}</span>
-              <span v-else>{{ isCreatingMode ? 'Create and continue' : 'Save and continue' }}</span>
+              <span v-else>Continue</span>
             </button>
           </div>
         </div>
@@ -405,9 +405,17 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  requestedSetupStep: {
+    type: Number,
+    default: 1,
+  },
+  workspaceIdentityDraft: {
+    type: Object,
+    default: null,
+  },
 })
 
-const emit = defineEmits(['navigate', 'set-active-workspace', 'workspace-operation-change'])
+const emit = defineEmits(['navigate', 'set-active-workspace', 'workspace-operation-change', 'workspace-created'])
 
 const appStore = useAppStore()
 
@@ -538,6 +546,26 @@ watch(
 )
 
 watch(
+  () => props.requestedSetupStep,
+  (nextStep) => {
+    if (props.panelMode !== 'ws-detail') return
+    const normalized = Number(nextStep)
+    if (![1, 2, 3].includes(normalized)) return
+    setupStep.value = normalized
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.workspaceIdentityDraft,
+  () => {
+    if (props.panelMode !== 'ws-detail') return
+    syncSetupIdentity()
+  },
+  { deep: true },
+)
+
+watch(
   () => setupStep.value,
   (nextStep) => {
     if (props.panelMode !== 'ws-detail') return
@@ -615,12 +643,25 @@ async function loadWorkspaceDetail() {
 }
 
 function resolveWorkspaceContext() {
-  return String(workspaceDetail.value?.schema_context ?? activeWorkspace.value?.schema_context ?? '').trim()
+  const draft = resolveWorkspaceIdentityDraft()
+  return String(workspaceDetail.value?.schema_context ?? activeWorkspace.value?.schema_context ?? draft?.context ?? '').trim()
+}
+
+function resolveWorkspaceIdentityDraft() {
+  const draft = props.workspaceIdentityDraft
+  const draftWorkspaceId = String(draft?.workspaceId || '').trim()
+  const activeId = String(props.activeWorkspaceId || '').trim()
+  if (!draftWorkspaceId || draftWorkspaceId !== activeId) return null
+  return {
+    name: String(draft?.name || '').trim(),
+    context: String(draft?.context || '').trim(),
+  }
 }
 
 function syncSetupIdentity() {
   if (props.panelMode !== 'ws-detail') return
-  setupWorkspaceName.value = String(activeWorkspace.value?.name || '').trim()
+  const draft = resolveWorkspaceIdentityDraft()
+  setupWorkspaceName.value = String(activeWorkspace.value?.name || draft?.name || '').trim()
   setupWorkspaceContext.value = resolveWorkspaceContext()
 }
 
@@ -629,7 +670,7 @@ async function goToSetupStep(stepId) {
   const normalized = Number(stepId)
   if (![1, 2, 3].includes(normalized)) return
   if (props.panelMode === 'ws-create' && normalized !== 1) {
-    toast.info('Create workspace first', 'Save the workspace identity before adding datasets.')
+    await createWorkspace({ setupStep: normalized })
     return
   }
   if (props.panelMode === 'ws-detail' && setupStep.value === 1 && normalized > 1) {
@@ -637,6 +678,14 @@ async function goToSetupStep(stepId) {
     if (!persisted) return
   }
   setupStep.value = normalized
+}
+
+async function continueFromWorkspaceIdentity() {
+  if (props.panelMode === 'ws-create') {
+    await createWorkspace({ setupStep: 2 })
+    return
+  }
+  await saveWorkspaceIdentityAndContinue()
 }
 
 async function saveWorkspaceIdentityAndContinue() {
@@ -1226,7 +1275,7 @@ async function deleteWorkspace() {
   }
 }
 
-async function createWorkspace() {
+async function createWorkspace({ setupStep: targetSetupStep = 2 } = {}) {
   const name = String(setupWorkspaceName.value || '').trim()
   if (!name) {
     toast.error('Workspace name required', 'Enter a workspace name to continue.')
@@ -1240,8 +1289,8 @@ async function createWorkspace() {
     const context = String(setupWorkspaceContext.value || '').trim()
     const workspace = await appStore.createWorkspace(name, context)
     const workspaceId = String(workspace?.id || appStore.activeWorkspaceId || '').trim()
-    if (workspaceId) {
-      emit('set-active-workspace', workspaceId)
+    if (!workspaceId) {
+      throw new Error('Backend did not return a workspace id.')
     }
     workspaceCreateMessage.value = 'Preparing workspace runtime...'
     const kernelReady = await appStore.ensureWorkspaceKernelConnected(workspaceId)
@@ -1249,10 +1298,12 @@ async function createWorkspace() {
       throw new Error(String(appStore.runtimeError || 'Workspace runtime bootstrap failed.'))
     }
     await appStore.fetchWorkspaces()
-    emit('navigate', 'ws-detail', 'forward')
-    setupStep.value = 2
-    setupWorkspaceName.value = ''
-    setupWorkspaceContext.value = ''
+    emit('workspace-created', {
+      workspaceId,
+      name,
+      context,
+      setupStep: targetSetupStep,
+    })
     toast.success('Workspace ready', 'Workspace is ready for dataset selection.')
   } catch (error) {
     toast.error('Create failed', extractApiErrorMessage(error, 'Failed to create workspace.'))
