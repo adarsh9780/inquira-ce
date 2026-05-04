@@ -122,6 +122,40 @@
           </div>
         </div>
       </div>
+
+      <div
+        data-testid="workspace-runtime-dialog"
+        :data-active="workspaceRuntimeDialogActive ? 'true' : 'false'"
+        class="layer-blocking pointer-events-none fixed inset-x-0 bottom-8 z-[var(--z-modal)] flex justify-center px-4 transition-all duration-300"
+        :class="workspaceRuntimeDialogActive ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
+      >
+        <div
+          class="pointer-events-auto w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-4 shadow-2xl"
+          role="status"
+          aria-live="polite"
+        >
+          <div class="flex items-start gap-4">
+            <div class="relative mt-0.5 h-9 w-9 shrink-0">
+              <div class="absolute inset-0 rounded-full border-2 border-[var(--color-border)]"></div>
+              <div class="absolute inset-0 rounded-full border-2 border-t-[var(--color-accent)] border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
+                Workspace runtime
+              </p>
+              <h2 class="mt-1 text-sm font-semibold text-[var(--color-text-main)]">
+                Preparing workspace runtime
+              </h2>
+              <p class="mt-1 text-sm text-[var(--color-text-muted)]">
+                {{ workspaceRuntimeDialogMessage }}
+              </p>
+              <p class="mt-3 text-xs text-[var(--color-text-sub)]">
+                {{ currentStartupElapsedLabel }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </Teleport>
   </div>
 </template>
@@ -285,7 +319,20 @@ const currentStartupStage = computed(() => {
 })
 
 const startupOverlayActive = computed(() => {
-  return Boolean(appBootstrap.active || (workspaceRuntimeStatus.active && !appStore.suppressWorkspaceRuntimeOverlay))
+  return Boolean(appBootstrap.active)
+})
+
+const workspaceRuntimeDialogActive = computed(() => {
+  return Boolean(
+    workspaceRuntimeStatus.active &&
+    appBootstrap.ready &&
+    !appBootstrap.active &&
+    !appStore.suppressWorkspaceRuntimeOverlay
+  )
+})
+
+const workspaceRuntimeDialogMessage = computed(() => {
+  return String(workspaceRuntimeStatus.message || '').trim() || 'Warming workspace runtime...'
 })
 
 const currentStartupElapsedLabel = computed(() => {
@@ -325,14 +372,10 @@ const desktopStartupTimelineEntries = computed(() => {
 })
 
 const startupOverlayTitle = computed(() => {
-  if (workspaceRuntimeStatus.active) return 'Preparing your workspace runtime.'
   return 'Loading your workspace.'
 })
 
 const startupOverlayMessage = computed(() => {
-  if (workspaceRuntimeStatus.active) {
-    return String(workspaceRuntimeStatus.message || '').trim() || 'Creating the runtime your current workspace needs.'
-  }
   return String(appBootstrap.message || '').trim() || 'Restoring your account, workspace, and runtime state.'
 })
 
@@ -344,13 +387,11 @@ const startupOverlayHint = computed(() => {
 })
 
 const startupOverlayPill = computed(() => {
-  if (workspaceRuntimeStatus.active) return 'Workspace runtime'
   if (appBootstrap.active) return 'Workspace restore'
   return 'Workspace restore'
 })
 
 const startupOverlayPanelTitle = computed(() => {
-  if (workspaceRuntimeStatus.active) return 'Workspace progress'
   return 'Workspace handoff'
 })
 

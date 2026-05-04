@@ -43,7 +43,10 @@ test('workspace setup stepper captures shared context before dataset selection',
   assert.equal(source.includes('appStore.setWorkspaceRuntimeOverlaySuppressed(true)'), true)
   assert.equal(source.includes('appStore.setWorkspaceRuntimeOverlaySuppressed(false)'), true)
   assert.equal(storeSource.includes('const suppressWorkspaceRuntimeOverlay = ref(false)'), true)
-  assert.equal(appSource.includes('workspaceRuntimeStatus.active && !appStore.suppressWorkspaceRuntimeOverlay'), true)
+  assert.equal(appSource.includes('data-testid="workspace-runtime-dialog"'), true)
+  assert.equal(appSource.includes('const startupOverlayActive = computed(() => {'), true)
+  assert.equal(appSource.includes('return Boolean(appBootstrap.active)'), true)
+  assert.equal(appSource.includes('!appStore.suppressWorkspaceRuntimeOverlay'), true)
 })
 
 test('workspace flow routes through settings panels and workspace list/detail/create modes', () => {
