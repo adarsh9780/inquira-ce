@@ -100,6 +100,23 @@ test('workspace creation carries step one identity into dataset selection automa
   assert.equal(createdHandlerBlock.includes("navigateTo('ws-detail', 'forward')"), false)
 })
 
+test('workspace dataset step exposes setup readiness checks before upload', () => {
+  const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue')
+  const source = readFileSync(tabPath, 'utf-8')
+
+  assert.equal(source.includes('Setup readiness'), true)
+  assert.equal(source.includes('workspaceReadinessItems'), true)
+  assert.equal(source.includes('workspaceReadinessProgress'), true)
+  assert.equal(source.includes('workspaceReadinessComplete'), true)
+  assert.equal(source.includes('Workspace saved'), true)
+  assert.equal(source.includes('Context saved'), true)
+  assert.equal(source.includes('Workspace active'), true)
+  assert.equal(source.includes('Kernel ready'), true)
+  assert.equal(source.includes('Retry runtime'), true)
+  assert.equal(source.includes('refreshWorkspaceReadiness'), true)
+  assert.equal(source.includes('appStore.ensureWorkspaceKernelConnected(workspaceId)'), true)
+})
+
 test('workspace flow routes through settings panels and workspace list/detail/create modes', () => {
   const settingsPath = resolve(process.cwd(), 'src/components/modals/SettingsModal.vue')
   const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue')

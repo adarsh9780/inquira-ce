@@ -206,6 +206,58 @@
 
         <!-- Step 2: Select datasets -->
         <div v-else-if="setupStep === 2" key="step-2" class="space-y-4 px-4">
+          <section
+            class="workspace-readiness-card"
+            :class="workspaceReadinessComplete ? 'workspace-readiness-card-ready' : 'workspace-readiness-card-pending'"
+            aria-live="polite"
+          >
+            <div class="relative z-10 flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-sub)]">Setup readiness</p>
+                <h3 class="mt-1 text-base font-semibold text-[var(--color-text-main)]">{{ workspaceReadinessTitle }}</h3>
+                <p class="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">{{ workspaceReadinessSummary }}</p>
+              </div>
+              <button
+                v-if="!workspaceReadinessComplete"
+                type="button"
+                class="shrink-0 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-base)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-accent)] shadow-sm transition-all hover:border-[var(--color-accent-border)] hover:bg-[var(--color-accent-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="isCheckingWorkspaceReadiness"
+                @click="refreshWorkspaceReadiness"
+              >
+                <span v-if="isCheckingWorkspaceReadiness">Checking...</span>
+                <span v-else>Retry runtime</span>
+              </button>
+            </div>
+
+            <div class="relative z-10 mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--color-base-muted)]">
+              <div
+                class="h-full rounded-full bg-[var(--color-accent)] transition-[width] duration-500 ease-out"
+                :style="{ width: `${workspaceReadinessProgress}%` }"
+              ></div>
+            </div>
+
+            <div class="relative z-10 mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div
+                v-for="item in workspaceReadinessItems"
+                :key="item.id"
+                class="workspace-readiness-item"
+                :class="readinessItemClass(item)"
+              >
+                <span class="workspace-readiness-dot" :class="readinessDotClass(item)">
+                  <svg v-if="item.state === 'done'" viewBox="0 0 16 16" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3.5 8.5l2.5 2.5 6.5-7" />
+                  </svg>
+                  <span v-else-if="item.state === 'checking'" class="h-2.5 w-2.5 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+                  <span v-else class="h-1.5 w-1.5 rounded-full bg-current"></span>
+                </span>
+                <span class="min-w-0">
+                  <span class="block truncate text-xs font-semibold text-[var(--color-text-main)]">{{ item.label }}</span>
+                  <span class="mt-0.5 block truncate text-[11px] text-[var(--color-text-muted)]">{{ item.detail }}</span>
+                </span>
+              </div>
+            </div>
+          </section>
+
           <div class="rounded-lg bg-[var(--color-base-soft)]/55">
             <div class="flex items-center justify-between px-3 py-2 text-sm">
               <span class="text-[var(--color-text-muted)]">Created date</span>
@@ -451,6 +503,7 @@ const setupStep = ref(1)
 const setupWorkspaceName = ref('')
 const setupWorkspaceContext = ref('')
 const isSavingWorkspaceIdentity = ref(false)
+const isCheckingWorkspaceReadiness = ref(false)
 const isGeneratingWorkspaceSchemas = ref(false)
 const schemaGenerationStatuses = ref({})
 const setupSteps = [
@@ -488,6 +541,58 @@ const detailConversationCount = computed(() => Number(workspaceDetail.value?.con
 const detailLastActive = computed(() => formatRelativeTime(workspaceDetail.value?.updated_at || activeWorkspace.value?.updated_at))
 const datasetIngestStatusLabel = computed(() => String(datasetIngestMessage.value || 'Processing dataset...').trim() || 'Processing dataset...')
 const datasetIngestHasError = computed(() => Boolean(String(datasetIngestError.value || '').trim()))
+const workspaceKernelStatus = computed(() => appStore.getWorkspaceKernelStatus(props.activeWorkspaceId))
+const workspaceKernelReady = computed(() => ['ready', 'busy'].includes(workspaceKernelStatus.value))
+const workspaceReadinessItems = computed(() => {
+  const workspaceId = String(props.activeWorkspaceId || '').trim()
+  const draft = resolveWorkspaceIdentityDraft()
+  const registeredName = String(activeWorkspace.value?.name || draft?.name || '').trim()
+  const context = String(resolveWorkspaceContext()).trim()
+  const registered = Boolean(workspaceId && registeredName)
+  const active = Boolean(workspaceId && String(appStore.activeWorkspaceId || '').trim() === workspaceId)
+  const kernelStatus = String(workspaceKernelStatus.value || 'missing').trim()
+  const kernelChecking = isCreatingWorkspaceRuntime.value || isCheckingWorkspaceReadiness.value || ['starting', 'connecting'].includes(kernelStatus)
+
+  return [
+    {
+      id: 'workspace',
+      label: 'Workspace saved',
+      detail: registered ? registeredName : 'Waiting for workspace record',
+      state: registered ? 'done' : 'pending',
+    },
+    {
+      id: 'context',
+      label: 'Context saved',
+      detail: context ? 'Shared schema context is ready' : 'No shared context added',
+      state: registered ? 'done' : 'pending',
+    },
+    {
+      id: 'active',
+      label: 'Workspace active',
+      detail: active ? 'New datasets will attach here' : 'Waiting for active workspace',
+      state: active ? 'done' : 'pending',
+    },
+    {
+      id: 'kernel',
+      label: 'Kernel ready',
+      detail: readinessKernelDetail(kernelStatus),
+      state: workspaceKernelReady.value ? 'done' : (kernelChecking ? 'checking' : 'pending'),
+    },
+  ]
+})
+const workspaceReadinessDoneCount = computed(() => workspaceReadinessItems.value.filter((item) => item.state === 'done').length)
+const workspaceReadinessProgress = computed(() => Math.round((workspaceReadinessDoneCount.value / workspaceReadinessItems.value.length) * 100))
+const workspaceReadinessComplete = computed(() => workspaceReadinessDoneCount.value === workspaceReadinessItems.value.length)
+const workspaceReadinessTitle = computed(() => (
+  workspaceReadinessComplete.value
+    ? 'Ready for datasets'
+    : `${workspaceReadinessDoneCount.value} of ${workspaceReadinessItems.value.length} checks ready`
+))
+const workspaceReadinessSummary = computed(() => (
+  workspaceReadinessComplete.value
+    ? 'Workspace setup is saved, active, and connected. Upload datasets when you are ready.'
+    : 'Workspace setup is still settling. If the runtime stalls, retry it here before uploading data.'
+))
 const workspaceCreateTitle = computed(() => (
   isCreatingWorkspaceRuntime.value
     ? 'Preparing workspace runtime inside Settings...'
@@ -851,6 +956,47 @@ function notifyWorkspaceOperationBlocked() {
     activeWorkspaceOperationMessage.value || 'Wait for the current workspace setup step to finish.',
   )
   return true
+}
+
+function readinessKernelDetail(status) {
+  const normalized = String(status || '').trim()
+  if (normalized === 'ready') return 'Runtime is connected'
+  if (normalized === 'busy') return 'Runtime is busy but available'
+  if (normalized === 'starting' || normalized === 'connecting') return 'Runtime is starting'
+  if (normalized === 'error') return 'Runtime needs attention'
+  return 'Runtime not prepared yet'
+}
+
+function readinessItemClass(item) {
+  const state = String(item?.state || '').trim()
+  if (state === 'done') return 'workspace-readiness-item-done'
+  if (state === 'checking') return 'workspace-readiness-item-checking'
+  return 'workspace-readiness-item-pending'
+}
+
+function readinessDotClass(item) {
+  const state = String(item?.state || '').trim()
+  if (state === 'done') return 'workspace-readiness-dot-done'
+  if (state === 'checking') return 'workspace-readiness-dot-checking'
+  return 'workspace-readiness-dot-pending'
+}
+
+async function refreshWorkspaceReadiness() {
+  const workspaceId = String(props.activeWorkspaceId || '').trim()
+  if (!workspaceId || isCheckingWorkspaceReadiness.value) return
+  isCheckingWorkspaceReadiness.value = true
+  try {
+    const ready = await appStore.ensureWorkspaceKernelConnected(workspaceId)
+    if (ready) {
+      toast.success('Workspace ready', 'Runtime is ready for dataset uploads.')
+    } else {
+      toast.error('Runtime not ready', String(appStore.runtimeError || 'Workspace runtime is still starting.'))
+    }
+  } catch (error) {
+    toast.error('Runtime check failed', extractApiErrorMessage(error, 'Failed to prepare workspace runtime.'))
+  } finally {
+    isCheckingWorkspaceReadiness.value = false
+  }
 }
 
 function stopDatasetDeletionPollers() {
@@ -1421,6 +1567,103 @@ function formatRelativeTime(raw) {
 </script>
 
 <style scoped>
+.workspace-readiness-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  padding: 1rem;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--color-accent) 14%, transparent), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-base-soft) 92%, var(--color-accent) 8%), var(--color-base));
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--color-text-main) 8%, transparent);
+  transition:
+    border-color var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease),
+    box-shadow var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease),
+    transform var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease);
+}
+
+.workspace-readiness-card::before {
+  content: '';
+  position: absolute;
+  inset: -35% auto auto 54%;
+  height: 9rem;
+  width: 9rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  filter: blur(22px);
+  pointer-events: none;
+}
+
+.workspace-readiness-card-ready {
+  border-color: color-mix(in srgb, var(--color-success) 36%, var(--color-border));
+}
+
+.workspace-readiness-card-pending {
+  border-color: color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
+}
+
+.workspace-readiness-item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.625rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 0.625rem;
+  background: color-mix(in srgb, var(--color-base) 72%, transparent);
+  transition:
+    border-color var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease),
+    background var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease),
+    transform var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease);
+}
+
+.workspace-readiness-item:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--color-base) 88%, transparent);
+}
+
+.workspace-readiness-item-done {
+  border-color: color-mix(in srgb, var(--color-success) 28%, var(--color-border));
+}
+
+.workspace-readiness-item-checking {
+  border-color: color-mix(in srgb, var(--color-accent) 34%, var(--color-border));
+}
+
+.workspace-readiness-item-pending {
+  opacity: 0.82;
+}
+
+.workspace-readiness-dot {
+  display: inline-flex;
+  height: 1.5rem;
+  width: 1.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  transition:
+    background var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease),
+    color var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease),
+    transform var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease);
+}
+
+.workspace-readiness-dot-done {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.workspace-readiness-dot-checking {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.workspace-readiness-dot-pending {
+  background: var(--color-base-muted);
+  color: var(--color-text-muted);
+}
+
 .workspace-stepper {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
