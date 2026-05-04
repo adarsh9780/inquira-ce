@@ -537,6 +537,15 @@ watch(
   },
 )
 
+watch(
+  () => setupStep.value,
+  (nextStep) => {
+    if (props.panelMode !== 'ws-detail') return
+    if (Number(nextStep) !== 1) return
+    syncSetupIdentity()
+  },
+)
+
 onMounted(async () => {
   unsubscribeProgress = settingsWebSocket.subscribeProgress(handleSettingsProgressUpdate)
   if (props.panelMode === 'ws-list') {
@@ -615,13 +624,17 @@ function syncSetupIdentity() {
   setupWorkspaceContext.value = resolveWorkspaceContext()
 }
 
-function goToSetupStep(stepId) {
+async function goToSetupStep(stepId) {
   if (notifyWorkspaceOperationBlocked()) return
   const normalized = Number(stepId)
   if (![1, 2, 3].includes(normalized)) return
   if (props.panelMode === 'ws-create' && normalized !== 1) {
     toast.info('Create workspace first', 'Save the workspace identity before adding datasets.')
     return
+  }
+  if (props.panelMode === 'ws-detail' && setupStep.value === 1 && normalized > 1) {
+    const persisted = await ensureWorkspaceIdentityPersisted({ silent: true })
+    if (!persisted) return
   }
   setupStep.value = normalized
 }
@@ -634,16 +647,43 @@ async function saveWorkspaceIdentityAndContinue() {
     toast.error('Workspace name required', 'Enter a workspace name to continue.')
     return
   }
+  const persisted = await ensureWorkspaceIdentityPersisted()
+  if (!persisted) return
+  setupStep.value = 2
+}
+
+async function ensureWorkspaceIdentityPersisted({ silent = false } = {}) {
+  const workspaceId = String(props.activeWorkspaceId || '').trim()
+  const name = String(setupWorkspaceName.value || '').trim()
+  if (!workspaceId || !name) {
+    if (!silent) {
+      toast.error('Workspace name required', 'Enter a workspace name to continue.')
+    }
+    return false
+  }
+
+  const context = String(setupWorkspaceContext.value || '').trim()
+  const currentName = String(activeWorkspace.value?.name || '').trim()
+  const currentContext = resolveWorkspaceContext()
+  const unchanged = name === currentName && context === currentContext
+  if (unchanged) return true
+
   isSavingWorkspaceIdentity.value = true
   try {
-    const context = String(setupWorkspaceContext.value || '').trim()
     await appStore.renameWorkspace(workspaceId, name, context)
     await appStore.fetchWorkspaces()
     await loadWorkspaceDetail()
-    setupStep.value = 2
-    toast.success('Workspace saved', 'Workspace name and context updated.')
+    if (!silent) {
+      toast.success('Workspace saved', 'Workspace name and context updated.')
+    }
+    return true
   } catch (error) {
-    toast.error('Save failed', extractApiErrorMessage(error, 'Failed to save workspace identity.'))
+    if (!silent) {
+      toast.error('Save failed', extractApiErrorMessage(error, 'Failed to save workspace identity.'))
+    } else {
+      toast.error('Save failed', extractApiErrorMessage(error, 'Failed to save workspace before continuing.'))
+    }
+    return false
   } finally {
     isSavingWorkspaceIdentity.value = false
   }
@@ -892,6 +932,8 @@ async function startBatchDatasetIngestion(paths) {
     ? paths.map((item) => String(item || '').trim()).filter(Boolean)
     : []
   if (!workspaceId || sourcePaths.length === 0) return
+  const identityReady = await ensureWorkspaceIdentityPersisted({ silent: true })
+  if (!identityReady) return
 
   startDatasetIngest(sourcePaths.length === 1 ? sourcePaths[0] : `${sourcePaths.length} selected files`)
   lastSelectedDatasetPaths.value = [...sourcePaths]
