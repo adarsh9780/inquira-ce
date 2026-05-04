@@ -284,7 +284,9 @@ function handleWorkspaceCreated(payload) {
     context: String(payload?.context || '').trim(),
   }
   workspaceDetailSetupStep.value = Number(payload?.setupStep || 2)
-  navigateTo('ws-detail', 'forward')
+  panelDirection.value = 'forward'
+  currentPanel.value = 'ws-detail'
+  activeSection.value = 'workspace'
 }
 
 function closeModal() {

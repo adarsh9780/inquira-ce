@@ -75,6 +75,11 @@ test('workspace creation carries step one identity into dataset selection automa
     'async function createWorkspace({ setupStep: targetSetupStep = 2 } = {}) {',
     'function schemaGenerationLabel(tableName) {',
   )
+  const createdHandlerBlock = extractBlock(
+    settingsSource,
+    'function handleWorkspaceCreated(payload) {',
+    'function closeModal() {',
+  )
 
   assert.equal(source.includes('@click="continueFromWorkspaceIdentity()"'), true)
   assert.equal(source.includes('async function continueFromWorkspaceIdentity() {'), true)
@@ -90,7 +95,9 @@ test('workspace creation carries step one identity into dataset selection automa
   assert.equal(settingsSource.includes(':workspace-identity-draft="workspaceIdentityDraft"'), true)
   assert.equal(settingsSource.includes('@workspace-created="handleWorkspaceCreated"'), true)
   assert.equal(settingsSource.includes('function handleWorkspaceCreated(payload) {'), true)
-  assert.equal(settingsSource.includes("navigateTo('ws-detail', 'forward')"), true)
+  assert.equal(createdHandlerBlock.includes("currentPanel.value = 'ws-detail'"), true)
+  assert.equal(createdHandlerBlock.includes("activeSection.value = 'workspace'"), true)
+  assert.equal(createdHandlerBlock.includes("navigateTo('ws-detail', 'forward')"), false)
 })
 
 test('workspace flow routes through settings panels and workspace list/detail/create modes', () => {
