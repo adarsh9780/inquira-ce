@@ -124,22 +124,24 @@
         </button>
       </header>
 
-      <div class="workspace-stepper">
-        <button
-          v-for="(step, index) in setupSteps"
-          :key="step.id"
-          type="button"
-          class="workspace-stepper-item"
-          @click="goToSetupStep(step.id)"
-        >
-          <span
-            v-if="index > 0"
-            class="workspace-stepper-line"
-            :class="setupStep > step.id - 1 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-border)]'"
-          ></span>
-          <span class="workspace-stepper-dot" :class="stepDotClass(step.id)">{{ step.id }}</span>
-          <span class="mt-2 block truncate text-xs font-medium" :class="stepLabelClass(step.id)">{{ step.label }}</span>
-        </button>
+      <div class="px-4">
+        <div class="workspace-stepper">
+          <button
+            v-for="(step, index) in setupSteps"
+            :key="step.id"
+            type="button"
+            class="workspace-stepper-item"
+            @click="goToSetupStep(step.id)"
+          >
+            <span
+              v-if="index > 0"
+              class="workspace-stepper-line"
+              :class="setupStep > step.id - 1 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-border)]'"
+            ></span>
+            <span class="workspace-stepper-dot" :class="stepDotClass(step.id)">{{ step.id }}</span>
+            <span class="mt-2 block truncate text-xs font-medium" :class="stepLabelClass(step.id)">{{ step.label }}</span>
+          </button>
+        </div>
       </div>
 
       <Transition
@@ -149,7 +151,7 @@
         leave-to-class="dialog-fade-leave-to"
         mode="out-in"
       >
-        <div v-if="setupStep === 1" key="detail-step-1" class="space-y-4">
+        <div v-if="setupStep === 1" key="detail-step-1" class="space-y-4 px-4">
           <div class="rounded-xl bg-[var(--color-base-soft)] px-4 py-4">
             <p class="mb-4 text-sm text-[var(--color-text-muted)]">
               A workspace is meant for related datasets that share business meaning, terminology, and schema context.
@@ -189,7 +191,7 @@
           </div>
         </div>
 
-        <div v-else-if="setupStep === 2" key="detail-step-2" class="space-y-4">
+        <div v-else-if="setupStep === 2" key="detail-step-2" class="space-y-4 px-4">
           <div class="rounded-lg bg-[var(--color-base-soft)]/55">
         <div class="flex items-center justify-between px-3 py-2 text-sm">
           <span class="text-[var(--color-text-muted)]">Created date</span>
@@ -205,7 +207,7 @@
         </div>
       </div>
 
-      <div class="space-y-2">
+      <div class="space-y-2 px-4">
         <p class="text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Datasets</p>
 
         <div
@@ -290,7 +292,7 @@
       </div>
         </div>
 
-        <div v-else key="detail-step-3" class="space-y-4">
+        <div v-else key="detail-step-3" class="space-y-4 px-4">
           <div class="rounded-xl bg-[var(--color-base-soft)] px-4 py-4">
             <div class="mb-4 flex items-start justify-between gap-3">
               <div>
@@ -363,22 +365,24 @@
         </div>
       </header>
 
-      <div class="workspace-stepper">
-        <button
-          v-for="(step, index) in setupSteps"
-          :key="`create-${step.id}`"
-          type="button"
-          class="workspace-stepper-item"
-          @click="goToSetupStep(step.id)"
-        >
-          <span
-            v-if="index > 0"
-            class="workspace-stepper-line"
-            :class="setupStep > step.id - 1 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-border)]'"
-          ></span>
-          <span class="workspace-stepper-dot" :class="stepDotClass(step.id)">{{ step.id }}</span>
-          <span class="mt-2 block truncate text-xs font-medium" :class="stepLabelClass(step.id)">{{ step.label }}</span>
-        </button>
+      <div class="px-4">
+        <div class="workspace-stepper">
+          <button
+            v-for="(step, index) in setupSteps"
+            :key="`create-${step.id}`"
+            type="button"
+            class="workspace-stepper-item"
+            @click="goToSetupStep(step.id)"
+          >
+            <span
+              v-if="index > 0"
+              class="workspace-stepper-line"
+              :class="setupStep > step.id - 1 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-border)]'"
+            ></span>
+            <span class="workspace-stepper-dot" :class="stepDotClass(step.id)">{{ step.id }}</span>
+            <span class="mt-2 block truncate text-xs font-medium" :class="stepLabelClass(step.id)">{{ step.label }}</span>
+          </button>
+        </div>
       </div>
 
       <Transition
@@ -388,7 +392,7 @@
         leave-to-class="dialog-fade-leave-to"
         mode="out-in"
       >
-        <div v-if="setupStep === 1" key="create-step-1" class="relative overflow-hidden rounded-xl bg-[var(--color-base-soft)] px-4 py-4">
+        <div v-if="setupStep === 1" key="create-step-1" class="relative mx-4 overflow-hidden rounded-xl bg-[var(--color-base-soft)] px-4 py-4">
           <div
             v-if="isCreatingWorkspace"
             class="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-base)]/85 px-6 text-center backdrop-blur-sm"
@@ -429,12 +433,12 @@
             ></textarea>
           </label>
         </div>
-        <div v-else key="create-step-locked" class="rounded-xl bg-[var(--color-base-soft)] px-4 py-4 text-sm text-[var(--color-text-muted)]">
+        <div v-else key="create-step-locked" class="mx-4 rounded-xl bg-[var(--color-base-soft)] px-4 py-4 text-sm text-[var(--color-text-muted)]">
           Save the workspace identity first. Dataset selection and schema generation unlock after the workspace exists.
         </div>
       </Transition>
 
-      <div class="flex justify-end pt-3">
+      <div class="flex justify-end px-4 pt-3">
         <button
           type="button"
           class="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
