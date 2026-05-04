@@ -17,6 +17,10 @@ test('workspace tab shows inline dataset processing card and consumes websocket 
   assert.equal(source.includes('function handleSettingsProgressUpdate(data) {'), true)
   assert.equal(source.includes('startDatasetIngest(sourcePaths.length === 1 ? sourcePaths[0] : `${sourcePaths.length} selected files`)'), true)
   assert.equal(source.includes('trackDatasetIngestionJob(workspaceId, jobId)'), true)
+  assert.equal(source.includes("setWorkspaceOperation('ingest', 'Importing selected datasets into the workspace.')"), true)
+  assert.equal(source.includes('if (completedCount > 0) {'), true)
+  assert.equal(source.includes('setupStep.value = 3'), true)
+  assert.equal(source.includes('clearWorkspaceOperation()'), true)
 })
 
 test('workspace tab uses modal confirmation for dataset deletion and polls cleanup job', () => {
@@ -29,4 +33,15 @@ test('workspace tab uses modal confirmation for dataset deletion and polls clean
   assert.equal(source.includes('trackDatasetDeletionJob(workspaceId, jobId, datasetLabel)'), true)
   assert.equal(source.includes('apiService.v1GetDatasetDeletionJob('), true)
   assert.equal(source.includes('apiService.v1ListDatasetDeletionJobs(workspaceId)'), true)
+})
+
+test('workspace delete uses shared confirmation modal from list and detail', () => {
+  const source = readSource('src/components/modals/tabs/WorkspaceTab.vue')
+
+  assert.equal(source.includes('isWorkspaceDeleteDialogOpen'), true)
+  assert.equal(source.includes('workspaceDeleteDialogMessage'), true)
+  assert.equal(source.includes('@click.stop="requestDeleteWorkspace(workspace.id)"'), true)
+  assert.equal(source.includes('@click="requestDeleteWorkspace(activeWorkspaceId)"'), true)
+  assert.equal(source.includes('showDeleteConfirm'), false)
+  assert.equal(source.includes('Danger zone'), false)
 })

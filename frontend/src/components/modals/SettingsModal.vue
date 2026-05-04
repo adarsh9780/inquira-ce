@@ -17,7 +17,6 @@
         <button
           type="button"
           class="btn-icon absolute right-3 top-3 z-20"
-          :disabled="workspaceCreationLocked"
           aria-label="Close settings"
           @click="closeModal"
         >
@@ -33,7 +32,6 @@
             <button
               type="button"
               class="mb-1"
-              :disabled="workspaceCreationLocked"
               :class="activeSection === 'llm' ? activeNavClass : inactiveNavClass"
               @click="openLeafSection('llm')"
             >
@@ -43,7 +41,6 @@
             <button
               type="button"
               class="mb-1"
-              :disabled="workspaceCreationLocked"
               :class="activeSection === 'workspace' ? activeNavClass : inactiveNavClass"
               @click="openWorkspaceSection"
             >
@@ -53,7 +50,6 @@
             <button
               type="button"
               class="mb-1"
-              :disabled="workspaceCreationLocked"
               :class="activeSection === 'appearance' ? activeNavClass : inactiveNavClass"
               @click="openLeafSection('appearance')"
             >
@@ -63,7 +59,6 @@
             <button
               type="button"
               class="mb-1"
-              :disabled="workspaceCreationLocked"
               :class="activeSection === 'terms' ? activeNavClass : inactiveNavClass"
               @click="openLeafSection('terms')"
             >
@@ -73,7 +68,6 @@
             <button
               type="button"
               class="mb-1"
-              :disabled="workspaceCreationLocked"
               :class="activeSection === 'account' ? activeNavClass : inactiveNavClass"
               @click="openLeafSection('account')"
             >
@@ -92,7 +86,7 @@
                 :active-workspace-id="activeWorkspaceId"
                 :workspaces="workspaceItems"
                 @navigate="navigateTo"
-                @creation-lock-change="setWorkspaceCreationLocked"
+                @workspace-operation-change="setActiveWorkspaceOperation"
                 @set-active-workspace="setActiveWorkspace"
               />
             </section>
@@ -103,7 +97,7 @@
                 :active-workspace-id="activeWorkspaceId"
                 :workspaces="workspaceItems"
                 @navigate="navigateTo"
-                @creation-lock-change="setWorkspaceCreationLocked"
+                @workspace-operation-change="setActiveWorkspaceOperation"
                 @set-active-workspace="setActiveWorkspace"
               />
             </section>
@@ -114,7 +108,7 @@
                 :active-workspace-id="activeWorkspaceId"
                 :workspaces="workspaceItems"
                 @navigate="navigateTo"
-                @creation-lock-change="setWorkspaceCreationLocked"
+                @workspace-operation-change="setActiveWorkspaceOperation"
                 @set-active-workspace="setActiveWorkspace"
               />
             </section>
@@ -141,6 +135,7 @@
 import { computed, ref, watch } from 'vue'
 import { useLLMConfig } from '../../composables/useLLMConfig'
 import { useAppStore } from '../../stores/appStore'
+import { toast } from '../../composables/useToast'
 import LLMSettingsTab from './tabs/LLMSettingsTab.vue'
 import WorkspaceTab from './tabs/WorkspaceTab.vue'
 import AppearanceTab from './tabs/AppearanceTab.vue'
@@ -167,7 +162,8 @@ const activeSection = ref('llm')
 const activeWorkspaceId = ref('')
 const currentPanel = ref('llm')
 const panelDirection = ref('forward')
-const workspaceCreationLocked = ref(false)
+const activeWorkspaceOperation = ref('')
+const activeWorkspaceOperationMessage = ref('')
 
 const activeNavClass = 'nav-tab-active'
 const inactiveNavClass = 'nav-tab'
@@ -239,7 +235,7 @@ function panelClass(panelId) {
 }
 
 function navigateTo(panel, direction = 'forward') {
-  if (workspaceCreationLocked.value) return
+  if (notifyWorkspaceOperationBlocked()) return
   panelDirection.value = direction
   currentPanel.value = panel
   if (panel.startsWith('ws-')) {
@@ -248,19 +244,19 @@ function navigateTo(panel, direction = 'forward') {
 }
 
 function openLeafSection(section) {
-  if (workspaceCreationLocked.value) return
+  if (notifyWorkspaceOperationBlocked()) return
   activeSection.value = section
   navigateTo(section, 'forward')
 }
 
 function openWorkspaceSection() {
-  if (workspaceCreationLocked.value) return
+  if (notifyWorkspaceOperationBlocked()) return
   activeSection.value = 'workspace'
   navigateTo('ws-list', 'forward')
 }
 
 async function setActiveWorkspace(workspaceId) {
-  if (workspaceCreationLocked.value) return
+  if (notifyWorkspaceOperationBlocked()) return
   const nextId = String(workspaceId || '').trim()
   if (!nextId) return
   if (activeWorkspaceId.value !== nextId) {
@@ -272,12 +268,27 @@ async function setActiveWorkspace(workspaceId) {
 }
 
 function closeModal() {
-  if (workspaceCreationLocked.value) return
+  if (notifyWorkspaceOperationBlocked()) return
   emit('update:modelValue', false)
 }
 
-function setWorkspaceCreationLocked(locked) {
-  workspaceCreationLocked.value = Boolean(locked)
+function setActiveWorkspaceOperation(payload) {
+  if (!payload || payload.locked === false) {
+    activeWorkspaceOperation.value = ''
+    activeWorkspaceOperationMessage.value = ''
+    return
+  }
+  activeWorkspaceOperation.value = String(payload.operation || 'workspace').trim()
+  activeWorkspaceOperationMessage.value = String(payload.message || 'Workspace setup is still running.').trim()
+}
+
+function notifyWorkspaceOperationBlocked() {
+  if (!activeWorkspaceOperation.value) return false
+  toast.info(
+    'Workspace setup in progress',
+    activeWorkspaceOperationMessage.value || 'Wait for the current workspace setup step to finish.',
+  )
+  return true
 }
 </script>
 

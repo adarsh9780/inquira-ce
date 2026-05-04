@@ -14,14 +14,13 @@
       </header>
 
       <div v-if="workspaceCards.length" class="space-y-2">
-        <button
+        <div
           v-for="workspace in workspaceCards"
           :key="workspace.id"
-          type="button"
-          class="w-full rounded-lg border px-3 py-3 text-left transition-all"
+          class="w-full rounded-lg px-3 py-3 text-left transition-all"
           :class="workspace.id === activeWorkspaceId
-            ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
-            : 'border-[var(--color-border-strong)] bg-[var(--color-base)] hover:border-[var(--color-accent-border)]'"
+            ? 'bg-[var(--color-accent-soft)]'
+            : 'bg-[var(--color-base-soft)] hover:bg-[var(--color-base-muted)]'"
           @click="openWorkspaceDetail(workspace.id)"
         >
           <div class="mb-2 flex items-start justify-between gap-2">
@@ -31,20 +30,29 @@
             >
               {{ workspace.name || 'Untitled workspace' }}
             </p>
-            <span
-              v-if="workspace.id === activeWorkspaceId"
-              class="rounded-full bg-[var(--color-success-bg)] px-2 py-0.5 text-[11px] text-[var(--color-success)]"
-            >
-              Active
-            </span>
+            <div class="flex shrink-0 items-center gap-2">
+              <span
+                v-if="workspace.id === activeWorkspaceId"
+                class="rounded-full bg-[var(--color-success-bg)] px-2 py-0.5 text-[11px] text-[var(--color-success)]"
+              >
+                Active
+              </span>
+              <button
+                type="button"
+                class="rounded px-2 py-1 text-xs text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger-bg)]"
+                @click.stop="requestDeleteWorkspace(workspace.id)"
+              >
+                Delete
+              </button>
+            </div>
           </div>
           <p class="text-xs text-[var(--color-text-muted)]">
             {{ workspace.conversationCount }} conversations · last active {{ workspace.lastActiveLabel }}
           </p>
-        </button>
+        </div>
       </div>
 
-      <div v-else class="rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] px-5 py-8 text-center">
+      <div v-else class="rounded-lg bg-[var(--color-base-soft)] px-5 py-8 text-center">
         <svg viewBox="0 0 24 24" class="mx-auto mb-3 h-8 w-8 text-[var(--color-text-muted)]" fill="none" stroke="currentColor" stroke-width="1.8">
           <path d="M3 7h6l2 2h10v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
         </svg>
@@ -116,23 +124,22 @@
         </button>
       </header>
 
-      <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-base-soft)]/55 px-3 py-3">
-        <div class="flex items-center gap-2">
-          <button
-            v-for="step in setupSteps"
-            :key="step.id"
-            type="button"
-            class="min-w-0 flex-1 rounded-lg px-3 py-2 text-left transition-all"
-            :disabled="isCreatingWorkspace"
-            :class="setupStep === step.id
-              ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
-              : 'text-[var(--color-text-muted)] hover:bg-[var(--color-base)] hover:text-[var(--color-text-main)]'"
-            @click="goToSetupStep(step.id)"
-          >
-            <span class="block text-[11px] font-semibold uppercase tracking-wider">Step {{ step.id }}</span>
-            <span class="block truncate text-sm font-medium">{{ step.label }}</span>
-          </button>
-        </div>
+      <div class="workspace-stepper">
+        <button
+          v-for="(step, index) in setupSteps"
+          :key="step.id"
+          type="button"
+          class="workspace-stepper-item"
+          @click="goToSetupStep(step.id)"
+        >
+          <span
+            v-if="index > 0"
+            class="workspace-stepper-line"
+            :class="setupStep > step.id - 1 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-border)]'"
+          ></span>
+          <span class="workspace-stepper-dot" :class="stepDotClass(step.id)">{{ step.id }}</span>
+          <span class="mt-2 block truncate text-xs font-medium" :class="stepLabelClass(step.id)">{{ step.label }}</span>
+        </button>
       </div>
 
       <Transition
@@ -143,7 +150,7 @@
         mode="out-in"
       >
         <div v-if="setupStep === 1" key="detail-step-1" class="space-y-4">
-          <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-base)] px-4 py-4">
+          <div class="rounded-xl bg-[var(--color-base-soft)] px-4 py-4">
             <p class="mb-4 text-sm text-[var(--color-text-muted)]">
               A workspace is meant for related datasets that share business meaning, terminology, and schema context.
             </p>
@@ -184,11 +191,11 @@
 
         <div v-else-if="setupStep === 2" key="detail-step-2" class="space-y-4">
           <div class="rounded-lg bg-[var(--color-base-soft)]/55">
-        <div class="flex items-center justify-between border-b border-[var(--color-border)]/70 px-3 py-2 text-sm">
+        <div class="flex items-center justify-between px-3 py-2 text-sm">
           <span class="text-[var(--color-text-muted)]">Created date</span>
           <span class="text-[var(--color-text-main)]">{{ detailCreatedAt }}</span>
         </div>
-        <div class="flex items-center justify-between border-b border-[var(--color-border)]/70 px-3 py-2 text-sm">
+        <div class="flex items-center justify-between px-3 py-2 text-sm">
           <span class="text-[var(--color-text-muted)]">Conversations</span>
           <span class="text-[var(--color-text-main)]">{{ detailConversationCount }}</span>
         </div>
@@ -203,7 +210,7 @@
 
         <div
           v-if="isDatasetIngesting"
-          class="rounded-lg border border-[var(--color-accent-border)] bg-[var(--color-accent-soft)] px-4 py-3"
+          class="rounded-lg bg-[var(--color-accent-soft)] px-4 py-3"
           aria-live="polite"
         >
           <div class="flex items-start justify-between gap-3">
@@ -228,7 +235,7 @@
           <div
             v-for="dataset in datasetEntries"
             :key="dataset.table_name"
-            class="mb-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] px-4 py-3"
+            class="mb-2 rounded-lg bg-[var(--color-base-soft)] px-4 py-3"
           >
             <div class="flex items-start justify-between gap-3">
               <p class="min-w-0 truncate text-sm font-medium text-[var(--color-text-main)]">{{ dataset.filename }}</p>
@@ -273,7 +280,7 @@
 
         <button
           type="button"
-          class="w-full rounded-lg border border-dashed border-[var(--color-border-strong)] px-4 py-3 text-center text-sm text-[var(--color-text-muted)] transition-all hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+          class="w-full rounded-lg bg-[var(--color-base-soft)] px-4 py-3 text-center text-sm text-[var(--color-text-muted)] transition-all hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="isDatasetIngesting || isDeletingDataset"
           @click="openDatasetPicker"
         >
@@ -284,7 +291,7 @@
         </div>
 
         <div v-else key="detail-step-3" class="space-y-4">
-          <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-base)] px-4 py-4">
+          <div class="rounded-xl bg-[var(--color-base-soft)] px-4 py-4">
             <div class="mb-4 flex items-start justify-between gap-3">
               <div>
                 <p class="text-sm font-semibold text-[var(--color-text-main)]">Generate schemas</p>
@@ -305,7 +312,7 @@
               <div
                 v-for="dataset in datasetEntries"
                 :key="`schema-${dataset.table_name}`"
-                class="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] px-3 py-2"
+                class="flex items-center justify-between gap-3 rounded-lg bg-[var(--color-base)] px-3 py-2"
               >
                 <div class="min-w-0">
                   <p class="truncate text-sm font-medium text-[var(--color-text-main)]">{{ dataset.filename }}</p>
@@ -326,22 +333,14 @@
         </div>
       </Transition>
 
-      <div class="mt-6 border-t border-[var(--color-border)] pt-4">
-        <div class="flex items-center justify-between">
-          <p class="text-xs text-[var(--color-text-muted)]">Danger zone</p>
+      <div class="mt-6 flex justify-end">
         <button
           type="button"
           class="btn-danger px-3 py-1 text-xs"
-          @click="showDeleteConfirm = !showDeleteConfirm"
+          @click="requestDeleteWorkspace(activeWorkspaceId)"
         >
           Delete workspace
         </button>
-      </div>
-      <div v-if="showDeleteConfirm" class="mt-3 flex items-center justify-end gap-2 rounded-lg bg-[var(--color-base-soft)] px-3 py-2">
-        <span class="mr-auto text-xs text-[var(--color-text-muted)]">Delete this workspace and all its datasets?</span>
-        <button type="button" class="btn-secondary px-2.5 py-1 text-xs" @click="showDeleteConfirm = false">Cancel</button>
-        <button type="button" class="btn-danger px-2.5 py-1 text-xs" @click="deleteWorkspace">Delete</button>
-      </div>
       </div>
     </div>
 
@@ -364,22 +363,22 @@
         </div>
       </header>
 
-      <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-base-soft)]/55 px-3 py-3">
-        <div class="flex items-center gap-2">
-          <button
-            v-for="step in setupSteps"
-            :key="`create-${step.id}`"
-            type="button"
-            class="min-w-0 flex-1 rounded-lg px-3 py-2 text-left transition-all"
-            :class="setupStep === step.id
-              ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
-              : 'text-[var(--color-text-muted)] hover:bg-[var(--color-base)] hover:text-[var(--color-text-main)]'"
-            @click="goToSetupStep(step.id)"
-          >
-            <span class="block text-[11px] font-semibold uppercase tracking-wider">Step {{ step.id }}</span>
-            <span class="block truncate text-sm font-medium">{{ step.label }}</span>
-          </button>
-        </div>
+      <div class="workspace-stepper">
+        <button
+          v-for="(step, index) in setupSteps"
+          :key="`create-${step.id}`"
+          type="button"
+          class="workspace-stepper-item"
+          @click="goToSetupStep(step.id)"
+        >
+          <span
+            v-if="index > 0"
+            class="workspace-stepper-line"
+            :class="setupStep > step.id - 1 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-border)]'"
+          ></span>
+          <span class="workspace-stepper-dot" :class="stepDotClass(step.id)">{{ step.id }}</span>
+          <span class="mt-2 block truncate text-xs font-medium" :class="stepLabelClass(step.id)">{{ step.label }}</span>
+        </button>
       </div>
 
       <Transition
@@ -389,7 +388,7 @@
         leave-to-class="dialog-fade-leave-to"
         mode="out-in"
       >
-        <div v-if="setupStep === 1" key="create-step-1" class="relative overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-base)] px-4 py-4">
+        <div v-if="setupStep === 1" key="create-step-1" class="relative overflow-hidden rounded-xl bg-[var(--color-base-soft)] px-4 py-4">
           <div
             v-if="isCreatingWorkspace"
             class="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-base)]/85 px-6 text-center backdrop-blur-sm"
@@ -430,7 +429,7 @@
             ></textarea>
           </label>
         </div>
-        <div v-else key="create-step-locked" class="rounded-xl border border-[var(--color-border)] bg-[var(--color-base)] px-4 py-4 text-sm text-[var(--color-text-muted)]">
+        <div v-else key="create-step-locked" class="rounded-xl bg-[var(--color-base-soft)] px-4 py-4 text-sm text-[var(--color-text-muted)]">
           Save the workspace identity first. Dataset selection and schema generation unlock after the workspace exists.
         </div>
       </Transition>
@@ -442,10 +441,7 @@
           :disabled="isCreatingWorkspace"
           @click="createWorkspace"
         >
-          <span v-if="isCreatingWorkspace" class="inline-flex items-center gap-2">
-            <span class="h-3 w-3 animate-spin rounded-full border-2 border-[var(--color-accent-border)] border-t-[var(--color-accent)]"></span>
-            Creating...
-          </span>
+          <span v-if="isCreatingWorkspace">Creating...</span>
           <span v-else>Create and continue</span>
         </button>
       </div>
@@ -459,6 +455,16 @@
       cancel-text="Cancel"
       @close="closeDatasetDeleteDialog"
       @confirm="confirmRemoveDataset"
+    />
+
+    <ConfirmationModal
+      :is-open="isWorkspaceDeleteDialogOpen"
+      title="Delete Workspace"
+      :message="workspaceDeleteDialogMessage"
+      confirm-text="Delete"
+      cancel-text="Cancel"
+      @close="closeWorkspaceDeleteDialog"
+      @confirm="deleteWorkspace"
     />
   </section>
 </template>
@@ -488,7 +494,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['navigate', 'set-active-workspace', 'creation-lock-change'])
+const emit = defineEmits(['navigate', 'set-active-workspace', 'workspace-operation-change'])
 
 const appStore = useAppStore()
 
@@ -507,21 +513,19 @@ const isDeletingDataset = ref(false)
 const isRenamingInline = ref(false)
 const renameValue = ref('')
 const renameInputRef = ref(null)
-const showDeleteConfirm = ref(false)
+const isWorkspaceDeleteDialogOpen = ref(false)
+const pendingWorkspaceDeletionId = ref('')
 const datasetDeletionPollers = new Map()
 const datasetIngestionPollers = new Map()
 let unsubscribeProgress = null
-let unsubscribeComplete = null
-let unsubscribeError = null
-let pendingCreateRuntimeResolve = null
-let pendingCreateRuntimeReject = null
-let pendingCreateRuntimeWorkspaceId = ''
 
 const newWorkspaceName = ref('')
 const newWorkspaceContext = ref('')
 const isCreatingWorkspace = ref(false)
 const isCreatingWorkspaceRuntime = ref(false)
 const workspaceCreateMessage = ref('Saving the workspace name and shared context. You will move to dataset selection next.')
+const activeWorkspaceOperation = ref('')
+const activeWorkspaceOperationMessage = ref('')
 const setupStep = ref(1)
 const setupWorkspaceName = ref('')
 const setupWorkspaceContext = ref('')
@@ -566,6 +570,12 @@ const workspaceCreateTitle = computed(() => (
     ? 'Preparing workspace runtime inside Settings...'
     : 'Creating workspace inside Settings...'
 ))
+const workspaceDeleteDialogMessage = computed(() => {
+  const targetId = String(pendingWorkspaceDeletionId.value || props.activeWorkspaceId || '').trim()
+  const target = workspaceCards.value.find((workspace) => workspace.id === targetId)
+  const name = String(target?.name || 'this workspace').trim()
+  return `Are you sure you want to delete "${name}"? Cleanup will run in the background and cannot be undone.`
+})
 const datasetDeleteDialogMessage = computed(() => {
   const filename = String(pendingRemovalDataset.value?.filename || '').trim()
   return `Are you sure you want to delete "${filename || 'this dataset'}"? Dataset disappears immediately while storage cleanup continues in background.`
@@ -612,18 +622,8 @@ watch(
   },
 )
 
-watch(
-  isCreatingWorkspace,
-  (locked) => {
-    emit('creation-lock-change', Boolean(locked))
-  },
-  { immediate: true },
-)
-
 onMounted(async () => {
   unsubscribeProgress = settingsWebSocket.subscribeProgress(handleSettingsProgressUpdate)
-  unsubscribeComplete = settingsWebSocket.subscribeComplete(handleSettingsComplete)
-  unsubscribeError = settingsWebSocket.subscribeError(handleSettingsError)
   if (props.panelMode === 'ws-list') {
     await hydrateWorkspaceCards()
   }
@@ -638,16 +638,7 @@ onUnmounted(() => {
     unsubscribeProgress()
     unsubscribeProgress = null
   }
-  if (typeof unsubscribeComplete === 'function') {
-    unsubscribeComplete()
-    unsubscribeComplete = null
-  }
-  if (typeof unsubscribeError === 'function') {
-    unsubscribeError()
-    unsubscribeError = null
-  }
-  resolvePendingCreateRuntime()
-  emit('creation-lock-change', false)
+  clearWorkspaceOperation()
   stopDatasetDeletionPollers()
   stopDatasetIngestionPollers()
 })
@@ -710,7 +701,7 @@ function syncSetupIdentity() {
 }
 
 function goToSetupStep(stepId) {
-  if (isCreatingWorkspace.value) return
+  if (notifyWorkspaceOperationBlocked()) return
   const normalized = Number(stepId)
   if (![1, 2, 3].includes(normalized)) return
   if (props.panelMode === 'ws-create' && normalized !== 1) {
@@ -821,61 +812,31 @@ function handleSettingsProgressUpdate(data) {
   }
 }
 
-function resolvePendingCreateRuntime() {
-  if (typeof pendingCreateRuntimeResolve === 'function') {
-    pendingCreateRuntimeResolve()
-  }
-  pendingCreateRuntimeResolve = null
-  pendingCreateRuntimeReject = null
-  pendingCreateRuntimeWorkspaceId = ''
-  isCreatingWorkspaceRuntime.value = false
-}
-
-function rejectPendingCreateRuntime(message) {
-  if (typeof pendingCreateRuntimeReject === 'function') {
-    pendingCreateRuntimeReject(new Error(String(message || 'Workspace runtime bootstrap failed.')))
-  }
-  pendingCreateRuntimeResolve = null
-  pendingCreateRuntimeReject = null
-  pendingCreateRuntimeWorkspaceId = ''
-  isCreatingWorkspaceRuntime.value = false
-}
-
-function handleSettingsComplete(result) {
-  const completedWorkspaceId = String(result?.workspace_id || '').trim()
-  if (!pendingCreateRuntimeWorkspaceId) return
-  if (completedWorkspaceId && completedWorkspaceId !== pendingCreateRuntimeWorkspaceId) return
-  workspaceCreateMessage.value = 'Workspace runtime is ready.'
-  resolvePendingCreateRuntime()
-}
-
-function handleSettingsError(message) {
-  if (!pendingCreateRuntimeWorkspaceId) return
-  rejectPendingCreateRuntime(message)
-}
-
-async function waitForCreateRuntimeToSettle(workspaceId) {
-  const normalizedWorkspaceId = String(workspaceId || '').trim()
-  if (!normalizedWorkspaceId) return
-
-  pendingCreateRuntimeWorkspaceId = normalizedWorkspaceId
-  await new Promise((resolve) => window.setTimeout(resolve, 350))
-
-  if (!isCreatingWorkspaceRuntime.value) {
-    pendingCreateRuntimeWorkspaceId = ''
-    return
-  }
-
-  await new Promise((resolve, reject) => {
-    pendingCreateRuntimeResolve = resolve
-    pendingCreateRuntimeReject = reject
-    window.setTimeout(() => {
-      if (pendingCreateRuntimeWorkspaceId === normalizedWorkspaceId) {
-        workspaceCreateMessage.value = 'Workspace runtime is taking longer than expected. You can continue while it finishes.'
-        resolvePendingCreateRuntime()
-      }
-    }, 120000)
+function setWorkspaceOperation(operation, message) {
+  const normalizedOperation = String(operation || '').trim()
+  const normalizedMessage = String(message || 'Workspace setup is still running.').trim()
+  activeWorkspaceOperation.value = normalizedOperation
+  activeWorkspaceOperationMessage.value = normalizedMessage
+  emit('workspace-operation-change', {
+    locked: Boolean(normalizedOperation),
+    operation: normalizedOperation,
+    message: normalizedMessage,
   })
+}
+
+function clearWorkspaceOperation() {
+  activeWorkspaceOperation.value = ''
+  activeWorkspaceOperationMessage.value = ''
+  emit('workspace-operation-change', { locked: false, operation: '', message: '' })
+}
+
+function notifyWorkspaceOperationBlocked() {
+  if (!activeWorkspaceOperation.value) return false
+  toast.info(
+    'Workspace setup in progress',
+    activeWorkspaceOperationMessage.value || 'Wait for the current workspace setup step to finish.',
+  )
+  return true
 }
 
 function stopDatasetDeletionPollers() {
@@ -937,7 +898,7 @@ function applyDatasetSelectionFromIngestionJob(job) {
   }, firstCompleted.source_path || '')
 }
 
-function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = 300000) {
+function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = Infinity) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   const normalizedJobId = String(jobId || '').trim()
   if (!normalizedWorkspaceId || !normalizedJobId) return
@@ -962,10 +923,15 @@ function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = 300000) {
         await loadWorkspaceDatasets()
         finishDatasetIngest()
         const failedCount = Number(job?.failed_count || 0)
+        const completedCount = Number(job?.completed_count || 0)
+        if (completedCount > 0) {
+          setupStep.value = 3
+        }
+        clearWorkspaceOperation()
         if (status === 'failed' || failedCount > 0) {
           toast.error('Dataset ingestion completed with errors', `${failedCount || 'Some'} file${failedCount === 1 ? '' : 's'} failed to import.`)
         } else {
-          toast.success('Datasets added', `${Number(job?.completed_count || 0)} dataset${Number(job?.completed_count || 0) === 1 ? '' : 's'} added to workspace.`)
+          toast.success('Datasets added', `${completedCount} dataset${completedCount === 1 ? '' : 's'} added to workspace.`)
         }
         return
       }
@@ -973,6 +939,7 @@ function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = 300000) {
       if (Date.now() - startedAt > timeoutMs) {
         datasetIngestionPollers.delete(normalizedJobId)
         finishDatasetIngest()
+        clearWorkspaceOperation()
         toast.info('Dataset ingestion still running', 'Dataset import is still running in the background.')
         return
       }
@@ -981,6 +948,7 @@ function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = 300000) {
     } catch (error) {
       datasetIngestionPollers.delete(normalizedJobId)
       finishDatasetIngest()
+      clearWorkspaceOperation()
       toast.error('Dataset Error', extractApiErrorMessage(error, 'Failed to poll dataset ingestion.'))
     }
   }
@@ -996,6 +964,7 @@ async function startBatchDatasetIngestion(paths) {
   if (!workspaceId || sourcePaths.length === 0) return
 
   startDatasetIngest(sourcePaths.length === 1 ? sourcePaths[0] : `${sourcePaths.length} selected files`)
+  setWorkspaceOperation('ingest', 'Importing selected datasets into the workspace.')
   datasetIngestMessage.value = 'Preparing workspace runtime...'
   try {
     const kernelReady = await appStore.ensureWorkspaceKernelConnected(workspaceId)
@@ -1007,12 +976,14 @@ async function startBatchDatasetIngestion(paths) {
     const jobId = String(job?.job_id || '').trim()
     if (!jobId) {
       finishDatasetIngest()
+      clearWorkspaceOperation()
       toast.error('Dataset Error', 'Backend did not return an ingestion job.')
       return
     }
     trackDatasetIngestionJob(workspaceId, jobId)
   } catch (error) {
     finishDatasetIngest()
+    clearWorkspaceOperation()
     toast.error('Dataset Error', extractApiErrorMessage(error, 'Failed to add datasets.'))
   }
 }
@@ -1159,6 +1130,7 @@ async function refreshDataset(dataset) {
     return
   }
   startDatasetIngest(sourcePath)
+  setWorkspaceOperation('ingest', 'Refreshing dataset in the workspace.')
   try {
     const uploadResult = await apiService.uploadDataPath(sourcePath)
     applyDatasetSelectionFromUpload(uploadResult, sourcePath)
@@ -1168,6 +1140,7 @@ async function refreshDataset(dataset) {
     toast.error('Refresh failed', extractApiErrorMessage(error, 'Failed to refresh dataset.'))
   } finally {
     finishDatasetIngest()
+    clearWorkspaceOperation()
   }
 }
 
@@ -1240,12 +1213,27 @@ async function openCurrentWorkspace() {
   await loadWorkspaceDetail()
 }
 
+function requestDeleteWorkspace(workspaceId) {
+  if (notifyWorkspaceOperationBlocked()) return
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId) return
+  pendingWorkspaceDeletionId.value = normalizedWorkspaceId
+  isWorkspaceDeleteDialogOpen.value = true
+}
+
+function closeWorkspaceDeleteDialog({ force = false } = {}) {
+  if (activeWorkspaceOperation.value === 'delete' && !force) return
+  isWorkspaceDeleteDialogOpen.value = false
+  pendingWorkspaceDeletionId.value = ''
+}
+
 async function deleteWorkspace() {
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
+  const workspaceId = String(pendingWorkspaceDeletionId.value || props.activeWorkspaceId || '').trim()
   if (!workspaceId) return
+  setWorkspaceOperation('delete', 'Deleting workspace and starting background cleanup.')
   try {
     await appStore.deleteWorkspaceAsync(workspaceId)
-    showDeleteConfirm.value = false
+    closeWorkspaceDeleteDialog({ force: true })
     await appStore.fetchWorkspaces()
     const fallbackId = String(appStore.activeWorkspaceId || workspaceCards.value[0]?.id || '').trim()
     if (fallbackId) {
@@ -1255,6 +1243,8 @@ async function deleteWorkspace() {
     toast.success('Workspace deletion started', 'Workspace deletion is running in background.')
   } catch (error) {
     toast.error('Delete failed', extractApiErrorMessage(error, 'Failed to delete workspace.'))
+  } finally {
+    clearWorkspaceOperation()
   }
 }
 
@@ -1267,6 +1257,7 @@ async function createWorkspace() {
   isCreatingWorkspace.value = true
   isCreatingWorkspaceRuntime.value = false
   workspaceCreateMessage.value = 'Saving the workspace name and shared context. You will move to dataset selection next.'
+  setWorkspaceOperation('create', 'Creating workspace and preparing its runtime.')
   try {
     const context = String(newWorkspaceContext.value || '').trim()
     const workspace = await appStore.createWorkspace(name, context)
@@ -1279,20 +1270,19 @@ async function createWorkspace() {
     if (!kernelReady) {
       throw new Error(String(appStore.runtimeError || 'Workspace runtime bootstrap failed.'))
     }
-    await waitForCreateRuntimeToSettle(workspaceId)
     await appStore.fetchWorkspaces()
     emit('navigate', 'ws-detail', 'forward')
     setupStep.value = 2
     newWorkspaceName.value = ''
     newWorkspaceContext.value = ''
-    toast.success('Workspace created', 'Workspace is ready for dataset selection.')
+    toast.success('Workspace ready', 'Workspace is ready for dataset selection.')
   } catch (error) {
     toast.error('Create failed', extractApiErrorMessage(error, 'Failed to create workspace.'))
   } finally {
     isCreatingWorkspace.value = false
     isCreatingWorkspaceRuntime.value = false
     workspaceCreateMessage.value = 'Saving the workspace name and shared context. You will move to dataset selection next.'
-    resolvePendingCreateRuntime()
+    clearWorkspaceOperation()
   }
 }
 
@@ -1312,10 +1302,23 @@ function schemaGenerationClass(tableName) {
   return 'bg-[var(--color-base-muted)] text-[var(--color-text-muted)]'
 }
 
+function stepDotClass(stepId) {
+  if (setupStep.value === stepId) return 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-base)]'
+  if (setupStep.value > stepId) return 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
+  return 'border-[var(--color-border)] bg-[var(--color-base)] text-[var(--color-text-muted)]'
+}
+
+function stepLabelClass(stepId) {
+  if (setupStep.value === stepId) return 'text-[var(--color-accent)]'
+  if (setupStep.value > stepId) return 'text-[var(--color-text-main)]'
+  return 'text-[var(--color-text-muted)]'
+}
+
 async function generateWorkspaceSchemas() {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   if (!workspaceId || datasetEntries.value.length === 0) return
   isGeneratingWorkspaceSchemas.value = true
+  setWorkspaceOperation('schema', 'Generating workspace schemas from the selected datasets.')
   const context = String(setupWorkspaceContext.value || resolveWorkspaceContext()).trim()
   const nextStatuses = {}
   datasetEntries.value.forEach((dataset) => {
@@ -1323,34 +1326,38 @@ async function generateWorkspaceSchemas() {
   })
   schemaGenerationStatuses.value = nextStatuses
 
-  for (const dataset of datasetEntries.value) {
-    const tableName = String(dataset?.table_name || '').trim()
-    if (!tableName) continue
-    schemaGenerationStatuses.value = {
-      ...schemaGenerationStatuses.value,
-      [tableName]: { status: 'running', message: '' },
-    }
-    try {
-      await apiService.v1RegenerateDatasetSchema(workspaceId, tableName, { context })
+  try {
+    for (const dataset of datasetEntries.value) {
+      const tableName = String(dataset?.table_name || '').trim()
+      if (!tableName) continue
       schemaGenerationStatuses.value = {
         ...schemaGenerationStatuses.value,
-        [tableName]: { status: 'completed', message: '' },
+        [tableName]: { status: 'running', message: '' },
       }
-    } catch (error) {
-      schemaGenerationStatuses.value = {
-        ...schemaGenerationStatuses.value,
-        [tableName]: { status: 'failed', message: extractApiErrorMessage(error, 'Failed to generate schema.') },
+      try {
+        await apiService.v1RegenerateDatasetSchema(workspaceId, tableName, { context })
+        schemaGenerationStatuses.value = {
+          ...schemaGenerationStatuses.value,
+          [tableName]: { status: 'completed', message: '' },
+        }
+      } catch (error) {
+        schemaGenerationStatuses.value = {
+          ...schemaGenerationStatuses.value,
+          [tableName]: { status: 'failed', message: extractApiErrorMessage(error, 'Failed to generate schema.') },
+        }
       }
     }
-  }
 
-  isGeneratingWorkspaceSchemas.value = false
-  previewService.clearSchemaCache()
-  const failedCount = Object.values(schemaGenerationStatuses.value).filter((item) => item.status === 'failed').length
-  if (failedCount > 0) {
-    toast.error('Schema generation completed with errors', `${failedCount} dataset${failedCount === 1 ? '' : 's'} failed.`)
-  } else {
-    toast.success('Schemas generated', 'Workspace schemas generated.')
+    previewService.clearSchemaCache()
+    const failedCount = Object.values(schemaGenerationStatuses.value).filter((item) => item.status === 'failed').length
+    if (failedCount > 0) {
+      toast.error('Schema generation completed with errors', `${failedCount} dataset${failedCount === 1 ? '' : 's'} failed.`)
+    } else {
+      toast.success('Schemas generated', 'Workspace schemas generated.')
+    }
+  } finally {
+    isGeneratingWorkspaceSchemas.value = false
+    clearWorkspaceOperation()
   }
 }
 
@@ -1383,3 +1390,44 @@ function formatRelativeTime(raw) {
   return `${days}d ago`
 }
 </script>
+
+<style scoped>
+.workspace-stepper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0.5rem 0.25rem 0.25rem;
+}
+
+.workspace-stepper-item {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  color: var(--color-text-muted);
+}
+
+.workspace-stepper-line {
+  position: absolute;
+  right: 50%;
+  top: 0.75rem;
+  height: 2px;
+  width: 100%;
+  transform: translateX(-0.75rem);
+}
+
+.workspace-stepper-dot {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  height: 1.5rem;
+  width: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  border-width: 2px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  transition: all var(--motion-duration-standard) var(--motion-ease-standard);
+}
+</style>
