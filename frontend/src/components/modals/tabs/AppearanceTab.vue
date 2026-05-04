@@ -8,7 +8,7 @@
     <div class="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-base)] p-4">
       <label class="mb-2 block text-sm font-semibold text-[var(--color-text-main)]">Font</label>
       <p class="mb-3 text-xs text-[var(--color-text-muted)]">
-        Switch between the current default font and Ubuntu Mono.
+        Switch between the current default font and Ubuntu.
       </p>
       <HeaderDropdown
         :model-value="activeFont"

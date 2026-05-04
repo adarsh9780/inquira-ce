@@ -29,14 +29,15 @@ test('app shell applies and persists font preference through font service', () =
   assert.equal(source.includes('appStore.setUiFont(storedFont, { persist: false })'), true)
 })
 
-test('style and store include ubuntu mono font option', () => {
+test('style and store include ubuntu font option', () => {
   const styleSource = read('src/style.css')
   const storeSource = read('src/stores/appStore.js')
   const fontsSource = read('src/constants/fonts.js')
 
-  assert.equal(styleSource.includes('family=Ubuntu+Mono:wght@400;700'), true)
-  assert.equal(styleSource.includes(':root[data-font="ubuntu-mono"]'), true)
-  assert.equal(fontsSource.includes("id: 'ubuntu-mono'"), true)
+  assert.equal(styleSource.includes('family=Ubuntu:wght@400;500;700'), true)
+  assert.equal(styleSource.includes(':root[data-font="ubuntu"]'), true)
+  assert.equal(styleSource.includes('--font-mono: "Ubuntu"'), false)
+  assert.equal(fontsSource.includes("id: 'ubuntu'"), true)
   assert.equal(storeSource.includes('const uiFont = ref(DEFAULT_FONT_ID)'), true)
   assert.equal(storeSource.includes('function setUiFont(fontId, options = {}) {'), true)
 })

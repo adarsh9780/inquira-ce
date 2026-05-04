@@ -5,9 +5,9 @@ export const FONT_OPTIONS = [
     description: 'Current UI font stack (Manrope).',
   },
   {
-    id: 'ubuntu-mono',
-    label: 'Ubuntu Mono',
-    description: 'Monospaced UI variant using Ubuntu Mono.',
+    id: 'ubuntu',
+    label: 'Ubuntu',
+    description: 'Sans-serif UI variant using Ubuntu.',
   },
 ]
 
