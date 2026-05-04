@@ -123,39 +123,6 @@
         </div>
       </div>
 
-      <div
-        data-testid="workspace-runtime-dialog"
-        :data-active="workspaceRuntimeDialogActive ? 'true' : 'false'"
-        class="layer-blocking pointer-events-none fixed inset-x-0 bottom-8 z-[var(--z-modal)] flex justify-center px-4 transition-all duration-300"
-        :class="workspaceRuntimeDialogActive ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
-      >
-        <div
-          class="pointer-events-auto w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-4 shadow-2xl"
-          role="status"
-          aria-live="polite"
-        >
-          <div class="flex items-start gap-4">
-            <div class="relative mt-0.5 h-9 w-9 shrink-0">
-              <div class="absolute inset-0 rounded-full border-2 border-[var(--color-border)]"></div>
-              <div class="absolute inset-0 rounded-full border-2 border-t-[var(--color-accent)] border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
-            </div>
-            <div class="min-w-0 flex-1">
-              <p class="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
-                Workspace runtime
-              </p>
-              <h2 class="mt-1 text-sm font-semibold text-[var(--color-text-main)]">
-                Preparing workspace runtime
-              </h2>
-              <p class="mt-1 text-sm text-[var(--color-text-muted)]">
-                {{ workspaceRuntimeDialogMessage }}
-              </p>
-              <p class="mt-3 text-xs text-[var(--color-text-sub)]">
-                {{ currentStartupElapsedLabel }}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
     </Teleport>
   </div>
 </template>
@@ -322,18 +289,6 @@ const currentStartupStage = computed(() => {
 
 const startupOverlayActive = computed(() => {
   return Boolean(appBootstrap.active)
-})
-
-const workspaceRuntimeDialogActive = computed(() => {
-  return Boolean(
-    workspaceRuntimeStatus.active &&
-    appBootstrap.ready &&
-    !appBootstrap.active
-  )
-})
-
-const workspaceRuntimeDialogMessage = computed(() => {
-  return String(workspaceRuntimeStatus.message || '').trim() || 'Warming workspace runtime...'
 })
 
 const currentStartupElapsedLabel = computed(() => {

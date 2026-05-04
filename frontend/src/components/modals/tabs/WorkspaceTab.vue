@@ -397,8 +397,8 @@
           >
             <div class="max-w-sm">
               <span class="mx-auto mb-4 block h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-accent-border)] border-t-[var(--color-accent)]"></span>
-              <p class="text-sm font-semibold text-[var(--color-text-main)]">Creating workspace inside Settings...</p>
-              <p class="mt-1 text-xs text-[var(--color-text-muted)]">Saving the workspace name and shared context. You will move to dataset selection next.</p>
+              <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ workspaceCreateTitle }}</p>
+              <p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ workspaceCreateMessage }}</p>
             </div>
           </div>
           <p class="mb-4 text-sm text-[var(--color-text-muted)]">
@@ -510,10 +510,17 @@ const showDeleteConfirm = ref(false)
 const datasetDeletionPollers = new Map()
 const datasetIngestionPollers = new Map()
 let unsubscribeProgress = null
+let unsubscribeComplete = null
+let unsubscribeError = null
+let pendingCreateRuntimeResolve = null
+let pendingCreateRuntimeReject = null
+let pendingCreateRuntimeWorkspaceId = ''
 
 const newWorkspaceName = ref('')
 const newWorkspaceContext = ref('')
 const isCreatingWorkspace = ref(false)
+const isCreatingWorkspaceRuntime = ref(false)
+const workspaceCreateMessage = ref('Saving the workspace name and shared context. You will move to dataset selection next.')
 const setupStep = ref(1)
 const setupWorkspaceName = ref('')
 const setupWorkspaceContext = ref('')
@@ -553,6 +560,11 @@ const detailCreatedAt = computed(() => formatCreatedDate(workspaceDetail.value?.
 const detailConversationCount = computed(() => Number(workspaceDetail.value?.conversation_count || 0))
 const detailLastActive = computed(() => formatRelativeTime(workspaceDetail.value?.updated_at || activeWorkspace.value?.updated_at))
 const datasetIngestStatusLabel = computed(() => String(datasetIngestMessage.value || 'Processing dataset...').trim() || 'Processing dataset...')
+const workspaceCreateTitle = computed(() => (
+  isCreatingWorkspaceRuntime.value
+    ? 'Preparing workspace runtime inside Settings...'
+    : 'Creating workspace inside Settings...'
+))
 const datasetDeleteDialogMessage = computed(() => {
   const filename = String(pendingRemovalDataset.value?.filename || '').trim()
   return `Are you sure you want to delete "${filename || 'this dataset'}"? Dataset disappears immediately while storage cleanup continues in background.`
@@ -601,6 +613,8 @@ watch(
 
 onMounted(async () => {
   unsubscribeProgress = settingsWebSocket.subscribeProgress(handleSettingsProgressUpdate)
+  unsubscribeComplete = settingsWebSocket.subscribeComplete(handleSettingsComplete)
+  unsubscribeError = settingsWebSocket.subscribeError(handleSettingsError)
   if (props.panelMode === 'ws-list') {
     await hydrateWorkspaceCards()
   }
@@ -615,6 +629,15 @@ onUnmounted(() => {
     unsubscribeProgress()
     unsubscribeProgress = null
   }
+  if (typeof unsubscribeComplete === 'function') {
+    unsubscribeComplete()
+    unsubscribeComplete = null
+  }
+  if (typeof unsubscribeError === 'function') {
+    unsubscribeError()
+    unsubscribeError = null
+  }
+  resolvePendingCreateRuntime()
   stopDatasetDeletionPollers()
   stopDatasetIngestionPollers()
 })
@@ -767,10 +790,16 @@ function finishDatasetIngest() {
 }
 
 function handleSettingsProgressUpdate(data) {
-  if (!isDatasetIngesting.value) return
   if (!data || data.type !== 'progress') return
   const stage = String(data?.stage || '').trim().toLowerCase()
-  if (stage.startsWith('workspace_runtime')) return
+  if (stage.startsWith('workspace_runtime')) {
+    if (isCreatingWorkspace.value && props.panelMode === 'ws-create') {
+      isCreatingWorkspaceRuntime.value = true
+      workspaceCreateMessage.value = String(data?.message || '').trim() || 'Preparing workspace runtime...'
+    }
+    return
+  }
+  if (!isDatasetIngesting.value) return
   const nextMessage = String(data?.message || '').trim()
   if (nextMessage) {
     datasetIngestMessage.value = nextMessage
@@ -779,6 +808,63 @@ function handleSettingsProgressUpdate(data) {
   if (Number.isFinite(percent) && percent >= 0 && percent <= 100) {
     datasetIngestPercent.value = Math.round(percent)
   }
+}
+
+function resolvePendingCreateRuntime() {
+  if (typeof pendingCreateRuntimeResolve === 'function') {
+    pendingCreateRuntimeResolve()
+  }
+  pendingCreateRuntimeResolve = null
+  pendingCreateRuntimeReject = null
+  pendingCreateRuntimeWorkspaceId = ''
+  isCreatingWorkspaceRuntime.value = false
+}
+
+function rejectPendingCreateRuntime(message) {
+  if (typeof pendingCreateRuntimeReject === 'function') {
+    pendingCreateRuntimeReject(new Error(String(message || 'Workspace runtime bootstrap failed.')))
+  }
+  pendingCreateRuntimeResolve = null
+  pendingCreateRuntimeReject = null
+  pendingCreateRuntimeWorkspaceId = ''
+  isCreatingWorkspaceRuntime.value = false
+}
+
+function handleSettingsComplete(result) {
+  const completedWorkspaceId = String(result?.workspace_id || '').trim()
+  if (!pendingCreateRuntimeWorkspaceId) return
+  if (completedWorkspaceId && completedWorkspaceId !== pendingCreateRuntimeWorkspaceId) return
+  workspaceCreateMessage.value = 'Workspace runtime is ready.'
+  resolvePendingCreateRuntime()
+}
+
+function handleSettingsError(message) {
+  if (!pendingCreateRuntimeWorkspaceId) return
+  rejectPendingCreateRuntime(message)
+}
+
+async function waitForCreateRuntimeToSettle(workspaceId) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId) return
+
+  pendingCreateRuntimeWorkspaceId = normalizedWorkspaceId
+  await new Promise((resolve) => window.setTimeout(resolve, 350))
+
+  if (!isCreatingWorkspaceRuntime.value) {
+    pendingCreateRuntimeWorkspaceId = ''
+    return
+  }
+
+  await new Promise((resolve, reject) => {
+    pendingCreateRuntimeResolve = resolve
+    pendingCreateRuntimeReject = reject
+    window.setTimeout(() => {
+      if (pendingCreateRuntimeWorkspaceId === normalizedWorkspaceId) {
+        workspaceCreateMessage.value = 'Workspace runtime is taking longer than expected. You can continue while it finishes.'
+        resolvePendingCreateRuntime()
+      }
+    }, 120000)
+  })
 }
 
 function stopDatasetDeletionPollers() {
@@ -1168,6 +1254,8 @@ async function createWorkspace() {
     return
   }
   isCreatingWorkspace.value = true
+  isCreatingWorkspaceRuntime.value = false
+  workspaceCreateMessage.value = 'Saving the workspace name and shared context. You will move to dataset selection next.'
   try {
     const context = String(newWorkspaceContext.value || '').trim()
     const workspace = await appStore.createWorkspace(name, context)
@@ -1175,16 +1263,25 @@ async function createWorkspace() {
     if (workspaceId) {
       emit('set-active-workspace', workspaceId)
     }
+    workspaceCreateMessage.value = 'Preparing workspace runtime...'
+    const kernelReady = await appStore.ensureWorkspaceKernelConnected(workspaceId)
+    if (!kernelReady) {
+      throw new Error(String(appStore.runtimeError || 'Workspace runtime bootstrap failed.'))
+    }
+    await waitForCreateRuntimeToSettle(workspaceId)
     await appStore.fetchWorkspaces()
     emit('navigate', 'ws-detail', 'forward')
     setupStep.value = 2
     newWorkspaceName.value = ''
     newWorkspaceContext.value = ''
-    toast.success('Workspace created', 'Workspace created')
+    toast.success('Workspace created', 'Workspace is ready for dataset selection.')
   } catch (error) {
     toast.error('Create failed', extractApiErrorMessage(error, 'Failed to create workspace.'))
   } finally {
     isCreatingWorkspace.value = false
+    isCreatingWorkspaceRuntime.value = false
+    workspaceCreateMessage.value = 'Saving the workspace name and shared context. You will move to dataset selection next.'
+    resolvePendingCreateRuntime()
   }
 }
 
