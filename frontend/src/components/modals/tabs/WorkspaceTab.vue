@@ -899,8 +899,13 @@ async function startBatchDatasetIngestion(paths) {
   if (!workspaceId || sourcePaths.length === 0) return
 
   startDatasetIngest(sourcePaths.length === 1 ? sourcePaths[0] : `${sourcePaths.length} selected files`)
-  datasetIngestMessage.value = 'Queueing dataset ingestion...'
+  datasetIngestMessage.value = 'Preparing workspace runtime...'
   try {
+    const kernelReady = await appStore.ensureWorkspaceKernelConnected(workspaceId)
+    if (!kernelReady) {
+      throw new Error(String(appStore.runtimeError || 'Workspace runtime bootstrap failed.'))
+    }
+    datasetIngestMessage.value = 'Queueing dataset ingestion...'
     const job = await apiService.v1AddDatasetsBatch(workspaceId, sourcePaths)
     const jobId = String(job?.job_id || '').trim()
     if (!jobId) {
@@ -1163,7 +1168,6 @@ async function createWorkspace() {
     return
   }
   isCreatingWorkspace.value = true
-  appStore.setWorkspaceRuntimeOverlaySuppressed(true)
   try {
     const context = String(newWorkspaceContext.value || '').trim()
     const workspace = await appStore.createWorkspace(name, context)
@@ -1181,9 +1185,6 @@ async function createWorkspace() {
     toast.error('Create failed', extractApiErrorMessage(error, 'Failed to create workspace.'))
   } finally {
     isCreatingWorkspace.value = false
-    window.setTimeout(() => {
-      appStore.setWorkspaceRuntimeOverlaySuppressed(false)
-    }, 500)
   }
 }
 

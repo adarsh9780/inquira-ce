@@ -31,7 +31,8 @@ test('app runtime applies html data-theme and persists changes via theme service
   assert.equal(source.includes('watch('), true)
   assert.equal(source.includes('() => appStore.uiTheme'), true)
   assert.equal(source.includes('void themeService.saveThemePreference(normalized)'), true)
-  assert.equal(source.includes('const storedTheme = await themeService.loadThemePreference()'), true)
+  assert.equal(source.includes('const [storedTheme, storedFont, storedCodeFont] = await Promise.all(['), true)
+  assert.equal(source.includes('themeService.loadThemePreference(),'), true)
   assert.equal(source.includes('appStore.setUiTheme(storedTheme, { persist: false })'), true)
 })
 

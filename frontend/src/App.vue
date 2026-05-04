@@ -328,8 +328,7 @@ const workspaceRuntimeDialogActive = computed(() => {
   return Boolean(
     workspaceRuntimeStatus.active &&
     appBootstrap.ready &&
-    !appBootstrap.active &&
-    !appStore.suppressWorkspaceRuntimeOverlay
+    !appBootstrap.active
   )
 })
 
@@ -701,7 +700,6 @@ onMounted(async () => {
     settingsWebSocket.subscribeProgress((data) => {
       const stage = String(data?.stage || '')
       if (!stage.startsWith('workspace_runtime')) return
-      if (appStore.suppressWorkspaceRuntimeOverlay) return
       workspaceRuntimeStatus.active = true
       workspaceRuntimeStatus.message = data?.message || 'Preparing workspace runtime...'
     }),

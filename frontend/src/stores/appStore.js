@@ -93,7 +93,6 @@ export const useAppStore = defineStore('app', () => {
   const finalTurnId = ref('')
   const turnsNextCursor = ref(null)
   const workspaceKernelStatusById = ref({})
-  const suppressWorkspaceRuntimeOverlay = ref(false)
 
   // Wasm Execution State
   const historicalCodeBlocks = ref([]) // Tracks successfully executed code snippets
@@ -2277,10 +2276,6 @@ export const useAppStore = defineStore('app', () => {
     ensuredKernelWorkspaceIds.delete(normalizedWorkspaceId)
   }
 
-  function setWorkspaceRuntimeOverlaySuppressed(suppressed) {
-    suppressWorkspaceRuntimeOverlay.value = Boolean(suppressed)
-  }
-
   function getWorkspaceKernelStatus(workspaceId = activeWorkspaceId.value) {
     const normalizedWorkspaceId = String(workspaceId || '').trim()
     if (!normalizedWorkspaceId) return 'missing'
@@ -2780,7 +2775,6 @@ export const useAppStore = defineStore('app', () => {
     finalTurnId,
     turnsNextCursor,
     workspaceKernelStatusById,
-    suppressWorkspaceRuntimeOverlay,
     generatedCode,
     resultData,
     plotlyFigure,
@@ -2942,7 +2936,6 @@ export const useAppStore = defineStore('app', () => {
     setTerminalEnabled,
     setRuntimeError,
     setWorkspaceKernelStatus,
-    setWorkspaceRuntimeOverlaySuppressed,
     getWorkspaceKernelStatus,
     clearWorkspaceKernelStatus,
     appendTerminalEntry,
