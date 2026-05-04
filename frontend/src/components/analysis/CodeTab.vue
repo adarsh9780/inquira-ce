@@ -139,6 +139,7 @@ let lastRunBlockedToastAt = 0
 let editor = null
 let isUpdatingFromStore = false
 const editableCompartment = new Compartment()
+const visualThemeCompartment = new Compartment()
 
 const hasSelectedData = computed(() => {
   const selectedPath = String(appStore.dataFilePath || '').trim()
@@ -711,29 +712,40 @@ function readEditorMonoFont() {
   return resolved || '"JetBrainsMono Nerd Font", "JetBrains Mono", monospace'
 }
 
+function buildEditorThemeExtension() {
+  const editorMonoFont = readEditorMonoFont()
+  return EditorView.theme({
+    '&': { fontSize: '14px', height: '100%', backgroundColor: 'var(--color-base)' },
+    '.cm-editor': { backgroundColor: 'var(--color-base)' },
+    '.cm-scroller': { fontFamily: editorMonoFont, backgroundColor: 'var(--color-base)' },
+    '.cm-gutters': {
+      backgroundColor: 'var(--color-surface)',
+      borderRight: '1px solid var(--color-border)',
+      color: 'var(--color-text-muted)',
+    },
+    '.cm-content': { padding: '16px' },
+    '.cm-focused': { outline: 'none' },
+  })
+}
+
+function syncEditorTheme() {
+  if (!editor) return
+  editor.dispatch({
+    effects: visualThemeCompartment.reconfigure(buildEditorThemeExtension())
+  })
+}
+
 async function initializeEditor() {
   if (!editorContainer.value) return
-  const editorMonoFont = readEditorMonoFont()
 
   const extensions = [
     basicSetup,
     editableCompartment.of(EditorView.editable.of(!isGeneratingCode.value)),
+    visualThemeCompartment.of(buildEditorThemeExtension()),
     indentUnit.of('    '),
     python(),
     autocompletion({ override: [completionSource] }),
     Prec.highest(keymap.of(customKeymap)),
-    EditorView.theme({
-      '&': { fontSize: '14px', height: '100%', backgroundColor: 'var(--color-base)' },
-      '.cm-editor': { backgroundColor: 'var(--color-base)' },
-      '.cm-scroller': { fontFamily: editorMonoFont, backgroundColor: 'var(--color-base)' },
-      '.cm-gutters': {
-        backgroundColor: 'var(--color-surface)',
-        borderRight: '1px solid var(--color-border)',
-        color: 'var(--color-text-muted)',
-      },
-      '.cm-content': { padding: '16px' },
-      '.cm-focused': { outline: 'none' },
-    }),
     EditorView.updateListener.of((update) => {
       // Handle content changes
       if (update.docChanged && !isUpdatingFromStore) {
@@ -859,6 +871,10 @@ watch(() => authStore.userId, async (newUserId, oldUserId) => {
 
 watch(() => appStore.activeWorkspaceId, async () => {
   await appStore.fetchColumnCatalog({ force: true })
+})
+
+watch(() => appStore.uiCodeFont, () => {
+  syncEditorTheme()
 })
 </script>
 

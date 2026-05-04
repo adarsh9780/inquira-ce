@@ -172,7 +172,7 @@ import { themeService } from './services/themeService'
 import { fontService } from './services/fontService'
 import { toast } from './composables/useToast'
 import { normalizeThemeId } from './constants/themes'
-import { normalizeFontId } from './constants/fonts'
+import { normalizeAppFontId, normalizeCodeFontId } from './constants/fonts'
 import logo from './assets/favicon.svg'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
@@ -209,6 +209,8 @@ const hasLoadedThemePreference = ref(false)
 const applyingThemePreference = ref(false)
 const hasLoadedFontPreference = ref(false)
 const applyingFontPreference = ref(false)
+const hasLoadedCodeFontPreference = ref(false)
+const applyingCodeFontPreference = ref(false)
 let startupClockTimer = null
 const isE2EMode = import.meta.env.VITE_E2E === '1'
 
@@ -429,8 +431,14 @@ function applyDocumentTheme(themeId) {
 
 function applyDocumentFont(fontId) {
   if (typeof document === 'undefined') return
-  const normalized = normalizeFontId(fontId)
+  const normalized = normalizeAppFontId(fontId)
   document.documentElement.setAttribute('data-font', normalized)
+}
+
+function applyDocumentCodeFont(fontId) {
+  if (typeof document === 'undefined') return
+  const normalized = normalizeCodeFontId(fontId)
+  document.documentElement.setAttribute('data-code-font', normalized)
 }
 
 function toggleSidebarVisibility() {
@@ -635,10 +643,21 @@ watch(
 watch(
   () => appStore.uiFont,
   (fontId) => {
-    const normalized = normalizeFontId(fontId)
+    const normalized = normalizeAppFontId(fontId)
     applyDocumentFont(normalized)
     if (!hasLoadedFontPreference.value || applyingFontPreference.value) return
-    void fontService.saveFontPreference(normalized)
+    void fontService.saveAppFontPreference(normalized)
+  },
+  { immediate: true },
+)
+
+watch(
+  () => appStore.uiCodeFont,
+  (fontId) => {
+    const normalized = normalizeCodeFontId(fontId)
+    applyDocumentCodeFont(normalized)
+    if (!hasLoadedCodeFontPreference.value || applyingCodeFontPreference.value) return
+    void fontService.saveCodeFontPreference(normalized)
   },
   { immediate: true },
 )
@@ -647,24 +666,31 @@ onMounted(async () => {
   if (typeof window !== 'undefined') {
     applyingThemePreference.value = true
     applyingFontPreference.value = true
+    applyingCodeFontPreference.value = true
     try {
-      const [storedTheme, storedFont] = await Promise.all([
+      const [storedTheme, storedFont, storedCodeFont] = await Promise.all([
         themeService.loadThemePreference(),
-        fontService.loadFontPreference(),
+        fontService.loadAppFontPreference(),
+        fontService.loadCodeFontPreference(),
       ])
       appStore.setUiTheme(storedTheme, { persist: false })
       appStore.setUiFont(storedFont, { persist: false })
+      appStore.setUiCodeFont(storedCodeFont, { persist: false })
       applyDocumentTheme(storedTheme)
       applyDocumentFont(storedFont)
+      applyDocumentCodeFont(storedCodeFont)
     } finally {
       applyingThemePreference.value = false
       hasLoadedThemePreference.value = true
       applyingFontPreference.value = false
       hasLoadedFontPreference.value = true
+      applyingCodeFontPreference.value = false
+      hasLoadedCodeFontPreference.value = true
     }
   } else {
     hasLoadedThemePreference.value = true
     hasLoadedFontPreference.value = true
+    hasLoadedCodeFontPreference.value = true
   }
 
   startupClockTimer = window.setInterval(() => {

@@ -6,17 +6,32 @@
     </p>
 
     <div class="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-base)] p-4">
-      <label class="mb-2 block text-sm font-semibold text-[var(--color-text-main)]">Font</label>
+      <label class="mb-2 block text-sm font-semibold text-[var(--color-text-main)]">App Font</label>
       <p class="mb-3 text-xs text-[var(--color-text-muted)]">
-        Switch between the current default font and Ubuntu.
+        Choose the font used in app UI text.
       </p>
       <HeaderDropdown
         :model-value="activeFont"
-        :options="fontOptions"
+        :options="appFontOptions"
         placeholder="Select font"
         aria-label="UI font"
         max-width-class="w-full max-w-[260px]"
         @update:model-value="selectFont"
+      />
+    </div>
+
+    <div class="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-base)] p-4">
+      <label class="mb-2 block text-sm font-semibold text-[var(--color-text-main)]">Code Editor Font</label>
+      <p class="mb-3 text-xs text-[var(--color-text-muted)]">
+        Choose the font used only in code editors and terminal-style views.
+      </p>
+      <HeaderDropdown
+        :model-value="activeCodeFont"
+        :options="codeFontOptions"
+        placeholder="Select code font"
+        aria-label="Code editor font"
+        max-width-class="w-full max-w-[260px]"
+        @update:model-value="selectCodeFont"
       />
     </div>
 
@@ -96,8 +111,16 @@ const appStore = useAppStore()
 const activeTheme = computed(() => appStore.uiTheme)
 const themes = computed(() => appStore.availableThemes)
 const activeFont = computed(() => appStore.uiFont)
-const fontOptions = computed(() => {
+const activeCodeFont = computed(() => appStore.uiCodeFont)
+const appFontOptions = computed(() => {
   const options = Array.isArray(appStore.availableFonts) ? appStore.availableFonts : []
+  return options.map((font) => ({
+    value: font.id,
+    label: font.label,
+  }))
+})
+const codeFontOptions = computed(() => {
+  const options = Array.isArray(appStore.availableCodeFonts) ? appStore.availableCodeFonts : []
   return options.map((font) => ({
     value: font.id,
     label: font.label,
@@ -110,5 +133,9 @@ function selectTheme(themeId) {
 
 function selectFont(fontId) {
   appStore.setUiFont(fontId)
+}
+
+function selectCodeFont(fontId) {
+  appStore.setUiCodeFont(fontId)
 }
 </script>

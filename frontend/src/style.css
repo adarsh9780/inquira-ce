@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Ubuntu:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Ubuntu:wght@400;500;700&family=Inter:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Fira+Code:wght@400;500;700&family=Source+Code+Pro:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -406,6 +406,49 @@
 [data-font="ubuntu"] {
   --font-ui: "Ubuntu", "Avenir Next", "Segoe UI", sans-serif;
   --font-display: "Ubuntu", "Avenir Next", "Segoe UI", sans-serif;
+}
+
+:root[data-font="inter"],
+[data-font="inter"] {
+  --font-ui: "Inter", "Avenir Next", "Segoe UI", sans-serif;
+  --font-display: "Inter", "Avenir Next", "Segoe UI", sans-serif;
+}
+
+:root[data-font="source-sans-3"],
+[data-font="source-sans-3"] {
+  --font-ui: "Source Sans 3", "Avenir Next", "Segoe UI", sans-serif;
+  --font-display: "Source Sans 3", "Avenir Next", "Segoe UI", sans-serif;
+}
+
+:root[data-font="ibm-plex-sans"],
+[data-font="ibm-plex-sans"] {
+  --font-ui: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  --font-display: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+}
+
+:root[data-code-font="jetbrains-mono"],
+[data-code-font="jetbrains-mono"] {
+  --font-mono: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
+}
+
+:root[data-code-font="fira-code"],
+[data-code-font="fira-code"] {
+  --font-mono: "Fira Code", monospace;
+}
+
+:root[data-code-font="source-code-pro"],
+[data-code-font="source-code-pro"] {
+  --font-mono: "Source Code Pro", monospace;
+}
+
+:root[data-code-font="ibm-plex-mono"],
+[data-code-font="ibm-plex-mono"] {
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
+:root[data-code-font="roboto-mono"],
+[data-code-font="roboto-mono"] {
+  --font-mono: "Roboto Mono", monospace;
 }
 
 /* Global styles */
