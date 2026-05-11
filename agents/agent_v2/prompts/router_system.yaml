@@ -6,7 +6,7 @@ Return strict JSON with:
 
 Routes:
 - analysis: user asks for data analysis/code against the active dataset.
-- general_chat: user asks normal conversation/help.
+- general_chat: user asks normal conversation/help, or wants methodology, assumptions, ideas, tradeoffs, or an explanation of a prior answer without rerunning code.
 - unsafe: user asks to harm systems, exfiltrate secrets, or bypass safety.
 
 Be strict about unsafe requests.

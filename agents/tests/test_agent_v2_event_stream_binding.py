@@ -105,6 +105,55 @@ async def test_route_node_prefers_workspace_table_description_before_router(monk
 
 
 @pytest.mark.asyncio
+async def test_route_node_routes_methodology_followup_to_general_chat_before_schema_shortcut(monkeypatch):
+    captured: list[tuple[str, dict]] = []
+
+    async def _should_not_call_router(_messages, _configurable):
+        raise AssertionError("router should be skipped for discussion-style methodology follow-ups")
+
+    monkeypatch.setattr("agent_v2.nodes.decide_route_details", _should_not_call_router)
+    monkeypatch.setattr("agent_v2.nodes.emit_agent_event", lambda event, payload: captured.append((event, payload)))
+
+    result = await route_node(
+        {
+            "messages": [
+                HumanMessage(content="give me top 10 songs by streams"),
+                HumanMessage(content="how did you decide the top 10 songs? explain the methodology"),
+            ],
+            "table_names": ["tracks"],
+            "workspace_schema": {
+                "tables": [
+                    {
+                        "table_name": "tracks",
+                        "context": "Track metadata and streaming performance.",
+                        "columns": [{"name": "streams", "description": "Total stream count"}],
+                    }
+                ]
+            },
+        },
+        {"configurable": {}},
+    )
+
+    assert result["route"] == "general_chat"
+    assert result["metadata"]["intent"] == "discussion"
+    assert result["metadata"]["is_relevant"] is False
+    assert result["metadata"]["schema_relevance"]["has_schema"] is True
+    assert captured == [
+        (
+            "reasoning",
+            {
+                "stage": "intent",
+                "message": (
+                    "I understand you want to discuss the method, assumptions, or prior result, "
+                    "so I can answer directly without rerunning code."
+                ),
+                "route": "general_chat",
+            },
+        )
+    ]
+
+
+@pytest.mark.asyncio
 async def test_route_node_uses_column_metadata_when_table_description_is_ambiguous(monkeypatch):
     async def _should_not_call_router(_messages, _configurable):
         raise AssertionError("router should be skipped for strong column metadata matches")

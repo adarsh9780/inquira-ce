@@ -114,7 +114,7 @@ const outputLabel = computed(() => {
   if (kind === 'code-bash') return 'Shell'
   if (kind === 'markdown') return 'Output'
   if (kind === 'table') return 'Table preview'
-  if (kind === 'json') return 'Structured output'
+  if (kind === 'json') return 'Tool details'
   return preview.value.error ? 'Error output' : 'Output'
 })
 

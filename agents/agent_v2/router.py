@@ -24,6 +24,26 @@ _UNSAFE_RE = re.compile(
     r"\b(rm\s+-rf|drop\s+table|truncate\s+table|delete\s+from|exfiltrate|steal|bypass)\b",
     re.IGNORECASE,
 )
+_DISCUSSION_INTENT_RES = (
+    re.compile(r"\bhow did you\b", re.IGNORECASE),
+    re.compile(r"\bwhy did you\b", re.IGNORECASE),
+    re.compile(r"\bwalk me through\b", re.IGNORECASE),
+    re.compile(r"\bexplain (?:how|why)\b", re.IGNORECASE),
+    re.compile(r"\bwhat (?:method|methodology|approach|criteria|logic|assumptions)\b", re.IGNORECASE),
+    re.compile(r"\bbased on what\b", re.IGNORECASE),
+    re.compile(r"\bhow would you (?:approach|analy[sz]e)\b", re.IGNORECASE),
+    re.compile(r"\b(?:can we|let'?s) discuss\b", re.IGNORECASE),
+    re.compile(r"\bbrainstorm\b", re.IGNORECASE),
+    re.compile(r"\b(?:ideas|alternatives|tradeoffs|pros and cons)\b", re.IGNORECASE),
+)
+_DISCUSSION_TOPIC_RE = re.compile(
+    r"\b(method|methodology|approach|reasoning|logic|criteria|assumptions|analysis|result|answer|finding|findings)\b",
+    re.IGNORECASE,
+)
+_EXECUTION_INTENT_RE = re.compile(
+    r"\b(run|rerun|execute|generate|write|produce|build|create|query|calculate|compute|find|show me|give me|list|plot|chart|graph)\b",
+    re.IGNORECASE,
+)
 
 
 class RouteDecision(BaseModel):
@@ -105,10 +125,46 @@ def _latest_user_text(messages: list[AnyMessage]) -> str:
     return ""
 
 
+def _has_recent_assistant_message(messages: list[AnyMessage]) -> bool:
+    for msg in reversed(messages):
+        msg_type = str(getattr(msg, "type", "") or "").lower()
+        if msg_type in {"ai", "assistant"}:
+            return True
+    return False
+
+
+def discussion_route_decision(messages: list[AnyMessage]) -> RouteDecision | None:
+    user_text = _latest_user_text(messages)
+    normalized = " ".join(str(user_text or "").strip().split())
+    if not normalized:
+        return None
+    if _EXECUTION_INTENT_RE.search(normalized):
+        return None
+
+    matched_discussion_intent = any(pattern.search(normalized) for pattern in _DISCUSSION_INTENT_RES)
+    has_topic_cue = bool(_DISCUSSION_TOPIC_RE.search(normalized))
+    if not matched_discussion_intent and not (
+        has_topic_cue and _has_recent_assistant_message(messages)
+    ):
+        return None
+
+    return RouteDecision(
+        route="general_chat",
+        reasoning=(
+            "I understand you want to discuss the method, assumptions, or prior result, "
+            "so I can answer directly without rerunning code."
+        ),
+    )
+
+
 async def decide_route_details(messages: list[AnyMessage], configurable: dict) -> RouteDecision:
     user_text = _latest_user_text(messages)
     if _UNSAFE_RE.search(user_text):
         return RouteDecision(route="unsafe", reasoning=_fallback_reasoning("unsafe", user_text))
+
+    discussion_decision = discussion_route_decision(messages)
+    if discussion_decision is not None:
+        return discussion_decision
 
     runtime = load_llm_runtime_config()
     provider = normalize_llm_provider(str(configurable.get("provider") or runtime.provider))

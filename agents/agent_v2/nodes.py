@@ -32,7 +32,7 @@ from .services.llm_runtime_config import load_llm_runtime_config, normalize_mode
 from .services.llm_provider_catalog import normalize_llm_provider, provider_requires_api_key
 from .code_guard import guard_code
 from .events import emit_agent_event
-from .router import decide_route_details
+from .router import decide_route_details, discussion_route_decision
 from .runtime import load_agent_runtime_config
 from .schema_manifest import build_schema_context_pack, build_schema_manifest
 from .memory.summarizer import build_conversation_memory
@@ -1611,6 +1611,23 @@ async def route_node(state: dict[str, Any], config: RunnableConfig) -> dict[str,
         workspace_schema=workspace_schema,
         table_names=table_names,
     )
+    discussion_decision = discussion_route_decision(messages)
+    if discussion_decision is not None:
+        reasoning = str(discussion_decision.reasoning or "").strip()
+        if reasoning:
+            emit_agent_event(
+                "reasoning",
+                {
+                    "stage": "intent",
+                    "message": reasoning,
+                    "route": "general_chat",
+                },
+            )
+        metadata: dict[str, Any] = {"is_safe": True, "is_relevant": False, "intent": "discussion"}
+        if bool(schema_relevance.get("has_schema")):
+            metadata["schema_relevance"] = schema_relevance
+        return {"route": "general_chat", "metadata": metadata}
+
     matched_tables = [
         str(item.get("table_name") or "").strip()
         for item in (schema_relevance.get("matched_tables") or [])

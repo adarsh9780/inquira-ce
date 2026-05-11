@@ -1,5 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { buildToolOutputPreview } from '../src/utils/toolOutputPreview.js'
 
 test('tool output preview detects code languages', () => {
@@ -35,4 +37,10 @@ test('tool output preview handles errors, json, and truncation', () => {
 
   const long = buildToolOutputPreview({ output: 'x'.repeat(5000) })
   assert.equal(long.truncated, true)
+})
+
+test('tool output preview uses user-facing label for json payloads', () => {
+  const source = readFileSync(resolve(process.cwd(), 'src/components/chat/ToolOutputPreview.vue'), 'utf-8')
+  assert.equal(source.includes("if (kind === 'json') return 'Tool details'"), true)
+  assert.equal(source.includes("if (kind === 'json') return 'Structured output'"), false)
 })
