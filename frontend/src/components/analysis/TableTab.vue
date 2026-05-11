@@ -298,6 +298,32 @@ onUnmounted(() => {
 })
 
 const allArtifacts = computed(() => (Array.isArray(workspaceArtifacts.value) ? workspaceArtifacts.value : []))
+const activeTurnArtifactIds = computed(() => {
+  if (!String(appStore.activeTurnId || '').trim()) return new Set()
+  const ids = (Array.isArray(appStore.activeTurnArtifacts) ? appStore.activeTurnArtifacts : [])
+    .filter((artifact) => String(artifact?.kind || '').trim().toLowerCase() === 'dataframe')
+    .map((artifact) => String(artifact?.artifact_id || '').trim())
+    .filter(Boolean)
+  return new Set(ids)
+})
+const livePersistedArtifactIds = computed(() => {
+  const ids = Array.isArray(appStore.dataframes)
+    ? appStore.dataframes
+      .map((df) => String(df?.data?.artifact_id || '').trim())
+      .filter(Boolean)
+    : []
+  return new Set(ids)
+})
+const scopedPersistedArtifacts = computed(() => {
+  const turnId = String(appStore.activeTurnId || '').trim()
+  const allowedIds = new Set([
+    ...activeTurnArtifactIds.value,
+    ...livePersistedArtifactIds.value,
+  ])
+  if (!turnId) return allArtifacts.value
+  if (allowedIds.size === 0) return []
+  return allArtifacts.value.filter((artifact) => allowedIds.has(String(artifact?.artifact_id || '').trim()))
+})
 
 function getMemoryArtifactId(name, index = 0) {
   const normalizedName = String(name || '').trim() || `dataframe_${index + 1}`
@@ -357,7 +383,7 @@ const memoryArtifacts = computed(() => {
 })
 
 const displayArtifacts = computed(() => {
-  const persistedArtifacts = allArtifacts.value.map((artifact) => ({
+  const persistedArtifacts = scopedPersistedArtifacts.value.map((artifact) => ({
     ...artifact,
     source: 'artifact',
   }))

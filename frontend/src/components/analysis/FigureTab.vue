@@ -202,6 +202,33 @@ const artifactListError = ref('')
 let listAbortController = null
 let figureAbortController = null
 const DEFAULT_PLOTLY_THEME_MODE = PLOTLY_THEME_MODE.SOFT
+const activeTurnFigureArtifactIds = computed(() => {
+  if (!String(appStore.activeTurnId || '').trim()) return new Set()
+  const ids = (Array.isArray(appStore.activeTurnArtifacts) ? appStore.activeTurnArtifacts : [])
+    .filter((artifact) => String(artifact?.kind || '').trim().toLowerCase() === 'figure')
+    .map((artifact) => String(artifact?.artifact_id || '').trim())
+    .filter(Boolean)
+  return new Set(ids)
+})
+const livePersistedFigureIds = computed(() => {
+  const ids = Array.isArray(appStore.figures)
+    ? appStore.figures
+      .map((fig) => String(fig?.artifact_id || fig?.data?.artifact_id || '').trim())
+      .filter(Boolean)
+    : []
+  return new Set(ids)
+})
+const scopedWorkspaceFigureArtifacts = computed(() => {
+  const turnId = String(appStore.activeTurnId || '').trim()
+  const allowedIds = new Set([
+    ...activeTurnFigureArtifactIds.value,
+    ...livePersistedFigureIds.value,
+  ])
+  if (!turnId) return Array.isArray(workspaceFigureArtifacts.value) ? workspaceFigureArtifacts.value : []
+  if (allowedIds.size === 0) return []
+  return (Array.isArray(workspaceFigureArtifacts.value) ? workspaceFigureArtifacts.value : [])
+    .filter((fig) => allowedIds.has(String(fig?.artifact_id || '').trim()))
+})
 
 function getMemoryFigureId(name, index = 0) {
   const normalizedName = String(name || '').trim() || `figure_${index + 1}`
@@ -232,9 +259,7 @@ const inMemoryFigureArtifacts = computed(() => {
 })
 
 const orderedFigures = computed(() => {
-  const persisted = Array.isArray(workspaceFigureArtifacts.value)
-    ? workspaceFigureArtifacts.value.map((fig) => ({ ...fig, source: 'artifact' }))
-    : []
+  const persisted = scopedWorkspaceFigureArtifacts.value.map((fig) => ({ ...fig, source: 'artifact' }))
   return [...persisted, ...inMemoryFigureArtifacts.value]
 })
 

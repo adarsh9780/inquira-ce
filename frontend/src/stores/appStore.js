@@ -1505,6 +1505,7 @@ export const useAppStore = defineStore('app', () => {
   function setActiveTurnPayload(turn) {
     activeTurn.value = turn && typeof turn === 'object' ? { ...turn } : null
     activeTurnCode.value = String(turn?.code_snapshot || '')
+    setPythonFileContent(activeTurnCode.value)
   }
 
   function hydrateArtifactsFromToolEvents(toolEvents) {
@@ -2143,11 +2144,17 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function tableOffsetKey(workspaceId, artifactId) {
-    return `${String(workspaceId || '').trim()}::${String(artifactId || '').trim()}`
+    const workspaceKey = String(workspaceId || '').trim()
+    const artifactKey = String(artifactId || '').trim()
+    const turnKey = String(activeTurnId.value || '').trim()
+    return `${workspaceKey}::${turnKey || 'workspace'}::${artifactKey}`
   }
 
   function workspaceSelectionKey(workspaceId) {
-    return String(workspaceId || '').trim()
+    const workspaceKey = String(workspaceId || '').trim()
+    const turnKey = String(activeTurnId.value || '').trim()
+    if (!workspaceKey) return ''
+    return `${workspaceKey}::${turnKey || 'workspace'}`
   }
 
   function setTablePageOffset(workspaceId, artifactId, page) {
