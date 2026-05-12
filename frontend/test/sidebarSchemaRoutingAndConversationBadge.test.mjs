@@ -16,8 +16,12 @@ test('sidebar adds a schema entry under workspace and uses numbered conversation
 
 test('activating a conversation returns the shell to workspace chat', () => {
   const storeSource = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf-8')
+  const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
   assert.equal(storeSource.includes("function setActiveConversationId(conversationId) {"), true)
   assert.equal(storeSource.includes("activeTab.value = 'workspace'"), true)
   assert.equal(storeSource.includes("workspacePane.value = 'chat'"), true)
+  assert.equal(sidebarSource.includes('if (target === current) {'), true)
+  assert.equal(sidebarSource.includes('appStore.setActiveConversationId(target)'), true)
+  assert.equal(sidebarSource.includes('await appStore.fetchConversationTurns({ reset: true })'), true)
 })

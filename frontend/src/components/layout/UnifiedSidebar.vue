@@ -596,8 +596,13 @@ async function createConversation() {
 async function selectConversation(id) {
   conversationMenuId.value = null
   const target = String(id || '').trim()
-  if (!target || target === String(appStore.activeConversationId || '').trim()) return
+  if (!target) return
+  const current = String(appStore.activeConversationId || '').trim()
   try {
+    if (target === current) {
+      appStore.setActiveConversationId(target)
+      return
+    }
     appStore.setActiveConversationId(target)
     await appStore.fetchConversationTurns({ reset: true })
   } catch (error) {
