@@ -1483,6 +1483,8 @@ export const useAppStore = defineStore('app', () => {
 
   function setActiveConversationId(conversationId) {
     activeConversationId.value = conversationId || ''
+    activeTab.value = 'workspace'
+    workspacePane.value = 'chat'
     activeTurnId.value = ''
     activeTurn.value = null
     activeTurnCode.value = ''

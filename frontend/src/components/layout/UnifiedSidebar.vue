@@ -31,22 +31,60 @@
         <button
           type="button"
           class="flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
-          :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3'"
+          :class="[
+            appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
+            appStore.activeTab === 'workspace' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
+          ]"
           :title="appStore.isSidebarCollapsed ? activeWorkspaceName : 'Open workspace settings'"
-          @click="openSettings('workspace', 1)"
+          @click="switchToWorkspace"
         >
           <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--color-accent)]/10 text-[var(--color-accent)]">
             <FolderOpenIcon class="h-4 w-4" />
           </div>
           <div
             class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[200px] opacity-100 ml-3'"
           >
             <span class="block truncate text-[13px] font-semibold leading-snug text-[var(--color-text-main)]">
               {{ activeWorkspaceName }}
             </span>
             <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
               {{ activeWorkspaceCaption }}
+            </span>
+          </div>
+          <button
+            v-if="!appStore.isSidebarCollapsed"
+            type="button"
+            class="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none"
+            title="Open workspace settings"
+            @click.stop="openSettings('workspace', 1)"
+          >
+            <EllipsisHorizontalIcon class="h-4 w-4" />
+          </button>
+        </button>
+
+        <button
+          type="button"
+          class="mt-1 flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
+          :class="[
+            appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
+            appStore.activeTab === 'schema-editor' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
+          ]"
+          :title="appStore.isSidebarCollapsed ? 'Open schema editor' : 'Schema editor'"
+          @click="openSchemaEditor"
+        >
+          <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--color-selected-surface)] text-[var(--color-selected-border)]">
+            <CircleStackIcon class="h-4 w-4" />
+          </div>
+          <div
+            class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+          >
+            <span class="block truncate text-[13px] font-medium leading-snug text-[var(--color-text-main)]">
+              Schema
+            </span>
+            <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
+              Inspect datasets and column metadata
             </span>
           </div>
         </button>
@@ -102,13 +140,14 @@
 
           <div v-else class="space-y-0.5 mt-1">
             <div
-              v-for="conv in appStore.conversations"
+              v-for="(conv, index) in appStore.conversations"
               :key="conv.id"
               class="group relative flex items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
               :class="[
                 appStore.isSidebarCollapsed ? 'justify-center px-0 py-2' : 'justify-start px-3 py-2',
                 appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : '',
               ]"
+              :title="conv.title || 'Untitled'"
               @click="selectConversation(conv.id)"
             >
               <!-- Active indicator line — only in expanded mode -->
@@ -131,14 +170,15 @@
 
               <!-- Display mode -->
               <template v-else>
-                <!-- Dot indicator (always visible, centers correctly in both states) -->
-                <div class="flex h-6 w-6 shrink-0 items-center justify-center text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]">
-                  <div
-                    class="h-[6px] w-[6px] rounded-full transition-colors duration-200"
+                <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+                  <span
+                    class="inline-flex min-w-[1.35rem] items-center justify-center rounded-md px-1 text-[10px] font-semibold leading-none transition-colors duration-200"
                     :class="appStore.activeConversationId === conv.id
-                      ? 'bg-[var(--color-accent)]'
-                      : 'bg-current opacity-40 group-hover:opacity-100'"
-                  />
+                      ? 'bg-[var(--color-accent)] text-white'
+                      : 'bg-[var(--color-base-soft)] text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
+                  >
+                    {{ conversationBadgeLabel(index) }}
+                  </span>
                 </div>
 
                 <!-- Title (hidden when collapsed) -->
@@ -321,6 +361,7 @@ import {
   PlusIcon,
   EllipsisHorizontalIcon,
   KeyIcon,
+  CircleStackIcon,
 } from '@heroicons/vue/24/outline'
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -471,6 +512,21 @@ function handleDatasetsChanged() {
 // ─── Brand / collapse ─────────────────────────────────────────────────────────
 function handleBrandClick() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
+}
+
+function switchToWorkspace() {
+  appStore.setActiveTab('workspace')
+}
+
+function openSchemaEditor() {
+  appStore.setActiveTab('schema-editor')
+}
+
+function conversationBadgeLabel(index) {
+  const ordinal = Number(index) + 1
+  if (!Number.isFinite(ordinal) || ordinal <= 0) return '1'
+  if (ordinal > 99) return '99+'
+  return String(ordinal)
 }
 
 // ─── Profile menu ─────────────────────────────────────────────────────────────

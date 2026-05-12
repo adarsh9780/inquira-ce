@@ -3,19 +3,21 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('workspace/schema toggle is in status bar, not sidebar', () => {
+test('workspace and schema navigation live in the sidebar instead of the status bar', () => {
   const sidebarPath = resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue')
   const statusBarPath = resolve(process.cwd(), 'src/components/layout/StatusBar.vue')
   const sidebarSource = readFileSync(sidebarPath, 'utf-8')
   const statusBarSource = readFileSync(statusBarPath, 'utf-8')
 
-  assert.equal(sidebarSource.includes("@click=\"handleTabClick('workspace')\""), false)
-  assert.equal(sidebarSource.includes("@click=\"handleTabClick('schema-editor')\""), false)
-  assert.equal(sidebarSource.includes('openSettings(\'workspace\', 1)'), true)
-  assert.equal(sidebarSource.includes('function openWorkspaceRail(target = \'\') {'), false)
-  assert.equal(sidebarSource.includes('function openSchemaFromRail() {'), false)
-  assert.equal(statusBarSource.includes('switchToWorkspace'), true)
-  assert.equal(statusBarSource.includes('switchToSchemaEditor'), true)
+  assert.equal(sidebarSource.includes('@click="switchToWorkspace"'), true)
+  assert.equal(sidebarSource.includes('@click="openSchemaEditor"'), true)
+  assert.equal(sidebarSource.includes('CircleStackIcon'), true)
+  assert.equal(sidebarSource.includes('Schema'), true)
+  assert.equal(sidebarSource.includes('Inspect datasets and column metadata'), true)
+  assert.equal(statusBarSource.includes('switchToWorkspace'), false)
+  assert.equal(statusBarSource.includes('switchToSchemaEditor'), false)
+  assert.equal(statusBarSource.includes('FolderOpenIcon'), false)
+  assert.equal(statusBarSource.includes('DocumentTextIcon'), false)
 })
 
 test('sidebar uses api/profile actions instead of the old direct settings footer', () => {

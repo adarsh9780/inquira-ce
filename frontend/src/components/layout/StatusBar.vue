@@ -1,30 +1,8 @@
 <template>
   <div class="h-7 w-full bg-[var(--color-surface)] border-t border-[var(--color-border)] flex items-center justify-between px-3 text-[12px] text-[var(--color-text-muted)] select-none z-50 shrink-0">
 
-    <!-- Left Section: Editor Toggle, Kernel Status, and Editor Position -->
+    <!-- Left Section: Token usage, kernel status, and editor position -->
     <div class="flex items-center gap-3 h-full">
-      <!-- Workspace/Schema Editor Toggle -->
-      <div v-if="authStore.isAuthenticated" class="flex items-center gap-0.5 h-full">
-        <button
-          @click="switchToWorkspace"
-          class="flex items-center gap-1 h-full px-1 rounded hover:bg-[var(--color-base)] transition-colors"
-          :class="appStore.activeTab === 'workspace' ? 'text-[var(--color-accent)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
-          :title="'Switch to Workspace'"
-        >
-          <FolderOpenIcon class="w-3.5 h-3.5" />
-        </button>
-        <button
-          @click="switchToSchemaEditor"
-          class="flex items-center gap-1 h-full px-1 rounded hover:bg-[var(--color-base)] transition-colors"
-          :class="appStore.activeTab === 'schema-editor' ? 'text-[var(--color-accent)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
-          :title="'Switch to Schema Editor'"
-        >
-          <DocumentTextIcon class="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      <div v-if="authStore.isAuthenticated" class="w-px h-3.5 bg-[var(--color-border)]"></div>
-
       <div
         v-if="authStore.isAuthenticated"
         class="flex items-center gap-1 h-full px-1 text-[10px] text-[var(--color-text-muted)]"
@@ -162,8 +140,6 @@ import {
   CommandLineIcon,
   ViewColumnsIcon,
   ExclamationTriangleIcon,
-  FolderOpenIcon,
-  DocumentTextIcon,
 } from '@heroicons/vue/24/outline'
 import { toast } from '../../composables/useToast'
 
@@ -357,14 +333,6 @@ const artifactUsageWarningTitle = computed(() => {
   if (!details.length) return 'Scratchpad artifact usage is within safe limits.'
   return `Scratchpad usage warning. ${details.join(' | ')}. Delete unused artifacts to avoid performance issues.`
 })
-
-function switchToWorkspace() {
-  appStore.setActiveTab('workspace')
-}
-
-function switchToSchemaEditor() {
-  appStore.setActiveTab('schema-editor')
-}
 
 function updateWebSocketStatus(connected) {
   const status = settingsWebSocket.getConnectionStatus()
