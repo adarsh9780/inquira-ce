@@ -36,14 +36,14 @@
             appStore.activeTab === 'workspace' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
           ]"
           :title="appStore.isSidebarCollapsed ? activeWorkspaceName : 'Open workspace settings'"
-          @click="switchToWorkspace"
+          @click="openSettings('workspace', 1)"
         >
           <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--color-accent)]/10 text-[var(--color-accent)]">
             <FolderOpenIcon class="h-4 w-4" />
           </div>
           <div
             class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[200px] opacity-100 ml-3'"
+            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
           >
             <span class="block truncate text-[13px] font-semibold leading-snug text-[var(--color-text-main)]">
               {{ activeWorkspaceName }}
@@ -52,15 +52,6 @@
               {{ activeWorkspaceCaption }}
             </span>
           </div>
-          <button
-            v-if="!appStore.isSidebarCollapsed"
-            type="button"
-            class="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none"
-            title="Open workspace settings"
-            @click.stop="openSettings('workspace', 1)"
-          >
-            <EllipsisHorizontalIcon class="h-4 w-4" />
-          </button>
         </button>
 
         <button
@@ -512,10 +503,6 @@ function handleDatasetsChanged() {
 // ─── Brand / collapse ─────────────────────────────────────────────────────────
 function handleBrandClick() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
-}
-
-function switchToWorkspace() {
-  appStore.setActiveTab('workspace')
 }
 
 function openSchemaEditor() {

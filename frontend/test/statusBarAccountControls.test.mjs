@@ -27,7 +27,7 @@ test('sidebar owns the profile and bottom action stack', () => {
   assert.equal(sidebarSource.includes('Legal &amp; Terms'), true)
   assert.equal(sidebarSource.includes('Account Settings'), true)
   assert.equal(sidebarSource.includes('Theme Preference'), true)
-  assert.equal(sidebarSource.includes('switchToWorkspace'), true)
+  assert.equal(sidebarSource.includes("@click=\"openSettings('workspace', 1)\""), true)
   assert.equal(sidebarSource.includes('Chats'), true)
   assert.equal(sidebarSource.includes('Datasets</p>'), false)
   assert.equal(sidebarSource.includes('CircleStackIcon'), true)

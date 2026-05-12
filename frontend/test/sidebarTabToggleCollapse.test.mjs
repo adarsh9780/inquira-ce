@@ -9,7 +9,7 @@ test('workspace and schema navigation live in the sidebar instead of the status 
   const sidebarSource = readFileSync(sidebarPath, 'utf-8')
   const statusBarSource = readFileSync(statusBarPath, 'utf-8')
 
-  assert.equal(sidebarSource.includes('@click="switchToWorkspace"'), true)
+  assert.equal(sidebarSource.includes("@click=\"openSettings('workspace', 1)\""), true)
   assert.equal(sidebarSource.includes('@click="openSchemaEditor"'), true)
   assert.equal(sidebarSource.includes('CircleStackIcon'), true)
   assert.equal(sidebarSource.includes('Schema'), true)
@@ -25,6 +25,7 @@ test('sidebar uses api/profile actions instead of the old direct settings footer
   const sidebarSource = readFileSync(sidebarPath, 'utf-8')
 
   assert.equal(sidebarSource.includes('@click="openSettings'), true)
+  assert.equal(sidebarSource.includes("@click.stop=\"openSettings('workspace', 1)\""), false)
   assert.equal(sidebarSource.includes('title="API Keys"'), true)
   assert.equal(sidebarSource.includes('title="Profile Settings"'), true)
   assert.equal(sidebarSource.includes('Legal &amp; Terms'), true)

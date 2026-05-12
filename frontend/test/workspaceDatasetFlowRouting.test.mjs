@@ -7,8 +7,8 @@ test('unified sidebar routes workspace entry points to settings workspace tab an
   const source = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
   const workspaceTabSource = readFileSync(resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue'), 'utf-8')
 
-  assert.equal(source.includes("@click.stop=\"openSettings('workspace', 1)\""), true)
-  assert.equal(source.includes('@click="switchToWorkspace"'), true)
+  assert.equal(source.includes("@click=\"openSettings('workspace', 1)\""), true)
+  assert.equal(source.includes("@click.stop=\"openSettings('workspace', 1)\""), false)
   assert.equal(source.includes(':initial-step="settingsInitialStep"'), true)
   assert.equal(source.includes('const settingsInitialStep = ref(1)'), true)
   assert.equal(source.includes('function openSettings(tab = \'llm\', step = 1) {'), true)
