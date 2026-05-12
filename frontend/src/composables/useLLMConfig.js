@@ -567,6 +567,7 @@ async function saveConfig() {
   try {
     const enteredKey = String(apiKey.value || '').trim()
     const hasNewUnmaskedKey = selectedProvider !== 'ollama' && !usingMaskedKey.value && !!enteredKey
+    const hasSavedProviderKey = selectedProvider === 'ollama' || !!selectedProviderApiKeyPresent.value
 
     if (hasNewUnmaskedKey) {
       const verifyResult = await verifyKey()
@@ -576,8 +577,8 @@ async function saveConfig() {
     }
 
     saveLoading.value = true
-    const payload = {
-      provider: selectedProvider,
+    const preferencePayload = {
+      llm_provider: selectedProvider,
       selected_model: String(mainModel.value || '').trim(),
       selected_lite_model: String(liteModel.value || '').trim(),
       selected_coding_model: String(mainModel.value || '').trim(),
@@ -590,14 +591,29 @@ async function saveConfig() {
       slow_request_warning_seconds: Number(slowRequestWarningSeconds.value),
       allow_llm_data_samples: Boolean(allowLlmDataSamples.value),
     }
-    if (selectedProvider === 'ollama') {
-      payload.base_url = String(ollamaBaseUrl.value || '').trim() || 'http://localhost:11434'
-    }
-    if (hasNewUnmaskedKey) {
-      payload.api_key = enteredKey
-    }
 
-    await apiService.v1SetApiKey(payload)
+    if (selectedProvider === 'ollama' || hasNewUnmaskedKey) {
+      const securePayload = {
+        provider: selectedProvider,
+        ...preferencePayload,
+      }
+      if (selectedProvider === 'ollama') {
+        securePayload.base_url = String(ollamaBaseUrl.value || '').trim() || 'http://localhost:11434'
+      }
+      if (hasNewUnmaskedKey) {
+        securePayload.api_key = enteredKey
+      }
+      await apiService.v1SetApiKey(securePayload)
+    } else {
+      if (!hasSavedProviderKey) {
+        return {
+          ok: false,
+          stage: 'save_configuration',
+          error: `Save a ${providerLabel.value} API key before updating model preferences.`,
+        }
+      }
+      await apiService.v1UpdatePreferences(preferencePayload)
+    }
     const response = await loadPreferences(selectedProvider, true)
     return { ok: true, response }
   } catch (error) {

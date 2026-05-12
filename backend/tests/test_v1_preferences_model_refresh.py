@@ -613,6 +613,7 @@ async def test_set_api_key_endpoint_persists_models_and_advanced_settings(monkey
         slow_request_warning_seconds=120,
         schema_context="",
         allow_schema_sample_values=False,
+        allow_llm_data_samples=False,
         terminal_risk_acknowledged=False,
         chat_overlay_width=0.25,
         is_sidebar_collapsed=True,
@@ -693,6 +694,7 @@ async def test_set_api_key_endpoint_persists_models_and_advanced_settings(monkey
             llm_frequency_penalty=0.1,
             llm_presence_penalty=0.2,
             slow_request_warning_seconds=45,
+            allow_llm_data_samples=True,
         ),
         session=_Session(),
         current_user=SimpleNamespace(id="u1"),
@@ -709,9 +711,11 @@ async def test_set_api_key_endpoint_persists_models_and_advanced_settings(monkey
     assert prefs.llm_frequency_penalty == 0.1
     assert prefs.llm_presence_penalty == 0.2
     assert prefs.slow_request_warning_seconds == 45
+    assert prefs.allow_llm_data_samples is True
     assert captured_secret_write == {"key": "sk-test", "provider": "openrouter"}
     assert response.detail == "Refreshed 2 OpenRouter account models."
     assert response.warning == ""
+    assert response.allow_llm_data_samples is True
 
 
 @pytest.mark.asyncio

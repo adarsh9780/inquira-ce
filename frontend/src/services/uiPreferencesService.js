@@ -73,15 +73,4 @@ export const uiPreferencesService = {
             return false
         }
     },
-
-    async hasSeenWalkthrough() {
-        const prefs = await this.getPreferences()
-        return !!prefs.hasSeenWalkthrough
-    },
-
-    async markWalkthroughAsSeen() {
-        const prefs = await this.getPreferences()
-        prefs.hasSeenWalkthrough = true
-        await this.savePreferences(prefs)
-    }
 }
