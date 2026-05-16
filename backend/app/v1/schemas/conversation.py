@@ -1,5 +1,7 @@
 """Pydantic schemas for conversation and turn APIs."""
 
+from __future__ import annotations
+
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -66,6 +68,25 @@ class TurnRelationsResponse(BaseModel):
     children: list[TurnResponse]
     previous_turn: TurnResponse | None
     next_turn: TurnResponse | None
+
+
+class TurnTreeNodeResponse(BaseModel):
+    """Recursive turn tree node."""
+
+    id: str
+    parent_turn_id: str | None = None
+    seq_no: int
+    user_text: str
+    created_at: datetime
+    children: list[TurnTreeNodeResponse] = Field(default_factory=list)
+
+
+class TurnTreeResponse(BaseModel):
+    """Complete conversation turn tree."""
+
+    roots: list[TurnTreeNodeResponse]
+    current_turn_id: str | None = None
+    final_turn_id: str | None = None
 
 
 class FinalTurnRerunResponse(BaseModel):

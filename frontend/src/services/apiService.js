@@ -912,6 +912,12 @@ export const apiService = {
     return axios.get(`/api/v1/conversations/${conversationId}/turns/${turnId}/relations`)
   },
 
+  async v1GetTurnTree(conversationId, currentTurnId = null) {
+    const params = {}
+    if (currentTurnId) params.current_turn_id = currentTurnId
+    return axios.get(`/api/v1/conversations/${conversationId}/turn-tree`, { params })
+  },
+
   async v1GetFinalTurn(conversationId) {
     return axios.get(`/api/v1/conversations/${conversationId}/final-turn`)
   },

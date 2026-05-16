@@ -90,6 +90,7 @@ export const useAppStore = defineStore('app', () => {
   const activeTurnCode = ref('')
   const activeTurnArtifacts = ref([])
   const activeTurnRelations = ref(null)
+  const activeTurnTree = ref(null)
   const finalTurnId = ref('')
   const turnsNextCursor = ref(null)
   const workspaceKernelStatusById = ref({})
@@ -1490,6 +1491,7 @@ export const useAppStore = defineStore('app', () => {
     activeTurnCode.value = ''
     activeTurnArtifacts.value = []
     activeTurnRelations.value = null
+    activeTurnTree.value = null
     finalTurnId.value = ''
     turnsNextCursor.value = null
     clearLiveTokenUsage()
@@ -1580,6 +1582,10 @@ export const useAppStore = defineStore('app', () => {
     hydrateArtifactsFromToolEvents(payload?.current?.tool_events)
   }
 
+  function setActiveTurnTree(payload) {
+    activeTurnTree.value = payload && typeof payload === 'object' ? { ...payload } : null
+  }
+
   async function loadActiveTurn(turnId = activeTurnId.value) {
     const conversationId = String(activeConversationId.value || '').trim()
     const targetTurnId = String(turnId || '').trim()
@@ -1598,7 +1604,22 @@ export const useAppStore = defineStore('app', () => {
     setActiveTurnId(targetTurnId)
     setActiveTurnPayload(relations?.current || null)
     setActiveTurnRelations(relations)
+    await loadActiveTurnTree(conversationId, targetTurnId)
     return relations
+  }
+
+  async function loadActiveTurnTree(
+    conversationId = activeConversationId.value,
+    currentTurnId = activeTurnId.value,
+  ) {
+    const targetConversationId = String(conversationId || '').trim()
+    if (!targetConversationId) {
+      setActiveTurnTree(null)
+      return null
+    }
+    const payload = await apiService.v1GetTurnTree(targetConversationId, currentTurnId)
+    setActiveTurnTree(payload)
+    return payload
   }
 
   async function loadFinalTurn(conversationId = activeConversationId.value) {
@@ -2781,6 +2802,7 @@ export const useAppStore = defineStore('app', () => {
     activeTurnCode,
     activeTurnArtifacts,
     activeTurnRelations,
+    activeTurnTree,
     finalTurnId,
     turnsNextCursor,
     workspaceKernelStatusById,
@@ -2899,8 +2921,10 @@ export const useAppStore = defineStore('app', () => {
     setActiveTurnId,
     setActiveTurnPayload,
     setActiveTurnRelations,
+    setActiveTurnTree,
     loadActiveTurn,
     loadActiveTurnRelations,
+    loadActiveTurnTree,
     loadFinalTurn,
     goToPreviousTurn,
     goToNextTurn,

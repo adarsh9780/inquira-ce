@@ -105,13 +105,12 @@
               <ChevronLeftIcon class="w-4 h-4" />
             </button>
             <button
-              ref="branchManagerButtonRef"
               type="button"
               class="btn-icon"
-              title="Open turn branches"
-              @click="toggleBranchManager"
+              title="Open turn tree"
+              @click="openTurnTreeModal"
             >
-              <Squares2X2Icon class="w-4 h-4" />
+              <ShareIcon class="w-4 h-4" />
             </button>
             <button
               type="button"
@@ -167,80 +166,6 @@
       </div>
 
       <div
-        v-if="branchManagerOpen"
-        ref="branchManagerRef"
-        class="absolute bottom-full left-0 z-[72] mb-2 w-full max-w-md overflow-hidden rounded-2xl border shadow-lg"
-        style="background-color: var(--color-base); border-color: var(--color-border);"
-      >
-        <div class="border-b px-4 py-3" style="border-color: var(--color-border);">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.14em]" style="color: var(--color-text-muted);">Turn Branches</p>
-              <p class="mt-1 text-sm" style="color: var(--color-text-main);">Jump across nearby turns and choose which one is final.</p>
-            </div>
-            <button type="button" class="btn-icon" title="Close branches" @click="closeBranchManager">
-              <XMarkIcon class="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        <div class="max-h-72 overflow-y-auto px-2 py-2">
-          <div
-            v-for="node in branchNodes"
-            :key="node.id"
-            class="mb-2 flex w-full items-start justify-between gap-3 rounded-xl border px-3 py-3 text-left transition-colors hover:bg-[var(--color-surface)]"
-            :style="node.id === appStore.activeTurnId ? activeBranchNodeStyle : branchNodeStyle"
-          >
-            <span class="min-w-0 flex-1">
-              <span class="flex items-center gap-2">
-                <span class="text-xs font-semibold uppercase tracking-[0.12em]" style="color: var(--color-text-muted);">{{ node.kind }}</span>
-                <span
-                  v-if="node.id === appStore.finalTurnId"
-                  class="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
-                  style="border-color: var(--color-border); color: var(--color-accent);"
-                >
-                  Final
-                </span>
-              </span>
-              <span class="mt-1 block truncate text-sm font-medium" style="color: var(--color-text-main);">
-                {{ node.title }}
-              </span>
-            </span>
-            <div class="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                class="rounded-lg border px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--color-base-soft)]"
-                style="border-color: var(--color-border); color: var(--color-text-main);"
-                @click="selectBranchNode(node.id)"
-              >
-                Open
-              </button>
-              <button
-                type="button"
-                class="rounded-lg border px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--color-base-soft)]"
-                style="border-color: var(--color-border); color: var(--color-text-main);"
-                @click="markTurnFinal(node.id)"
-              >
-                Mark Final
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-between gap-3 border-t px-4 py-3" style="border-color: var(--color-border);">
-          <p class="text-xs" style="color: var(--color-text-muted);">Latest turn is used by default until you choose a different final turn.</p>
-          <button
-            type="button"
-            class="btn-secondary text-sm"
-            :disabled="!appStore.finalTurnId"
-            @click="rerunFinalTurn"
-          >
-            Rerun Final
-          </button>
-        </div>
-      </div>
-
-      <div
         v-if="showCommandSuggestions"
         class="absolute left-0 right-0 z-[70] overflow-hidden rounded-xl border shadow-lg"
         :class="suggestionsOpenUp ? 'bottom-full mb-2' : 'top-full mt-1'"
@@ -275,6 +200,17 @@
       />
     </div>
 
+    <TurnTreeModal
+      :is-open="turnTreeModalOpen"
+      :roots="appStore.activeTurnTree?.roots || []"
+      :current-turn-id="appStore.activeTurnId"
+      :final-turn-id="appStore.finalTurnId"
+      @close="closeTurnTreeModal"
+      @select="selectTurnTreeNode"
+      @mark-final="markTurnFinal"
+      @rerun-final="rerunFinalTurn"
+    />
+
     <!-- Requirements Notice -->
     <div v-if="!appStore.canAnalyze" class="rounded-xl p-4 border" style="background-color: color-mix(in srgb, var(--color-error) 5%, transparent); border-color: color-mix(in srgb, var(--color-error) 20%, transparent);">
       <div class="flex items-start gap-3">
@@ -304,6 +240,7 @@ import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import { modelSupportsImages, SUPPORTED_CHAT_IMAGE_TYPES } from '../../utils/modelCapabilities'
 import ModelSelector from '../ui/ModelSelector.vue'
 import ColumnSuggest from './ColumnSuggest.vue'
+import TurnTreeModal from './TurnTreeModal.vue'
 import {
   PlusIcon,
   ExclamationTriangleIcon,
@@ -311,7 +248,7 @@ import {
   PhotoIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  Squares2X2Icon,
+  ShareIcon,
 } from '@heroicons/vue/24/outline'
 import { ArrowUpIcon, MicrophoneIcon, StopIcon } from '@heroicons/vue/24/solid'
 
@@ -322,8 +259,6 @@ const isFocused = ref(false)
 const textareaRef = ref(null)
 const inputCardRef = ref(null)
 const attachmentInputRef = ref(null)
-const branchManagerRef = ref(null)
-const branchManagerButtonRef = ref(null)
 const commandSuggestions = ref([])
 const selectedCommandIndex = ref(0)
 const columnSuggestions = ref([])
@@ -342,7 +277,7 @@ const speechRecognition = ref(null)
 const voiceDraftPrefix = ref('')
 const activeAbortController = ref(null)
 const userRequestedStop = ref(false)
-const branchManagerOpen = ref(false)
+const turnTreeModalOpen = ref(false)
 
 const showCommandSuggestions = computed(() => commandSuggestions.value.length > 0)
 const showColumnSuggestions = computed(() => columnSuggestions.value.length > 0)
@@ -363,34 +298,6 @@ const composerCardStyle = computed(() => {
   }
   return style
 })
-const branchNodeStyle = {
-  borderColor: 'var(--color-border)',
-  backgroundColor: 'var(--color-base)',
-}
-const activeBranchNodeStyle = {
-  borderColor: 'var(--color-border-hover)',
-  backgroundColor: 'color-mix(in srgb, var(--color-accent) 8%, var(--color-base))',
-}
-const branchNodes = computed(() => {
-  const seen = new Set()
-  const nodes = []
-  const pushNode = (node, kind) => {
-    const id = String(node?.id || '').trim()
-    if (!id || seen.has(id)) return
-    seen.add(id)
-    nodes.push({
-      id,
-      kind,
-      title: String(node?.user_text || node?.title || id).trim() || id,
-    })
-  }
-  pushNode(appStore.activeTurnRelations?.previous_turn, 'Previous')
-  pushNode(appStore.activeTurnRelations?.current || appStore.activeTurn, 'Current')
-  const children = Array.isArray(appStore.activeTurnRelations?.children) ? appStore.activeTurnRelations.children : []
-  children.forEach((child, index) => pushNode(child, index === 0 ? 'Next' : 'Branch'))
-  return nodes
-})
-
 const canSend = computed(() =>
   appStore.canAnalyze &&
   (question.value.trim().length > 0 || pendingAttachments.value.length > 0) &&
@@ -514,33 +421,31 @@ function openAttachmentPicker() {
   attachmentInputRef.value?.click()
 }
 
-function toggleBranchManager() {
-  branchManagerOpen.value = !branchManagerOpen.value
+async function openTurnTreeModal() {
+  const conversationId = String(appStore.activeConversationId || '').trim()
+  const turnId = String(appStore.activeTurnId || '').trim()
+  if (!conversationId || !turnId) return
+  await appStore.loadActiveTurnTree(conversationId, turnId)
+  turnTreeModalOpen.value = true
 }
 
-function closeBranchManager() {
-  branchManagerOpen.value = false
+function closeTurnTreeModal() {
+  turnTreeModalOpen.value = false
 }
 
-async function selectBranchNode(turnId) {
-  closeBranchManager()
+async function selectTurnTreeNode(turnId) {
+  closeTurnTreeModal()
   await appStore.loadActiveTurnRelations(turnId)
 }
 
 async function markTurnFinal(turnId) {
   await appStore.markTurnFinal(turnId)
+  await appStore.loadActiveTurnTree()
 }
 
 async function rerunFinalTurn() {
-  closeBranchManager()
+  closeTurnTreeModal()
   await appStore.rerunSelectedFinalTurn()
-}
-
-function handleGlobalPointerDown(event) {
-  const target = event?.target
-  if (!(target instanceof Element)) return
-  if (branchManagerRef.value?.contains(target) || branchManagerButtonRef.value?.contains(target)) return
-  closeBranchManager()
 }
 
 async function fileToBase64(file) {
@@ -1565,7 +1470,6 @@ onMounted(() => {
     void appStore.fetchColumnCatalog({ force: true })
   }
   window.addEventListener('resize', updateSuggestionPlacement)
-  document.addEventListener('pointerdown', handleGlobalPointerDown)
 })
 
 onUnmounted(() => {
@@ -1573,11 +1477,10 @@ onUnmounted(() => {
     stopVoiceInput()
   }
   window.removeEventListener('resize', updateSuggestionPlacement)
-  document.removeEventListener('pointerdown', handleGlobalPointerDown)
 })
 
 watch(() => appStore.activeWorkspaceId, () => {
-  closeBranchManager()
+  closeTurnTreeModal()
   clearSuggestions()
   if (appStore.activeWorkspaceId) {
     void appStore.fetchColumnCatalog({ force: true })
@@ -1585,7 +1488,7 @@ watch(() => appStore.activeWorkspaceId, () => {
 })
 
 watch(() => appStore.activeTurnId, () => {
-  closeBranchManager()
+  closeTurnTreeModal()
 })
 
 watch(() => appStore.ingestedTableName, () => {

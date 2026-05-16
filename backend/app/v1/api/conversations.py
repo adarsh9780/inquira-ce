@@ -13,6 +13,8 @@ from ..schemas.conversation import (
     ConversationResponse,
     FinalTurnRerunResponse,
     TurnRelationsResponse,
+    TurnTreeNodeResponse,
+    TurnTreeResponse,
     ConversationUpdateRequest,
     TurnPageResponse,
     TurnResponse,
@@ -185,6 +187,38 @@ async def get_turn_relations(
         children=[TurnResponse(**turn) for turn in payload["children"]],
         previous_turn=TurnResponse(**payload["previous_turn"]) if payload["previous_turn"] else None,
         next_turn=TurnResponse(**payload["next_turn"]) if payload["next_turn"] else None,
+    )
+
+
+def _build_turn_tree_node(payload: dict) -> TurnTreeNodeResponse:
+    return TurnTreeNodeResponse(
+        id=payload["id"],
+        parent_turn_id=payload.get("parent_turn_id"),
+        seq_no=payload["seq_no"],
+        user_text=payload["user_text"],
+        created_at=payload["created_at"],
+        children=[_build_turn_tree_node(child) for child in payload.get("children") or []],
+    )
+
+
+@router.get("/conversations/{conversation_id}/turn-tree", response_model=TurnTreeResponse)
+async def get_turn_tree(
+    conversation_id: str,
+    current_turn_id: str | None = None,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Fetch the full turn tree for a conversation."""
+    payload = await ConversationService.get_turn_tree(
+        session=session,
+        principal_id=current_user.id,
+        conversation_id=conversation_id,
+        current_turn_id=current_turn_id,
+    )
+    return TurnTreeResponse(
+        roots=[_build_turn_tree_node(node) for node in payload["roots"]],
+        current_turn_id=payload.get("current_turn_id"),
+        final_turn_id=payload.get("final_turn_id"),
     )
 
 

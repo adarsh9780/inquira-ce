@@ -229,6 +229,48 @@ class ConversationService:
         }
 
     @staticmethod
+    async def get_turn_tree(
+        session: AsyncSession,
+        principal_id: str,
+        conversation_id: str,
+        current_turn_id: str | None = None,
+    ) -> dict:
+        conversation = await ConversationRepository.get_conversation(session, conversation_id)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
+
+        turns = await ConversationRepository.list_turns_in_sequence(session, conversation_id)
+        node_lookup: dict[str, dict] = {}
+        roots: list[dict] = []
+
+        for turn in turns:
+            node_lookup[turn.id] = {
+                "id": turn.id,
+                "parent_turn_id": turn.parent_turn_id,
+                "seq_no": turn.seq_no,
+                "user_text": turn.user_text,
+                "created_at": turn.created_at,
+                "children": [],
+            }
+
+        for turn in turns:
+            node = node_lookup[turn.id]
+            parent_id = str(turn.parent_turn_id or "").strip()
+            parent_node = node_lookup.get(parent_id)
+            if parent_node is None:
+                roots.append(node)
+                continue
+            parent_node["children"].append(node)
+
+        final_turn_id = str(getattr(conversation, "final_turn_id", "") or "").strip() or None
+        return {
+            "roots": roots,
+            "current_turn_id": str(current_turn_id or "").strip() or None,
+            "final_turn_id": final_turn_id,
+        }
+
+    @staticmethod
     async def get_final_turn(
         session: AsyncSession,
         principal_id: str,
