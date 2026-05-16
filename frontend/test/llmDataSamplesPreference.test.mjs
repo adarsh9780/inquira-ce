@@ -9,7 +9,8 @@ test('LLM settings expose opt-in data samples preference', () => {
 
   assert.equal(tabSource.includes('v-model="allowLlmDataSamples"'), true)
   assert.equal(tabSource.includes('Allow bounded data samples in LLM prompts'), true)
-  assert.equal(tabSource.includes('enables insight-first result explanations'), true)
+  assert.equal(tabSource.includes('analyst-style markdown explanations instead of generic summaries'), true)
+  assert.equal(tabSource.includes('enables insight-first result explanations'), false)
 })
 
 test('app store syncs LLM data samples preference with backend preferences', () => {

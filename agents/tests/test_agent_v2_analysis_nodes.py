@@ -1333,8 +1333,9 @@ async def test_generate_result_explanations_uses_lite_model(monkeypatch) -> None
         "code_explanation": "Grouped revenue by month.",
         "explanation_mode": (
             "Insight-first mode is enabled. Use the bounded result preview when present. "
-            "Start with the main finding, compare important rows/groups, identify strongest or weakest performers when visible, "
-            "then mention caveats. Do not open with a task-completion sentence like 'I have compiled'."
+            "Start with the main finding, compare important rows or groups, identify strongest or weakest performers when visible, "
+            "and explain why the result matters. Use structured markdown sections and concrete evidence from the preview. "
+            "Do not open with a task-completion sentence like 'I have compiled'."
         ),
         "result_summary_json": "{\"success\": true, \"result_kind\": \"scalar\", \"result_preview\": \"{\\\"value\\\": 10}\"}",
     }
@@ -1381,6 +1382,7 @@ async def test_generate_result_explanations_redacts_preview_when_samples_disable
     assert "Acme" not in str(payload["result_summary_json"])
     assert "result_preview_redacted" in str(payload["result_summary_json"])
     assert "Private metadata-only mode is enabled" in str(payload["explanation_mode"])
+    assert "structured markdown" in str(payload["explanation_mode"])
 
 
 @pytest.mark.asyncio

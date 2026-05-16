@@ -187,7 +187,7 @@
                   Allow bounded data samples in LLM prompts
                 </span>
                 <span class="mt-1 block text-xs leading-relaxed text-[var(--color-text-muted)]">
-                  Off keeps row previews local. On allows small table samples and result previews to be sent to your selected LLM provider, and enables insight-first result explanations.
+                  Off keeps row previews local. On allows small table samples and result previews to be sent to your selected LLM provider, so the agent can write more concrete, analyst-style markdown explanations instead of generic summaries.
                 </span>
               </span>
             </label>

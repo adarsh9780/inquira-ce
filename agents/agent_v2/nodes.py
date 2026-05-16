@@ -2832,12 +2832,14 @@ async def _generate_result_explanations(
 ) -> ResultExplanation:
     explanation_mode = (
         "Insight-first mode is enabled. Use the bounded result preview when present. "
-        "Start with the main finding, compare important rows/groups, identify strongest or weakest performers when visible, "
-        "then mention caveats. Do not open with a task-completion sentence like 'I have compiled'."
+        "Start with the main finding, compare important rows or groups, identify strongest or weakest performers when visible, "
+        "and explain why the result matters. Use structured markdown sections and concrete evidence from the preview. "
+        "Do not open with a task-completion sentence like 'I have compiled'."
         if allow_llm_data_samples
         else (
             "Private metadata-only mode is enabled. Row-level result previews are not available to the LLM. "
-            "Use stdout, artifact metadata, and aggregate summaries only; do not invent values."
+            "Use stdout, artifact metadata, and aggregate summaries only; do not invent values. "
+            "Still answer in structured markdown and be explicit when an insight is based on aggregates rather than row samples."
         )
     )
     llm_result_summary = _sanitize_result_summary_for_llm(
