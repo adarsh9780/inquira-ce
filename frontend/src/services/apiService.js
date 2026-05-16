@@ -954,6 +954,14 @@ export const apiService = {
     return v1Api.runtime.bootstrapWorkspaceRuntime(workspaceId)
   },
 
+  async v1RetryWorkspaceRuntime(workspaceId) {
+    return v1Api.runtime.retryWorkspaceRuntime(workspaceId)
+  },
+
+  async v1HardResetWorkspaceRuntime(workspaceId) {
+    return v1Api.runtime.hardResetWorkspaceRuntime(workspaceId)
+  },
+
   async v1GetWorkspaceKernelStatus(workspaceId) {
     return v1Api.runtime.kernelStatus(workspaceId)
   },

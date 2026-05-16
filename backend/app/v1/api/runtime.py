@@ -49,6 +49,7 @@ from ...services.llm_provider_catalog import (
 )
 from ...services.execution_config import load_execution_runtime_config
 from ...services.runner_env import install_runner_package
+from ...services.runner_env import delete_workspace_runner_environment
 from ...services.terminal_executor import (
     run_workspace_terminal_command,
     stream_workspace_terminal_command,
@@ -1629,6 +1630,143 @@ async def bootstrap_workspace_runtime_endpoint(
             await websocket_manager.send_error(
                 websocket_user_id,
                 f"Workspace runtime bootstrap failed: {detail}",
+            )
+        raise HTTPException(status_code=500, detail=detail) from exc
+    return KernelResetResponse(workspace_id=workspace_id, reset=bool(ready))
+
+
+@router.post(
+    "/workspaces/{workspace_id}/runtime/retry",
+    response_model=KernelResetResponse,
+)
+async def retry_workspace_runtime_endpoint(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Reset the current kernel session and rebuild the runtime with progress events."""
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
+    websocket_user_id = _resolve_websocket_user_id(current_user.id)
+
+    async def _progress(stage: str, message: str) -> None:
+        if websocket_user_id:
+            await websocket_manager.send_to_user(
+                websocket_user_id,
+                {
+                    "type": "progress",
+                    "stage": stage,
+                    "message": message,
+                },
+            )
+        logprint(
+            f"Workspace runtime retry [{workspace_id}] {stage}: {message}",
+            level="info",
+        )
+
+    try:
+        await _progress(
+            "workspace_runtime_cleanup",
+            "Resetting the current workspace kernel...",
+        )
+        await reset_workspace_kernel(workspace_id)
+        await _progress(
+            "workspace_runtime_cleanup",
+            "Restarting the workspace runtime...",
+        )
+        ready = await bootstrap_workspace_runtime(
+            workspace_id=workspace_id,
+            workspace_duckdb_path=str(workspace.duckdb_path),
+            progress_callback=_progress,
+        )
+        if websocket_user_id:
+            await websocket_manager.send_to_user(
+                websocket_user_id,
+                {
+                    "type": "completed",
+                    "result": {
+                        "workspace_id": workspace_id,
+                        "status": "ready" if ready else "not_ready",
+                    },
+                },
+            )
+    except Exception as exc:
+        detail = _describe_exception(exc)
+        if websocket_user_id:
+            await websocket_manager.send_error(
+                websocket_user_id,
+                f"Workspace runtime retry failed: {detail}",
+            )
+        raise HTTPException(status_code=500, detail=detail) from exc
+    return KernelResetResponse(workspace_id=workspace_id, reset=bool(ready))
+
+
+@router.post(
+    "/workspaces/{workspace_id}/runtime/hard-reset",
+    response_model=KernelResetResponse,
+)
+async def hard_reset_workspace_runtime_endpoint(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Delete the workspace runner venv, reset the kernel, then rebuild the runtime."""
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
+    websocket_user_id = _resolve_websocket_user_id(current_user.id)
+
+    async def _progress(stage: str, message: str) -> None:
+        if websocket_user_id:
+            await websocket_manager.send_to_user(
+                websocket_user_id,
+                {
+                    "type": "progress",
+                    "stage": stage,
+                    "message": message,
+                },
+            )
+        logprint(
+            f"Workspace runtime hard reset [{workspace_id}] {stage}: {message}",
+            level="info",
+        )
+
+    try:
+        await _progress(
+            "workspace_runtime_cleanup",
+            "Stopping the current workspace kernel...",
+        )
+        await reset_workspace_kernel(workspace_id)
+        await _progress(
+            "workspace_runtime_cleanup",
+            "Deleting the workspace virtual environment...",
+        )
+        delete_workspace_runner_environment(str(workspace.duckdb_path))
+        await _progress(
+            "workspace_runtime_cleanup",
+            "Rebuilding the workspace runtime from scratch...",
+        )
+        ready = await bootstrap_workspace_runtime(
+            workspace_id=workspace_id,
+            workspace_duckdb_path=str(workspace.duckdb_path),
+            progress_callback=_progress,
+        )
+        if websocket_user_id:
+            await websocket_manager.send_to_user(
+                websocket_user_id,
+                {
+                    "type": "completed",
+                    "result": {
+                        "workspace_id": workspace_id,
+                        "status": "ready" if ready else "not_ready",
+                    },
+                },
+            )
+    except Exception as exc:
+        detail = _describe_exception(exc)
+        if websocket_user_id:
+            await websocket_manager.send_error(
+                websocket_user_id,
+                f"Workspace hard reset failed: {detail}",
             )
         raise HTTPException(status_code=500, detail=detail) from exc
     return KernelResetResponse(workspace_id=workspace_id, reset=bool(ready))

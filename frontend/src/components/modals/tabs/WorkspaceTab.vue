@@ -93,12 +93,22 @@
             {{ isCreatingMode ? 'New workspace' : (setupWorkspaceName || activeWorkspace?.name || 'Workspace detail') }}
           </h2>
         </div>
-        <span
-          v-if="!isCreatingMode && isWorkspaceActive"
-          class="inline-flex items-center rounded-full bg-[var(--color-success-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-success)]"
-        >
-          Active
-        </span>
+        <div v-if="!isCreatingMode" class="flex items-center gap-2">
+          <button
+            v-if="!isWorkspaceActive"
+            type="button"
+            class="rounded-full border border-[var(--color-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-main)] transition-colors hover:border-[var(--color-accent-border)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)]"
+            @click="activateSelectedWorkspace"
+          >
+            Activate workspace
+          </button>
+          <span
+            v-else
+            class="inline-flex items-center rounded-full bg-[var(--color-success-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-success)]"
+          >
+            Active
+          </span>
+        </div>
       </header>
 
       <!-- Stepper (single shared instance) -->
@@ -144,6 +154,16 @@
               <span class="mx-auto mb-4 block h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-accent-border)] border-t-[var(--color-accent)]"></span>
               <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ workspaceCreateTitle }}</p>
               <p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ workspaceCreateMessage }}</p>
+              <div v-if="runtimeProgressEntries.length" class="mt-4 space-y-2 rounded-2xl border border-[var(--color-border)] bg-[var(--color-base)]/80 px-3 py-3 text-left">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">Runtime activity</p>
+                <p
+                  v-for="entry in runtimeProgressEntries"
+                  :key="`create-${entry.stage}-${entry.message}`"
+                  class="text-xs text-[var(--color-text-muted)]"
+                >
+                  {{ entry.message }}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -205,73 +225,82 @@
         </div>
 
         <!-- Step 2: Select datasets -->
-        <div v-else-if="setupStep === 2" key="step-2" class="space-y-4 px-4">
-          <section
-            class="workspace-readiness-card"
-            :class="workspaceReadinessComplete ? 'workspace-readiness-card-ready' : 'workspace-readiness-card-pending'"
-            aria-live="polite"
-          >
-            <div class="relative z-10 flex items-start justify-between gap-4">
-              <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-sub)]">Setup readiness</p>
-                <h3 class="mt-1 text-base font-semibold text-[var(--color-text-main)]">{{ workspaceReadinessTitle }}</h3>
-                <p class="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">{{ workspaceReadinessSummary }}</p>
-              </div>
-              <button
-                v-if="!workspaceReadinessComplete"
-                type="button"
-                class="shrink-0 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-base)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-accent)] shadow-sm transition-all hover:border-[var(--color-accent-border)] hover:bg-[var(--color-accent-soft)] disabled:cursor-not-allowed disabled:opacity-60"
-                :disabled="isCheckingWorkspaceReadiness"
-                @click="refreshWorkspaceReadiness"
-              >
-                <span v-if="isCheckingWorkspaceReadiness">Checking...</span>
-                <span v-else>Retry runtime</span>
-              </button>
+        <div v-else-if="setupStep === 2" key="step-2" class="space-y-5 px-4">
+          <div class="grid grid-cols-1 gap-4 border-b border-[var(--color-border)] pb-4 sm:grid-cols-3">
+            <div>
+              <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">Created</p>
+              <p class="mt-1 text-sm text-[var(--color-text-main)]">{{ detailCreatedAt }}</p>
             </div>
-
-            <div class="relative z-10 mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--color-base-muted)]">
-              <div
-                class="h-full rounded-full bg-[var(--color-accent)] transition-[width] duration-500 ease-out"
-                :style="{ width: `${workspaceReadinessProgress}%` }"
-              ></div>
+            <div>
+              <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">Conversations</p>
+              <p class="mt-1 text-sm text-[var(--color-text-main)]">{{ detailConversationCount }}</p>
             </div>
-
-            <div class="relative z-10 mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <div
-                v-for="item in workspaceReadinessItems"
-                :key="item.id"
-                class="workspace-readiness-item"
-                :class="readinessItemClass(item)"
-              >
-                <span class="workspace-readiness-dot" :class="readinessDotClass(item)">
-                  <svg v-if="item.state === 'done'" viewBox="0 0 16 16" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3.5 8.5l2.5 2.5 6.5-7" />
-                  </svg>
-                  <span v-else-if="item.state === 'checking'" class="h-2.5 w-2.5 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
-                  <span v-else class="h-1.5 w-1.5 rounded-full bg-current"></span>
-                </span>
-                <span class="min-w-0">
-                  <span class="block truncate text-xs font-semibold text-[var(--color-text-main)]">{{ item.label }}</span>
-                  <span class="mt-0.5 block truncate text-[11px] text-[var(--color-text-muted)]">{{ item.detail }}</span>
-                </span>
-              </div>
-            </div>
-          </section>
-
-          <div class="rounded-lg bg-[var(--color-base-soft)]/55">
-            <div class="flex items-center justify-between px-3 py-2 text-sm">
-              <span class="text-[var(--color-text-muted)]">Created date</span>
-              <span class="text-[var(--color-text-main)]">{{ detailCreatedAt }}</span>
-            </div>
-            <div class="flex items-center justify-between px-3 py-2 text-sm">
-              <span class="text-[var(--color-text-muted)]">Conversations</span>
-              <span class="text-[var(--color-text-main)]">{{ detailConversationCount }}</span>
-            </div>
-            <div class="flex items-center justify-between px-3 py-2 text-sm">
-              <span class="text-[var(--color-text-muted)]">Last active</span>
-              <span class="text-[var(--color-text-main)]">{{ detailLastActive }}</span>
+            <div>
+              <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">Last active</p>
+              <p class="mt-1 text-sm text-[var(--color-text-main)]">{{ detailLastActive }}</p>
             </div>
           </div>
+
+          <section class="space-y-3 border-b border-[var(--color-border)] pb-5">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">Workspace runtime</p>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                  <span
+                    class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium"
+                    :class="{
+                      'bg-[var(--color-success-bg)] text-[var(--color-success)]': runtimeStatusTone === 'success',
+                      'bg-[var(--color-danger-bg)] text-[var(--color-danger)]': runtimeStatusTone === 'danger',
+                      'bg-[var(--color-accent-soft)] text-[var(--color-accent)]': runtimeStatusTone === 'accent',
+                      'bg-[var(--color-base-soft)] text-[var(--color-text-muted)]': runtimeStatusTone === 'muted',
+                    }"
+                  >
+                    {{ runtimeStatusLabel }}
+                  </span>
+                  <span v-if="requiresWorkspaceActivation" class="text-xs text-[var(--color-text-muted)]">Inspecting only. Activate this workspace before changing data.</span>
+                </div>
+                <p class="mt-2 max-w-2xl text-sm text-[var(--color-text-muted)]">{{ runtimeStatusMessage }}</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button
+                  v-if="requiresWorkspaceActivation"
+                  type="button"
+                  class="rounded-full border border-[var(--color-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-main)] transition-colors hover:border-[var(--color-accent-border)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)]"
+                  @click="activateSelectedWorkspace"
+                >
+                  Activate workspace
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full border border-[var(--color-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-main)] transition-colors hover:border-[var(--color-accent-border)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                  :disabled="isRetryingWorkspaceRuntime || isHardResettingWorkspaceRuntime || isCreatingWorkspace"
+                  @click="retryWorkspaceRuntime"
+                >
+                  {{ isRetryingWorkspaceRuntime ? 'Retrying...' : 'Retry runtime' }}
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full border border-[var(--color-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-main)] transition-colors hover:border-[var(--color-danger)]/35 hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-60"
+                  :disabled="isRetryingWorkspaceRuntime || isHardResettingWorkspaceRuntime || isCreatingWorkspace"
+                  @click="hardResetWorkspaceRuntime"
+                >
+                  {{ isHardResettingWorkspaceRuntime ? 'Rebuilding...' : 'Hard reset runtime' }}
+                </button>
+              </div>
+            </div>
+
+            <div v-if="runtimeProgressEntries.length || runtimeProgressError" class="space-y-2 rounded-2xl border border-[var(--color-border)] bg-[var(--color-base-soft)]/55 px-4 py-4">
+              <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">Runtime activity</p>
+              <p
+                v-for="entry in runtimeProgressEntries"
+                :key="`runtime-${entry.stage}-${entry.message}`"
+                class="text-sm text-[var(--color-text-muted)]"
+              >
+                {{ entry.message }}
+              </p>
+              <p v-if="runtimeProgressError" class="text-sm text-[var(--color-danger)]">{{ runtimeProgressError }}</p>
+            </div>
+          </section>
 
           <div class="space-y-2">
             <p class="text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Datasets</p>
@@ -358,10 +387,11 @@
             <button
               type="button"
               class="w-full rounded-lg bg-[var(--color-base-soft)] px-4 py-3 text-center text-sm text-[var(--color-text-muted)] transition-all hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="isDatasetIngesting || isDeletingDataset"
+              :disabled="isDatasetIngesting || isDeletingDataset || requiresWorkspaceActivation"
               @click="openDatasetPicker"
             >
               <span v-if="isDatasetIngesting">Processing dataset...</span>
+              <span v-else-if="requiresWorkspaceActivation">Activate workspace to add data</span>
               <span v-else>+ Add datasets</span>
             </button>
           </div>
@@ -373,16 +403,16 @@
             <div class="mb-4 flex items-start justify-between gap-3">
               <div>
                 <p class="text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Generate schema</p>
-                <p class="mt-1 text-sm text-[var(--color-text-muted)]">Schema descriptions use the shared workspace context for every dataset.</p>
+                <p class="mt-1 text-sm text-[var(--color-text-muted)]">Schema generation starts automatically after import. Use retry to repair any failed dataset descriptions.</p>
               </div>
               <button
                 type="button"
                 class="btn-primary px-3 py-2 text-sm whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
-                :disabled="isGeneratingWorkspaceSchemas || datasetEntries.length === 0"
+                :disabled="isGeneratingWorkspaceSchemas || datasetEntries.length === 0 || requiresWorkspaceActivation"
                 @click="generateWorkspaceSchemas"
               >
                 <span v-if="isGeneratingWorkspaceSchemas">Generating...</span>
-                <span v-else>Generate all</span>
+                <span v-else>Retry schema generation</span>
               </button>
             </div>
 
@@ -467,7 +497,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['navigate', 'set-active-workspace', 'workspace-operation-change', 'workspace-created'])
+const emit = defineEmits(['navigate', 'select-workspace', 'activate-workspace', 'workspace-operation-change', 'workspace-created'])
 
 const appStore = useAppStore()
 
@@ -493,10 +523,17 @@ const pendingWorkspaceDeletionId = ref('')
 const datasetDeletionPollers = new Map()
 const datasetIngestionPollers = new Map()
 let unsubscribeProgress = null
+let unsubscribeRuntimeError = null
+let unsubscribeRuntimeComplete = null
 
 const isCreatingWorkspace = ref(false)
 const isCreatingWorkspaceRuntime = ref(false)
 const workspaceCreateMessage = ref('Saving the workspace name and shared context. You will move to dataset selection next.')
+const runtimeProgressEntries = ref([])
+const runtimeProgressError = ref('')
+const runtimeActionMode = ref('')
+const isRetryingWorkspaceRuntime = ref(false)
+const isHardResettingWorkspaceRuntime = ref(false)
 const activeWorkspaceOperation = ref('')
 const activeWorkspaceOperationMessage = ref('')
 const setupStep = ref(1)
@@ -536,6 +573,8 @@ const workspaceCards = computed(() => {
 const activeWorkspace = computed(() => workspaceCards.value.find((workspace) => workspace.id === String(props.activeWorkspaceId || '').trim()) || null)
 const isCreatingMode = computed(() => props.panelMode === 'ws-create')
 const isWorkspaceActive = computed(() => !!activeWorkspace.value && !!activeWorkspace.value.is_active)
+const detailWorkspaceSelected = computed(() => Boolean(String(props.activeWorkspaceId || '').trim()))
+const requiresWorkspaceActivation = computed(() => !isCreatingMode.value && !isWorkspaceActive.value)
 const detailCreatedAt = computed(() => formatCreatedDate(workspaceDetail.value?.created_at || activeWorkspace.value?.created_at))
 const detailConversationCount = computed(() => Number(workspaceDetail.value?.conversation_count || 0))
 const detailLastActive = computed(() => formatRelativeTime(workspaceDetail.value?.updated_at || activeWorkspace.value?.updated_at))
@@ -543,6 +582,34 @@ const datasetIngestStatusLabel = computed(() => String(datasetIngestMessage.valu
 const datasetIngestHasError = computed(() => Boolean(String(datasetIngestError.value || '').trim()))
 const workspaceKernelStatus = computed(() => appStore.getWorkspaceKernelStatus(props.activeWorkspaceId))
 const workspaceKernelReady = computed(() => ['ready', 'busy'].includes(workspaceKernelStatus.value))
+const isRuntimeActionInProgress = computed(() => (
+  isCreatingWorkspaceRuntime.value || isRetryingWorkspaceRuntime.value || isHardResettingWorkspaceRuntime.value
+))
+const runtimeStatusTone = computed(() => {
+  if (runtimeProgressError.value) return 'danger'
+  if (workspaceKernelReady.value) return 'success'
+  if (isRuntimeActionInProgress.value || ['starting', 'connecting'].includes(String(workspaceKernelStatus.value || ''))) {
+    return 'accent'
+  }
+  return 'muted'
+})
+const runtimeStatusLabel = computed(() => {
+  if (runtimeProgressError.value) return 'Runtime failed'
+  if (workspaceKernelStatus.value === 'busy') return 'Kernel busy'
+  if (workspaceKernelStatus.value === 'ready') return 'Kernel ready'
+  if (isHardResettingWorkspaceRuntime.value) return 'Hard reset in progress'
+  if (isRetryingWorkspaceRuntime.value) return 'Retry in progress'
+  if (isCreatingWorkspaceRuntime.value) return 'Preparing runtime'
+  if (workspaceKernelStatus.value === 'starting' || workspaceKernelStatus.value === 'connecting') return 'Starting runtime'
+  if (workspaceKernelStatus.value === 'error') return 'Runtime needs attention'
+  return 'Runtime not started'
+})
+const runtimeStatusMessage = computed(() => {
+  if (runtimeProgressError.value) return runtimeProgressError.value
+  const latestEntry = runtimeProgressEntries.value[runtimeProgressEntries.value.length - 1]
+  if (latestEntry?.message) return latestEntry.message
+  return readinessKernelDetail(workspaceKernelStatus.value)
+})
 const workspaceReadinessItems = computed(() => {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   const draft = resolveWorkspaceIdentityDraft()
@@ -681,6 +748,8 @@ watch(
 
 onMounted(async () => {
   unsubscribeProgress = settingsWebSocket.subscribeProgress(handleSettingsProgressUpdate)
+  unsubscribeRuntimeError = settingsWebSocket.subscribeError(handleRuntimeSocketError)
+  unsubscribeRuntimeComplete = settingsWebSocket.subscribeComplete(handleRuntimeSocketComplete)
   if (props.panelMode === 'ws-list') {
     await hydrateWorkspaceCards()
   }
@@ -694,6 +763,14 @@ onUnmounted(() => {
   if (typeof unsubscribeProgress === 'function') {
     unsubscribeProgress()
     unsubscribeProgress = null
+  }
+  if (typeof unsubscribeRuntimeError === 'function') {
+    unsubscribeRuntimeError()
+    unsubscribeRuntimeError = null
+  }
+  if (typeof unsubscribeRuntimeComplete === 'function') {
+    unsubscribeRuntimeComplete()
+    unsubscribeRuntimeComplete = null
   }
   clearWorkspaceOperation()
   stopDatasetDeletionPollers()
@@ -721,14 +798,20 @@ async function hydrateWorkspaceCards() {
 }
 
 async function openWorkspaceDetail(workspaceId) {
-  await emitActiveWorkspace(workspaceId)
+  await emitSelectedWorkspace(workspaceId)
   emit('navigate', 'ws-detail', 'forward')
 }
 
-async function emitActiveWorkspace(workspaceId) {
+async function emitSelectedWorkspace(workspaceId) {
   const id = String(workspaceId || '').trim()
   if (!id) return
-  emit('set-active-workspace', id)
+  emit('select-workspace', id)
+}
+
+async function activateSelectedWorkspace() {
+  const id = String(props.activeWorkspaceId || '').trim()
+  if (!id) return
+  emit('activate-workspace', id)
 }
 
 async function loadWorkspaceDetail() {
@@ -875,6 +958,34 @@ function startDatasetIngest(path) {
   datasetIngestError.value = ''
 }
 
+function appendRuntimeProgress(stage, message) {
+  const normalizedMessage = String(message || '').trim()
+  if (!normalizedMessage) return
+  const previous = runtimeProgressEntries.value[runtimeProgressEntries.value.length - 1]
+  if (previous?.message === normalizedMessage) return
+  runtimeProgressEntries.value = [
+    ...runtimeProgressEntries.value.slice(-7),
+    {
+      stage: String(stage || '').trim(),
+      message: normalizedMessage,
+    },
+  ]
+}
+
+function clearRuntimeProgress({ preserveError = false } = {}) {
+  runtimeProgressEntries.value = []
+  if (!preserveError) {
+    runtimeProgressError.value = ''
+  }
+}
+
+function resetRuntimeActionFlags() {
+  isCreatingWorkspaceRuntime.value = false
+  isRetryingWorkspaceRuntime.value = false
+  isHardResettingWorkspaceRuntime.value = false
+  runtimeActionMode.value = ''
+}
+
 function applyDatasetSelectionFromUpload(uploadResult, fallbackPath = '') {
   const resolvedPath = String(uploadResult?.file_path || fallbackPath || '').trim()
   const resolvedTableName = String(uploadResult?.table_name || '').trim()
@@ -914,6 +1025,8 @@ function handleSettingsProgressUpdate(data) {
   if (!data || data.type !== 'progress') return
   const stage = String(data?.stage || '').trim().toLowerCase()
   if (stage.startsWith('workspace_runtime')) {
+    runtimeProgressError.value = ''
+    appendRuntimeProgress(stage, data?.message || '')
     if (isCreatingWorkspace.value && props.panelMode === 'ws-create') {
       isCreatingWorkspaceRuntime.value = true
       workspaceCreateMessage.value = String(data?.message || '').trim() || 'Preparing workspace runtime...'
@@ -929,6 +1042,20 @@ function handleSettingsProgressUpdate(data) {
   if (Number.isFinite(percent) && percent >= 0 && percent <= 100) {
     datasetIngestPercent.value = Math.round(percent)
   }
+}
+
+function handleRuntimeSocketError(message) {
+  if (!isRuntimeActionInProgress.value && !isCreatingWorkspace.value) return
+  runtimeProgressError.value = String(message || 'Workspace runtime failed.').trim() || 'Workspace runtime failed.'
+  appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
+  resetRuntimeActionFlags()
+}
+
+function handleRuntimeSocketComplete(result) {
+  const workspaceId = String(result?.workspace_id || '').trim()
+  if (!workspaceId || workspaceId !== String(props.activeWorkspaceId || '').trim()) return
+  if (!isRuntimeActionInProgress.value && !isCreatingWorkspace.value) return
+  resetRuntimeActionFlags()
 }
 
 function setWorkspaceOperation(operation, message) {
@@ -985,6 +1112,7 @@ async function refreshWorkspaceReadiness() {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   if (!workspaceId || isCheckingWorkspaceReadiness.value) return
   isCheckingWorkspaceReadiness.value = true
+  clearRuntimeProgress()
   try {
     const ready = await appStore.ensureWorkspaceKernelConnected(workspaceId)
     if (ready) {
@@ -996,6 +1124,62 @@ async function refreshWorkspaceReadiness() {
     toast.error('Runtime check failed', extractApiErrorMessage(error, 'Failed to prepare workspace runtime.'))
   } finally {
     isCheckingWorkspaceReadiness.value = false
+  }
+}
+
+async function retryWorkspaceRuntime() {
+  const workspaceId = String(props.activeWorkspaceId || '').trim()
+  if (!workspaceId || isRetryingWorkspaceRuntime.value || isHardResettingWorkspaceRuntime.value) return
+  clearRuntimeProgress()
+  runtimeActionMode.value = 'retry'
+  isRetryingWorkspaceRuntime.value = true
+  setWorkspaceOperation('runtime', 'Retrying the workspace runtime.')
+  appStore.clearWorkspaceKernelStatus(workspaceId)
+  try {
+    const response = await apiService.v1RetryWorkspaceRuntime(workspaceId)
+    await appStore.fetchWorkspaces()
+    if (!response?.reset) {
+      throw new Error('Workspace runtime retry did not finish successfully.')
+    }
+    appStore.setWorkspaceKernelStatus(workspaceId, 'ready')
+    toast.success('Runtime ready', 'Workspace runtime restarted successfully.')
+  } catch (error) {
+    runtimeProgressError.value = extractApiErrorMessage(error, 'Failed to retry workspace runtime.')
+    appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
+    appStore.setWorkspaceKernelStatus(workspaceId, 'error')
+    toast.error('Runtime retry failed', runtimeProgressError.value)
+  } finally {
+    isRetryingWorkspaceRuntime.value = false
+    runtimeActionMode.value = ''
+    clearWorkspaceOperation()
+  }
+}
+
+async function hardResetWorkspaceRuntime() {
+  const workspaceId = String(props.activeWorkspaceId || '').trim()
+  if (!workspaceId || isRetryingWorkspaceRuntime.value || isHardResettingWorkspaceRuntime.value) return
+  clearRuntimeProgress()
+  runtimeActionMode.value = 'hard-reset'
+  isHardResettingWorkspaceRuntime.value = true
+  setWorkspaceOperation('runtime', 'Rebuilding the workspace runtime from scratch.')
+  appStore.clearWorkspaceKernelStatus(workspaceId)
+  try {
+    const response = await apiService.v1HardResetWorkspaceRuntime(workspaceId)
+    await appStore.fetchWorkspaces()
+    if (!response?.reset) {
+      throw new Error('Workspace hard reset did not finish successfully.')
+    }
+    appStore.setWorkspaceKernelStatus(workspaceId, 'ready')
+    toast.success('Runtime rebuilt', 'Workspace runtime was rebuilt from scratch.')
+  } catch (error) {
+    runtimeProgressError.value = extractApiErrorMessage(error, 'Failed to rebuild workspace runtime.')
+    appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
+    appStore.setWorkspaceKernelStatus(workspaceId, 'error')
+    toast.error('Hard reset failed', runtimeProgressError.value)
+  } finally {
+    isHardResettingWorkspaceRuntime.value = false
+    runtimeActionMode.value = ''
+    clearWorkspaceOperation()
   }
 }
 
@@ -1058,6 +1242,14 @@ function applyDatasetSelectionFromIngestionJob(job) {
   }, firstCompleted.source_path || '')
 }
 
+function completedTableNamesFromIngestionJob(job) {
+  const items = Array.isArray(job?.items) ? job.items : []
+  return items
+    .filter((item) => String(item?.status || '').toLowerCase() === 'completed')
+    .map((item) => String(item?.table_name || '').trim())
+    .filter(Boolean)
+}
+
 function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = Infinity) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   const normalizedJobId = String(jobId || '').trim()
@@ -1081,6 +1273,7 @@ function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = Infinity) {
         datasetIngestionPollers.delete(normalizedJobId)
         applyDatasetSelectionFromIngestionJob(job)
         await loadWorkspaceDatasets()
+        const completedTables = completedTableNamesFromIngestionJob(job)
         const failedCount = Number(job?.failed_count || 0)
         const completedCount = Number(job?.completed_count || 0)
         datasetIngestPercent.value = 100
@@ -1091,6 +1284,10 @@ function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = Infinity) {
         finishDatasetIngest()
         if (completedCount > 0) {
           setupStep.value = 3
+          void generateWorkspaceSchemas({
+            tableNames: completedTables,
+            autoStart: true,
+          })
         }
         clearWorkspaceOperation()
         if (status === 'failed' || failedCount > 0) {
@@ -1127,6 +1324,10 @@ async function startBatchDatasetIngestion(paths) {
     ? paths.map((item) => String(item || '').trim()).filter(Boolean)
     : []
   if (!workspaceId || sourcePaths.length === 0) return
+  if (requiresWorkspaceActivation.value) {
+    toast.info('Activate workspace first', 'Activate this workspace before importing datasets.')
+    return
+  }
   const identityReady = await ensureWorkspaceIdentityPersisted({ silent: true })
   if (!identityReady) return
 
@@ -1270,6 +1471,10 @@ async function confirmRemoveDataset() {
   const tableName = String(dataset?.table_name || '').trim()
   const datasetLabel = String(dataset?.filename || formatFilename(tableName)).trim()
   if (!workspaceId || !tableName) return
+  if (requiresWorkspaceActivation.value) {
+    toast.info('Activate workspace first', 'Activate this workspace before deleting datasets.')
+    return
+  }
   isDeletingDataset.value = true
   try {
     const job = await apiService.v1DeleteDataset(workspaceId, tableName)
@@ -1305,6 +1510,10 @@ async function confirmRemoveDataset() {
 
 async function refreshDataset(dataset) {
   const sourcePath = String(dataset?.source_path || '').trim()
+  if (requiresWorkspaceActivation.value) {
+    toast.info('Activate workspace first', 'Activate this workspace before refreshing datasets.')
+    return
+  }
   if (!sourcePath || sourcePath.startsWith('browser://')) {
     toast.error('Refresh failed', 'This dataset cannot be refreshed from source.')
     return
@@ -1410,7 +1619,7 @@ async function deleteWorkspace() {
     await appStore.fetchWorkspaces()
     const fallbackId = String(appStore.activeWorkspaceId || workspaceCards.value[0]?.id || '').trim()
     if (fallbackId) {
-      emit('set-active-workspace', fallbackId)
+      emit('select-workspace', fallbackId)
     }
     emit('navigate', 'ws-list', 'backward')
     toast.success('Workspace deletion started', 'Workspace deletion is running in background.')
@@ -1427,14 +1636,17 @@ async function createWorkspace({ setupStep: targetSetupStep = 2 } = {}) {
     toast.error('Workspace name required', 'Enter a workspace name to continue.')
     return
   }
+  let workspaceId = ''
   isCreatingWorkspace.value = true
   isCreatingWorkspaceRuntime.value = false
+  clearRuntimeProgress()
+  runtimeActionMode.value = 'create'
   workspaceCreateMessage.value = 'Saving the workspace name and shared context. You will move to dataset selection next.'
   setWorkspaceOperation('create', 'Creating workspace and preparing its runtime.')
   try {
     const context = String(setupWorkspaceContext.value || '').trim()
     const workspace = await appStore.createWorkspace(name, context)
-    const workspaceId = String(workspace?.id || appStore.activeWorkspaceId || '').trim()
+    workspaceId = String(workspace?.id || appStore.activeWorkspaceId || '').trim()
     if (!workspaceId) {
       throw new Error('Backend did not return a workspace id.')
     }
@@ -1452,10 +1664,21 @@ async function createWorkspace({ setupStep: targetSetupStep = 2 } = {}) {
     })
     toast.success('Workspace ready', 'Workspace is ready for dataset selection.')
   } catch (error) {
+    if (workspaceId) {
+      emit('workspace-created', {
+        workspaceId,
+        name,
+        context: String(setupWorkspaceContext.value || '').trim(),
+        setupStep: 2,
+      })
+      runtimeProgressError.value = extractApiErrorMessage(error, 'Workspace runtime bootstrap failed.')
+      appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
+    }
     toast.error('Create failed', extractApiErrorMessage(error, 'Failed to create workspace.'))
   } finally {
     isCreatingWorkspace.value = false
     isCreatingWorkspaceRuntime.value = false
+    runtimeActionMode.value = ''
     workspaceCreateMessage.value = 'Saving the workspace name and shared context. You will move to dataset selection next.'
     clearWorkspaceOperation()
   }
@@ -1489,20 +1712,43 @@ function stepLabelClass(stepId) {
   return 'text-[var(--color-text-muted)]'
 }
 
-async function generateWorkspaceSchemas() {
+async function generateWorkspaceSchemas({ tableNames = null, autoStart = false } = {}) {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   if (!workspaceId || datasetEntries.value.length === 0) return
+  if (requiresWorkspaceActivation.value) {
+    if (!autoStart) {
+      toast.info('Activate workspace first', 'Activate this workspace before generating schemas.')
+    }
+    return
+  }
   isGeneratingWorkspaceSchemas.value = true
-  setWorkspaceOperation('schema', 'Generating workspace schemas from the selected datasets.')
+  setWorkspaceOperation(
+    'schema',
+    autoStart
+      ? 'Generating dataset schemas in the background.'
+      : 'Generating workspace schemas from the selected datasets.',
+  )
   const context = String(setupWorkspaceContext.value || resolveWorkspaceContext()).trim()
-  const nextStatuses = {}
-  datasetEntries.value.forEach((dataset) => {
+  const targetNames = Array.isArray(tableNames)
+    ? new Set(tableNames.map((item) => String(item || '').trim()).filter(Boolean))
+    : null
+  const targetDatasets = datasetEntries.value.filter((dataset) => {
+    if (!targetNames || targetNames.size === 0) return true
+    return targetNames.has(String(dataset?.table_name || '').trim())
+  })
+  if (targetDatasets.length === 0) {
+    isGeneratingWorkspaceSchemas.value = false
+    clearWorkspaceOperation()
+    return
+  }
+  const nextStatuses = { ...schemaGenerationStatuses.value }
+  targetDatasets.forEach((dataset) => {
     nextStatuses[dataset.table_name] = { status: 'pending', message: '' }
   })
   schemaGenerationStatuses.value = nextStatuses
 
   try {
-    for (const dataset of datasetEntries.value) {
+    for (const dataset of targetDatasets) {
       const tableName = String(dataset?.table_name || '').trim()
       if (!tableName) continue
       schemaGenerationStatuses.value = {
@@ -1524,10 +1770,15 @@ async function generateWorkspaceSchemas() {
     }
 
     previewService.clearSchemaCache()
-    const failedCount = Object.values(schemaGenerationStatuses.value).filter((item) => item.status === 'failed').length
+    const failedCount = targetDatasets.filter((dataset) => {
+      const item = schemaGenerationStatuses.value?.[dataset.table_name]
+      return item?.status === 'failed'
+    }).length
     if (failedCount > 0) {
-      toast.error('Schema generation completed with errors', `${failedCount} dataset${failedCount === 1 ? '' : 's'} failed.`)
-    } else {
+      if (!autoStart) {
+        toast.error('Schema generation completed with errors', `${failedCount} dataset${failedCount === 1 ? '' : 's'} failed.`)
+      }
+    } else if (!autoStart) {
       toast.success('Schemas generated', 'Workspace schemas generated.')
     }
   } finally {

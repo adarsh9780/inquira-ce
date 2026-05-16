@@ -55,6 +55,15 @@ def resolve_workspace_runner_venv(workspace_duckdb_path: str) -> Path:
     return workspace_root / ".venv"
 
 
+def delete_workspace_runner_environment(workspace_duckdb_path: str) -> bool:
+    """Delete the workspace-local runner venv when a hard runtime reset is requested."""
+    venv_path = resolve_workspace_runner_venv(workspace_duckdb_path)
+    if not venv_path.exists():
+        return False
+    shutil.rmtree(venv_path)
+    return True
+
+
 def resolve_runner_python(
     config: ExecutionRuntimeConfig,
     workspace_duckdb_path: str | None = None,

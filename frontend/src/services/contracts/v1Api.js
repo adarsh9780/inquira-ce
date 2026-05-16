@@ -96,6 +96,10 @@ export const v1Api = {
       axios.post(`/api/v1/workspaces/${workspaceId}/commands/execute`, payload),
     bootstrapWorkspaceRuntime: (workspaceId) =>
       axios.post(`/api/v1/workspaces/${workspaceId}/runtime/bootstrap`),
+    retryWorkspaceRuntime: (workspaceId) =>
+      axios.post(`/api/v1/workspaces/${workspaceId}/runtime/retry`),
+    hardResetWorkspaceRuntime: (workspaceId) =>
+      axios.post(`/api/v1/workspaces/${workspaceId}/runtime/hard-reset`),
     kernelStatus: (workspaceId) =>
       axios.get(`/api/v1/workspaces/${workspaceId}/kernel/status`),
     kernelInterrupt: (workspaceId) =>

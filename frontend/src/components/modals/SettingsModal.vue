@@ -87,7 +87,8 @@
                 :workspaces="workspaceItems"
                 @navigate="navigateTo"
                 @workspace-operation-change="setActiveWorkspaceOperation"
-                @set-active-workspace="setActiveWorkspace"
+                @select-workspace="selectWorkspace"
+                @activate-workspace="activateWorkspace"
               />
             </section>
 
@@ -100,7 +101,8 @@
                 :workspace-identity-draft="workspaceIdentityDraft"
                 @navigate="navigateTo"
                 @workspace-operation-change="setActiveWorkspaceOperation"
-                @set-active-workspace="setActiveWorkspace"
+                @select-workspace="selectWorkspace"
+                @activate-workspace="activateWorkspace"
                 @workspace-created="handleWorkspaceCreated"
               />
             </section>
@@ -112,7 +114,8 @@
                 :workspaces="workspaceItems"
                 @navigate="navigateTo"
                 @workspace-operation-change="setActiveWorkspaceOperation"
-                @set-active-workspace="setActiveWorkspace"
+                @select-workspace="selectWorkspace"
+                @activate-workspace="activateWorkspace"
                 @workspace-created="handleWorkspaceCreated"
               />
             </section>
@@ -261,7 +264,7 @@ function openWorkspaceSection() {
   navigateTo('ws-list', 'forward')
 }
 
-async function setActiveWorkspace(workspaceId) {
+function selectWorkspace(workspaceId) {
   if (notifyWorkspaceOperationBlocked()) return
   const nextId = String(workspaceId || '').trim()
   if (!nextId) return
@@ -269,9 +272,16 @@ async function setActiveWorkspace(workspaceId) {
   if (activeWorkspaceId.value !== nextId) {
     activeWorkspaceId.value = nextId
   }
-  if (String(appStore.activeWorkspaceId || '').trim() !== nextId) {
-    await appStore.activateWorkspace(nextId)
-  }
+}
+
+async function activateWorkspace(workspaceId) {
+  if (notifyWorkspaceOperationBlocked()) return
+  const nextId = String(workspaceId || '').trim()
+  if (!nextId) return
+  workspaceIdentityDraft.value = null
+  activeWorkspaceId.value = nextId
+  if (String(appStore.activeWorkspaceId || '').trim() === nextId) return
+  await appStore.activateWorkspace(nextId)
 }
 
 function handleWorkspaceCreated(payload) {

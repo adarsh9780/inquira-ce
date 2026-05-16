@@ -25,6 +25,8 @@ test('workspace tab shows inline dataset processing card and consumes websocket 
   assert.equal(source.includes("setWorkspaceOperation('ingest', 'Importing selected datasets into the workspace.')"), true)
   assert.equal(source.includes('if (completedCount > 0) {'), true)
   assert.equal(source.includes('setupStep.value = 3'), true)
+  assert.equal(source.includes('void generateWorkspaceSchemas({'), true)
+  assert.equal(source.includes('autoStart: true'), true)
   assert.equal(source.includes('clearWorkspaceOperation()'), true)
   assert.equal(source.includes('const datasetIngestError = ref(\'\')'), true)
   assert.equal(source.includes('const datasetIngestHasError = computed(() => Boolean(String(datasetIngestError.value || \'\').trim()))'), true)
@@ -60,4 +62,13 @@ test('workspace delete uses shared confirmation modal from list and detail', () 
   assert.equal(source.includes('group-hover:opacity-100'), false)
   assert.equal(source.includes('showDeleteConfirm'), false)
   assert.equal(source.includes('Danger zone'), false)
+})
+
+test('workspace tab disables dataset mutation until the inspected workspace is activated', () => {
+  const source = readSource('src/components/modals/tabs/WorkspaceTab.vue')
+
+  assert.equal(source.includes('const requiresWorkspaceActivation = computed(() => !isCreatingMode.value && !isWorkspaceActive.value)'), true)
+  assert.equal(source.includes('Activate workspace to add data'), true)
+  assert.equal(source.includes("toast.info('Activate workspace first', 'Activate this workspace before importing datasets.')"), true)
+  assert.equal(source.includes("toast.info('Activate workspace first', 'Activate this workspace before generating schemas.')"), true)
 })
