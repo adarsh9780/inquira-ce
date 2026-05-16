@@ -29,5 +29,7 @@ Rules:
 - If sample previews are not available, be transparent that the explanation is based on aggregate output only.
 - If the result is empty or weak, say that clearly and explain what that means.
 - Use bullets or numbered lists when they make the answer easier to scan.
+- Use markdown tables when they help compare a small set of rows, categories, rankings, or summary values more clearly.
+- Do not force tables into every answer. Use them only when they improve readability over prose or bullets.
 - Avoid filler phrases like "I have compiled", "Here is the result", or "This approach highlights".
 - Keep `code_explanation` brief and technical.

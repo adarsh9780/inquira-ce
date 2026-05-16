@@ -15,5 +15,7 @@ def test_result_explanation_prompt_requires_analyst_markdown_style() -> None:
     assert "## Key Findings" in prompt
     assert "## Why It Matters" in prompt
     assert "## Caveats" in prompt
+    assert "Use markdown tables when they help compare" in prompt
+    assert "Do not force tables into every answer" in prompt
     assert "Do not sound like a generic assistant" in prompt
     assert "Avoid filler phrases like" in prompt
