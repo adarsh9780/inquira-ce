@@ -62,8 +62,16 @@
         <div class="px-3 py-2.5 rounded-2xl rounded-tl-sm" style="background-color: transparent">
           <div v-if="reasoningRows(message).length" class="stream-reasoning-list">
             <div v-for="row in reasoningRows(message)" :key="row.id" class="stream-reasoning-item">
-              <p class="stream-reasoning-label">Understanding</p>
-              <p class="stream-reasoning-text">{{ row.message }}</p>
+              <template v-if="row.sections?.length">
+                <div v-for="section in row.sections" :key="`${row.id}-${section.label}`" class="stream-reasoning-section">
+                  <p class="stream-reasoning-label">{{ section.label }}</p>
+                  <p class="stream-reasoning-text">{{ section.text }}</p>
+                </div>
+              </template>
+              <template v-else>
+                <p class="stream-reasoning-label">Reasoning</p>
+                <p class="stream-reasoning-text">{{ row.message }}</p>
+              </template>
             </div>
           </div>
 
@@ -567,8 +575,92 @@ function reasoningRows(message) {
     .map((event, index) => ({
       id: `${message?.id || 'msg'}-reasoning-${String(event?.stage || 'intent')}-${index}`,
       message: normalizeEphemeralText(event?.message),
+      sections: parseReasoningSections(event?.message),
     }))
-    .filter((row) => row.message)
+    .filter((row) => row.message && !isGenericReasoningMessage(row.message))
+}
+
+const GENERIC_REASONING_PATTERNS = [
+  'assessing schema context',
+  'deciding whether more schema/data lookup is required before code generation',
+]
+
+const REASONING_SECTION_LABELS = {
+  has: 'Has',
+  wants: 'Wants',
+  next: 'Next',
+}
+
+function isGenericReasoningMessage(message) {
+  const normalized = String(message || '').trim().toLowerCase()
+  if (!normalized) return true
+  return GENERIC_REASONING_PATTERNS.some((pattern) => normalized.includes(pattern))
+}
+
+function parseReasoningSections(message) {
+  const raw = String(message || '').trim()
+  if (!raw) return []
+
+  const normalized = raw.replace(/\r\n/g, '\n')
+  const explicitSections = [
+    extractReasoningSection(normalized, 'has'),
+    extractReasoningSection(normalized, 'wants'),
+    extractReasoningSection(normalized, 'next'),
+  ].filter((section) => section && section.text)
+
+  if (explicitSections.length === 3) {
+    return explicitSections
+  }
+
+  const sentenceSections = inferReasoningSectionsFromSentences(normalized)
+  if (sentenceSections.length === 3) {
+    return sentenceSections
+  }
+
+  return []
+}
+
+function extractReasoningSection(text, kind) {
+  const patterns = {
+    has: [
+      /(?:what i (?:already )?(?:have|know)|what it already has|what the assistant already has|already have|already know|has|context)\s*:\s*/i,
+    ],
+    wants: [
+      /(?:what (?:the )?user wants|what the request needs|user wants|request|goal|wants)\s*:\s*/i,
+    ],
+    next: [
+      /(?:what i need to do next|what happens next|next step|next|need to do next)\s*:\s*/i,
+    ],
+  }
+  const markerPatterns = patterns[kind] || []
+  for (const pattern of markerPatterns) {
+    const match = pattern.exec(text)
+    if (!match) continue
+    const start = match.index + match[0].length
+    const tail = text.slice(start)
+    const nextMarker = /(?:^|\n)\s*(?:what i (?:already )?(?:have|know)|what it already has|what the assistant already has|already have|already know|has|context|what (?:the )?user wants|what the request needs|user wants|request|goal|wants|what i need to do next|what happens next|next step|next|need to do next)\s*:/im
+    const nextMatch = nextMarker.exec(tail)
+    const value = normalizeEphemeralText(nextMatch ? tail.slice(0, nextMatch.index) : tail)
+    if (!value) continue
+    return {
+      label: REASONING_SECTION_LABELS[kind],
+      text: value,
+    }
+  }
+  return null
+}
+
+function inferReasoningSectionsFromSentences(text) {
+  const sentences = String(text || '')
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => normalizeEphemeralText(part))
+    .filter(Boolean)
+  if (sentences.length < 3) return []
+  return [
+    { label: REASONING_SECTION_LABELS.has, text: sentences[0] },
+    { label: REASONING_SECTION_LABELS.wants, text: sentences[1] },
+    { label: REASONING_SECTION_LABELS.next, text: sentences[2] },
+  ]
 }
 
 function normalizeNodeName(nodeName) {
@@ -973,6 +1065,10 @@ watch(() => appStore.isLoading, (isLoading, wasLoading) => {
 .stream-reasoning-item {
   border-left: 2px solid var(--color-accent);
   padding-left: 0.75rem;
+}
+
+.stream-reasoning-section + .stream-reasoning-section {
+  margin-top: 0.55rem;
 }
 
 .stream-reasoning-label {
