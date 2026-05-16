@@ -2,16 +2,13 @@
   <div class="flex flex-col h-full">
     <!-- Figure Header (Teleported) -->
     <Teleport to="#workspace-right-pane-toolbar-center" v-if="isMounted && appStore.dataPane === 'figure'">
-      <div v-if="orderedFigures && orderedFigures.length > 0" class="flex min-w-[10rem] max-w-full flex-1 items-center">
+      <div v-if="orderedFigures && orderedFigures.length > 0" class="flex min-w-[10rem] max-w-full flex-1 items-center" style="max-width: clamp(10rem, 32vw, 20rem);">
         <HeaderDropdown
           id="figure-select"
           v-model="selectedArtifactId"
           :options="figureDropdownOptions"
           placeholder="Select chart"
           aria-label="Select chart"
-          :fit-to-longest-label="true"
-          :min-chars="12"
-          :max-chars="36"
           max-width-class="w-full"
         />
       </div>

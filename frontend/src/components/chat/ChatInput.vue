@@ -127,7 +127,7 @@
 
         <!-- Right: Model selector + action button -->
         <div class="flex min-w-[12rem] flex-1 items-center justify-end gap-3">
-          <div class="min-w-[10rem] max-w-full flex-1 sm:max-w-[22rem]">
+          <div class="min-w-[9rem] flex-1" style="max-width: clamp(9rem, 30vw, 22rem);">
             <ModelSelector
               :selected-model="appStore.selectedModel"
               :model-options="appStore.availableModels"

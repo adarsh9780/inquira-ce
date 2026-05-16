@@ -1,21 +1,21 @@
 <template>
   <div class="flex h-full w-full min-h-0 min-w-0 flex-col" style="background-color: var(--color-workspace-surface);">
     <div class="flex-shrink-0 h-16 px-4 flex items-center gap-4" style="background-color: var(--color-workspace-surface);">
-      <div class="inline-flex rounded-xl border p-1 flex-shrink-0" style="border-color: var(--color-border); background-color: var(--color-control-surface);">
+      <div class="inline-flex items-center gap-1 flex-shrink-0">
         <button
           @click="appStore.setWorkspacePane('code')"
-          class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+          class="workspace-pane-tab"
           :style="appStore.workspacePane === 'code'
-            ? 'background-color: var(--color-selected-surface); color: var(--color-text-main); box-shadow: inset 0 0 0 1px var(--color-selected-border);'
+            ? 'color: var(--color-text-main); box-shadow: inset 0 -2px 0 0 var(--color-accent);'
             : 'color: var(--color-text-muted);'"
         >
           Code
         </button>
         <button
           @click="appStore.setWorkspacePane('chat')"
-          class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+          class="workspace-pane-tab"
           :style="appStore.workspacePane === 'chat'
-            ? 'background-color: var(--color-selected-surface); color: var(--color-text-main); box-shadow: inset 0 0 0 1px var(--color-selected-border);'
+            ? 'color: var(--color-text-main); box-shadow: inset 0 -2px 0 0 var(--color-accent);'
             : 'color: var(--color-text-muted);'"
         >
           Chat
@@ -51,3 +51,18 @@ import ChatInput from '../chat/ChatInput.vue'
 
 const appStore = useAppStore()
 </script>
+
+<style scoped>
+.workspace-pane-tab {
+  border-radius: 0;
+  padding: 0.625rem 0.75rem 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1;
+  transition: color 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+
+.workspace-pane-tab:hover {
+  color: var(--color-text-main);
+}
+</style>

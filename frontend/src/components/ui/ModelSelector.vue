@@ -1,14 +1,14 @@
 <template>
-  <div class="relative">
+  <div class="relative w-full min-w-0">
     <Listbox v-model="selectedModel" @update:model-value="handleModelChange">
       <div class="relative">
         <!-- Text-only trigger (Cursor-style: "Model Name ↓") -->
         <ListboxButton
-          class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none group"
+          class="inline-flex w-full min-w-0 items-center justify-between gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none group"
           style="color: var(--color-text-main); border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-surface) 88%, var(--color-workspace-surface));"
           title="Select model"
         >
-          <span class="truncate max-w-[170px]" style="color: var(--color-text-main);">
+          <span class="min-w-0 flex-1 truncate text-left" style="color: var(--color-text-main);">
             {{ getModelDisplayName(selectedModel) }}
           </span>
           <ChevronDownIcon class="h-3.5 w-3.5 shrink-0 transition-transform group-data-[open]:rotate-180" style="color: var(--color-text-muted);" />

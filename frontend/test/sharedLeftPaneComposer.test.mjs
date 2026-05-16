@@ -9,6 +9,9 @@ test('workspace left pane hosts a shared chat composer below both code and chat 
 
   assert.equal(source.includes("import ChatInput from '../chat/ChatInput.vue'"), true)
   assert.equal(source.includes('<ChatInput />'), true)
+  assert.equal(source.includes('class="inline-flex items-center gap-1 flex-shrink-0"'), true)
+  assert.equal(source.includes('class="workspace-pane-tab"'), true)
+  assert.equal(source.includes('rounded-xl border p-1'), false)
   assert.equal(source.includes("class=\"min-h-0 flex-1 flex flex-col p-3 sm:p-4 pb-0\""), true)
   assert.equal(source.includes("class=\"flex-shrink-0 pt-2 sm:pt-3\""), true)
   assert.equal(source.includes("v-show=\"appStore.workspacePane === 'code'\""), true)

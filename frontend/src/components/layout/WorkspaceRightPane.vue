@@ -14,12 +14,12 @@
           aria-label="Select data pane"
           max-width-class="w-[150px]"
         />
-        <div v-else class="inline-flex rounded-xl border p-1" style="border-color: var(--color-border); background-color: var(--color-control-surface);">
+        <div v-else class="inline-flex items-center gap-1">
           <button
             @click="appStore.setDataPane('table')"
-            class="rounded-lg px-3 py-2 transition-colors flex items-center justify-center gap-1.5"
+            class="data-pane-tab"
             :style="appStore.dataPane === 'table'
-              ? 'background-color: var(--color-selected-surface); color: var(--color-text-main); box-shadow: inset 0 0 0 1px var(--color-selected-border);'
+              ? 'color: var(--color-text-main); box-shadow: inset 0 -2px 0 0 var(--color-accent);'
               : 'color: var(--color-text-muted);'"
             title="Table"
             aria-label="Table"
@@ -29,9 +29,9 @@
           </button>
           <button
             @click="appStore.setDataPane('figure')"
-            class="rounded-lg px-3 py-2 transition-colors flex items-center justify-center gap-1.5"
+            class="data-pane-tab"
             :style="appStore.dataPane === 'figure'
-              ? 'background-color: var(--color-selected-surface); color: var(--color-text-main); box-shadow: inset 0 0 0 1px var(--color-selected-border);'
+              ? 'color: var(--color-text-main); box-shadow: inset 0 -2px 0 0 var(--color-accent);'
               : 'color: var(--color-text-muted);'"
             title="Chart"
             aria-label="Chart"
@@ -41,9 +41,9 @@
           </button>
           <button
             @click="appStore.setDataPane('output')"
-            class="rounded-lg px-3 py-2 transition-colors flex items-center justify-center gap-1.5"
+            class="data-pane-tab"
             :style="appStore.dataPane === 'output'
-              ? 'background-color: var(--color-selected-surface); color: var(--color-text-main); box-shadow: inset 0 0 0 1px var(--color-selected-border);'
+              ? 'color: var(--color-text-main); box-shadow: inset 0 -2px 0 0 var(--color-accent);'
               : 'color: var(--color-text-muted);'"
             title="Output"
             aria-label="Output"
@@ -152,5 +152,19 @@ onUnmounted(() => {
 .workspace-toolbar-zone-right {
   justify-content: flex-end;
   flex: 0 1 auto;
+}
+
+.data-pane-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 0;
+  padding: 0.625rem 0.75rem 0.5rem;
+  transition: color 150ms ease, box-shadow 150ms ease;
+}
+
+.data-pane-tab:hover {
+  color: var(--color-text-main);
 }
 </style>

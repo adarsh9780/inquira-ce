@@ -12,6 +12,10 @@ test('sidebar adds a schema entry under workspace and uses numbered conversation
   assert.equal(sidebarSource.includes('Inspect datasets and column metadata'), true)
   assert.equal(sidebarSource.includes('conversationBadgeLabel(index)'), true)
   assert.equal(sidebarSource.includes("if (ordinal > 99) return '99+'"), true)
+  assert.equal(sidebarSource.includes('rounded-md bg-[var(--color-accent)]/10'), false)
+  assert.equal(sidebarSource.includes('rounded-md bg-[var(--color-selected-surface)]'), false)
+  assert.equal(sidebarSource.includes('text-[11px] font-semibold leading-none tabular-nums'), true)
+  assert.equal(sidebarSource.includes('bg-[var(--color-accent)] text-white'), false)
 })
 
 test('activating a conversation returns the shell to workspace chat', () => {

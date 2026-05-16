@@ -5,17 +5,14 @@
         <div
           v-if="displayArtifacts.length > 0"
           class="flex min-w-[11rem] w-full items-center"
-          style="max-width: min(34vw, 20rem);"
+          style="max-width: clamp(11rem, 34vw, 20rem);"
         >
-          <HeaderDropdown
+        <HeaderDropdown
             id="dataframe-select"
             v-model="selectedArtifactId"
             :options="tableDropdownOptions"
             placeholder="Select table"
             aria-label="Select table"
-            :fit-to-longest-label="true"
-            :min-chars="12"
-            :max-chars="36"
             max-width-class="w-full"
           />
         </div>
@@ -35,7 +32,7 @@
 
         <div
           class="relative min-w-[10rem] flex-1"
-          style="max-width: min(24vw, 13.5rem);"
+          style="max-width: clamp(9rem, 24vw, 13.5rem);"
         >
           <FunnelIcon
             class="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2"

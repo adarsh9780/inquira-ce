@@ -22,6 +22,9 @@ test('model selector accepts injected model options prop', () => {
   assert.equal(source.includes('searchDebounceMs'), true)
   assert.equal(source.includes('Searching...'), true)
   assert.equal(source.includes('No models found.'), true)
+  assert.equal(source.includes('class="relative w-full min-w-0"'), true)
+  assert.equal(source.includes('class="inline-flex w-full min-w-0 items-center justify-between'), true)
+  assert.equal(source.includes('class="min-w-0 flex-1 truncate text-left"'), true)
 })
 
 test('chat input model dropdown updates only main model in pinia store', () => {
@@ -33,6 +36,7 @@ test('chat input model dropdown updates only main model in pinia store', () => {
   assert.equal(source.includes(':backend-search="searchProviderModels"'), true)
   assert.equal(source.includes(':provider="appStore.llmProvider"'), true)
   assert.equal(source.includes(':search-loading="appStore.providerModelSearchLoading"'), true)
+  assert.equal(source.includes('style="max-width: clamp(9rem, 30vw, 22rem);"'), true)
   assert.equal(source.includes('appStore.setSelectedModel(model)'), true)
 })
 

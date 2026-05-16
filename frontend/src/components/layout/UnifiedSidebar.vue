@@ -38,8 +38,8 @@
           :title="appStore.isSidebarCollapsed ? activeWorkspaceName : 'Open workspace settings'"
           @click="openSettings('workspace', 1)"
         >
-          <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--color-accent)]/10 text-[var(--color-accent)]">
-            <FolderOpenIcon class="h-4 w-4" />
+          <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+            <FolderOpenIcon class="h-5 w-5" :class="appStore.activeTab === 'workspace' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
           </div>
           <div
             class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
@@ -64,8 +64,8 @@
           :title="appStore.isSidebarCollapsed ? 'Open schema editor' : 'Schema editor'"
           @click="openSchemaEditor"
         >
-          <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--color-selected-surface)] text-[var(--color-selected-border)]">
-            <CircleStackIcon class="h-4 w-4" />
+          <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+            <CircleStackIcon class="h-5 w-5" :class="appStore.activeTab === 'schema-editor' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
           </div>
           <div
             class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
@@ -163,10 +163,10 @@
               <template v-else>
                 <div class="flex h-6 w-6 shrink-0 items-center justify-center">
                   <span
-                    class="inline-flex min-w-[1.35rem] items-center justify-center rounded-md px-1 text-[10px] font-semibold leading-none transition-colors duration-200"
+                    class="inline-flex min-w-[1.5rem] items-center justify-center px-1 text-[11px] font-semibold leading-none tabular-nums tracking-[0.02em] transition-colors duration-200"
                     :class="appStore.activeConversationId === conv.id
-                      ? 'bg-[var(--color-accent)] text-white'
-                      : 'bg-[var(--color-base-soft)] text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
+                      ? 'text-[var(--color-accent)]'
+                      : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
                   >
                     {{ conversationBadgeLabel(index) }}
                   </span>
