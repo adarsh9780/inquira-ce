@@ -22,8 +22,9 @@ test('status bar stays focused on runtime status and no longer renders workspace
 test('sidebar owns the profile and bottom action stack', () => {
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
-  assert.equal(sidebarSource.includes('title="API Keys"'), true)
+  assert.equal(sidebarSource.includes('title="Settings"'), true)
   assert.equal(sidebarSource.includes('title="Profile Settings"'), true)
+  assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"), true)
   assert.equal(sidebarSource.includes('Legal &amp; Terms'), true)
   assert.equal(sidebarSource.includes('Account Settings'), true)
   assert.equal(sidebarSource.includes('Theme Preference'), true)

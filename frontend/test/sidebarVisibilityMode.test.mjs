@@ -19,6 +19,6 @@ test('app keeps a single sidebar container and relies on click-only collapse sta
   assert.equal(sidebarSource.includes('Open workspace settings'), true)
   assert.equal(sidebarSource.includes('function openWorkspaceRail(target = \'\') {'), false)
   assert.equal(sidebarSource.includes('title="Conversations"'), false)
-  assert.equal(sidebarSource.includes('title="API Keys"'), true)
+  assert.equal(sidebarSource.includes('title="Settings"'), true)
   assert.equal(sidebarSource.includes('title="New Conversation"'), true)
 })

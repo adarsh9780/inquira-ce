@@ -234,22 +234,43 @@
         <div class="mx-1 mb-2 h-px bg-[var(--color-border)] opacity-60" />
         <div class="flex flex-col space-y-0.5">
 
-          <!-- API Keys -->
           <button
             type="button"
             class="flex w-full items-center rounded-lg py-2 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/5 hover:text-[var(--color-text-main)] focus:outline-none"
             :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3'"
-            title="API Keys"
-            @click="openSettings('llm')"
+            :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+            @click="handleBrandClick"
           >
             <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-              <KeyIcon class="h-5 w-5" />
+              <ChevronDoubleRightIcon v-if="appStore.isSidebarCollapsed" class="h-5 w-5" />
+              <ChevronDoubleLeftIcon v-else class="h-5 w-5" />
             </div>
             <div
               class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
               :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
             >
-              <span class="text-[13px] font-medium">API Keys</span>
+              <span class="text-[13px] font-medium">
+                {{ appStore.isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar' }}
+              </span>
+            </div>
+          </button>
+
+          <!-- Settings -->
+          <button
+            type="button"
+            class="flex w-full items-center rounded-lg py-2 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/5 hover:text-[var(--color-text-main)] focus:outline-none"
+            :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3'"
+            title="Settings"
+            @click="openSettings('llm', 1)"
+          >
+            <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+              <Cog6ToothIcon class="h-5 w-5" />
+            </div>
+            <div
+              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+              :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+            >
+              <span class="text-[13px] font-medium">Setting</span>
             </div>
           </button>
 
@@ -351,8 +372,10 @@ import {
   FolderOpenIcon,
   PlusIcon,
   EllipsisHorizontalIcon,
-  KeyIcon,
   CircleStackIcon,
+  Cog6ToothIcon,
+  ChevronDoubleLeftIcon,
+  ChevronDoubleRightIcon,
 } from '@heroicons/vue/24/outline'
 
 // ─── Store ───────────────────────────────────────────────────────────────────

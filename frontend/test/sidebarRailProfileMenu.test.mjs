@@ -11,7 +11,8 @@ test('sidebar keeps the bottom action stack and expanded-only labels', () => {
   const source = read('src/components/layout/UnifiedSidebar.vue')
 
   assert.equal(source.includes("appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3'"), true)
-  assert.equal(source.includes('class="text-[13px] font-medium">API Keys</span>'), true)
+  assert.equal(source.includes('class="text-[13px] font-medium">Setting</span>'), true)
+  assert.equal(source.includes("{{ appStore.isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar' }}"), true)
   assert.equal(source.includes('{{ profileDisplayName }}'), true)
   assert.equal(source.includes('sidebar-initials-avatar'), true)
   assert.equal(source.includes('UserCircleIcon'), false)
@@ -30,5 +31,5 @@ test('sidebar profile menu routes terms, account, and appearance through setting
   assert.equal(source.includes("@click=\"openProfileSection('terms')\""), true)
   assert.equal(source.includes("@click=\"openProfileSection('account')\""), true)
   assert.equal(source.includes("@click=\"openProfileSection('appearance')\""), true)
-  assert.equal(source.includes('title="Settings"'), false)
+  assert.equal(source.includes('title="Settings"'), true)
 })
