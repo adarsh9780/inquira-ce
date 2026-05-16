@@ -5,35 +5,44 @@
       Pick a UI theme. Each preview mirrors the shell hierarchy, not just the accent color.
     </p>
 
-    <div class="space-y-6 border-y border-[var(--color-border)] py-5">
-      <div>
-        <label class="mb-2 block text-sm font-semibold text-[var(--color-text-main)]">App Font</label>
-        <p class="mb-3 text-xs text-[var(--color-text-muted)]">
-          Choose the font used in app UI text.
+    <div class="border-y border-[var(--color-border)] py-5">
+      <div class="mb-4">
+        <h3 class="text-sm font-semibold text-[var(--color-text-main)]">Fonts</h3>
+        <p class="mt-1 text-xs text-[var(--color-text-muted)]">
+          Choose the typefaces used across the app shell and code-heavy surfaces.
         </p>
-        <HeaderDropdown
-          :model-value="activeFont"
-          :options="appFontOptions"
-          placeholder="Select font"
-          aria-label="UI font"
-          max-width-class="w-full max-w-[260px]"
-          @update:model-value="selectFont"
-        />
       </div>
 
-      <div class="border-t border-[var(--color-border)] pt-5">
-        <label class="mb-2 block text-sm font-semibold text-[var(--color-text-main)]">Code Editor Font</label>
-        <p class="mb-3 text-xs text-[var(--color-text-muted)]">
-          Choose the font used only in code editors and terminal-style views.
-        </p>
-        <HeaderDropdown
-          :model-value="activeCodeFont"
-          :options="codeFontOptions"
-          placeholder="Select code font"
-          aria-label="Code editor font"
-          max-width-class="w-full max-w-[260px]"
-          @update:model-value="selectCodeFont"
-        />
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label class="mb-2 block text-sm font-semibold text-[var(--color-text-main)]">App Font</label>
+          <p class="mb-3 text-xs text-[var(--color-text-muted)]">
+            Used in navigation, forms, and the wider app interface.
+          </p>
+          <HeaderDropdown
+            :model-value="activeFont"
+            :options="appFontOptions"
+            placeholder="Select font"
+            aria-label="UI font"
+            max-width-class="w-full"
+            @update:model-value="selectFont"
+          />
+        </div>
+
+        <div>
+          <label class="mb-2 block text-sm font-semibold text-[var(--color-text-main)]">Code Font</label>
+          <p class="mb-3 text-xs text-[var(--color-text-muted)]">
+            Used in editors, terminal output, and code-oriented views.
+          </p>
+          <HeaderDropdown
+            :model-value="activeCodeFont"
+            :options="codeFontOptions"
+            placeholder="Select code font"
+            aria-label="Code editor font"
+            max-width-class="w-full"
+            @update:model-value="selectCodeFont"
+          />
+        </div>
       </div>
     </div>
 
