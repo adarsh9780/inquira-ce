@@ -112,7 +112,7 @@
       </header>
 
       <!-- Stepper (single shared instance) -->
-      <div class="shrink-0 px-4 pt-5">
+      <div class="shrink-0 px-4 pb-4 pt-5">
         <div class="workspace-stepper">
           <button
             v-for="(step, index) in setupSteps"
@@ -133,13 +133,15 @@
       </div>
 
       <!-- Step content -->
+      <div class="mx-4 border-t border-[var(--color-border)]"></div>
+
       <Transition
         enter-active-class="dialog-fade-enter-active"
         enter-from-class="dialog-fade-enter-from"
         leave-active-class="dialog-fade-leave-active"
         leave-to-class="dialog-fade-leave-to"
         mode="out-in"
-        class="min-h-0 flex-1 overflow-y-auto"
+        class="min-h-0 flex-1 overflow-y-auto pt-5"
       >
         <!-- Step 1: Workspace identity — shared between create and detail -->
         <div v-if="setupStep === 1" key="step-1" class="relative flex flex-col gap-5 px-4 pb-4 pt-2">
@@ -398,46 +400,44 @@
         </div>
 
         <!-- Step 3: Generate schema -->
-        <div v-else key="step-3" class="space-y-4 px-4">
-          <div class="rounded-lg bg-[var(--color-base-soft)] px-4 py-4">
-            <div class="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <p class="text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Generate schema</p>
-                <p class="mt-1 text-sm text-[var(--color-text-muted)]">Schema generation starts automatically after import. Use retry to repair any failed dataset descriptions.</p>
-              </div>
-              <button
-                type="button"
-                class="btn-primary px-3 py-2 text-sm whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
-                :disabled="isGeneratingWorkspaceSchemas || datasetEntries.length === 0 || requiresWorkspaceActivation"
-                @click="generateWorkspaceSchemas"
-              >
-                <span v-if="isGeneratingWorkspaceSchemas">Generating...</span>
-                <span v-else>Retry schema generation</span>
-              </button>
+        <div v-else key="step-3" class="space-y-5 px-4">
+          <div class="flex items-start justify-between gap-3 border-b border-[var(--color-border)] pb-4">
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Generate schema</p>
+              <p class="mt-1 text-sm text-[var(--color-text-muted)]">Schema generation starts automatically after import. Use retry to repair any failed dataset descriptions.</p>
             </div>
-
-            <div v-if="datasetEntries.length" class="space-y-2">
-              <div
-                v-for="dataset in datasetEntries"
-                :key="`schema-${dataset.table_name}`"
-                class="flex items-center justify-between gap-3 rounded-lg bg-[var(--color-base)] px-3 py-2"
-              >
-                <div class="min-w-0">
-                  <p class="truncate text-sm font-medium text-[var(--color-text-main)]">{{ dataset.filename }}</p>
-                  <p class="truncate text-xs text-[var(--color-text-muted)]">{{ dataset.table_name }}</p>
-                </div>
-                <span
-                  class="shrink-0 rounded-full px-2 py-0.5 text-[11px] border"
-                  :class="schemaGenerationClass(dataset.table_name)"
-                >
-                  {{ schemaGenerationLabel(dataset.table_name) }}
-                </span>
-              </div>
-            </div>
-            <p v-else class="rounded-lg bg-[var(--color-base-soft)] px-3 py-3 text-sm text-[var(--color-text-muted)]">
-              Add at least one dataset before generating schemas.
-            </p>
+            <button
+              type="button"
+              class="btn-primary px-3 py-2 text-sm whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="isGeneratingWorkspaceSchemas || datasetEntries.length === 0 || requiresWorkspaceActivation"
+              @click="generateWorkspaceSchemas"
+            >
+              <span v-if="isGeneratingWorkspaceSchemas">Generating...</span>
+              <span v-else>Retry schema generation</span>
+            </button>
           </div>
+
+          <div v-if="datasetEntries.length" class="divide-y divide-[var(--color-border)]">
+            <div
+              v-for="dataset in datasetEntries"
+              :key="`schema-${dataset.table_name}`"
+              class="flex items-center justify-between gap-3 py-3"
+            >
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium text-[var(--color-text-main)]">{{ dataset.filename }}</p>
+                <p class="truncate text-xs text-[var(--color-text-muted)]">{{ dataset.table_name }}</p>
+              </div>
+              <span
+                class="shrink-0 rounded-full px-2 py-0.5 text-[11px] border"
+                :class="schemaGenerationClass(dataset.table_name)"
+              >
+                {{ schemaGenerationLabel(dataset.table_name) }}
+              </span>
+            </div>
+          </div>
+          <p v-else class="py-2 text-sm text-[var(--color-text-muted)]">
+            Add at least one dataset before generating schemas.
+          </p>
         </div>
       </Transition>
     </div>
