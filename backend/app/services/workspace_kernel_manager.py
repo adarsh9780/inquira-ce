@@ -71,11 +71,13 @@ _RUN_EXPORTS_PROBE_TEMPLATE = """
 _inquira_get_active_exports(run_id={run_id!r})
 """
 
+_MATERIALIZE_EXPORTS_SPECS_SENTINEL = "__INQUIRA_MATERIALIZE_EXPORT_SPECS__"
+
 _MATERIALIZE_EXPORTS_TEMPLATE = """
 import json as _json
 from pathlib import Path as _Path
 
-_inquira_export_specs = _json.loads({specs_json!r})
+_inquira_export_specs = _json.loads("__INQUIRA_MATERIALIZE_EXPORT_SPECS__")
 _inquira_materialized = []
 for _spec in _inquira_export_specs:
     if not isinstance(_spec, dict):
@@ -95,7 +97,7 @@ for _spec in _inquira_export_specs:
             _escaped_table = _table_name.replace('"', '""')
             _escaped_path = str(_target).replace("'", "''")
             scratchpad_conn.execute(
-                f"COPY (SELECT * FROM \\\"{_escaped_table}\\\") TO '{_escaped_path}' (FORMAT PARQUET)"
+                f"COPY (SELECT * FROM \\\"{{_escaped_table}}\\\") TO '{{_escaped_path}}' (FORMAT PARQUET)"
             )
     elif _kind == 'text':
         _payload = _spec.get('payload')
@@ -318,8 +320,9 @@ class WorkspaceKernelManager:
             session = self._sessions.get(workspace_id)
         if session is None:
             raise RuntimeError("Workspace kernel is not active")
-        probe_code = _MATERIALIZE_EXPORTS_TEMPLATE.format(
-            specs_json=json.dumps(specs, ensure_ascii=True, default=str)
+        probe_code = _MATERIALIZE_EXPORTS_TEMPLATE.replace(
+            _MATERIALIZE_EXPORTS_SPECS_SENTINEL,
+            json.dumps(json.dumps(specs, ensure_ascii=True, default=str)),
         )
         async with session.lock:
             session.last_used = datetime.now(UTC)
