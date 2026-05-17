@@ -500,6 +500,41 @@ async def test_shutdown_session_attempts_kernel_resource_cleanup_before_shutdown
 
 
 @pytest.mark.asyncio
+async def test_shutdown_session_releases_runtime_lease():
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-clean", "/tmp/a.duckdb")
+    session.runtime_lease_owner_token = "owner-1"
+    events: list[str] = []
+
+    class FakeClient:
+        def stop_channels(self):
+            events.append("stop_channels")
+
+    class FakeKernelManager:
+        async def shutdown_kernel(self, now=True):
+            _ = now
+            events.append("shutdown_kernel")
+
+    session.client = FakeClient()
+    session.manager = FakeKernelManager()
+
+    async def fake_execute_request(current_session, code):
+        _ = (current_session, code)
+        return ParsedExecutionOutput()
+
+    async def fake_release(current_session):
+        assert current_session is session
+        events.append("release_lease")
+
+    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
+    manager._release_runtime_lease = fake_release  # type: ignore[method-assign]
+
+    await manager._shutdown_session(session)
+
+    assert events == ["stop_channels", "shutdown_kernel", "release_lease"]
+
+
+@pytest.mark.asyncio
 async def test_bootstrap_workspace_creates_scratchpad_parent_dir(tmp_path):
     manager = WorkspaceKernelManager(idle_minutes=30)
     workspace_db = tmp_path / "ws" / "workspace.duckdb"

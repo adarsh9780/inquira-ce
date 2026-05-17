@@ -13,10 +13,10 @@ from pathlib import Path, PureWindowsPath
 from typing import Any
 from typing import cast
 
-import duckdb
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...data_access.workspace_db import WorkspaceRuntimeAdapter
 from ...services.agent_client import AgentClient, AgentRuntimeError
 from ...services.agent_service_config import load_agent_service_config
 from ...services.code_executor import execute_code, get_workspace_run_exports
@@ -967,27 +967,13 @@ class ChatService:
         return await asyncio.to_thread(_read)
 
     @staticmethod
-    async def _read_live_table_columns(duckdb_path: str, table_name: str) -> list[dict[str, Any]]:
+    async def _read_live_table_columns(workspace_id: str, table_name: str) -> list[dict[str, Any]]:
         """Read authoritative column names/types from workspace DuckDB."""
-
-        def _read() -> list[dict[str, Any]]:
-            con = duckdb.connect(duckdb_path, read_only=True)
-            try:
-                rows = con.execute(f'DESCRIBE "{table_name}"').fetchall()
-                return [
-                    {
-                        "name": str(row[0]),
-                        "dtype": str(row[1]),
-                        "description": "",
-                        "samples": [],
-                    }
-                    for row in rows
-                ]
-            finally:
-                con.close()
-
         try:
-            return await asyncio.to_thread(_read)
+            return await WorkspaceRuntimeAdapter().get_table_columns(
+                workspace_id=workspace_id,
+                table_name=table_name,
+            )
         except Exception:
             return []
 
@@ -1129,7 +1115,7 @@ class ChatService:
                 except HTTPException as exc:
                     if exc.status_code != 404:
                         raise
-            live_columns = await ChatService._read_live_table_columns(duckdb_path, table_name)
+            live_columns = await ChatService._read_live_table_columns(workspace_id, table_name)
             if live_columns:
                 schema = ChatService._merge_schema_with_live_columns(schema, table_name, live_columns)
             if schema is None:

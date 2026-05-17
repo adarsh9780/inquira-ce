@@ -49,6 +49,14 @@ def _stub_llm_preferences(monkeypatch):
         staticmethod(_fake_resolve_llm_preferences),
     )
 
+    async def _fake_persist_turn_artifacts(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.TurnArtifactStorageService.persist_turn_artifacts",
+        staticmethod(_fake_persist_turn_artifacts),
+    )
+
 
 @pytest.mark.asyncio
 async def test_chat_uses_empty_schema_when_workspace_has_no_dataset(monkeypatch):

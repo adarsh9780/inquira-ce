@@ -7,15 +7,18 @@ import inspect
 import json
 import re
 import time
+import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from queue import Empty as QueueEmpty
 from typing import Any
 
-import duckdb
 from jupyter_client import AsyncKernelManager
 
+from app.data_access.coordinator import LeaseConflictError, LeaseKinds, ResourceLeaseCoordinator
+from app.data_access.workspace_db import WorkspaceOfflineAdapter
+from app.v1.db.session import AppDataSessionLocal
 from app.services.jupyter_message_parser import (
     ParsedExecutionOutput,
     update_from_iopub_message,
@@ -179,6 +182,7 @@ class WorkspaceKernelSession:
     last_used: datetime = field(default_factory=lambda: datetime.now(UTC))
     restart_count: int = 0
     bootstrap_completed: bool = False
+    runtime_lease_owner_token: str | None = None
 
 
 class WorkspaceKernelManager:
@@ -188,6 +192,9 @@ class WorkspaceKernelManager:
         self._sessions: dict[str, WorkspaceKernelSession] = {}
         self._sessions_lock = asyncio.Lock()
         self._idle_delta = timedelta(minutes=max(1, idle_minutes))
+        self._lease_coordinator = ResourceLeaseCoordinator(
+            lease_seconds=max(300, int(self._idle_delta.total_seconds()) + 120)
+        )
 
     async def execute(
         self,
@@ -221,7 +228,7 @@ class WorkspaceKernelManager:
 
         async with session.lock:
             session.status = "busy"
-            session.last_used = datetime.now(UTC)
+            await self._touch_session(session)
             try:
                 response = await asyncio.wait_for(
                     self._execute_on_session(session, code),
@@ -286,7 +293,7 @@ class WorkspaceKernelManager:
         try:
             await self._await_maybe(session.manager.interrupt_kernel())
             session.status = "ready"
-            session.last_used = datetime.now(UTC)
+            await self._touch_session(session)
             return True
         except Exception:
             session.status = "error"
@@ -304,7 +311,7 @@ class WorkspaceKernelManager:
             return []
         probe_code = _RUN_EXPORTS_PROBE_TEMPLATE.format(run_id=str(run_id))
         async with session.lock:
-            session.last_used = datetime.now(UTC)
+            await self._touch_session(session)
             parsed = await self._execute_request(session, probe_code)
         if parsed.error is not None or not isinstance(parsed.result, list):
             return []
@@ -325,7 +332,7 @@ class WorkspaceKernelManager:
             json.dumps(json.dumps(specs, ensure_ascii=True, default=str)),
         )
         async with session.lock:
-            session.last_used = datetime.now(UTC)
+            await self._touch_session(session)
             parsed = await self._execute_request(session, probe_code)
         if parsed.error is not None or not isinstance(parsed.result, list):
             raise RuntimeError(str(parsed.error or "Failed to materialize run artifacts"))
@@ -359,7 +366,7 @@ class WorkspaceKernelManager:
         )
 
         async with session.lock:
-            session.last_used = datetime.now(UTC)
+            await self._touch_session(session)
             parsed = await self._execute_request(session, probe_code)
 
         if parsed.error is not None or not isinstance(parsed.result, list):
@@ -408,7 +415,7 @@ class WorkspaceKernelManager:
         )
 
         async with session.lock:
-            session.last_used = datetime.now(UTC)
+            await self._touch_session(session)
             parsed = await self._execute_request(session, probe_code)
 
         if parsed.error is not None:
@@ -500,7 +507,7 @@ class WorkspaceKernelManager:
         )
 
         async with session.lock:
-            session.last_used = datetime.now(UTC)
+            await self._touch_session(session)
             parsed = await self._execute_request(
                 session,
                 ingest_code,
@@ -556,7 +563,7 @@ class WorkspaceKernelManager:
         )
 
         async with session.lock:
-            session.last_used = datetime.now(UTC)
+            await self._touch_session(session)
             parsed_meta = await self._execute_request(session, probe_code)
 
         if parsed_meta.error is not None or parsed_meta.result is None:
@@ -607,7 +614,7 @@ class WorkspaceKernelManager:
         )
 
         async with session.lock:
-            session.last_used = datetime.now(UTC)
+            await self._touch_session(session)
             parsed = await self._execute_request(session, rows_code)
 
         if parsed.error is not None or parsed.result is None:
@@ -664,7 +671,7 @@ class WorkspaceKernelManager:
         )
 
         async with session.lock:
-            session.last_used = datetime.now(UTC)
+            await self._touch_session(session)
             parsed = await self._execute_request(session, list_code)
 
         if parsed.error is not None or not isinstance(parsed.result, list):
@@ -698,7 +705,7 @@ class WorkspaceKernelManager:
         )
 
         async with session.lock:
-            session.last_used = datetime.now(UTC)
+            await self._touch_session(session)
             parsed = await self._execute_request(session, usage_code)
 
         if parsed.error is not None or not isinstance(parsed.result, dict):
@@ -766,7 +773,7 @@ class WorkspaceKernelManager:
         )
 
         async with session.lock:
-            session.last_used = datetime.now(UTC)
+            await self._touch_session(session)
             parsed = await self._execute_request(session, meta_code)
 
         if parsed.error is not None:
@@ -812,7 +819,7 @@ class WorkspaceKernelManager:
         )
 
         async with session.lock:
-            session.last_used = datetime.now(UTC)
+            await self._touch_session(session)
             parsed = await self._execute_request(session, delete_code)
 
         return parsed.error is None and bool(parsed.result)
@@ -926,6 +933,7 @@ class WorkspaceKernelManager:
             await self._await_maybe(progress_callback("workspace_runtime_kernel", "Starting Python kernel..."))
         km = AsyncKernelManager(kernel_name="python3")
         kc = None
+        session: WorkspaceKernelSession | None = None
         ready_timeout = max(15, int(config.runner_policy.timeout_seconds) * 2)
         kernel_spec = km.kernel_spec
         if kernel_spec is None:
@@ -949,22 +957,28 @@ class WorkspaceKernelManager:
                 client=kc,
                 scratchpad_db_path=str(Path(workspace_duckdb_path).parent / "scratchpad" / "artifacts.duckdb"),
                 status="ready",
+                runtime_lease_owner_token=f"kernel:{workspace_id}:{uuid.uuid4()}",
             )
+            await self._acquire_runtime_lease(session)
             if progress_callback is not None:
                 await self._await_maybe(progress_callback("workspace_runtime_bootstrap", "Warming workspace runtime..."))
             await self._bootstrap_workspace(session)
             return session
         except asyncio.TimeoutError as exc:
             await self._shutdown_partial_startup(km, kc)
+            if session is not None:
+                await self._release_runtime_lease(session)
             raise RuntimeError(
                 f"Timed out waiting for workspace kernel to become ready after {ready_timeout} seconds."
             ) from exc
         except Exception as exc:
             await self._shutdown_partial_startup(km, kc)
+            if session is not None:
+                await self._release_runtime_lease(session)
             raise RuntimeError(f"Failed to start workspace kernel: {self._describe_exception(exc)}") from exc
 
     async def _bootstrap_workspace(self, session: WorkspaceKernelSession) -> None:
-        self._ensure_workspace_duckdb_file(session.workspace_duckdb_path)
+        await WorkspaceOfflineAdapter().ensure_database_file(session.workspace_duckdb_path)
         duckdb_path = Path(session.workspace_duckdb_path).as_posix()
         scratchpad_file = Path(session.scratchpad_db_path)
         scratchpad_file.parent.mkdir(parents=True, exist_ok=True)
@@ -1187,21 +1201,6 @@ class WorkspaceKernelManager:
             return
         raise RuntimeError(output.get("error") or "Workspace kernel bootstrap failed")
 
-    def _ensure_workspace_duckdb_file(self, workspace_duckdb_path: str) -> None:
-        workspace_db = Path(workspace_duckdb_path)
-        if workspace_db.exists():
-            return
-        parts = {part.lower() for part in workspace_db.expanduser().parts}
-        if ".inquira" in parts and "workspaces" in parts:
-            raise RuntimeError(
-                "Workspace database is missing. "
-                f"Expected path: {workspace_db}. "
-                "Re-create data by selecting the original dataset again."
-            )
-        workspace_db.parent.mkdir(parents=True, exist_ok=True)
-        con = duckdb.connect(str(workspace_db))
-        con.close()
-
     async def _execute_on_session(
         self,
         session: WorkspaceKernelSession,
@@ -1344,7 +1343,64 @@ class WorkspaceKernelManager:
             session.client.stop_channels()
         except Exception:
             pass
-        await self._await_maybe(session.manager.shutdown_kernel(now=True))
+        try:
+            await self._await_maybe(session.manager.shutdown_kernel(now=True))
+        finally:
+            await self._release_runtime_lease(session)
+
+    async def _acquire_runtime_lease(self, session: WorkspaceKernelSession) -> None:
+        owner_token = str(session.runtime_lease_owner_token or "").strip()
+        if not owner_token:
+            return
+        async with AppDataSessionLocal() as db:
+            try:
+                await self._lease_coordinator.acquire_workspace_runtime_lease(
+                    db,
+                    workspace_id=session.workspace_id,
+                    owner_token=owner_token,
+                    metadata={"source": "workspace_kernel_manager"},
+                )
+            except LeaseConflictError as exc:
+                await db.rollback()
+                raise RuntimeError(
+                    "Workspace runtime cannot start because maintenance mode is active for this workspace."
+                ) from exc
+            await db.commit()
+
+    async def _renew_runtime_lease(self, session: WorkspaceKernelSession) -> None:
+        owner_token = str(session.runtime_lease_owner_token or "").strip()
+        if not owner_token:
+            return
+        async with AppDataSessionLocal() as db:
+            try:
+                await self._lease_coordinator.renew_lease(
+                    db,
+                    resource_key=session.workspace_id,
+                    lease_kind=LeaseKinds.WORKSPACE_RUNTIME,
+                    owner_token=owner_token,
+                    metadata={"source": "workspace_kernel_manager"},
+                )
+            except LeaseConflictError:
+                await db.rollback()
+                return
+            await db.commit()
+
+    async def _release_runtime_lease(self, session: WorkspaceKernelSession) -> None:
+        owner_token = str(session.runtime_lease_owner_token or "").strip()
+        if not owner_token:
+            return
+        async with AppDataSessionLocal() as db:
+            await self._lease_coordinator.release_lease(
+                db,
+                resource_key=session.workspace_id,
+                lease_kind=LeaseKinds.WORKSPACE_RUNTIME,
+                owner_token=owner_token,
+            )
+            await db.commit()
+
+    async def _touch_session(self, session: WorkspaceKernelSession) -> None:
+        session.last_used = datetime.now(UTC)
+        await self._renew_runtime_lease(session)
 
     async def _await_maybe(self, maybe_awaitable: Any) -> None:
         if inspect.isawaitable(maybe_awaitable):

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
+import uuid
 from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...data_access.coordinator import LeaseKinds, ResourceLeaseCoordinator
+from ...data_access.workspace_db import WorkspaceOfflineAdapter
 from ...services.code_executor import reset_workspace_kernel
 from ..db.session import AppDataSessionLocal
 from ..repositories.dataset_deletion_repository import DatasetDeletionRepository
@@ -141,6 +143,7 @@ class DatasetDeletionService:
         table_name: str,
     ) -> None:
         """Execute delete job: release kernel, drop table from workspace DB, update status."""
+        maintenance_owner_token = f"dataset-delete:{job_id}:{uuid.uuid4()}"
         async with AppDataSessionLocal() as session:
             job = await DatasetDeletionRepository.get_by_id(session, job_id)
             if job is None:
@@ -158,16 +161,34 @@ class DatasetDeletionService:
 
             duckdb_path = ""
             async with AppDataSessionLocal() as session:
+                coordinator = ResourceLeaseCoordinator()
+                await coordinator.acquire_workspace_maintenance_lease(
+                    session,
+                    workspace_id=workspace_id,
+                    owner_token=maintenance_owner_token,
+                    metadata={"job_id": job_id, "source": "dataset_deletion"},
+                )
+                await session.commit()
                 workspace = await WorkspaceRepository.get_by_id(session, workspace_id, principal_id)
                 if workspace is not None:
                     duckdb_path = str(workspace.duckdb_path or "").strip()
-
-            if duckdb_path:
-                await asyncio.to_thread(
-                    self._drop_workspace_table,
-                    duckdb_path,
-                    table_name,
+                if duckdb_path:
+                    await WorkspaceOfflineAdapter(
+                        session=session,
+                        owner_token=maintenance_owner_token,
+                        coordinator=coordinator,
+                    ).drop_table(
+                        workspace_id=workspace_id,
+                        workspace_duckdb_path=duckdb_path,
+                        table_name=table_name,
+                    )
+                await coordinator.release_lease(
+                    session,
+                    resource_key=workspace_id,
+                    lease_kind=LeaseKinds.WORKSPACE_MAINTENANCE,
+                    owner_token=maintenance_owner_token,
                 )
+                await session.commit()
 
             async with AppDataSessionLocal() as session:
                 job = await DatasetDeletionRepository.get_by_id(session, job_id)
@@ -177,23 +198,14 @@ class DatasetDeletionService:
                 await session.commit()
         except Exception as exc:  # noqa: BLE001
             async with AppDataSessionLocal() as session:
+                await ResourceLeaseCoordinator().release_lease(
+                    session,
+                    resource_key=workspace_id,
+                    lease_kind=LeaseKinds.WORKSPACE_MAINTENANCE,
+                    owner_token=maintenance_owner_token,
+                )
                 job = await DatasetDeletionRepository.get_by_id(session, job_id)
                 if job is not None:
                     job.status = "failed"
                     job.error_message = str(exc)[:1000]
                 await session.commit()
-
-    @staticmethod
-    def _drop_workspace_table(duckdb_path: str, table_name: str) -> None:
-        """Drop one table from the workspace DuckDB file."""
-        import duckdb
-
-        db_path = Path(duckdb_path).expanduser()
-        if not db_path.exists():
-            return
-        escaped_table = str(table_name).replace('"', '""')
-        conn = duckdb.connect(str(db_path), read_only=False)
-        try:
-            conn.execute(f'DROP TABLE IF EXISTS "{escaped_table}"')
-        finally:
-            conn.close()

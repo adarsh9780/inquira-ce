@@ -10,6 +10,7 @@ from .registry import (
     list_database_specs,
 )
 from .scratchpad_db import ScratchpadOfflineAdapter, ScratchpadRuntimeAdapter
+from .workspace_db import WorkspaceOfflineAdapter, WorkspaceRuntimeAdapter
 
 __all__ = [
     "AccessMode",
@@ -18,6 +19,8 @@ __all__ = [
     "OwnershipMode",
     "ScratchpadOfflineAdapter",
     "ScratchpadRuntimeAdapter",
+    "WorkspaceOfflineAdapter",
+    "WorkspaceRuntimeAdapter",
     "can_accessor_use_database",
     "get_database_spec",
     "list_database_specs",
