@@ -12,7 +12,10 @@ import duckdb
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...services.artifact_scratchpad import ArtifactScratchpadStore
-from ...services.code_executor import materialize_workspace_artifacts_via_kernel
+from ...services.code_executor import (
+    get_workspace_artifact_metadata_via_kernel,
+    materialize_workspace_artifacts_via_kernel,
+)
 from ..repositories.turn_artifact_repository import TurnArtifactRepository
 from .turn_bundle_service import TurnBundleService
 
@@ -137,15 +140,29 @@ class TurnArtifactStorageService:
             needs_scratchpad_lookup = not str(artifact.get("table_name") or "").strip()
         elif kind in {"figure", "scalar", "text", "structured"}:
             needs_scratchpad_lookup = artifact.get("payload") is None
+        scratchpad_fallback_allowed = False
         if needs_scratchpad_lookup and artifact_id:
-            scratchpad_meta = scratchpad.get_artifact(
-                workspace_duckdb_path=workspace_duckdb_path,
-                artifact_id=artifact_id,
-            )
-            if isinstance(scratchpad_meta, dict):
-                source_meta = scratchpad_meta
+            try:
+                kernel_meta = await get_workspace_artifact_metadata_via_kernel(workspace_id, artifact_id)
+            except RuntimeError:
+                kernel_meta = None
+                scratchpad_fallback_allowed = True
+            if isinstance(kernel_meta, dict):
+                source_meta = kernel_meta
+            elif scratchpad_fallback_allowed:
+                scratchpad_meta = scratchpad.get_artifact(
+                    workspace_duckdb_path=workspace_duckdb_path,
+                    artifact_id=artifact_id,
+                )
+                if isinstance(scratchpad_meta, dict):
+                    source_meta = scratchpad_meta
         size_bytes = kernel_materialized_sizes.get(artifact_id)
         if size_bytes is None and not storage_path.exists():
+            if kind == "dataframe" and not scratchpad_fallback_allowed:
+                raise RuntimeError(
+                    "Dataframe artifact export was not materialized by the workspace kernel. "
+                    "Retry after the kernel finishes the run."
+                )
             await asyncio.to_thread(
                 TurnArtifactStorageService._write_artifact_payload,
                 scratchpad_db_path,

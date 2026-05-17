@@ -95,3 +95,134 @@ async def test_persist_turn_artifacts_uses_kernel_materialization_without_direct
     assert captured["conversation_id"] == "conversation-1"
     assert captured["turn_id"] == "turn-1"
     assert len(captured["items"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_persist_turn_artifacts_uses_kernel_metadata_lookup_when_payload_missing(monkeypatch, tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace-2"
+    (workspace_dir / "scratchpad").mkdir(parents=True, exist_ok=True)
+    captured: dict[str, object] = {}
+
+    async def fake_replace_for_turn(session, *, workspace_id, conversation_id, turn_id, items):
+        _ = session
+        captured["items"] = items
+        return []
+
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_storage_service.TurnArtifactRepository.replace_for_turn",
+        fake_replace_for_turn,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.workspace_storage_service.WorkspaceStorageService.build_workspace_dir",
+        lambda username, workspace_id: tmp_path / username / workspace_id,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_storage_service.ArtifactScratchpadStore.get_artifact",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("scratchpad metadata lookup should not run")),
+    )
+
+    async def fake_materialize_workspace_artifacts_via_kernel(workspace_id, specs):
+        assert workspace_id == "workspace-2"
+        for spec in specs:
+            target = Path(spec["storage_path"])
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps({"figure": {"data": [1], "layout": {}}}), encoding="utf-8")
+        return [{"artifact_id": "fig-2", "size_bytes": 39}]
+
+    async def fake_get_workspace_artifact_metadata_via_kernel(workspace_id, artifact_id):
+        assert workspace_id == "workspace-2"
+        assert artifact_id == "fig-2"
+        return {
+            "artifact_id": "fig-2",
+            "kind": "figure",
+            "logical_name": "trend_chart",
+            "payload": {"figure": {"data": [1], "layout": {}}},
+            "created_at": "2026-05-18T04:00:00+00:00",
+        }
+
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_storage_service.materialize_workspace_artifacts_via_kernel",
+        fake_materialize_workspace_artifacts_via_kernel,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_storage_service.get_workspace_artifact_metadata_via_kernel",
+        fake_get_workspace_artifact_metadata_via_kernel,
+    )
+
+    rows = await TurnArtifactStorageService.persist_turn_artifacts(
+        session=SimpleNamespace(),
+        username="alice",
+        workspace_id="workspace-2",
+        conversation_id="conversation-2",
+        turn_id="turn-2",
+        workspace_duckdb_path=str(workspace_dir / "workspace.db"),
+        artifacts=[
+            {
+                "artifact_id": "fig-2",
+                "kind": "figure",
+                "logical_name": "trend_chart",
+            },
+        ],
+    )
+
+    assert rows[0]["payload"]["figure"]["data"] == [1]
+    assert captured["items"][0]["payload"]["figure"]["data"] == [1]
+
+
+@pytest.mark.asyncio
+async def test_persist_turn_artifacts_raises_when_kernel_dataframe_export_missing(monkeypatch, tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace-3"
+    (workspace_dir / "scratchpad").mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_storage_service.TurnArtifactRepository.replace_for_turn",
+        lambda *args, **kwargs: [],
+    )
+    monkeypatch.setattr(
+        "app.v1.services.workspace_storage_service.WorkspaceStorageService.build_workspace_dir",
+        lambda username, workspace_id: tmp_path / username / workspace_id,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_storage_service.ArtifactScratchpadStore.get_artifact",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("scratchpad dataframe lookup should not run")),
+    )
+
+    async def fake_materialize_workspace_artifacts_via_kernel(workspace_id, specs):
+        _ = (workspace_id, specs)
+        return []
+
+    async def fake_get_workspace_artifact_metadata_via_kernel(workspace_id, artifact_id):
+        assert workspace_id == "workspace-3"
+        assert artifact_id == "df-3"
+        return {
+            "artifact_id": "df-3",
+            "kind": "dataframe",
+            "logical_name": "summary_df",
+            "table_name": "art_df_3",
+        }
+
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_storage_service.materialize_workspace_artifacts_via_kernel",
+        fake_materialize_workspace_artifacts_via_kernel,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_storage_service.get_workspace_artifact_metadata_via_kernel",
+        fake_get_workspace_artifact_metadata_via_kernel,
+    )
+
+    with pytest.raises(RuntimeError, match="not materialized by the workspace kernel"):
+        await TurnArtifactStorageService.persist_turn_artifacts(
+            session=SimpleNamespace(),
+            username="alice",
+            workspace_id="workspace-3",
+            conversation_id="conversation-3",
+            turn_id="turn-3",
+            workspace_duckdb_path=str(workspace_dir / "workspace.db"),
+            artifacts=[
+                {
+                    "artifact_id": "df-3",
+                    "kind": "dataframe",
+                    "logical_name": "summary_df",
+                },
+            ],
+        )
