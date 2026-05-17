@@ -95,26 +95,34 @@ class TurnBundleService:
         """Create or refresh conversation.json and return the conversation directory."""
         conversation_dir = TurnBundleService.build_conversation_dir(username, workspace_id, conversation_id)
         manifest_path = TurnBundleService.build_conversation_manifest_path(username, workspace_id, conversation_id)
+        existing_payload: dict[str, Any] = {}
+        if manifest_path.is_file():
+            try:
+                raw_existing = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                raw_existing = {}
+            if isinstance(raw_existing, dict):
+                existing_payload = raw_existing
+
         payload = {
             "conversation_id": conversation_id,
             "workspace_id": workspace_id,
             "updated_at": datetime.now(UTC).isoformat(),
         }
-        if not manifest_path.exists():
+        if not existing_payload:
             payload["created_at"] = payload["updated_at"]
-        elif manifest_path.is_file():
-            try:
-                existing = json.loads(manifest_path.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
-                existing = {}
-            if isinstance(existing, dict) and existing.get("created_at"):
-                payload["created_at"] = existing["created_at"]
+        elif existing_payload.get("created_at"):
+            payload["created_at"] = existing_payload["created_at"]
+        merged_payload = {
+            **existing_payload,
+            **payload,
+        }
         if manifest:
-            payload.update(manifest)
+            merged_payload.update(manifest)
 
         def _write() -> None:
             conversation_dir.mkdir(parents=True, exist_ok=True)
-            manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            manifest_path.write_text(json.dumps(merged_payload, indent=2), encoding="utf-8")
 
         await asyncio.to_thread(_write)
         return conversation_dir

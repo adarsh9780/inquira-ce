@@ -30,6 +30,7 @@ from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
 from .v1.services.workspace_deletion_service import WorkspaceDeletionService
 from .v1.services.dataset_deletion_service import DatasetDeletionService
 from .v1.services.dataset_ingestion_service import DatasetIngestionService
+from .v1.services.conversation_migration_service import ConversationMigrationService
 from .v1.services.storage_cleanup_service import StorageCleanupService
 from .core.config_models import AppConfig
 from .core.logger import logprint, patch_print
@@ -142,6 +143,10 @@ async def lifespan(app: FastAPI):
     logprint("Session cleanup worker started")
     storage_cleanup_task = asyncio.create_task(app.state.storage_cleanup_service.worker_loop())
     logprint("Storage cleanup worker started")
+    conversation_migration_task = asyncio.create_task(
+        ConversationMigrationService.migrate_pending_conversations_once()
+    )
+    logprint("Conversation storage migration worker started")
 
     yield
 
@@ -149,12 +154,17 @@ async def lifespan(app: FastAPI):
     logprint("Shutting down API server")
     cleanup_task.cancel()
     storage_cleanup_task.cancel()
+    conversation_migration_task.cancel()
     try:
         await cleanup_task
     except asyncio.CancelledError:
         pass
     try:
         await storage_cleanup_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await conversation_migration_task
     except asyncio.CancelledError:
         pass
 

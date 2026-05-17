@@ -8,16 +8,20 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..db.session import AppDataSessionLocal
 from ..models import Turn
 from ..repositories.conversation_repository import ConversationRepository
+from ..repositories.principal_repository import PrincipalRepository
+from ..repositories.turn_artifact_repository import TurnArtifactRepository
 from .conversation_service import ConversationService
+from .turn_artifact_storage_service import TurnArtifactStorageService
 from .turn_bundle_service import TurnBundleService
 
 
 class ConversationMigrationService:
     """Backfill older linear conversations into the new turn-based structure."""
 
-    CURRENT_MIGRATION_VERSION = 1
+    CURRENT_MIGRATION_VERSION = 2
 
     @staticmethod
     def _safe_json(raw: str | None) -> dict[str, Any]:
@@ -62,6 +66,26 @@ class ConversationMigrationService:
         ]
 
     @staticmethod
+    async def migrate_pending_conversations_once(limit: int = 100) -> None:
+        """Backfill conversations that still predate the storage migration version."""
+        async with AppDataSessionLocal() as session:
+            conversations = await ConversationRepository.list_conversations_needing_migration(
+                session,
+                target_version=ConversationMigrationService.CURRENT_MIGRATION_VERSION,
+                limit=limit,
+            )
+            for conversation in conversations:
+                principal = await PrincipalRepository.get_by_id(session, conversation.created_by_principal_id)
+                if principal is None:
+                    continue
+                await ConversationMigrationService.migrate_conversation(
+                    session=session,
+                    principal_id=principal.id,
+                    conversation_id=conversation.id,
+                    username=principal.username_cached,
+                )
+
+    @staticmethod
     async def migrate_conversation(
         session: AsyncSession,
         principal_id: str,
@@ -73,7 +97,16 @@ class ConversationMigrationService:
         conversation = await ConversationRepository.get_conversation(session, conversation_id)
         if conversation is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
-        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
+        workspace = await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
+        await TurnBundleService.create_or_update_conversation_bundle(
+            username=username,
+            workspace_id=conversation.workspace_id,
+            conversation_id=conversation.id,
+            manifest={"title": str(getattr(conversation, "title", "") or "")},
+        )
+        conversation.storage_path = str(
+            TurnBundleService.build_conversation_dir(username, conversation.workspace_id, conversation.id)
+        )
 
         turns = await ConversationRepository.list_turns_in_sequence(session, conversation_id)
         previous_turn: Turn | None = None
@@ -93,23 +126,57 @@ class ConversationMigrationService:
             if turn.execution_summary_json:
                 manifest["execution"] = ConversationMigrationService._safe_json(turn.execution_summary_json)
 
-            needs_bundle = not str(turn.manifest_path or "").strip() or not str(turn.code_path or "").strip()
-            if needs_bundle:
-                turn_dir = await TurnBundleService.create_turn_bundle(
-                    username=username,
-                    workspace_id=conversation.workspace_id,
-                    conversation_id=conversation.id,
-                    turn_id=turn.id,
-                    user_text=turn.user_text,
-                    assistant_text=turn.assistant_text,
-                    code=str(turn.code_snapshot or ""),
-                    manifest=manifest,
-                )
-                turn.code_path = str(turn_dir / "analysis.py")
-                turn.manifest_path = str(turn_dir / "turn.json")
+            existing_artifact_rows = await TurnArtifactRepository.list_for_turn(
+                session,
+                turn.id,
+                include_deleted=True,
+            )
+            if artifact_summary and not existing_artifact_rows:
+                resolvable_artifacts = [
+                    item for item in artifact_summary if str(item.get("artifact_id") or "").strip()
+                ]
+                if resolvable_artifacts and str(getattr(workspace, "duckdb_path", "") or "").strip():
+                    persisted_artifacts = await TurnArtifactStorageService.persist_turn_artifacts(
+                        session=session,
+                        username=username,
+                        workspace_id=conversation.workspace_id,
+                        conversation_id=conversation.id,
+                        turn_id=turn.id,
+                        workspace_duckdb_path=str(workspace.duckdb_path),
+                        artifacts=resolvable_artifacts,
+                    )
+                    artifact_summary = [
+                        {
+                            "artifact_id": str(item.get("artifact_id") or ""),
+                            "kind": str(item.get("kind") or ""),
+                            "path": str(item.get("storage_path") or ""),
+                            "payload_format": str(item.get("payload_format") or ""),
+                        }
+                        for item in persisted_artifacts
+                    ]
+                else:
+                    artifact_summary = [
+                        {
+                            **item,
+                            "status": "legacy_orphan",
+                        }
+                        for item in artifact_summary
+                    ]
 
-            if not str(turn.artifact_summary_json or "").strip():
-                turn.artifact_summary_json = json.dumps(artifact_summary)
+            turn_dir = await TurnBundleService.create_turn_bundle(
+                username=username,
+                workspace_id=conversation.workspace_id,
+                conversation_id=conversation.id,
+                turn_id=turn.id,
+                user_text=turn.user_text,
+                assistant_text=turn.assistant_text,
+                code=str(turn.code_snapshot or ""),
+                manifest=manifest | {"artifacts": artifact_summary},
+            )
+            turn.storage_path = str(turn_dir)
+            turn.code_path = str(TurnBundleService.build_turn_code_path(username, conversation.workspace_id, conversation.id, turn.id))
+            turn.manifest_path = str(TurnBundleService.build_turn_manifest_path(username, conversation.workspace_id, conversation.id, turn.id))
+            turn.artifact_summary_json = json.dumps(artifact_summary)
 
             migrated_turn_ids.append(turn.id)
             previous_turn = turn

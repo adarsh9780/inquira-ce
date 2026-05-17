@@ -134,6 +134,24 @@ class ConversationRepository:
         return list(result.scalars().all())
 
     @staticmethod
+    async def list_conversations_needing_migration(
+        session: AsyncSession,
+        *,
+        target_version: int,
+        limit: int = 100,
+    ) -> list[Conversation]:
+        result = await session.execute(
+            select(Conversation)
+            .where(
+                Conversation.is_marked_for_deletion.is_(False),
+                ((Conversation.migration_version.is_(None)) | (Conversation.migration_version < target_version)),
+            )
+            .order_by(Conversation.created_at.asc(), Conversation.id.asc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
     async def list_turns_marked_for_deletion(
         session: AsyncSession,
         *,
