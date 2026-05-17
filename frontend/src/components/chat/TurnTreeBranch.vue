@@ -24,6 +24,7 @@
         :class="isCurrent ? 'border-[var(--color-border-hover)]' : 'border-[var(--color-border)]'"
         :style="cardStyle"
         @click="emit('select', node.id)"
+        @contextmenu.prevent="openContextMenu"
       >
         <div class="flex items-start gap-2">
           <div class="min-w-0 flex-1">
@@ -33,22 +34,6 @@
             <p class="mt-0.5 truncate text-[10px] leading-[0.95rem] text-[var(--color-text-muted)]">
               {{ answerLine }}
             </p>
-          </div>
-
-          <div class="flex shrink-0 items-center gap-1 pl-1">
-            <button
-              type="button"
-              class="opacity-0 transition-opacity group-hover/node:opacity-100"
-              title="Mark final"
-              @click.stop="emit('mark-final', node.id)"
-            >
-              <span
-                class="inline-flex rounded-full border px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.08em]"
-                style="border-color: var(--color-border); color: var(--color-text-muted);"
-              >
-                Mark final
-              </span>
-            </button>
           </div>
         </div>
       </button>
@@ -60,9 +45,11 @@
         :key="child.id"
         :node="child"
         :current-turn-id="currentTurnId"
+        :current-parent-turn-id="currentParentTurnId"
         :final-turn-id="finalTurnId"
         @select="emit('select', $event)"
         @mark-final="emit('mark-final', $event)"
+        @open-context-menu="emit('open-context-menu', $event)"
       />
     </div>
   </div>
@@ -84,19 +71,23 @@ const props = defineProps({
     type: String,
     default: ''
   },
+  currentParentTurnId: {
+    type: String,
+    default: ''
+  },
   finalTurnId: {
     type: String,
     default: ''
   }
 })
 
-const emit = defineEmits(['select', 'mark-final'])
+const emit = defineEmits(['select', 'mark-final', 'open-context-menu'])
 
 const isCollapsed = ref(false)
 
 const hasChildren = computed(() => Array.isArray(props.node?.children) && props.node.children.length > 0)
 const isCurrent = computed(() => String(props.currentTurnId || '').trim() === String(props.node?.id || '').trim())
-const isFinal = computed(() => String(props.finalTurnId || '').trim() === String(props.node?.id || '').trim())
+const isCurrentParent = computed(() => String(props.currentParentTurnId || '').trim() === String(props.node?.id || '').trim())
 const questionLine = computed(() => {
   const value = String(props.node?.user_text || '').trim()
   return value || `Turn ${props.node?.seq_no || ''}`.trim()
@@ -108,11 +99,21 @@ const answerLine = computed(() => {
 const cardStyle = computed(() => ({
   boxShadow: 'none',
   backgroundColor: isCurrent.value
-    ? 'color-mix(in srgb, var(--color-accent) 6%, var(--color-base))'
-    : 'transparent',
+    ? 'color-mix(in srgb, var(--color-accent) 10%, var(--color-base))'
+    : (isCurrentParent.value
+        ? 'color-mix(in srgb, var(--color-text-main) 4%, var(--color-base))'
+        : 'transparent'),
 }))
 
 function toggleCollapsed() {
   isCollapsed.value = !isCollapsed.value
+}
+
+function openContextMenu(event) {
+  emit('open-context-menu', {
+    turnId: String(props.node?.id || '').trim(),
+    x: Number(event?.clientX || 0),
+    y: Number(event?.clientY || 0),
+  })
 }
 </script>

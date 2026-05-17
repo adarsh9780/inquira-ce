@@ -203,7 +203,9 @@
     <TurnTreeModal
       :is-open="turnTreeModalOpen"
       :roots="appStore.activeTurnTree?.roots || []"
+      :conversation-id="appStore.activeConversationId"
       :current-turn-id="appStore.activeTurnId"
+      :current-parent-turn-id="appStore.activeTurnRelations?.parent?.id || ''"
       :final-turn-id="appStore.finalTurnId"
       @close="closeTurnTreeModal"
       @select="selectTurnTreeNode"
