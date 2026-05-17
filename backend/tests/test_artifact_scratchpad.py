@@ -379,6 +379,31 @@ def test_get_workspace_artifact_usage_reports_duckdb_bytes_and_ready_figure_coun
     assert usage["figure_count"] == 1
 
 
+def test_get_workspace_artifact_usage_tolerates_lock_conflict_and_returns_file_bytes(monkeypatch, tmp_path):
+    workspace_db = tmp_path / "ws_usage_locked" / "workspace.duckdb"
+    workspace_db.parent.mkdir(parents=True, exist_ok=True)
+    workspace_db.touch()
+
+    store = ArtifactScratchpadStore()
+    scratchpad_db = store.ensure_workspace(str(workspace_db))
+
+    def raise_lock_conflict(workspace_duckdb_path: str):
+        _ = workspace_duckdb_path
+        raise duckdb.IOException(
+            f'IO Error: Could not set lock on file "{scratchpad_db}": '
+            "Conflicting lock is held in /tmp/python (PID 123)"
+        )
+
+    monkeypatch.setattr(store, "_open_readonly", raise_lock_conflict)
+
+    usage = store.get_workspace_artifact_usage(workspace_duckdb_path=str(workspace_db))
+
+    assert usage == {
+        "duckdb_bytes": scratchpad_db.stat().st_size,
+        "figure_count": 0,
+    }
+
+
 def test_list_artifacts_for_workspace_deduplicates_by_logical_name(tmp_path):
     """Regression: the UNIQUE(workspace_id, kind, logical_name) constraint must prevent duplicate rows.
 

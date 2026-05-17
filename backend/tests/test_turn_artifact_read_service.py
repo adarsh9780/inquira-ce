@@ -142,3 +142,58 @@ async def test_turn_artifact_read_service_delete_removes_file_and_manifest_entry
     assert committed["value"] is True
     assert json.loads(turn.artifact_summary_json) == [{"artifact_id": "artifact-2"}]
     assert updated_manifest["artifacts"] == [{"artifact_id": "artifact-2"}]
+
+
+@pytest.mark.asyncio
+async def test_turn_artifact_read_service_prefers_kernel_usage_for_legacy_scratchpad(monkeypatch, tmp_path) -> None:
+    artifact_path = tmp_path / "artifact.json"
+    artifact_path.write_text('{"figure": {"data": []}}', encoding="utf-8")
+    row = SimpleNamespace(
+        id="row-1",
+        artifact_id="artifact-1",
+        workspace_id="workspace-1",
+        conversation_id="conversation-1",
+        turn_id="turn-1",
+        logical_name="chart",
+        kind="figure",
+        payload_format="json",
+        storage_path=str(artifact_path),
+        created_at=SimpleNamespace(isoformat=lambda: "2026-05-17T00:00:00+00:00"),
+        status="active",
+    )
+
+    async def fake_list_for_workspace(session, workspace_id, *, kind=None, statuses=("active",)):
+        _ = (session, workspace_id, kind, statuses)
+        return [row]
+
+    async def fake_kernel_usage(workspace_id: str):
+        assert workspace_id == "workspace-1"
+        return {"duckdb_bytes": 128, "figure_count": 3}
+
+    def fail_if_called(*args, **kwargs):
+        _ = (args, kwargs)
+        raise AssertionError("scratchpad usage fallback should not be used when kernel usage succeeds")
+
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_read_service.TurnArtifactRepository.list_for_workspace",
+        fake_list_for_workspace,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_read_service.get_workspace_artifact_usage_via_kernel",
+        fake_kernel_usage,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_read_service.ArtifactScratchpadStore.get_workspace_artifact_usage",
+        fail_if_called,
+    )
+
+    usage = await TurnArtifactReadService.get_workspace_artifact_usage(
+        SimpleNamespace(),
+        workspace_id="workspace-1",
+        workspace_duckdb_path=str(tmp_path / "workspace.duckdb"),
+    )
+
+    assert usage == {
+        "duckdb_bytes": artifact_path.stat().st_size + 128,
+        "figure_count": 4,
+    }

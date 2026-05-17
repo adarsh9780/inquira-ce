@@ -655,7 +655,12 @@ class ArtifactScratchpadStore:
         """Return lightweight scratchpad usage metrics for workspace warning UX."""
         db_path = self.build_scratchpad_db_path(workspace_duckdb_path)
         duckdb_bytes = int(db_path.stat().st_size) if db_path.exists() else 0
-        con = self._open_readonly(workspace_duckdb_path)
+        try:
+            con = self._open_readonly(workspace_duckdb_path)
+        except duckdb.IOException as exc:
+            if self._is_lock_conflict(exc):
+                return {"duckdb_bytes": duckdb_bytes, "figure_count": 0}
+            raise
         if con is None:
             return {"duckdb_bytes": duckdb_bytes, "figure_count": 0}
 
