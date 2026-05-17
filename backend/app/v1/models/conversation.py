@@ -15,7 +15,20 @@ class Conversation(AppDataBase):
     """Conversation container within a workspace."""
 
     __tablename__ = "v1_conversations"
-    __table_args__ = (Index("ix_v1_conversations_workspace_updated", "workspace_id", "updated_at"),)
+    __table_args__ = (
+        Index("ix_v1_conversations_workspace_updated", "workspace_id", "updated_at"),
+        Index(
+            "ix_v1_conversations_workspace_visible_updated",
+            "workspace_id",
+            "is_marked_for_deletion",
+            "updated_at",
+        ),
+        Index(
+            "ix_v1_conversations_delete_sweep",
+            "is_marked_for_deletion",
+            "marked_for_deletion_at",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     workspace_id: Mapped[str] = mapped_column(ForeignKey("v1_workspaces.id", ondelete="CASCADE"), index=True, nullable=False)
@@ -34,6 +47,21 @@ class Conversation(AppDataBase):
     schema_memory_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     branch_summary_json: Mapped[str | None] = mapped_column(String, nullable=True)
     migration_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    storage_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    is_marked_for_deletion: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+    )
+    marked_for_deletion_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deletion_status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="active",
+        server_default="active",
+    )
+    deletion_error: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     last_turn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -46,6 +74,12 @@ class Conversation(AppDataBase):
         cascade="all, delete-orphan",
         foreign_keys="Turn.conversation_id",
     )
+    turn_artifacts = relationship(
+        "TurnArtifact",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        foreign_keys="TurnArtifact.conversation_id",
+    )
     final_turn = relationship("Turn", foreign_keys=[final_turn_id], post_update=True)
 
 
@@ -56,6 +90,14 @@ class Turn(AppDataBase):
     __table_args__ = (
         UniqueConstraint("conversation_id", "seq_no", name="uq_v1_turn_seq"),
         Index("ix_v1_turns_conversation_created", "conversation_id", "created_at", "id"),
+        Index(
+            "ix_v1_turns_conversation_visible_created",
+            "conversation_id",
+            "is_marked_for_deletion",
+            "created_at",
+            "id",
+        ),
+        Index("ix_v1_turns_delete_sweep", "is_marked_for_deletion", "marked_for_deletion_at"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -73,6 +115,21 @@ class Turn(AppDataBase):
     artifact_summary_json: Mapped[str | None] = mapped_column(String, nullable=True)
     schema_usage_json: Mapped[str | None] = mapped_column(String, nullable=True)
     execution_summary_json: Mapped[str | None] = mapped_column(String, nullable=True)
+    storage_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    is_marked_for_deletion: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+    )
+    marked_for_deletion_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deletion_status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="active",
+        server_default="active",
+    )
+    deletion_error: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     user_text: Mapped[str] = mapped_column(String, nullable=False)
     assistant_text: Mapped[str] = mapped_column(String, nullable=False)
     tool_events_json: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -82,3 +139,47 @@ class Turn(AppDataBase):
 
     conversation = relationship("Conversation", back_populates="turns", foreign_keys=[conversation_id])
     parent_turn = relationship("Turn", remote_side=[id], foreign_keys=[parent_turn_id])
+    artifacts = relationship(
+        "TurnArtifact",
+        back_populates="turn",
+        cascade="all, delete-orphan",
+        foreign_keys="TurnArtifact.turn_id",
+    )
+
+
+class TurnArtifact(AppDataBase):
+    """Metadata record for one artifact owned by a turn folder."""
+
+    __tablename__ = "v1_turn_artifacts"
+    __table_args__ = (
+        Index("ix_v1_turn_artifacts_workspace_status_created", "workspace_id", "status", "created_at"),
+        Index("ix_v1_turn_artifacts_turn_status", "turn_id", "status"),
+        Index("ix_v1_turn_artifacts_conversation_status", "conversation_id", "status"),
+        Index("ix_v1_turn_artifacts_delete_sweep", "status", "deleted_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("v1_workspaces.id", ondelete="CASCADE"), index=True, nullable=False)
+    conversation_id: Mapped[str] = mapped_column(
+        ForeignKey("v1_conversations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    turn_id: Mapped[str] = mapped_column(ForeignKey("v1_turns.id", ondelete="CASCADE"), index=True, nullable=False)
+    artifact_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    kind: Mapped[str] = mapped_column(String(64), nullable=False)
+    logical_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    storage_path: Mapped[str] = mapped_column(String(1024), nullable=False)
+    payload_format: Mapped[str] = mapped_column(String(32), nullable=False)
+    size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="active",
+        server_default="active",
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    conversation = relationship("Conversation", back_populates="turn_artifacts", foreign_keys=[conversation_id])
+    turn = relationship("Turn", back_populates="artifacts", foreign_keys=[turn_id])

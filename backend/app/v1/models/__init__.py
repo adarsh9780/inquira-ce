@@ -1,6 +1,6 @@
 """ORM model exports for API v1."""
 
-from .conversation import Conversation, Turn
+from .conversation import Conversation, Turn, TurnArtifact
 from .enums import UserPlan
 from .preferences import UserPreferences
 from .user import User
@@ -25,4 +25,5 @@ __all__ = [
     "WorkspaceDatasetIngestionJob",
     "Conversation",
     "Turn",
+    "TurnArtifact",
 ]
