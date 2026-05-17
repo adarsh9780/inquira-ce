@@ -25,4 +25,7 @@ test('turn tree flow loads the full tree and restores state from modal selection
   assert.equal(branchSource.includes('Mark final'), true)
   assert.equal(branchSource.includes('No response saved'), true)
   assert.equal(branchSource.includes("{{ isCollapsed ? '+' : '−' }}"), true)
+  assert.equal(branchSource.includes('ml-1 border-l border-[var(--color-border)] pl-2'), true)
+  assert.equal(branchSource.includes('v-if="isFinal"'), false)
+  assert.equal(branchSource.includes('v-if="isCurrent"'), false)
 })
