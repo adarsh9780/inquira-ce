@@ -11,11 +11,8 @@ from typing import Any
 import duckdb
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...data_access import ScratchpadOfflineAdapter, ScratchpadRuntimeAdapter
 from ...services.artifact_scratchpad import ArtifactScratchpadStore
-from ...services.code_executor import (
-    get_workspace_artifact_metadata_via_kernel,
-    materialize_workspace_artifacts_via_kernel,
-)
 from ..repositories.turn_artifact_repository import TurnArtifactRepository
 from .turn_bundle_service import TurnBundleService
 
@@ -33,6 +30,7 @@ class TurnArtifactStorageService:
         turn_id: str,
         workspace_duckdb_path: str,
         artifacts: list[dict[str, Any]] | None,
+        offline_lease_owner_token: str | None = None,
     ) -> list[dict[str, Any]]:
         normalized_artifacts = [item for item in (artifacts or []) if isinstance(item, dict)]
         artifacts_dir = TurnBundleService.build_turn_artifacts_dir(
@@ -41,8 +39,7 @@ class TurnArtifactStorageService:
             conversation_id,
             turn_id,
         )
-        scratchpad = ArtifactScratchpadStore()
-        scratchpad_db_path = scratchpad.build_scratchpad_db_path(workspace_duckdb_path)
+        scratchpad_db_path = ArtifactScratchpadStore.build_scratchpad_db_path(workspace_duckdb_path)
 
         def _reset_artifacts_dir() -> None:
             if artifacts_dir.exists():
@@ -74,7 +71,10 @@ class TurnArtifactStorageService:
         ]
         if kernel_specs:
             try:
-                materialized = await materialize_workspace_artifacts_via_kernel(workspace_id, kernel_specs)
+                materialized = await ScratchpadRuntimeAdapter().materialize_workspace_artifacts(
+                    workspace_id=workspace_id,
+                    specs=kernel_specs,
+                )
             except RuntimeError:
                 materialized = []
             materialized_sizes = {
@@ -94,8 +94,9 @@ class TurnArtifactStorageService:
                     workspace_duckdb_path=workspace_duckdb_path,
                     scratchpad_db_path=scratchpad_db_path,
                     artifact=item,
-                    scratchpad=scratchpad,
                     kernel_materialized_sizes=materialized_sizes,
+                    session=session,
+                    offline_lease_owner_token=offline_lease_owner_token,
                 )
             )
 
@@ -118,8 +119,9 @@ class TurnArtifactStorageService:
         workspace_duckdb_path: str,
         scratchpad_db_path: Path,
         artifact: dict[str, Any],
-        scratchpad: ArtifactScratchpadStore,
         kernel_materialized_sizes: dict[str, int | None],
+        session: AsyncSession,
+        offline_lease_owner_token: str | None,
     ) -> dict[str, Any]:
         artifact_id = str(artifact.get("artifact_id") or "").strip()
         kind = str(artifact.get("kind") or "").strip().lower() or "scalar"
@@ -143,14 +145,21 @@ class TurnArtifactStorageService:
         scratchpad_fallback_allowed = False
         if needs_scratchpad_lookup and artifact_id:
             try:
-                kernel_meta = await get_workspace_artifact_metadata_via_kernel(workspace_id, artifact_id)
+                kernel_meta = await ScratchpadRuntimeAdapter().get_workspace_artifact_metadata(
+                    workspace_id=workspace_id,
+                    artifact_id=artifact_id,
+                )
             except RuntimeError:
                 kernel_meta = None
-                scratchpad_fallback_allowed = True
+                scratchpad_fallback_allowed = bool(offline_lease_owner_token)
             if isinstance(kernel_meta, dict):
                 source_meta = kernel_meta
             elif scratchpad_fallback_allowed:
-                scratchpad_meta = scratchpad.get_artifact(
+                scratchpad_meta = await ScratchpadOfflineAdapter(
+                    session=session,
+                    owner_token=str(offline_lease_owner_token),
+                ).get_workspace_artifact_metadata(
+                    workspace_id=workspace_id,
                     workspace_duckdb_path=workspace_duckdb_path,
                     artifact_id=artifact_id,
                 )
@@ -163,6 +172,12 @@ class TurnArtifactStorageService:
                     "Dataframe artifact export was not materialized by the workspace kernel. "
                     "Retry after the kernel finishes the run."
                 )
+            if not scratchpad_fallback_allowed and kind in {"figure", "scalar", "text", "structured"}:
+                serializable_payload = source_meta.get("payload")
+                if serializable_payload is None:
+                    raise RuntimeError(
+                        "Artifact payload metadata is unavailable because the workspace kernel is not active."
+                    )
             await asyncio.to_thread(
                 TurnArtifactStorageService._write_artifact_payload,
                 scratchpad_db_path,

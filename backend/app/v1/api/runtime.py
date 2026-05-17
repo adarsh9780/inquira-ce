@@ -17,19 +17,16 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...data_access import ScratchpadRuntimeAdapter
 from ...services.code_executor import (
     bootstrap_workspace_runtime,
-    delete_workspace_artifact_via_kernel,
     execute_code,
-    get_workspace_artifact_metadata_via_kernel,
-    get_workspace_artifact_usage_via_kernel,
     get_workspace_columns_via_kernel,
     get_workspace_dataframe_rows,
     get_workspace_kernel_status,
     get_workspace_run_exports,
     get_workspace_table_schema_via_kernel,
     interrupt_workspace_kernel,
-    list_workspace_artifacts_via_kernel,
     reset_workspace_kernel,
 )
 from ...services.output_capture import build_run_wrapped_code
@@ -1457,7 +1454,7 @@ async def get_workspace_artifact_metadata(
     )
     if artifact is None:
         try:
-            artifact = await get_workspace_artifact_metadata_via_kernel(
+            artifact = await ScratchpadRuntimeAdapter().get_workspace_artifact_metadata(
                 workspace_id=workspace_id,
                 artifact_id=artifact_id,
             )
@@ -1486,7 +1483,7 @@ async def delete_workspace_artifact(
     )
     if not deleted:
         try:
-            deleted = await delete_workspace_artifact_via_kernel(
+            deleted = await ScratchpadRuntimeAdapter().delete_workspace_artifact(
                 workspace_id=workspace_id,
                 artifact_id=artifact_id,
             )
@@ -1519,7 +1516,10 @@ async def list_workspace_artifacts(
     )
     seen_artifact_ids = {str(item.get("artifact_id") or "") for item in items}
     try:
-        legacy_items = await list_workspace_artifacts_via_kernel(workspace_id, kind=kind)
+        legacy_items = await ScratchpadRuntimeAdapter().list_workspace_artifacts(
+            workspace_id=workspace_id,
+            kind=kind,
+        )
     except RuntimeError:
         legacy_items = []
     for legacy_item in legacy_items:

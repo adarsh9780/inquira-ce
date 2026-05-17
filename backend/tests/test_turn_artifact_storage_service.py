@@ -36,7 +36,8 @@ async def test_persist_turn_artifacts_uses_kernel_materialization_without_direct
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("scratchpad lookup should not run during live export")),
     )
 
-    async def fake_materialize_workspace_artifacts_via_kernel(workspace_id, specs):
+    async def fake_materialize_workspace_artifacts_via_kernel(self, workspace_id, specs):
+        _ = self
         assert workspace_id == "workspace-1"
         for spec in specs:
             target = Path(spec["storage_path"])
@@ -51,7 +52,7 @@ async def test_persist_turn_artifacts_uses_kernel_materialization_without_direct
         ]
 
     monkeypatch.setattr(
-        "app.v1.services.turn_artifact_storage_service.materialize_workspace_artifacts_via_kernel",
+        "app.v1.services.turn_artifact_storage_service.ScratchpadRuntimeAdapter.materialize_workspace_artifacts",
         fake_materialize_workspace_artifacts_via_kernel,
     )
 
@@ -121,7 +122,8 @@ async def test_persist_turn_artifacts_uses_kernel_metadata_lookup_when_payload_m
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("scratchpad metadata lookup should not run")),
     )
 
-    async def fake_materialize_workspace_artifacts_via_kernel(workspace_id, specs):
+    async def fake_materialize_workspace_artifacts_via_kernel(self, workspace_id, specs):
+        _ = self
         assert workspace_id == "workspace-2"
         for spec in specs:
             target = Path(spec["storage_path"])
@@ -129,7 +131,8 @@ async def test_persist_turn_artifacts_uses_kernel_metadata_lookup_when_payload_m
             target.write_text(json.dumps({"figure": {"data": [1], "layout": {}}}), encoding="utf-8")
         return [{"artifact_id": "fig-2", "size_bytes": 39}]
 
-    async def fake_get_workspace_artifact_metadata_via_kernel(workspace_id, artifact_id):
+    async def fake_get_workspace_artifact_metadata_via_kernel(self, workspace_id, artifact_id):
+        _ = self
         assert workspace_id == "workspace-2"
         assert artifact_id == "fig-2"
         return {
@@ -141,11 +144,11 @@ async def test_persist_turn_artifacts_uses_kernel_metadata_lookup_when_payload_m
         }
 
     monkeypatch.setattr(
-        "app.v1.services.turn_artifact_storage_service.materialize_workspace_artifacts_via_kernel",
+        "app.v1.services.turn_artifact_storage_service.ScratchpadRuntimeAdapter.materialize_workspace_artifacts",
         fake_materialize_workspace_artifacts_via_kernel,
     )
     monkeypatch.setattr(
-        "app.v1.services.turn_artifact_storage_service.get_workspace_artifact_metadata_via_kernel",
+        "app.v1.services.turn_artifact_storage_service.ScratchpadRuntimeAdapter.get_workspace_artifact_metadata",
         fake_get_workspace_artifact_metadata_via_kernel,
     )
 
@@ -187,11 +190,12 @@ async def test_persist_turn_artifacts_raises_when_kernel_dataframe_export_missin
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("scratchpad dataframe lookup should not run")),
     )
 
-    async def fake_materialize_workspace_artifacts_via_kernel(workspace_id, specs):
-        _ = (workspace_id, specs)
+    async def fake_materialize_workspace_artifacts_via_kernel(self, workspace_id, specs):
+        _ = (self, workspace_id, specs)
         return []
 
-    async def fake_get_workspace_artifact_metadata_via_kernel(workspace_id, artifact_id):
+    async def fake_get_workspace_artifact_metadata_via_kernel(self, workspace_id, artifact_id):
+        _ = self
         assert workspace_id == "workspace-3"
         assert artifact_id == "df-3"
         return {
@@ -202,11 +206,11 @@ async def test_persist_turn_artifacts_raises_when_kernel_dataframe_export_missin
         }
 
     monkeypatch.setattr(
-        "app.v1.services.turn_artifact_storage_service.materialize_workspace_artifacts_via_kernel",
+        "app.v1.services.turn_artifact_storage_service.ScratchpadRuntimeAdapter.materialize_workspace_artifacts",
         fake_materialize_workspace_artifacts_via_kernel,
     )
     monkeypatch.setattr(
-        "app.v1.services.turn_artifact_storage_service.get_workspace_artifact_metadata_via_kernel",
+        "app.v1.services.turn_artifact_storage_service.ScratchpadRuntimeAdapter.get_workspace_artifact_metadata",
         fake_get_workspace_artifact_metadata_via_kernel,
     )
 

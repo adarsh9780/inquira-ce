@@ -150,6 +150,25 @@ class ResourceLeaseCoordinator:
                 f"Conflicting active lease {conflict.lease_kind} exists for {resource_type}:{resource_key}."
             )
 
+    async def assert_owned_lease(
+        self,
+        session: AsyncSession,
+        *,
+        resource_key: str,
+        lease_kind: str,
+        owner_token: str,
+    ) -> ResourceLease:
+        lease = await self._get_lease(session, resource_key=resource_key, lease_kind=lease_kind)
+        if (
+            lease is None
+            or lease.owner_token != owner_token
+            or self._normalize_dt(lease.leased_until) <= datetime.now(UTC)
+        ):
+            raise LeaseConflictError(
+                f"Active owned lease {lease_kind} is required for {resource_key}."
+            )
+        return lease
+
     async def _acquire_lease(
         self,
         session: AsyncSession,
@@ -225,3 +244,9 @@ class ResourceLeaseCoordinator:
 
     def _expires_at(self) -> datetime:
         return datetime.now(UTC) + self._lease_delta
+
+    @staticmethod
+    def _normalize_dt(value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)

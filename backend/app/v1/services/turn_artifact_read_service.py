@@ -10,8 +10,8 @@ from typing import Any
 import duckdb
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...data_access import ScratchpadRuntimeAdapter
 from ...services.artifact_scratchpad import ArtifactScratchpadStore
-from ...services.code_executor import get_workspace_artifact_usage_via_kernel
 from ..models import Turn
 from ..repositories.turn_artifact_repository import TurnArtifactRepository
 from ..repositories.conversation_repository import ConversationRepository
@@ -117,11 +117,11 @@ class TurnArtifactReadService:
                 figure_count += 1
 
         try:
-            legacy_usage = await get_workspace_artifact_usage_via_kernel(workspace_id)
-        except RuntimeError:
-            legacy_usage = ArtifactScratchpadStore().get_workspace_artifact_usage(
-                workspace_duckdb_path=workspace_duckdb_path
+            legacy_usage = await ScratchpadRuntimeAdapter().get_workspace_artifact_usage(
+                workspace_id=workspace_id
             )
+        except RuntimeError:
+            legacy_usage = {"duckdb_bytes": 0, "figure_count": 0}
         return {
             "duckdb_bytes": file_bytes + int(legacy_usage.get("duckdb_bytes") or 0),
             "figure_count": figure_count + int(legacy_usage.get("figure_count") or 0),

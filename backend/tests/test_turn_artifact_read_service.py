@@ -166,7 +166,8 @@ async def test_turn_artifact_read_service_prefers_kernel_usage_for_legacy_scratc
         _ = (session, workspace_id, kind, statuses)
         return [row]
 
-    async def fake_kernel_usage(workspace_id: str):
+    async def fake_kernel_usage(self, workspace_id: str):
+        _ = self
         assert workspace_id == "workspace-1"
         return {"duckdb_bytes": 128, "figure_count": 3}
 
@@ -179,7 +180,7 @@ async def test_turn_artifact_read_service_prefers_kernel_usage_for_legacy_scratc
         fake_list_for_workspace,
     )
     monkeypatch.setattr(
-        "app.v1.services.turn_artifact_read_service.get_workspace_artifact_usage_via_kernel",
+        "app.v1.services.turn_artifact_read_service.ScratchpadRuntimeAdapter.get_workspace_artifact_usage",
         fake_kernel_usage,
     )
     monkeypatch.setattr(
