@@ -28,3 +28,16 @@ test('current selection is preserved when no newer artifact is pending', () => {
 
   assert.equal(selected, 'artifact-old')
 })
+
+test('turn-specific remembered selection beats stale selection from a different turn', () => {
+  const selected = chooseTableSelectionAfterRefresh({
+    currentSelectionId: 'artifact-from-previous-turn',
+    availableArtifactIds: new Set(['artifact-from-previous-turn', 'artifact-for-current-turn']),
+    rememberedArtifactId: 'artifact-for-current-turn',
+    latestArtifactId: '',
+    latestMemoryArtifactId: '',
+    pendingAutoSelectArtifactId: '',
+  })
+
+  assert.equal(selected, 'artifact-for-current-turn')
+})

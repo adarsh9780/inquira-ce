@@ -15,6 +15,8 @@ test('figure pane clears stale kernel-required banner after kernel becomes ready
   assert.equal(source.includes('await apiService.v1GetWorkspaceKernelStatus(workspaceId)'), true)
   assert.equal(source.includes("if (status !== 'ready') return"), true)
   assert.equal(source.includes('await loadWorkspaceFigureArtifacts(workspaceId, {'), true)
+  assert.equal(source.includes("() => [\n    String(appStore.activeTurnId || '').trim(),"), true)
+  assert.equal(source.includes('await loadSelectedFigurePayload(nextSelection)'), true)
   assert.equal(source.includes("() => appStore.getWorkspaceKernelStatus(appStore.activeWorkspaceId)"), true)
   assert.equal(source.includes("if (status === 'ready' && appStore.dataPane === 'figure') {"), true)
 })

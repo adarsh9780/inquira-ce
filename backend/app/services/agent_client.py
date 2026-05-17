@@ -66,6 +66,31 @@ class AgentClient:
         return "apiconnectionerror" in haystack or "connection error" in haystack
 
     @staticmethod
+    def _is_retryable_provider_error_detail(detail: Any) -> bool:
+        if not isinstance(detail, dict):
+            return False
+        err = str(detail.get("error") or "").strip().lower()
+        msg = str(detail.get("message") or detail.get("detail") or "").strip().lower()
+        if err not in {"apierror", "internalservererror", "servererror"}:
+            return False
+        transient_markers = (
+            "internal error occurred",
+            "internal server error",
+            "server error",
+            "temporarily unavailable",
+            "temporarily overloaded",
+            "overloaded",
+        )
+        return any(marker in msg for marker in transient_markers)
+
+    @classmethod
+    def _is_retryable_runtime_error_detail(cls, detail: Any) -> bool:
+        return (
+            cls._is_retryable_connection_error_detail(detail)
+            or cls._is_retryable_provider_error_detail(detail)
+        )
+
+    @staticmethod
     def _estimate_token_count(value: Any) -> int:
         if value is None:
             return 0
@@ -319,7 +344,7 @@ class AgentClient:
                 raise AgentRuntimeError("Agent run returned non-object response")
             if isinstance(body.get("__error__"), dict):
                 err = body.get("__error__") or {}
-                if attempt < attempts - 1 and self._is_retryable_connection_error_detail(err):
+                if attempt < attempts - 1 and self._is_retryable_runtime_error_detail(err):
                     continue
                 raise AgentRuntimeError(
                     f"{str(err.get('error') or 'Agent run failed')}: {str(err.get('message') or '')}"
@@ -380,7 +405,7 @@ class AgentClient:
                                         detail = payload_data if isinstance(payload_data, dict) else {"detail": str(payload_data)}
                                         if (
                                             attempt < attempts - 1
-                                            and self._is_retryable_connection_error_detail(detail)
+                                            and self._is_retryable_runtime_error_detail(detail)
                                         ):
                                             raise AgentRuntimeError("__retry_stream__")
                                         raise AgentRuntimeError(f"Agent stream error: {detail}")

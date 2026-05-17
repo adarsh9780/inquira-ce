@@ -334,6 +334,29 @@ watch(() => appStore.activeWorkspaceId, (workspaceId) => {
   }
 }, { immediate: true })
 
+watch(
+  () => [
+    String(appStore.activeTurnId || '').trim(),
+    Array.from(activeTurnFigureArtifactIds.value).sort().join('|'),
+    Array.from(livePersistedFigureIds.value).sort().join('|'),
+  ].join('||'),
+  async () => {
+    const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+    if (!workspaceId || !appStore.hasWorkspace) return
+
+    const previousSelection = String(selectedArtifactId.value || '').trim()
+    const latestFigureHint = resolveLatestFigureHint()
+    await loadWorkspaceFigureArtifacts(workspaceId, {
+      preferredArtifactId: latestFigureHint.artifactId,
+      preferredLogicalName: latestFigureHint.logicalName,
+    })
+
+    const nextSelection = String(selectedArtifactId.value || '').trim()
+    if (!nextSelection || nextSelection !== previousSelection) return
+    await loadSelectedFigurePayload(nextSelection)
+  },
+)
+
 function isKernelAvailabilityErrorMessage(message) {
   const normalized = String(message || '').toLowerCase()
   return (

@@ -10,5 +10,7 @@ test('TableTab uses workspace artifact catalog as canonical source and refreshes
   assert.equal(source.includes('const allArtifacts = computed(() => (Array.isArray(workspaceArtifacts.value) ? workspaceArtifacts.value : []))'), true)
   assert.equal(source.includes('appStore.dataframes.map((df) => String(df?.data?.artifact_id || \'\')).filter(Boolean).join(\'|\')'), true)
   assert.equal(source.includes('void loadWorkspaceArtifacts(appStore.activeWorkspaceId)'), true)
+  assert.equal(source.includes("() => [\n    String(appStore.activeTurnId || '').trim(),"), true)
+  assert.equal(source.includes('await prepareArtifact(nextSelection)'), true)
   assert.equal(source.includes('if (selectedArtifactId.value && !list.some((item) => item.artifact_id === selectedArtifactId.value))'), true)
 })

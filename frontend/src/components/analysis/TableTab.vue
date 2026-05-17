@@ -717,6 +717,50 @@ watch(() => appStore.activeWorkspaceId, (id) => {
 }, { immediate: true })
 
 watch(
+  () => [
+    String(appStore.activeTurnId || '').trim(),
+    Array.from(activeTurnArtifactIds.value).sort().join('|'),
+    Array.from(livePersistedArtifactIds.value).sort().join('|'),
+  ].join('||'),
+  async () => {
+    const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+    if (!workspaceId || !appStore.hasWorkspace) return
+
+    const previousSelection = String(selectedArtifactId.value || '').trim()
+    await loadWorkspaceArtifacts(workspaceId)
+
+    const nextSelection = String(selectedArtifactId.value || '').trim()
+    if (!nextSelection || nextSelection !== previousSelection) return
+
+    resetTableState()
+
+    if (isMemoryArtifactId(nextSelection)) {
+      const memoryArtifact = displayArtifacts.value.find(
+        (entry) => entry.artifact_id === nextSelection && entry.source === 'memory',
+      )
+      if (memoryArtifact) {
+        loadInMemoryArtifact(memoryArtifact)
+      }
+      return
+    }
+
+    const rememberedPage = appStore.getTablePageOffset(workspaceId, nextSelection)
+    if (Number.isInteger(rememberedPage) && rememberedPage > 0) {
+      pendingRestorePageByArtifact.set(nextSelection, rememberedPage)
+    } else {
+      pendingRestorePageByArtifact.delete(nextSelection)
+    }
+
+    try {
+      await prepareArtifact(nextSelection)
+    } catch (error) {
+      if (isAbortError(error)) return
+      tableError.value = error?.message || 'Failed to load selected table.'
+    }
+  },
+)
+
+watch(
   () => appStore.getWorkspaceKernelStatus(appStore.activeWorkspaceId),
   (status) => {
     if (status === 'ready' && kernelRecoveryPoller) {
