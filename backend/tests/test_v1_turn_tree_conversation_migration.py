@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
 from app.v1.services.conversation_migration_service import ConversationMigrationService
 
@@ -59,8 +60,27 @@ async def test_migrate_conversation_backfills_linear_lineage_and_turn_bundles(mo
         _ = include_deleted
         return []
 
-    async def fake_persist_turn_artifacts(*, session, username, workspace_id, conversation_id, turn_id, workspace_duckdb_path, artifacts):
-        _ = session, username, workspace_id, conversation_id, turn_id, workspace_duckdb_path, artifacts
+    async def fake_persist_turn_artifacts(
+        *,
+        session,
+        username,
+        workspace_id,
+        conversation_id,
+        turn_id,
+        workspace_duckdb_path,
+        artifacts,
+        offline_lease_owner_token=None,
+    ):
+        _ = (
+            session,
+            username,
+            workspace_id,
+            conversation_id,
+            turn_id,
+            workspace_duckdb_path,
+            artifacts,
+            offline_lease_owner_token,
+        )
         turn_dir = (
             Path.home()
             / ".inquira"
@@ -111,6 +131,21 @@ async def test_migrate_conversation_backfills_linear_lineage_and_turn_bundles(mo
     monkeypatch.setattr(
         "app.v1.services.conversation_migration_service.TurnArtifactStorageService.persist_turn_artifacts",
         fake_persist_turn_artifacts,
+    )
+
+    async def fake_acquire_lease(*args, **kwargs):
+        _ = args, kwargs
+
+    async def fake_release_lease(*args, **kwargs):
+        _ = args, kwargs
+
+    monkeypatch.setattr(
+        "app.v1.services.conversation_migration_service.WorkspaceMaintenanceService.acquire_lease_or_raise",
+        fake_acquire_lease,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.conversation_migration_service.WorkspaceMaintenanceService.release_lease",
+        fake_release_lease,
     )
 
     result = await ConversationMigrationService.migrate_conversation(
@@ -206,3 +241,96 @@ async def test_migrate_pending_conversations_once_only_processes_outdated_rows(m
         ("principal-1", "conv-1", "user-principal-1"),
         ("principal-2", "conv-2", "user-principal-2"),
     ]
+
+
+@pytest.mark.asyncio
+async def test_migrate_conversation_marks_artifacts_legacy_orphan_when_workspace_busy(monkeypatch) -> None:
+    conversation = SimpleNamespace(id="conv-2", workspace_id="ws-1", title="Legacy", migration_version=None, storage_path=None)
+    turn = SimpleNamespace(
+        id="turn-1",
+        conversation_id="conv-2",
+        parent_turn_id=None,
+        seq_no=1,
+        result_kind="dataframe",
+        user_text="Load orders",
+        assistant_text="Loaded orders.",
+        metadata_json=json.dumps({"artifacts": [{"artifact_id": "df-1", "kind": "dataframe", "path": "artifacts/df-1.parquet"}]}),
+        code_snapshot="print('busy')\n",
+        storage_path=None,
+        code_path=None,
+        manifest_path=None,
+        artifact_summary_json=None,
+        execution_summary_json=None,
+        is_final=False,
+    )
+
+    async def fake_get_conversation(_session, _conversation_id):
+        return conversation
+
+    async def fake_ensure_workspace_access(_session, _principal_id, _workspace_id):
+        return SimpleNamespace(id="ws-1", duckdb_path="/tmp/workspace.db")
+
+    async def fake_list_turns_in_sequence(_session, _conversation_id):
+        return [turn]
+
+    async def fake_list_turn_artifacts(_session, _turn_id, *, include_deleted=False):
+        _ = include_deleted
+        return []
+
+    async def fake_acquire(*args, **kwargs):
+        _ = args, kwargs
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "workspace_busy",
+                "detail": "Workspace ws-1 is busy because workspace_runtime is still active.",
+                "resource": "ws-1",
+                "current_operation": "workspace_runtime",
+            },
+        )
+
+    async def fail_persist_turn_artifacts(**kwargs):
+        _ = kwargs
+        raise AssertionError("Artifact persistence should not run when maintenance lease is unavailable.")
+
+    session = SimpleNamespace()
+
+    async def _commit():
+        return None
+
+    session.commit = _commit
+
+    monkeypatch.setattr(
+        "app.v1.services.conversation_migration_service.ConversationRepository.get_conversation",
+        fake_get_conversation,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.conversation_migration_service.ConversationService.ensure_workspace_access",
+        fake_ensure_workspace_access,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.conversation_migration_service.ConversationRepository.list_turns_in_sequence",
+        fake_list_turns_in_sequence,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.conversation_migration_service.TurnArtifactRepository.list_for_turn",
+        fake_list_turn_artifacts,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.conversation_migration_service.WorkspaceMaintenanceService.acquire_lease_or_raise",
+        fake_acquire,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.conversation_migration_service.TurnArtifactStorageService.persist_turn_artifacts",
+        fail_persist_turn_artifacts,
+    )
+
+    result = await ConversationMigrationService.migrate_conversation(
+        session=session,
+        principal_id="principal-1",
+        conversation_id="conv-2",
+        username="alice",
+    )
+
+    assert result["conversation_id"] == "conv-2"
+    assert json.loads(turn.artifact_summary_json)[0]["status"] == "legacy_orphan"

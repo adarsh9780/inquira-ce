@@ -40,6 +40,7 @@ from ..services.conversation_service import ConversationService
 from ..services.turn_artifact_read_service import TurnArtifactReadService
 from ..services.turn_artifact_storage_service import TurnArtifactStorageService
 from ..services.turn_bundle_service import TurnBundleService
+from ..services.workspace_maintenance_service import WorkspaceMaintenanceService
 from .deps import ensure_appdata_principal, get_current_user
 from ...core.prompt_library import get_prompt
 from ...services.llm_service import LLMService
@@ -1778,6 +1779,18 @@ async def bootstrap_workspace_runtime_endpoint(
                     },
                 },
             )
+    except HTTPException:
+        raise
+    except HTTPException:
+        raise
+    except HTTPException:
+        raise
+    except HTTPException:
+        raise
+    except HTTPException:
+        raise
+    except HTTPException:
+        raise
     except Exception as exc:
         detail = _describe_exception(exc)
         if websocket_user_id:
@@ -1868,6 +1881,7 @@ async def hard_reset_workspace_runtime_endpoint(
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
     websocket_user_id = _resolve_websocket_user_id(current_user.id)
+    maintenance_owner_token = f"runtime-hard-reset:{workspace_id}:{uuid.uuid4()}"
 
     async def _progress(stage: str, message: str) -> None:
         if websocket_user_id:
@@ -1889,12 +1903,29 @@ async def hard_reset_workspace_runtime_endpoint(
             "workspace_runtime_cleanup",
             "Stopping the current workspace kernel...",
         )
-        await reset_workspace_kernel(workspace_id)
+        await WorkspaceMaintenanceService.drain_runtime(
+            workspace_id=workspace_id,
+            user_id=str(current_user.id),
+        )
         await _progress(
             "workspace_runtime_cleanup",
             "Deleting the workspace virtual environment...",
         )
-        delete_workspace_runner_environment(str(workspace.duckdb_path))
+        await WorkspaceMaintenanceService.acquire_lease_or_raise(
+            session,
+            workspace_id=workspace_id,
+            owner_token=maintenance_owner_token,
+            requested_operation="runtime_hard_reset",
+            metadata={"source": "runtime_hard_reset"},
+        )
+        try:
+            delete_workspace_runner_environment(str(workspace.duckdb_path))
+        finally:
+            await WorkspaceMaintenanceService.release_lease(
+                session,
+                workspace_id=workspace_id,
+                owner_token=maintenance_owner_token,
+            )
         await _progress(
             "workspace_runtime_cleanup",
             "Rebuilding the workspace runtime from scratch...",
@@ -1915,6 +1946,8 @@ async def hard_reset_workspace_runtime_endpoint(
                     },
                 },
             )
+    except HTTPException:
+        raise
     except Exception as exc:
         detail = _describe_exception(exc)
         if websocket_user_id:

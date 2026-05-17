@@ -3,19 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...data_access.coordinator import LeaseKinds, ResourceLeaseCoordinator
 from ...data_access.workspace_db import WorkspaceOfflineAdapter
-from ...services.code_executor import reset_workspace_kernel
 from ..db.session import AppDataSessionLocal
 from ..repositories.dataset_deletion_repository import DatasetDeletionRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .dataset_service import DatasetService
+from .workspace_maintenance_service import WorkspaceMaintenanceService
 
 
 class DatasetDeletionService:
@@ -173,23 +173,21 @@ class DatasetDeletionService:
             await session.commit()
 
         try:
-            try:
-                await reset_workspace_kernel(workspace_id)
-            except Exception:
-                # Best-effort unlock. Drop can still succeed without this.
-                pass
+            await WorkspaceMaintenanceService.drain_runtime(
+                workspace_id=workspace_id,
+                user_id=str(principal_id),
+            )
             await self._heartbeat(job_id=job_id, worker_id=worker_id)
 
             duckdb_path = ""
             async with AppDataSessionLocal() as session:
-                coordinator = ResourceLeaseCoordinator()
-                await coordinator.acquire_workspace_maintenance_lease(
+                await WorkspaceMaintenanceService.acquire_lease_or_raise(
                     session,
                     workspace_id=workspace_id,
                     owner_token=maintenance_owner_token,
+                    requested_operation="dataset_deletion",
                     metadata={"job_id": job_id, "source": "dataset_deletion"},
                 )
-                await session.commit()
                 workspace = await WorkspaceRepository.get_by_id(session, workspace_id, principal_id)
                 if workspace is not None:
                     duckdb_path = str(workspace.duckdb_path or "").strip()
@@ -197,19 +195,16 @@ class DatasetDeletionService:
                     await WorkspaceOfflineAdapter(
                         session=session,
                         owner_token=maintenance_owner_token,
-                        coordinator=coordinator,
                     ).drop_table(
                         workspace_id=workspace_id,
                         workspace_duckdb_path=duckdb_path,
                         table_name=table_name,
                     )
-                await coordinator.release_lease(
+                await WorkspaceMaintenanceService.release_lease(
                     session,
-                    resource_key=workspace_id,
-                    lease_kind=LeaseKinds.WORKSPACE_MAINTENANCE,
+                    workspace_id=workspace_id,
                     owner_token=maintenance_owner_token,
                 )
-                await session.commit()
 
             async with AppDataSessionLocal() as session:
                 job = await DatasetDeletionRepository.get_by_id(session, job_id)
@@ -222,10 +217,9 @@ class DatasetDeletionService:
                 await session.commit()
         except Exception as exc:  # noqa: BLE001
             async with AppDataSessionLocal() as session:
-                await ResourceLeaseCoordinator().release_lease(
+                await WorkspaceMaintenanceService.release_lease(
                     session,
-                    resource_key=workspace_id,
-                    lease_kind=LeaseKinds.WORKSPACE_MAINTENANCE,
+                    workspace_id=workspace_id,
                     owner_token=maintenance_owner_token,
                 )
                 job = await DatasetDeletionRepository.get_by_id(session, job_id)
@@ -234,7 +228,10 @@ class DatasetDeletionService:
                     job.claimed_by = None
                     job.lease_expires_at = None
                     job.last_heartbeat_at = None
-                    job.error_message = str(exc)[:1000]
+                    raw_detail = getattr(exc, "detail", exc)
+                    job.error_message = (
+                        json.dumps(raw_detail, default=str) if isinstance(raw_detail, dict) else str(raw_detail)
+                    )[:1000]
                 await session.commit()
 
     async def _heartbeat(self, *, job_id: str, worker_id: str) -> None:

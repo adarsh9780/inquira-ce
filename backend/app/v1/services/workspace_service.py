@@ -20,6 +20,7 @@ from ..repositories.dataset_repository import DatasetRepository
 from ..repositories.principal_repository import PrincipalRepository
 from ..repositories.workspace_deletion_repository import WorkspaceDeletionRepository
 from ..repositories.workspace_repository import WorkspaceRepository
+from .workspace_maintenance_service import WorkspaceMaintenanceService
 from .workspace_storage_service import WorkspaceStorageService
 
 
@@ -214,15 +215,18 @@ class WorkspaceService:
         if workspace is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
 
-        # Release runtime/kernel file handles before touching workspace DB files.
-        try:
-            await stop_workspace_terminal_session(user_id=str(user.id), workspace_id=workspace_id)
-        except Exception:
-            pass
-        try:
-            await reset_workspace_kernel(workspace_id)
-        except Exception:
-            pass
+        maintenance_owner_token = f"workspace-clear:{workspace_id}:{uuid.uuid4()}"
+        await WorkspaceMaintenanceService.drain_runtime(
+            workspace_id=workspace_id,
+            user_id=str(user.id),
+        )
+        await WorkspaceMaintenanceService.acquire_lease_or_raise(
+            session,
+            workspace_id=workspace_id,
+            owner_token=maintenance_owner_token,
+            requested_operation="clear_workspace_database",
+            metadata={"source": "workspace_database_clear"},
+        )
 
         datasets = await DatasetRepository.list_for_workspace(session, workspace_id)
         schema_paths = [
@@ -280,15 +284,22 @@ class WorkspaceService:
 
             return removed_any
 
-        cleared = await asyncio.to_thread(_clear_files)
-        await DatasetRepository.delete_for_workspace(session, workspace_id)
-        await session.commit()
-        detail = (
-            "Workspace database cleared. Re-create data by selecting the original dataset."
-            if cleared
-            else "Workspace database was already empty. Re-create data by selecting the original dataset."
-        )
-        return cleared, detail
+        try:
+            cleared = await asyncio.to_thread(_clear_files)
+            await DatasetRepository.delete_for_workspace(session, workspace_id)
+            await session.commit()
+            detail = (
+                "Workspace database cleared. Re-create data by selecting the original dataset."
+                if cleared
+                else "Workspace database was already empty. Re-create data by selecting the original dataset."
+            )
+            return cleared, detail
+        finally:
+            await WorkspaceMaintenanceService.release_lease(
+                session,
+                workspace_id=workspace_id,
+                owner_token=maintenance_owner_token,
+            )
 
     @staticmethod
     async def delete_workspace(session: AsyncSession, user, workspace_id: str) -> None:
@@ -297,18 +308,38 @@ class WorkspaceService:
         if workspace is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
 
-        was_active = bool(getattr(workspace, "is_active", 0))
-        await WorkspaceRepository.delete(session, workspace)
-        remaining = await WorkspaceRepository.list_for_principal(session, user.id)
-        next_workspace_id = str(remaining[0].id) if was_active and remaining else None
-        if was_active or next_workspace_id is None:
-            await WorkspaceService._set_active_workspace_atomic(
-                session=session,
-                principal_id=str(user.id),
-                workspace_id=next_workspace_id,
+        maintenance_owner_token = f"workspace-delete:{workspace_id}:{uuid.uuid4()}"
+        await WorkspaceMaintenanceService.drain_runtime(
+            workspace_id=workspace_id,
+            user_id=str(user.id),
+        )
+        await WorkspaceMaintenanceService.acquire_lease_or_raise(
+            session,
+            workspace_id=workspace_id,
+            owner_token=maintenance_owner_token,
+            requested_operation="delete_workspace",
+            metadata={"source": "workspace_delete"},
+        )
+
+        try:
+            was_active = bool(getattr(workspace, "is_active", 0))
+            await WorkspaceRepository.delete(session, workspace)
+            remaining = await WorkspaceRepository.list_for_principal(session, user.id)
+            next_workspace_id = str(remaining[0].id) if was_active and remaining else None
+            if was_active or next_workspace_id is None:
+                await WorkspaceService._set_active_workspace_atomic(
+                    session=session,
+                    principal_id=str(user.id),
+                    workspace_id=next_workspace_id,
+                )
+            await session.commit()
+            await WorkspaceStorageService.hard_delete_workspace(user.username, workspace_id)
+        finally:
+            await WorkspaceMaintenanceService.release_lease(
+                session,
+                workspace_id=workspace_id,
+                owner_token=maintenance_owner_token,
             )
-        await session.commit()
-        await WorkspaceStorageService.hard_delete_workspace(user.username, workspace_id)
 
     @staticmethod
     async def _set_active_workspace_atomic(

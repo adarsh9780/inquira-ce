@@ -123,6 +123,21 @@ async def test_clear_workspace_database_removes_workspace_db_and_scratchpad(monk
     monkeypatch.setattr("app.v1.services.workspace_service.stop_workspace_terminal_session", fake_stop_terminal_session)
     monkeypatch.setattr("app.v1.services.workspace_service.reset_workspace_kernel", fake_reset_workspace_kernel)
 
+    async def fake_acquire_lease(*args, **kwargs):
+        _ = args, kwargs
+
+    async def fake_release_lease(*args, **kwargs):
+        _ = args, kwargs
+
+    monkeypatch.setattr(
+        "app.v1.services.workspace_service.WorkspaceMaintenanceService.acquire_lease_or_raise",
+        fake_acquire_lease,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.workspace_service.WorkspaceMaintenanceService.release_lease",
+        fake_release_lease,
+    )
+
     class DummySession:
         async def commit(self):
             calls["committed"] = True
@@ -190,6 +205,21 @@ async def test_clear_workspace_database_keeps_metadata_when_file_clear_fails(mon
     monkeypatch.setattr("app.v1.services.workspace_service.reset_workspace_kernel", fake_reset_workspace_kernel)
     monkeypatch.setattr(Path, "unlink", fail_workspace_unlink)
 
+    async def fake_acquire_lease(*args, **kwargs):
+        _ = args, kwargs
+
+    async def fake_release_lease(*args, **kwargs):
+        _ = args, kwargs
+
+    monkeypatch.setattr(
+        "app.v1.services.workspace_service.WorkspaceMaintenanceService.acquire_lease_or_raise",
+        fake_acquire_lease,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.workspace_service.WorkspaceMaintenanceService.release_lease",
+        fake_release_lease,
+    )
+
     class DummySession:
         async def commit(self):
             calls["committed"] = True
@@ -207,3 +237,57 @@ async def test_clear_workspace_database_keeps_metadata_when_file_clear_fails(mon
     assert calls["deleted"] is False
     assert calls["committed"] is False
     assert workspace_db.exists() is True
+
+
+@pytest.mark.asyncio
+async def test_clear_workspace_database_returns_structured_busy_conflict(monkeypatch):
+    workspace = SimpleNamespace(id="ws-3", duckdb_path="/tmp/ws-3/workspace.db")
+    user = SimpleNamespace(id="user-1", username="alice")
+
+    async def fake_get_by_id(_session, workspace_id, principal_id):
+        assert workspace_id == "ws-3"
+        assert principal_id == "user-1"
+        return workspace
+
+    async def fake_drain_runtime(*, workspace_id, user_id):
+        assert workspace_id == "ws-3"
+        assert user_id == "user-1"
+
+    async def fake_acquire(*args, **kwargs):
+        _ = args
+        assert kwargs["workspace_id"] == "ws-3"
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "workspace_busy",
+                "detail": "Workspace ws-3 is busy because workspace_runtime is still active.",
+                "resource": "ws-3",
+                "current_operation": "workspace_runtime",
+            },
+        )
+
+    monkeypatch.setattr("app.v1.services.workspace_service.WorkspaceRepository.get_by_id", fake_get_by_id)
+    monkeypatch.setattr(
+        "app.v1.services.workspace_service.WorkspaceMaintenanceService.drain_runtime",
+        fake_drain_runtime,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.workspace_service.WorkspaceMaintenanceService.acquire_lease_or_raise",
+        fake_acquire,
+    )
+
+    class DummySession:
+        async def commit(self):
+            return None
+
+    with pytest.raises(HTTPException) as exc:
+        await WorkspaceService.clear_workspace_database(
+            session=DummySession(),
+            user=user,
+            workspace_id="ws-3",
+        )
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail["code"] == "workspace_busy"
+    assert exc.value.detail["resource"] == "ws-3"
+    assert exc.value.detail["current_operation"] == "workspace_runtime"

@@ -189,6 +189,24 @@ class ResourceLeaseCoordinator:
             )
         return lease
 
+    async def get_active_lease(
+        self,
+        session: AsyncSession,
+        *,
+        resource_key: str,
+        resource_type: str,
+        lease_kinds: tuple[str, ...] | None = None,
+    ) -> ResourceLease | None:
+        stmt = select(ResourceLease).where(
+            ResourceLease.resource_key == resource_key,
+            ResourceLease.resource_type == resource_type,
+            ResourceLease.leased_until > datetime.now(UTC),
+        )
+        if lease_kinds:
+            stmt = stmt.where(ResourceLease.lease_kind.in_(lease_kinds))
+        result = await session.execute(stmt.order_by(ResourceLease.updated_at.desc()).limit(1))
+        return result.scalar_one_or_none()
+
     async def _acquire_lease(
         self,
         session: AsyncSession,

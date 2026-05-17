@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from typing import Any
 
@@ -13,6 +14,7 @@ from ..db.session import AppDataSessionLocal
 from ..repositories.principal_repository import PrincipalRepository
 from ..repositories.workspace_deletion_repository import WorkspaceDeletionRepository
 from ..repositories.workspace_repository import WorkspaceRepository
+from .workspace_maintenance_service import WorkspaceMaintenanceService
 from .workspace_storage_service import WorkspaceStorageService
 from .workspace_service import WorkspaceService
 
@@ -135,6 +137,7 @@ class WorkspaceDeletionService:
         langgraph_manager,
     ) -> None:
         """Execute delete job: close graph, delete files, remove DB row, update status."""
+        maintenance_owner_token = f"workspace-delete:{job_id}:{uuid.uuid4()}"
         worker_id = f"workspace-delete:{job_id}:{uuid.uuid4()}"
         async with AppDataSessionLocal() as session:
             job = await WorkspaceDeletionRepository.claim_job(
@@ -151,8 +154,28 @@ class WorkspaceDeletionService:
         try:
             await self._heartbeat(job_id=job_id, worker_id=worker_id)
             await langgraph_manager.close_workspace(workspace_id)
+            await WorkspaceMaintenanceService.drain_runtime(
+                workspace_id=workspace_id,
+                user_id=str(principal_id),
+            )
             await self._heartbeat(job_id=job_id, worker_id=worker_id)
-            await WorkspaceStorageService.hard_delete_workspace(username, workspace_id)
+            async with AppDataSessionLocal() as session:
+                await WorkspaceMaintenanceService.acquire_lease_or_raise(
+                    session,
+                    workspace_id=workspace_id,
+                    owner_token=maintenance_owner_token,
+                    requested_operation="workspace_deletion",
+                    metadata={"job_id": job_id, "source": "workspace_deletion"},
+                )
+            try:
+                await WorkspaceStorageService.hard_delete_workspace(username, workspace_id)
+            finally:
+                async with AppDataSessionLocal() as session:
+                    await WorkspaceMaintenanceService.release_lease(
+                        session,
+                        workspace_id=workspace_id,
+                        owner_token=maintenance_owner_token,
+                    )
 
             async with AppDataSessionLocal() as session:
                 workspace = await WorkspaceRepository.get_by_id(session, workspace_id, principal_id)
@@ -180,13 +203,21 @@ class WorkspaceDeletionService:
                 await session.commit()
         except Exception as exc:  # noqa: BLE001
             async with AppDataSessionLocal() as session:
+                await WorkspaceMaintenanceService.release_lease(
+                    session,
+                    workspace_id=workspace_id,
+                    owner_token=maintenance_owner_token,
+                )
                 job = await WorkspaceDeletionRepository.get_by_id(session, job_id)
                 if job is not None:
                     job.status = "failed"
                     job.claimed_by = None
                     job.lease_expires_at = None
                     job.last_heartbeat_at = None
-                    job.error_message = str(exc)[:1000]
+                    raw_detail = getattr(exc, "detail", exc)
+                    job.error_message = (
+                        json.dumps(raw_detail, default=str) if isinstance(raw_detail, dict) else str(raw_detail)
+                    )[:1000]
                 await session.commit()
 
     async def _heartbeat(self, *, job_id: str, worker_id: str) -> None:
