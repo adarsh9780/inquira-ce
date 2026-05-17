@@ -196,6 +196,7 @@ def _build_turn_tree_node(payload: dict) -> TurnTreeNodeResponse:
         parent_turn_id=payload.get("parent_turn_id"),
         seq_no=payload["seq_no"],
         user_text=payload["user_text"],
+        assistant_text=payload.get("assistant_text", ""),
         created_at=payload["created_at"],
         children=[_build_turn_tree_node(child) for child in payload.get("children") or []],
     )

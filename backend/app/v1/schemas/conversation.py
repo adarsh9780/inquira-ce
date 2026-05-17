@@ -77,6 +77,7 @@ class TurnTreeNodeResponse(BaseModel):
     parent_turn_id: str | None = None
     seq_no: int
     user_text: str
+    assistant_text: str
     created_at: datetime
     children: list[TurnTreeNodeResponse] = Field(default_factory=list)
 

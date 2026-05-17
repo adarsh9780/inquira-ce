@@ -19,6 +19,7 @@ def test_turn_tree_api_returns_full_tree(monkeypatch):
                     "parent_turn_id": None,
                     "seq_no": 1,
                     "user_text": "root question",
+                    "assistant_text": "root answer",
                     "created_at": "2026-05-02T09:00:00Z",
                     "children": [
                         {
@@ -26,6 +27,7 @@ def test_turn_tree_api_returns_full_tree(monkeypatch):
                             "parent_turn_id": "turn-1",
                             "seq_no": 2,
                             "user_text": "child question",
+                            "assistant_text": "child answer",
                             "created_at": "2026-05-02T10:00:00Z",
                             "children": [
                                 {
@@ -33,6 +35,7 @@ def test_turn_tree_api_returns_full_tree(monkeypatch):
                                     "parent_turn_id": "turn-2",
                                     "seq_no": 3,
                                     "user_text": "grandchild question",
+                                    "assistant_text": "grandchild answer",
                                     "created_at": "2026-05-02T11:00:00Z",
                                     "children": [],
                                 }
@@ -70,7 +73,10 @@ def test_turn_tree_api_returns_full_tree(monkeypatch):
         assert payload["current_turn_id"] == "turn-2"
         assert payload["final_turn_id"] == "turn-3"
         assert payload["roots"][0]["id"] == "turn-1"
+        assert payload["roots"][0]["assistant_text"] == "root answer"
         assert payload["roots"][0]["children"][0]["id"] == "turn-2"
+        assert payload["roots"][0]["children"][0]["assistant_text"] == "child answer"
         assert payload["roots"][0]["children"][0]["children"][0]["id"] == "turn-3"
+        assert payload["roots"][0]["children"][0]["children"][0]["assistant_text"] == "grandchild answer"
     finally:
         app.dependency_overrides.clear()

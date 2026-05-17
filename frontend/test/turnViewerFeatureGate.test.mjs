@@ -19,5 +19,5 @@ test('turn mode keeps the chat history renderer and moves navigation controls in
   assert.equal(chatInputSource.includes('title="Open turn tree"'), true)
   assert.equal(chatInputSource.includes('<TurnTreeModal'), true)
   assert.equal(turnTreeModalSource.includes('Conversation Tree'), true)
-  assert.equal(turnTreeModalSource.includes('Mark Final'), true)
+  assert.equal(turnTreeModalSource.includes('Rerun Final'), true)
 })

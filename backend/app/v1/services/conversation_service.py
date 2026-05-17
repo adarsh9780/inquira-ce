@@ -250,6 +250,7 @@ class ConversationService:
                 "parent_turn_id": turn.parent_turn_id,
                 "seq_no": turn.seq_no,
                 "user_text": turn.user_text,
+                "assistant_text": turn.assistant_text,
                 "created_at": turn.created_at,
                 "children": [],
             }
