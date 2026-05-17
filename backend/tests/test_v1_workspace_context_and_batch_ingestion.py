@@ -47,6 +47,10 @@ def test_workspace_context_migration_adds_context_and_ingestion_jobs(tmp_path) -
             "completed_count",
             "failed_count",
             "items_json",
+            "claimed_by",
+            "lease_expires_at",
+            "attempt_count",
+            "last_heartbeat_at",
             "error_message",
         }.issubset(ingestion_columns)
     finally:
@@ -114,8 +118,8 @@ def test_batch_ingestion_service_processes_items_sequentially() -> None:
     service_path = Path(__file__).resolve().parents[1] / "app/v1/services/dataset_ingestion_service.py"
     source = service_path.read_text(encoding="utf-8")
 
-    assert "self._ingest_lock = asyncio.Lock()" in source
+    assert "self._workspace_locks: dict[str, asyncio.Lock] = {}" in source
     assert "for index, item in enumerate(items):" in source
-    assert "async with self._ingest_lock:" in source
+    assert "async with await self._workspace_lock(workspace_id):" in source
     assert "await DatasetService.add_dataset(" in source
     assert "asyncio.gather" not in source

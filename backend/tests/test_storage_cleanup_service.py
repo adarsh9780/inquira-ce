@@ -102,9 +102,16 @@ async def test_run_once_skips_turn_cleanup_when_parent_conversation_is_marked(mo
         _ = session, turn
         cleaned["turn"] += 1
 
+    class _RunSession:
+        async def commit(self):
+            return None
+
+        async def rollback(self):
+            return None
+
     class _SessionContext:
         async def __aenter__(self):
-            return SimpleNamespace()
+            return _RunSession()
 
         async def __aexit__(self, exc_type, exc, tb):
             return False
@@ -129,6 +136,16 @@ async def test_run_once_skips_turn_cleanup_when_parent_conversation_is_marked(mo
     service = StorageCleanupService()
     monkeypatch.setattr(service, "_cleanup_conversation", fake_cleanup_conversation)
     monkeypatch.setattr(service, "_cleanup_turn", fake_cleanup_turn)
+
+    async def fake_acquire_system_lease(*args, **kwargs):
+        _ = args, kwargs
+        return "cleanup-worker"
+
+    async def fake_release_lease(*args, **kwargs):
+        _ = args, kwargs
+
+    monkeypatch.setattr(service._leases, "acquire_system_lease", fake_acquire_system_lease)
+    monkeypatch.setattr(service._leases, "release_lease", fake_release_lease)
 
     await service.run_once()
 

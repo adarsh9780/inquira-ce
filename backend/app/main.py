@@ -138,6 +138,12 @@ async def lifespan(app: FastAPI):
         logprint(f"Failed to initialize API v1 ORM schema: {e}", level="error")
         raise
 
+    await app.state.workspace_deletion_service.resume_pending_jobs(
+        langgraph_manager=app.state.workspace_langgraph_manager
+    )
+    await app.state.dataset_deletion_service.resume_pending_jobs()
+    await app.state.dataset_ingestion_service.resume_pending_jobs()
+
     # Start session cleanup task
     cleanup_task = asyncio.create_task(session_cleanup_worker())
     logprint("Session cleanup worker started")

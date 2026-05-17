@@ -21,6 +21,8 @@ from .dataset_service import DatasetService
 class DatasetDeletionService:
     """Manage dataset delete-job lifecycle."""
 
+    CLAIM_LEASE_SECONDS = 300
+
     def __init__(self) -> None:
         self._tasks: dict[str, asyncio.Task[Any]] = {}
         self._lock = asyncio.Lock()
@@ -111,6 +113,19 @@ class DatasetDeletionService:
                 task.cancel()
             self._tasks.clear()
 
+    async def resume_pending_jobs(self) -> None:
+        """Resume queued/running dataset deletion jobs after backend restart."""
+        async with AppDataSessionLocal() as session:
+            await DatasetDeletionRepository.reset_claims_for_active_jobs(session)
+            jobs = await DatasetDeletionRepository.list_pending_jobs(session)
+            for job in jobs:
+                await self._schedule_job(
+                    job_id=str(job.id),
+                    workspace_id=str(job.workspace_id),
+                    principal_id=str(job.owner_principal_id),
+                    table_name=str(job.table_name),
+                )
+
     async def _schedule_job(
         self,
         *,
@@ -144,11 +159,16 @@ class DatasetDeletionService:
     ) -> None:
         """Execute delete job: release kernel, drop table from workspace DB, update status."""
         maintenance_owner_token = f"dataset-delete:{job_id}:{uuid.uuid4()}"
+        worker_id = f"dataset-delete:{job_id}:{uuid.uuid4()}"
         async with AppDataSessionLocal() as session:
-            job = await DatasetDeletionRepository.get_by_id(session, job_id)
+            job = await DatasetDeletionRepository.claim_job(
+                session,
+                job_id=job_id,
+                worker_id=worker_id,
+                lease_seconds=self.CLAIM_LEASE_SECONDS,
+            )
             if job is None:
                 return
-            job.status = "running"
             job.error_message = None
             await session.commit()
 
@@ -158,6 +178,7 @@ class DatasetDeletionService:
             except Exception:
                 # Best-effort unlock. Drop can still succeed without this.
                 pass
+            await self._heartbeat(job_id=job_id, worker_id=worker_id)
 
             duckdb_path = ""
             async with AppDataSessionLocal() as session:
@@ -194,6 +215,9 @@ class DatasetDeletionService:
                 job = await DatasetDeletionRepository.get_by_id(session, job_id)
                 if job is not None:
                     job.status = "completed"
+                    job.claimed_by = None
+                    job.lease_expires_at = None
+                    job.last_heartbeat_at = None
                     job.error_message = None
                 await session.commit()
         except Exception as exc:  # noqa: BLE001
@@ -207,5 +231,17 @@ class DatasetDeletionService:
                 job = await DatasetDeletionRepository.get_by_id(session, job_id)
                 if job is not None:
                     job.status = "failed"
+                    job.claimed_by = None
+                    job.lease_expires_at = None
+                    job.last_heartbeat_at = None
                     job.error_message = str(exc)[:1000]
                 await session.commit()
+
+    async def _heartbeat(self, *, job_id: str, worker_id: str) -> None:
+        async with AppDataSessionLocal() as session:
+            await DatasetDeletionRepository.heartbeat_job(
+                session,
+                job_id=job_id,
+                worker_id=worker_id,
+                lease_seconds=self.CLAIM_LEASE_SECONDS,
+            )

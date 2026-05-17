@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import AppDataSessionLocal
+from ..repositories.principal_repository import PrincipalRepository
 from ..repositories.workspace_deletion_repository import WorkspaceDeletionRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .workspace_storage_service import WorkspaceStorageService
@@ -17,6 +19,8 @@ from .workspace_service import WorkspaceService
 
 class WorkspaceDeletionService:
     """Manage delete-job lifecycle for workspaces."""
+
+    CLAIM_LEASE_SECONDS = 300
 
     def __init__(self) -> None:
         self._tasks: dict[str, asyncio.Task[Any]] = {}
@@ -82,6 +86,22 @@ class WorkspaceDeletionService:
                 task.cancel()
             self._tasks.clear()
 
+    async def resume_pending_jobs(self, *, langgraph_manager) -> None:
+        """Resume queued/running deletion jobs after backend restart."""
+        async with AppDataSessionLocal() as session:
+            await WorkspaceDeletionRepository.reset_claims_for_active_jobs(session)
+            jobs = await WorkspaceDeletionRepository.list_pending_jobs(session)
+            for job in jobs:
+                principal = await PrincipalRepository.get_by_id(session, str(job.owner_principal_id))
+                username = str(getattr(principal, "username_cached", "") or "")
+                await self._schedule_job(
+                    job_id=str(job.id),
+                    workspace_id=str(job.workspace_id),
+                    principal_id=str(job.owner_principal_id),
+                    username=username,
+                    langgraph_manager=langgraph_manager,
+                )
+
     async def _schedule_job(
         self,
         job_id: str,
@@ -115,16 +135,23 @@ class WorkspaceDeletionService:
         langgraph_manager,
     ) -> None:
         """Execute delete job: close graph, delete files, remove DB row, update status."""
+        worker_id = f"workspace-delete:{job_id}:{uuid.uuid4()}"
         async with AppDataSessionLocal() as session:
-            job = await WorkspaceDeletionRepository.get_by_id(session, job_id)
+            job = await WorkspaceDeletionRepository.claim_job(
+                session,
+                job_id=job_id,
+                worker_id=worker_id,
+                lease_seconds=self.CLAIM_LEASE_SECONDS,
+            )
             if job is None:
                 return
-            job.status = "running"
             job.error_message = None
             await session.commit()
 
         try:
+            await self._heartbeat(job_id=job_id, worker_id=worker_id)
             await langgraph_manager.close_workspace(workspace_id)
+            await self._heartbeat(job_id=job_id, worker_id=worker_id)
             await WorkspaceStorageService.hard_delete_workspace(username, workspace_id)
 
             async with AppDataSessionLocal() as session:
@@ -145,6 +172,9 @@ class WorkspaceDeletionService:
                 job = await WorkspaceDeletionRepository.get_by_id(session, job_id)
                 if job is not None:
                     job.status = "completed"
+                    job.claimed_by = None
+                    job.lease_expires_at = None
+                    job.last_heartbeat_at = None
                     job.error_message = None
 
                 await session.commit()
@@ -153,5 +183,17 @@ class WorkspaceDeletionService:
                 job = await WorkspaceDeletionRepository.get_by_id(session, job_id)
                 if job is not None:
                     job.status = "failed"
+                    job.claimed_by = None
+                    job.lease_expires_at = None
+                    job.last_heartbeat_at = None
                     job.error_message = str(exc)[:1000]
                 await session.commit()
+
+    async def _heartbeat(self, *, job_id: str, worker_id: str) -> None:
+        async with AppDataSessionLocal() as session:
+            await WorkspaceDeletionRepository.heartbeat_job(
+                session,
+                job_id=job_id,
+                worker_id=worker_id,
+                lease_seconds=self.CLAIM_LEASE_SECONDS,
+            )

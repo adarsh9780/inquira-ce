@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import WorkspaceDatasetIngestionJob
@@ -12,6 +13,8 @@ from ..models import WorkspaceDatasetIngestionJob
 
 class DatasetIngestionRepository:
     """Repository for batch dataset ingestion job lifecycle."""
+
+    ACTIVE_STATUSES = ("queued", "running")
 
     @staticmethod
     async def create_job(
@@ -64,8 +67,108 @@ class DatasetIngestionRepository:
             .where(
                 WorkspaceDatasetIngestionJob.owner_principal_id == principal_id,
                 WorkspaceDatasetIngestionJob.workspace_id == workspace_id,
-                WorkspaceDatasetIngestionJob.status.in_(("queued", "running")),
+                WorkspaceDatasetIngestionJob.status.in_(DatasetIngestionRepository.ACTIVE_STATUSES),
             )
             .order_by(desc(WorkspaceDatasetIngestionJob.created_at))
         )
         return list(result.scalars().all())
+
+    @staticmethod
+    async def list_pending_jobs(
+        session: AsyncSession,
+        *,
+        limit: int = 100,
+    ) -> list[WorkspaceDatasetIngestionJob]:
+        result = await session.execute(
+            select(WorkspaceDatasetIngestionJob)
+            .where(WorkspaceDatasetIngestionJob.status.in_(DatasetIngestionRepository.ACTIVE_STATUSES))
+            .order_by(WorkspaceDatasetIngestionJob.created_at.asc(), WorkspaceDatasetIngestionJob.id.asc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def reset_claims_for_active_jobs(session: AsyncSession) -> None:
+        await session.execute(
+            update(WorkspaceDatasetIngestionJob)
+            .execution_options(synchronize_session=False)
+            .where(WorkspaceDatasetIngestionJob.status.in_(DatasetIngestionRepository.ACTIVE_STATUSES))
+            .values(claimed_by=None, lease_expires_at=None, last_heartbeat_at=None)
+        )
+        await session.commit()
+
+    @staticmethod
+    async def claim_job(
+        session: AsyncSession,
+        *,
+        job_id: str,
+        worker_id: str,
+        lease_seconds: int,
+    ) -> WorkspaceDatasetIngestionJob | None:
+        now = datetime.now(UTC)
+        lease_until = now + timedelta(seconds=max(30, int(lease_seconds)))
+        result = await session.execute(
+            update(WorkspaceDatasetIngestionJob)
+            .execution_options(synchronize_session=False)
+            .where(
+                WorkspaceDatasetIngestionJob.id == job_id,
+                WorkspaceDatasetIngestionJob.status.in_(DatasetIngestionRepository.ACTIVE_STATUSES),
+                or_(
+                    WorkspaceDatasetIngestionJob.claimed_by.is_(None),
+                    WorkspaceDatasetIngestionJob.claimed_by == worker_id,
+                    WorkspaceDatasetIngestionJob.lease_expires_at.is_(None),
+                    WorkspaceDatasetIngestionJob.lease_expires_at <= now,
+                ),
+            )
+            .values(
+                status="running",
+                claimed_by=worker_id,
+                lease_expires_at=lease_until,
+                last_heartbeat_at=now,
+                attempt_count=WorkspaceDatasetIngestionJob.attempt_count + 1,
+            )
+        )
+        if not result.rowcount:
+            await session.rollback()
+            return None
+        await session.commit()
+        return await DatasetIngestionRepository.get_by_id(session, job_id)
+
+    @staticmethod
+    async def heartbeat_job(
+        session: AsyncSession,
+        *,
+        job_id: str,
+        worker_id: str,
+        lease_seconds: int,
+    ) -> None:
+        now = datetime.now(UTC)
+        lease_until = now + timedelta(seconds=max(30, int(lease_seconds)))
+        await session.execute(
+            update(WorkspaceDatasetIngestionJob)
+            .execution_options(synchronize_session=False)
+            .where(
+                WorkspaceDatasetIngestionJob.id == job_id,
+                WorkspaceDatasetIngestionJob.claimed_by == worker_id,
+            )
+            .values(last_heartbeat_at=now, lease_expires_at=lease_until)
+        )
+        await session.commit()
+
+    @staticmethod
+    async def release_claim(
+        session: AsyncSession,
+        *,
+        job_id: str,
+        worker_id: str,
+    ) -> None:
+        await session.execute(
+            update(WorkspaceDatasetIngestionJob)
+            .execution_options(synchronize_session=False)
+            .where(
+                WorkspaceDatasetIngestionJob.id == job_id,
+                WorkspaceDatasetIngestionJob.claimed_by == worker_id,
+            )
+            .values(claimed_by=None, lease_expires_at=None, last_heartbeat_at=None)
+        )
+        await session.commit()

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import shutil
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from ...data_access.coordinator import LeaseConflictError, LeaseKinds, ResourceLeaseCoordinator
 from ..db.session import AppDataSessionLocal
 from ..repositories.conversation_repository import ConversationRepository
 
@@ -18,29 +20,57 @@ SOFT_DELETE_SWEEP_INTERVAL_SECONDS = 4 * 60 * 60
 class StorageCleanupService:
     """Best-effort cleanup worker for deferred filesystem and metadata removal."""
 
-    async def run_once(self) -> None:
-        cutoff = datetime.now(UTC) - SOFT_DELETE_GRACE_PERIOD
-        async with AppDataSessionLocal() as session:
-            conversations = await ConversationRepository.list_conversations_marked_for_deletion(
-                session,
-                marked_before=cutoff,
-            )
-            for conversation in conversations:
-                await self._cleanup_conversation(session, conversation)
+    def __init__(self) -> None:
+        self._leases = ResourceLeaseCoordinator(lease_seconds=300)
 
-            turns = await ConversationRepository.list_turns_marked_for_deletion(
-                session,
-                marked_before=cutoff,
-            )
-            for turn in turns:
-                parent_conversation = await ConversationRepository.get_conversation(
+    async def run_once(self) -> None:
+        owner_token = f"storage-cleanup:{uuid.uuid4()}"
+        async with AppDataSessionLocal() as session:
+            try:
+                await self._leases.acquire_system_lease(
                     session,
-                    str(getattr(turn, "conversation_id", "") or ""),
-                    include_deleted=True,
+                    resource_key="storage_cleanup",
+                    lease_kind=LeaseKinds.STORAGE_CLEANUP,
+                    owner_token=owner_token,
+                    metadata={"source": "storage_cleanup_service"},
                 )
-                if parent_conversation is not None and bool(parent_conversation.is_marked_for_deletion):
-                    continue
-                await self._cleanup_turn(session, turn)
+                await session.commit()
+            except LeaseConflictError:
+                await session.rollback()
+                return
+
+        try:
+            cutoff = datetime.now(UTC) - SOFT_DELETE_GRACE_PERIOD
+            async with AppDataSessionLocal() as session:
+                conversations = await ConversationRepository.list_conversations_marked_for_deletion(
+                    session,
+                    marked_before=cutoff,
+                )
+                for conversation in conversations:
+                    await self._cleanup_conversation(session, conversation)
+
+                turns = await ConversationRepository.list_turns_marked_for_deletion(
+                    session,
+                    marked_before=cutoff,
+                )
+                for turn in turns:
+                    parent_conversation = await ConversationRepository.get_conversation(
+                        session,
+                        str(getattr(turn, "conversation_id", "") or ""),
+                        include_deleted=True,
+                    )
+                    if parent_conversation is not None and bool(parent_conversation.is_marked_for_deletion):
+                        continue
+                    await self._cleanup_turn(session, turn)
+        finally:
+            async with AppDataSessionLocal() as session:
+                await self._leases.release_lease(
+                    session,
+                    resource_key="storage_cleanup",
+                    lease_kind=LeaseKinds.STORAGE_CLEANUP,
+                    owner_token=owner_token,
+                )
+                await session.commit()
 
     async def worker_loop(self) -> None:
         """Run cleanup immediately once, then continue periodically."""

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import uuid
 from types import SimpleNamespace
 from typing import Any
 
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import AppDataSessionLocal
 from ..repositories.dataset_ingestion_repository import DatasetIngestionRepository
+from ..repositories.principal_repository import PrincipalRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .dataset_service import DatasetService
 
@@ -19,10 +21,12 @@ from .dataset_service import DatasetService
 class DatasetIngestionService:
     """Manage batch ingestion jobs while serializing workspace DB writes."""
 
+    CLAIM_LEASE_SECONDS = 300
+
     def __init__(self) -> None:
         self._tasks: dict[str, asyncio.Task[Any]] = {}
         self._lock = asyncio.Lock()
-        self._ingest_lock = asyncio.Lock()
+        self._workspace_locks: dict[str, asyncio.Lock] = {}
 
     async def enqueue_dataset_ingestion(
         self,
@@ -100,6 +104,21 @@ class DatasetIngestionService:
                 task.cancel()
             self._tasks.clear()
 
+    async def resume_pending_jobs(self) -> None:
+        """Resume queued/running jobs after backend restart."""
+        async with AppDataSessionLocal() as session:
+            await DatasetIngestionRepository.reset_claims_for_active_jobs(session)
+            jobs = await DatasetIngestionRepository.list_pending_jobs(session)
+            for job in jobs:
+                principal = await PrincipalRepository.get_by_id(session, str(job.owner_principal_id))
+                username = str(getattr(principal, "username_cached", "") or "")
+                await self._schedule_job(
+                    job_id=str(job.id),
+                    workspace_id=str(job.workspace_id),
+                    principal_id=str(job.owner_principal_id),
+                    username=username,
+                )
+
     async def _schedule_job(
         self,
         *,
@@ -132,11 +151,16 @@ class DatasetIngestionService:
         username: str,
     ) -> None:
         """Process one job serially so one workspace kernel writes at a time."""
+        worker_id = f"dataset-ingestion:{job_id}:{uuid.uuid4()}"
         async with AppDataSessionLocal() as session:
-            job = await DatasetIngestionRepository.get_by_id(session, job_id)
+            job = await DatasetIngestionRepository.claim_job(
+                session,
+                job_id=job_id,
+                worker_id=worker_id,
+                lease_seconds=self.CLAIM_LEASE_SECONDS,
+            )
             if job is None:
                 return
-            job.status = "running"
             job.error_message = None
             await session.commit()
 
@@ -150,10 +174,12 @@ class DatasetIngestionService:
                 items = _read_items(job.items_json)
 
             for index, item in enumerate(items):
+                await self._heartbeat(job_id=job_id, worker_id=worker_id)
                 item["status"] = "running"
-                await self._write_items(job_id, items)
+                await self._write_items(job_id, items, worker_id=worker_id)
                 try:
-                    async with self._ingest_lock:
+                    async with await self._workspace_lock(workspace_id):
+                        await self._heartbeat(job_id=job_id, worker_id=worker_id)
                         async with AppDataSessionLocal() as session:
                             dataset = await DatasetService.add_dataset(
                                 session=session,
@@ -170,7 +196,7 @@ class DatasetIngestionService:
                     item["error_message"] = str(getattr(exc, "detail", None) or exc)[:1000]
                 finally:
                     items[index] = item
-                    await self._write_items(job_id, items)
+                    await self._write_items(job_id, items, worker_id=worker_id)
 
             completed = sum(1 for item in items if item.get("status") == "completed")
             failed = sum(1 for item in items if item.get("status") == "failed")
@@ -180,6 +206,9 @@ class DatasetIngestionService:
                     job.completed_count = completed
                     job.failed_count = failed
                     job.status = "completed" if failed == 0 else "completed_with_errors"
+                    job.claimed_by = None
+                    job.lease_expires_at = None
+                    job.last_heartbeat_at = None
                     job.error_message = None if failed == 0 else f"{failed} dataset(s) failed to ingest."
                     job.items_json = json.dumps(items)
                 await session.commit()
@@ -188,10 +217,13 @@ class DatasetIngestionService:
                 job = await DatasetIngestionRepository.get_by_id(session, job_id)
                 if job is not None:
                     job.status = "failed"
+                    job.claimed_by = None
+                    job.lease_expires_at = None
+                    job.last_heartbeat_at = None
                     job.error_message = str(exc)[:1000]
                 await session.commit()
 
-    async def _write_items(self, job_id: str, items: list[dict[str, Any]]) -> None:
+    async def _write_items(self, job_id: str, items: list[dict[str, Any]], *, worker_id: str) -> None:
         completed = sum(1 for item in items if item.get("status") == "completed")
         failed = sum(1 for item in items if item.get("status") == "failed")
         async with AppDataSessionLocal() as session:
@@ -201,6 +233,24 @@ class DatasetIngestionService:
                 job.completed_count = completed
                 job.failed_count = failed
             await session.commit()
+        await self._heartbeat(job_id=job_id, worker_id=worker_id)
+
+    async def _heartbeat(self, *, job_id: str, worker_id: str) -> None:
+        async with AppDataSessionLocal() as session:
+            await DatasetIngestionRepository.heartbeat_job(
+                session,
+                job_id=job_id,
+                worker_id=worker_id,
+                lease_seconds=self.CLAIM_LEASE_SECONDS,
+            )
+
+    async def _workspace_lock(self, workspace_id: str) -> asyncio.Lock:
+        async with self._lock:
+            lock = self._workspace_locks.get(workspace_id)
+            if lock is None:
+                lock = asyncio.Lock()
+                self._workspace_locks[workspace_id] = lock
+            return lock
 
 
 def _read_items(items_json: str) -> list[dict[str, Any]]:

@@ -27,6 +27,7 @@ class LeaseKinds:
     WORKSPACE_RUNTIME: str = "workspace_runtime"
     WORKSPACE_MAINTENANCE: str = "workspace_maintenance"
     PRINCIPAL_ACTIVATION: str = "principal_activation"
+    STORAGE_CLEANUP: str = "storage_cleanup"
 
 
 class ResourceLeaseCoordinator:
@@ -87,6 +88,25 @@ class ResourceLeaseCoordinator:
             owner_token=owner_token,
             metadata=metadata,
             conflicting_kinds=(),
+        )
+
+    async def acquire_system_lease(
+        self,
+        session: AsyncSession,
+        *,
+        resource_key: str,
+        lease_kind: str,
+        owner_token: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> ResourceLease:
+        return await self._acquire_lease(
+            session,
+            resource_key=resource_key,
+            resource_type="system",
+            lease_kind=lease_kind,
+            owner_token=owner_token,
+            metadata=metadata,
+            conflicting_kinds=(lease_kind,),
         )
 
     async def renew_lease(
