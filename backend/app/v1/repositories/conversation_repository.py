@@ -117,6 +117,40 @@ class ConversationRepository:
         await session.delete(conversation)
 
     @staticmethod
+    async def list_conversations_marked_for_deletion(
+        session: AsyncSession,
+        *,
+        marked_before: datetime,
+    ) -> list[Conversation]:
+        result = await session.execute(
+            select(Conversation)
+            .where(
+                Conversation.is_marked_for_deletion.is_(True),
+                Conversation.marked_for_deletion_at.is_not(None),
+                Conversation.marked_for_deletion_at <= marked_before,
+            )
+            .order_by(Conversation.marked_for_deletion_at.asc(), Conversation.id.asc())
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def list_turns_marked_for_deletion(
+        session: AsyncSession,
+        *,
+        marked_before: datetime,
+    ) -> list[Turn]:
+        result = await session.execute(
+            select(Turn)
+            .where(
+                Turn.is_marked_for_deletion.is_(True),
+                Turn.marked_for_deletion_at.is_not(None),
+                Turn.marked_for_deletion_at <= marked_before,
+            )
+            .order_by(Turn.marked_for_deletion_at.asc(), Turn.id.asc())
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
     async def mark_conversation_for_deletion(session: AsyncSession, conversation: Conversation) -> None:
         """Soft-delete a conversation and its turns."""
         marked_at = datetime.now(UTC)

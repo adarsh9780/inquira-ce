@@ -30,6 +30,7 @@ from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
 from .v1.services.workspace_deletion_service import WorkspaceDeletionService
 from .v1.services.dataset_deletion_service import DatasetDeletionService
 from .v1.services.dataset_ingestion_service import DatasetIngestionService
+from .v1.services.storage_cleanup_service import StorageCleanupService
 from .core.config_models import AppConfig
 from .core.logger import logprint, patch_print
 from .services.code_executor import (
@@ -113,6 +114,7 @@ async def lifespan(app: FastAPI):
     app.state.workspace_deletion_service = WorkspaceDeletionService()
     app.state.dataset_deletion_service = DatasetDeletionService()
     app.state.dataset_ingestion_service = DatasetIngestionService()
+    app.state.storage_cleanup_service = StorageCleanupService()
 
     # Load merged configuration
     try:
@@ -138,14 +140,21 @@ async def lifespan(app: FastAPI):
     # Start session cleanup task
     cleanup_task = asyncio.create_task(session_cleanup_worker())
     logprint("Session cleanup worker started")
+    storage_cleanup_task = asyncio.create_task(app.state.storage_cleanup_service.worker_loop())
+    logprint("Storage cleanup worker started")
 
     yield
 
     # Cleanup on shutdown
     logprint("Shutting down API server")
     cleanup_task.cancel()
+    storage_cleanup_task.cancel()
     try:
         await cleanup_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await storage_cleanup_task
     except asyncio.CancelledError:
         pass
 
