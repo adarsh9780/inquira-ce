@@ -168,7 +168,7 @@
                       ? 'text-[var(--color-accent)]'
                       : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
                   >
-                    {{ conversationBadgeLabel(index) }}
+                    {{ conversationBadgeLabel(index, appStore.conversations.length) }}
                   </span>
                 </div>
 
@@ -532,8 +532,10 @@ function openSchemaEditor() {
   appStore.setActiveTab('schema-editor')
 }
 
-function conversationBadgeLabel(index) {
-  const ordinal = Number(index) + 1
+function conversationBadgeLabel(index, totalCount = appStore.conversations.length) {
+  const total = Number(totalCount)
+  const offset = Number(index)
+  const ordinal = total - offset
   if (!Number.isFinite(ordinal) || ordinal <= 0) return '1'
   if (ordinal > 99) return '99+'
   return String(ordinal)
