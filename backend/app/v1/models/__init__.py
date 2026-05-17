@@ -3,6 +3,7 @@
 from .conversation import Conversation, Turn, TurnArtifact
 from .enums import UserPlan
 from .preferences import UserPreferences
+from .resource_lease import ResourceLease
 from .user import User
 from .workspace import (
     Principal,
@@ -18,6 +19,7 @@ __all__ = [
     "Principal",
     "UserPreferences",
     "UserPlan",
+    "ResourceLease",
     "Workspace",
     "WorkspaceDataset",
     "WorkspaceDeletionJob",
