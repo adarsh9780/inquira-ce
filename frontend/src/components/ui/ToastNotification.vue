@@ -4,8 +4,9 @@
     class="max-w-sm w-full animate-toast-in"
   >
     <div
-      class="relative overflow-hidden flex items-start gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
-      style="box-shadow: var(--shadow-lifted);"
+      class="relative overflow-hidden flex items-start gap-3 rounded-lg border p-4"
+      :class="containerClass"
+      :style="{ boxShadow: 'var(--shadow-lifted)' }"
     >
       <!-- Icon -->
       <div class="flex-shrink-0 mt-0.5">
@@ -17,14 +18,15 @@
 
       <!-- Message -->
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium text-[var(--color-text-main)]">{{ title }}</p>
-        <p v-if="message" class="text-sm text-[var(--color-text-muted)] mt-0.5">{{ message }}</p>
+        <p class="text-sm font-medium" :class="titleClass">{{ title }}</p>
+        <p v-if="message" class="mt-0.5 text-sm" :class="messageClass">{{ message }}</p>
       </div>
 
       <!-- Close button -->
       <button
         @click="close"
-        class="flex-shrink-0 text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] transition-colors p-0.5 -mr-1"
+        class="flex-shrink-0 transition-colors p-0.5 -mr-1"
+        :class="closeButtonClass"
       >
         <XMarkIcon class="h-4 w-4" />
       </button>
@@ -76,6 +78,40 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 let timeoutId = null
+
+const containerClass = computed(() => {
+  if (props.type === 'success') {
+    return 'border-[var(--color-success)]/35 bg-[var(--color-success-bg)]'
+  }
+  if (props.type === 'error') {
+    return 'border-[var(--color-error)]/40 bg-[var(--color-danger-bg)]'
+  }
+  if (props.type === 'warning') {
+    return 'border-[var(--color-warning)]/40 bg-[var(--color-warning-bg)]'
+  }
+  return 'border-[var(--color-info)]/35 bg-[var(--color-info-bg)]'
+})
+
+const titleClass = computed(() => {
+  if (props.type === 'success') return 'text-[var(--color-success)]'
+  if (props.type === 'error') return 'text-[var(--color-danger-text)]'
+  if (props.type === 'warning') return 'text-[var(--color-warning-text)]'
+  return 'text-[var(--color-info-text)]'
+})
+
+const messageClass = computed(() => {
+  if (props.type === 'success') return 'text-[var(--color-success)]/90'
+  if (props.type === 'error') return 'text-[var(--color-danger-text)]/90'
+  if (props.type === 'warning') return 'text-[var(--color-warning-text)]/90'
+  return 'text-[var(--color-info-text)]/90'
+})
+
+const closeButtonClass = computed(() => {
+  if (props.type === 'success') return 'text-[var(--color-success)]/70 hover:text-[var(--color-success)]'
+  if (props.type === 'error') return 'text-[var(--color-danger-text)]/70 hover:text-[var(--color-danger-text)]'
+  if (props.type === 'warning') return 'text-[var(--color-warning-text)]/70 hover:text-[var(--color-warning-text)]'
+  return 'text-[var(--color-info-text)]/70 hover:text-[var(--color-info-text)]'
+})
 
 const progressBarClass = computed(() => {
   if (props.type === 'success') return 'bg-[var(--color-success)] animate-toast-progress'
