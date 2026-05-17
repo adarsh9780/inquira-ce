@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,7 +36,10 @@ class ConversationRepository:
         """List conversations by recency."""
         result = await session.execute(
             select(Conversation)
-            .where(Conversation.workspace_id == workspace_id)
+            .where(
+                Conversation.workspace_id == workspace_id,
+                Conversation.is_marked_for_deletion.is_(False),
+            )
             .order_by(desc(Conversation.updated_at))
             .limit(limit)
         )
@@ -46,22 +49,39 @@ class ConversationRepository:
     async def count_for_workspace(session: AsyncSession, workspace_id: str) -> int:
         """Count conversations stored for one workspace."""
         result = await session.execute(
-            select(func.count()).select_from(Conversation).where(Conversation.workspace_id == workspace_id)
+            select(func.count()).select_from(Conversation).where(
+                Conversation.workspace_id == workspace_id,
+                Conversation.is_marked_for_deletion.is_(False),
+            )
         )
         return int(result.scalar_one() or 0)
 
     @staticmethod
-    async def get_conversation(session: AsyncSession, conversation_id: str) -> Conversation | None:
+    async def get_conversation(
+        session: AsyncSession,
+        conversation_id: str,
+        *,
+        include_deleted: bool = False,
+    ) -> Conversation | None:
         """Get conversation by id."""
-        result = await session.execute(
-            select(Conversation).where(Conversation.id == conversation_id)
-        )
+        stmt = select(Conversation).where(Conversation.id == conversation_id)
+        if not include_deleted:
+            stmt = stmt.where(Conversation.is_marked_for_deletion.is_(False))
+        result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def get_turn(session: AsyncSession, turn_id: str) -> Turn | None:
+    async def get_turn(
+        session: AsyncSession,
+        turn_id: str,
+        *,
+        include_deleted: bool = False,
+    ) -> Turn | None:
         """Get turn by id."""
-        result = await session.execute(select(Turn).where(Turn.id == turn_id))
+        stmt = select(Turn).where(Turn.id == turn_id)
+        if not include_deleted:
+            stmt = stmt.where(Turn.is_marked_for_deletion.is_(False))
+        result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -69,7 +89,11 @@ class ConversationRepository:
         """List direct child turns in sequence order."""
         result = await session.execute(
             select(Turn)
-            .where(Turn.conversation_id == conversation_id, Turn.parent_turn_id == parent_turn_id)
+            .where(
+                Turn.conversation_id == conversation_id,
+                Turn.parent_turn_id == parent_turn_id,
+                Turn.is_marked_for_deletion.is_(False),
+            )
             .order_by(Turn.seq_no.asc(), Turn.created_at.asc(), Turn.id.asc())
         )
         return list(result.scalars().all())
@@ -79,7 +103,10 @@ class ConversationRepository:
         """List turns oldest-first for migration and lineage rebuilds."""
         result = await session.execute(
             select(Turn)
-            .where(Turn.conversation_id == conversation_id)
+            .where(
+                Turn.conversation_id == conversation_id,
+                Turn.is_marked_for_deletion.is_(False),
+            )
             .order_by(Turn.seq_no.asc(), Turn.created_at.asc(), Turn.id.asc())
         )
         return list(result.scalars().all())
@@ -88,6 +115,25 @@ class ConversationRepository:
     async def delete_conversation(session: AsyncSession, conversation: Conversation) -> None:
         """Delete conversation and cascaded turns."""
         await session.delete(conversation)
+
+    @staticmethod
+    async def mark_conversation_for_deletion(session: AsyncSession, conversation: Conversation) -> None:
+        """Soft-delete a conversation and its turns."""
+        marked_at = datetime.now(UTC)
+        conversation.is_marked_for_deletion = True
+        conversation.marked_for_deletion_at = marked_at
+        conversation.deletion_status = "marked"
+        conversation.deletion_error = None
+
+        result = await session.execute(
+            select(Turn).where(Turn.conversation_id == conversation.id)
+        )
+        for turn in result.scalars().all():
+            turn.is_marked_for_deletion = True
+            turn.marked_for_deletion_at = marked_at
+            turn.deletion_status = "marked"
+            turn.deletion_error = None
+        await session.flush()
 
     @staticmethod
     async def update_conversation(session: AsyncSession, conversation: Conversation, title: str) -> None:
@@ -155,7 +201,10 @@ class ConversationRepository:
         """List turns newest-first with optional cursor boundary."""
         stmt = (
             select(Turn)
-            .where(Turn.conversation_id == conversation_id)
+            .where(
+                Turn.conversation_id == conversation_id,
+                Turn.is_marked_for_deletion.is_(False),
+            )
             .order_by(desc(Turn.created_at), desc(Turn.id))
             .limit(limit)
         )

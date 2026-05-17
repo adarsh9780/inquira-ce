@@ -106,11 +106,17 @@ class ConversationService:
         conversation_id: str,
     ) -> None:
         """Delete full conversation including turns."""
-        conversation = await ConversationRepository.get_conversation(session, conversation_id)
+        conversation = await ConversationRepository.get_conversation(
+            session,
+            conversation_id,
+            include_deleted=True,
+        )
         if conversation is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
         await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
-        await ConversationRepository.delete_conversation(session, conversation)
+        if conversation.is_marked_for_deletion:
+            return
+        await ConversationRepository.mark_conversation_for_deletion(session, conversation)
         await session.commit()
 
     @staticmethod
