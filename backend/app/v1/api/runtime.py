@@ -40,6 +40,8 @@ from ..repositories.workspace_repository import WorkspaceRepository
 from ..repositories.conversation_repository import ConversationRepository
 from ..services.secret_storage_service import SecretStorageService
 from ..services.conversation_service import ConversationService
+from ..services.turn_artifact_storage_service import TurnArtifactStorageService
+from ..services.turn_bundle_service import TurnBundleService
 from .deps import ensure_appdata_principal, get_current_user
 from ...core.prompt_library import get_prompt
 from ...services.llm_service import LLMService
@@ -130,6 +132,8 @@ async def _read_table_columns_for_prompt(
 class ExecuteRequest(BaseModel):
     code: str = Field(..., description="Python code to execute")
     timeout: int = Field(60, ge=1, le=300, description="Max execution time in seconds")
+    conversation_id: str | None = Field(default=None, description="Owning conversation to update in-place")
+    turn_id: str | None = Field(default=None, description="Owning turn to overwrite in-place")
 
 
 class ExecuteResponse(BaseModel):
@@ -914,6 +918,93 @@ def _build_inline_artifact_fallback(
     ]
 
 
+async def _persist_runtime_execution_to_turn(
+    *,
+    session: AsyncSession,
+    username: str,
+    workspace_id: str,
+    workspace_duckdb_path: str,
+    conversation_id: str,
+    turn_id: str,
+    code: str,
+    execution_result: ExecuteResponse,
+) -> None:
+    conversation = await ConversationRepository.get_conversation(session, conversation_id)
+    if conversation is None or conversation.workspace_id != workspace_id:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    turn = await ConversationRepository.get_turn(session, turn_id)
+    if turn is None or turn.conversation_id != conversation_id:
+        raise HTTPException(status_code=404, detail="Turn not found")
+
+    artifact_rows = await TurnArtifactStorageService.persist_turn_artifacts(
+        session=session,
+        username=username,
+        workspace_id=workspace_id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        workspace_duckdb_path=workspace_duckdb_path,
+        artifacts=execution_result.artifacts,
+    )
+
+    turn_dir = await TurnBundleService.create_turn_bundle(
+        username=username,
+        workspace_id=workspace_id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        user_text=str(turn.user_text or ""),
+        assistant_text=str(turn.assistant_text or ""),
+        code=code,
+        manifest={
+            "seq_no": int(turn.seq_no),
+            "parent_turn_id": turn.parent_turn_id,
+            "result_kind": str(execution_result.result_kind or turn.result_kind or ""),
+            "execution": {
+                "status": "success" if bool(execution_result.success) else "failed",
+                "stdout": str(execution_result.stdout or ""),
+                "stderr": str(execution_result.stderr or execution_result.error or ""),
+                "success": bool(execution_result.success),
+            },
+            "artifacts": [
+                {
+                    "artifact_id": str(item.get("artifact_id") or ""),
+                    "kind": str(item.get("kind") or ""),
+                    "path": str(item.get("storage_path") or ""),
+                    "payload_format": str(item.get("payload_format") or ""),
+                }
+                for item in artifact_rows
+            ],
+        },
+    )
+
+    conversation.storage_path = str(TurnBundleService.build_conversation_dir(username, workspace_id, conversation_id))
+    turn.storage_path = str(turn_dir)
+    turn.code_snapshot = code
+    turn.code_path = str(TurnBundleService.build_turn_code_path(username, workspace_id, conversation_id, turn_id))
+    turn.manifest_path = str(TurnBundleService.build_turn_manifest_path(username, workspace_id, conversation_id, turn_id))
+    turn.result_kind = str(execution_result.result_kind or turn.result_kind or "")
+    turn.artifact_summary_json = json.dumps(
+        [
+            {
+                "artifact_id": str(item.get("artifact_id") or ""),
+                "kind": str(item.get("kind") or ""),
+                "path": str(item.get("storage_path") or ""),
+                "payload_format": str(item.get("payload_format") or ""),
+            }
+            for item in artifact_rows
+        ]
+    )
+    turn.execution_summary_json = json.dumps(
+        {
+            "status": "success" if bool(execution_result.success) else "failed",
+            "stdout": str(execution_result.stdout or ""),
+            "stderr": str(execution_result.stderr or execution_result.error or ""),
+            "success": bool(execution_result.success),
+        }
+    )
+    await session.commit()
+
+
 @router.get("/workspaces/{workspace_id}/paths", response_model=WorkspacePathsResponse)
 async def get_workspace_paths(
     workspace_id: str,
@@ -1144,11 +1235,25 @@ async def execute_workspace_code(
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
-    return await _execute_workspace_code_impl(
+    response = await _execute_workspace_code_impl(
         workspace_id=workspace_id,
         workspace_duckdb_path=str(workspace.duckdb_path),
         payload=payload,
     )
+    conversation_id = str(payload.conversation_id or "").strip()
+    turn_id = str(payload.turn_id or "").strip()
+    if conversation_id and turn_id:
+        await _persist_runtime_execution_to_turn(
+            session=session,
+            username=str(getattr(current_user, "username", "") or ""),
+            workspace_id=workspace_id,
+            workspace_duckdb_path=str(workspace.duckdb_path),
+            conversation_id=conversation_id,
+            turn_id=turn_id,
+            code=payload.code,
+            execution_result=response,
+        )
+    return response
 
 
 @router.get(

@@ -8,4 +8,6 @@ test('api service executes code through v1 workspace runtime endpoint', () => {
   const source = readFileSync(servicePath, 'utf-8')
 
   assert.equal(source.includes('/api/v1/workspaces/${activeWorkspaceId}/execute'), true)
+  assert.equal(source.includes('conversation_id: appStore.activeConversationId || null'), true)
+  assert.equal(source.includes('turn_id: appStore.activeTurnId || null'), true)
 })

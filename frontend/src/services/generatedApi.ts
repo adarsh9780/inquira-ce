@@ -318,6 +318,8 @@ export interface ExecuteRequest {
    * @maximum 300
    */
   timeout?: number;
+  conversation_id?: string | null;
+  turn_id?: string | null;
 }
 
 export type ExecuteResponseRunId = string | null;

@@ -40,6 +40,7 @@ from .branch_summary_service import BranchSummaryService
 from .conversation_service import ConversationService
 from .schema_memory_service import SchemaMemoryService
 from .secret_storage_service import SecretStorageService
+from .turn_artifact_storage_service import TurnArtifactStorageService
 from .turn_bundle_service import TurnBundleService
 from ...core.logger import logprint
 
@@ -1557,6 +1558,15 @@ class ChatService:
             code_snapshot=response_payload["code"],
             parent_turn_id=parent_turn_id,
         )
+        artifact_rows = await TurnArtifactStorageService.persist_turn_artifacts(
+            session=session,
+            username=username,
+            workspace_id=workspace_id,
+            conversation_id=conversation_id,
+            turn_id=turn.id,
+            workspace_duckdb_path=str(data_path or ""),
+            artifacts=artifacts,
+        )
         turn_dir = await TurnBundleService.create_turn_bundle(
             username=username,
             workspace_id=workspace_id,
@@ -1568,26 +1578,34 @@ class ChatService:
             manifest={
                 "seq_no": seq_no,
                 "result_kind": str(response_payload.get("result_kind") or ""),
+                "parent_turn_id": parent_turn_id,
                 "artifacts": [
                     {
                         "artifact_id": str(item.get("artifact_id") or ""),
                         "kind": str(item.get("kind") or ""),
-                        "path": str(item.get("path") or ""),
+                        "path": str(item.get("storage_path") or ""),
+                        "payload_format": str(item.get("payload_format") or ""),
                     }
-                    for item in artifacts
+                    for item in artifact_rows
                 ],
+                "execution": response_payload.get("execution") if isinstance(response_payload.get("execution"), dict) else None,
             },
         )
-        turn.code_path = str(turn_dir / "analysis.py")
-        turn.manifest_path = str(turn_dir / "turn.json")
+        conversation.storage_path = str(
+            TurnBundleService.build_conversation_dir(username, workspace_id, conversation_id)
+        )
+        turn.storage_path = str(turn_dir)
+        turn.code_path = str(TurnBundleService.build_turn_code_path(username, workspace_id, conversation_id, turn.id))
+        turn.manifest_path = str(TurnBundleService.build_turn_manifest_path(username, workspace_id, conversation_id, turn.id))
         turn.artifact_summary_json = json.dumps(
             [
                 {
                     "artifact_id": str(item.get("artifact_id") or ""),
                     "kind": str(item.get("kind") or ""),
-                    "path": str(item.get("path") or ""),
+                    "path": str(item.get("storage_path") or ""),
+                    "payload_format": str(item.get("payload_format") or ""),
                 }
-                for item in artifacts
+                for item in artifact_rows
             ]
         )
         execution_summary = response_payload.get("execution")

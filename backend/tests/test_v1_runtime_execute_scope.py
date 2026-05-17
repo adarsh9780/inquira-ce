@@ -268,6 +268,85 @@ async def test_execute_workspace_code_populates_artifacts_from_run_exports(monke
 
 
 @pytest.mark.asyncio
+async def test_execute_workspace_code_persists_active_turn_artifacts(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws2-active-turn"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.duckdb"
+    duckdb_path.touch()
+
+    workspace = SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return workspace
+
+    async def fake_execute_workspace_code_impl(*, workspace_id, workspace_duckdb_path, payload):
+        assert workspace_id == "ws-2"
+        assert workspace_duckdb_path == str(duckdb_path)
+        assert payload.conversation_id == "conv-1"
+        assert payload.turn_id == "turn-1"
+        return runtime_api.ExecuteResponse(
+            success=True,
+            run_id="run-1",
+            stdout="",
+            stderr="",
+            error=None,
+            result=None,
+            result_type=None,
+            result_kind="dataframe",
+            artifacts=[{"artifact_id": "art-1", "kind": "dataframe"}],
+        )
+
+    captured = {}
+
+    async def fake_persist_runtime_execution_to_turn(
+        *,
+        session,
+        username,
+        workspace_id,
+        workspace_duckdb_path,
+        conversation_id,
+        turn_id,
+        code,
+        execution_result,
+    ):
+        _ = session
+        captured["username"] = username
+        captured["workspace_id"] = workspace_id
+        captured["workspace_duckdb_path"] = workspace_duckdb_path
+        captured["conversation_id"] = conversation_id
+        captured["turn_id"] = turn_id
+        captured["code"] = code
+        captured["execution_result"] = execution_result
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(runtime_api, "_execute_workspace_code_impl", fake_execute_workspace_code_impl)
+    monkeypatch.setattr(runtime_api, "_persist_runtime_execution_to_turn", fake_persist_runtime_execution_to_turn)
+
+    payload = runtime_api.ExecuteRequest(
+        code='print("x")',
+        timeout=30,
+        conversation_id="conv-1",
+        turn_id="turn-1",
+    )
+    response = await runtime_api.execute_workspace_code(
+        workspace_id="ws-2",
+        payload=payload,
+        session=object(),
+        current_user=SimpleNamespace(id="user-1", username="alice"),
+    )
+
+    assert response.success is True
+    assert captured["username"] == "alice"
+    assert captured["workspace_id"] == "ws-2"
+    assert captured["workspace_duckdb_path"] == str(duckdb_path)
+    assert captured["conversation_id"] == "conv-1"
+    assert captured["turn_id"] == "turn-1"
+    assert captured["code"] == 'print("x")'
+    assert captured["execution_result"].artifacts[0]["artifact_id"] == "art-1"
+
+
+@pytest.mark.asyncio
 async def test_workspace_dataframe_artifact_rows_endpoint(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws5"
     workspace_dir.mkdir(parents=True, exist_ok=True)

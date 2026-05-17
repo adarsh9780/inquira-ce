@@ -487,7 +487,12 @@ export const apiService = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ code, timeout })
+        body: JSON.stringify({
+          code,
+          timeout,
+          conversation_id: appStore.activeConversationId || null,
+          turn_id: appStore.activeTurnId || null,
+        })
       }
     )
     if (!response.ok) {
