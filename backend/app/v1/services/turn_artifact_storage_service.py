@@ -8,7 +8,6 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-import duckdb
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...data_access import ScratchpadOfflineAdapter, ScratchpadRuntimeAdapter
@@ -172,19 +171,30 @@ class TurnArtifactStorageService:
                     "Dataframe artifact export was not materialized by the workspace kernel. "
                     "Retry after the kernel finishes the run."
                 )
-            if not scratchpad_fallback_allowed and kind in {"figure", "scalar", "text", "structured"}:
+            if kind == "dataframe":
+                await ScratchpadOfflineAdapter(
+                    session=session,
+                    owner_token=str(offline_lease_owner_token),
+                ).export_dataframe_to_parquet(
+                    workspace_id=workspace_id,
+                    workspace_duckdb_path=workspace_duckdb_path,
+                    table_name=str(source_meta.get("table_name") or "").strip(),
+                    storage_path=str(storage_path),
+                )
+            if kind in {"figure", "scalar", "text", "structured"} and not scratchpad_fallback_allowed:
                 serializable_payload = source_meta.get("payload")
                 if serializable_payload is None:
                     raise RuntimeError(
                         "Artifact payload metadata is unavailable because the workspace kernel is not active."
                     )
-            await asyncio.to_thread(
-                TurnArtifactStorageService._write_artifact_payload,
-                scratchpad_db_path,
-                storage_path,
-                kind,
-                source_meta,
-            )
+            if kind != "dataframe":
+                await asyncio.to_thread(
+                    TurnArtifactStorageService._write_artifact_payload,
+                    scratchpad_db_path,
+                    storage_path,
+                    kind,
+                    source_meta,
+                )
             size_bytes = int(storage_path.stat().st_size) if storage_path.exists() else None
 
         return {
@@ -210,14 +220,6 @@ class TurnArtifactStorageService:
         source_meta: dict[str, Any],
     ) -> None:
         storage_path.parent.mkdir(parents=True, exist_ok=True)
-        if kind == "dataframe":
-            TurnArtifactStorageService._write_dataframe_payload(
-                scratchpad_db_path=scratchpad_db_path,
-                storage_path=storage_path,
-                table_name=str(source_meta.get("table_name") or "").strip(),
-            )
-            return
-
         payload = source_meta.get("payload")
         if kind == "text":
             if isinstance(payload, dict):
@@ -234,23 +236,3 @@ class TurnArtifactStorageService:
             json.dumps(serializable_payload, indent=2, ensure_ascii=False, default=str),
             encoding="utf-8",
         )
-
-    @staticmethod
-    def _write_dataframe_payload(
-        *,
-        scratchpad_db_path: Path,
-        storage_path: Path,
-        table_name: str,
-    ) -> None:
-        if not table_name:
-            storage_path.write_text("[]", encoding="utf-8")
-            return
-        escaped_table = table_name.replace('"', '""')
-        escaped_path = str(storage_path).replace("'", "''")
-        con = duckdb.connect(str(scratchpad_db_path), read_only=True)
-        try:
-            con.execute(
-                f"COPY (SELECT * FROM \"{escaped_table}\") TO '{escaped_path}' (FORMAT PARQUET)"
-            )
-        finally:
-            con.close()

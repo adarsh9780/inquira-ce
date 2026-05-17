@@ -175,6 +175,21 @@ class ScratchpadOfflineAdapter:
         await self._assert_maintenance_lease(workspace_id)
         return self._store.build_scratchpad_db_path(workspace_duckdb_path)
 
+    async def export_dataframe_to_parquet(
+        self,
+        *,
+        workspace_id: str,
+        workspace_duckdb_path: str,
+        table_name: str,
+        storage_path: str,
+    ) -> None:
+        await self._assert_maintenance_lease(workspace_id)
+        self._store.export_dataframe_to_parquet(
+            workspace_duckdb_path=workspace_duckdb_path,
+            table_name=table_name,
+            storage_path=storage_path,
+        )
+
     async def _assert_maintenance_lease(self, workspace_id: str) -> None:
         await self._coordinator.assert_owned_lease(
             self._session,

@@ -725,6 +725,30 @@ class ArtifactScratchpadStore:
         finally:
             con.close()
 
+    def export_dataframe_to_parquet(
+        self,
+        *,
+        workspace_duckdb_path: str,
+        table_name: str,
+        storage_path: str,
+    ) -> None:
+        db_path = self.build_scratchpad_db_path(workspace_duckdb_path)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path = Path(storage_path)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        if not table_name:
+            target_path.write_text("[]", encoding="utf-8")
+            return
+        escaped_table = table_name.replace('"', '""')
+        escaped_path = str(target_path).replace("'", "''")
+        con = duckdb.connect(str(db_path), read_only=True)
+        try:
+            con.execute(
+                f"COPY (SELECT * FROM \"{escaped_table}\") TO '{escaped_path}' (FORMAT PARQUET)"
+            )
+        finally:
+            con.close()
+
     def prune_workspace(self, *, workspace_duckdb_path: str) -> None:
         db_path = self.build_scratchpad_db_path(workspace_duckdb_path)
         if not db_path.exists():
