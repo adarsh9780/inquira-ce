@@ -97,6 +97,13 @@ async def test_create_workspace_writes_manifest(monkeypatch):
         "app.v1.services.workspace_service.WorkspaceRepository.count_for_principal",
         fake_count_for_principal,
     )
+    async def fake_get_principal(_session, _principal_id):
+        return SimpleNamespace(active_workspace_id=None)
+
+    monkeypatch.setattr(
+        "app.v1.services.workspace_service.PrincipalRepository.get_by_id",
+        fake_get_principal,
+    )
     monkeypatch.setattr(
         "app.v1.services.workspace_service.WorkspaceRepository.create",
         fake_create,
@@ -112,6 +119,13 @@ async def test_create_workspace_writes_manifest(monkeypatch):
     monkeypatch.setattr(
         "app.v1.services.workspace_service.WorkspaceStorageService.build_duckdb_path",
         staticmethod(lambda username, workspace_id: f"/tmp/{username}/{workspace_id}/workspace.duckdb"),
+    )
+    async def fake_set_active(*, session, principal_id, workspace_id):
+        calls["active_workspace"] = (principal_id, workspace_id)
+
+    monkeypatch.setattr(
+        "app.v1.services.workspace_service.WorkspaceService._set_active_workspace_atomic",
+        staticmethod(fake_set_active),
     )
 
     class DummySession:
@@ -131,6 +145,7 @@ async def test_create_workspace_writes_manifest(monkeypatch):
     assert calls["manifest"][2] == "Data Lab"
     assert calls["manifest"][3] == "data lab"
     assert calls["schema_context"] == ""
+    assert calls["active_workspace"] == ("user-1", "ws-123")
 
 
 @pytest.mark.asyncio
@@ -154,9 +169,6 @@ async def test_activate_workspace_refreshes_manifest(monkeypatch):
     async def fake_get_active_for_principal(_session, principal_id):
         calls["previous_active_lookup"] = principal_id
         return previous_workspace
-
-    async def fake_deactivate_all(_session, principal_id):
-        calls["deactivate"] = principal_id
 
     async def fake_stop_terminal_session(*, user_id, workspace_id):
         calls["terminal_cleanup"] = (user_id, workspace_id)
@@ -192,10 +204,6 @@ async def test_activate_workspace_refreshes_manifest(monkeypatch):
         fake_get_active_for_principal,
     )
     monkeypatch.setattr(
-        "app.v1.services.workspace_service.WorkspaceRepository.deactivate_all_for_principal",
-        fake_deactivate_all,
-    )
-    monkeypatch.setattr(
         "app.v1.services.workspace_service.stop_workspace_terminal_session",
         fake_stop_terminal_session,
     )
@@ -206,6 +214,14 @@ async def test_activate_workspace_refreshes_manifest(monkeypatch):
     monkeypatch.setattr(
         "app.v1.services.workspace_service.WorkspaceStorageService.write_workspace_manifest",
         fake_write_manifest,
+    )
+    async def fake_set_active(*, session, principal_id, workspace_id):
+        calls["active_workspace"] = (principal_id, workspace_id)
+        workspace.is_active = 1
+
+    monkeypatch.setattr(
+        "app.v1.services.workspace_service.WorkspaceService._set_active_workspace_atomic",
+        staticmethod(fake_set_active),
     )
 
     class DummySession:
@@ -225,7 +241,7 @@ async def test_activate_workspace_refreshes_manifest(monkeypatch):
     assert workspace.is_active == 1
     assert calls["workspace_lookup"] == ("ws-9", "user-1")
     assert calls["previous_active_lookup"] == "user-1"
-    assert calls["deactivate"] == "user-1"
+    assert calls["active_workspace"] == ("user-1", "ws-9")
     assert calls["terminal_cleanup"] == ("user-1", "ws-1")
     assert calls["kernel_cleanup"] == "ws-1"
     assert calls["manifest"][0] == "alice"

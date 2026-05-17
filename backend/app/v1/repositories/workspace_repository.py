@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Workspace
+from ..models import Principal, Workspace
 
 
 class WorkspaceRepository:
@@ -65,9 +65,11 @@ class WorkspaceRepository:
     async def get_active_for_principal(session: AsyncSession, principal_id: str) -> Workspace | None:
         """Return the currently active workspace for a principal, if any."""
         result = await session.execute(
-            select(Workspace).where(
+            select(Workspace)
+            .join(Principal, Principal.active_workspace_id == Workspace.id)
+            .where(
+                Principal.id == principal_id,
                 Workspace.owner_principal_id == principal_id,
-                Workspace.is_active == 1,
             )
         )
         return result.scalars().first()
@@ -103,6 +105,24 @@ class WorkspaceRepository:
             .where(Workspace.owner_principal_id == principal_id)
             .values(is_active=0)
         )
+
+    @staticmethod
+    async def set_active_for_principal(
+        session: AsyncSession,
+        *,
+        principal_id: str,
+        workspace_id: str | None,
+    ) -> None:
+        await WorkspaceRepository.deactivate_all_for_principal(session, principal_id)
+        if workspace_id:
+            await session.execute(
+                update(Workspace)
+                .where(
+                    Workspace.owner_principal_id == principal_id,
+                    Workspace.id == workspace_id,
+                )
+                .values(is_active=1)
+            )
 
     @staticmethod
     async def delete(session: AsyncSession, workspace: Workspace) -> None:

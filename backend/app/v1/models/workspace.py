@@ -19,15 +19,26 @@ class Principal(AppDataBase):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     username_cached: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     plan_cached: Mapped[str] = mapped_column(String(32), nullable=False, default="FREE")
+    active_workspace_id: Mapped[str | None] = mapped_column(
+        ForeignKey("v1_workspaces.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    workspaces = relationship("Workspace", back_populates="owner_principal", cascade="all, delete-orphan")
+    workspaces = relationship(
+        "Workspace",
+        back_populates="owner_principal",
+        cascade="all, delete-orphan",
+        foreign_keys="Workspace.owner_principal_id",
+    )
     conversations = relationship("Conversation", back_populates="created_by_principal", cascade="all, delete-orphan")
     preferences = relationship("UserPreferences", back_populates="principal", cascade="all, delete-orphan", uselist=False)
     deletion_jobs = relationship("WorkspaceDeletionJob", back_populates="owner_principal", cascade="all, delete-orphan")
     dataset_deletion_jobs = relationship("WorkspaceDatasetDeletionJob", back_populates="owner_principal", cascade="all, delete-orphan")
     dataset_ingestion_jobs = relationship("WorkspaceDatasetIngestionJob", back_populates="owner_principal", cascade="all, delete-orphan")
+    active_workspace = relationship("Workspace", foreign_keys=[active_workspace_id], post_update=True)
 
 
 class Workspace(AppDataBase):
@@ -52,7 +63,7 @@ class Workspace(AppDataBase):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    owner_principal = relationship("Principal", back_populates="workspaces")
+    owner_principal = relationship("Principal", back_populates="workspaces", foreign_keys=[owner_principal_id])
     datasets = relationship("WorkspaceDataset", back_populates="workspace", cascade="all, delete-orphan")
     conversations = relationship("Conversation", back_populates="workspace", cascade="all, delete-orphan")
 

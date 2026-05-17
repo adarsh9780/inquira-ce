@@ -12,6 +12,7 @@ from ..db.session import AppDataSessionLocal
 from ..repositories.workspace_deletion_repository import WorkspaceDeletionRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .workspace_storage_service import WorkspaceStorageService
+from .workspace_service import WorkspaceService
 
 
 class WorkspaceDeletionService:
@@ -128,12 +129,18 @@ class WorkspaceDeletionService:
 
             async with AppDataSessionLocal() as session:
                 workspace = await WorkspaceRepository.get_by_id(session, workspace_id, principal_id)
+                was_active = bool(getattr(workspace, "is_active", 0)) if workspace is not None else False
                 if workspace is not None:
                     await WorkspaceRepository.delete(session, workspace)
 
                 remaining = await WorkspaceRepository.list_for_principal(session, principal_id)
-                if remaining and not any(ws.is_active == 1 for ws in remaining):
-                    remaining[0].is_active = 1
+                next_workspace_id = str(remaining[0].id) if was_active and remaining else None
+                if was_active or next_workspace_id is None:
+                    await WorkspaceService._set_active_workspace_atomic(
+                        session=session,
+                        principal_id=str(principal_id),
+                        workspace_id=next_workspace_id,
+                    )
 
                 job = await WorkspaceDeletionRepository.get_by_id(session, job_id)
                 if job is not None:

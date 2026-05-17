@@ -4,17 +4,20 @@ from __future__ import annotations
 
 import asyncio
 import shutil
+import uuid
 from pathlib import Path
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.logger import logprint
+from ...data_access.coordinator import LeaseConflictError, ResourceLeaseCoordinator
 from ...services.code_executor import reset_workspace_kernel
 from ...services.terminal_executor import stop_workspace_terminal_session
 from ..models import Workspace
 from ..repositories.conversation_repository import ConversationRepository
 from ..repositories.dataset_repository import DatasetRepository
+from ..repositories.principal_repository import PrincipalRepository
 from ..repositories.workspace_deletion_repository import WorkspaceDeletionRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .workspace_storage_service import WorkspaceStorageService
@@ -22,6 +25,8 @@ from .workspace_storage_service import WorkspaceStorageService
 
 class WorkspaceService:
     """Create/manage workspaces and filesystem provisioning."""
+
+    _activation_leases = ResourceLeaseCoordinator()
 
     @staticmethod
     def normalize_name(name: str) -> str:
@@ -69,8 +74,12 @@ class WorkspaceService:
         if existing is not None:
             raise HTTPException(status_code=409, detail="Workspace name already exists")
 
+        principal = await PrincipalRepository.get_by_id(session, user.id)
+        if principal is None:
+            raise HTTPException(status_code=404, detail="Principal not found")
+
         count = await WorkspaceRepository.count_for_principal(session, user.id)
-        is_active = 1 if count == 0 else 0
+        is_active = 1 if count == 0 and not principal.active_workspace_id else 0
         placeholder_id = "temp"
         duckdb_path = str(WorkspaceStorageService.build_duckdb_path(user.username, placeholder_id))
 
@@ -86,6 +95,12 @@ class WorkspaceService:
 
         await WorkspaceStorageService.ensure_workspace_dirs(user.username, workspace.id)
         workspace.duckdb_path = str(WorkspaceStorageService.build_duckdb_path(user.username, workspace.id))
+        if count == 0 or not principal.active_workspace_id:
+            await WorkspaceService._set_active_workspace_atomic(
+                session=session,
+                principal_id=str(user.id),
+                workspace_id=str(workspace.id),
+            )
         await session.commit()
         await session.refresh(workspace)
         await WorkspaceStorageService.write_workspace_manifest(
@@ -106,8 +121,11 @@ class WorkspaceService:
             raise HTTPException(status_code=404, detail="Workspace not found")
 
         previous_active = await WorkspaceRepository.get_active_for_principal(session, user.id)
-        await WorkspaceRepository.deactivate_all_for_principal(session, user.id)
-        workspace.is_active = 1
+        await WorkspaceService._set_active_workspace_atomic(
+            session=session,
+            principal_id=str(user.id),
+            workspace_id=str(workspace.id),
+        )
         await session.commit()
         await session.refresh(workspace)
 
@@ -279,11 +297,60 @@ class WorkspaceService:
         if workspace is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
 
+        was_active = bool(getattr(workspace, "is_active", 0))
         await WorkspaceRepository.delete(session, workspace)
+        remaining = await WorkspaceRepository.list_for_principal(session, user.id)
+        next_workspace_id = str(remaining[0].id) if was_active and remaining else None
+        if was_active or next_workspace_id is None:
+            await WorkspaceService._set_active_workspace_atomic(
+                session=session,
+                principal_id=str(user.id),
+                workspace_id=next_workspace_id,
+            )
         await session.commit()
         await WorkspaceStorageService.hard_delete_workspace(user.username, workspace_id)
 
-        remaining = await WorkspaceRepository.list_for_principal(session, user.id)
-        if remaining and not any(ws.is_active == 1 for ws in remaining):
-            remaining[0].is_active = 1
-            await session.commit()
+    @staticmethod
+    async def _set_active_workspace_atomic(
+        *,
+        session: AsyncSession,
+        principal_id: str,
+        workspace_id: str | None,
+    ) -> None:
+        owner_token = f"workspace-activation:{principal_id}:{uuid.uuid4()}"
+        try:
+            await WorkspaceService._activation_leases.acquire_principal_activation_lease(
+                session,
+                principal_id=principal_id,
+                owner_token=owner_token,
+                metadata={"workspace_id": workspace_id or ""},
+            )
+            await PrincipalRepository.set_active_workspace_id(
+                session,
+                principal_id=principal_id,
+                workspace_id=workspace_id,
+            )
+            await WorkspaceRepository.set_active_for_principal(
+                session,
+                principal_id=principal_id,
+                workspace_id=workspace_id,
+            )
+            await WorkspaceService._activation_leases.release_lease(
+                session,
+                resource_key=principal_id,
+                lease_kind="principal_activation",
+                owner_token=owner_token,
+            )
+        except LeaseConflictError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail="Another workspace activation is already in progress.",
+            ) from exc
+        except Exception:
+            await WorkspaceService._activation_leases.release_lease(
+                session,
+                resource_key=principal_id,
+                lease_kind="principal_activation",
+                owner_token=owner_token,
+            )
+            raise

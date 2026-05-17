@@ -47,6 +47,12 @@ class Conversation(AppDataBase):
     schema_memory_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     branch_summary_json: Mapped[str | None] = mapped_column(String, nullable=True)
     migration_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    next_turn_seq: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
     storage_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     is_marked_for_deletion: Mapped[bool] = mapped_column(
         Boolean,

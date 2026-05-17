@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
-from sqlalchemy import delete, desc, func, select
+from sqlalchemy import delete, desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Conversation, Turn
@@ -202,13 +202,15 @@ class ConversationRepository:
     async def next_seq_no(session: AsyncSession, conversation_id: str) -> int:
         """Return next sequence number for a conversation turn."""
         result = await session.execute(
-            select(Turn.seq_no)
-            .where(Turn.conversation_id == conversation_id)
-            .order_by(desc(Turn.seq_no))
-            .limit(1)
+            update(Conversation)
+            .where(Conversation.id == conversation_id)
+            .values(next_turn_seq=Conversation.next_turn_seq + 1)
+            .returning(Conversation.next_turn_seq)
         )
-        latest = result.scalar_one_or_none()
-        return (latest or 0) + 1
+        next_value = result.scalar_one_or_none()
+        if next_value is None:
+            raise ValueError(f"Conversation not found for seq allocation: {conversation_id}")
+        return max(1, int(next_value) - 1)
 
     @staticmethod
     async def create_turn(
@@ -237,7 +239,7 @@ class ConversationRepository:
 
         conversation = await ConversationRepository.get_conversation(session, conversation_id)
         if conversation:
-            conversation.last_turn_at = datetime.utcnow()
+            conversation.last_turn_at = datetime.now(UTC)
 
         await session.flush()
         return turn

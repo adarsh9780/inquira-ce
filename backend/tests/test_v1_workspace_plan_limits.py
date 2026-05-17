@@ -65,6 +65,13 @@ async def test_free_plan_can_create_a_second_workspace(monkeypatch):
         "app.v1.services.workspace_service.WorkspaceRepository.count_for_principal",
         fake_count_for_principal,
     )
+    async def fake_get_principal(_session, _principal_id):
+        return SimpleNamespace(active_workspace_id="ws-1")
+
+    monkeypatch.setattr(
+        "app.v1.services.workspace_service.PrincipalRepository.get_by_id",
+        fake_get_principal,
+    )
     monkeypatch.setattr(
         "app.v1.services.workspace_service.WorkspaceRepository.create",
         fake_create,

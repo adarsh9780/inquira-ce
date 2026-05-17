@@ -64,6 +64,13 @@ async def test_chat_service_builds_selected_turn_context_when_flag_enabled(monke
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.get_turn", fake_get_turn)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
+    async def fake_persist_turn_artifacts(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.TurnArtifactStorageService.persist_turn_artifacts",
+        staticmethod(fake_persist_turn_artifacts),
+    )
     monkeypatch.setattr("app.v1.services.chat_service.AgentClient.assert_health", fake_health)
     monkeypatch.setattr("app.v1.services.chat_service.AgentClient.run", fake_run)
     async def _fake_resolve_llm_preferences(_session, _user_id):

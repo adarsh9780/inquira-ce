@@ -47,3 +47,17 @@ class PrincipalRepository:
         session.add(principal)
         await session.flush()
         return principal
+
+    @staticmethod
+    async def set_active_workspace_id(
+        session: AsyncSession,
+        *,
+        principal_id: str,
+        workspace_id: str | None,
+    ) -> Principal | None:
+        principal = await PrincipalRepository.get_by_id(session, principal_id)
+        if principal is None:
+            return None
+        principal.active_workspace_id = str(workspace_id).strip() if workspace_id else None
+        await session.flush()
+        return principal

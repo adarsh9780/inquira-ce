@@ -29,6 +29,13 @@ async def test_persist_turn_defaults_first_saved_turn_to_final(monkeypatch) -> N
 
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.next_seq_no", fake_next_seq_no)
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
+    async def fake_persist_turn_artifacts(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.TurnArtifactStorageService.persist_turn_artifacts",
+        staticmethod(fake_persist_turn_artifacts),
+    )
 
     session = SimpleNamespace()
 
