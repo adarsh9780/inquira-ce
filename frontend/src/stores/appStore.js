@@ -296,6 +296,7 @@ export const useAppStore = defineStore('app', () => {
         active_dataset_path: dataFilePath.value || '',
         active_table_name: ingestedTableName.value || '',
         active_conversation_id: activeConversationId.value || '',
+        active_turn_id: activeTurnId.value || '',
         question_history: Array.isArray(questionHistory.value) ? questionHistory.value : [],
         schema_file_id: schemaFileId.value || '',
         schema_uploaded: !!isSchemaFileUploaded.value,
@@ -439,6 +440,9 @@ export const useAppStore = defineStore('app', () => {
     }
     if (typeof sessionState.active_conversation_id === 'string') {
       activeConversationId.value = sessionState.active_conversation_id
+    }
+    if (typeof sessionState.active_turn_id === 'string') {
+      activeTurnId.value = String(sessionState.active_turn_id || '').trim()
     }
     if (Array.isArray(sessionState.question_history)) {
       questionHistory.value = sessionState.question_history
@@ -1504,6 +1508,7 @@ export const useAppStore = defineStore('app', () => {
 
   function setActiveTurnId(turnId) {
     activeTurnId.value = String(turnId || '').trim()
+    saveLocalConfig()
   }
 
   function setActiveTurnPayload(turn) {
@@ -1889,6 +1894,7 @@ export const useAppStore = defineStore('app', () => {
 
   async function fetchConversationTurns({ reset = true } = {}) {
     if (!activeConversationId.value) return
+    const preferredTurnId = String(activeTurnId.value || '').trim()
     const response = await apiService.v1ListTurns(
       activeConversationId.value,
       5,
@@ -1902,9 +1908,19 @@ export const useAppStore = defineStore('app', () => {
     prependChatHistoryFromTurns(turns)
     if (reset) {
       const newestTurnId = String(turns[0]?.id || '').trim()
-      if (newestTurnId) {
-        setActiveTurnId(newestTurnId)
-        await loadActiveTurnRelations(newestTurnId)
+      const targetTurnId = preferredTurnId || newestTurnId
+      if (targetTurnId) {
+        try {
+          await loadActiveTurnRelations(targetTurnId)
+        } catch (_error) {
+          if (newestTurnId && newestTurnId !== targetTurnId) {
+            await loadActiveTurnRelations(newestTurnId)
+          } else {
+            setActiveTurnId('')
+            setActiveTurnPayload(null)
+            setActiveTurnRelations(null)
+          }
+        }
       } else {
         setActiveTurnId('')
         setActiveTurnPayload(null)

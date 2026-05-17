@@ -609,11 +609,9 @@ async function selectConversation(id) {
   if (!target) return
   const current = String(appStore.activeConversationId || '').trim()
   try {
-    if (target === current) {
+    if (target !== current) {
       appStore.setActiveConversationId(target)
-      return
     }
-    appStore.setActiveConversationId(target)
     await appStore.fetchConversationTurns({ reset: true })
   } catch (error) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to load conversation'))

@@ -180,12 +180,10 @@ function toggleExpanded() {
 }
 
 async function selectConversation(id) {
-  if (id === appStore.activeConversationId) {
-    emit('select')
-    return
-  }
   try {
-    appStore.setActiveConversationId(id)
+    if (id !== appStore.activeConversationId) {
+      appStore.setActiveConversationId(id)
+    }
     await appStore.fetchConversationTurns({ reset: true })
     emit('select')
   } catch (error) {
