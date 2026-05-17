@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import TurnArtifact
@@ -25,6 +25,39 @@ class TurnArtifactRepository:
             stmt = stmt.where(TurnArtifact.status != "deleted")
         result = await session.execute(stmt.order_by(TurnArtifact.created_at.asc(), TurnArtifact.id.asc()))
         return list(result.scalars().all())
+
+    @staticmethod
+    async def list_for_workspace(
+        session: AsyncSession,
+        workspace_id: str,
+        *,
+        kind: str | None = None,
+        statuses: tuple[str, ...] = ("active",),
+    ) -> list[TurnArtifact]:
+        stmt = select(TurnArtifact).where(TurnArtifact.workspace_id == workspace_id)
+        if kind:
+            stmt = stmt.where(TurnArtifact.kind == kind)
+        if statuses:
+            stmt = stmt.where(TurnArtifact.status.in_(statuses))
+        result = await session.execute(stmt.order_by(desc(TurnArtifact.created_at), desc(TurnArtifact.id)))
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def get_for_workspace(
+        session: AsyncSession,
+        *,
+        workspace_id: str,
+        artifact_id: str,
+        statuses: tuple[str, ...] = ("active",),
+    ) -> TurnArtifact | None:
+        stmt = select(TurnArtifact).where(
+            TurnArtifact.workspace_id == workspace_id,
+            TurnArtifact.artifact_id == artifact_id,
+        )
+        if statuses:
+            stmt = stmt.where(TurnArtifact.status.in_(statuses))
+        result = await session.execute(stmt.limit(1))
+        return result.scalar_one_or_none()
 
     @staticmethod
     async def replace_for_turn(
@@ -54,6 +87,11 @@ class TurnArtifactRepository:
             rows.append(row)
         await session.flush()
         return rows
+
+    @staticmethod
+    async def delete_by_id(session: AsyncSession, artifact_row_id: str) -> None:
+        await session.execute(delete(TurnArtifact).where(TurnArtifact.id == artifact_row_id))
+        await session.flush()
 
     @staticmethod
     async def mark_turn_for_deletion(session: AsyncSession, turn_id: str) -> None:

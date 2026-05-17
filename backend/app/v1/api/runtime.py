@@ -40,6 +40,7 @@ from ..repositories.workspace_repository import WorkspaceRepository
 from ..repositories.conversation_repository import ConversationRepository
 from ..services.secret_storage_service import SecretStorageService
 from ..services.conversation_service import ConversationService
+from ..services.turn_artifact_read_service import TurnArtifactReadService
 from ..services.turn_artifact_storage_service import TurnArtifactStorageService
 from ..services.turn_bundle_service import TurnBundleService
 from .deps import ensure_appdata_principal, get_current_user
@@ -1287,20 +1288,29 @@ async def get_workspace_dataframe_artifact_rows(
         expected_kind=dict,
     )
     search_text = _normalize_search_query(search)
-    # Keep live artifact reads inside the workspace kernel so the API process
-    # never contends for the scratchpad DuckDB file lock.
-    try:
-        rows = await get_workspace_dataframe_rows(
-            workspace_id=workspace_id,
-            artifact_id=artifact_id,
-            offset=offset,
-            limit=limit,
-            sort_model=cast(list[dict[str, Any]], parsed_sort_model),
-            filter_model=cast(dict[str, Any], parsed_filter_model),
-            search_text=search_text,
-        )
-    except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    rows = await TurnArtifactReadService.get_dataframe_rows(
+        session,
+        workspace_id=workspace_id,
+        artifact_id=artifact_id,
+        offset=offset,
+        limit=limit,
+        sort_model=cast(list[dict[str, Any]], parsed_sort_model),
+        filter_model=cast(dict[str, Any], parsed_filter_model),
+        search_text=search_text,
+    )
+    if rows is None:
+        try:
+            rows = await get_workspace_dataframe_rows(
+                workspace_id=workspace_id,
+                artifact_id=artifact_id,
+                offset=offset,
+                limit=limit,
+                sort_model=cast(list[dict[str, Any]], parsed_sort_model),
+                filter_model=cast(dict[str, Any], parsed_filter_model),
+                search_text=search_text,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
     if rows is None:
         raise HTTPException(status_code=404, detail="Dataframe artifact not found")
     return DataframeArtifactRowsResponse(**rows)
@@ -1337,18 +1347,29 @@ async def get_workspace_artifact_rows(
         expected_kind=dict,
     )
     search_text = _normalize_search_query(search)
-    try:
-        rows = await get_workspace_dataframe_rows(
-            workspace_id=workspace_id,
-            artifact_id=artifact_id,
-            offset=offset,
-            limit=limit,
-            sort_model=cast(list[dict[str, Any]], parsed_sort_model),
-            filter_model=cast(dict[str, Any], parsed_filter_model),
-            search_text=search_text,
-        )
-    except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    rows = await TurnArtifactReadService.get_dataframe_rows(
+        session,
+        workspace_id=workspace_id,
+        artifact_id=artifact_id,
+        offset=offset,
+        limit=limit,
+        sort_model=cast(list[dict[str, Any]], parsed_sort_model),
+        filter_model=cast(dict[str, Any], parsed_filter_model),
+        search_text=search_text,
+    )
+    if rows is None:
+        try:
+            rows = await get_workspace_dataframe_rows(
+                workspace_id=workspace_id,
+                artifact_id=artifact_id,
+                offset=offset,
+                limit=limit,
+                sort_model=cast(list[dict[str, Any]], parsed_sort_model),
+                filter_model=cast(dict[str, Any], parsed_filter_model),
+                search_text=search_text,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
     if rows is None:
         raise HTTPException(status_code=404, detail="Artifact rows not found")
     return DataframeArtifactRowsResponse(**rows)
@@ -1364,8 +1385,12 @@ async def get_workspace_artifact_usage(
     current_user=Depends(get_current_user),
 ):
     """Return scratchpad usage summary used by status-bar artifact pressure warning."""
-    await _require_workspace_access(session, current_user.id, workspace_id)
-    return await _read_workspace_artifact_usage_response(workspace_id=workspace_id)
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    return await _read_workspace_artifact_usage_response(
+        session=session,
+        workspace_id=workspace_id,
+        workspace_duckdb_path=str(workspace.duckdb_path),
+    )
 
 
 @router.get(
@@ -1378,7 +1403,7 @@ async def stream_workspace_artifact_usage(
     current_user=Depends(get_current_user),
 ):
     """Stream scratchpad usage snapshots for status-bar warnings."""
-    await _require_workspace_access(session, current_user.id, workspace_id)
+    workspace = await _require_workspace_access(session, current_user.id, workspace_id)
 
     async def event_stream():
         while True:
@@ -1386,7 +1411,9 @@ async def stream_workspace_artifact_usage(
                 return
             try:
                 payload = await _read_workspace_artifact_usage_response(
+                    session=session,
                     workspace_id=workspace_id,
+                    workspace_duckdb_path=str(workspace.duckdb_path),
                 )
             except HTTPException as exc:
                 yield _format_sse_event(
@@ -1423,13 +1450,19 @@ async def get_workspace_artifact_metadata(
     current_user=Depends(get_current_user),
 ):
     await _require_workspace_access(session, current_user.id, workspace_id)
-    try:
-        artifact = await get_workspace_artifact_metadata_via_kernel(
-            workspace_id=workspace_id,
-            artifact_id=artifact_id,
-        )
-    except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    artifact = await TurnArtifactReadService.get_workspace_artifact(
+        session,
+        workspace_id=workspace_id,
+        artifact_id=artifact_id,
+    )
+    if artifact is None:
+        try:
+            artifact = await get_workspace_artifact_metadata_via_kernel(
+                workspace_id=workspace_id,
+                artifact_id=artifact_id,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
     if artifact is None:
         raise HTTPException(status_code=404, detail="Artifact not found")
     return ArtifactMetadataResponse(**artifact)
@@ -1446,13 +1479,19 @@ async def delete_workspace_artifact(
     current_user=Depends(get_current_user),
 ):
     await _require_workspace_access(session, current_user.id, workspace_id)
-    try:
-        deleted = await delete_workspace_artifact_via_kernel(
-            workspace_id=workspace_id,
-            artifact_id=artifact_id,
-        )
-    except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    deleted = await TurnArtifactReadService.delete_workspace_artifact(
+        session,
+        workspace_id=workspace_id,
+        artifact_id=artifact_id,
+    )
+    if not deleted:
+        try:
+            deleted = await delete_workspace_artifact_via_kernel(
+                workspace_id=workspace_id,
+                artifact_id=artifact_id,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not deleted:
         raise HTTPException(status_code=404, detail="Artifact not found")
     return ArtifactDeleteResponse(artifact_id=artifact_id, deleted=True)
@@ -1473,10 +1512,20 @@ async def list_workspace_artifacts(
 ):
     """List all non-expired artifacts for a workspace, optionally filtered by kind."""
     await _require_workspace_access(session, current_user.id, workspace_id)
+    items = await TurnArtifactReadService.list_workspace_artifacts(
+        session,
+        workspace_id=workspace_id,
+        kind=kind,
+    )
+    seen_artifact_ids = {str(item.get("artifact_id") or "") for item in items}
     try:
-        items = await list_workspace_artifacts_via_kernel(workspace_id, kind=kind)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        legacy_items = await list_workspace_artifacts_via_kernel(workspace_id, kind=kind)
+    except RuntimeError:
+        legacy_items = []
+    for legacy_item in legacy_items:
+        artifact_id = str(legacy_item.get("artifact_id") or "")
+        if artifact_id and artifact_id not in seen_artifact_ids:
+            items.append(legacy_item)
     summaries = [
         WorkspaceArtifactSummary(
             artifact_id=item["artifact_id"],
@@ -2296,10 +2345,16 @@ def _format_sse_event(event: str, payload: Any) -> str:
 
 async def _read_workspace_artifact_usage_response(
     *,
+    session: AsyncSession,
     workspace_id: str,
+    workspace_duckdb_path: str,
 ) -> WorkspaceArtifactUsageResponse:
     try:
-        usage = await get_workspace_artifact_usage_via_kernel(workspace_id)
+        usage = await TurnArtifactReadService.get_workspace_artifact_usage(
+            session,
+            workspace_id=workspace_id,
+            workspace_duckdb_path=workspace_duckdb_path,
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
