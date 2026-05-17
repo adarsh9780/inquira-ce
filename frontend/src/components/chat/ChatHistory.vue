@@ -176,7 +176,7 @@
     </div>
 
     <!-- Placeholder message when no chat history -->
-    <div v-once v-if="displayedChatHistory.length === 0 && !appStore.isLoading" class="flex items-center justify-center py-12">
+    <div v-if="displayedChatHistory.length === 0 && !appStore.isLoading" class="flex items-center justify-center py-12">
       <div class="text-center">
         <div class="mb-4" style="color: var(--color-border-hover);">
           <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
