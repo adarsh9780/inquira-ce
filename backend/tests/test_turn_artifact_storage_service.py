@@ -4,54 +4,15 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-import duckdb
 import pytest
 
 from app.v1.services.turn_artifact_storage_service import TurnArtifactStorageService
 
 
 @pytest.mark.asyncio
-async def test_persist_turn_artifacts_writes_turn_owned_files_and_metadata(monkeypatch, tmp_path) -> None:
+async def test_persist_turn_artifacts_uses_kernel_materialization_without_direct_scratchpad_reads(monkeypatch, tmp_path) -> None:
     workspace_dir = tmp_path / "workspace-1"
-    scratchpad_dir = workspace_dir / "scratchpad"
-    scratchpad_dir.mkdir(parents=True, exist_ok=True)
-    scratchpad_db = scratchpad_dir / "artifacts.duckdb"
-
-    con = duckdb.connect(str(scratchpad_db))
-    try:
-        con.execute(
-            """
-            CREATE TABLE artifact_manifest (
-                artifact_id TEXT,
-                run_id TEXT,
-                workspace_id TEXT,
-                logical_name TEXT,
-                kind TEXT,
-                table_name TEXT,
-                payload_json TEXT,
-                schema_json TEXT,
-                row_count BIGINT,
-                created_at TIMESTAMP,
-                expires_at TIMESTAMP,
-                status TEXT,
-                error TEXT
-            )
-            """
-        )
-        con.execute("CREATE TABLE art_turn_1 AS SELECT 1 AS amount, 'north' AS region")
-        con.execute(
-            """
-            INSERT INTO artifact_manifest
-            VALUES
-            ('df-1', 'run-1', 'workspace-1', 'summary_df', 'dataframe', 'art_turn_1', '{"title":"Revenue"}',
-             '[{"name":"amount","dtype":"INTEGER"},{"name":"region","dtype":"VARCHAR"}]', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'ready', NULL),
-            ('fig-1', 'run-1', 'workspace-1', 'sales_chart', 'figure', NULL, '{"figure":{"data":[],"layout":{}}}', NULL, NULL,
-             CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'ready', NULL)
-            """
-        )
-    finally:
-        con.close()
-
+    (workspace_dir / "scratchpad").mkdir(parents=True, exist_ok=True)
     captured: dict[str, object] = {}
 
     async def fake_replace_for_turn(session, *, workspace_id, conversation_id, turn_id, items):
@@ -70,6 +31,29 @@ async def test_persist_turn_artifacts_writes_turn_owned_files_and_metadata(monke
         "app.v1.services.workspace_storage_service.WorkspaceStorageService.build_workspace_dir",
         lambda username, workspace_id: tmp_path / username / workspace_id,
     )
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_storage_service.ArtifactScratchpadStore.get_artifact",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("scratchpad lookup should not run during live export")),
+    )
+
+    async def fake_materialize_workspace_artifacts_via_kernel(workspace_id, specs):
+        assert workspace_id == "workspace-1"
+        for spec in specs:
+            target = Path(spec["storage_path"])
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if spec["kind"] == "dataframe":
+                target.write_bytes(b"PAR1")
+            else:
+                target.write_text(json.dumps(spec["payload"]), encoding="utf-8")
+        return [
+            {"artifact_id": "df-1", "size_bytes": 4},
+            {"artifact_id": "fig-1", "size_bytes": 37},
+        ]
+
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_storage_service.materialize_workspace_artifacts_via_kernel",
+        fake_materialize_workspace_artifacts_via_kernel,
+    )
 
     rows = await TurnArtifactStorageService.persist_turn_artifacts(
         session=SimpleNamespace(),
@@ -79,8 +63,20 @@ async def test_persist_turn_artifacts_writes_turn_owned_files_and_metadata(monke
         turn_id="turn-1",
         workspace_duckdb_path=str(workspace_dir / "workspace.db"),
         artifacts=[
-            {"artifact_id": "df-1", "kind": "dataframe", "logical_name": "summary_df"},
-            {"artifact_id": "fig-1", "kind": "figure", "logical_name": "sales_chart"},
+            {
+                "artifact_id": "df-1",
+                "kind": "dataframe",
+                "logical_name": "summary_df",
+                "table_name": "art_turn_1",
+                "row_count": 1,
+                "schema": [{"name": "amount", "dtype": "INTEGER"}],
+            },
+            {
+                "artifact_id": "fig-1",
+                "kind": "figure",
+                "logical_name": "sales_chart",
+                "payload": {"figure": {"data": [], "layout": {}}},
+            },
         ],
     )
 
@@ -94,6 +90,7 @@ async def test_persist_turn_artifacts_writes_turn_owned_files_and_metadata(monke
     assert rows[1]["payload_format"] == "json"
     assert rows[0]["storage_path"] == str(dataframe_path)
     assert json.loads(figure_path.read_text(encoding="utf-8"))["figure"] == {"data": [], "layout": {}}
+    assert rows[0]["size_bytes"] == 4
     assert captured["workspace_id"] == "workspace-1"
     assert captured["conversation_id"] == "conversation-1"
     assert captured["turn_id"] == "turn-1"

@@ -12,6 +12,7 @@ import duckdb
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...services.artifact_scratchpad import ArtifactScratchpadStore
+from ...services.code_executor import materialize_workspace_artifacts_via_kernel
 from ..repositories.turn_artifact_repository import TurnArtifactRepository
 from .turn_bundle_service import TurnBundleService
 
@@ -47,6 +48,38 @@ class TurnArtifactStorageService:
 
         await asyncio.to_thread(_reset_artifacts_dir)
 
+        materialized_sizes: dict[str, int | None] = {}
+        kernel_specs = [
+            {
+                "artifact_id": str(item.get("artifact_id") or "").strip(),
+                "kind": str(item.get("kind") or "").strip().lower() or "scalar",
+                "payload": item.get("payload"),
+                "table_name": item.get("table_name"),
+                "storage_path": str(
+                    TurnBundleService.build_turn_artifact_path(
+                        username,
+                        workspace_id,
+                        conversation_id,
+                        turn_id,
+                        str(item.get("artifact_id") or item.get("logical_name") or item.get("kind") or "artifact"),
+                        str(item.get("kind") or ""),
+                    )
+                ),
+            }
+            for item in normalized_artifacts
+            if str(item.get("artifact_id") or "").strip()
+        ]
+        if kernel_specs:
+            try:
+                materialized = await materialize_workspace_artifacts_via_kernel(workspace_id, kernel_specs)
+            except RuntimeError:
+                materialized = []
+            materialized_sizes = {
+                str(item.get("artifact_id") or ""): item.get("size_bytes")
+                for item in materialized
+                if isinstance(item, dict)
+            }
+
         persisted_rows: list[dict[str, Any]] = []
         for item in normalized_artifacts:
             persisted_rows.append(
@@ -59,6 +92,7 @@ class TurnArtifactStorageService:
                     scratchpad_db_path=scratchpad_db_path,
                     artifact=item,
                     scratchpad=scratchpad,
+                    kernel_materialized_sizes=materialized_sizes,
                 )
             )
 
@@ -82,6 +116,7 @@ class TurnArtifactStorageService:
         scratchpad_db_path: Path,
         artifact: dict[str, Any],
         scratchpad: ArtifactScratchpadStore,
+        kernel_materialized_sizes: dict[str, int | None],
     ) -> dict[str, Any]:
         artifact_id = str(artifact.get("artifact_id") or "").strip()
         kind = str(artifact.get("kind") or "").strip().lower() or "scalar"
@@ -96,19 +131,29 @@ class TurnArtifactStorageService:
             kind,
         )
 
-        scratchpad_meta = scratchpad.get_artifact(
-            workspace_duckdb_path=workspace_duckdb_path,
-            artifact_id=artifact_id,
-        ) if artifact_id else None
-        source_meta = scratchpad_meta if isinstance(scratchpad_meta, dict) else artifact
-
-        await asyncio.to_thread(
-            TurnArtifactStorageService._write_artifact_payload,
-            scratchpad_db_path,
-            storage_path,
-            kind,
-            source_meta,
-        )
+        source_meta: dict[str, Any] = artifact
+        needs_scratchpad_lookup = False
+        if kind == "dataframe":
+            needs_scratchpad_lookup = not str(artifact.get("table_name") or "").strip()
+        elif kind in {"figure", "scalar", "text", "structured"}:
+            needs_scratchpad_lookup = artifact.get("payload") is None
+        if needs_scratchpad_lookup and artifact_id:
+            scratchpad_meta = scratchpad.get_artifact(
+                workspace_duckdb_path=workspace_duckdb_path,
+                artifact_id=artifact_id,
+            )
+            if isinstance(scratchpad_meta, dict):
+                source_meta = scratchpad_meta
+        size_bytes = kernel_materialized_sizes.get(artifact_id)
+        if size_bytes is None and not storage_path.exists():
+            await asyncio.to_thread(
+                TurnArtifactStorageService._write_artifact_payload,
+                scratchpad_db_path,
+                storage_path,
+                kind,
+                source_meta,
+            )
+            size_bytes = int(storage_path.stat().st_size) if storage_path.exists() else None
 
         return {
             "artifact_id": artifact_id or logical_name,
@@ -116,7 +161,7 @@ class TurnArtifactStorageService:
             "logical_name": logical_name,
             "storage_path": str(storage_path),
             "payload_format": payload_format,
-            "size_bytes": int(storage_path.stat().st_size) if storage_path.exists() else None,
+            "size_bytes": size_bytes if size_bytes is not None else (int(storage_path.stat().st_size) if storage_path.exists() else None),
             "status": "active",
             "row_count": source_meta.get("row_count"),
             "schema": source_meta.get("schema"),

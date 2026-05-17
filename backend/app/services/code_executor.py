@@ -171,6 +171,16 @@ async def get_workspace_run_exports(
     return await manager.get_run_exports(workspace_id=workspace_id, run_id=run_id)
 
 
+async def materialize_workspace_artifacts_via_kernel(
+    workspace_id: str,
+    specs: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Write exported run artifacts to filesystem using the live kernel-owned scratchpad connection."""
+    await ensure_workspace_kernel_active(workspace_id, "Persisting turn artifacts")
+    manager = await get_workspace_kernel_manager()
+    return await manager.materialize_exports(workspace_id=workspace_id, specs=specs)
+
+
 async def ingest_workspace_dataset_via_kernel(
     *,
     workspace_id: str,

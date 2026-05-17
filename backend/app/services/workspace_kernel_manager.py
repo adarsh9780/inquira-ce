@@ -71,6 +71,52 @@ _RUN_EXPORTS_PROBE_TEMPLATE = """
 _inquira_get_active_exports(run_id={run_id!r})
 """
 
+_MATERIALIZE_EXPORTS_TEMPLATE = """
+import json as _json
+from pathlib import Path as _Path
+
+_inquira_export_specs = _json.loads({specs_json!r})
+_inquira_materialized = []
+for _spec in _inquira_export_specs:
+    if not isinstance(_spec, dict):
+        continue
+    _artifact_id = str(_spec.get('artifact_id') or '').strip()
+    _kind = str(_spec.get('kind') or '').strip().lower()
+    _storage_path = str(_spec.get('storage_path') or '').strip()
+    if not _artifact_id or not _storage_path:
+        continue
+    _target = _Path(_storage_path)
+    _target.parent.mkdir(parents=True, exist_ok=True)
+    if _kind == 'dataframe':
+        _table_name = str(_spec.get('table_name') or '').strip()
+        if not _table_name:
+            _target.write_text('[]', encoding='utf-8')
+        else:
+            _escaped_table = _table_name.replace('"', '""')
+            _escaped_path = str(_target).replace("'", "''")
+            scratchpad_conn.execute(
+                f"COPY (SELECT * FROM \\\"{_escaped_table}\\\") TO '{_escaped_path}' (FORMAT PARQUET)"
+            )
+    elif _kind == 'text':
+        _payload = _spec.get('payload')
+        if isinstance(_payload, dict):
+            _payload = _payload.get('value')
+        _target.write_text(str(_payload or ''), encoding='utf-8')
+    else:
+        _payload = _spec.get('payload')
+        if _payload is None:
+            _payload = _spec
+        _target.write_text(
+            _json.dumps(_payload, indent=2, ensure_ascii=False, default=str),
+            encoding='utf-8',
+        )
+    _inquira_materialized.append({
+        'artifact_id': _artifact_id,
+        'size_bytes': int(_target.stat().st_size) if _target.exists() else None,
+    })
+_inquira_materialized
+"""
+
 def _build_identifier_result_probe_code(identifier: str) -> str:
     target = repr(str(identifier))
     return (
@@ -260,6 +306,26 @@ class WorkspaceKernelManager:
             parsed = await self._execute_request(session, probe_code)
         if parsed.error is not None or not isinstance(parsed.result, list):
             return []
+        return [item for item in parsed.result if isinstance(item, dict)]
+
+    async def materialize_exports(
+        self,
+        *,
+        workspace_id: str,
+        specs: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        async with self._sessions_lock:
+            session = self._sessions.get(workspace_id)
+        if session is None:
+            raise RuntimeError("Workspace kernel is not active")
+        probe_code = _MATERIALIZE_EXPORTS_TEMPLATE.format(
+            specs_json=json.dumps(specs, ensure_ascii=True, default=str)
+        )
+        async with session.lock:
+            session.last_used = datetime.now(UTC)
+            parsed = await self._execute_request(session, probe_code)
+        if parsed.error is not None or not isinstance(parsed.result, list):
+            raise RuntimeError(str(parsed.error or "Failed to materialize run artifacts"))
         return [item for item in parsed.result if isinstance(item, dict)]
 
     async def get_workspace_columns(
