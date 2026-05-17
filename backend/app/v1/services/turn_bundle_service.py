@@ -14,6 +14,14 @@ from .workspace_storage_service import WorkspaceStorageService
 class TurnBundleService:
     """Create and resolve per-turn bundle folders inside a workspace."""
 
+    ARTIFACT_FORMAT_BY_KIND = {
+        "dataframe": "parquet",
+        "figure": "json",
+        "scalar": "json",
+        "structured": "json",
+        "text": "txt",
+    }
+
     @staticmethod
     def build_conversations_dir(username: str, workspace_id: str) -> Path:
         return WorkspaceStorageService.build_workspace_dir(username, workspace_id) / "conversations"
@@ -21,6 +29,10 @@ class TurnBundleService:
     @staticmethod
     def build_conversation_dir(username: str, workspace_id: str, conversation_id: str) -> Path:
         return TurnBundleService.build_conversations_dir(username, workspace_id) / conversation_id
+
+    @staticmethod
+    def build_conversation_manifest_path(username: str, workspace_id: str, conversation_id: str) -> Path:
+        return TurnBundleService.build_conversation_dir(username, workspace_id, conversation_id) / "conversation.json"
 
     @staticmethod
     def build_turns_dir(username: str, workspace_id: str, conversation_id: str) -> Path:
@@ -31,8 +43,81 @@ class TurnBundleService:
         return TurnBundleService.build_turns_dir(username, workspace_id, conversation_id) / turn_id
 
     @staticmethod
+    def build_turn_user_message_path(username: str, workspace_id: str, conversation_id: str, turn_id: str) -> Path:
+        return TurnBundleService.build_turn_dir(username, workspace_id, conversation_id, turn_id) / "user.md"
+
+    @staticmethod
+    def build_turn_assistant_message_path(username: str, workspace_id: str, conversation_id: str, turn_id: str) -> Path:
+        return TurnBundleService.build_turn_dir(username, workspace_id, conversation_id, turn_id) / "assistant.md"
+
+    @staticmethod
+    def build_turn_code_path(username: str, workspace_id: str, conversation_id: str, turn_id: str) -> Path:
+        return TurnBundleService.build_turn_dir(username, workspace_id, conversation_id, turn_id) / "analysis.py"
+
+    @staticmethod
+    def build_turn_artifacts_dir(username: str, workspace_id: str, conversation_id: str, turn_id: str) -> Path:
+        return TurnBundleService.build_turn_dir(username, workspace_id, conversation_id, turn_id) / "artifacts"
+
+    @staticmethod
     def build_turn_manifest_path(username: str, workspace_id: str, conversation_id: str, turn_id: str) -> Path:
         return TurnBundleService.build_turn_dir(username, workspace_id, conversation_id, turn_id) / "turn.json"
+
+    @staticmethod
+    def artifact_payload_format(kind: str | None) -> str:
+        normalized = str(kind or "").strip().lower()
+        return TurnBundleService.ARTIFACT_FORMAT_BY_KIND.get(normalized, "json")
+
+    @staticmethod
+    def build_turn_artifact_path(
+        username: str,
+        workspace_id: str,
+        conversation_id: str,
+        turn_id: str,
+        artifact_id: str,
+        kind: str | None,
+    ) -> Path:
+        extension = TurnBundleService.artifact_payload_format(kind)
+        return TurnBundleService.build_turn_artifacts_dir(
+            username,
+            workspace_id,
+            conversation_id,
+            turn_id,
+        ) / f"{artifact_id}.{extension}"
+
+    @staticmethod
+    async def create_or_update_conversation_bundle(
+        *,
+        username: str,
+        workspace_id: str,
+        conversation_id: str,
+        manifest: dict[str, Any] | None = None,
+    ) -> Path:
+        """Create or refresh conversation.json and return the conversation directory."""
+        conversation_dir = TurnBundleService.build_conversation_dir(username, workspace_id, conversation_id)
+        manifest_path = TurnBundleService.build_conversation_manifest_path(username, workspace_id, conversation_id)
+        payload = {
+            "conversation_id": conversation_id,
+            "workspace_id": workspace_id,
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        if not manifest_path.exists():
+            payload["created_at"] = payload["updated_at"]
+        elif manifest_path.is_file():
+            try:
+                existing = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                existing = {}
+            if isinstance(existing, dict) and existing.get("created_at"):
+                payload["created_at"] = existing["created_at"]
+        if manifest:
+            payload.update(manifest)
+
+        def _write() -> None:
+            conversation_dir.mkdir(parents=True, exist_ok=True)
+            manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+        await asyncio.to_thread(_write)
+        return conversation_dir
 
     @staticmethod
     async def create_turn_bundle(
@@ -47,9 +132,14 @@ class TurnBundleService:
         manifest: dict[str, Any] | None = None,
     ) -> Path:
         """Create the standard turn bundle files and return the turn directory."""
+        await TurnBundleService.create_or_update_conversation_bundle(
+            username=username,
+            workspace_id=workspace_id,
+            conversation_id=conversation_id,
+        )
         turn_dir = TurnBundleService.build_turn_dir(username, workspace_id, conversation_id, turn_id)
-        manifest_path = turn_dir / "turn.json"
-        artifacts_dir = turn_dir / "artifacts"
+        manifest_path = TurnBundleService.build_turn_manifest_path(username, workspace_id, conversation_id, turn_id)
+        artifacts_dir = TurnBundleService.build_turn_artifacts_dir(username, workspace_id, conversation_id, turn_id)
         payload = {
             "turn_id": turn_id,
             "conversation_id": conversation_id,
@@ -68,9 +158,24 @@ class TurnBundleService:
         def _write() -> None:
             turn_dir.mkdir(parents=True, exist_ok=True)
             artifacts_dir.mkdir(parents=True, exist_ok=True)
-            (turn_dir / "user.md").write_text(user_text, encoding="utf-8")
-            (turn_dir / "assistant.md").write_text(assistant_text, encoding="utf-8")
-            (turn_dir / "analysis.py").write_text(code, encoding="utf-8")
+            TurnBundleService.build_turn_user_message_path(
+                username,
+                workspace_id,
+                conversation_id,
+                turn_id,
+            ).write_text(user_text, encoding="utf-8")
+            TurnBundleService.build_turn_assistant_message_path(
+                username,
+                workspace_id,
+                conversation_id,
+                turn_id,
+            ).write_text(assistant_text, encoding="utf-8")
+            TurnBundleService.build_turn_code_path(
+                username,
+                workspace_id,
+                conversation_id,
+                turn_id,
+            ).write_text(code, encoding="utf-8")
             manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
         await asyncio.to_thread(_write)
