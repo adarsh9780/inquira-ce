@@ -1,5 +1,5 @@
 <template>
-  <div class="layer-toast fixed bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+  <div class="layer-toast fixed right-4 bottom-4 flex max-h-[calc(100vh-5rem)] flex-col items-end gap-2 overflow-hidden">
     <ToastNotification
       v-for="toast in toasts"
       :key="toast.id"
@@ -14,12 +14,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import { useToast } from '../../composables/useToast'
 import ToastNotification from './ToastNotification.vue'
 
 const { toasts, removeToast } = useToast()
-
-// Make toasts reactive
-const reactiveToasts = computed(() => toasts)
 </script>

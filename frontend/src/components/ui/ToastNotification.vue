@@ -4,7 +4,7 @@
     class="max-w-sm w-full animate-toast-in"
   >
     <div
-      class="flex items-start gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+      class="relative overflow-hidden flex items-start gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
       style="box-shadow: var(--shadow-lifted);"
     >
       <!-- Icon -->
@@ -28,12 +28,19 @@
       >
         <XMarkIcon class="h-4 w-4" />
       </button>
+
+      <div
+        v-if="duration > 0"
+        class="pointer-events-none absolute inset-x-0 bottom-0 h-px origin-left"
+        :class="progressBarClass"
+        :style="{ animationDuration: `${duration}ms` }"
+      ></div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
@@ -69,6 +76,13 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 let timeoutId = null
+
+const progressBarClass = computed(() => {
+  if (props.type === 'success') return 'bg-[var(--color-success)] animate-toast-progress'
+  if (props.type === 'error') return 'bg-[var(--color-error)] animate-toast-progress'
+  if (props.type === 'warning') return 'bg-[var(--color-warning)] animate-toast-progress'
+  return 'bg-[var(--color-info)] animate-toast-progress'
+})
 
 function close() {
   emit('close')
@@ -112,15 +126,30 @@ onUnmounted(() => {
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateX(16px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(0);
   }
 }
 
 .animate-toast-in {
   animation: toast-in 0.2s ease-out forwards;
+}
+
+@keyframes toast-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.animate-toast-progress {
+  animation-name: toast-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
 }
 </style>

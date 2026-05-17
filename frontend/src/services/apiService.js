@@ -997,14 +997,26 @@ export const apiService = {
 
     if (!response.ok) {
       let detail = `Request failed with status ${response.status}`
+      let responsePayload = null
       try {
         const text = await response.text()
-        if (text) detail = text
+        if (text) {
+          try {
+            responsePayload = JSON.parse(text)
+          } catch (_error) {
+            responsePayload = { detail: text }
+          }
+          detail = extractApiErrorMessage(
+            { response: { data: responsePayload } },
+            detail,
+          )
+        }
       } catch (_) {
         // keep default
       }
       const err = new Error(detail)
       err.status = response.status
+      err.data = responsePayload
       throw err
     }
 
@@ -1030,9 +1042,13 @@ export const apiService = {
           if (evt.event === 'final') {
             finalPayload = evt.data
           } else if (evt.event === 'error') {
-            const detail = evt.data?.detail || 'Streaming analysis failed.'
+            const detail = extractApiErrorMessage(
+              { response: { data: evt.data } },
+              'Streaming analysis failed.',
+            )
             const err = new Error(detail)
             err.status = evt.data?.status_code || 500
+            err.data = evt.data
             throw err
           }
         }

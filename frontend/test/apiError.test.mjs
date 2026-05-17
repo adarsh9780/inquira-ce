@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { extractApiErrorMessage } from '../src/utils/apiError.js'
+import { extractApiErrorMessage, extractApiErrorMessageFromPayload } from '../src/utils/apiError.js'
 
 test('extracts string detail from backend error payload', () => {
   const err = {
@@ -33,4 +33,11 @@ test('extracts validation detail list with msg field', () => {
 test('falls back to generic message when no detail is present', () => {
   const err = { message: '' }
   assert.equal(extractApiErrorMessage(err, 'fallback'), 'fallback')
+})
+
+test('extracts nested detail from stringified backend json payload', () => {
+  assert.equal(
+    extractApiErrorMessageFromPayload('{"detail":"Agent stream error: internal provider failure"}', 'fallback'),
+    'Agent stream error: internal provider failure',
+  )
 })

@@ -1403,6 +1403,7 @@ async function handleSubmit() {
     let errorTitle = 'Analysis Failed'
     let errorMessage = 'Failed to generate code. Please try again.'
     const status = Number(error?.response?.status ?? error?.status ?? 0)
+    const backendDetail = extractApiErrorMessage(error, '')
 
     if (error.name === 'AbortError' || signal.aborted) {
       if (userRequestedStop.value) {
@@ -1417,25 +1418,36 @@ async function handleSubmit() {
       }
     } else if (status === 400) {
       errorTitle = 'Invalid Request'
-      errorMessage = extractApiErrorMessage(error, 'The request is invalid. Please review your dataset and schema setup.')
+      errorMessage = backendDetail || 'The request is invalid. Please review your dataset and schema setup.'
     } else if (status === 401) {
       errorTitle = 'Authentication Error'
-      errorMessage = 'Please check your API key and try again.'
+      errorMessage = backendDetail || 'Please check your API key and try again.'
     } else if (status === 403) {
       errorTitle = 'Access Denied'
-      errorMessage = 'You do not have permission to perform this action.'
+      errorMessage = backendDetail || 'You do not have permission to perform this action.'
     } else if (status === 429) {
       errorTitle = 'Rate Limit Exceeded'
-      errorMessage = 'Too many requests. Please wait a moment and try again.'
+      errorMessage = backendDetail || 'Too many requests. Please wait a moment and try again.'
     } else if (status >= 500) {
-      errorTitle = 'Server Error'
-      errorMessage = 'The server encountered an error. Please try again later.'
+      errorTitle = 'Backend Error'
+      errorMessage = backendDetail || 'The server encountered an error. Please try again later.'
     } else if (error.code === 'NETWORK_ERROR' || !navigator.onLine) {
       errorTitle = 'Network Error'
       errorMessage = 'Unable to connect to the server. Please check your internet connection.'
+    } else if (backendDetail) {
+      errorMessage = backendDetail
     }
 
-    toast.error(errorTitle, errorMessage)
+    toast.error(
+      errorTitle,
+      errorMessage,
+      7000,
+      {
+        source: status > 0 ? 'Backend' : 'Frontend',
+        statusCode: status || null,
+        category: 'llm_api',
+      },
+    )
     appStore.setTerminalOutput(`Error: ${errorMessage}`)
     appStore.updateLastMessageExplanation(errorMessage)
     if (attachmentsPayload.length > 0) {

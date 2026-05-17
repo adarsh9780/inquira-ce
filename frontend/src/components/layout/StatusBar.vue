@@ -113,6 +113,85 @@
 
       <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
 
+      <div class="relative" data-notification-center>
+        <button
+          type="button"
+          class="relative flex items-center gap-1.5 h-full px-1.5 hover:bg-[var(--color-base)] transition-colors text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]"
+          title="Session notifications"
+          @click="toggleNotificationsPanel"
+        >
+          <BellIcon class="w-3.5 h-3.5" />
+          <span>Alerts</span>
+          <span
+            v-if="unreadNotificationCount > 0"
+            class="absolute -right-0.5 -top-0.5 inline-flex min-w-[1rem] items-center justify-center rounded-full px-1 text-[9px] font-semibold leading-4 text-white"
+            style="background-color: var(--color-error);"
+          >
+            {{ unreadNotificationBadge }}
+          </span>
+        </button>
+
+        <div
+          v-if="notificationsPanelOpen"
+          class="layer-modal-dropdown absolute right-0 bottom-full mb-2 w-[24rem] overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-[var(--shadow-lifted)]"
+        >
+          <div class="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
+            <div>
+              <p class="text-sm font-semibold text-[var(--color-text-main)]">Session Notifications</p>
+              <p class="text-[11px] text-[var(--color-text-muted)]">Stored for this app session only.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                class="text-[11px] font-medium text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
+                @click="clearNotificationHistory"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                class="text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
+                @click="closeNotificationsPanel"
+              >
+                <XMarkIcon class="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div v-if="notificationHistory.length === 0" class="px-4 py-6 text-sm text-[var(--color-text-muted)]">
+            No notifications in this session yet.
+          </div>
+          <div v-else class="max-h-80 overflow-y-auto">
+            <div
+              v-for="entry in notificationHistory"
+              :key="entry.id"
+              class="border-b border-[var(--color-border)] px-4 py-3 last:border-b-0"
+              :style="{ backgroundColor: entry.read ? 'transparent' : 'color-mix(in srgb, var(--color-accent) 5%, var(--color-base))' }"
+            >
+              <div class="flex items-start gap-3">
+                <span class="mt-1 inline-flex h-2 w-2 shrink-0 rounded-full" :class="notificationDotClass(entry.type)"></span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-start justify-between gap-3">
+                    <p class="text-[12px] font-semibold text-[var(--color-text-main)]">{{ entry.title }}</p>
+                    <span class="shrink-0 text-[10px] text-[var(--color-text-muted)]">{{ formatNotificationTimestamp(entry.createdAt) }}</span>
+                  </div>
+                  <p v-if="entry.message" class="mt-1 whitespace-pre-wrap break-words text-[11px] leading-5 text-[var(--color-text-muted)]">
+                    {{ entry.message }}
+                  </p>
+                  <div class="mt-2 flex items-center gap-2 text-[10px] text-[var(--color-text-muted)]">
+                    <span v-if="entry.source">{{ entry.source }}</span>
+                    <span v-if="entry.statusCode">HTTP {{ entry.statusCode }}</span>
+                    <span class="uppercase tracking-[0.08em]">{{ entry.type }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
+
       <!-- Version -->
       <a
         href="https://inquiraai.com"
@@ -137,14 +216,22 @@ import apiService from '../../services/apiService'
 import { openExternalUrl } from '../../services/externalLinkService'
 import { settingsWebSocket } from '../../services/websocketService'
 import {
+  BellIcon,
   CommandLineIcon,
   ViewColumnsIcon,
   ExclamationTriangleIcon,
+  XMarkIcon,
 } from '@heroicons/vue/24/outline'
-import { toast } from '../../composables/useToast'
+import { toast, useToast } from '../../composables/useToast'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
+const {
+  notificationHistory,
+  unreadNotificationCount,
+  markAllNotificationsRead,
+  clearNotificationHistory,
+} = useToast()
 const uiVersion = String(
   typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'
 ).trim() || '0.0.0'
@@ -159,6 +246,7 @@ let unsubscribeWebSocketConnection = null
 let unsubscribeKernelStatus = null
 let artifactUsageStreamAbortController = null
 let artifactUsageReconnectTimer = null
+const notificationsPanelOpen = ref(false)
 const artifactUsage = ref({
   duckdbBytes: 0,
   duckdbWarningThresholdBytes: 1024 * 1024 * 1024,
@@ -177,6 +265,12 @@ const workspaceLayoutLabel = computed(() => {
 
 const workspaceLayoutTitle = computed(() => {
   return 'Cycle workspace layout: Chat Only, Split, Data Only (Cmd/Ctrl+Shift+D)'
+})
+
+const unreadNotificationBadge = computed(() => {
+  const count = Number(unreadNotificationCount.value || 0)
+  if (count <= 0) return ''
+  return count > 99 ? '99+' : String(count)
 })
 
 function toNonNegativeInt(value) {
@@ -486,6 +580,52 @@ function openInquiraSite() {
   void openExternalUrl('https://inquiraai.com')
 }
 
+function formatNotificationTimestamp(value) {
+  const timestamp = Number(value || 0)
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return ''
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function notificationDotClass(type) {
+  if (type === 'success') return 'bg-[var(--color-success)]'
+  if (type === 'error') return 'bg-[var(--color-error)]'
+  if (type === 'warning') return 'bg-[var(--color-warning)]'
+  return 'bg-[var(--color-info)]'
+}
+
+function openNotificationsPanel() {
+  notificationsPanelOpen.value = true
+  markAllNotificationsRead()
+}
+
+function closeNotificationsPanel() {
+  notificationsPanelOpen.value = false
+}
+
+function toggleNotificationsPanel() {
+  if (notificationsPanelOpen.value) {
+    closeNotificationsPanel()
+    return
+  }
+  openNotificationsPanel()
+}
+
+function handleGlobalPointerDown(event) {
+  const target = event?.target
+  if (!(target instanceof Element)) return
+  if (target.closest('[data-notification-center]')) return
+  closeNotificationsPanel()
+}
+
+function handleStatusBarEscape(event) {
+  if (event.key === 'Escape') {
+    closeNotificationsPanel()
+  }
+}
+
 function syncWorkspaceRealtimeSubscriptions() {
   const workspaceId = String(appStore.activeWorkspaceId || '').trim()
   if (!authStore.isAuthenticated || !workspaceId || !appStore.hasWorkspace) {
@@ -554,6 +694,8 @@ onMounted(() => {
   setupWebSocketMonitoring()
   syncWorkspaceRealtimeSubscriptions()
   document.addEventListener('visibilitychange', handleVisibilityChange)
+  document.addEventListener('pointerdown', handleGlobalPointerDown)
+  document.addEventListener('keydown', handleStatusBarEscape)
 })
 
 onUnmounted(() => {
@@ -569,6 +711,8 @@ onUnmounted(() => {
     unsubscribeWebSocketConnection = null
   }
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  document.removeEventListener('pointerdown', handleGlobalPointerDown)
+  document.removeEventListener('keydown', handleStatusBarEscape)
 })
 
 watch([() => appStore.activeWorkspaceId, () => appStore.hasWorkspace, () => authStore.isAuthenticated], ([newId, hasWorkspace, isAuthenticated]) => {
