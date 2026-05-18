@@ -41,6 +41,7 @@ from ..services.turn_artifact_read_service import TurnArtifactReadService
 from ..services.turn_artifact_storage_service import TurnArtifactStorageService
 from ..services.turn_bundle_service import TurnBundleService
 from ..services.workspace_maintenance_service import WorkspaceMaintenanceService
+from ..services.dataset_service import DatasetService
 from .deps import ensure_appdata_principal, get_current_user
 from ...core.prompt_library import get_prompt
 from ...services.llm_service import LLMService
@@ -2195,6 +2196,15 @@ async def regenerate_workspace_dataset_schema(
             status_code=400, detail="No columns found for this dataset table"
         )
 
+    from datetime import date, datetime
+
+    schema_updated_at = datetime.now().astimezone()
+
+    if dataset is not None:
+        dataset.schema_status = DatasetService.SCHEMA_STATUS_GENERATING
+        dataset.schema_error_message = None
+        await session.commit()
+
     missing_sentinel = object()
     missing_advanced: list[str] = []
     advanced_values: dict[str, Any] = {}
@@ -2260,13 +2270,25 @@ async def regenerate_workspace_dataset_schema(
         )
     except HTTPException as exc:
         detail = exc.detail if getattr(exc, "detail", None) is not None else str(exc)
+        message = f"Failed to generate schema via LLM: {detail}"
+        if dataset is not None:
+            dataset.schema_status = DatasetService.SCHEMA_STATUS_FAILED
+            dataset.schema_error_message = message
+            dataset.schema_updated_at = schema_updated_at
+            await session.commit()
         raise HTTPException(
             status_code=int(getattr(exc, "status_code", 500) or 500),
-            detail=f"Failed to generate schema via LLM: {detail}",
+            detail=message,
         ) from exc
     except Exception as exc:
+        message = f"Failed to generate schema via LLM: {str(exc)}"
+        if dataset is not None:
+            dataset.schema_status = DatasetService.SCHEMA_STATUS_FAILED
+            dataset.schema_error_message = message
+            dataset.schema_updated_at = schema_updated_at
+            await session.commit()
         raise HTTPException(
-            status_code=500, detail=f"Failed to generate schema via LLM: {str(exc)}"
+            status_code=500, detail=message
         ) from exc
 
     generated_by_name: dict[str, dict[str, Any]] = {}
@@ -2328,8 +2350,6 @@ async def regenerate_workspace_dataset_schema(
         "context": context,
         "columns": merged_columns,
     }
-    from datetime import date, datetime
-
     class DateTimeEncoder(json.JSONEncoder):
         def default(self, obj):
             if isinstance(obj, (datetime, date)):
@@ -2341,6 +2361,9 @@ async def regenerate_workspace_dataset_schema(
 
     if dataset is not None:
         dataset.schema_path = str(schema_path)
+        dataset.schema_status = DatasetService.SCHEMA_STATUS_READY
+        dataset.schema_error_message = None
+        dataset.schema_updated_at = schema_updated_at
     await session.commit()
 
     return DatasetSchemaResponse(

@@ -35,6 +35,9 @@ class DatasetResponse(BaseModel):
     table_name: str
     row_count: int | None
     file_type: str | None
+    schema_status: str
+    schema_error_message: str | None = None
+    schema_updated_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

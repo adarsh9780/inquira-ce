@@ -27,6 +27,11 @@ from ..repositories.workspace_repository import WorkspaceRepository
 class DatasetService:
     """Ingest and manage workspace datasets."""
 
+    SCHEMA_STATUS_QUEUED = "queued"
+    SCHEMA_STATUS_GENERATING = "generating"
+    SCHEMA_STATUS_READY = "ready"
+    SCHEMA_STATUS_FAILED = "failed"
+
     @staticmethod
     def _normalize_table_name(source_path: str) -> str:
         stem = Path(source_path).stem
@@ -133,6 +138,9 @@ class DatasetService:
             existing.source_path = str(source)
             existing.table_name = table_name
             existing.schema_path = schema_path
+            existing.schema_status = DatasetService.SCHEMA_STATUS_QUEUED
+            existing.schema_error_message = None
+            existing.schema_updated_at = None
             existing.file_size = source_size
             existing.source_mtime = source_mtime
             existing.row_count = row_count
@@ -145,6 +153,9 @@ class DatasetService:
                 source_fingerprint=fingerprint,
                 table_name=table_name,
                 schema_path=schema_path,
+                schema_status=DatasetService.SCHEMA_STATUS_QUEUED,
+                schema_error_message=None,
+                schema_updated_at=None,
                 file_size=source_size,
                 source_mtime=source_mtime,
                 row_count=row_count,
@@ -218,6 +229,9 @@ class DatasetService:
             existing.source_path = source_path
             existing.source_fingerprint = fingerprint
             existing.schema_path = schema_path
+            existing.schema_status = DatasetService.SCHEMA_STATUS_QUEUED
+            existing.schema_error_message = None
+            existing.schema_updated_at = None
             existing.file_size = None
             existing.source_mtime = None
             existing.row_count = row_count
@@ -230,6 +244,9 @@ class DatasetService:
                 source_fingerprint=fingerprint,
                 table_name=normalized_table,
                 schema_path=schema_path,
+                schema_status=DatasetService.SCHEMA_STATUS_QUEUED,
+                schema_error_message=None,
+                schema_updated_at=None,
                 file_size=None,
                 source_mtime=None,
                 row_count=row_count,

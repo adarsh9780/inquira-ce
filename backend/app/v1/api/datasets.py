@@ -33,6 +33,22 @@ router = APIRouter(
 )
 
 
+def _dataset_response(ds) -> DatasetResponse:
+    return DatasetResponse(
+        id=ds.id,
+        workspace_id=ds.workspace_id,
+        source_path=ds.source_path,
+        table_name=ds.table_name,
+        row_count=ds.row_count,
+        file_type=ds.file_type,
+        schema_status=str(getattr(ds, "schema_status", "queued") or "queued"),
+        schema_error_message=getattr(ds, "schema_error_message", None),
+        schema_updated_at=getattr(ds, "schema_updated_at", None),
+        created_at=ds.created_at,
+        updated_at=ds.updated_at,
+    )
+
+
 @router.get("/workspaces/{workspace_id}/datasets", response_model=DatasetListResponse)
 async def list_workspace_datasets(
     workspace_id: str,
@@ -41,21 +57,7 @@ async def list_workspace_datasets(
 ):
     """List datasets inside one workspace."""
     datasets = await DatasetService.list_datasets(session, current_user.id, workspace_id)
-    return DatasetListResponse(
-        datasets=[
-            DatasetResponse(
-                id=ds.id,
-                workspace_id=ds.workspace_id,
-                source_path=ds.source_path,
-                table_name=ds.table_name,
-                row_count=ds.row_count,
-                file_type=ds.file_type,
-                created_at=ds.created_at,
-                updated_at=ds.updated_at,
-            )
-            for ds in datasets
-        ]
-    )
+    return DatasetListResponse(datasets=[_dataset_response(ds) for ds in datasets])
 
 
 def _ingestion_job_response(job) -> DatasetIngestionJobResponse:
@@ -90,16 +92,7 @@ async def add_workspace_dataset(
 ):
     """Add or refresh a dataset in the workspace DuckDB."""
     ds = await DatasetService.add_dataset(session, current_user, workspace_id, payload.source_path)
-    return DatasetResponse(
-        id=ds.id,
-        workspace_id=ds.workspace_id,
-        source_path=ds.source_path,
-        table_name=ds.table_name,
-        row_count=ds.row_count,
-        file_type=ds.file_type,
-        created_at=ds.created_at,
-        updated_at=ds.updated_at,
-    )
+    return _dataset_response(ds)
 
 
 @router.post(
@@ -181,16 +174,7 @@ async def sync_browser_workspace_dataset(
         row_count=payload.row_count,
         allow_sample_values=payload.allow_sample_values,
     )
-    return DatasetResponse(
-        id=ds.id,
-        workspace_id=ds.workspace_id,
-        source_path=ds.source_path,
-        table_name=ds.table_name,
-        row_count=ds.row_count,
-        file_type=ds.file_type,
-        created_at=ds.created_at,
-        updated_at=ds.updated_at,
-    )
+    return _dataset_response(ds)
 
 
 @router.delete(

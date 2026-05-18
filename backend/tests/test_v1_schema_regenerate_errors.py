@@ -54,7 +54,10 @@ async def test_regenerate_schema_raises_500_on_llm_failure(monkeypatch, tmp_path
     )
     monkeypatch.setattr(runtime_api, "LLMService", FakeLLMService)
 
-    session = SimpleNamespace(commit=lambda: None)
+    async def _commit():
+        return None
+
+    session = SimpleNamespace(commit=_commit)
 
     with pytest.raises(HTTPException) as exc_info:
         await runtime_api.regenerate_workspace_dataset_schema(
@@ -123,7 +126,10 @@ async def test_regenerate_schema_preserves_upstream_http_status(monkeypatch, tmp
     )
     monkeypatch.setattr(runtime_api, "LLMService", FakeLLMService)
 
-    session = SimpleNamespace(commit=lambda: None)
+    async def _commit():
+        return None
+
+    session = SimpleNamespace(commit=_commit)
 
     with pytest.raises(HTTPException) as exc_info:
         await runtime_api.regenerate_workspace_dataset_schema(
