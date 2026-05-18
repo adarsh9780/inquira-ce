@@ -44,3 +44,14 @@ test('workspace datasets section uses prominent primary import actions in header
   assert.equal(source.includes('class="btn-primary px-4 py-2 text-sm'), true)
   assert.equal(source.includes('class="w-full rounded-lg bg-[var(--color-base-soft)] px-4 py-3 text-center text-sm text-[var(--color-text-muted)] transition-all hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"'), false)
 })
+
+test('workspace dataset rows show inline schema status and row-level regenerate control', () => {
+  const source = readWorkspaceTab()
+
+  assert.equal(source.includes('title="Regenerate schema"'), true)
+  assert.equal(source.includes('title="Refresh dataset"'), false)
+  assert.equal(source.includes('function datasetSchemaStatusLabel(dataset) {'), true)
+  assert.equal(source.includes('function datasetSchemaStatusBadgeClass(dataset) {'), true)
+  assert.equal(source.includes('schema_status: String(item?.schema_status || \'queued\')'), true)
+  assert.equal(source.includes('{{ datasetSchemaStatusLabel(dataset) }}'), true)
+})

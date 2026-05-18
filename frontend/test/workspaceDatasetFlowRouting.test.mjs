@@ -22,7 +22,7 @@ test('workspace stepper state-b flow renders inline dataset actions and remove c
 
   assert.equal(source.includes('pendingRemovalDataset'), true)
   assert.equal(source.includes('datasetDeleteDialogMessage'), true)
-  assert.equal(source.includes('title="Refresh dataset"'), true)
+  assert.equal(source.includes('title="Regenerate schema"'), true)
   assert.equal(source.includes('title="Remove dataset"'), true)
   assert.equal(source.includes('@confirm="confirmRemoveDataset"'), true)
 })

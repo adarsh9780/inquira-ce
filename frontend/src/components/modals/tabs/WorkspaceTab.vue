@@ -339,14 +339,24 @@
                 class="mb-2 rounded-lg bg-[var(--color-base-soft)] px-4 py-3"
               >
                 <div class="flex items-start justify-between gap-3">
-                  <p class="min-w-0 truncate text-sm font-medium text-[var(--color-text-main)]">{{ dataset.filename }}</p>
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <p class="min-w-0 truncate text-sm font-medium text-[var(--color-text-main)]">{{ dataset.filename }}</p>
+                      <span
+                        class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium"
+                        :class="datasetSchemaStatusBadgeClass(dataset)"
+                      >
+                        {{ datasetSchemaStatusLabel(dataset) }}
+                      </span>
+                    </div>
+                  </div>
                   <div class="flex items-center gap-1">
                     <button
                       type="button"
                       class="rounded p-1 text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)] disabled:cursor-not-allowed disabled:opacity-50"
-                      title="Refresh dataset"
-                      :disabled="isDatasetIngesting || isDeletingDataset"
-                      @click="refreshDataset(dataset)"
+                      title="Regenerate schema"
+                      :disabled="isDatasetIngesting || isDeletingDataset || isGeneratingWorkspaceSchemas"
+                      @click="refreshDatasetSchema(dataset)"
                     >
                       <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
                         <path d="M20 12a8 8 0 1 1-2.34-5.66" />
@@ -912,6 +922,9 @@ async function loadWorkspaceDatasets() {
       source_path: String(item?.source_path || '').trim(),
       row_count: Number.isFinite(Number(item?.row_count)) ? Number(item.row_count) : null,
       file_type: String(item?.file_type || '').trim().toLowerCase(),
+      schema_status: String(item?.schema_status || 'queued').trim().toLowerCase(),
+      schema_error_message: String(item?.schema_error_message || '').trim(),
+      schema_updated_at: String(item?.schema_updated_at || '').trim(),
       filename: formatFilename(item?.source_path || item?.table_name || ''),
     })).filter((item) => item.table_name)
     await enrichDatasetMetadata(workspaceId)
@@ -1482,29 +1495,13 @@ async function confirmRemoveDataset() {
   }
 }
 
-async function refreshDataset(dataset) {
-  const sourcePath = String(dataset?.source_path || '').trim()
-  if (requiresWorkspaceActivation.value) {
-    toast.info('Activate workspace first', 'Activate this workspace before refreshing datasets.')
-    return
-  }
-  if (!sourcePath || sourcePath.startsWith('browser://')) {
-    toast.error('Refresh failed', 'This dataset cannot be refreshed from source.')
-    return
-  }
-  startDatasetIngest(sourcePath)
-  setWorkspaceOperation('ingest', 'Refreshing dataset in the workspace.')
-  try {
-    const uploadResult = await apiService.uploadDataPath(sourcePath)
-    applyDatasetSelectionFromUpload(uploadResult, sourcePath)
-    await loadWorkspaceDatasets()
-    toast.success('Dataset refreshed', 'Dataset refreshed successfully.')
-  } catch (error) {
-    toast.error('Refresh failed', extractApiErrorMessage(error, 'Failed to refresh dataset.'))
-  } finally {
-    finishDatasetIngest()
-    clearWorkspaceOperation()
-  }
+async function refreshDatasetSchema(dataset) {
+  const tableName = String(dataset?.table_name || '').trim()
+  if (!tableName) return
+  await generateWorkspaceSchemas({
+    tableNames: [tableName],
+    autoStart: false,
+  })
 }
 
 async function openDatasetPicker() {
@@ -1673,6 +1670,35 @@ function schemaGenerationClass(tableName) {
   if (status === 'completed') return 'bg-[var(--color-success-bg)] text-[var(--color-success)] border-transparent'
   if (status === 'failed') return 'bg-[var(--color-danger-bg)] text-[var(--color-danger)] border-transparent'
   return 'bg-[var(--color-base-muted)] text-[var(--color-text-muted)] border-[var(--color-border)]'
+}
+
+function datasetSchemaStatusState(dataset) {
+  const tableName = String(dataset?.table_name || '').trim()
+  const localStatus = String(schemaGenerationStatuses.value?.[tableName]?.status || '').trim().toLowerCase()
+  if (localStatus === 'running') return 'generating'
+  if (localStatus === 'completed') return 'ready'
+  if (localStatus === 'failed') return 'failed'
+  const persistedStatus = String(dataset?.schema_status || 'queued').trim().toLowerCase()
+  if (['queued', 'generating', 'ready', 'failed'].includes(persistedStatus)) {
+    return persistedStatus
+  }
+  return 'queued'
+}
+
+function datasetSchemaStatusLabel(dataset) {
+  const status = datasetSchemaStatusState(dataset)
+  if (status === 'generating') return 'Generating schema'
+  if (status === 'ready') return 'Schema ready'
+  if (status === 'failed') return 'Schema failed'
+  return 'Schema queued'
+}
+
+function datasetSchemaStatusBadgeClass(dataset) {
+  const status = datasetSchemaStatusState(dataset)
+  if (status === 'generating') return 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
+  if (status === 'ready') return 'bg-[var(--color-success-bg)] text-[var(--color-success)]'
+  if (status === 'failed') return 'bg-[var(--color-danger-bg)] text-[var(--color-danger)]'
+  return 'bg-[var(--color-base-muted)] text-[var(--color-text-muted)]'
 }
 
 function stepDotClass(stepId) {

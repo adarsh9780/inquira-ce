@@ -152,7 +152,7 @@ test('workspace flow routes through settings panels and workspace list/detail/cr
   assert.equal(tabSource.includes("panelMode === 'ws-detail'"), true)
   assert.equal(tabSource.includes("@click=\"emit('navigate', 'ws-create', 'forward')\""), true)
   assert.equal(tabSource.includes("@click=\"emit('navigate', 'ws-list', 'backward')\""), true)
-  assert.equal(tabSource.includes('title="Refresh dataset"'), true)
+  assert.equal(tabSource.includes('title="Regenerate schema"'), true)
   assert.equal(tabSource.includes('title="Remove dataset"'), true)
   assert.equal(tabSource.includes('openWorkspaceDetail(workspace.id)'), true)
 })
