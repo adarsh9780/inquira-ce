@@ -49,6 +49,13 @@ async def test_chat_service_passes_model_and_context_to_agent_payload(monkeypatc
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.create_turn", fake_create_turn)
     monkeypatch.setattr("app.v1.services.chat_service.AgentClient.assert_health", fake_health)
     monkeypatch.setattr("app.v1.services.chat_service.AgentClient.run", fake_run)
+    async def fake_persist_turn_artifacts(**_kwargs):
+        return []
+
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.TurnArtifactStorageService.persist_turn_artifacts",
+        fake_persist_turn_artifacts,
+    )
     async def _fake_resolve_llm_preferences(_session, _user_id):
         return {
             "provider": "openrouter",

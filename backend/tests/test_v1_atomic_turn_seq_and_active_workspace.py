@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, inspect, select, text
+from sqlalchemy import create_engine, inspect, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.v1 import models  # noqa: F401

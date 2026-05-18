@@ -124,8 +124,9 @@ class WorkspaceDeletionRepository:
                 last_heartbeat_at=now,
                 attempt_count=WorkspaceDeletionJob.attempt_count + 1,
             )
+            .returning(WorkspaceDeletionJob.id)
         )
-        if not result.rowcount:
+        if result.scalar_one_or_none() is None:
             await session.rollback()
             return None
         await session.commit()

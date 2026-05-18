@@ -71,6 +71,8 @@ class TurnArtifactRepository:
         await session.execute(delete(TurnArtifact).where(TurnArtifact.turn_id == turn_id))
         rows: list[TurnArtifact] = []
         for item in items:
+            raw_size = item.get("size_bytes")
+            size_bytes = int(raw_size) if isinstance(raw_size, int | float | str) else None
             row = TurnArtifact(
                 workspace_id=workspace_id,
                 conversation_id=conversation_id,
@@ -80,7 +82,7 @@ class TurnArtifactRepository:
                 logical_name=str(item["logical_name"]) if item.get("logical_name") is not None else None,
                 storage_path=str(item["storage_path"]),
                 payload_format=str(item["payload_format"]),
-                size_bytes=int(item["size_bytes"]) if item.get("size_bytes") is not None else None,
+                size_bytes=size_bytes,
                 status=str(item.get("status") or "active"),
             )
             session.add(row)

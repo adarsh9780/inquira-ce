@@ -12,10 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...data_access import ScratchpadRuntimeAdapter
 from ...services.artifact_scratchpad import ArtifactScratchpadStore
-from ..models import Turn
 from ..repositories.turn_artifact_repository import TurnArtifactRepository
 from ..repositories.conversation_repository import ConversationRepository
-from .turn_bundle_service import TurnBundleService
 
 
 class TurnArtifactReadService:

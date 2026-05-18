@@ -40,10 +40,10 @@ test('midnight dark theme keeps brand accent while using deep slate surfaces', (
   assert.equal(source.includes('--color-selected-surface: #222E3C;'), true)
 })
 
-test('theme catalog presents midnight dark with brand-accent preview chip', () => {
+test('theme catalog presents bluehour as the midnight palette with brand-accent preview chip', () => {
   const source = read('src/constants/themes.js')
 
   assert.equal(source.includes("id: 'midnight'"), true)
-  assert.equal(source.includes("label: 'Midnight Dark'"), true)
+  assert.equal(source.includes("label: 'Bluehour'"), true)
   assert.equal(source.includes("preview: ['#111A24', '#182230', '#C97443']"), true)
 })

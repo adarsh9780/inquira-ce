@@ -31,7 +31,9 @@ test('sidebar icons keep fixed sizing during collapse/expand', () => {
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
   assert.equal(sidebarSource.includes('h-6 w-6 shrink-0 items-center justify-center'), true)
-  assert.equal(sidebarSource.includes('KeyIcon class="h-5 w-5"'), true)
+  assert.equal(sidebarSource.includes('Cog6ToothIcon class="h-5 w-5"'), true)
+  assert.equal(sidebarSource.includes('ChevronDoubleRightIcon v-if="appStore.isSidebarCollapsed" class="h-5 w-5"'), true)
+  assert.equal(sidebarSource.includes('ChevronDoubleLeftIcon v-else class="h-5 w-5"'), true)
   assert.equal(sidebarSource.includes('sidebar-initials-avatar'), true)
   assert.equal(sidebarSource.includes('class="h-14 shrink-0 border-b border-[var(--color-border)] flex items-center pl-[20px] pr-4"'), true)
   assert.equal(sidebarSource.includes("appStore.activeTab === 'workspace' ? 'scale-110' : ''"), false)
