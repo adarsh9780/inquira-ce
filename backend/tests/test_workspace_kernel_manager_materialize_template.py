@@ -11,6 +11,8 @@ def test_materialize_exports_template_uses_safe_sentinel_replacement() -> None:
         json.dumps("[]"),
     )
 
+    compile(rendered, "<materialize_exports>", "exec")
     assert "{_escaped_table}" in rendered
     assert "COPY (SELECT * FROM" in rendered
+    assert "artifact_manifest" in rendered
     assert manager._MATERIALIZE_EXPORTS_SPECS_SENTINEL not in rendered

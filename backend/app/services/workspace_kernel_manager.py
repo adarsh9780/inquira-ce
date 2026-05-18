@@ -81,7 +81,7 @@ _MATERIALIZE_EXPORTS_TEMPLATE = """
 import json as _json
 from pathlib import Path as _Path
 
-_inquira_export_specs = _json.loads("__INQUIRA_MATERIALIZE_EXPORT_SPECS__")
+_inquira_export_specs = _json.loads(__INQUIRA_MATERIALIZE_EXPORT_SPECS__)
 _inquira_materialized = []
 for _spec in _inquira_export_specs:
     if not isinstance(_spec, dict):
@@ -96,7 +96,14 @@ for _spec in _inquira_export_specs:
     if _kind == 'dataframe':
         _table_name = str(_spec.get('table_name') or '').strip()
         if not _table_name:
-            _target.write_text('[]', encoding='utf-8')
+            _manifest_row = scratchpad_conn.execute(
+                "SELECT table_name FROM artifact_manifest WHERE artifact_id = ? LIMIT 1",
+                [_artifact_id],
+            ).fetchone()
+            if _manifest_row is not None:
+                _table_name = str(_manifest_row[0] or '').strip()
+        if not _table_name:
+            continue
         else:
             _escaped_table = _table_name.replace('"', '""')
             _escaped_path = str(_target).replace("'", "''")
