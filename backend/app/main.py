@@ -30,6 +30,7 @@ from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
 from .v1.services.workspace_deletion_service import WorkspaceDeletionService
 from .v1.services.dataset_deletion_service import DatasetDeletionService
 from .v1.services.dataset_ingestion_service import DatasetIngestionService
+from .v1.services.dataset_schema_generation_service import DatasetSchemaGenerationService
 from .v1.services.conversation_migration_service import ConversationMigrationService
 from .v1.services.storage_cleanup_service import StorageCleanupService
 from .core.config_models import AppConfig
@@ -114,7 +115,8 @@ async def lifespan(app: FastAPI):
     app.state.workspace_langgraph_manager = WorkspaceLangGraphManager()
     app.state.workspace_deletion_service = WorkspaceDeletionService()
     app.state.dataset_deletion_service = DatasetDeletionService()
-    app.state.dataset_ingestion_service = DatasetIngestionService()
+    app.state.dataset_schema_generation_service = DatasetSchemaGenerationService()
+    app.state.dataset_ingestion_service = DatasetIngestionService(schema_generation_service=app.state.dataset_schema_generation_service)
     app.state.storage_cleanup_service = StorageCleanupService()
 
     # Load merged configuration
@@ -143,6 +145,7 @@ async def lifespan(app: FastAPI):
     )
     await app.state.dataset_deletion_service.resume_pending_jobs()
     await app.state.dataset_ingestion_service.resume_pending_jobs()
+    await app.state.dataset_schema_generation_service.resume_pending_jobs()
 
     # Start session cleanup task
     cleanup_task = asyncio.create_task(session_cleanup_worker())
@@ -197,6 +200,12 @@ async def lifespan(app: FastAPI):
             await app.state.dataset_ingestion_service.shutdown()
         except Exception as e:
             logprint(f"Error closing dataset ingestion service: {e}", level="error")
+
+    if hasattr(app.state, "dataset_schema_generation_service") and app.state.dataset_schema_generation_service:
+        try:
+            await app.state.dataset_schema_generation_service.shutdown()
+        except Exception as e:
+            logprint(f"Error closing dataset schema generation service: {e}", level="error")
 
     try:
         await shutdown_workspace_kernel_manager()
