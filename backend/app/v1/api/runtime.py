@@ -823,6 +823,18 @@ def _ensure_workspace_db_exists_or_raise(duckdb_path: str) -> None:
     )
 
 
+async def _release_appdata_session_before_kernel(session: AsyncSession | None) -> None:
+    """Avoid holding SQLite transactions while kernel/DuckDB work runs."""
+    if session is None or not hasattr(session, "in_transaction"):
+        return
+    try:
+        in_transaction = bool(session.in_transaction())
+    except Exception:  # noqa: BLE001
+        return
+    if in_transaction:
+        await session.commit()
+
+
 async def _execute_workspace_code_impl(
     *,
     workspace_id: str,
@@ -1032,6 +1044,7 @@ async def get_workspace_columns(
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
+    await _release_appdata_session_before_kernel(session)
     try:
         columns = await get_workspace_columns_via_kernel(workspace_id)
     except RuntimeError as exc:
@@ -1086,6 +1099,7 @@ async def execute_workspace_slash_command(
             args = raw_args.split()
         command_text = f"/{parsed_name}" + (f" {raw_args}" if raw_args else "")
 
+    await _release_appdata_session_before_kernel(session)
     try:
         await bootstrap_workspace_runtime(
             workspace_id=workspace_id,
@@ -1235,6 +1249,7 @@ async def execute_workspace_code(
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    await _release_appdata_session_before_kernel(session)
     response = await _execute_workspace_code_impl(
         workspace_id=workspace_id,
         workspace_duckdb_path=str(workspace.duckdb_path),
@@ -1298,6 +1313,7 @@ async def get_workspace_dataframe_artifact_rows(
         search_text=search_text,
     )
     if rows is None:
+        await _release_appdata_session_before_kernel(session)
         try:
             rows = await get_workspace_dataframe_rows(
                 workspace_id=workspace_id,
@@ -1357,6 +1373,7 @@ async def get_workspace_artifact_rows(
         search_text=search_text,
     )
     if rows is None:
+        await _release_appdata_session_before_kernel(session)
         try:
             rows = await get_workspace_dataframe_rows(
                 workspace_id=workspace_id,
@@ -1455,6 +1472,7 @@ async def get_workspace_artifact_metadata(
         artifact_id=artifact_id,
     )
     if artifact is None:
+        await _release_appdata_session_before_kernel(session)
         try:
             artifact = await ScratchpadRuntimeAdapter().get_workspace_artifact_metadata(
                 workspace_id=workspace_id,
@@ -1484,6 +1502,7 @@ async def delete_workspace_artifact(
         artifact_id=artifact_id,
     )
     if not deleted:
+        await _release_appdata_session_before_kernel(session)
         try:
             deleted = await ScratchpadRuntimeAdapter().delete_workspace_artifact(
                 workspace_id=workspace_id,
@@ -1517,6 +1536,7 @@ async def list_workspace_artifacts(
         kind=kind,
     )
     seen_artifact_ids = {str(item.get("artifact_id") or "") for item in items}
+    await _release_appdata_session_before_kernel(session)
     try:
         legacy_items = await ScratchpadRuntimeAdapter().list_workspace_artifacts(
             workspace_id=workspace_id,
@@ -1568,6 +1588,7 @@ async def install_runner_runtime_package(
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    await _release_appdata_session_before_kernel(session)
     reset = await reset_workspace_kernel(payload.workspace_id)
 
     saved_default = False
@@ -1759,6 +1780,7 @@ async def bootstrap_workspace_runtime_endpoint(
             level="info",
         )
 
+    await _release_appdata_session_before_kernel(session)
     try:
         await _progress(
             "workspace_runtime_start",
@@ -1832,6 +1854,7 @@ async def retry_workspace_runtime_endpoint(
             level="info",
         )
 
+    await _release_appdata_session_before_kernel(session)
     try:
         await _progress(
             "workspace_runtime_cleanup",
@@ -1899,6 +1922,7 @@ async def hard_reset_workspace_runtime_endpoint(
             level="info",
         )
 
+    await _release_appdata_session_before_kernel(session)
     try:
         await _progress(
             "workspace_runtime_cleanup",
@@ -1971,6 +1995,7 @@ async def interrupt_workspace_kernel_runtime(
 ):
     """Interrupt currently running code in workspace kernel."""
     await _require_workspace_access(session, current_user.id, workspace_id)
+    await _release_appdata_session_before_kernel(session)
     interrupted = await interrupt_workspace_kernel(workspace_id)
     return KernelResetResponse(workspace_id=workspace_id, reset=interrupted)
 
@@ -1986,6 +2011,7 @@ async def reset_workspace_kernel_runtime(
 ):
     """Reset workspace kernel and clear in-memory execution context."""
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    await _release_appdata_session_before_kernel(session)
     return await _restart_workspace_kernel(workspace_id, workspace)
 
 
@@ -2000,6 +2026,7 @@ async def restart_workspace_kernel_runtime(
 ):
     """Restart workspace kernel and warm it immediately."""
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    await _release_appdata_session_before_kernel(session)
     return await _restart_workspace_kernel(workspace_id, workspace)
 
 
@@ -2055,6 +2082,7 @@ async def get_workspace_dataset_schema(
                 # Fall back to DuckDB introspection when saved schema metadata is unreadable.
                 pass
 
+    await _release_appdata_session_before_kernel(session)
     try:
         columns = await get_workspace_table_schema_via_kernel(
             workspace_id=workspace_id,
@@ -2164,6 +2192,7 @@ async def regenerate_workspace_dataset_schema(
         )
 
     read_columns_error: RuntimeError | None = None
+    await _release_appdata_session_before_kernel(session)
     try:
         columns_result = _read_table_columns_for_prompt(
             workspace_id=workspace_id,

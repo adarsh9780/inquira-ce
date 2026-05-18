@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import sqlite3
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.data_access.coordinator import LeaseConflictError, LeaseKinds, ResourceLeaseCoordinator
@@ -117,6 +120,44 @@ async def test_resource_lease_coordinator_renews_owned_lease(lease_session) -> N
 
     assert renewed.leased_until >= original_expiry
     assert renewed.metadata_json == '{"step": 2}'
+
+
+@pytest.mark.asyncio
+async def test_resource_lease_coordinator_retries_locked_sqlite_renewal(monkeypatch) -> None:
+    coordinator = ResourceLeaseCoordinator(
+        lease_seconds=30,
+        lock_retry_attempts=3,
+        lock_retry_base_delay_seconds=0,
+    )
+    session = SimpleNamespace(rollbacks=0)
+    calls = {"renew": 0}
+
+    async def fake_rollback():
+        session.rollbacks += 1
+
+    async def fake_renew_once(*_args, **_kwargs):
+        calls["renew"] += 1
+        if calls["renew"] < 3:
+            raise OperationalError(
+                "UPDATE v1_resource_leases SET leased_until=? WHERE id=?",
+                (),
+                sqlite3.OperationalError("database is locked"),
+            )
+        return SimpleNamespace(leased_until=datetime.now(UTC) + timedelta(seconds=30))
+
+    session.rollback = fake_rollback
+    monkeypatch.setattr(coordinator, "_renew_lease_once", fake_renew_once)
+
+    renewed = await coordinator.renew_lease(
+        session,  # type: ignore[arg-type]
+        resource_key="workspace-1",
+        lease_kind=LeaseKinds.WORKSPACE_RUNTIME,
+        owner_token="owner-1",
+    )
+
+    assert renewed.leased_until > datetime.now(UTC)
+    assert calls["renew"] == 3
+    assert session.rollbacks == 2
 
 
 @pytest.mark.asyncio

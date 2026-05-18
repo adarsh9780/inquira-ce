@@ -1,4 +1,5 @@
 import asyncio
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from queue import Empty as QueueEmpty
 from types import SimpleNamespace
@@ -84,6 +85,35 @@ async def test_interrupt_workspace_updates_status():
     assert await manager.interrupt_workspace("ws-1") is True
     assert called["interrupt"] == 1
     assert session.status == "ready"
+
+
+@pytest.mark.asyncio
+async def test_touch_session_throttles_runtime_lease_renewal(monkeypatch):
+    manager = WorkspaceKernelManager(idle_minutes=30)
+    session = _session("ws-lease", "/tmp/ws-lease.duckdb")
+    now = datetime.now(UTC)
+    session.runtime_lease_owner_token = "kernel:ws-lease:test"
+    session.runtime_lease_expires_at = now + timedelta(minutes=30)
+    session.runtime_lease_renew_after = now + timedelta(minutes=5)
+    renewals = {"count": 0}
+
+    async def fake_renew(current_session):
+        renewals["count"] += 1
+        current_session.runtime_lease_expires_at = datetime.now(UTC) + timedelta(minutes=30)
+        current_session.runtime_lease_renew_after = datetime.now(UTC) + timedelta(minutes=5)
+        return True
+
+    monkeypatch.setattr(manager, "_renew_runtime_lease", fake_renew)
+
+    await manager._touch_session(session)
+    await manager._touch_session(session)
+    assert renewals["count"] == 0
+
+    session.runtime_lease_renew_after = datetime.now(UTC) - timedelta(seconds=1)
+    await manager._touch_session(session)
+    await manager._touch_session(session)
+
+    assert renewals["count"] == 1
 
 
 @pytest.mark.asyncio

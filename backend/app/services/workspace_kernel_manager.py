@@ -24,6 +24,7 @@ from app.services.jupyter_message_parser import (
     update_from_iopub_message,
 )
 from app.services.artifact_scratchpad import ArtifactScratchpadStore
+from app.core.logger import logprint
 from app.services.runner_env import ensure_runner_kernel_dependencies, resolve_runner_python
 
 _FALLBACK_RESULT_PROBE_CODE = """
@@ -183,6 +184,8 @@ class WorkspaceKernelSession:
     restart_count: int = 0
     bootstrap_completed: bool = False
     runtime_lease_owner_token: str | None = None
+    runtime_lease_expires_at: datetime | None = None
+    runtime_lease_renew_after: datetime | None = None
 
 
 class WorkspaceKernelManager:
@@ -192,8 +195,11 @@ class WorkspaceKernelManager:
         self._sessions: dict[str, WorkspaceKernelSession] = {}
         self._sessions_lock = asyncio.Lock()
         self._idle_delta = timedelta(minutes=max(1, idle_minutes))
+        self._runtime_lease_delta = timedelta(
+            seconds=max(300, int(self._idle_delta.total_seconds()) + 120)
+        )
         self._lease_coordinator = ResourceLeaseCoordinator(
-            lease_seconds=max(300, int(self._idle_delta.total_seconds()) + 120)
+            lease_seconds=int(self._runtime_lease_delta.total_seconds())
         )
 
     async def execute(
@@ -1354,7 +1360,7 @@ class WorkspaceKernelManager:
             return
         async with AppDataSessionLocal() as db:
             try:
-                await self._lease_coordinator.acquire_workspace_runtime_lease(
+                lease = await self._lease_coordinator.acquire_workspace_runtime_lease(
                     db,
                     workspace_id=session.workspace_id,
                     owner_token=owner_token,
@@ -1366,14 +1372,15 @@ class WorkspaceKernelManager:
                     "Workspace runtime cannot start because maintenance mode is active for this workspace."
                 ) from exc
             await db.commit()
+        self._cache_runtime_lease(session, getattr(lease, "leased_until", None))
 
-    async def _renew_runtime_lease(self, session: WorkspaceKernelSession) -> None:
+    async def _renew_runtime_lease(self, session: WorkspaceKernelSession) -> bool:
         owner_token = str(session.runtime_lease_owner_token or "").strip()
         if not owner_token:
-            return
+            return False
         async with AppDataSessionLocal() as db:
             try:
-                await self._lease_coordinator.renew_lease(
+                lease = await self._lease_coordinator.renew_lease(
                     db,
                     resource_key=session.workspace_id,
                     lease_kind=LeaseKinds.WORKSPACE_RUNTIME,
@@ -1382,8 +1389,10 @@ class WorkspaceKernelManager:
                 )
             except LeaseConflictError:
                 await db.rollback()
-                return
+                return False
             await db.commit()
+        self._cache_runtime_lease(session, getattr(lease, "leased_until", None))
+        return True
 
     async def _release_runtime_lease(self, session: WorkspaceKernelSession) -> None:
         owner_token = str(session.runtime_lease_owner_token or "").strip()
@@ -1397,10 +1406,68 @@ class WorkspaceKernelManager:
                 owner_token=owner_token,
             )
             await db.commit()
+        session.runtime_lease_expires_at = None
+        session.runtime_lease_renew_after = None
 
     async def _touch_session(self, session: WorkspaceKernelSession) -> None:
-        session.last_used = datetime.now(UTC)
-        await self._renew_runtime_lease(session)
+        now = datetime.now(UTC)
+        session.last_used = now
+        if not self._should_renew_runtime_lease(session, now):
+            return
+        try:
+            await self._renew_runtime_lease(session)
+        except Exception as exc:
+            if self._cached_runtime_lease_still_valid(session, now):
+                session.runtime_lease_renew_after = now + timedelta(seconds=10)
+                logprint(
+                    (
+                        "Workspace runtime lease renewal deferred "
+                        f"for workspace {session.workspace_id}: {exc}"
+                    ),
+                    level="warning",
+                )
+                return
+            raise
+
+    def _cache_runtime_lease(
+        self,
+        session: WorkspaceKernelSession,
+        leased_until: datetime | None,
+    ) -> None:
+        if leased_until is None:
+            session.runtime_lease_expires_at = None
+            session.runtime_lease_renew_after = None
+            return
+        expires_at = ResourceLeaseCoordinator._normalize_dt(leased_until)
+        session.runtime_lease_expires_at = expires_at
+        session.runtime_lease_renew_after = expires_at - self._lease_renewal_margin()
+
+    def _lease_renewal_margin(self) -> timedelta:
+        margin_seconds = max(
+            30,
+            min(120, int(self._runtime_lease_delta.total_seconds() / 3)),
+        )
+        return timedelta(seconds=margin_seconds)
+
+    @staticmethod
+    def _should_renew_runtime_lease(
+        session: WorkspaceKernelSession,
+        now: datetime,
+    ) -> bool:
+        renew_after = session.runtime_lease_renew_after
+        if renew_after is None:
+            return True
+        return ResourceLeaseCoordinator._normalize_dt(renew_after) <= now
+
+    @staticmethod
+    def _cached_runtime_lease_still_valid(
+        session: WorkspaceKernelSession,
+        now: datetime,
+    ) -> bool:
+        expires_at = session.runtime_lease_expires_at
+        if expires_at is None:
+            return False
+        return ResourceLeaseCoordinator._normalize_dt(expires_at) > now
 
     async def _await_maybe(self, maybe_awaitable: Any) -> None:
         if inspect.isawaitable(maybe_awaitable):

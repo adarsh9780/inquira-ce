@@ -37,6 +37,58 @@ def _llm_preferences() -> dict[str, object]:
 
 
 @pytest.mark.asyncio
+async def test_workspace_schema_releases_db_transaction_before_live_columns(monkeypatch):
+    session = _TrackingSession()
+
+    async def _fake_list_for_workspace(_session, workspace_id):
+        assert _session is session
+        assert workspace_id == "ws-1"
+        assert session.in_transaction() is True
+        return [SimpleNamespace(table_name="orders", schema_path="")]
+
+    async def _fake_read_live_table_columns(workspace_id, table_name):
+        assert workspace_id == "ws-1"
+        assert table_name == "orders"
+        assert session.commits == 1
+        assert session.in_transaction() is False
+        return [{"name": "order_id", "dtype": "BIGINT"}]
+
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.DatasetRepository.list_for_workspace",
+        _fake_list_for_workspace,
+    )
+    monkeypatch.setattr(
+        ChatService,
+        "_read_live_table_columns",
+        staticmethod(_fake_read_live_table_columns),
+    )
+
+    schema = await ChatService._load_workspace_schema(
+        session=session,
+        workspace_id="ws-1",
+        duckdb_path="/tmp/ws.db",
+        active_schema_override=None,
+    )
+
+    assert session.commits == 1
+    assert schema["tables"] == [
+        {
+            "table_name": "orders",
+            "context": "",
+            "columns": [
+                {
+                    "name": "order_id",
+                    "dtype": "BIGINT",
+                    "description": "",
+                    "samples": [],
+                    "aliases": [],
+                }
+            ],
+        }
+    ]
+
+
+@pytest.mark.asyncio
 async def test_stream_chat_releases_db_transaction_before_agent_stream(monkeypatch):
     session = _TrackingSession()
 

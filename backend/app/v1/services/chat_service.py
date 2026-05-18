@@ -1115,13 +1115,22 @@ class ChatService:
         active_schema_override: dict[str, Any] | None,
     ) -> dict[str, Any]:
         datasets = await DatasetRepository.list_for_workspace(session, workspace_id)
+        dataset_descriptors = [
+            {
+                "table_name": str(getattr(dataset, "table_name", "") or "").strip(),
+                "schema_path": str(getattr(dataset, "schema_path", "") or "").strip(),
+            }
+            for dataset in datasets
+        ]
+        await ChatService._release_session_before_agent(session)
+
         tables: list[dict[str, Any]] = []
-        for dataset in datasets:
-            table_name = str(getattr(dataset, "table_name", "") or "").strip()
+        for dataset in dataset_descriptors:
+            table_name = str(dataset.get("table_name") or "").strip()
             if not table_name:
                 continue
             schema: dict[str, Any] | None = None
-            schema_path = str(getattr(dataset, "schema_path", "") or "").strip()
+            schema_path = str(dataset.get("schema_path") or "").strip()
             if schema_path:
                 try:
                     schema = await ChatService._load_schema(schema_path)
