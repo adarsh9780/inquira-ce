@@ -45,6 +45,6 @@ def test_upgrade_or_stamp_schema_bootstraps_missing_core_appdata_tables(tmp_path
         }.issubset(tables)
         with engine.begin() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        assert version == "0018_v1_job_claims"
+        assert version == "0019_v1_dataset_schema_status_metadata"
     finally:
         engine.dispose()

@@ -355,7 +355,7 @@
                       type="button"
                       class="rounded p-1 text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)] disabled:cursor-not-allowed disabled:opacity-50"
                       title="Regenerate schema"
-                      :disabled="isDatasetIngesting || isDeletingDataset || isGeneratingWorkspaceSchemas"
+                      :disabled="isDatasetIngesting || isDeletingDataset || isSchemaRegenerateSubmitting"
                       @click="requestRegenerateDatasetSchema(dataset)"
                     >
                       <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -492,6 +492,7 @@ const pendingRemovalDataset = ref(null)
 const isDeletingDataset = ref(false)
 const isSchemaRegenerateDialogOpen = ref(false)
 const pendingSchemaRegenerateDataset = ref(null)
+const isSchemaRegenerateSubmitting = ref(false)
 const isRenamingInline = ref(false)
 const renameValue = ref('')
 const renameInputRef = ref(null)
@@ -502,6 +503,7 @@ const datasetIngestionPollers = new Map()
 let unsubscribeProgress = null
 let unsubscribeRuntimeError = null
 let unsubscribeRuntimeComplete = null
+let datasetSchemaPoller = null
 
 const isCreatingWorkspace = ref(false)
 const isCreatingWorkspaceRuntime = ref(false)
@@ -518,8 +520,6 @@ const setupWorkspaceName = ref('')
 const setupWorkspaceContext = ref('')
 const isSavingWorkspaceIdentity = ref(false)
 const isCheckingWorkspaceReadiness = ref(false)
-const isGeneratingWorkspaceSchemas = ref(false)
-const schemaGenerationStatuses = ref({})
 const setupSteps = [
   { id: 1, label: 'Workspace context' },
   { id: 2, label: 'Datasets' },
@@ -668,6 +668,7 @@ watch(
   () => props.panelMode,
   async (nextMode) => {
     if (nextMode === 'ws-list') {
+      stopDatasetSchemaPolling()
       await hydrateWorkspaceCards()
     }
     if (nextMode === 'ws-detail') {
@@ -677,6 +678,7 @@ watch(
       syncSetupIdentity()
     }
     if (nextMode === 'ws-create') {
+      stopDatasetSchemaPolling()
       setupStep.value = 1
       setupWorkspaceName.value = ''
       setupWorkspaceContext.value = ''
@@ -773,6 +775,7 @@ onUnmounted(() => {
   clearWorkspaceOperation()
   stopDatasetDeletionPollers()
   stopDatasetIngestionPollers()
+  stopDatasetSchemaPolling()
 })
 
 async function hydrateWorkspaceCards() {
@@ -944,8 +947,10 @@ async function loadWorkspaceDatasets() {
       filename: formatFilename(item?.source_path || item?.table_name || ''),
     })).filter((item) => item.table_name)
     await enrichDatasetMetadata(workspaceId)
+    syncDatasetSchemaPolling()
   } catch (error) {
     datasetEntries.value = []
+    stopDatasetSchemaPolling()
     toast.error('Dataset Error', extractApiErrorMessage(error, 'Failed to load datasets.'))
   }
 }
@@ -1246,14 +1251,6 @@ function applyDatasetSelectionFromIngestionJob(job) {
   }, firstCompleted.source_path || '')
 }
 
-function completedTableNamesFromIngestionJob(job) {
-  const items = Array.isArray(job?.items) ? job.items : []
-  return items
-    .filter((item) => String(item?.status || '').toLowerCase() === 'completed')
-    .map((item) => String(item?.table_name || '').trim())
-    .filter(Boolean)
-}
-
 function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = Infinity) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   const normalizedJobId = String(jobId || '').trim()
@@ -1277,7 +1274,6 @@ function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = Infinity) {
         datasetIngestionPollers.delete(normalizedJobId)
         applyDatasetSelectionFromIngestionJob(job)
         await loadWorkspaceDatasets()
-        const completedTables = completedTableNamesFromIngestionJob(job)
         const failedCount = Number(job?.failed_count || 0)
         const completedCount = Number(job?.completed_count || 0)
         datasetIngestPercent.value = 100
@@ -1286,12 +1282,6 @@ function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = Infinity) {
           : 'Import complete.'
         await new Promise((resolve) => setTimeout(resolve, 700))
         finishDatasetIngest()
-        if (completedCount > 0) {
-          void generateWorkspaceSchemas({
-            tableNames: completedTables,
-            autoStart: true,
-          })
-        }
         clearWorkspaceOperation()
         if (status === 'failed' || failedCount > 0) {
           toast.error('Dataset ingestion completed with errors', `${failedCount || 'Some'} file${failedCount === 1 ? '' : 's'} failed to import.`)
@@ -1512,12 +1502,13 @@ async function confirmRemoveDataset() {
 }
 
 function requestRegenerateDatasetSchema(dataset) {
-  if (!dataset || isGeneratingWorkspaceSchemas.value) return
+  if (!dataset || isSchemaRegenerateSubmitting.value) return
   pendingSchemaRegenerateDataset.value = dataset
   isSchemaRegenerateDialogOpen.value = true
 }
 
 function closeSchemaRegenerateDialog() {
+  if (isSchemaRegenerateSubmitting.value) return
   isSchemaRegenerateDialogOpen.value = false
   pendingSchemaRegenerateDataset.value = null
 }
@@ -1532,16 +1523,15 @@ async function confirmRegenerateDatasetSchema() {
     return
   }
   try {
+    isSchemaRegenerateSubmitting.value = true
     await apiService.v1EnqueueDatasetSchemaRegeneration(workspaceId, tableName)
-    schemaGenerationStatuses.value = {
-      ...schemaGenerationStatuses.value,
-      [tableName]: { status: 'pending', message: '' },
-    }
     await loadWorkspaceDatasets()
-    closeSchemaRegenerateDialog()
     toast.success('Schema regeneration queued', 'Schema generation will continue in the background.')
   } catch (error) {
     toast.error('Schema regeneration failed', extractApiErrorMessage(error, 'Failed to queue schema regeneration.'))
+  } finally {
+    isSchemaRegenerateSubmitting.value = false
+    closeSchemaRegenerateDialog()
   }
 }
 
@@ -1697,28 +1687,7 @@ async function createWorkspace({ setupStep: targetSetupStep = 2 } = {}) {
   }
 }
 
-function schemaGenerationLabel(tableName) {
-  const status = String(schemaGenerationStatuses.value?.[tableName]?.status || 'pending').trim()
-  if (status === 'running') return 'Generating'
-  if (status === 'completed') return 'Generated'
-  if (status === 'failed') return 'Failed'
-  return 'Pending'
-}
-
-function schemaGenerationClass(tableName) {
-  const status = String(schemaGenerationStatuses.value?.[tableName]?.status || 'pending').trim()
-  if (status === 'running') return 'bg-[var(--color-accent-soft)] text-[var(--color-accent)] border-transparent'
-  if (status === 'completed') return 'bg-[var(--color-success-bg)] text-[var(--color-success)] border-transparent'
-  if (status === 'failed') return 'bg-[var(--color-danger-bg)] text-[var(--color-danger)] border-transparent'
-  return 'bg-[var(--color-base-muted)] text-[var(--color-text-muted)] border-[var(--color-border)]'
-}
-
 function datasetSchemaStatusState(dataset) {
-  const tableName = String(dataset?.table_name || '').trim()
-  const localStatus = String(schemaGenerationStatuses.value?.[tableName]?.status || '').trim().toLowerCase()
-  if (localStatus === 'running') return 'generating'
-  if (localStatus === 'completed') return 'ready'
-  if (localStatus === 'failed') return 'failed'
   const persistedStatus = String(dataset?.schema_status || 'queued').trim().toLowerCase()
   if (['queued', 'generating', 'ready', 'failed'].includes(persistedStatus)) {
     return persistedStatus
@@ -1742,6 +1711,29 @@ function datasetSchemaStatusBadgeClass(dataset) {
   return 'bg-[var(--color-base-muted)] text-[var(--color-text-muted)]'
 }
 
+function stopDatasetSchemaPolling() {
+  if (datasetSchemaPoller !== null) {
+    clearInterval(datasetSchemaPoller)
+    datasetSchemaPoller = null
+  }
+}
+
+function syncDatasetSchemaPolling() {
+  const shouldPoll = datasetEntries.value.some((dataset) => {
+    const status = datasetSchemaStatusState(dataset)
+    return status === 'queued' || status === 'generating'
+  })
+  if (!shouldPoll) {
+    stopDatasetSchemaPolling()
+    return
+  }
+  if (datasetSchemaPoller !== null) return
+  datasetSchemaPoller = setInterval(async () => {
+    if (props.panelMode !== 'ws-detail' || setupStep.value !== 2) return
+    await loadWorkspaceDatasets()
+  }, 1500)
+}
+
 function stepDotClass(stepId) {
   if (setupStep.value === stepId) return 'border-[var(--color-accent)] bg-[var(--color-accent)] text-white shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-accent)_20%,transparent)]'
   if (setupStep.value > stepId) return 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
@@ -1752,81 +1744,6 @@ function stepLabelClass(stepId) {
   if (setupStep.value === stepId) return 'text-[var(--color-accent)] font-semibold'
   if (setupStep.value > stepId) return 'text-[var(--color-text-main)]'
   return 'text-[var(--color-text-muted)]'
-}
-
-async function generateWorkspaceSchemas({ tableNames = null, autoStart = false } = {}) {
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  if (!workspaceId || datasetEntries.value.length === 0) return
-  if (requiresWorkspaceActivation.value) {
-    if (!autoStart) {
-      toast.info('Activate workspace first', 'Activate this workspace before generating schemas.')
-    }
-    return
-  }
-  isGeneratingWorkspaceSchemas.value = true
-  setWorkspaceOperation(
-    'schema',
-    autoStart
-      ? 'Generating dataset schemas in the background.'
-      : 'Generating workspace schemas from the selected datasets.',
-  )
-  const context = String(setupWorkspaceContext.value || resolveWorkspaceContext()).trim()
-  const targetNames = Array.isArray(tableNames)
-    ? new Set(tableNames.map((item) => String(item || '').trim()).filter(Boolean))
-    : null
-  const targetDatasets = datasetEntries.value.filter((dataset) => {
-    if (!targetNames || targetNames.size === 0) return true
-    return targetNames.has(String(dataset?.table_name || '').trim())
-  })
-  if (targetDatasets.length === 0) {
-    isGeneratingWorkspaceSchemas.value = false
-    clearWorkspaceOperation()
-    return
-  }
-  const nextStatuses = { ...schemaGenerationStatuses.value }
-  targetDatasets.forEach((dataset) => {
-    nextStatuses[dataset.table_name] = { status: 'pending', message: '' }
-  })
-  schemaGenerationStatuses.value = nextStatuses
-
-  try {
-    for (const dataset of targetDatasets) {
-      const tableName = String(dataset?.table_name || '').trim()
-      if (!tableName) continue
-      schemaGenerationStatuses.value = {
-        ...schemaGenerationStatuses.value,
-        [tableName]: { status: 'running', message: '' },
-      }
-      try {
-        await apiService.v1RegenerateDatasetSchema(workspaceId, tableName, { context })
-        schemaGenerationStatuses.value = {
-          ...schemaGenerationStatuses.value,
-          [tableName]: { status: 'completed', message: '' },
-        }
-      } catch (error) {
-        schemaGenerationStatuses.value = {
-          ...schemaGenerationStatuses.value,
-          [tableName]: { status: 'failed', message: extractApiErrorMessage(error, 'Failed to generate schema.') },
-        }
-      }
-    }
-
-    previewService.clearSchemaCache()
-    const failedCount = targetDatasets.filter((dataset) => {
-      const item = schemaGenerationStatuses.value?.[dataset.table_name]
-      return item?.status === 'failed'
-    }).length
-    if (failedCount > 0) {
-      if (!autoStart) {
-        toast.error('Schema generation completed with errors', `${failedCount} dataset${failedCount === 1 ? '' : 's'} failed.`)
-      }
-    } else if (!autoStart) {
-      toast.success('Schemas generated', 'Workspace schemas generated.')
-    }
-  } finally {
-    isGeneratingWorkspaceSchemas.value = false
-    clearWorkspaceOperation()
-  }
 }
 
 function formatFilename(raw) {

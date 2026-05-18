@@ -146,7 +146,9 @@ async def test_schema_generation_service_resumes_queued_and_inflight_datasets(sc
     await service.resume_pending_jobs()
 
     for _ in range(30):
-        if len(resumed) == 2:
+        queued_dataset = await _fetch_dataset(schema_session_factory, "ws-1", "queued_table")
+        inflight_dataset = await _fetch_dataset(schema_session_factory, "ws-1", "inflight_table")
+        if len(resumed) == 2 and queued_dataset.schema_status == "ready" and inflight_dataset.schema_status == "ready":
             break
         await asyncio.sleep(0.02)
 

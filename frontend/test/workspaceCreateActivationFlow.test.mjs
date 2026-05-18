@@ -60,7 +60,8 @@ test('workspace setup stepper captures shared context before dataset selection',
   assert.equal(source.includes("emit('workspace-created', {"), true)
   assert.equal(source.includes("setWorkspaceOperation('create', 'Creating workspace and preparing its runtime.')"), true)
   assert.equal(source.includes("setWorkspaceOperation('ingest', 'Importing selected datasets into the workspace.')"), true)
-  assert.equal(source.includes('Generating dataset schemas in the background.'), true)
+  assert.equal(source.includes('Generating dataset schemas in the background.'), false)
+  assert.equal(source.includes('function syncDatasetSchemaPolling() {'), true)
   assert.equal(settingsSource.includes("const activeWorkspaceOperation = ref('')"), true)
   assert.equal(settingsSource.includes('@workspace-operation-change="setActiveWorkspaceOperation"'), true)
   assert.equal(settingsSource.includes('notifyWorkspaceOperationBlocked()'), true)
@@ -81,7 +82,7 @@ test('workspace creation carries step one identity into dataset selection automa
   const createBlock = extractBlock(
     source,
     'async function createWorkspace({ setupStep: targetSetupStep = 2 } = {}) {',
-    'function schemaGenerationLabel(tableName) {',
+    'function datasetSchemaStatusState(dataset) {',
   )
   const createdHandlerBlock = extractBlock(
     settingsSource,

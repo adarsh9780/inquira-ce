@@ -6,8 +6,10 @@ import asyncio
 import uuid
 from datetime import datetime
 from types import SimpleNamespace
+from typing import Any, cast
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import AppDataSessionLocal
 from ..models import Workspace, WorkspaceDataset
@@ -98,7 +100,7 @@ class DatasetSchemaGenerationService:
                 )
             )
             self._tasks[key] = task
-            task.add_done_callback(lambda _task, job_key=key: self._tasks.pop(job_key, None))
+            task.add_done_callback(self._build_task_cleanup_callback(key))
 
     async def _run_job(self, *, principal_id: str, workspace_id: str, table_name: str) -> None:
         async with self._semaphore:
@@ -164,15 +166,21 @@ class DatasetSchemaGenerationService:
             )
 
     @staticmethod
-    async def _get_dataset(session, workspace_id: str, table_name: str) -> WorkspaceDataset | None:
+    async def _get_dataset(session: AsyncSession, workspace_id: str, table_name: str) -> WorkspaceDataset | None:
         result = await session.execute(
             select(WorkspaceDataset).where(
                 WorkspaceDataset.workspace_id == workspace_id,
                 WorkspaceDataset.table_name == table_name,
             )
         )
-        return result.scalar_one_or_none()
+        return cast(WorkspaceDataset | None, result.scalar_one_or_none())
 
     @staticmethod
     def _job_key(workspace_id: str, table_name: str) -> str:
         return f"{workspace_id}:{table_name}"
+
+    def _build_task_cleanup_callback(self, key: str):
+        def _cleanup(_task: asyncio.Task[Any]) -> None:
+            self._tasks.pop(key, None)
+
+        return _cleanup
