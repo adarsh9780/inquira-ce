@@ -30,7 +30,7 @@
         "height": 380,
         "minWidth": 560,
         "minHeight": 380,
-        "visible": true,
+        "visible": false,
         "resizable": false,
         "fullscreen": false,
         "decorations": false,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from alembic import context
 from alembic import op
 import sqlalchemy as sa
 
@@ -12,7 +13,20 @@ branch_labels = None
 depends_on = None
 
 
+def _db_role() -> str:
+    cfg_role = str(context.config.attributes.get("inquira_db_role") or "").strip().lower()
+    if cfg_role in {"auth", "appdata"}:
+        return cfg_role
+    x_args = context.get_x_argument(as_dictionary=True)
+    x_role = str(x_args.get("db", "")).strip().lower()
+    if x_role in {"auth", "appdata"}:
+        return x_role
+    return "appdata"
+
+
 def upgrade() -> None:
+    if _db_role() == "auth":
+        return
     op.add_column(
         "v1_principals",
         sa.Column("active_workspace_id", sa.String(length=36), nullable=True),
@@ -62,6 +76,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if _db_role() == "auth":
+        return
     op.drop_index("ix_v1_principals_active_workspace_id", table_name="v1_principals")
     op.drop_column("v1_principals", "active_workspace_id")
     op.drop_column("v1_conversations", "next_turn_seq")

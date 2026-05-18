@@ -657,10 +657,9 @@ fn close_splash_window(app: &tauri::AppHandle) {
 }
 
 fn handoff_from_splash_to_main(app: &tauri::AppHandle) {
-    // The main window hosts the full frontend runtime; by deferring it until the
-    // backend bootstrap path has finished (success or structured failure), we avoid
-    // early frontend requests racing a cold backend and surfacing transient
-    // NETWORK_ERROR states to users.
+    // The app now renders startup progress inside the main shell itself, so the
+    // native splash should get out of the way as soon as possible instead of
+    // owning startup UX from outside the app window.
     close_splash_window(app);
     show_main_window(app);
 }
@@ -1766,10 +1765,11 @@ pub fn run() {
             }
 
             update_startup_state(&app.handle(), false, "", "Launching desktop services...");
-            // We intentionally do not reveal the main window here.
-            // Showing it this early allows frontend modules to initialize while
-            // backend bootstrap is still in-flight, which is exactly the race that
-            // can surface transient startup NETWORK_ERROR states on cold boots.
+            // Reveal the main shell immediately and let the in-app startup screen
+            // own all progress/error messaging. This avoids a detached splash window
+            // blocking the desktop while still keeping frontend startup gated on the
+            // backend readiness signal exposed through get_startup_state.
+            handoff_from_splash_to_main(&app.handle());
 
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -2026,9 +2026,6 @@ pub fn run() {
                 match startup_result {
                     Ok(()) => {
                         update_startup_state(&app_handle, true, "", "");
-                        // Success path: switch away from splash only after both
-                        // backend and agent health checks have completed.
-                        handoff_from_splash_to_main(&app_handle);
                     }
                     Err(error) => {
                         log::error!("Desktop startup failed: {}", error);
@@ -2060,10 +2057,6 @@ pub fn run() {
                             ),
                             "",
                         );
-                        // Failure path still reveals the main shell so users get
-                        // actionable error details from the existing startup-failure
-                        // UI instead of being trapped on an indefinite splash.
-                        handoff_from_splash_to_main(&app_handle);
                     }
                 }
             });

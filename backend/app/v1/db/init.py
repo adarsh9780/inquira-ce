@@ -15,6 +15,25 @@ from .base import AppDataBase, AuthBase
 from .session import appdata_engine, auth_engine
 
 
+CORE_TABLES_BY_ROLE = {
+    "auth": {"v1_users", "v1_user_sessions"},
+    "appdata": {"v1_principals", "v1_workspaces", "v1_conversations", "v1_turns"},
+}
+
+
+def _target_metadata_for_role(db_role: str):
+    return AuthBase.metadata if db_role == "auth" else AppDataBase.metadata
+
+
+def _bootstrap_schema_from_metadata(*, db_role: str, normalized_url: str) -> None:
+    """Create the current ORM schema directly for empty/broken local metadata DBs."""
+    sync_engine = create_engine(normalized_url)
+    try:
+        _target_metadata_for_role(db_role).create_all(sync_engine)
+    finally:
+        sync_engine.dispose()
+
+
 def _normalize_alembic_url(database_url: str) -> str:
     """Convert async runtime URL into sync URL for Alembic/introspection."""
     if database_url.startswith("sqlite+aiosqlite://"):
@@ -26,17 +45,17 @@ def _normalize_alembic_url(database_url: str) -> str:
 
 def _upgrade_or_stamp_schema(*, alembic_ini: Path, db_role: str, database_url: str, expected_table: str) -> None:
     cfg = Config(str(alembic_ini))
+    cfg.set_main_option("script_location", str(alembic_ini.parent / "alembic"))
     normalized_url = _normalize_alembic_url(database_url)
     cfg.set_main_option("sqlalchemy.url", normalized_url)
     cfg.attributes["inquira_db_role"] = db_role
 
+    upgrade_exc: Exception | None = None
     try:
         command.upgrade(cfg, "head")
         return
     except Exception as exc:  # noqa: BLE001
-        message = str(exc).lower()
-        if "already exists" not in message:
-            raise
+        upgrade_exc = exc
 
     sync_engine = create_engine(normalized_url)
     try:
@@ -44,12 +63,21 @@ def _upgrade_or_stamp_schema(*, alembic_ini: Path, db_role: str, database_url: s
         tables = set(inspector.get_table_names())
         has_expected_schema = expected_table in tables
         has_alembic_version = "alembic_version" in tables
+        missing_core_tables = CORE_TABLES_BY_ROLE.get(db_role, {expected_table}) - tables
     finally:
         sync_engine.dispose()
+
+    if missing_core_tables:
+        _bootstrap_schema_from_metadata(db_role=db_role, normalized_url=normalized_url)
+        command.stamp(cfg, "head")
+        return
 
     if has_expected_schema and not has_alembic_version:
         command.stamp(cfg, "head")
         return
+
+    if upgrade_exc is not None:
+        raise upgrade_exc
 
     raise RuntimeError(f"Failed to migrate {db_role} schema to Alembic head.")
 
