@@ -879,6 +879,10 @@ export const apiService = {
     )
   },
 
+  async v1EnqueueDatasetSchemaRegeneration(workspaceId, tableName) {
+    return v1Api.datasets.enqueueSchemaRegeneration(workspaceId, tableName)
+  },
+
   async v1SyncBrowserDataset(workspaceId, payload) {
     return v1Api.datasets.syncBrowser(workspaceId, payload)
   },

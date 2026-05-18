@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_appdata_db_session
@@ -17,6 +17,9 @@ from ..schemas.dataset import (
     DatasetListResponse,
     DatasetResponse,
 )
+from ..repositories.dataset_repository import DatasetRepository
+from ..repositories.workspace_repository import WorkspaceRepository
+from ..services.dataset_schema_generation_service import DatasetSchemaGenerationService
 from ..services.dataset_deletion_service import DatasetDeletionService
 from ..services.dataset_ingestion_service import DatasetIngestionService
 from ..services.dataset_service import DatasetService
@@ -25,6 +28,7 @@ from .deps import (
     get_current_user,
     get_dataset_deletion_service,
     get_dataset_ingestion_service,
+    get_dataset_schema_generation_service,
 )
 
 router = APIRouter(
@@ -175,6 +179,45 @@ async def sync_browser_workspace_dataset(
         allow_sample_values=payload.allow_sample_values,
     )
     return _dataset_response(ds)
+
+
+@router.post(
+    "/workspaces/{workspace_id}/datasets/{table_name}/schema/enqueue",
+    response_model=DatasetResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def enqueue_workspace_dataset_schema_regeneration(
+    workspace_id: str,
+    table_name: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+    dataset_schema_generation_service: DatasetSchemaGenerationService = Depends(get_dataset_schema_generation_service),
+):
+    """Queue background schema regeneration for one dataset row."""
+    workspace = await WorkspaceRepository.get_by_id(session, workspace_id, current_user.id)
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    normalized_table_name = str(table_name or "").strip()
+    dataset = await DatasetRepository.get_for_workspace_table(
+        session=session,
+        workspace_id=workspace_id,
+        table_name=normalized_table_name,
+    )
+    if dataset is None:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    await dataset_schema_generation_service.enqueue_dataset_schema_generation(
+        principal_id=current_user.id,
+        workspace_id=workspace_id,
+        table_name=normalized_table_name,
+    )
+    dataset = await DatasetRepository.get_for_workspace_table(
+        session=session,
+        workspace_id=workspace_id,
+        table_name=normalized_table_name,
+    )
+    return _dataset_response(dataset)
 
 
 @router.delete(

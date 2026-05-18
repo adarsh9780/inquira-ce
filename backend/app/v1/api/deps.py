@@ -85,3 +85,11 @@ def get_dataset_ingestion_service(request: Request):
     if service is None:
         raise HTTPException(status_code=500, detail="Dataset ingestion service not initialized")
     return service
+
+
+def get_dataset_schema_generation_service(request: Request):
+    """Return shared dataset schema generation service from app state."""
+    service = getattr(request.app.state, "dataset_schema_generation_service", None)
+    if service is None:
+        raise HTTPException(status_code=500, detail="Dataset schema generation service not initialized")
+    return service

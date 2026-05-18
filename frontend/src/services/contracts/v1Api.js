@@ -45,6 +45,8 @@ export const v1Api = {
       axios.get(`/api/v1/workspaces/${workspaceId}/datasets/deletions`),
     deletionById: (workspaceId, jobId) =>
       axios.get(`/api/v1/workspaces/${workspaceId}/datasets/deletions/${jobId}`),
+    enqueueSchemaRegeneration: (workspaceId, tableName) =>
+      axios.post(`/api/v1/workspaces/${workspaceId}/datasets/${encodeURIComponent(tableName)}/schema/enqueue`),
     syncBrowser: (workspaceId, payload) =>
       axios.post(`/api/v1/workspaces/${workspaceId}/datasets/browser-sync`, payload)
   },
