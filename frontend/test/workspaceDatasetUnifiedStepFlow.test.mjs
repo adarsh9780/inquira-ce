@@ -35,3 +35,12 @@ test('workspace dataset import action is labeled as a primary import datasets ac
   assert.equal(source.includes('>Import datasets</span>'), true)
   assert.equal(source.includes('+ Add datasets'), false)
 })
+
+test('workspace datasets section uses prominent primary import actions in header and empty state', () => {
+  const source = readWorkspaceTab()
+
+  assert.equal(source.includes('data-testid="workspace-import-datasets-header"'), true)
+  assert.equal(source.includes('data-testid="workspace-import-datasets-empty"'), true)
+  assert.equal(source.includes('class="btn-primary px-4 py-2 text-sm'), true)
+  assert.equal(source.includes('class="w-full rounded-lg bg-[var(--color-base-soft)] px-4 py-3 text-center text-sm text-[var(--color-text-muted)] transition-all hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"'), false)
+})

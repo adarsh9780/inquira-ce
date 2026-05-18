@@ -283,8 +283,21 @@
 
           </section>
 
-          <div class="space-y-2">
-            <p class="text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Datasets</p>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Datasets</p>
+              <button
+                type="button"
+                data-testid="workspace-import-datasets-header"
+                class="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="isDatasetIngesting || isDeletingDataset || requiresWorkspaceActivation"
+                @click="openDatasetPicker"
+              >
+                <span v-if="isDatasetIngesting">Processing dataset...</span>
+                <span v-else-if="requiresWorkspaceActivation">Activate workspace to add data</span>
+                <span v-else>Import datasets</span>
+              </button>
+            </div>
 
             <div
               v-if="isDatasetIngesting"
@@ -361,20 +374,24 @@
               </div>
             </div>
 
-            <p v-else class="rounded-lg bg-[var(--color-base-soft)] px-3 py-3 text-sm text-[var(--color-text-muted)]">
-              No datasets loaded for this workspace.
-            </p>
-
-            <button
-              type="button"
-              class="w-full rounded-lg bg-[var(--color-base-soft)] px-4 py-3 text-center text-sm text-[var(--color-text-muted)] transition-all hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="isDatasetIngesting || isDeletingDataset || requiresWorkspaceActivation"
-              @click="openDatasetPicker"
+            <div
+              v-else
+              class="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-base-soft)]/50 px-5 py-6 text-center"
             >
-              <span v-if="isDatasetIngesting">Processing dataset...</span>
-              <span v-else-if="requiresWorkspaceActivation">Activate workspace to add data</span>
-              <span v-else>Import datasets</span>
-            </button>
+              <p class="text-sm font-medium text-[var(--color-text-main)]">No datasets loaded yet.</p>
+              <p class="mt-1 text-sm text-[var(--color-text-muted)]">Import one or more files to start profiling data and generating schemas automatically.</p>
+              <button
+                type="button"
+                data-testid="workspace-import-datasets-empty"
+                class="btn-primary mt-4 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="isDatasetIngesting || isDeletingDataset || requiresWorkspaceActivation"
+                @click="openDatasetPicker"
+              >
+                <span v-if="isDatasetIngesting">Processing dataset...</span>
+                <span v-else-if="requiresWorkspaceActivation">Activate workspace to add data</span>
+                <span v-else>Import datasets</span>
+              </button>
+            </div>
           </div>
         </div>
       </Transition>
