@@ -108,7 +108,7 @@ for _spec in _inquira_export_specs:
             _escaped_table = _table_name.replace('"', '""')
             _escaped_path = str(_target).replace("'", "''")
             scratchpad_conn.execute(
-                f"COPY (SELECT * FROM \\\"{{_escaped_table}}\\\") TO '{{_escaped_path}}' (FORMAT PARQUET)"
+                f"COPY (SELECT * FROM \\\"{_escaped_table}\\\") TO '{_escaped_path}' (FORMAT PARQUET)"
             )
     elif _kind == 'text':
         _payload = _spec.get('payload')

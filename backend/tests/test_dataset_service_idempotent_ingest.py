@@ -18,19 +18,29 @@ class _Session:
     def __init__(self, existing):
         self._existing = existing
         self.added = None
-        self.committed = False
+        self.commit_count = 0
+        self._in_transaction = True
 
     async def execute(self, *_args, **_kwargs):
+        self._in_transaction = True
         return _Result(self._existing)
 
     def add(self, item):
         self.added = item
 
+    def in_transaction(self):
+        return self._in_transaction
+
     async def commit(self):
-        self.committed = True
+        self.commit_count += 1
+        self._in_transaction = False
 
     async def refresh(self, _item):
         return None
+
+    @property
+    def committed(self):
+        return self.commit_count > 0
 
 
 @pytest.mark.asyncio
@@ -136,6 +146,67 @@ async def test_add_dataset_reingests_when_source_changed(monkeypatch, tmp_path):
     assert result is existing
     assert calls["ingest"] == 1
     assert session.committed is True
+
+
+@pytest.mark.asyncio
+async def test_add_dataset_releases_db_transaction_before_kernel_ingest(monkeypatch, tmp_path):
+    source = tmp_path / "demo.csv"
+    source.write_text("a\n1\n", encoding="utf-8")
+    workspace_db = tmp_path / "workspace.duckdb"
+    workspace_db.touch()
+    workspace = SimpleNamespace(duckdb_path=str(workspace_db))
+    user = SimpleNamespace(id="u1")
+
+    async def fake_workspace(_session, _workspace_id, _user_id):
+        return workspace
+
+    existing = SimpleNamespace(
+        workspace_id="ws-1",
+        source_path=str(source),
+        source_fingerprint=DatasetService._source_fingerprint(str(source)),
+        table_name="demo__abc12345",
+        schema_path=str(tmp_path / "meta" / "demo_schema.json"),
+        file_size=source.stat().st_size,
+        source_mtime=source.stat().st_mtime - 100.0,
+        row_count=1,
+        file_type="csv",
+    )
+    session = _Session(existing=existing)
+    monkeypatch.setattr(
+        dataset_service_module.WorkspaceRepository,
+        "get_by_id",
+        fake_workspace,
+    )
+
+    async def fake_ensure_kernel(workspace_id, operation_name):
+        assert workspace_id == "ws-1"
+        assert "dataset" in operation_name.lower()
+        assert session.commit_count == 1
+        assert session.in_transaction() is False
+
+    async def fake_ingest_dataset_via_kernel(*, workspace_id, source_path, table_name, file_type):
+        assert workspace_id == "ws-1"
+        assert source_path == str(source)
+        assert table_name == DatasetService._normalize_table_name(str(source))
+        assert file_type == "csv"
+        assert session.commit_count == 1
+        assert session.in_transaction() is False
+        return {
+            "row_count": 1,
+            "columns": [{"name": "a", "dtype": "INTEGER", "description": "", "samples": []}],
+        }
+
+    monkeypatch.setattr(dataset_service_module, "ensure_workspace_kernel_active", fake_ensure_kernel)
+    monkeypatch.setattr(dataset_service_module, "ingest_workspace_dataset_via_kernel", fake_ingest_dataset_via_kernel)
+
+    await DatasetService.add_dataset(
+        session=session,
+        user=user,
+        workspace_id="ws-1",
+        source_path=str(source),
+    )
+
+    assert session.commit_count == 2
 
 
 @pytest.mark.asyncio

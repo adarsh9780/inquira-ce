@@ -30,7 +30,7 @@ from ...services.code_executor import (
     reset_workspace_kernel,
 )
 from ...services.output_capture import build_run_wrapped_code
-from ..db.session import get_appdata_db_session
+from ..db.session import get_appdata_db_session, release_appdata_session_before_kernel_or_agent
 from ..repositories.preferences_repository import PreferencesRepository
 from ..repositories.dataset_repository import DatasetRepository
 from ..repositories.workspace_repository import WorkspaceRepository
@@ -825,14 +825,7 @@ def _ensure_workspace_db_exists_or_raise(duckdb_path: str) -> None:
 
 async def _release_appdata_session_before_kernel(session: AsyncSession | None) -> None:
     """Avoid holding SQLite transactions while kernel/DuckDB work runs."""
-    if session is None or not hasattr(session, "in_transaction"):
-        return
-    try:
-        in_transaction = bool(session.in_transaction())
-    except Exception:  # noqa: BLE001
-        return
-    if in_transaction:
-        await session.commit()
+    await release_appdata_session_before_kernel_or_agent(session)
 
 
 async def _execute_workspace_code_impl(

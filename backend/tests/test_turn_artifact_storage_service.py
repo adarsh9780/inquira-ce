@@ -173,13 +173,22 @@ async def test_persist_turn_artifacts_uses_kernel_metadata_lookup_when_payload_m
 
 
 @pytest.mark.asyncio
-async def test_persist_turn_artifacts_raises_when_kernel_dataframe_export_missing(monkeypatch, tmp_path) -> None:
+async def test_persist_turn_artifacts_skips_dataframe_when_kernel_export_missing(monkeypatch, tmp_path) -> None:
     workspace_dir = tmp_path / "workspace-3"
     (workspace_dir / "scratchpad").mkdir(parents=True, exist_ok=True)
+    captured: dict[str, object] = {}
+
+    async def fake_replace_for_turn(session, *, workspace_id, conversation_id, turn_id, items):
+        _ = session
+        captured["workspace_id"] = workspace_id
+        captured["conversation_id"] = conversation_id
+        captured["turn_id"] = turn_id
+        captured["items"] = items
+        return []
 
     monkeypatch.setattr(
         "app.v1.services.turn_artifact_storage_service.TurnArtifactRepository.replace_for_turn",
-        lambda *args, **kwargs: [],
+        fake_replace_for_turn,
     )
     monkeypatch.setattr(
         "app.v1.services.workspace_storage_service.WorkspaceStorageService.build_workspace_dir",
@@ -214,19 +223,22 @@ async def test_persist_turn_artifacts_raises_when_kernel_dataframe_export_missin
         fake_get_workspace_artifact_metadata_via_kernel,
     )
 
-    with pytest.raises(RuntimeError, match="not materialized by the workspace kernel"):
-        await TurnArtifactStorageService.persist_turn_artifacts(
-            session=SimpleNamespace(),
-            username="alice",
-            workspace_id="workspace-3",
-            conversation_id="conversation-3",
-            turn_id="turn-3",
-            workspace_duckdb_path=str(workspace_dir / "workspace.db"),
-            artifacts=[
-                {
-                    "artifact_id": "df-3",
-                    "kind": "dataframe",
-                    "logical_name": "summary_df",
-                },
-            ],
-        )
+    rows = await TurnArtifactStorageService.persist_turn_artifacts(
+        session=SimpleNamespace(),
+        username="alice",
+        workspace_id="workspace-3",
+        conversation_id="conversation-3",
+        turn_id="turn-3",
+        workspace_duckdb_path=str(workspace_dir / "workspace.db"),
+        artifacts=[
+            {
+                "artifact_id": "df-3",
+                "kind": "dataframe",
+                "logical_name": "summary_df",
+            },
+        ],
+    )
+
+    assert rows == []
+    assert captured["items"] == []
+    assert captured["workspace_id"] == "workspace-3"

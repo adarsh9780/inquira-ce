@@ -32,6 +32,7 @@ from ...services.llm_provider_catalog import (
     provider_requires_api_key,
 )
 from ...services.llm_runtime_config import load_llm_runtime_config
+from ..db.session import release_appdata_session_before_kernel_or_agent
 from ..repositories.conversation_repository import ConversationRepository
 from ..repositories.dataset_repository import DatasetRepository
 from ..repositories.preferences_repository import PreferencesRepository
@@ -61,15 +62,7 @@ class ChatService:
     @staticmethod
     async def _release_session_before_agent(session: AsyncSession | None) -> None:
         """End pre-agent DB work so SQLite is not locked during slow LLM calls."""
-        if session is None or not hasattr(session, "in_transaction"):
-            return
-        try:
-            in_transaction = bool(session.in_transaction())
-        except Exception:  # noqa: BLE001
-            return
-        if not in_transaction or not hasattr(session, "commit"):
-            return
-        await session.commit()
+        await release_appdata_session_before_kernel_or_agent(session)
 
     @staticmethod
     def _known_columns_thread_id(user_id: str, workspace_id: str) -> str:

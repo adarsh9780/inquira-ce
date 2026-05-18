@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...data_access import ScratchpadOfflineAdapter, ScratchpadRuntimeAdapter
+from ...core.logger import logprint
 from ...services.artifact_scratchpad import ArtifactScratchpadStore
 from ..repositories.turn_artifact_repository import TurnArtifactRepository
 from .turn_bundle_service import TurnBundleService
@@ -74,7 +75,15 @@ class TurnArtifactStorageService:
                     workspace_id=workspace_id,
                     specs=kernel_specs,
                 )
-            except RuntimeError:
+            except Exception as exc:  # noqa: BLE001
+                logprint(
+                    "Workspace kernel artifact materialization failed; continuing without local shadow copies.",
+                    level="WARNING",
+                    workspace_id=workspace_id,
+                    conversation_id=conversation_id,
+                    turn_id=turn_id,
+                    error=str(exc),
+                )
                 materialized = []
             materialized_sizes = {
                 str(item.get("artifact_id") or ""): item.get("size_bytes")
@@ -84,8 +93,8 @@ class TurnArtifactStorageService:
 
         persisted_rows: list[dict[str, Any]] = []
         for item in normalized_artifacts:
-            persisted_rows.append(
-                await TurnArtifactStorageService._persist_one_artifact(
+            try:
+                persisted = await TurnArtifactStorageService._persist_one_artifact(
                     username=username,
                     workspace_id=workspace_id,
                     conversation_id=conversation_id,
@@ -97,7 +106,20 @@ class TurnArtifactStorageService:
                     session=session,
                     offline_lease_owner_token=offline_lease_owner_token,
                 )
-            )
+            except Exception as exc:  # noqa: BLE001
+                logprint(
+                    "Skipping turn artifact shadow persistence after artifact write failure.",
+                    level="WARNING",
+                    workspace_id=workspace_id,
+                    conversation_id=conversation_id,
+                    turn_id=turn_id,
+                    artifact_id=str(item.get("artifact_id") or ""),
+                    kind=str(item.get("kind") or ""),
+                    error=str(exc),
+                )
+                continue
+            if persisted is not None:
+                persisted_rows.append(persisted)
 
         await TurnArtifactRepository.replace_for_turn(
             session,
@@ -121,7 +143,7 @@ class TurnArtifactStorageService:
         kernel_materialized_sizes: dict[str, int | None],
         session: AsyncSession,
         offline_lease_owner_token: str | None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         artifact_id = str(artifact.get("artifact_id") or "").strip()
         kind = str(artifact.get("kind") or "").strip().lower() or "scalar"
         logical_name = str(artifact.get("logical_name") or artifact_id or kind).strip() or kind
@@ -167,10 +189,15 @@ class TurnArtifactStorageService:
         size_bytes = kernel_materialized_sizes.get(artifact_id)
         if size_bytes is None and not storage_path.exists():
             if kind == "dataframe" and not scratchpad_fallback_allowed:
-                raise RuntimeError(
-                    "Dataframe artifact export was not materialized by the workspace kernel. "
-                    "Retry after the kernel finishes the run."
+                TurnArtifactStorageService._log_artifact_shadow_skip(
+                    workspace_id=workspace_id,
+                    conversation_id=conversation_id,
+                    turn_id=turn_id,
+                    artifact_id=artifact_id,
+                    kind=kind,
+                    reason="Dataframe artifact export was not materialized by the workspace kernel.",
                 )
+                return None
             if kind == "dataframe":
                 await ScratchpadOfflineAdapter(
                     session=session,
@@ -184,9 +211,15 @@ class TurnArtifactStorageService:
             if kind in {"figure", "scalar", "text", "structured"} and not scratchpad_fallback_allowed:
                 serializable_payload = source_meta.get("payload")
                 if serializable_payload is None:
-                    raise RuntimeError(
-                        "Artifact payload metadata is unavailable because the workspace kernel is not active."
+                    TurnArtifactStorageService._log_artifact_shadow_skip(
+                        workspace_id=workspace_id,
+                        conversation_id=conversation_id,
+                        turn_id=turn_id,
+                        artifact_id=artifact_id,
+                        kind=kind,
+                        reason="Artifact payload metadata is unavailable because the workspace kernel is not active.",
                     )
+                    return None
             if kind != "dataframe":
                 await asyncio.to_thread(
                     TurnArtifactStorageService._write_artifact_payload,
@@ -197,13 +230,26 @@ class TurnArtifactStorageService:
                 )
             size_bytes = int(storage_path.stat().st_size) if storage_path.exists() else None
 
+        if not storage_path.exists():
+            TurnArtifactStorageService._log_artifact_shadow_skip(
+                workspace_id=workspace_id,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+                artifact_id=artifact_id,
+                kind=kind,
+                reason="Local artifact shadow file is missing after materialization.",
+            )
+            return None
+        if size_bytes is None:
+            size_bytes = int(storage_path.stat().st_size)
+
         return {
             "artifact_id": artifact_id or logical_name,
             "kind": kind,
             "logical_name": logical_name,
             "storage_path": str(storage_path),
             "payload_format": payload_format,
-            "size_bytes": size_bytes if size_bytes is not None else (int(storage_path.stat().st_size) if storage_path.exists() else None),
+            "size_bytes": size_bytes,
             "status": "active",
             "row_count": source_meta.get("row_count"),
             "schema": source_meta.get("schema"),
@@ -211,6 +257,27 @@ class TurnArtifactStorageService:
             "created_at": str(source_meta.get("created_at") or ""),
             "payload": source_meta.get("payload"),
         }
+
+    @staticmethod
+    def _log_artifact_shadow_skip(
+        *,
+        workspace_id: str,
+        conversation_id: str,
+        turn_id: str,
+        artifact_id: str,
+        kind: str,
+        reason: str,
+    ) -> None:
+        logprint(
+            "Skipping turn artifact local shadow copy.",
+            level="WARNING",
+            workspace_id=workspace_id,
+            conversation_id=conversation_id,
+            turn_id=turn_id,
+            artifact_id=artifact_id,
+            kind=kind,
+            reason=reason,
+        )
 
     @staticmethod
     def _write_artifact_payload(

@@ -20,6 +20,7 @@ from ...services.code_executor import (
     ensure_workspace_kernel_active,
     ingest_workspace_dataset_via_kernel,
 )
+from ..db.session import release_appdata_session_before_kernel_or_agent
 from ..models import WorkspaceDataset
 from ..repositories.workspace_repository import WorkspaceRepository
 
@@ -68,6 +69,7 @@ class DatasetService:
         workspace = await WorkspaceRepository.get_by_id(session, workspace_id, user.id)
         if workspace is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
+        workspace_duckdb_path = str(workspace.duckdb_path or "")
 
         source = Path(source_path).expanduser().resolve()
         if not source.exists() or not source.is_file():
@@ -78,6 +80,8 @@ class DatasetService:
         file_type = source.suffix.lower().lstrip(".")
         source_size = source.stat().st_size
         source_mtime = os.path.getmtime(source)
+        if file_type not in {"csv", "tsv", "parquet", "json", "xlsx", "xls"}:
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_type}")
 
         existing_result = await session.execute(
             select(WorkspaceDataset).where(
@@ -95,13 +99,12 @@ class DatasetService:
         ):
             return existing
 
+        await release_appdata_session_before_kernel_or_agent(session)
+
         try:
             await ensure_workspace_kernel_active(workspace_id, "Loading a dataset")
         except RuntimeError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-        if file_type not in {"csv", "tsv", "parquet", "json", "xlsx", "xls"}:
-            raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_type}")
 
         try:
             kernel_result = await ingest_workspace_dataset_via_kernel(
@@ -125,7 +128,7 @@ class DatasetService:
                 "table_name": table_name,
                 "columns": kernel_result.get("columns") or [],
             }
-            schema_dir = Path(workspace.duckdb_path).parent / "meta"
+            schema_dir = Path(workspace_duckdb_path).parent / "meta"
             schema_dir.mkdir(parents=True, exist_ok=True)
             schema_path = schema_dir / f"{table_name}_schema.json"
             with schema_path.open("w", encoding="utf-8") as file:
@@ -133,6 +136,14 @@ class DatasetService:
             return row_count, str(schema_path)
 
         row_count, schema_path = await asyncio.to_thread(_write_schema)
+
+        existing_result = await session.execute(
+            select(WorkspaceDataset).where(
+                WorkspaceDataset.workspace_id == workspace_id,
+                WorkspaceDataset.source_fingerprint == fingerprint,
+            )
+        )
+        existing = existing_result.scalar_one_or_none()
 
         if existing:
             existing.source_path = str(source)

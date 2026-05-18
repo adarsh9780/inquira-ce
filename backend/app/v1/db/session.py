@@ -77,6 +77,19 @@ AppDataSessionLocal = async_sessionmaker(
 )
 
 
+async def release_appdata_session_before_kernel_or_agent(session: AsyncSession | None) -> None:
+    """End active SQLite work before slow kernel, DuckDB, or agent operations."""
+    if session is None or not hasattr(session, "in_transaction"):
+        return
+    try:
+        in_transaction = bool(session.in_transaction())
+    except Exception:  # noqa: BLE001
+        return
+    if not in_transaction or not hasattr(session, "commit"):
+        return
+    await session.commit()
+
+
 async def get_auth_db_session() -> AsyncGenerator[AsyncSession, None]:
     """Yield an async session for request-scoped auth DB access."""
     async with AuthSessionLocal() as session:
