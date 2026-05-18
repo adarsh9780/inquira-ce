@@ -155,17 +155,7 @@
             <div class="max-w-sm">
               <span class="mx-auto mb-4 block h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-accent-border)] border-t-[var(--color-accent)]"></span>
               <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ workspaceCreateTitle }}</p>
-              <p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ workspaceCreateMessage }}</p>
-              <div v-if="runtimeProgressEntries.length" class="mt-4 space-y-2 rounded-2xl border border-[var(--color-border)] bg-[var(--color-base)]/80 px-3 py-3 text-left">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">Runtime activity</p>
-                <p
-                  v-for="entry in runtimeProgressEntries"
-                  :key="`create-${entry.stage}-${entry.message}`"
-                  class="text-xs text-[var(--color-text-muted)]"
-                >
-                  {{ entry.message }}
-                </p>
-              </div>
+              <p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ currentRuntimeProgressMessage || workspaceCreateMessage }}</p>
             </div>
           </div>
 
@@ -261,7 +251,7 @@
                   </span>
                   <span v-if="requiresWorkspaceActivation" class="text-xs text-[var(--color-text-muted)]">Inspecting only. Activate this workspace before changing data.</span>
                 </div>
-                <p class="mt-2 max-w-2xl text-sm text-[var(--color-text-muted)]">{{ runtimeStatusMessage }}</p>
+                <p v-if="runtimeStatusMessage" class="mt-2 max-w-2xl text-sm text-[var(--color-text-muted)]">{{ runtimeStatusMessage }}</p>
               </div>
               <div class="flex flex-wrap items-center gap-2">
                 <button
@@ -291,17 +281,6 @@
               </div>
             </div>
 
-            <div v-if="runtimeProgressEntries.length || runtimeProgressError" class="space-y-2 rounded-2xl border border-[var(--color-border)] bg-[var(--color-base-soft)]/55 px-4 py-4">
-              <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">Runtime activity</p>
-              <p
-                v-for="entry in runtimeProgressEntries"
-                :key="`runtime-${entry.stage}-${entry.message}`"
-                class="text-sm text-[var(--color-text-muted)]"
-              >
-                {{ entry.message }}
-              </p>
-              <p v-if="runtimeProgressError" class="text-sm text-[var(--color-danger)]">{{ runtimeProgressError }}</p>
-            </div>
           </section>
 
           <div class="space-y-2">
@@ -612,7 +591,12 @@ const runtimeStatusMessage = computed(() => {
   if (runtimeProgressError.value) return runtimeProgressError.value
   const latestEntry = runtimeProgressEntries.value[runtimeProgressEntries.value.length - 1]
   if (latestEntry?.message) return latestEntry.message
-  return readinessKernelDetail(workspaceKernelStatus.value)
+  const fallback = readinessKernelDetail(workspaceKernelStatus.value)
+  return fallback === 'Runtime is connected' ? '' : fallback
+})
+const currentRuntimeProgressMessage = computed(() => {
+  const latestEntry = runtimeProgressEntries.value[runtimeProgressEntries.value.length - 1]
+  return String(latestEntry?.message || '').trim()
 })
 const workspaceReadinessItems = computed(() => {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
@@ -1068,6 +1052,7 @@ function handleRuntimeSocketComplete(result) {
   const workspaceId = String(result?.workspace_id || '').trim()
   if (!workspaceId || workspaceId !== String(props.activeWorkspaceId || '').trim()) return
   if (!isRuntimeActionInProgress.value && !isCreatingWorkspace.value) return
+  clearRuntimeProgress()
   resetRuntimeActionFlags()
 }
 
@@ -1155,6 +1140,7 @@ async function retryWorkspaceRuntime() {
       throw new Error('Workspace runtime retry did not finish successfully.')
     }
     appStore.setWorkspaceKernelStatus(workspaceId, 'ready')
+    clearRuntimeProgress()
     toast.success('Runtime ready', 'Workspace runtime restarted successfully.')
   } catch (error) {
     runtimeProgressError.value = extractApiErrorMessage(error, 'Failed to retry workspace runtime.')
@@ -1183,6 +1169,7 @@ async function hardResetWorkspaceRuntime() {
       throw new Error('Workspace hard reset did not finish successfully.')
     }
     appStore.setWorkspaceKernelStatus(workspaceId, 'ready')
+    clearRuntimeProgress()
     toast.success('Runtime rebuilt', 'Workspace runtime was rebuilt from scratch.')
   } catch (error) {
     runtimeProgressError.value = extractApiErrorMessage(error, 'Failed to rebuild workspace runtime.')
@@ -1668,6 +1655,7 @@ async function createWorkspace({ setupStep: targetSetupStep = 2 } = {}) {
     if (!kernelReady) {
       throw new Error(String(appStore.runtimeError || 'Workspace runtime bootstrap failed.'))
     }
+    clearRuntimeProgress()
     await appStore.fetchWorkspaces()
     emit('workspace-created', {
       workspaceId,
