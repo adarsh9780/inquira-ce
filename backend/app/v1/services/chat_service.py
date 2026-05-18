@@ -59,6 +59,19 @@ class ChatService:
     """Runs analysis and persists chat turns."""
 
     @staticmethod
+    async def _release_session_before_agent(session: AsyncSession | None) -> None:
+        """End pre-agent DB work so SQLite is not locked during slow LLM calls."""
+        if session is None or not hasattr(session, "in_transaction"):
+            return
+        try:
+            in_transaction = bool(session.in_transaction())
+        except Exception:  # noqa: BLE001
+            return
+        if not in_transaction or not hasattr(session, "commit"):
+            return
+        await session.commit()
+
+    @staticmethod
     def _known_columns_thread_id(user_id: str, workspace_id: str) -> str:
         return f"{user_id}:{workspace_id}:known_columns"
 
@@ -1330,6 +1343,8 @@ class ChatService:
                     schema_memory_json=getattr(conversation, "schema_memory_json", None),
                 )
 
+        await ChatService._release_session_before_agent(session)
+
         payload = ChatService._build_remote_agent_payload(
             request_id=thread_id,
             user_id=str(user.id),
@@ -1683,6 +1698,8 @@ class ChatService:
                     branch_summary_json=getattr(conversation, "branch_summary_json", None),
                     schema_memory_json=getattr(conversation, "schema_memory_json", None),
                 )
+
+        await ChatService._release_session_before_agent(session)
 
         payload = ChatService._build_remote_agent_payload(
             request_id=thread_id,
