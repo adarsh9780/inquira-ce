@@ -23,10 +23,11 @@ class DatasetIngestionService:
 
     CLAIM_LEASE_SECONDS = 300
 
-    def __init__(self) -> None:
+    def __init__(self, schema_generation_service=None) -> None:
         self._tasks: dict[str, asyncio.Task[Any]] = {}
         self._lock = asyncio.Lock()
         self._workspace_locks: dict[str, asyncio.Lock] = {}
+        self._schema_generation_service = schema_generation_service
 
     async def enqueue_dataset_ingestion(
         self,
@@ -191,6 +192,11 @@ class DatasetIngestionService:
                     item["table_name"] = str(dataset.table_name or "")
                     item["row_count"] = int(dataset.row_count or 0)
                     item["error_message"] = None
+                    await self._enqueue_schema_generation(
+                        principal_id=principal_id,
+                        workspace_id=workspace_id,
+                        table_name=item["table_name"],
+                    )
                 except Exception as exc:  # noqa: BLE001
                     item["status"] = "failed"
                     item["error_message"] = str(getattr(exc, "detail", None) or exc)[:1000]
@@ -251,6 +257,27 @@ class DatasetIngestionService:
                 lock = asyncio.Lock()
                 self._workspace_locks[workspace_id] = lock
             return lock
+
+    async def _enqueue_schema_generation(
+        self,
+        *,
+        principal_id: str,
+        workspace_id: str,
+        table_name: str,
+    ) -> None:
+        if self._schema_generation_service is None:
+            return
+        normalized_table_name = str(table_name or "").strip()
+        if not normalized_table_name:
+            return
+        try:
+            await self._schema_generation_service.enqueue_dataset_schema_generation(
+                principal_id=principal_id,
+                workspace_id=workspace_id,
+                table_name=normalized_table_name,
+            )
+        except Exception:
+            return
 
 
 def _read_items(items_json: str) -> list[dict[str, Any]]:
