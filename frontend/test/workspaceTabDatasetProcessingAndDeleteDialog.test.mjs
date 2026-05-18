@@ -24,7 +24,7 @@ test('workspace tab shows inline dataset processing card and consumes websocket 
   assert.equal(source.includes('trackDatasetIngestionJob(workspaceId, jobId)'), true)
   assert.equal(source.includes("setWorkspaceOperation('ingest', 'Importing selected datasets into the workspace.')"), true)
   assert.equal(source.includes('if (completedCount > 0) {'), true)
-  assert.equal(source.includes('setupStep.value = 3'), true)
+  assert.equal(source.includes('setupStep.value = 3'), false)
   assert.equal(source.includes('void generateWorkspaceSchemas({'), true)
   assert.equal(source.includes('autoStart: true'), true)
   assert.equal(source.includes('clearWorkspaceOperation()'), true)

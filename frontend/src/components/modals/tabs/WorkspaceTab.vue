@@ -216,7 +216,7 @@
           </div>
         </div>
 
-        <!-- Step 2: Select datasets -->
+        <!-- Step 2: Datasets -->
         <div v-else-if="setupStep === 2" key="step-2" class="space-y-5 px-4">
           <div class="grid grid-cols-1 gap-4 border-b border-[var(--color-border)] pb-4 sm:grid-cols-3">
             <div>
@@ -373,50 +373,9 @@
             >
               <span v-if="isDatasetIngesting">Processing dataset...</span>
               <span v-else-if="requiresWorkspaceActivation">Activate workspace to add data</span>
-              <span v-else>+ Add datasets</span>
+              <span v-else>Import datasets</span>
             </button>
           </div>
-        </div>
-
-        <!-- Step 3: Generate schema -->
-        <div v-else key="step-3" class="space-y-5 px-4">
-          <div class="flex items-start justify-between gap-3 border-b border-[var(--color-border)] pb-4">
-            <div>
-              <p class="text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Generate schema</p>
-              <p class="mt-1 text-sm text-[var(--color-text-muted)]">Schema generation starts automatically after import. Use retry to repair any failed dataset descriptions.</p>
-            </div>
-            <button
-              type="button"
-              class="btn-primary px-3 py-2 text-sm whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="isGeneratingWorkspaceSchemas || datasetEntries.length === 0 || requiresWorkspaceActivation"
-              @click="generateWorkspaceSchemas"
-            >
-              <span v-if="isGeneratingWorkspaceSchemas">Generating...</span>
-              <span v-else>Retry schema generation</span>
-            </button>
-          </div>
-
-          <div v-if="datasetEntries.length" class="divide-y divide-[var(--color-border)]">
-            <div
-              v-for="dataset in datasetEntries"
-              :key="`schema-${dataset.table_name}`"
-              class="flex items-center justify-between gap-3 py-3"
-            >
-              <div class="min-w-0">
-                <p class="truncate text-sm font-medium text-[var(--color-text-main)]">{{ dataset.filename }}</p>
-                <p class="truncate text-xs text-[var(--color-text-muted)]">{{ dataset.table_name }}</p>
-              </div>
-              <span
-                class="shrink-0 rounded-full px-2 py-0.5 text-[11px] border"
-                :class="schemaGenerationClass(dataset.table_name)"
-              >
-                {{ schemaGenerationLabel(dataset.table_name) }}
-              </span>
-            </div>
-          </div>
-          <p v-else class="py-2 text-sm text-[var(--color-text-muted)]">
-            Add at least one dataset before generating schemas.
-          </p>
         </div>
       </Transition>
     </div>
@@ -524,8 +483,7 @@ const isGeneratingWorkspaceSchemas = ref(false)
 const schemaGenerationStatuses = ref({})
 const setupSteps = [
   { id: 1, label: 'Workspace context' },
-  { id: 2, label: 'Select data' },
-  { id: 3, label: 'Generate schema' },
+  { id: 2, label: 'Datasets' },
 ]
 
 function normalizeWorkspaceName(value) {
@@ -719,7 +677,7 @@ watch(
   (nextStep) => {
     if (props.panelMode !== 'ws-detail') return
     const normalized = Number(nextStep)
-    if (![1, 2, 3].includes(normalized)) return
+    if (![1, 2].includes(normalized)) return
     setupStep.value = normalized
   },
   { immediate: true },
@@ -853,7 +811,7 @@ function syncSetupIdentity() {
 async function goToSetupStep(stepId) {
   if (notifyWorkspaceOperationBlocked()) return
   const normalized = Number(stepId)
-  if (![1, 2, 3].includes(normalized)) return
+    if (![1, 2].includes(normalized)) return
   if (props.panelMode === 'ws-create' && normalized !== 1) {
     await createWorkspace({ setupStep: normalized })
     return
@@ -1283,7 +1241,6 @@ function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = Infinity) {
         await new Promise((resolve) => setTimeout(resolve, 700))
         finishDatasetIngest()
         if (completedCount > 0) {
-          setupStep.value = 3
           void generateWorkspaceSchemas({
             tableNames: completedTables,
             autoStart: true,

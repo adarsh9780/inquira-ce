@@ -12,7 +12,7 @@ test('unified sidebar routes workspace entry points to settings workspace tab an
   assert.equal(source.includes(':initial-step="settingsInitialStep"'), true)
   assert.equal(source.includes('const settingsInitialStep = ref(1)'), true)
   assert.equal(source.includes('function openSettings(tab = \'llm\', step = 1) {'), true)
-  assert.equal(workspaceTabSource.includes('+ Add dataset'), true)
+  assert.equal(workspaceTabSource.includes('Import datasets'), true)
   assert.equal(workspaceTabSource.includes('title="Delete Dataset"'), true)
   assert.equal(source.includes('WorkspaceCreateModal'), false)
 })
