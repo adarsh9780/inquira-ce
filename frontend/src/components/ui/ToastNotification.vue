@@ -149,7 +149,7 @@ watch(() => props.isVisible, (isVisible) => {
   } else {
     clearTimer()
   }
-})
+}, { immediate: true })
 
 // Cleanup on unmount
 import { onUnmounted } from 'vue'

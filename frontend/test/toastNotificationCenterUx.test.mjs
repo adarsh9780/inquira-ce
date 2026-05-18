@@ -18,5 +18,6 @@ test('toast system keeps session history and renders right-edge timeout progress
   assert.equal(toastNotification.includes("return 'border-[var(--color-warning)]/40 bg-[var(--color-warning-bg)]'"), true)
   assert.equal(toastNotification.includes('class="pointer-events-none absolute inset-x-0 bottom-0 h-px origin-left"'), true)
   assert.equal(toastNotification.includes('animationDuration: `${duration}ms`'), true)
+  assert.equal(toastNotification.includes('}, { immediate: true })'), true)
   assert.equal(toastNotification.includes('@keyframes toast-progress'), true)
 })

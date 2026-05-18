@@ -57,8 +57,17 @@ class WorkspaceOfflineAdapter:
         self._owner_token = str(owner_token or "").strip() or None
         self._coordinator = coordinator or ResourceLeaseCoordinator()
 
-    async def ensure_database_file(self, workspace_duckdb_path: str) -> None:
-        await asyncio.to_thread(self._ensure_database_file_sync, workspace_duckdb_path)
+    async def ensure_database_file(
+        self,
+        workspace_duckdb_path: str,
+        *,
+        create_if_missing: bool = False,
+    ) -> None:
+        await asyncio.to_thread(
+            self._ensure_database_file_sync,
+            workspace_duckdb_path,
+            create_if_missing,
+        )
 
     async def drop_table(
         self,
@@ -99,9 +108,14 @@ class WorkspaceOfflineAdapter:
         )
 
     @staticmethod
-    def _ensure_database_file_sync(workspace_duckdb_path: str) -> None:
+    def _ensure_database_file_sync(workspace_duckdb_path: str, create_if_missing: bool = False) -> None:
         workspace_db = Path(workspace_duckdb_path)
         if workspace_db.exists():
+            return
+        if create_if_missing:
+            workspace_db.parent.mkdir(parents=True, exist_ok=True)
+            con = duckdb.connect(str(workspace_db))
+            con.close()
             return
         parts = {part.lower() for part in workspace_db.expanduser().parts}
         if ".inquira" in parts and "workspaces" in parts:

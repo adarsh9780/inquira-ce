@@ -549,6 +549,10 @@ const setupSteps = [
   { id: 3, label: 'Generate schema' },
 ]
 
+function normalizeWorkspaceName(value) {
+  return String(value || '').toUpperCase()
+}
+
 const workspaceCards = computed(() => {
   const items = Array.isArray(props.workspaces) ? props.workspaces : []
   return items.map((workspace) => {
@@ -707,6 +711,15 @@ watch(
 )
 
 watch(
+  () => setupWorkspaceName.value,
+  (nextValue) => {
+    const normalized = normalizeWorkspaceName(nextValue)
+    if (normalized === nextValue) return
+    setupWorkspaceName.value = normalized
+  },
+)
+
+watch(
   () => props.activeWorkspaceId,
   async () => {
     if (props.panelMode !== 'ws-detail') return
@@ -849,7 +862,7 @@ function resolveWorkspaceIdentityDraft() {
 function syncSetupIdentity() {
   if (props.panelMode !== 'ws-detail') return
   const draft = resolveWorkspaceIdentityDraft()
-  setupWorkspaceName.value = String(activeWorkspace.value?.name || draft?.name || '').trim()
+  setupWorkspaceName.value = normalizeWorkspaceName(String(activeWorkspace.value?.name || draft?.name || '').trim())
   setupWorkspaceContext.value = resolveWorkspaceContext()
 }
 

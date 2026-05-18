@@ -118,6 +118,23 @@ async def test_workspace_storage_service_bootstraps_workspace_db(monkeypatch, tm
     assert (workspace_dir / "workspace.db").exists() is True
 
 
+@pytest.mark.asyncio
+async def test_workspace_offline_adapter_can_create_missing_managed_db_when_explicitly_allowed(tmp_path) -> None:
+    db_path = tmp_path / ".inquira" / "alice" / "workspaces" / "ws-1" / "workspace.db"
+
+    await WorkspaceOfflineAdapter().ensure_database_file(str(db_path), create_if_missing=True)
+
+    assert db_path.exists() is True
+
+
+@pytest.mark.asyncio
+async def test_workspace_offline_adapter_still_rejects_missing_managed_db_by_default(tmp_path) -> None:
+    db_path = tmp_path / ".inquira" / "alice" / "workspaces" / "ws-1" / "workspace.db"
+
+    with pytest.raises(RuntimeError, match="Workspace database is missing"):
+        await WorkspaceOfflineAdapter().ensure_database_file(str(db_path))
+
+
 def test_migrated_workspace_services_do_not_open_duckdb_directly() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     targets = [

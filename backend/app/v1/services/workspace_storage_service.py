@@ -85,7 +85,7 @@ class WorkspaceStorageService:
                 )
 
         await asyncio.to_thread(_create)
-        await WorkspaceOfflineAdapter().ensure_database_file(str(duckdb_path))
+        await WorkspaceOfflineAdapter().ensure_database_file(str(duckdb_path), create_if_missing=True)
         return workspace_dir
 
     @staticmethod
