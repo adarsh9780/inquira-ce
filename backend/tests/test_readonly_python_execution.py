@@ -8,6 +8,7 @@ from app.services.readonly_python_execution import (
     ReadOnlyExecutionBlockedError,
     ReadOnlyPythonExecutionService,
     assert_readonly_python,
+    _normalize_filesystem_path,
 )
 from app.v1.services.chat_service import ChatService
 
@@ -47,6 +48,15 @@ def test_readonly_python_guard_rejects_writable_duckdb_connection(tmp_path):
     db_path = tmp_path / "workspace.duckdb"
     with pytest.raises(ReadOnlyExecutionBlockedError):
         assert_readonly_python(f'import duckdb\nduckdb.connect({str(db_path)!r}, read_only=False)')
+
+
+def test_readonly_path_normalization_handles_equivalent_windows_shapes(monkeypatch):
+    monkeypatch.setattr("os.path.abspath", lambda value: f"C:\\Workspace\\{str(value).replace('/', '\\')}")
+    monkeypatch.setattr("os.path.normcase", lambda value: str(value).replace("/", "\\").lower())
+
+    assert _normalize_filesystem_path("Data/workspace.duckdb") == (
+        _normalize_filesystem_path("Data\\workspace.duckdb")
+    )
 
 
 @pytest.mark.asyncio

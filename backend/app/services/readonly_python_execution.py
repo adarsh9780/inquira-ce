@@ -65,6 +65,14 @@ _BLOCKED_ATTR_CALLS = {
 }
 
 
+def _normalize_filesystem_path(path: str) -> str:
+    """Normalize a local path for same-file checks across Windows and POSIX."""
+    value = str(path or "").strip()
+    if not value:
+        return ""
+    return os.path.normcase(os.path.abspath(os.path.expanduser(value)))
+
+
 def _strip_sql_comments(sql: str) -> str:
     lines: list[str] = []
     for line in str(sql or "").splitlines():
@@ -232,12 +240,13 @@ class ReadOnlyPythonExecutionService:
         timeout: int,
         run_id: str,
     ) -> dict[str, Any]:
-        db_path = Path(workspace_duckdb_path)
+        db_path = Path(workspace_duckdb_path).expanduser().resolve(strict=False)
         scratchpad_path = ArtifactScratchpadStore.build_scratchpad_db_path(str(db_path))
         scratchpad_path.parent.mkdir(parents=True, exist_ok=True)
         worker_code = _build_worker_code(
             workspace_id=workspace_id,
             workspace_duckdb_path=str(db_path),
+            workspace_duckdb_path_key=_normalize_filesystem_path(str(db_path)),
             scratchpad_path=str(scratchpad_path),
             run_id=run_id,
             user_code=code,
@@ -331,6 +340,7 @@ def _build_worker_code(
     *,
     workspace_id: str,
     workspace_duckdb_path: str,
+    workspace_duckdb_path_key: str,
     scratchpad_path: str,
     run_id: str,
     user_code: str,
@@ -347,6 +357,7 @@ def _build_worker_code(
 
         _WORKSPACE_ID = {workspace_id!r}
         _WORKSPACE_DB_PATH = {workspace_duckdb_path!r}
+        _WORKSPACE_DB_PATH_KEY = {workspace_duckdb_path_key!r}
         _SCRATCHPAD_PATH = {scratchpad_path!r}
         _RUN_ID = {run_id!r}
         _RESULT_PREFIX = "__INQUIRA_READONLY_RESULT__"
@@ -376,6 +387,16 @@ def _build_worker_code(
             if keyword in _WRITE_SQL_KEYWORDS:
                 raise PermissionError(f"Blocked write-like SQL statement: {{keyword}}. Analysis runs are read-only.")
 
+        def _normalize_filesystem_path(path):
+            import os as _os
+            value = str(path or "").strip()
+            if not value:
+                return ""
+            return _os.path.normcase(_os.path.abspath(_os.path.expanduser(value)))
+
+        def _is_workspace_db_path(path):
+            return _normalize_filesystem_path(path) == _WORKSPACE_DB_PATH_KEY
+
         class _ReadOnlyDuckDBConnection:
             def __init__(self, inner):
                 self._inner = inner
@@ -391,7 +412,7 @@ def _build_worker_code(
         _original_duckdb_connect = _duckdb.connect
         def _guarded_duckdb_connect(database=None, *args, **kwargs):
             candidate = str(database or "")
-            if candidate == _WORKSPACE_DB_PATH:
+            if _is_workspace_db_path(candidate):
                 if kwargs.get("read_only") is not True:
                     raise PermissionError("Blocked writable DuckDB connection to workspace DB. Analysis runs are read-only.")
                 return _ReadOnlyDuckDBConnection(_original_duckdb_connect(database, *args, **kwargs))
