@@ -12,11 +12,15 @@ from ..schemas.conversation import (
     ConversationListResponse,
     ConversationResponse,
     FinalTurnRerunResponse,
+    GlobalTurnTreeConversationResponse,
+    GlobalTurnTreeResponse,
     TurnRelationsResponse,
     TurnTreeNodeResponse,
     TurnTreeResponse,
     ConversationUpdateRequest,
     TurnPageResponse,
+    TurnOrderUpdateRequest,
+    TurnParentUpdateRequest,
     TurnResponse,
 )
 from ..services.conversation_service import ConversationService
@@ -195,10 +199,38 @@ def _build_turn_tree_node(payload: dict) -> TurnTreeNodeResponse:
         id=payload["id"],
         parent_turn_id=payload.get("parent_turn_id"),
         seq_no=payload["seq_no"],
+        sibling_order=payload.get("sibling_order", 0),
         user_text=payload["user_text"],
         assistant_text=payload.get("assistant_text", ""),
         created_at=payload["created_at"],
         children=[_build_turn_tree_node(child) for child in payload.get("children") or []],
+    )
+
+
+@router.get("/workspaces/{workspace_id}/turn-tree", response_model=GlobalTurnTreeResponse)
+async def get_workspace_turn_tree(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Fetch all visible conversation trees for a workspace."""
+    payload = await ConversationService.get_workspace_turn_tree(
+        session=session,
+        principal_id=current_user.id,
+        workspace_id=workspace_id,
+    )
+    return GlobalTurnTreeResponse(
+        conversations=[
+            GlobalTurnTreeConversationResponse(
+                id=conversation["id"],
+                title=conversation["title"],
+                last_turn_at=conversation["last_turn_at"],
+                created_at=conversation["created_at"],
+                updated_at=conversation["updated_at"],
+                roots=[_build_turn_tree_node(node) for node in conversation.get("roots") or []],
+            )
+            for conversation in payload["conversations"]
+        ]
     )
 
 
@@ -220,6 +252,64 @@ async def get_turn_tree(
         roots=[_build_turn_tree_node(node) for node in payload["roots"]],
         current_turn_id=payload.get("current_turn_id"),
         final_turn_id=payload.get("final_turn_id"),
+    )
+
+
+@router.delete("/conversations/{conversation_id}/turns/{turn_id}", response_model=MessageResponse)
+async def delete_turn(
+    conversation_id: str,
+    turn_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Soft-delete one visible leaf turn."""
+    await ConversationService.delete_turn(
+        session=session,
+        principal_id=current_user.id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+    )
+    return MessageResponse(message="Turn deleted")
+
+
+@router.patch("/conversations/{conversation_id}/turns/{turn_id}/parent", response_model=TurnResponse)
+async def move_turn_parent(
+    conversation_id: str,
+    turn_id: str,
+    payload: TurnParentUpdateRequest,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Move one visible turn under another visible turn in the same conversation."""
+    turn = await ConversationService.move_turn_parent(
+        session=session,
+        principal_id=current_user.id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        parent_turn_id=payload.parent_turn_id,
+    )
+    return TurnResponse(**turn)
+
+
+@router.patch("/conversations/{conversation_id}/turns/order", response_model=TurnTreeResponse)
+async def reorder_turns(
+    conversation_id: str,
+    payload: TurnOrderUpdateRequest,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Replace display order for all visible siblings under one parent."""
+    tree = await ConversationService.reorder_turns(
+        session=session,
+        principal_id=current_user.id,
+        conversation_id=conversation_id,
+        parent_turn_id=payload.parent_turn_id,
+        turn_ids=payload.turn_ids,
+    )
+    return TurnTreeResponse(
+        roots=[_build_turn_tree_node(node) for node in tree["roots"]],
+        current_turn_id=tree.get("current_turn_id"),
+        final_turn_id=tree.get("final_turn_id"),
     )
 
 

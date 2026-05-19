@@ -110,7 +110,7 @@
               title="Open turn tree"
               @click="openTurnTreeModal"
             >
-              <ShareIcon class="w-4 h-4" />
+              <QueueListIcon class="w-4 h-4" />
             </button>
             <button
               type="button"
@@ -211,6 +211,9 @@
       @select="selectTurnTreeNode"
       @mark-final="markTurnFinal"
       @rerun-final="rerunFinalTurn"
+      @delete-turn="deleteTurnTreeNode"
+      @move-turn="moveTurnTreeNode"
+      @reorder-turns="reorderTurnTreeNodes"
     />
 
     <!-- Requirements Notice -->
@@ -250,7 +253,7 @@ import {
   PhotoIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  ShareIcon,
+  QueueListIcon,
 } from '@heroicons/vue/24/outline'
 import { ArrowUpIcon, MicrophoneIcon, StopIcon } from '@heroicons/vue/24/solid'
 
@@ -441,13 +444,49 @@ async function selectTurnTreeNode(turnId) {
 }
 
 async function markTurnFinal(turnId) {
-  await appStore.markTurnFinal(turnId)
-  await appStore.loadActiveTurnTree()
+  try {
+    await appStore.markTurnFinal(turnId)
+    await appStore.loadActiveTurnTree()
+    toast.success('Final turn updated', 'This turn is now marked final.')
+  } catch (error) {
+    toast.error('Final turn failed', extractApiErrorMessage(error, 'Unable to mark final turn.'))
+  }
 }
 
 async function rerunFinalTurn() {
   closeTurnTreeModal()
   await appStore.rerunSelectedFinalTurn()
+}
+
+async function deleteTurnTreeNode(turnId) {
+  const ok = window.confirm('Delete this leaf turn? This hides the turn and marks its artifacts for cleanup.')
+  if (!ok) return
+  try {
+    await appStore.deleteTurn(turnId)
+    await appStore.loadActiveTurnTree()
+    toast.success('Turn deleted', 'The turn was removed from the tree.')
+  } catch (error) {
+    toast.error('Delete failed', extractApiErrorMessage(error, 'Unable to delete this turn.'))
+  }
+}
+
+async function moveTurnTreeNode(payload) {
+  try {
+    await appStore.moveTurn(payload?.turnId, payload?.parentTurnId)
+    await appStore.loadActiveTurnTree()
+    toast.success('Turn moved', 'The turn was moved under the selected parent.')
+  } catch (error) {
+    toast.error('Move failed', extractApiErrorMessage(error, 'Unable to move this turn.'))
+  }
+}
+
+async function reorderTurnTreeNodes(payload) {
+  try {
+    await appStore.reorderTurnSiblings(payload?.parentTurnId || null, payload?.turnIds || [])
+    toast.success('Tree order updated', 'Sibling order was updated.')
+  } catch (error) {
+    toast.error('Reorder failed', extractApiErrorMessage(error, 'Unable to reorder these turns.'))
+  }
 }
 
 async function fileToBase64(file) {

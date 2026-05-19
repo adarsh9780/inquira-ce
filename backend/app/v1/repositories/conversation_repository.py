@@ -112,6 +112,21 @@ class ConversationRepository:
         return list(result.scalars().all())
 
     @staticmethod
+    async def list_turns_for_workspace(session: AsyncSession, workspace_id: str) -> list[Turn]:
+        """List visible turns for every visible conversation in a workspace."""
+        result = await session.execute(
+            select(Turn)
+            .join(Conversation, Conversation.id == Turn.conversation_id)
+            .where(
+                Conversation.workspace_id == workspace_id,
+                Conversation.is_marked_for_deletion.is_(False),
+                Turn.is_marked_for_deletion.is_(False),
+            )
+            .order_by(Turn.conversation_id.asc(), Turn.seq_no.asc(), Turn.created_at.asc(), Turn.id.asc())
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
     async def delete_conversation(session: AsyncSession, conversation: Conversation) -> None:
         """Delete conversation and cascaded turns."""
         await session.delete(conversation)
@@ -229,6 +244,7 @@ class ConversationRepository:
             conversation_id=conversation_id,
             parent_turn_id=parent_turn_id,
             seq_no=seq_no,
+            sibling_order=seq_no,
             user_text=user_text,
             assistant_text=assistant_text,
             tool_events_json=json.dumps(tool_events) if tool_events is not None else None,
@@ -268,4 +284,36 @@ class ConversationRepository:
                 | ((Turn.created_at == before_created_at) & (Turn.id < before_turn_id))
             )
         result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def max_child_sibling_order(session: AsyncSession, conversation_id: str, parent_turn_id: str) -> int:
+        """Return the largest sibling order under a visible parent."""
+        result = await session.execute(
+            select(func.max(Turn.sibling_order)).where(
+                Turn.conversation_id == conversation_id,
+                Turn.parent_turn_id == parent_turn_id,
+                Turn.is_marked_for_deletion.is_(False),
+            )
+        )
+        return int(result.scalar_one_or_none() or 0)
+
+    @staticmethod
+    async def list_visible_siblings(
+        session: AsyncSession,
+        conversation_id: str,
+        parent_turn_id: str | None,
+    ) -> list[Turn]:
+        """List visible sibling turns for one parent pointer."""
+        stmt = select(Turn).where(
+            Turn.conversation_id == conversation_id,
+            Turn.is_marked_for_deletion.is_(False),
+        )
+        if parent_turn_id is None:
+            stmt = stmt.where(Turn.parent_turn_id.is_(None))
+        else:
+            stmt = stmt.where(Turn.parent_turn_id == parent_turn_id)
+        result = await session.execute(
+            stmt.order_by(Turn.sibling_order.asc(), Turn.seq_no.asc(), Turn.created_at.asc(), Turn.id.asc())
+        )
         return list(result.scalars().all())

@@ -45,6 +45,7 @@ class TurnResponse(BaseModel):
     code_path: str | None = None
     manifest_path: str | None = None
     seq_no: int
+    sibling_order: int = 0
     user_text: str
     assistant_text: str
     tool_events: list[dict] | None
@@ -76,6 +77,7 @@ class TurnTreeNodeResponse(BaseModel):
     id: str
     parent_turn_id: str | None = None
     seq_no: int
+    sibling_order: int = 0
     user_text: str
     assistant_text: str
     created_at: datetime
@@ -88,6 +90,36 @@ class TurnTreeResponse(BaseModel):
     roots: list[TurnTreeNodeResponse]
     current_turn_id: str | None = None
     final_turn_id: str | None = None
+
+
+class TurnParentUpdateRequest(BaseModel):
+    """Move one turn under another visible turn in the same conversation."""
+
+    parent_turn_id: str
+
+
+class TurnOrderUpdateRequest(BaseModel):
+    """Replace display order for all visible siblings under one parent."""
+
+    parent_turn_id: str | None = None
+    turn_ids: list[str] = Field(min_length=1)
+
+
+class GlobalTurnTreeConversationResponse(BaseModel):
+    """Workspace-level tree group for one conversation."""
+
+    id: str
+    title: str
+    last_turn_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    roots: list[TurnTreeNodeResponse] = Field(default_factory=list)
+
+
+class GlobalTurnTreeResponse(BaseModel):
+    """All visible conversation trees for a workspace."""
+
+    conversations: list[GlobalTurnTreeConversationResponse]
 
 
 class FinalTurnRerunResponse(BaseModel):

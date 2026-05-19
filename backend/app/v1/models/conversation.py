@@ -114,6 +114,7 @@ class Turn(AppDataBase):
         nullable=True,
     )
     seq_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    sibling_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     is_final: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     result_kind: Mapped[str | None] = mapped_column(String(64), nullable=True)
     code_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)

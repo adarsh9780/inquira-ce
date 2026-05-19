@@ -80,6 +80,46 @@
       >
         View Details
       </button>
+      <button
+        type="button"
+        class="w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors"
+        :class="canMoveSelectedUp ? 'text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)]' : 'cursor-not-allowed text-[var(--color-text-muted)] opacity-60'"
+        :title="canMoveSelectedUp ? 'Move before previous sibling' : 'Already first among siblings'"
+        :disabled="!canMoveSelectedUp"
+        @click="handleContextAction('move-up')"
+      >
+        Move Up
+      </button>
+      <button
+        type="button"
+        class="w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors"
+        :class="canMoveSelectedDown ? 'text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)]' : 'cursor-not-allowed text-[var(--color-text-muted)] opacity-60'"
+        :title="canMoveSelectedDown ? 'Move after next sibling' : 'Already last among siblings'"
+        :disabled="!canMoveSelectedDown"
+        @click="handleContextAction('move-down')"
+      >
+        Move Down
+      </button>
+      <button
+        type="button"
+        class="w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors"
+        :class="canMoveSelected ? 'text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)]' : 'cursor-not-allowed text-[var(--color-text-muted)] opacity-60'"
+        :title="canMoveSelected ? 'Move under another turn by ID' : 'Root turns cannot be moved'"
+        :disabled="!canMoveSelected"
+        @click="handleContextAction('move-to')"
+      >
+        Move To
+      </button>
+      <button
+        type="button"
+        class="w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors"
+        :class="canDeleteSelected ? 'text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)]' : 'cursor-not-allowed text-[var(--color-text-muted)] opacity-60'"
+        :title="selectedDeleteBlockReason || 'Delete leaf turn'"
+        :disabled="!canDeleteSelected"
+        @click="handleContextAction('delete')"
+      >
+        Delete
+      </button>
     </div>
 
     <div
@@ -182,7 +222,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'select', 'mark-final', 'rerun-final'])
+const emit = defineEmits(['close', 'select', 'mark-final', 'rerun-final', 'delete-turn', 'move-turn', 'reorder-turns'])
 const contextMenu = ref({
   open: false,
   turnId: '',
@@ -213,6 +253,41 @@ const detailArtifacts = computed(() => {
       }
     })
 })
+
+const selectedContext = computed(() => findNodeContext(props.roots, contextMenu.value.turnId))
+const selectedNode = computed(() => selectedContext.value?.node || null)
+const selectedSiblings = computed(() => selectedContext.value?.siblings || [])
+const selectedSiblingIndex = computed(() => {
+  const id = String(contextMenu.value.turnId || '').trim()
+  return selectedSiblings.value.findIndex((node) => String(node?.id || '').trim() === id)
+})
+const canMoveSelected = computed(() => Boolean(String(selectedNode.value?.parent_turn_id || '').trim()))
+const canMoveSelectedUp = computed(() => canMoveSelected.value && selectedSiblingIndex.value > 0)
+const canMoveSelectedDown = computed(() => canMoveSelected.value && selectedSiblingIndex.value >= 0 && selectedSiblingIndex.value < selectedSiblings.value.length - 1)
+const selectedDeleteBlockReason = computed(() => {
+  const node = selectedNode.value
+  if (!node) return 'Turn not found'
+  if (!String(node.parent_turn_id || '').trim()) return 'Root turns cannot be deleted'
+  if (String(props.finalTurnId || '').trim() === String(node.id || '').trim()) return 'Final turn cannot be deleted'
+  if (Array.isArray(node.children) && node.children.length > 0) return 'Turns with child turns cannot be deleted'
+  if (String(props.currentTurnId || '').trim() === String(node.id || '').trim()) return 'Open another turn before deleting the active turn'
+  return ''
+})
+const canDeleteSelected = computed(() => !selectedDeleteBlockReason.value)
+
+function findNodeContext(nodes, turnId, parent = null) {
+  const target = String(turnId || '').trim()
+  const siblings = Array.isArray(nodes) ? nodes : []
+  if (!target) return null
+  for (const node of siblings) {
+    if (String(node?.id || '').trim() === target) {
+      return { node, parent, siblings }
+    }
+    const childContext = findNodeContext(node?.children || [], target, node)
+    if (childContext) return childContext
+  }
+  return null
+}
 
 function closeModal() {
   closeContextMenu()
@@ -265,6 +340,33 @@ async function handleContextAction(action) {
   }
   if (action === 'view-details') {
     await openDetailModal(turnId)
+    return
+  }
+  if (action === 'delete') {
+    emit('delete-turn', turnId)
+    return
+  }
+  if (action === 'move-to') {
+    const parentTurnId = window.prompt('Move under turn ID')
+    const normalizedParentId = String(parentTurnId || '').trim()
+    if (normalizedParentId) emit('move-turn', { turnId, parentTurnId: normalizedParentId })
+    return
+  }
+  if (action === 'move-up' || action === 'move-down') {
+    const context = findNodeContext(props.roots, turnId)
+    if (!context) return
+    const ids = context.siblings.map((node) => String(node?.id || '').trim()).filter(Boolean)
+    const index = ids.indexOf(turnId)
+    const delta = action === 'move-up' ? -1 : 1
+    const nextIndex = index + delta
+    if (index < 0 || nextIndex < 0 || nextIndex >= ids.length) return
+    const reordered = [...ids]
+    const [moved] = reordered.splice(index, 1)
+    reordered.splice(nextIndex, 0, moved)
+    emit('reorder-turns', {
+      parentTurnId: String(context.parent?.id || '').trim() || null,
+      turnIds: reordered,
+    })
   }
 }
 

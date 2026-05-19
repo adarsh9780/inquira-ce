@@ -79,6 +79,12 @@
             </span>
           </div>
         </button>
+        <div
+          v-if="!appStore.isSidebarCollapsed && appStore.activeTab === 'schema-editor'"
+          class="max-h-64 overflow-y-auto"
+        >
+          <SidebarGlobalTurnTree />
+        </div>
       </div>
 
       <div class="mx-1 mb-2 h-px bg-[var(--color-border)] opacity-60" />
@@ -365,6 +371,7 @@ import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import SettingsModal from '../modals/SettingsModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
+import SidebarGlobalTurnTree from './sidebar/SidebarGlobalTurnTree.vue'
 import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 

@@ -927,6 +927,27 @@ export const apiService = {
     return axios.get(`/api/v1/conversations/${conversationId}/turn-tree`, { params })
   },
 
+  async v1GetWorkspaceTurnTree(workspaceId) {
+    return axios.get(`/api/v1/workspaces/${workspaceId}/turn-tree`)
+  },
+
+  async v1DeleteTurn(conversationId, turnId) {
+    return axios.delete(`/api/v1/conversations/${conversationId}/turns/${turnId}`)
+  },
+
+  async v1MoveTurn(conversationId, turnId, parentTurnId) {
+    return axios.patch(`/api/v1/conversations/${conversationId}/turns/${turnId}/parent`, {
+      parent_turn_id: parentTurnId,
+    })
+  },
+
+  async v1ReorderTurns(conversationId, parentTurnId, turnIds) {
+    return axios.patch(`/api/v1/conversations/${conversationId}/turns/order`, {
+      parent_turn_id: parentTurnId || null,
+      turn_ids: Array.isArray(turnIds) ? turnIds : [],
+    })
+  },
+
   async v1GetFinalTurn(conversationId) {
     return axios.get(`/api/v1/conversations/${conversationId}/final-turn`)
   },

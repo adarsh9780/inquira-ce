@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Conversation, Turn, Workspace
 from ..repositories.conversation_repository import ConversationRepository
+from ..repositories.turn_artifact_repository import TurnArtifactRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .cursor_service import decode_cursor, encode_cursor
 
@@ -34,6 +35,7 @@ class ConversationService:
             "code_path": turn.code_path,
             "manifest_path": turn.manifest_path,
             "seq_no": turn.seq_no,
+            "sibling_order": int(getattr(turn, "sibling_order", 0) or 0),
             "user_text": turn.user_text,
             "assistant_text": turn.assistant_text,
             "tool_events": json.loads(turn.tool_events_json) if turn.tool_events_json else None,
@@ -255,6 +257,7 @@ class ConversationService:
                 "id": turn.id,
                 "parent_turn_id": turn.parent_turn_id,
                 "seq_no": turn.seq_no,
+                "sibling_order": int(getattr(turn, "sibling_order", 0) or 0),
                 "user_text": turn.user_text,
                 "assistant_text": turn.assistant_text,
                 "created_at": turn.created_at,
@@ -270,12 +273,188 @@ class ConversationService:
                 continue
             parent_node["children"].append(node)
 
+        def sort_nodes(nodes: list[dict]) -> None:
+            nodes.sort(key=lambda item: (
+                int(item.get("sibling_order") or 0),
+                int(item.get("seq_no") or 0),
+                item.get("created_at"),
+                str(item.get("id") or ""),
+            ))
+            for item in nodes:
+                sort_nodes(item["children"])
+
+        sort_nodes(roots)
+
         final_turn_id = str(getattr(conversation, "final_turn_id", "") or "").strip() or None
         return {
             "roots": roots,
             "current_turn_id": str(current_turn_id or "").strip() or None,
             "final_turn_id": final_turn_id,
         }
+
+    @staticmethod
+    def _build_tree_from_turns(turns: list[Turn]) -> list[dict]:
+        node_lookup: dict[str, dict] = {}
+        roots: list[dict] = []
+        for turn in turns:
+            node_lookup[turn.id] = {
+                "id": turn.id,
+                "parent_turn_id": turn.parent_turn_id,
+                "seq_no": turn.seq_no,
+                "sibling_order": int(getattr(turn, "sibling_order", 0) or 0),
+                "user_text": turn.user_text,
+                "assistant_text": turn.assistant_text,
+                "created_at": turn.created_at,
+                "children": [],
+            }
+        for turn in turns:
+            node = node_lookup[turn.id]
+            parent_node = node_lookup.get(str(turn.parent_turn_id or "").strip())
+            if parent_node is None:
+                roots.append(node)
+            else:
+                parent_node["children"].append(node)
+
+        def sort_nodes(nodes: list[dict]) -> None:
+            nodes.sort(key=lambda item: (
+                int(item.get("sibling_order") or 0),
+                int(item.get("seq_no") or 0),
+                item.get("created_at"),
+                str(item.get("id") or ""),
+            ))
+            for item in nodes:
+                sort_nodes(item["children"])
+
+        sort_nodes(roots)
+        return roots
+
+    @staticmethod
+    async def get_workspace_turn_tree(
+        session: AsyncSession,
+        principal_id: str,
+        workspace_id: str,
+    ) -> dict:
+        await ConversationService.ensure_workspace_access(session, principal_id, workspace_id)
+        conversations = await ConversationRepository.list_conversations(session, workspace_id, limit=200)
+        turns = await ConversationRepository.list_turns_for_workspace(session, workspace_id)
+        turns_by_conversation: dict[str, list[Turn]] = {}
+        for turn in turns:
+            turns_by_conversation.setdefault(turn.conversation_id, []).append(turn)
+        return {
+            "conversations": [
+                {
+                    "id": conversation.id,
+                    "title": conversation.title,
+                    "last_turn_at": conversation.last_turn_at,
+                    "created_at": conversation.created_at,
+                    "updated_at": conversation.updated_at,
+                    "roots": ConversationService._build_tree_from_turns(turns_by_conversation.get(conversation.id, [])),
+                }
+                for conversation in conversations
+            ]
+        }
+
+    @staticmethod
+    async def delete_turn(
+        session: AsyncSession,
+        principal_id: str,
+        conversation_id: str,
+        turn_id: str,
+    ) -> None:
+        conversation = await ConversationRepository.get_conversation(session, conversation_id)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
+        turn = await ConversationRepository.get_turn(session, turn_id)
+        if turn is None or turn.conversation_id != conversation_id:
+            raise HTTPException(status_code=404, detail="Turn not found")
+        if str(getattr(conversation, "final_turn_id", "") or "").strip() == turn.id:
+            raise HTTPException(status_code=409, detail="Final turn cannot be deleted until another final turn is selected.")
+        children = await ConversationRepository.list_child_turns(session, conversation_id, turn.id)
+        if children:
+            raise HTTPException(status_code=409, detail="Turn delete is blocked because child turns would become orphaned.")
+        if turn.seq_no == 1 or not str(turn.parent_turn_id or "").strip():
+            raise HTTPException(status_code=409, detail="Root turns cannot be deleted until branch rewiring is supported.")
+
+        from datetime import UTC, datetime
+
+        marked_at = datetime.now(UTC)
+        turn.is_marked_for_deletion = True
+        turn.marked_for_deletion_at = marked_at
+        turn.deletion_status = "marked"
+        turn.deletion_error = None
+        await TurnArtifactRepository.mark_turn_for_deletion(session, turn_id)
+        await session.commit()
+
+    @staticmethod
+    async def move_turn_parent(
+        session: AsyncSession,
+        principal_id: str,
+        conversation_id: str,
+        turn_id: str,
+        parent_turn_id: str,
+    ) -> dict:
+        conversation = await ConversationRepository.get_conversation(session, conversation_id)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
+        turn = await ConversationRepository.get_turn(session, turn_id)
+        if turn is None or turn.conversation_id != conversation_id:
+            raise HTTPException(status_code=404, detail="Turn not found")
+        if turn.seq_no == 1 or not str(turn.parent_turn_id or "").strip():
+            raise HTTPException(status_code=409, detail="Root turns cannot be moved.")
+        new_parent_id = str(parent_turn_id or "").strip()
+        if not new_parent_id:
+            raise HTTPException(status_code=400, detail="parent_turn_id is required")
+        if new_parent_id == turn.id:
+            raise HTTPException(status_code=409, detail="A turn cannot be moved under itself.")
+        parent_turn = await ConversationRepository.get_turn(session, new_parent_id)
+        if parent_turn is None or parent_turn.conversation_id != conversation_id:
+            raise HTTPException(status_code=404, detail="Parent turn not found")
+
+        all_turns = await ConversationRepository.list_turns_in_sequence(session, conversation_id)
+        parent_by_id = {item.id: str(item.parent_turn_id or "").strip() for item in all_turns}
+        cursor = new_parent_id
+        while cursor:
+            if cursor == turn.id:
+                raise HTTPException(status_code=409, detail="A turn cannot be moved under one of its descendants.")
+            cursor = parent_by_id.get(cursor, "")
+
+        turn.parent_turn_id = new_parent_id
+        turn.sibling_order = await ConversationRepository.max_child_sibling_order(session, conversation_id, new_parent_id) + 1
+        await session.commit()
+        return ConversationService._turn_to_dict(turn)
+
+    @staticmethod
+    async def reorder_turns(
+        session: AsyncSession,
+        principal_id: str,
+        conversation_id: str,
+        parent_turn_id: str | None,
+        turn_ids: list[str],
+    ) -> dict:
+        conversation = await ConversationRepository.get_conversation(session, conversation_id)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
+        normalized_ids = [str(item or "").strip() for item in turn_ids]
+        if not normalized_ids or any(not item for item in normalized_ids):
+            raise HTTPException(status_code=400, detail="turn_ids must contain visible turn IDs")
+        if len(set(normalized_ids)) != len(normalized_ids):
+            raise HTTPException(status_code=409, detail="Sibling order cannot contain duplicate turns.")
+        siblings = await ConversationRepository.list_visible_siblings(
+            session,
+            conversation_id,
+            str(parent_turn_id or "").strip() or None,
+        )
+        sibling_ids = [turn.id for turn in siblings]
+        if set(normalized_ids) != set(sibling_ids):
+            raise HTTPException(status_code=409, detail="Sibling order must include exactly the visible siblings for this parent.")
+        lookup = {turn.id: turn for turn in siblings}
+        for index, item_id in enumerate(normalized_ids, start=1):
+            lookup[item_id].sibling_order = index
+        await session.commit()
+        return await ConversationService.get_turn_tree(session, principal_id, conversation_id)
 
     @staticmethod
     async def get_final_turn(
