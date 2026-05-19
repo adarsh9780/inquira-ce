@@ -10,7 +10,7 @@ import sys
 import tempfile
 import textwrap
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -186,6 +186,8 @@ class ReadOnlyPythonExecutionService:
     """Execute generated Python in a separate read-only worker process."""
 
     max_parallel_per_workspace: int = 4
+    _workspace_semaphores: dict[str, asyncio.Semaphore] = field(init=False, repr=False)
+    _semaphores_lock: asyncio.Lock = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "_workspace_semaphores", {})
@@ -231,7 +233,7 @@ class ReadOnlyPythonExecutionService:
         run_id: str,
     ) -> dict[str, Any]:
         db_path = Path(workspace_duckdb_path)
-        scratchpad_path = ArtifactScratchpadStore.build_scratchpad_db_path(db_path)
+        scratchpad_path = ArtifactScratchpadStore.build_scratchpad_db_path(str(db_path))
         scratchpad_path.parent.mkdir(parents=True, exist_ok=True)
         worker_code = _build_worker_code(
             workspace_id=workspace_id,

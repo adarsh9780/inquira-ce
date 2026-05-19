@@ -335,7 +335,7 @@ class ResourceLeaseCoordinator:
         return await operation()
 
     def _retry_delay(self, attempt: int) -> float:
-        return self._lock_retry_base_delay_seconds * (2**attempt)
+        return float(self._lock_retry_base_delay_seconds * (2**attempt))
 
     @staticmethod
     def _is_sqlite_locked_error(exc: BaseException) -> bool:
