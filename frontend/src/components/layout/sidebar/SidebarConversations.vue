@@ -67,13 +67,18 @@
                   {{ conv.title || 'Conversation' }}
                 </p>
                 <p class="text-[9px] truncate" :class="conv.id === appStore.activeConversationId ? 'text-[var(--color-accent-text)] opacity-80' : 'text-zinc-400'">
-                  {{ formatTimestamp(conv.updated_at || conv.created_at) }}
+                  {{ appStore.isConversationRunning(conv.id) ? 'Running...' : formatTimestamp(conv.updated_at || conv.created_at) }}
                 </p>
               </template>
             </div>
           </div>
 
-          <div v-if="editingId !== conv.id" class="flex-shrink-0 flex items-center opacity-0 group-hover/item:opacity-100 transition-opacity">
+          <div v-if="editingId !== conv.id" class="flex-shrink-0 flex items-center transition-opacity" :class="appStore.isConversationRunning(conv.id) ? 'opacity-100' : 'opacity-0 group-hover/item:opacity-100'">
+            <span
+              v-if="appStore.isConversationRunning(conv.id)"
+              class="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-500"
+              title="Analysis running"
+            />
             <button
               @click.stop="startEditing(conv)"
               class="btn-icon p-1 hover:text-[var(--color-accent)]"

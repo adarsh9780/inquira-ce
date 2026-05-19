@@ -84,6 +84,7 @@ export const useAppStore = defineStore('app', () => {
   const activeWorkspaceId = ref('')
   const conversations = ref([])
   const activeConversationId = ref('')
+  const conversationRuns = ref({})
   const turnViewEnabled = ref(true)
   const activeTurnId = ref('')
   const activeTurn = ref(null)
@@ -163,6 +164,7 @@ export const useAppStore = defineStore('app', () => {
     return hasWorkspace.value
   })
   const activeWorkspaceKernelStatus = computed(() => getWorkspaceKernelStatus())
+  const activeConversationIsLoading = computed(() => isConversationRunning(activeConversationId.value))
 
   let preferenceSyncTimer = null
   let localStateSyncTimer = null
@@ -939,8 +941,8 @@ export const useAppStore = defineStore('app', () => {
       : createEmptyStreamTrace()
 
     // Add to local state
-    chatHistory.value.push({
-      id: Date.now(),
+    const message = {
+      id: options?.localMessageId || Date.now(),
       question,
       explanation: resultExplanation,
       resultExplanation,
@@ -952,9 +954,11 @@ export const useAppStore = defineStore('app', () => {
       codeUpdated: Boolean(codeSnapshot.trim()),
       toolEvents: Array.isArray(options?.toolEvents) ? options.toolEvents : null,
       timestamp: new Date().toISOString()
-    })
+    }
+    chatHistory.value.push(message)
     currentQuestion.value = question
     currentExplanation.value = resultExplanation
+    return message.id
   }
 
   function addQuestionHistoryEntry(question) {
@@ -969,8 +973,18 @@ export const useAppStore = defineStore('app', () => {
     saveLocalConfig()
   }
 
-  function updateLastMessageExplanation(explanation) {
-    const lastMessage = getLastChatMessage()
+  function getChatMessageById(messageId) {
+    const targetId = String(messageId || '').trim()
+    if (!targetId) return null
+    return chatHistory.value.find((message) => String(message?.id || '') === targetId) || null
+  }
+
+  function getTargetChatMessage(messageId) {
+    return getChatMessageById(messageId) || getLastChatMessage()
+  }
+
+  function updateLastMessageExplanation(explanation, messageId = null) {
+    const lastMessage = getTargetChatMessage(messageId)
     if (!lastMessage) return
     lastMessage.explanation = explanation
     lastMessage.resultExplanation = explanation
@@ -978,7 +992,8 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function appendLastMessageExplanationChunk(text) {
-    const lastMessage = getLastChatMessage()
+    const messageId = arguments[1] || null
+    const lastMessage = getTargetChatMessage(messageId)
     if (!lastMessage || typeof text !== 'string' || !text) return
     const current = String(lastMessage.explanation || '')
     const updated = current + text
@@ -988,13 +1003,14 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setLastMessageCodeExplanation(explanation) {
-    const lastMessage = getLastChatMessage()
+    const messageId = arguments[1] || null
+    const lastMessage = getTargetChatMessage(messageId)
     if (!lastMessage) return
     lastMessage.codeExplanation = String(explanation || '')
   }
 
-  function setLastMessageAnalysisMetadata(metadata) {
-    const lastMessage = getLastChatMessage()
+  function setLastMessageAnalysisMetadata(metadata, messageId = null) {
+    const lastMessage = getTargetChatMessage(messageId)
     if (!lastMessage) return
     const normalized = metadata && typeof metadata === 'object' ? { ...metadata } : {}
     lastMessage.analysisMetadata = normalized
@@ -1072,7 +1088,8 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function appendLastMessagePlanChunk(text, node = '') {
-    const lastMessage = getLastChatMessage()
+    const messageId = arguments[2] || null
+    const lastMessage = getTargetChatMessage(messageId)
     if (!lastMessage || typeof text !== 'string' || !text) return
     const trace = ensureMessageStreamTrace(lastMessage)
     if (!trace) return
@@ -1081,7 +1098,8 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function appendLastMessageReasoningEvent(event) {
-    const lastMessage = getLastChatMessage()
+    const messageId = arguments[1] || null
+    const lastMessage = getTargetChatMessage(messageId)
     if (!lastMessage || !event || typeof event !== 'object') return
     const trace = ensureMessageStreamTrace(lastMessage)
     if (!trace) return
@@ -1102,7 +1120,8 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function appendLastMessageTraceEvent(event) {
-    const lastMessage = getLastChatMessage()
+    const messageId = arguments[1] || null
+    const lastMessage = getTargetChatMessage(messageId)
     if (!lastMessage || !event || typeof event !== 'object') return
     const trace = ensureMessageStreamTrace(lastMessage)
     if (!trace) return
@@ -1117,7 +1136,8 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function markLastMessageStreamStopped(reason = 'Response generation stopped.') {
-    const lastMessage = getLastChatMessage()
+    const messageId = arguments[1] || null
+    const lastMessage = getTargetChatMessage(messageId)
     if (!lastMessage) return
     const trace = ensureMessageStreamTrace(lastMessage)
     if (!trace) return
@@ -1133,8 +1153,8 @@ export const useAppStore = defineStore('app', () => {
     })
   }
 
-  function appendLastMessageToolCall(event) {
-    const lastMessage = getLastChatMessage()
+  function appendLastMessageToolCall(event, messageId = null) {
+    const lastMessage = getTargetChatMessage(messageId)
     if (!lastMessage || !event || typeof event !== 'object') return
     const trace = ensureMessageStreamTrace(lastMessage)
     if (!trace) return
@@ -1162,8 +1182,8 @@ export const useAppStore = defineStore('app', () => {
     })
   }
 
-  function appendLastMessageToolProgress(event) {
-    const lastMessage = getLastChatMessage()
+  function appendLastMessageToolProgress(event, messageId = null) {
+    const lastMessage = getTargetChatMessage(messageId)
     if (!lastMessage || !event || typeof event !== 'object') return
     const trace = ensureMessageStreamTrace(lastMessage)
     if (!trace) return
@@ -1178,8 +1198,8 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  function appendLastMessageToolResult(event) {
-    const lastMessage = getLastChatMessage()
+  function appendLastMessageToolResult(event, messageId = null) {
+    const lastMessage = getTargetChatMessage(messageId)
     if (!lastMessage || !event || typeof event !== 'object') return
     const trace = ensureMessageStreamTrace(lastMessage)
     if (!trace) return
@@ -1205,8 +1225,8 @@ export const useAppStore = defineStore('app', () => {
     tool.completed_at = new Date().toISOString()
   }
 
-  function setLastMessageInterventionRequest(event) {
-    const lastMessage = getLastChatMessage()
+  function setLastMessageInterventionRequest(event, messageId = null) {
+    const lastMessage = getTargetChatMessage(messageId)
     if (!lastMessage || !event || typeof event !== 'object') return
     const trace = ensureMessageStreamTrace(lastMessage)
     if (!trace) return
@@ -1222,8 +1242,8 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  function setLastMessageInterventionResponse(event) {
-    const lastMessage = getLastChatMessage()
+  function setLastMessageInterventionResponse(event, messageId = null) {
+    const lastMessage = getTargetChatMessage(messageId)
     if (!lastMessage || !event || typeof event !== 'object') return
     const trace = ensureMessageStreamTrace(lastMessage)
     if (!trace || !trace.intervention) return
@@ -1243,7 +1263,8 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setLastMessageCodeSnapshot(code) {
-    const lastMessage = getLastChatMessage()
+    const messageId = arguments[1] || null
+    const lastMessage = getTargetChatMessage(messageId)
     if (!lastMessage) return
     const codeSnapshot = String(code || '')
     lastMessage.codeSnapshot = codeSnapshot
@@ -1251,7 +1272,8 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setLastMessageTurnId(turnId) {
-    const lastMessage = getLastChatMessage()
+    const messageId = arguments[1] || null
+    const lastMessage = getTargetChatMessage(messageId)
     if (!lastMessage) return
     const normalizedTurnId = String(turnId || '').trim()
     if (!normalizedTurnId) return
@@ -2638,6 +2660,33 @@ export const useAppStore = defineStore('app', () => {
     isLoading.value = loading
   }
 
+  function isConversationRunning(conversationId) {
+    const id = String(conversationId || '').trim()
+    if (!id) return false
+    return String(conversationRuns.value?.[id]?.status || '') === 'running'
+  }
+
+  function setConversationRun(conversationId, runState = null) {
+    const id = String(conversationId || '').trim()
+    if (!id) return
+    const next = { ...(conversationRuns.value || {}) }
+    if (runState && typeof runState === 'object') {
+      next[id] = {
+        status: String(runState.status || 'running'),
+        requestId: String(runState.requestId || ''),
+        startedAt: runState.startedAt || new Date().toISOString(),
+      }
+    } else {
+      delete next[id]
+    }
+    conversationRuns.value = next
+    isLoading.value = Object.values(next).some((item) => String(item?.status || '') === 'running')
+  }
+
+  function clearConversationRun(conversationId) {
+    setConversationRun(conversationId, null)
+  }
+
   function setCodeRunning(running) {
     isCodeRunning.value = running
   }
@@ -2867,6 +2916,7 @@ export const useAppStore = defineStore('app', () => {
     activeWorkspaceId,
     conversations,
     activeConversationId,
+    conversationRuns,
     turnViewEnabled,
     activeTurnId,
     activeTurn,
@@ -2917,6 +2967,7 @@ export const useAppStore = defineStore('app', () => {
     editorCol,
     isEditorFocused,
     isLoading,
+    activeConversationIsLoading,
     isCodeRunning,
     historicalCodeBlocks,
 
@@ -3073,6 +3124,9 @@ export const useAppStore = defineStore('app', () => {
     setEditorFocused,
     loadUserPreferences,
     setLoading,
+    isConversationRunning,
+    setConversationRun,
+    clearConversationRun,
     setCodeRunning,
     resetSession,
     fetchChatHistory,

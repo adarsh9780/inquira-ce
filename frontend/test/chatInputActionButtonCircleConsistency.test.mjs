@@ -11,7 +11,7 @@ test('chat input action button keeps one shared circular shell across mic, send,
   const sharedShellMatches = source.split(sharedShell).length - 1
 
   assert.equal(sharedShellMatches, 1)
-  assert.equal(source.includes('<StopIcon v-if="appStore.isLoading" class="w-3 h-3" />'), true)
+  assert.equal(source.includes('<StopIcon v-if="appStore.activeConversationIsLoading" class="w-3 h-3" />'), true)
   assert.equal(source.includes('<MicrophoneIcon v-else-if="isComposerEmpty" class="w-3 h-3" />'), true)
   assert.equal(source.includes('<ArrowUpIcon v-else class="w-3 h-3" />'), true)
   assert.equal(source.includes('ArrowUpCircleIcon'), false)

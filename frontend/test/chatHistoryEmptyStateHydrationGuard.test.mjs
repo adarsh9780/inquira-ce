@@ -7,11 +7,11 @@ test('chat history empty state does not use v-once during async turn hydration',
   const source = readFileSync(resolve(process.cwd(), 'src/components/chat/ChatHistory.vue'), 'utf-8')
 
   assert.equal(
-    source.includes('v-once v-if="displayedChatHistory.length === 0 && !appStore.isLoading"'),
+    source.includes('v-once v-if="displayedChatHistory.length === 0 && !appStore.activeConversationIsLoading"'),
     false,
   )
   assert.equal(
-    source.includes('v-if="displayedChatHistory.length === 0 && !appStore.isLoading"'),
+    source.includes('v-if="displayedChatHistory.length === 0 && !appStore.activeConversationIsLoading"'),
     true,
   )
   assert.equal(source.includes('const syntheticMessage = mapTurnToMessage(appStore.activeTurn)'), true)

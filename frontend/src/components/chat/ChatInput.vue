@@ -37,8 +37,8 @@
         placeholder="How can I help you today?"
         class="w-full px-4 pt-4 pb-2 resize-none focus:outline-none text-sm leading-relaxed bg-transparent border-none"
         style="color: var(--color-text-main); min-height: 72px;"
-        :class="{ 'opacity-60 cursor-not-allowed': !appStore.canAnalyze || appStore.isLoading }"
-        :disabled="!appStore.canAnalyze || appStore.isLoading"
+        :class="{ 'opacity-60 cursor-not-allowed': !appStore.canAnalyze || appStore.activeConversationIsLoading }"
+        :disabled="!appStore.canAnalyze || appStore.activeConversationIsLoading"
       />
 
       <div v-if="pendingAttachments.length" class="px-4 pb-2">
@@ -155,7 +155,7 @@
               class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-text-main)] text-[var(--color-on-accent)]"
               :class="{ 'animate-pulse': isVoiceInputActive }"
             >
-              <StopIcon v-if="appStore.isLoading" class="w-3 h-3" />
+              <StopIcon v-if="appStore.activeConversationIsLoading" class="w-3 h-3" />
               <MicrophoneIcon v-else-if="isComposerEmpty" class="w-3 h-3" />
               <ArrowUpIcon v-else class="w-3 h-3" />
             </span>
@@ -307,7 +307,7 @@ const canSend = computed(() =>
   appStore.canAnalyze &&
   (question.value.trim().length > 0 || pendingAttachments.value.length > 0) &&
   question.value.length <= 1000 &&
-  !appStore.isLoading
+  !appStore.activeConversationIsLoading
 )
 const isComposerEmpty = computed(() =>
   question.value.trim().length === 0 && pendingAttachments.value.length === 0
@@ -316,16 +316,16 @@ const canTriggerVoiceInput = computed(() =>
   appStore.canAnalyze &&
   isComposerEmpty.value &&
   supportsVoiceInput.value &&
-  !appStore.isLoading
+  !appStore.activeConversationIsLoading
 )
 const canTriggerActionButton = computed(() => {
-  if (appStore.isLoading) return true
+  if (appStore.activeConversationIsLoading) return true
   if (!appStore.canAnalyze) return false
   if (canSend.value) return true
   return isComposerEmpty.value && supportsVoiceInput.value
 })
 const actionButtonTitle = computed(() => {
-  if (appStore.isLoading) return 'Stop generation'
+  if (appStore.activeConversationIsLoading) return 'Stop generation'
   if (canSend.value) return 'Send (Enter)'
   if (canTriggerVoiceInput.value) {
     return isVoiceInputActive.value ? 'Stop voice input' : 'Start voice input'
@@ -663,7 +663,7 @@ function handleStopGeneration() {
 }
 
 function handleActionButtonClick() {
-  if (appStore.isLoading) {
+  if (appStore.activeConversationIsLoading) {
     handleStopGeneration()
     return
   }
@@ -1215,9 +1215,23 @@ async function handleSubmit() {
     return
   }
 
-  appStore.addChatMessage(questionText, '', { attachments: attachmentsPayload })
+  const requestConversationId = String(appStore.activeConversationId || '').trim()
+  if (requestConversationId && appStore.isConversationRunning(requestConversationId)) {
+    toast.warning('Conversation Running', 'Wait for this conversation to finish before sending another prompt.')
+    return
+  }
+  const localMessageId = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  appStore.addChatMessage(questionText, '', { attachments: attachmentsPayload, localMessageId })
   appStore.syncLiveTokenUsageFromChatHistory()
-  appStore.setLoading(true)
+  if (requestConversationId) {
+    appStore.setConversationRun(requestConversationId, {
+      status: 'running',
+      requestId: localMessageId,
+      startedAt: new Date().toISOString(),
+    })
+  } else {
+    appStore.setLoading(true)
+  }
 
   const abortController = new AbortController()
   activeAbortController.value = abortController
@@ -1249,7 +1263,7 @@ async function handleSubmit() {
     response = await apiService.v1AnalyzeStream(
       {
         workspace_id: workspaceId,
-        conversation_id: appStore.activeConversationId || null,
+        conversation_id: requestConversationId || null,
         question: questionText,
         current_code: appStore.pythonFileContent || '',
         model: appStore.selectedModel,
@@ -1265,7 +1279,7 @@ async function handleSubmit() {
           if ((evt.event === 'messages' || evt.event === 'messages/partial' || evt.event === 'messages-tuple')) {
             const text = extractLangGraphTokenText(evt.data)
             if (text) {
-              appStore.appendLastMessageExplanationChunk(text)
+              appStore.appendLastMessageExplanationChunk(text, localMessageId)
             }
             return
           }
@@ -1275,9 +1289,9 @@ async function handleSubmit() {
           if (evt.event === 'token' && typeof evt.data?.text === 'string') {
             const nodeName = String(evt.data?.node || '').trim().toLowerCase()
             if (FINAL_STREAM_NODES.has(nodeName)) {
-              appStore.appendLastMessageExplanationChunk(evt.data.text)
+              appStore.appendLastMessageExplanationChunk(evt.data.text, localMessageId)
             } else {
-              appStore.appendLastMessagePlanChunk(evt.data.text, evt.data.node || '')
+              appStore.appendLastMessagePlanChunk(evt.data.text, evt.data.node || '', localMessageId)
             }
             return
           }
@@ -1287,7 +1301,7 @@ async function handleSubmit() {
               stage: evt.data?.stage || '',
               message: evt.data.message,
               output: evt.data?.output || ''
-            })
+            }, localMessageId)
             return
           }
           if (evt.event === 'reasoning' && evt.data?.message) {
@@ -1295,7 +1309,7 @@ async function handleSubmit() {
               stage: evt.data?.stage || 'intent',
               message: evt.data.message,
               route: evt.data?.route || ''
-            })
+            }, localMessageId)
             return
           }
           if (evt.event === 'agent_status' && evt.data?.message) {
@@ -1305,27 +1319,27 @@ async function handleSubmit() {
               stage: evt.data.step || '',
               message: evt.data.message,
               output: evt.data?.detail || evt.data?.output || ''
-            })
+            }, localMessageId)
             return
           }
           if (evt.event === 'tool_call' && evt.data?.call_id) {
-            appStore.appendLastMessageToolCall(evt.data)
+            appStore.appendLastMessageToolCall(evt.data, localMessageId)
             return
           }
           if (evt.event === 'tool_progress' && evt.data?.call_id) {
-            appStore.appendLastMessageToolProgress(evt.data)
+            appStore.appendLastMessageToolProgress(evt.data, localMessageId)
             return
           }
           if (evt.event === 'tool_result' && evt.data?.call_id) {
-            appStore.appendLastMessageToolResult(evt.data)
+            appStore.appendLastMessageToolResult(evt.data, localMessageId)
             return
           }
           if (evt.event === 'intervention_request' && evt.data?.id) {
-            appStore.setLastMessageInterventionRequest(evt.data)
+            appStore.setLastMessageInterventionRequest(evt.data, localMessageId)
             return
           }
           if (evt.event === 'intervention_response' && evt.data?.id) {
-            appStore.setLastMessageInterventionResponse(evt.data)
+            appStore.setLastMessageInterventionResponse(evt.data, localMessageId)
             return
           }
           if (evt.event === 'token_usage' && evt.data && typeof evt.data === 'object') {
@@ -1345,24 +1359,26 @@ async function handleSubmit() {
 
     const responseTurnId = String(response?.turn_id || '').trim()
     if (responseTurnId) {
-      appStore.setLastMessageTurnId(responseTurnId)
-      await appStore.loadActiveTurnRelations(responseTurnId)
-      await appStore.loadFinalTurn()
+      appStore.setLastMessageTurnId(responseTurnId, localMessageId)
+      if (String(response?.conversation_id || requestConversationId) === String(appStore.activeConversationId || '')) {
+        await appStore.loadActiveTurnRelations(responseTurnId)
+        await appStore.loadFinalTurn()
+      }
     }
 
     const { is_safe, code, current_code, explanation, result_explanation, code_explanation } = response
     const finalCode = (code ?? current_code ?? '').toString()
-    appStore.setLastMessageAnalysisMetadata(response?.metadata || {})
+    appStore.setLastMessageAnalysisMetadata(response?.metadata || {}, localMessageId)
     const finalExplanation = (result_explanation ?? explanation ?? '').toString()
-    appStore.setLastMessageCodeSnapshot(finalCode)
-    appStore.setLastMessageCodeExplanation((code_explanation ?? '').toString())
+    appStore.setLastMessageCodeSnapshot(finalCode, localMessageId)
+    appStore.setLastMessageCodeExplanation((code_explanation ?? '').toString(), localMessageId)
 
     if (!is_safe) {
-      appStore.updateLastMessageExplanation(finalExplanation || 'Your query was flagged as potentially unsafe.')
+      appStore.updateLastMessageExplanation(finalExplanation || 'Your query was flagged as potentially unsafe.', localMessageId)
       return
     }
 
-    appStore.updateLastMessageExplanation(finalExplanation)
+    appStore.updateLastMessageExplanation(finalExplanation, localMessageId)
     appStore.setGeneratedCode(finalCode)
     if (finalCode.trim()) {
       appStore.setPythonFileContent(finalCode)
@@ -1448,7 +1464,7 @@ async function handleSubmit() {
       if (userRequestedStop.value) {
         errorTitle = 'Generation Stopped'
         errorMessage = 'Response generation was stopped.'
-        appStore.markLastMessageStreamStopped(errorMessage)
+        appStore.markLastMessageStreamStopped(errorMessage, localMessageId)
         toast.error(errorTitle, errorMessage)
         return
       } else {
@@ -1488,7 +1504,7 @@ async function handleSubmit() {
       },
     )
     appStore.setTerminalOutput(`Error: ${errorMessage}`)
-    appStore.updateLastMessageExplanation(errorMessage)
+    appStore.updateLastMessageExplanation(errorMessage, localMessageId)
     if (attachmentsPayload.length > 0) {
       pendingAttachments.value = attachmentsPayload.map((item) => ({
         ...item,
@@ -1501,7 +1517,11 @@ async function handleSubmit() {
     if (cancelTimer) clearTimeout(cancelTimer)
     activeAbortController.value = null
     userRequestedStop.value = false
-    appStore.setLoading(false)
+    if (requestConversationId) {
+      appStore.clearConversationRun(requestConversationId)
+    } else {
+      appStore.setLoading(false)
+    }
   }
 }
 

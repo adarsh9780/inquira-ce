@@ -1,5 +1,5 @@
 <template>
-  <div ref="chatContainer" class="space-y-4" style="min-height: 200px;" role="log" aria-live="polite" aria-relevant="additions" :aria-busy="appStore.isLoading">
+  <div ref="chatContainer" class="space-y-4" style="min-height: 200px;" role="log" aria-live="polite" aria-relevant="additions" :aria-busy="appStore.activeConversationIsLoading">
     <div v-if="!appStore.turnViewEnabled && appStore.activeConversationId && appStore.turnsNextCursor" class="flex justify-center">
       <button
         type="button"
@@ -12,7 +12,7 @@
     </div>
 
     <!-- Loading indicator for first message when no history yet -->
-    <div v-if="appStore.isLoading && displayedChatHistory.length === 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
+    <div v-if="appStore.activeConversationIsLoading && displayedChatHistory.length === 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
       <div class="analyzing-status">
         <div class="analyzing-spinner" aria-hidden="true"></div>
         <span class="analyzing-status-text">Analyzing your question...</span>
@@ -168,7 +168,7 @@
     </div>
 
     <!-- Loading indicator when analyzing - shown below last message -->
-    <div v-if="appStore.isLoading && displayedChatHistory.length > 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
+    <div v-if="appStore.activeConversationIsLoading && displayedChatHistory.length > 0" role="status" aria-live="polite" class="flex items-center justify-center py-6">
       <div class="analyzing-status">
         <div class="analyzing-spinner" aria-hidden="true"></div>
         <span class="analyzing-status-text">Analyzing your question...</span>
@@ -176,7 +176,7 @@
     </div>
 
     <!-- Placeholder message when no chat history -->
-    <div v-if="displayedChatHistory.length === 0 && !appStore.isLoading" class="flex items-center justify-center py-12">
+    <div v-if="displayedChatHistory.length === 0 && !appStore.activeConversationIsLoading" class="flex items-center justify-center py-12">
       <div class="text-center">
         <div class="mb-4" style="color: var(--color-border-hover);">
           <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -273,7 +273,7 @@ const displayedChatHistory = computed(() => {
   }
 
   const localHistory = Array.isArray(appStore.chatHistory) ? appStore.chatHistory : []
-  if (appStore.isLoading && localHistory.length > 0) {
+  if (appStore.activeConversationIsLoading && localHistory.length > 0) {
     const pendingMessage = localHistory[localHistory.length - 1]
     const pendingId = String(pendingMessage?.id || '').trim()
     const activeId = String(appStore.activeTurnId || '').trim()
@@ -912,7 +912,7 @@ function updateScrollState(options = {}) {
 }
 
 function scrollToBottom(options = {}) {
-  const resolvedBehavior = String(options?.behavior || '').trim() || (appStore.isLoading ? 'auto' : 'smooth')
+  const resolvedBehavior = String(options?.behavior || '').trim() || (appStore.activeConversationIsLoading ? 'auto' : 'smooth')
   const force = options?.force === true
   const hardAlign = options?.hardAlign === true
   nextTick(() => {
@@ -994,7 +994,7 @@ watch(() => appStore.activeConversationId, () => {
 })
 
 // Watch for loading state changes
-watch(() => appStore.isLoading, (isLoading, wasLoading) => {
+watch(() => appStore.activeConversationIsLoading, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) {
     pendingInterventionIds.value.clear()
   }

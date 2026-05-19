@@ -69,23 +69,27 @@ async def analyze(
     langgraph_manager=Depends(get_langgraph_manager),
 ):
     """Run analysis in workspace scope and persist a turn."""
-    response_payload, conversation_id, turn_id = await ChatService.analyze_and_persist_turn(
-        session=session,
-        langgraph_manager=langgraph_manager,
-        user=current_user,
-        workspace_id=payload.workspace_id,
-        conversation_id=payload.conversation_id,
-        question=payload.question,
-        current_code=payload.current_code,
-        model=payload.model,
-        context=payload.context,
-        use_selected_turn_context=payload.use_selected_turn_context,
-        selected_parent_turn_id=payload.selected_parent_turn_id,
-        table_name_override=payload.table_name,
-        active_schema_override=payload.active_schema,
-        attachments=[item.model_dump() for item in payload.attachments],
-        api_key=payload.api_key,
-    )
+    try:
+        response_payload, conversation_id, turn_id = await ChatService.analyze_and_persist_turn(
+            session=session,
+            langgraph_manager=langgraph_manager,
+            user=current_user,
+            workspace_id=payload.workspace_id,
+            conversation_id=payload.conversation_id,
+            question=payload.question,
+            current_code=payload.current_code,
+            model=payload.model,
+            context=payload.context,
+            use_selected_turn_context=payload.use_selected_turn_context,
+            selected_parent_turn_id=payload.selected_parent_turn_id,
+            table_name_override=payload.table_name,
+            active_schema_override=payload.active_schema,
+            attachments=[item.model_dump() for item in payload.attachments],
+            api_key=payload.api_key,
+        )
+    finally:
+        if payload.conversation_id:
+            await ChatService._release_conversation_run(payload.conversation_id)
 
     return AnalyzeResponse(
         conversation_id=conversation_id,
@@ -156,6 +160,9 @@ async def stream_analyze(
             except Exception:
                 # If transport is already broken we still prefer a graceful exit.
                 return
+        finally:
+            if payload.conversation_id:
+                await ChatService._release_conversation_run(payload.conversation_id)
 
     return StreamingResponse(
         event_generator(),

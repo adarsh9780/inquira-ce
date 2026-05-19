@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 import uuid
 from pathlib import Path, PureWindowsPath
@@ -19,11 +20,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...data_access.workspace_db import WorkspaceRuntimeAdapter
 from ...services.agent_client import AgentClient, AgentRuntimeError
 from ...services.agent_service_config import load_agent_service_config
-from ...services.code_executor import execute_code, get_workspace_run_exports
+from ...services.code_executor import get_workspace_run_exports
 from ...services.output_capture import (
     build_auto_capture_result_code,
     build_run_wrapped_code,
     normalize_output_contract,
+)
+from ...services.readonly_python_execution import (
+    ReadOnlyExecutionBlockedError,
+    ReadOnlyPythonExecutionService,
 )
 from ...services.llm_provider_catalog import (
     model_supports_vision,
@@ -46,6 +51,13 @@ from .turn_bundle_service import TurnBundleService
 from ...core.logger import logprint
 
 
+_readonly_execution_service = ReadOnlyPythonExecutionService(
+    max_parallel_per_workspace=int(os.getenv("INQUIRA_MAX_PARALLEL_READONLY_RUNS_PER_WORKSPACE", "4"))
+)
+_active_conversation_runs: set[str] = set()
+_active_conversation_runs_lock = asyncio.Lock()
+
+
 class _AttrAccessDict(dict[str, Any]):
     """Dict with attribute access for compatibility with legacy graph mocks."""
 
@@ -58,6 +70,27 @@ class _AttrAccessDict(dict[str, Any]):
 
 class ChatService:
     """Runs analysis and persists chat turns."""
+
+    @staticmethod
+    async def _claim_conversation_run(conversation_id: str) -> None:
+        key = str(conversation_id or "").strip()
+        if not key:
+            return
+        async with _active_conversation_runs_lock:
+            if key in _active_conversation_runs:
+                raise HTTPException(
+                    status_code=409,
+                    detail="This conversation already has an active analysis run.",
+                )
+            _active_conversation_runs.add(key)
+
+    @staticmethod
+    async def _release_conversation_run(conversation_id: str) -> None:
+        key = str(conversation_id or "").strip()
+        if not key:
+            return
+        async with _active_conversation_runs_lock:
+            _active_conversation_runs.discard(key)
 
     @staticmethod
     async def _release_session_before_agent(session: AsyncSession | None) -> None:
@@ -628,12 +661,12 @@ class ChatService:
             f"set_active_run({run_id!r})\n"
             f"finalize_run({run_id!r}, metadata={finalize_payload!r})\n"
         )
-        await execute_code(
+        await _readonly_execution_service.execute(
             code=finalize_code,
             timeout=30,
-            working_dir=str(Path(workspace_duckdb_path).parent),
             workspace_id=workspace_id,
             workspace_duckdb_path=workspace_duckdb_path,
+            run_id=run_id,
         )
 
     @staticmethod
@@ -662,14 +695,35 @@ class ChatService:
         }
         started = time.perf_counter()
         while True:
-            last_result = await execute_code(
-                code=wrapped_code,
-                timeout=90,
-                working_dir=str(Path(workspace_duckdb_path).parent),
-                workspace_id=workspace_id,
-                workspace_duckdb_path=workspace_duckdb_path,
-            )
+            try:
+                last_result = await _readonly_execution_service.execute(
+                    code=wrapped_code,
+                    timeout=90,
+                    workspace_id=workspace_id,
+                    workspace_duckdb_path=workspace_duckdb_path,
+                    run_id=run_id,
+                )
+            except ReadOnlyExecutionBlockedError as exc:
+                last_result = {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": str(exc),
+                    "error": str(exc),
+                    "result": None,
+                    "result_type": None,
+                    "result_kind": "error",
+                    "result_name": None,
+                    "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
+                    "artifacts": [],
+                    "blocked_write": True,
+                }
+                break
             if bool(last_result.get("success")):
+                break
+            if bool(last_result.get("blocked_write")):
+                break
+            if "Blocked write-like" in str(last_result.get("error") or ""):
+                last_result["blocked_write"] = True
                 break
             if retries >= max_retries:
                 break
@@ -1317,19 +1371,24 @@ class ChatService:
             active_schema_override=active_schema_override,
         )
 
+        await ChatService._claim_conversation_run(conversation_id)
         normalized_attachments = ChatService._normalize_chat_attachments(attachments)
-        thread_id = f"{user.id}:{workspace_id}:{conversation_id}"
-        llm_prefs = await ChatService._resolve_llm_preferences(session, str(user.id))
-        resolved_api_key = (api_key or "").strip() or (
-            SecretStorageService.get_api_key(user.id, provider=llm_prefs["provider"]) or ""
-        )
-        if llm_prefs["requires_api_key"] and not resolved_api_key:
-            raise HTTPException(status_code=401, detail="API key not configured")
-        if normalized_attachments and not model_supports_vision(llm_prefs["provider"], model):
-            raise HTTPException(
-                status_code=400,
-                detail="The selected model does not support image attachments.",
+        try:
+            thread_id = f"{user.id}:{workspace_id}:{conversation_id}"
+            llm_prefs = await ChatService._resolve_llm_preferences(session, str(user.id))
+            resolved_api_key = (api_key or "").strip() or (
+                SecretStorageService.get_api_key(user.id, provider=llm_prefs["provider"]) or ""
             )
+            if llm_prefs["requires_api_key"] and not resolved_api_key:
+                raise HTTPException(status_code=401, detail="API key not configured")
+            if normalized_attachments and not model_supports_vision(llm_prefs["provider"], model):
+                raise HTTPException(
+                    status_code=400,
+                    detail="The selected model does not support image attachments.",
+                )
+        except BaseException:
+            await ChatService._release_conversation_run(conversation_id)
+            raise
 
         selected_turn = None
         parent_turn_id = None
@@ -1427,6 +1486,7 @@ class ChatService:
             parent_turn_id=parent_turn_id,
         )
 
+        await ChatService._release_conversation_run(conversation_id)
         return response_payload, conversation_id, turn_id
 
     @staticmethod
@@ -1673,6 +1733,7 @@ class ChatService:
             )
         )
 
+        await ChatService._claim_conversation_run(resolved_conversation_id)
         normalized_attachments = ChatService._normalize_chat_attachments(attachments)
         thread_id = f"{user.id}:{workspace_id}:{resolved_conversation_id}"
         llm_prefs = await ChatService._resolve_llm_preferences(session, str(user.id))
@@ -1855,6 +1916,7 @@ class ChatService:
             }
         )
         yield {"event": "final", "data": response_payload}
+        await ChatService._release_conversation_run(resolved_conversation_id)
 
     @staticmethod
     async def rerun_final_turn(

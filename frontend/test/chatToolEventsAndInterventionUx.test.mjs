@@ -49,6 +49,7 @@ test('app store preserves tool-call explanations in stream trace', () => {
   assert.equal(source.includes('explanation: String(event.explanation || \'\')'), true)
   assert.equal(source.includes('function appendLastMessageReasoningEvent(event)'), true)
   assert.equal(source.includes('function markLastMessageStreamStopped(reason'), true)
+  assert.equal(source.includes('const messageId = arguments[1] || null'), true)
 })
 
 test('v1 contract includes intervention response endpoint', () => {

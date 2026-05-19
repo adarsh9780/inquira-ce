@@ -8,7 +8,7 @@ test('chat input action button supports stop and voice-input states', () => {
   const source = readFileSync(componentPath, 'utf-8')
 
   assert.equal(source.includes('handleActionButtonClick'), true)
-  assert.equal(source.includes('<StopIcon v-if="appStore.isLoading" class="w-3 h-3" />'), true)
+  assert.equal(source.includes('<StopIcon v-if="appStore.activeConversationIsLoading" class="w-3 h-3" />'), true)
   assert.equal(source.includes(":class=\"{ 'animate-pulse': isVoiceInputActive }\""), true)
   assert.equal(source.includes('v-else-if="isComposerEmpty"'), true)
   assert.equal(source.includes('<MicrophoneIcon v-else-if="isComposerEmpty" class="w-3 h-3" />'), true)
