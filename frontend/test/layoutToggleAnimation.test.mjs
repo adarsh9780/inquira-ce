@@ -23,7 +23,8 @@ test('sidebar keeps the current animated text-collapse and scroll layout', () =>
 
   assert.equal(sidebarSource.includes('activeWorkspaceName'), true)
   assert.equal(sidebarSource.includes('class="flex min-h-0 flex-1 flex-col overflow-x-hidden px-2 custom-scrollbar"'), true)
-  assert.equal(sidebarSource.includes('class="group relative flex items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"'), true)
+  assert.equal(sidebarSource.includes('class="max-h-[11.75rem] flex-none overflow-y-auto overflow-x-hidden pb-1"'), true)
+  assert.equal(sidebarSource.includes('class="group relative flex min-h-9 items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"'), true)
   assert.equal(sidebarSource.includes('<Transition name="sidebar-section">'), false)
 })
 

@@ -172,7 +172,7 @@
         </div>
 
         <!-- Conversation List -->
-        <div class="flex-1 overflow-y-auto overflow-x-hidden pb-2">
+        <div class="max-h-[11.75rem] flex-none overflow-y-auto overflow-x-hidden pb-1">
           <div
             v-if="!appStore.hasWorkspace"
             class="px-3 py-2 text-[12px] text-[var(--color-text-muted)] transition-opacity"
@@ -185,9 +185,9 @@
             <div
               v-for="(conv, index) in appStore.conversations"
               :key="conv.id"
-              class="group relative flex items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
+              class="group relative flex min-h-9 items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
               :class="[
-                appStore.isSidebarCollapsed ? 'justify-center px-0 py-2' : 'justify-start px-3 py-2',
+                appStore.isSidebarCollapsed ? 'justify-center px-0 py-1.5' : 'justify-start px-3 py-1.5',
                 appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : '',
               ]"
               :title="conv.title || 'Untitled'"
