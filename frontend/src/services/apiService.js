@@ -895,10 +895,6 @@ export const apiService = {
     return v1Api.conversations.create(workspaceId, title)
   },
 
-  async v1ClearConversation(conversationId) {
-    return v1Api.conversations.clear(conversationId)
-  },
-
   async v1DeleteConversation(conversationId) {
     return v1Api.conversations.remove(conversationId)
   },

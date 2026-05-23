@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
-from sqlalchemy import delete, desc, func, select, update
+from sqlalchemy import desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Conversation, Turn
@@ -207,11 +207,6 @@ class ConversationRepository:
         """Update conversation title."""
         conversation.title = title
         await session.flush()
-
-    @staticmethod
-    async def clear_conversation(session: AsyncSession, conversation_id: str) -> None:
-        """Delete all turns for a conversation."""
-        await session.execute(delete(Turn).where(Turn.conversation_id == conversation_id))
 
     @staticmethod
     async def next_seq_no(session: AsyncSession, conversation_id: str) -> int:

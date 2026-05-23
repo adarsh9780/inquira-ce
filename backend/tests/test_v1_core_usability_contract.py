@@ -21,7 +21,7 @@ def test_openapi_contains_core_workspace_dataset_chat_and_conversation_routes():
     assert "/api/v1/chat/stream" in paths
 
     assert "/api/v1/workspaces/{workspace_id}/conversations" in paths
-    assert "/api/v1/conversations/{conversation_id}/clear" in paths
+    assert "/api/v1/conversations/{conversation_id}/clear" not in paths
     assert "/api/v1/conversations/{conversation_id}" in paths
     assert "/api/v1/conversations/{conversation_id}/turns" in paths
 

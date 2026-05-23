@@ -86,17 +86,6 @@ async def list_conversations(
     )
 
 
-@router.post("/conversations/{conversation_id}/clear", response_model=MessageResponse)
-async def clear_conversation(
-    conversation_id: str,
-    session: AsyncSession = Depends(get_appdata_db_session),
-    current_user=Depends(get_current_user),
-):
-    """Delete all turns while keeping conversation."""
-    await ConversationService.clear_conversation(session, current_user.id, conversation_id)
-    return MessageResponse(message="Conversation cleared")
-
-
 @router.delete("/conversations/{conversation_id}", response_model=MessageResponse)
 async def delete_conversation(
     conversation_id: str,

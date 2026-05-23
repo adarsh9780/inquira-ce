@@ -1860,65 +1860,6 @@
         }
       }
     },
-    "/api/v1/conversations/{conversation_id}/clear": {
-      "post": {
-        "tags": [
-          "V1 Conversations"
-        ],
-        "summary": "Clear Conversation",
-        "description": "Delete all turns while keeping conversation.",
-        "operationId": "clear_conversation_api_v1_conversations__conversation_id__clear_post",
-        "parameters": [
-          {
-            "name": "conversation_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Conversation Id"
-            }
-          },
-          {
-            "name": "Authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MessageResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/conversations/{conversation_id}": {
       "delete": {
         "tags": [

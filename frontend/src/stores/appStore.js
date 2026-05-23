@@ -2021,14 +2021,6 @@ export const useAppStore = defineStore('app', () => {
     turnsNextCursor.value = response?.next_cursor || null
   }
 
-  async function clearActiveConversation() {
-    if (!activeConversationId.value) return
-    await apiService.v1ClearConversation(activeConversationId.value)
-    chatHistory.value = []
-    turnsNextCursor.value = null
-    clearLiveTokenUsage()
-  }
-
   async function deleteConversationById(conversationId) {
     const targetId = String(conversationId || '').trim()
     if (!targetId) return ''
@@ -3079,7 +3071,6 @@ export const useAppStore = defineStore('app', () => {
     fetchConversations,
     createConversation,
     fetchConversationTurns,
-    clearActiveConversation,
     deleteConversationById,
     deleteActiveConversation,
     updateConversationTitle,

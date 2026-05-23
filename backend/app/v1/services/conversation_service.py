@@ -88,20 +88,6 @@ class ConversationService:
         return await ConversationRepository.list_conversations(session, workspace_id, limit)
 
     @staticmethod
-    async def clear_conversation(
-        session: AsyncSession,
-        principal_id: str,
-        conversation_id: str,
-    ) -> None:
-        """Delete all turns for a conversation but keep conversation row."""
-        conversation = await ConversationRepository.get_conversation(session, conversation_id)
-        if conversation is None:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
-        await ConversationRepository.clear_conversation(session, conversation_id)
-        await session.commit()
-
-    @staticmethod
     async def delete_conversation(
         session: AsyncSession,
         principal_id: str,
