@@ -80,57 +80,6 @@
           </div>
         </button>
 
-        <button
-          type="button"
-          class="mt-1 flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
-          :class="[
-            appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
-            appStore.activeTab === 'schema-editor' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
-          ]"
-          :title="appStore.isSidebarCollapsed ? 'Open schema editor' : 'Schema editor'"
-          @click="openSchemaEditor"
-        >
-          <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-            <CircleStackIcon class="h-5 w-5" :class="appStore.activeTab === 'schema-editor' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
-          </div>
-          <div
-            class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
-          >
-            <span class="block truncate text-[13px] font-medium leading-snug text-[var(--color-text-main)]">
-              Schema
-            </span>
-            <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
-              Datasets and column metadata
-            </span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          class="mt-1 flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
-          :class="[
-            appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
-            appStore.activeTab === 'conversation-tree' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
-          ]"
-          :title="appStore.isSidebarCollapsed ? 'Open conversation tree' : 'Conversation Tree'"
-          @click="openConversationTree"
-        >
-          <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-            <QueueListIcon class="h-5 w-5" :class="appStore.activeTab === 'conversation-tree' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
-          </div>
-          <div
-            class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
-          >
-            <span class="block truncate text-[13px] font-medium leading-snug text-[var(--color-text-main)]">
-              Conversation Tree
-            </span>
-            <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
-              Turns across this workspace
-            </span>
-          </div>
-        </button>
       </div>
 
       <div class="mx-1 mb-2 h-px bg-[var(--color-border)] opacity-60" />
@@ -281,6 +230,63 @@
           </div>
         </div>
       </div>
+
+      <!-- ─── Workspace Views ─── -->
+      <nav class="flex-none pb-2 pt-2">
+        <div class="flex flex-col space-y-0.5">
+          <button
+            type="button"
+            class="flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
+            :class="[
+              appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
+              appStore.activeTab === 'schema-editor' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
+            ]"
+            :title="appStore.isSidebarCollapsed ? 'Open schema editor' : 'Schema editor'"
+            @click="openSchemaEditor"
+          >
+            <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+              <CircleStackIcon class="h-5 w-5" :class="appStore.activeTab === 'schema-editor' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
+            </div>
+            <div
+              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+              :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+            >
+              <span class="block truncate text-[13px] font-medium leading-snug text-[var(--color-text-main)]">
+                Schema
+              </span>
+              <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
+                Datasets and column metadata
+              </span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            class="flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
+            :class="[
+              appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
+              appStore.activeTab === 'conversation-tree' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
+            ]"
+            :title="appStore.isSidebarCollapsed ? 'Open conversation tree' : 'Conversation Tree'"
+            @click="openConversationTree"
+          >
+            <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+              <QueueListIcon class="h-5 w-5" :class="appStore.activeTab === 'conversation-tree' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
+            </div>
+            <div
+              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+              :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+            >
+              <span class="block truncate text-[13px] font-medium leading-snug text-[var(--color-text-main)]">
+                Conversation Tree
+              </span>
+              <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
+                Turns across this workspace
+              </span>
+            </div>
+          </button>
+        </div>
+      </nav>
 
       <!-- ─── Footer Navigation ─── -->
       <nav class="mt-auto pb-4 pt-2">

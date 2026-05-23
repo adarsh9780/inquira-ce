@@ -17,6 +17,8 @@ test('sidebar adds workspace view entries and uses numbered conversation badges'
   assert.equal(sidebarSource.includes('Conversations and analysis'), true)
   assert.equal(sidebarSource.includes('Datasets and column metadata'), true)
   assert.equal(sidebarSource.includes('Turns across this workspace'), true)
+  assert.equal(sidebarSource.indexOf('<!-- ─── Workspace Views ─── -->') > sidebarSource.indexOf('<!-- Conversation List -->'), true)
+  assert.equal(sidebarSource.indexOf('<!-- ─── Footer Navigation ─── -->') > sidebarSource.indexOf('<!-- ─── Workspace Views ─── -->'), true)
   assert.equal(sidebarSource.includes(`v-if="appStore.activeTab === 'workspace'"`), false)
   assert.equal(sidebarSource.includes('max-h-[11.75rem] flex-none overflow-y-auto overflow-x-hidden pb-1'), true)
   assert.equal(sidebarSource.includes('min-h-9 select-none items-center rounded-lg'), true)
