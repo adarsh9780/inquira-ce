@@ -1,12 +1,16 @@
 <template>
-  <div class="mt-1 space-y-1 pl-3 pr-1 pb-2">
-    <div v-if="isLoading" class="px-2 py-2 text-[11px] text-[var(--color-text-muted)]">
+  <div
+    :class="variant === 'page'
+      ? 'min-h-0 flex-1 overflow-y-auto px-1 py-3'
+      : 'mt-1 space-y-1 pl-3 pr-1 pb-2'"
+  >
+    <div v-if="isLoading" :class="variant === 'page' ? 'px-2 py-6 text-sm text-[var(--color-text-muted)]' : 'px-2 py-2 text-[11px] text-[var(--color-text-muted)]'">
       Loading tree...
     </div>
-    <div v-else-if="conversations.length === 0" class="px-2 py-2 text-[11px] text-[var(--color-text-muted)]">
+    <div v-else-if="conversations.length === 0" :class="variant === 'page' ? 'px-2 py-6 text-sm text-[var(--color-text-muted)]' : 'px-2 py-2 text-[11px] text-[var(--color-text-muted)]'">
       No conversation turns yet.
     </div>
-    <div v-else class="space-y-2">
+    <div v-else :class="variant === 'page' ? 'space-y-2 py-2' : 'space-y-2'">
       <div
         v-for="conversation in conversations"
         :key="conversation.id"
@@ -14,7 +18,9 @@
       >
         <button
           type="button"
-          class="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-[12px] font-medium text-[var(--color-text-main)] transition-colors hover:bg-[var(--color-text-main)]/5"
+          :class="variant === 'page'
+            ? 'flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] transition-colors hover:bg-[var(--color-text-main)]/5'
+            : 'flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-[12px] font-medium text-[var(--color-text-main)] transition-colors hover:bg-[var(--color-text-main)]/5'"
           :title="conversation.title || 'Untitled'"
           @click="selectConversation(conversation.id)"
         >
@@ -24,7 +30,7 @@
           />
           <span class="truncate">{{ conversation.title || 'Untitled' }}</span>
         </button>
-        <div v-show="isExpanded(conversation.id)" class="ml-2 border-l border-[var(--color-border)] pl-2">
+        <div v-show="isExpanded(conversation.id)" :class="variant === 'page' ? 'ml-4 border-l border-[var(--color-border)] pl-3' : 'ml-2 border-l border-[var(--color-border)] pl-2'">
           <SidebarTreeNode
             v-for="node in conversation.roots || []"
             :key="node.id"
@@ -46,6 +52,9 @@ import { toast } from '../../../composables/useToast'
 import { extractApiErrorMessage } from '../../../utils/apiError'
 
 const appStore = useAppStore()
+defineProps({
+  variant: { type: String, default: 'sidebar' },
+})
 const isLoading = ref(false)
 const expandedConversationIds = ref(new Set())
 

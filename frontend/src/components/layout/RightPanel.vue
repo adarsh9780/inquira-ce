@@ -70,10 +70,17 @@
       </div>
     </div>
 
-    <!-- Other Full-Screen Views (Schema) -->
+    <!-- Other Full-Screen Views (Schema / Conversation Tree) -->
     <div v-show="appStore.activeTab !== 'workspace'" class="relative flex-1 overflow-hidden" style="background-color: var(--color-workspace-surface);">
       <div v-show="appStore.activeTab === 'schema-editor'" class="h-full p-3 sm:p-4">
         <SchemaEditorTab />
+      </div>
+      <div v-show="appStore.activeTab === 'conversation-tree'" class="flex h-full flex-col p-3 sm:p-4">
+        <div class="shrink-0 border-b border-[var(--color-border)] px-1 pb-3">
+          <h2 class="text-base font-semibold tracking-tight text-[var(--color-text-main)]">Conversation Tree</h2>
+          <p class="mt-1 text-xs text-[var(--color-text-muted)]">Turns across this workspace</p>
+        </div>
+        <SidebarGlobalTurnTree variant="page" />
       </div>
     </div>
     
@@ -97,6 +104,7 @@ import WorkspaceLeftPane from './WorkspaceLeftPane.vue'
 import WorkspaceRightPane from './WorkspaceRightPane.vue'
 import TerminalTab from '../analysis/TerminalTab.vue'
 import SchemaEditorTab from '../preview/SchemaEditorTab.vue'
+import SidebarGlobalTurnTree from './sidebar/SidebarGlobalTurnTree.vue'
 import { CommandLineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()

@@ -3,13 +3,21 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('sidebar adds a schema entry under workspace and uses numbered conversation badges', () => {
+test('sidebar adds workspace view entries and uses numbered conversation badges', () => {
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
+  assert.equal(sidebarSource.includes('@click="openChat"'), true)
   assert.equal(sidebarSource.includes('@click="openSchemaEditor"'), true)
+  assert.equal(sidebarSource.includes('@click="openConversationTree"'), true)
+  assert.equal(sidebarSource.includes('Chat'), true)
   assert.equal(sidebarSource.includes('CircleStackIcon'), true)
+  assert.equal(sidebarSource.includes('QueueListIcon'), true)
   assert.equal(sidebarSource.includes('Schema'), true)
-  assert.equal(sidebarSource.includes('Inspect datasets and column metadata'), true)
+  assert.equal(sidebarSource.includes('Conversation Tree'), true)
+  assert.equal(sidebarSource.includes('Conversations and analysis'), true)
+  assert.equal(sidebarSource.includes('Datasets and column metadata'), true)
+  assert.equal(sidebarSource.includes('Turns across this workspace'), true)
+  assert.equal(sidebarSource.includes(`v-if="appStore.activeTab === 'workspace'"`), true)
   assert.equal(sidebarSource.includes('conversationBadgeLabel(index, appStore.conversations.length)'), true)
   assert.equal(sidebarSource.includes('const ordinal = total - offset'), true)
   assert.equal(sidebarSource.includes("if (ordinal > 99) return '99+'"), true)

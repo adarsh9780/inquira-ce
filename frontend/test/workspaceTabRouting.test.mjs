@@ -11,6 +11,7 @@ test('app store maps legacy code/chat tabs into workspace pane routing', () => {
   assert.equal(source.includes("const workspacePane = ref('chat')"), true)
   assert.equal(source.includes("if (normalized === 'code')"), true)
   assert.equal(source.includes("if (normalized === 'chat')"), true)
+  assert.equal(source.includes("'conversation-tree'"), true)
   assert.equal(source.includes("activeTab.value = 'workspace'"), true)
 })
 
@@ -21,6 +22,8 @@ test('right panel includes unified workspace layout', () => {
   assert.equal(source.includes('WorkspaceLeftPane'), true)
   assert.equal(source.includes('WorkspaceRightPane'), true)
   assert.equal(source.includes("appStore.activeTab === 'workspace'"), true)
+  assert.equal(source.includes("appStore.activeTab === 'conversation-tree'"), true)
+  assert.equal(source.includes('SidebarGlobalTurnTree'), true)
 })
 
 test('preview tab is removed from sidebar navigation and runtime API client', () => {

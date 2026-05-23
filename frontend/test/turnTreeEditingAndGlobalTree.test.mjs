@@ -5,6 +5,7 @@ import test from 'node:test'
 const chatInputSource = readFileSync(new URL('../src/components/chat/ChatInput.vue', import.meta.url), 'utf8')
 const modalSource = readFileSync(new URL('../src/components/chat/TurnTreeModal.vue', import.meta.url), 'utf8')
 const sidebarSource = readFileSync(new URL('../src/components/layout/UnifiedSidebar.vue', import.meta.url), 'utf8')
+const rightPanelSource = readFileSync(new URL('../src/components/layout/RightPanel.vue', import.meta.url), 'utf8')
 const globalTreeSource = readFileSync(new URL('../src/components/layout/sidebar/SidebarGlobalTurnTree.vue', import.meta.url), 'utf8')
 const apiServiceSource = readFileSync(new URL('../src/services/apiService.js', import.meta.url), 'utf8')
 const storeSource = readFileSync(new URL('../src/stores/appStore.js', import.meta.url), 'utf8')
@@ -36,9 +37,12 @@ test('frontend API and store expose turn edit and workspace tree calls', () => {
   assert.equal(storeSource.includes('async function reorderTurnSiblings(parentTurnId, turnIds)'), true)
 })
 
-test('global tree is rendered under the schema sidebar entry and opens turns', () => {
-  assert.equal(sidebarSource.includes('SidebarGlobalTurnTree'), true)
-  assert.equal(sidebarSource.includes("appStore.activeTab === 'schema-editor'"), true)
+test('global tree is routed as a full conversation tree view and opens turns', () => {
+  assert.equal(sidebarSource.includes('openConversationTree'), true)
+  assert.equal(sidebarSource.includes("appStore.activeTab === 'conversation-tree'"), true)
+  assert.equal(sidebarSource.includes('SidebarGlobalTurnTree'), false)
+  assert.equal(rightPanelSource.includes("appStore.activeTab === 'conversation-tree'"), true)
+  assert.equal(rightPanelSource.includes('<SidebarGlobalTurnTree variant="page" />'), true)
   assert.equal(globalTreeSource.includes('appStore.loadWorkspaceTurnTree()'), true)
   assert.equal(globalTreeSource.includes("appStore.setActiveTab('workspace')"), true)
   assert.equal(globalTreeSource.includes('appStore.loadActiveTurnRelations(targetTurnId)'), true)

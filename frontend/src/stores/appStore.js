@@ -2591,7 +2591,7 @@ export const useAppStore = defineStore('app', () => {
   function toggleTerminal() {
     isTerminalOpen.value = !isTerminalOpen.value
     // If opening the terminal, ensure we are not hiding the workspace if we were previously in a full-screen view.
-    if (isTerminalOpen.value && activeTab.value === 'schema-editor') {
+    if (isTerminalOpen.value && ['schema-editor', 'conversation-tree'].includes(activeTab.value)) {
       activeTab.value = 'workspace'
     }
     saveLocalConfig()

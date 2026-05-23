@@ -3,17 +3,24 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('workspace and schema navigation live in the sidebar instead of the status bar', () => {
+test('workspace views live in the sidebar instead of the status bar', () => {
   const sidebarPath = resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue')
   const statusBarPath = resolve(process.cwd(), 'src/components/layout/StatusBar.vue')
   const sidebarSource = readFileSync(sidebarPath, 'utf-8')
   const statusBarSource = readFileSync(statusBarPath, 'utf-8')
 
   assert.equal(sidebarSource.includes("@click=\"openSettings('workspace', 1)\""), true)
+  assert.equal(sidebarSource.includes('@click="openChat"'), true)
   assert.equal(sidebarSource.includes('@click="openSchemaEditor"'), true)
+  assert.equal(sidebarSource.includes('@click="openConversationTree"'), true)
+  assert.equal(sidebarSource.includes('ChatBubbleLeftRightIcon'), true)
   assert.equal(sidebarSource.includes('CircleStackIcon'), true)
+  assert.equal(sidebarSource.includes('QueueListIcon'), true)
+  assert.equal(sidebarSource.includes('Chat'), true)
   assert.equal(sidebarSource.includes('Schema'), true)
-  assert.equal(sidebarSource.includes('Inspect datasets and column metadata'), true)
+  assert.equal(sidebarSource.includes('Conversation Tree'), true)
+  assert.equal(sidebarSource.includes('Datasets and column metadata'), true)
+  assert.equal(sidebarSource.includes('Turns across this workspace'), true)
   assert.equal(statusBarSource.includes('switchToWorkspace'), false)
   assert.equal(statusBarSource.includes('switchToSchemaEditor'), false)
   assert.equal(statusBarSource.includes('FolderOpenIcon'), false)

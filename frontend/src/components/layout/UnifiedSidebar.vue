@@ -33,13 +33,13 @@
           class="flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
           :class="[
             appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
-            appStore.activeTab === 'workspace' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
+            'text-[var(--color-text-muted)]',
           ]"
           :title="appStore.isSidebarCollapsed ? activeWorkspaceName : 'Open workspace settings'"
           @click="openSettings('workspace', 1)"
         >
           <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-            <FolderOpenIcon class="h-5 w-5" :class="appStore.activeTab === 'workspace' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
+            <FolderOpenIcon class="h-5 w-5 text-[var(--color-text-main)]" />
           </div>
           <div
             class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
@@ -50,6 +50,32 @@
             </span>
             <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
               {{ activeWorkspaceCaption }}
+            </span>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          class="mt-1 flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
+          :class="[
+            appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
+            appStore.activeTab === 'workspace' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
+          ]"
+          :title="appStore.isSidebarCollapsed ? 'Open chat' : 'Chat'"
+          @click="openChat"
+        >
+          <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+            <ChatBubbleLeftRightIcon class="h-5 w-5" :class="appStore.activeTab === 'workspace' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
+          </div>
+          <div
+            class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+          >
+            <span class="block truncate text-[13px] font-medium leading-snug text-[var(--color-text-main)]">
+              Chat
+            </span>
+            <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
+              Conversations and analysis
             </span>
           </div>
         </button>
@@ -75,22 +101,42 @@
               Schema
             </span>
             <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
-              Inspect datasets and column metadata
+              Datasets and column metadata
             </span>
           </div>
         </button>
-        <div
-          v-if="!appStore.isSidebarCollapsed && appStore.activeTab === 'schema-editor'"
-          class="max-h-64 overflow-y-auto"
+
+        <button
+          type="button"
+          class="mt-1 flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
+          :class="[
+            appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
+            appStore.activeTab === 'conversation-tree' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
+          ]"
+          :title="appStore.isSidebarCollapsed ? 'Open conversation tree' : 'Conversation Tree'"
+          @click="openConversationTree"
         >
-          <SidebarGlobalTurnTree />
-        </div>
+          <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+            <QueueListIcon class="h-5 w-5" :class="appStore.activeTab === 'conversation-tree' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
+          </div>
+          <div
+            class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+          >
+            <span class="block truncate text-[13px] font-medium leading-snug text-[var(--color-text-main)]">
+              Conversation Tree
+            </span>
+            <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
+              Turns across this workspace
+            </span>
+          </div>
+        </button>
       </div>
 
       <div class="mx-1 mb-2 h-px bg-[var(--color-border)] opacity-60" />
 
       <!-- ─── Conversations ─── -->
-      <div class="flex min-h-0 flex-1 flex-col">
+      <div v-if="appStore.activeTab === 'workspace'" class="flex min-h-0 flex-1 flex-col">
 
         <!-- Section Header -->
         <div
@@ -371,7 +417,6 @@ import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import SettingsModal from '../modals/SettingsModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
-import SidebarGlobalTurnTree from './sidebar/SidebarGlobalTurnTree.vue'
 import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 
@@ -380,6 +425,8 @@ import {
   PlusIcon,
   EllipsisHorizontalIcon,
   CircleStackIcon,
+  ChatBubbleLeftRightIcon,
+  QueueListIcon,
   Cog6ToothIcon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
@@ -537,6 +584,14 @@ function handleBrandClick() {
 
 function openSchemaEditor() {
   appStore.setActiveTab('schema-editor')
+}
+
+function openChat() {
+  appStore.setActiveTab('chat')
+}
+
+function openConversationTree() {
+  appStore.setActiveTab('conversation-tree')
 }
 
 function conversationBadgeLabel(index, totalCount = appStore.conversations.length) {
