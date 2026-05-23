@@ -54,32 +54,6 @@
           </div>
         </button>
 
-        <button
-          type="button"
-          class="mt-1 flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
-          :class="[
-            appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
-            appStore.activeTab === 'workspace' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
-          ]"
-          :title="appStore.isSidebarCollapsed ? 'Open chat' : 'Chat'"
-          @click="openChat"
-        >
-          <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-            <ChatBubbleLeftRightIcon class="h-5 w-5" :class="appStore.activeTab === 'workspace' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
-          </div>
-          <div
-            class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
-          >
-            <span class="block truncate text-[13px] font-medium leading-snug text-[var(--color-text-main)]">
-              Chat
-            </span>
-            <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
-              Conversations and analysis
-            </span>
-          </div>
-        </button>
-
       </div>
 
       <div class="mx-1 mb-2 h-px bg-[var(--color-border)] opacity-60" />
@@ -448,7 +422,6 @@ import {
   PlusIcon,
   EllipsisHorizontalIcon,
   CircleStackIcon,
-  ChatBubbleLeftRightIcon,
   QueueListIcon,
   Cog6ToothIcon,
   ChevronDoubleLeftIcon,
@@ -620,10 +593,6 @@ function handleBrandClick() {
 
 function openSchemaEditor() {
   appStore.setActiveTab('schema-editor')
-}
-
-function openChat() {
-  appStore.setActiveTab('chat')
 }
 
 function openConversationTree() {
