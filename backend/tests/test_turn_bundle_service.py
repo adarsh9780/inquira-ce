@@ -21,7 +21,7 @@ async def test_create_turn_bundle_writes_expected_files() -> None:
     )
 
     assert turn_dir.name == "turn-1"
-    assert turn_dir.joinpath("artifacts").is_dir()
+    assert not turn_dir.joinpath("artifacts").exists()
     conversation_manifest_path = TurnBundleService.build_conversation_manifest_path(
         "alice",
         "workspace-1",
@@ -42,6 +42,7 @@ async def test_create_turn_bundle_writes_expected_files() -> None:
     assert manifest["workspace_id"] == "workspace-1"
     assert manifest["status"] == "draft"
     assert manifest["files"]["analysis_code"] == "analysis.py"
+    assert manifest["files"]["artifacts_dir"] == "."
 
 
 @pytest.mark.asyncio
@@ -56,7 +57,7 @@ async def test_turn_bundle_service_exposes_explicit_paths_and_artifact_formats()
     )
 
     assert TurnBundleService.build_conversation_dir("alice", "workspace-1", "conversation-1").name == "conversation-1"
-    assert TurnBundleService.build_turns_dir("alice", "workspace-1", "conversation-1").name == "turns"
+    assert TurnBundleService.build_turns_dir("alice", "workspace-1", "conversation-1").name == "conversation-1"
     assert TurnBundleService.build_turn_user_message_path("alice", "workspace-1", "conversation-1", "turn-1").name == "user.md"
     assert TurnBundleService.build_turn_assistant_message_path(
         "alice",
@@ -66,6 +67,7 @@ async def test_turn_bundle_service_exposes_explicit_paths_and_artifact_formats()
     ).name == "assistant.md"
     assert TurnBundleService.build_turn_code_path("alice", "workspace-1", "conversation-1", "turn-1").name == "analysis.py"
     assert artifact_path.name == "artifact-1.parquet"
+    assert artifact_path.parent.name == "turn-1"
     assert TurnBundleService.artifact_payload_format("figure") == "json"
     assert TurnBundleService.artifact_payload_format("text") == "txt"
     assert TurnBundleService.artifact_payload_format("unknown-kind") == "json"

@@ -20,7 +20,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...data_access.workspace_db import WorkspaceRuntimeAdapter
 from ...services.agent_client import AgentClient, AgentRuntimeError
 from ...services.agent_service_config import load_agent_service_config
-from ...services.code_executor import get_workspace_run_exports
 from ...services.output_capture import (
     build_auto_capture_result_code,
     build_run_wrapped_code,
@@ -361,7 +360,8 @@ class ChatService:
         data_path: str,
         workspace_schema: dict[str, Any],
         schema_folder_path: str = "",
-        scratchpad_path: str,
+        artifact_dir: str,
+        turn_id: str,
         attachments: list[dict[str, Any]],
         llm_prefs: dict[str, Any],
         resolved_api_key: str,
@@ -392,7 +392,8 @@ class ChatService:
             "data_path": ChatService._normalize_remote_path(data_path),
             "workspace_schema": workspace_schema if isinstance(workspace_schema, dict) else {},
             "schema_folder_path": ChatService._normalize_remote_path(schema_folder_path),
-            "scratchpad_path": ChatService._normalize_remote_path(scratchpad_path) or None,
+            "artifact_dir": ChatService._normalize_remote_path(artifact_dir) or None,
+            "turn_id": str(turn_id or "").strip() or None,
             "agent_profile": str(agent_profile or "").strip(),
             "attachments": attachments,
             "llm": {
@@ -631,8 +632,23 @@ class ChatService:
         return build_auto_capture_result_code(output_contract)
 
     @staticmethod
-    def _build_run_wrapped_code(code: str, run_id: str, output_contract: list[dict[str, str]]) -> str:
-        return build_run_wrapped_code(code, run_id, output_contract)
+    def _build_run_wrapped_code(
+        code: str,
+        run_id: str,
+        output_contract: list[dict[str, str]],
+        *,
+        conversation_id: str | None = None,
+        turn_id: str | None = None,
+        artifact_dir: str | None = None,
+    ) -> str:
+        return build_run_wrapped_code(
+            code,
+            run_id,
+            output_contract,
+            conversation_id=conversation_id,
+            turn_id=turn_id,
+            artifact_dir=artifact_dir,
+        )
 
     @staticmethod
     async def _finalize_kernel_run(
@@ -677,10 +693,20 @@ class ChatService:
         generated_code: str,
         run_id: str,
         output_contract: list[dict[str, str]],
+        conversation_id: str,
+        turn_id: str,
+        artifact_dir: str,
         max_retries: int = 2,
     ) -> tuple[dict[str, Any], int, float, str]:
         retries = 0
-        wrapped_code = ChatService._build_run_wrapped_code(generated_code, run_id, output_contract)
+        wrapped_code = ChatService._build_run_wrapped_code(
+            generated_code,
+            run_id,
+            output_contract,
+            conversation_id=conversation_id,
+            turn_id=turn_id,
+            artifact_dir=artifact_dir,
+        )
         last_result: dict[str, Any] = {
             "success": True,
             "stdout": "",
@@ -883,6 +909,9 @@ class ChatService:
         generated_code: str,
         output_contract: list[dict[str, str]],
         response_payload: dict[str, Any],
+        conversation_id: str,
+        turn_id: str,
+        artifact_dir: str,
     ) -> None:
         execution_result, retry_count, duration_ms, executed_code = (
             await ChatService._execute_generated_code_with_retries(
@@ -891,6 +920,9 @@ class ChatService:
                 generated_code=generated_code,
                 run_id=run_id,
                 output_contract=output_contract,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+                artifact_dir=artifact_dir,
                 max_retries=2,
             )
         )
@@ -908,11 +940,6 @@ class ChatService:
             retry_count=retry_count,
         )
         artifacts = ChatService._normalize_artifacts(execution_result.get("artifacts"))
-        if not artifacts:
-            artifacts = await get_workspace_run_exports(
-                workspace_id=workspace_id,
-                run_id=run_id,
-            )
         if not artifacts:
             artifacts = ChatService._build_inline_artifact_fallback(
                 run_id=run_id,
@@ -1169,8 +1196,6 @@ class ChatService:
             }
             for dataset in datasets
         ]
-        await ChatService._release_session_before_agent(session)
-
         tables: list[dict[str, Any]] = []
         for dataset in dataset_descriptors:
             table_name = str(dataset.get("table_name") or "").strip()
@@ -1404,6 +1429,16 @@ class ChatService:
                     schema_memory_json=getattr(conversation, "schema_memory_json", None),
                 )
 
+        reserved_turn, reserved_seq_no, reserved_turn_dir = await ChatService._reserve_turn(
+            session=session,
+            conversation=conversation,
+            username=str(user.username),
+            workspace_id=workspace_id,
+            conversation_id=conversation_id,
+            question=question,
+            parent_turn_id=parent_turn_id,
+        )
+
         await ChatService._release_session_before_agent(session)
 
         payload = ChatService._build_remote_agent_payload(
@@ -1419,7 +1454,8 @@ class ChatService:
             data_path=data_path,
             workspace_schema=schema if isinstance(schema, dict) else {},
             schema_folder_path=str(Path(data_path).parent / "meta") if data_path else "",
-            scratchpad_path=str(Path(data_path).parent / "scratchpad" / "artifacts.duckdb") if data_path else "",
+            artifact_dir=str(reserved_turn_dir),
+            turn_id=reserved_turn.id,
             attachments=normalized_attachments,
             llm_prefs=llm_prefs,
             resolved_api_key=resolved_api_key,
@@ -1468,12 +1504,17 @@ class ChatService:
                     generated_code=code_to_execute,
                     output_contract=response_payload.get("output_contract") or [],
                     response_payload=response_payload,
+                    conversation_id=conversation_id,
+                    turn_id=reserved_turn.id,
+                    artifact_dir=str(reserved_turn_dir),
                 )
             ChatService._reconcile_success_explanation(response_payload)
 
         turn_id = await ChatService._persist_turn(
             session=session,
             conversation=conversation,
+            turn=reserved_turn,
+            seq_no=reserved_seq_no,
             username=str(user.username),
             workspace_id=workspace_id,
             workspace_schema=schema if isinstance(schema, dict) else {},
@@ -1587,6 +1628,42 @@ class ChatService:
         }
 
     @staticmethod
+    async def _reserve_turn(
+        *,
+        session: AsyncSession,
+        conversation: Any,
+        username: str,
+        workspace_id: str,
+        conversation_id: str,
+        question: str,
+        parent_turn_id: str | None,
+    ) -> tuple[Any, int, Path]:
+        seq_no = await ConversationRepository.next_seq_no(session, conversation_id)
+        if seq_no == 1 and (conversation.title or "").strip().lower() == "new conversation":
+            conversation.title = ChatService._derive_conversation_title(question)
+        turn = await ConversationRepository.create_turn(
+            session=session,
+            conversation_id=conversation_id,
+            seq_no=seq_no,
+            user_text=question,
+            assistant_text="",
+            tool_events=[],
+            metadata={"status": "running"},
+            code_snapshot="",
+            parent_turn_id=parent_turn_id,
+        )
+        conversation.storage_path = str(
+            TurnBundleService.build_conversation_dir(username, workspace_id, conversation_id)
+        )
+        turn_dir = TurnBundleService.build_turn_dir(username, workspace_id, conversation_id, turn.id)
+        turn.storage_path = str(turn_dir)
+        turn.code_path = str(TurnBundleService.build_turn_code_path(username, workspace_id, conversation_id, turn.id))
+        turn.manifest_path = str(TurnBundleService.build_turn_manifest_path(username, workspace_id, conversation_id, turn.id))
+        await asyncio.to_thread(turn_dir.mkdir, parents=True, exist_ok=True)
+        await session.commit()
+        return turn, seq_no, turn_dir
+
+    @staticmethod
     async def _persist_turn(
         session: AsyncSession,
         conversation: Any,
@@ -1600,27 +1677,34 @@ class ChatService:
         response_payload: dict[str, Any],
         result: dict[str, Any],
         parent_turn_id: str | None = None,
+        turn: Any | None = None,
+        seq_no: int | None = None,
     ) -> str:
         """Helper to persist a conversation turn in the database."""
-        seq_no = await ConversationRepository.next_seq_no(session, conversation_id)
-        if seq_no == 1 and (conversation.title or "").strip().lower() == "new conversation":
-            conversation.title = ChatService._derive_conversation_title(question)
-        
+        if seq_no is None:
+            seq_no = await ConversationRepository.next_seq_no(session, conversation_id)
+            if seq_no == 1 and (conversation.title or "").strip().lower() == "new conversation":
+                conversation.title = ChatService._derive_conversation_title(question)
+        if turn is None:
+            turn = await ConversationRepository.create_turn(
+                session=session,
+                conversation_id=conversation_id,
+                seq_no=seq_no,
+                user_text=question,
+                assistant_text="",
+                tool_events=[],
+                metadata={"status": "running"},
+                code_snapshot="",
+                parent_turn_id=parent_turn_id,
+            )
         metadata = dict(response_payload.get("metadata", {}) or {})
         metadata["user_attachments"] = attachments or []
         artifacts = ChatService._normalize_artifacts(response_payload.get("artifacts"))
-
-        turn = await ConversationRepository.create_turn(
-            session=session,
-            conversation_id=conversation_id,
-            seq_no=seq_no,
-            user_text=question,
-            assistant_text=response_payload["explanation"],
-            tool_events=[{"type": "artifact", "data": item} for item in artifacts],
-            metadata=metadata,
-            code_snapshot=response_payload["code"],
-            parent_turn_id=parent_turn_id,
-        )
+        turn.user_text = question
+        turn.assistant_text = response_payload["explanation"]
+        turn.tool_events_json = json.dumps([{"type": "artifact", "data": item} for item in artifacts])
+        turn.metadata_json = json.dumps(metadata)
+        turn.code_snapshot = response_payload["code"]
         artifact_rows = await TurnArtifactStorageService.persist_turn_artifacts(
             session=session,
             username=username,
@@ -1772,6 +1856,16 @@ class ChatService:
                     schema_memory_json=getattr(conversation, "schema_memory_json", None),
                 )
 
+        reserved_turn, reserved_seq_no, reserved_turn_dir = await ChatService._reserve_turn(
+            session=session,
+            conversation=conversation,
+            username=str(user.username),
+            workspace_id=workspace_id,
+            conversation_id=resolved_conversation_id,
+            question=question,
+            parent_turn_id=parent_turn_id,
+        )
+
         await ChatService._release_session_before_agent(session)
 
         payload = ChatService._build_remote_agent_payload(
@@ -1787,7 +1881,8 @@ class ChatService:
             data_path=data_path,
             workspace_schema=schema if isinstance(schema, dict) else {},
             schema_folder_path=str(Path(data_path).parent / "meta") if data_path else "",
-            scratchpad_path=str(Path(data_path).parent / "scratchpad" / "artifacts.duckdb") if data_path else "",
+            artifact_dir=str(reserved_turn_dir),
+            turn_id=reserved_turn.id,
             attachments=normalized_attachments,
             llm_prefs=llm_prefs,
             resolved_api_key=resolved_api_key,
@@ -1901,12 +1996,17 @@ class ChatService:
                     generated_code=code_to_execute,
                     output_contract=response_payload.get("output_contract") or [],
                     response_payload=response_payload,
+                    conversation_id=resolved_conversation_id,
+                    turn_id=reserved_turn.id,
+                    artifact_dir=str(reserved_turn_dir),
                 )
             ChatService._reconcile_success_explanation(response_payload)
 
         turn_id = await ChatService._persist_turn(
             session=session,
             conversation=conversation,
+            turn=reserved_turn,
+            seq_no=reserved_seq_no,
             username=str(user.username),
             workspace_id=workspace_id,
             workspace_schema=schema if isinstance(schema, dict) else {},
@@ -1986,6 +2086,15 @@ class ChatService:
             "final_script_artifact_id": None,
             "result_kind": str(getattr(final_turn, "result_kind", "") or ""),
         }
+        reserved_turn, reserved_seq_no, reserved_turn_dir = await ChatService._reserve_turn(
+            session=session,
+            conversation=conversation,
+            username=str(user.username),
+            workspace_id=workspace.id,
+            conversation_id=conversation_id,
+            question=str(final_turn.user_text or ""),
+            parent_turn_id=final_turn.id,
+        )
         await ChatService._apply_authoritative_execution_to_response(
             workspace_id=workspace.id,
             workspace_duckdb_path=data_path,
@@ -1994,11 +2103,16 @@ class ChatService:
             generated_code=stored_code,
             output_contract=[],
             response_payload=response_payload,
+            conversation_id=conversation_id,
+            turn_id=reserved_turn.id,
+            artifact_dir=str(reserved_turn_dir),
         )
         ChatService._reconcile_success_explanation(response_payload)
         child_turn_id = await ChatService._persist_turn(
             session=session,
             conversation=conversation,
+            turn=reserved_turn,
+            seq_no=reserved_seq_no,
             username=str(user.username),
             workspace_id=workspace.id,
             workspace_schema=schema if isinstance(schema, dict) else {},

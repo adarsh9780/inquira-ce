@@ -8,7 +8,7 @@ def test_build_run_wrapped_code_uses_real_newlines():
         "run-1",
         [{"name": "result_df", "kind": "dataframe"}],
     )
-    assert "set_active_run('run-1')\nx = 1\n" in wrapped
+    assert "set_active_run('run-1', conversation_id=None, turn_id=None, artifact_dir=None)\nx = 1\n" in wrapped
     assert "\"name\": \"result_df\"" in wrapped
     assert "export_dataframe" in wrapped
     assert "\\n" not in wrapped

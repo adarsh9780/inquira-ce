@@ -5,15 +5,12 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-import shutil
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...data_access import ScratchpadOfflineAdapter, ScratchpadRuntimeAdapter
 from ...core.logger import logprint
-from ...services.artifact_scratchpad import ArtifactScratchpadStore
 from ..repositories.turn_artifact_repository import TurnArtifactRepository
 from .turn_bundle_service import TurnBundleService
 
@@ -146,57 +143,7 @@ class TurnArtifactStorageService:
             conversation_id,
             turn_id,
         )
-        scratchpad_db_path = ArtifactScratchpadStore.build_scratchpad_db_path(workspace_duckdb_path)
-
-        def _reset_artifacts_dir() -> None:
-            if artifacts_dir.exists():
-                shutil.rmtree(artifacts_dir)
-            artifacts_dir.mkdir(parents=True, exist_ok=True)
-
-        await asyncio.to_thread(_reset_artifacts_dir)
-
-        materialized_sizes: dict[str, int | None] = {}
-        kernel_specs = [
-            {
-                "artifact_id": str(item.get("source_artifact_id") or item.get("artifact_id") or "").strip(),
-                "kind": str(item.get("kind") or "").strip().lower() or "scalar",
-                "payload": item.get("payload"),
-                "table_name": item.get("table_name"),
-                "storage_path": str(
-                    TurnBundleService.build_turn_artifact_path(
-                        username,
-                        workspace_id,
-                        conversation_id,
-                        turn_id,
-                        str(item.get("artifact_id") or item.get("logical_name") or item.get("kind") or "artifact"),
-                        str(item.get("kind") or ""),
-                    )
-                ),
-            }
-            for item in normalized_artifacts
-            if str(item.get("source_artifact_id") or item.get("artifact_id") or "").strip()
-        ]
-        if kernel_specs:
-            try:
-                materialized = await ScratchpadRuntimeAdapter().materialize_workspace_artifacts(
-                    workspace_id=workspace_id,
-                    specs=kernel_specs,
-                )
-            except Exception as exc:  # noqa: BLE001
-                logprint(
-                    "Workspace kernel artifact materialization failed; continuing without local shadow copies.",
-                    level="WARNING",
-                    workspace_id=workspace_id,
-                    conversation_id=conversation_id,
-                    turn_id=turn_id,
-                    error=str(exc),
-                )
-                materialized = []
-            materialized_sizes = {
-                str(item.get("artifact_id") or ""): item.get("size_bytes")
-                for item in materialized
-                if isinstance(item, dict)
-            }
+        await asyncio.to_thread(artifacts_dir.mkdir, parents=True, exist_ok=True)
 
         persisted_rows: list[dict[str, Any]] = []
         for item in normalized_artifacts:
@@ -207,9 +154,7 @@ class TurnArtifactStorageService:
                     conversation_id=conversation_id,
                     turn_id=turn_id,
                     workspace_duckdb_path=workspace_duckdb_path,
-                    scratchpad_db_path=scratchpad_db_path,
                     artifact=item,
-                    kernel_materialized_sizes=materialized_sizes,
                     session=session,
                     offline_lease_owner_token=offline_lease_owner_token,
                 )
@@ -245,9 +190,7 @@ class TurnArtifactStorageService:
         conversation_id: str,
         turn_id: str,
         workspace_duckdb_path: str,
-        scratchpad_db_path: Path,
         artifact: dict[str, Any],
-        kernel_materialized_sizes: dict[str, int | None],
         session: AsyncSession,
         offline_lease_owner_token: str | None,
     ) -> dict[str, Any] | None:
@@ -257,87 +200,26 @@ class TurnArtifactStorageService:
         logical_name = str(artifact.get("logical_name") or artifact_id or kind).strip() or kind
         display_name = str(artifact.get("display_name") or "").strip() or TurnArtifactStorageService.display_name_for_artifact(logical_name)
         payload_format = TurnBundleService.artifact_payload_format(kind)
-        storage_path = TurnBundleService.build_turn_artifact_path(
-            username,
-            workspace_id,
-            conversation_id,
-            turn_id,
-            artifact_id or logical_name,
-            kind,
-        )
+        raw_storage_path = str(artifact.get("storage_path") or "").strip()
+        storage_path = Path(raw_storage_path).expanduser() if raw_storage_path else None
+        if storage_path is None:
+            storage_path = TurnBundleService.build_turn_artifact_path(
+                username,
+                workspace_id,
+                conversation_id,
+                turn_id,
+                artifact_id or logical_name,
+                kind,
+            )
 
         source_meta: dict[str, Any] = artifact
-        needs_scratchpad_lookup = False
-        if kind == "dataframe":
-            needs_scratchpad_lookup = not str(artifact.get("table_name") or "").strip()
-        elif kind in {"figure", "scalar", "text", "structured"}:
-            needs_scratchpad_lookup = artifact.get("payload") is None
-        scratchpad_fallback_allowed = False
-        if needs_scratchpad_lookup and source_artifact_id:
-            try:
-                kernel_meta = await ScratchpadRuntimeAdapter().get_workspace_artifact_metadata(
-                    workspace_id=workspace_id,
-                    artifact_id=source_artifact_id,
-                )
-            except RuntimeError:
-                kernel_meta = None
-                scratchpad_fallback_allowed = bool(offline_lease_owner_token)
-            if isinstance(kernel_meta, dict):
-                source_meta = kernel_meta
-            elif scratchpad_fallback_allowed:
-                scratchpad_meta = await ScratchpadOfflineAdapter(
-                    session=session,
-                    owner_token=str(offline_lease_owner_token),
-                ).get_workspace_artifact_metadata(
-                    workspace_id=workspace_id,
-                    workspace_duckdb_path=workspace_duckdb_path,
-                    artifact_id=source_artifact_id,
-                )
-                if isinstance(scratchpad_meta, dict):
-                    source_meta = scratchpad_meta
-        size_bytes = kernel_materialized_sizes.get(source_artifact_id)
-        if size_bytes is None and not storage_path.exists():
-            if kind == "dataframe" and not scratchpad_fallback_allowed:
-                TurnArtifactStorageService._log_artifact_shadow_skip(
-                    workspace_id=workspace_id,
-                    conversation_id=conversation_id,
-                    turn_id=turn_id,
-                    artifact_id=artifact_id,
-                    kind=kind,
-                    reason="Dataframe artifact export was not materialized by the workspace kernel.",
-                )
-                return None
-            if kind == "dataframe":
-                await ScratchpadOfflineAdapter(
-                    session=session,
-                    owner_token=str(offline_lease_owner_token),
-                ).export_dataframe_to_parquet(
-                    workspace_id=workspace_id,
-                    workspace_duckdb_path=workspace_duckdb_path,
-                    table_name=str(source_meta.get("table_name") or "").strip(),
-                    storage_path=str(storage_path),
-                )
-            if kind in {"figure", "scalar", "text", "structured"} and not scratchpad_fallback_allowed:
-                serializable_payload = source_meta.get("payload")
-                if serializable_payload is None:
-                    TurnArtifactStorageService._log_artifact_shadow_skip(
-                        workspace_id=workspace_id,
-                        conversation_id=conversation_id,
-                        turn_id=turn_id,
-                        artifact_id=artifact_id,
-                        kind=kind,
-                        reason="Artifact payload metadata is unavailable because the workspace kernel is not active.",
-                    )
-                    return None
-            if kind != "dataframe":
-                await asyncio.to_thread(
-                    TurnArtifactStorageService._write_artifact_payload,
-                    scratchpad_db_path,
-                    storage_path,
-                    kind,
-                    source_meta,
-                )
-            size_bytes = int(storage_path.stat().st_size) if storage_path.exists() else None
+        if not storage_path.exists() and kind != "dataframe":
+            await asyncio.to_thread(
+                TurnArtifactStorageService._write_artifact_payload,
+                storage_path,
+                kind,
+                source_meta,
+            )
 
         if not storage_path.exists():
             TurnArtifactStorageService._log_artifact_shadow_skip(
@@ -346,11 +228,10 @@ class TurnArtifactStorageService:
                 turn_id=turn_id,
                 artifact_id=artifact_id,
                 kind=kind,
-                reason="Local artifact shadow file is missing after materialization.",
+                reason="Turn artifact file is missing.",
             )
             return None
-        if size_bytes is None:
-            size_bytes = int(storage_path.stat().st_size)
+        size_bytes = int(storage_path.stat().st_size)
 
         return {
             "artifact_id": artifact_id or logical_name,
@@ -392,12 +273,7 @@ class TurnArtifactStorageService:
         )
 
     @staticmethod
-    def _write_artifact_payload(
-        scratchpad_db_path: Path,
-        storage_path: Path,
-        kind: str,
-        source_meta: dict[str, Any],
-    ) -> None:
+    def _write_artifact_payload(storage_path: Path, kind: str, source_meta: dict[str, Any]) -> None:
         storage_path.parent.mkdir(parents=True, exist_ok=True)
         payload = source_meta.get("payload")
         if kind == "text":

@@ -14,9 +14,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from app.services.artifact_scratchpad import ArtifactScratchpadStore
-
-
 class ReadOnlyExecutionBlockedError(ValueError):
     """Raised when generated code attempts a write-like operation."""
 
@@ -241,13 +238,10 @@ class ReadOnlyPythonExecutionService:
         run_id: str,
     ) -> dict[str, Any]:
         db_path = Path(workspace_duckdb_path).expanduser().resolve(strict=False)
-        scratchpad_path = ArtifactScratchpadStore.build_scratchpad_db_path(str(db_path))
-        scratchpad_path.parent.mkdir(parents=True, exist_ok=True)
         worker_code = _build_worker_code(
             workspace_id=workspace_id,
             workspace_duckdb_path=str(db_path),
             workspace_duckdb_path_key=_normalize_filesystem_path(str(db_path)),
-            scratchpad_path=str(scratchpad_path),
             run_id=run_id,
             user_code=code,
         )
@@ -341,7 +335,6 @@ def _build_worker_code(
     workspace_id: str,
     workspace_duckdb_path: str,
     workspace_duckdb_path_key: str,
-    scratchpad_path: str,
     run_id: str,
     user_code: str,
 ) -> str:
@@ -352,18 +345,19 @@ def _build_worker_code(
         import traceback as _traceback
         import uuid as _uuid
         from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+        from pathlib import Path as _Path
 
         import duckdb as _duckdb
 
         _WORKSPACE_ID = {workspace_id!r}
         _WORKSPACE_DB_PATH = {workspace_duckdb_path!r}
         _WORKSPACE_DB_PATH_KEY = {workspace_duckdb_path_key!r}
-        _SCRATCHPAD_PATH = {scratchpad_path!r}
         _RUN_ID = {run_id!r}
         _RESULT_PREFIX = "__INQUIRA_READONLY_RESULT__"
         _WRITE_SQL_KEYWORDS = {_WRITE_SQL_KEYWORDS!r}
         _inquira_run_exports = {{}}
         _inquira_active_run_id = None
+        _inquira_active_turn_context = {{}}
         _inquira_workspace_id = _WORKSPACE_ID
         _inquira_ttl_hours = 48
 
@@ -421,74 +415,70 @@ def _build_worker_code(
         duckdb = _duckdb
 
         conn = _ReadOnlyDuckDBConnection(_original_duckdb_connect(_WORKSPACE_DB_PATH, read_only=True))
-        def _open_scratchpad():
-            import time as _time
-            last_exc = None
-            for _attempt in range(25):
-                try:
-                    _sp = _original_duckdb_connect(_SCRATCHPAD_PATH, read_only=False)
-                    _sp.execute(\"\"\"
-                    CREATE TABLE IF NOT EXISTS artifact_manifest (
-                      artifact_id VARCHAR PRIMARY KEY,
-                      run_id VARCHAR NOT NULL,
-                      workspace_id VARCHAR NOT NULL,
-                      logical_name VARCHAR NOT NULL,
-                      kind VARCHAR NOT NULL,
-                      table_name VARCHAR,
-                      payload_json TEXT,
-                      schema_json TEXT,
-                      row_count BIGINT,
-                      created_at TIMESTAMP NOT NULL,
-                      expires_at TIMESTAMP NOT NULL,
-                      status VARCHAR NOT NULL,
-                      error TEXT,
-                      UNIQUE (workspace_id, kind, logical_name)
-                    )
-                    \"\"\")
-                    _sp.execute(\"\"\"
-                    CREATE TABLE IF NOT EXISTS run_manifest (
-                      run_id VARCHAR PRIMARY KEY,
-                      workspace_id VARCHAR NOT NULL,
-                      conversation_id VARCHAR,
-                      turn_id VARCHAR,
-                      question TEXT,
-                      generated_code TEXT,
-                      executed_code TEXT,
-                      stdout TEXT,
-                      stderr TEXT,
-                      execution_status VARCHAR NOT NULL,
-                      retry_count INTEGER NOT NULL,
-                      created_at TIMESTAMP NOT NULL,
-                      expires_at TIMESTAMP NOT NULL
-                    )
-                    \"\"\")
-                    return _sp
-                except Exception as _exc:
-                    last_exc = _exc
-                    _time.sleep(0.05)
-            raise last_exc
-
         def _inquira_now_and_expiry():
             now = _dt.now(_tz.utc)
             return now, now + _td(hours=max(1, int(_inquira_ttl_hours)))
 
-        def set_active_run(run_id):
-            global _inquira_active_run_id
+        def _inquira_safe_name(name):
+            cleaned = "".join(ch if (str(ch).isalnum() or str(ch) in "._-") else "_" for ch in str(name or "artifact"))
+            cleaned = "_".join(part for part in cleaned.split("_") if part)
+            return (cleaned[:96].strip("._-") or "artifact")
+
+        def set_active_run(run_id, conversation_id=None, turn_id=None, artifact_dir=None):
+            global _inquira_active_run_id, _inquira_active_turn_context
             _inquira_active_run_id = str(run_id)
             _inquira_run_exports.setdefault(_inquira_active_run_id, [])
+            if conversation_id is not None or turn_id is not None or artifact_dir is not None:
+                _inquira_active_turn_context[_inquira_active_run_id] = {{
+                    "conversation_id": str(conversation_id or ""),
+                    "turn_id": str(turn_id or ""),
+                    "artifact_dir": str(artifact_dir or ""),
+                }}
             return _inquira_active_run_id
 
         def _inquira_get_active_exports(run_id=None):
             key = str(run_id or _inquira_active_run_id or "")
             return list(_inquira_run_exports.get(key, []))
 
-        def _inquira_export_envelope(*, artifact_id, run_id, kind, logical_name, table_name=None, row_count=None, schema=None, preview_rows=None, payload=None, status='ready', error=None):
+        def _inquira_artifact_path(run_id, artifact_id, kind):
+            context = _inquira_active_turn_context.get(str(run_id), {{}})
+            artifact_dir = str(context.get("artifact_dir") or "")
+            if not artifact_dir:
+                raise ValueError("No artifact_dir set. Call set_active_run(run_id, artifact_dir=...) first.")
+            extension = {{"dataframe": "parquet", "figure": "json", "scalar": "json", "structured": "json", "text": "txt"}}.get(str(kind), "json")
+            target = _Path(artifact_dir).expanduser()
+            target.mkdir(parents=True, exist_ok=True)
+            return target / (str(artifact_id) + "." + extension)
+
+        def _inquira_named_artifact_id(logical_name, kind):
+            return _inquira_safe_name(logical_name or kind or "artifact") + "__" + str(_uuid.uuid4())
+
+        def _inquira_replace_run_export(run_id, kind, logical_name, envelope):
+            existing = []
+            for item in _inquira_run_exports.get(str(run_id), []):
+                if str(item.get("kind")) == str(kind) and str(item.get("logical_name")) == str(logical_name):
+                    old_path = str(item.get("storage_path") or "")
+                    if old_path:
+                        try:
+                            _Path(old_path).unlink(missing_ok=True)
+                        except Exception:
+                            pass
+                    continue
+                existing.append(item)
+            existing.append(envelope)
+            _inquira_run_exports[str(run_id)] = existing
+
+        def _inquira_export_envelope(*, artifact_id, run_id, kind, logical_name, storage_path=None, table_name=None, row_count=None, schema=None, preview_rows=None, payload=None, status='ready', error=None):
             now, expires = _inquira_now_and_expiry()
+            context = _inquira_active_turn_context.get(str(run_id), {{}})
             return {{
                 "artifact_id": str(artifact_id),
                 "run_id": str(run_id),
                 "kind": str(kind),
-                "pointer": f"duckdb://scratchpad/artifacts.duckdb#artifact={{artifact_id}}",
+                "pointer": str(storage_path or ""),
+                "storage_path": str(storage_path or ""),
+                "conversation_id": str(context.get("conversation_id") or ""),
+                "turn_id": str(context.get("turn_id") or ""),
                 "logical_name": str(logical_name),
                 "row_count": int(row_count) if row_count is not None else None,
                 "schema": schema,
@@ -528,41 +518,34 @@ def _build_worker_code(
                 pdf = df
             else:
                 pdf = _pd.DataFrame(df)
-            seq = len(_inquira_run_exports.get(active_run, [])) + 1
-            run_short = "".join(ch for ch in active_run if ch.isalnum())[:12] or "run"
-            table_name = f"art_{{run_short}}_{{seq}}"
-            artifact_id = str(_uuid.uuid4())
-            _sp = _open_scratchpad()
+            artifact_id = _inquira_named_artifact_id(logical_name, "dataframe")
+            storage_path = _inquira_artifact_path(active_run, artifact_id, "dataframe")
+            _export_con = _original_duckdb_connect(":memory:")
             try:
-                _old = _sp.execute(
-                    "SELECT artifact_id, table_name FROM artifact_manifest WHERE workspace_id = ? AND kind = 'dataframe' AND logical_name = ?",
-                    [_inquira_workspace_id, str(logical_name)]
-                ).fetchone()
-                if _old is not None:
-                    _old_aid, _old_table = _old
-                    _sp.execute("DELETE FROM artifact_manifest WHERE artifact_id = ?", [_old_aid])
-                    try:
-                        _sp.execute(f'DROP TABLE IF EXISTS "{{_old_table}}"')
-                    except Exception:
-                        pass
-                _sp.register("_inquira_df_tmp", pdf)
-                _sp.execute(f'CREATE TABLE "{{table_name}}" AS SELECT * FROM _inquira_df_tmp')
-                _sp.unregister("_inquira_df_tmp")
-                row_count = int(_sp.execute(f'SELECT COUNT(*) FROM "{{table_name}}"').fetchone()[0])
-                schema_rows = _sp.execute(f'DESCRIBE "{{table_name}}"').fetchall()
-                schema = [{{"name": str(r[0]), "dtype": str(r[1])}} for r in schema_rows]
-                preview_df = _sp.execute(f'SELECT * FROM "{{table_name}}" LIMIT 1000').fetchdf()
-                preview_rows = _json.loads(preview_df.to_json(orient="records", date_format="iso"))
-                now, expires = _inquira_now_and_expiry()
-                payload = _json.dumps({{"title": title, "insight": insight}}, default=str)
-                _sp.execute(
-                    "INSERT INTO artifact_manifest (artifact_id, run_id, workspace_id, logical_name, kind, table_name, payload_json, schema_json, row_count, created_at, expires_at, status, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    [artifact_id, active_run, _inquira_workspace_id, str(logical_name), "dataframe", table_name, payload, _json.dumps(schema), row_count, now, expires, "ready", None]
-                )
+                _export_con.register("_inquira_df_tmp", pdf)
+                _safe_storage_path = str(storage_path).replace("'", "''")
+                _export_con.execute(f"COPY (SELECT * FROM _inquira_df_tmp) TO '{{_safe_storage_path}}' (FORMAT PARQUET)")
             finally:
-                _sp.close()
-            envelope = _inquira_export_envelope(artifact_id=artifact_id, run_id=active_run, kind="dataframe", logical_name=str(logical_name), table_name=table_name, row_count=row_count, schema=schema, preview_rows=preview_rows)
-            _inquira_run_exports.setdefault(active_run, []).append(envelope)
+                try:
+                    _export_con.unregister("_inquira_df_tmp")
+                except Exception:
+                    pass
+                _export_con.close()
+            row_count = int(len(pdf.index))
+            schema = [{{"name": str(col), "dtype": str(dtype)}} for col, dtype in pdf.dtypes.items()]
+            preview_rows = _json.loads(pdf.head(20).to_json(orient="records", date_format="iso"))
+            envelope = _inquira_export_envelope(
+                artifact_id=artifact_id,
+                run_id=active_run,
+                kind="dataframe",
+                logical_name=str(logical_name),
+                storage_path=str(storage_path),
+                row_count=row_count,
+                schema=schema,
+                preview_rows=preview_rows,
+                payload={{"title": title, "insight": insight}},
+            )
+            _inquira_replace_run_export(active_run, "dataframe", str(logical_name), envelope)
             return envelope
 
         def export_figure(fig, logical_name, run_id=None, title=None, insight=None):
@@ -577,54 +560,44 @@ def _build_worker_code(
                 fig_payload = _json.loads(fig.to_json())
             else:
                 fig_payload = _json.loads(_json.dumps(fig, default=str))
-            artifact_id = str(_uuid.uuid4())
-            now, expires = _inquira_now_and_expiry()
-            payload = _json.dumps({{"figure": fig_payload, "title": title, "insight": insight}}, default=str)
-            _sp = _open_scratchpad()
-            try:
-                _sp.execute(
-                    "INSERT INTO artifact_manifest (artifact_id, run_id, workspace_id, logical_name, kind, table_name, payload_json, schema_json, row_count, created_at, expires_at, status, error) VALUES (?, ?, ?, ?, ?, NULL, ?, NULL, NULL, ?, ?, ?, ?)",
-                    [artifact_id, active_run, _inquira_workspace_id, str(logical_name), "figure", payload, now, expires, "ready", None]
-                )
-            finally:
-                _sp.close()
-            envelope = _inquira_export_envelope(artifact_id=artifact_id, run_id=active_run, kind="figure", logical_name=str(logical_name), payload={{"figure": fig_payload, "title": title, "insight": insight}})
-            _inquira_run_exports.setdefault(active_run, []).append(envelope)
+            artifact_id = _inquira_named_artifact_id(logical_name, "figure")
+            storage_path = _inquira_artifact_path(active_run, artifact_id, "figure")
+            payload = {{"figure": fig_payload, "title": title, "insight": insight}}
+            storage_path.write_text(_json.dumps(payload, default=str), encoding="utf-8")
+            envelope = _inquira_export_envelope(
+                artifact_id=artifact_id,
+                run_id=active_run,
+                kind="figure",
+                logical_name=str(logical_name),
+                storage_path=str(storage_path),
+                payload=payload,
+            )
+            _inquira_replace_run_export(active_run, "figure", str(logical_name), envelope)
             return envelope
 
         def export_scalar(value, logical_name, run_id=None, meta=None):
             active_run = str(run_id or _inquira_active_run_id or "")
             if not active_run:
                 raise ValueError("No active run_id set. Call set_active_run(run_id) first.")
-            artifact_id = str(_uuid.uuid4())
-            now, expires = _inquira_now_and_expiry()
-            payload = _json.dumps({{"value": value, "meta": meta}}, default=str)
-            _sp = _open_scratchpad()
-            try:
-                _sp.execute(
-                    "INSERT INTO artifact_manifest (artifact_id, run_id, workspace_id, logical_name, kind, table_name, payload_json, schema_json, row_count, created_at, expires_at, status, error) VALUES (?, ?, ?, ?, ?, NULL, ?, NULL, NULL, ?, ?, ?, ?)",
-                    [artifact_id, active_run, _inquira_workspace_id, str(logical_name), "scalar", payload, now, expires, "ready", None]
-                )
-            finally:
-                _sp.close()
-            envelope = _inquira_export_envelope(artifact_id=artifact_id, run_id=active_run, kind="scalar", logical_name=str(logical_name), payload={{"value": value, "meta": meta}})
-            _inquira_run_exports.setdefault(active_run, []).append(envelope)
+            artifact_id = _inquira_named_artifact_id(logical_name, "scalar")
+            storage_path = _inquira_artifact_path(active_run, artifact_id, "scalar")
+            payload = {{"value": value, "meta": meta}}
+            storage_path.write_text(_json.dumps(payload, default=str), encoding="utf-8")
+            envelope = _inquira_export_envelope(
+                artifact_id=artifact_id,
+                run_id=active_run,
+                kind="scalar",
+                logical_name=str(logical_name),
+                storage_path=str(storage_path),
+                payload=payload,
+            )
+            _inquira_replace_run_export(active_run, "scalar", str(logical_name), envelope)
             return envelope
 
         def finalize_run(run_id, metadata=None):
             active_run = str(run_id or _inquira_active_run_id or "")
             if not active_run:
                 raise ValueError("No run_id provided to finalize_run")
-            now, expires = _inquira_now_and_expiry()
-            payload = metadata or {{}}
-            _sp = _open_scratchpad()
-            try:
-                _sp.execute(
-                    "INSERT OR REPLACE INTO run_manifest (run_id, workspace_id, conversation_id, turn_id, question, generated_code, executed_code, stdout, stderr, execution_status, retry_count, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    [active_run, _inquira_workspace_id, None, None, str(payload.get("question") or ""), str(payload.get("generated_code") or ""), str(payload.get("executed_code") or ""), str(payload.get("stdout") or ""), str(payload.get("stderr") or ""), str(payload.get("execution_status") or "completed"), int(payload.get("retry_count") or 0), now, expires]
-                )
-            finally:
-                _sp.close()
             return {{"run_id": active_run, "exports": list(_inquira_run_exports.get(active_run, []))}}
 
         def _json_safe(value):

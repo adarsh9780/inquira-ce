@@ -646,9 +646,9 @@ async def test_bootstrap_workspace_exports_figure_payload_in_run_envelope(tmp_pa
     assert "payload=None, status='ready', error=None" in bootstrap_code
     assert "'payload': payload" in bootstrap_code
     assert "kind='figure'" in bootstrap_code
-    assert "payload={'figure': fig_payload, 'title': title, 'insight': insight}" in bootstrap_code
-    assert "kind = 'scalar' AND logical_name = ?" in bootstrap_code
-    assert "_old_scalar is not None" in bootstrap_code
+    assert "payload = {'figure': fig_payload, 'title': title, 'insight': insight}" in bootstrap_code
+    assert "_inquira_replace_run_export(active_run, 'scalar'" in bootstrap_code
+    assert "storage_path.write_text(_json.dumps(payload, default=str), encoding='utf-8')" in bootstrap_code
     assert "_pd_display.set_option('display.max_rows', 1000)" in bootstrap_code
     assert "_pd_display.set_option('display.max_columns', 20)" in bootstrap_code
     assert "_pd_display.set_option('display.large_repr', 'truncate')" in bootstrap_code

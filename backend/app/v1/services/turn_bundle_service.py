@@ -36,11 +36,11 @@ class TurnBundleService:
 
     @staticmethod
     def build_turns_dir(username: str, workspace_id: str, conversation_id: str) -> Path:
-        return TurnBundleService.build_conversation_dir(username, workspace_id, conversation_id) / "turns"
+        return TurnBundleService.build_conversation_dir(username, workspace_id, conversation_id)
 
     @staticmethod
     def build_turn_dir(username: str, workspace_id: str, conversation_id: str, turn_id: str) -> Path:
-        return TurnBundleService.build_turns_dir(username, workspace_id, conversation_id) / turn_id
+        return TurnBundleService.build_conversation_dir(username, workspace_id, conversation_id) / turn_id
 
     @staticmethod
     def build_turn_user_message_path(username: str, workspace_id: str, conversation_id: str, turn_id: str) -> Path:
@@ -56,7 +56,7 @@ class TurnBundleService:
 
     @staticmethod
     def build_turn_artifacts_dir(username: str, workspace_id: str, conversation_id: str, turn_id: str) -> Path:
-        return TurnBundleService.build_turn_dir(username, workspace_id, conversation_id, turn_id) / "artifacts"
+        return TurnBundleService.build_turn_dir(username, workspace_id, conversation_id, turn_id)
 
     @staticmethod
     def build_turn_manifest_path(username: str, workspace_id: str, conversation_id: str, turn_id: str) -> Path:
@@ -147,7 +147,6 @@ class TurnBundleService:
         )
         turn_dir = TurnBundleService.build_turn_dir(username, workspace_id, conversation_id, turn_id)
         manifest_path = TurnBundleService.build_turn_manifest_path(username, workspace_id, conversation_id, turn_id)
-        artifacts_dir = TurnBundleService.build_turn_artifacts_dir(username, workspace_id, conversation_id, turn_id)
         payload = {
             "turn_id": turn_id,
             "conversation_id": conversation_id,
@@ -157,7 +156,7 @@ class TurnBundleService:
                 "user_message": "user.md",
                 "assistant_message": "assistant.md",
                 "analysis_code": "analysis.py",
-                "artifacts_dir": "artifacts",
+                "artifacts_dir": ".",
             },
         }
         if manifest:
@@ -165,7 +164,6 @@ class TurnBundleService:
 
         def _write() -> None:
             turn_dir.mkdir(parents=True, exist_ok=True)
-            artifacts_dir.mkdir(parents=True, exist_ok=True)
             TurnBundleService.build_turn_user_message_path(
                 username,
                 workspace_id,

@@ -22,7 +22,11 @@ async def test_analyze_and_persist_turn_uses_remote_agent_client(monkeypatch):
     async def _fake_persist_turn(**_kwargs):
         return "turn-1"
 
+    async def _fake_reserve_turn(**_kwargs):
+        return SimpleNamespace(id="turn-1"), 1, "/tmp/conversations/conv-1/turn-1"
+
     monkeypatch.setattr(ChatService, "_preflight_check", staticmethod(_fake_preflight))
+    monkeypatch.setattr(ChatService, "_reserve_turn", staticmethod(_fake_reserve_turn))
     monkeypatch.setattr(ChatService, "_persist_turn", staticmethod(_fake_persist_turn))
     monkeypatch.setattr(
         "app.v1.services.chat_service.SecretStorageService.get_api_key",
@@ -86,9 +90,10 @@ async def test_analyze_and_persist_turn_uses_remote_agent_client(monkeypatch):
     assert turn_id == "turn-1"
     assert captured_payload["workspace_id"] == "ws-1"
     assert captured_payload["conversation_id"] == "conv-1"
+    assert captured_payload["turn_id"] == "turn-1"
     assert captured_payload["table_names"] == ["orders"]
     assert captured_payload["workspace_schema"] == {"tables": [{"table_name": "orders", "columns": []}]}
-    assert captured_payload["scratchpad_path"] == "/tmp/scratchpad/artifacts.duckdb"
+    assert captured_payload["artifact_dir"] == "/tmp/conversations/conv-1/turn-1"
     assert "table_name" not in captured_payload
     assert "preferred_table_name" not in captured_payload
     assert "active_schema" not in captured_payload
@@ -111,7 +116,8 @@ def test_build_remote_agent_payload_normalizes_windows_paths():
         table_names=["orders"],
         data_path=r"C:\tmp\ws.db",
         workspace_schema={},
-        scratchpad_path=r"C:\tmp\scratchpad\artifacts.duckdb",
+        artifact_dir=r"C:\tmp\conversations\conv-1\turn-1",
+        turn_id="turn-1",
         attachments=[],
         llm_prefs={
             "provider": "openrouter",
@@ -132,7 +138,8 @@ def test_build_remote_agent_payload_normalizes_windows_paths():
     )
 
     assert payload["data_path"] == "C:/tmp/ws.db"
-    assert payload["scratchpad_path"] == "C:/tmp/scratchpad/artifacts.duckdb"
+    assert payload["artifact_dir"] == "C:/tmp/conversations/conv-1/turn-1"
+    assert payload["turn_id"] == "turn-1"
 
 
 def test_agent_client_configurable_clamps_max_tokens_to_context_budget():

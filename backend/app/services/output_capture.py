@@ -281,7 +281,15 @@ def build_auto_capture_result_code(
     )
 
 
-def build_run_wrapped_code(code: str, run_id: str, output_contract: list[dict[str, str]]) -> str:
+def build_run_wrapped_code(
+    code: str,
+    run_id: str,
+    output_contract: list[dict[str, str]],
+    *,
+    conversation_id: str | None = None,
+    turn_id: str | None = None,
+    artifact_dir: str | None = None,
+) -> str:
     """Wrap analysis code with active run setup and output capture footer."""
     body = str(code or "").rstrip()
     if not body:
@@ -290,4 +298,10 @@ def build_run_wrapped_code(code: str, run_id: str, output_contract: list[dict[st
         output_contract,
         fallback_candidates=infer_capture_candidate_names(body),
     )
-    return f"set_active_run({run_id!r})\n{body}\n{auto_capture_code}\n"
+    setup = (
+        f"set_active_run({run_id!r}, "
+        f"conversation_id={conversation_id!r}, "
+        f"turn_id={turn_id!r}, "
+        f"artifact_dir={artifact_dir!r})"
+    )
+    return f"{setup}\n{body}\n{auto_capture_code}\n"
