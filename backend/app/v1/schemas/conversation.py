@@ -113,6 +113,7 @@ class GlobalTurnTreeConversationResponse(BaseModel):
     last_turn_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    final_turn_id: str | None = None
     roots: list[TurnTreeNodeResponse] = Field(default_factory=list)
 
 

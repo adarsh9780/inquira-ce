@@ -227,6 +227,7 @@ async def get_workspace_turn_tree(
                 last_turn_at=conversation["last_turn_at"],
                 created_at=conversation["created_at"],
                 updated_at=conversation["updated_at"],
+                final_turn_id=conversation.get("final_turn_id"),
                 roots=[_build_turn_tree_node(node) for node in conversation.get("roots") or []],
             )
             for conversation in payload["conversations"]

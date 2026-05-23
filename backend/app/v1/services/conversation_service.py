@@ -348,6 +348,7 @@ class ConversationService:
                     "last_turn_at": conversation.last_turn_at,
                     "created_at": conversation.created_at,
                     "updated_at": conversation.updated_at,
+                    "final_turn_id": conversation.final_turn_id,
                     "roots": ConversationService._build_tree_from_turns(turns_by_conversation.get(conversation.id, [])),
                 }
                 for conversation in conversations

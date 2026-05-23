@@ -80,3 +80,60 @@ def test_turn_tree_api_returns_full_tree(monkeypatch):
         assert payload["roots"][0]["children"][0]["children"][0]["assistant_text"] == "grandchild answer"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_workspace_turn_tree_api_returns_final_turn_per_conversation(monkeypatch):
+    async def fake_workspace_turn_tree(*, session, principal_id, workspace_id):
+        _ = session, principal_id, workspace_id
+        return {
+            "conversations": [
+                {
+                    "id": "conv-1",
+                    "title": "Revenue analysis",
+                    "last_turn_at": "2026-05-02T11:00:00Z",
+                    "created_at": "2026-05-02T09:00:00Z",
+                    "updated_at": "2026-05-02T11:00:00Z",
+                    "final_turn_id": "turn-2",
+                    "roots": [
+                        {
+                            "id": "turn-1",
+                            "parent_turn_id": None,
+                            "seq_no": 1,
+                            "sibling_order": 0,
+                            "user_text": "root question",
+                            "assistant_text": "root answer",
+                            "created_at": "2026-05-02T09:00:00Z",
+                            "children": [],
+                        }
+                    ],
+                }
+            ]
+        }
+
+    async def fake_session():
+        yield SimpleNamespace()
+
+    app.dependency_overrides.clear()
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(
+        id="user-1",
+        username="Ada",
+        email="",
+        plan="FREE",
+        is_authenticated=False,
+        is_guest=True,
+        auth_provider="local",
+    )
+    app.dependency_overrides[ensure_appdata_principal] = lambda: None
+    app.dependency_overrides[get_appdata_db_session] = fake_session
+    monkeypatch.setattr("app.v1.api.conversations.ConversationService.get_workspace_turn_tree", fake_workspace_turn_tree)
+
+    try:
+        client = TestClient(app)
+        response = client.get("/api/v1/workspaces/workspace-1/turn-tree")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["conversations"][0]["id"] == "conv-1"
+        assert payload["conversations"][0]["final_turn_id"] == "turn-2"
+        assert payload["conversations"][0]["roots"][0]["id"] == "turn-1"
+    finally:
+        app.dependency_overrides.clear()
