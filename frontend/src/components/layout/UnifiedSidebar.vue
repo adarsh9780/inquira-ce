@@ -303,7 +303,7 @@
               class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
               :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
             >
-              <span class="text-[13px] font-medium">Setting</span>
+              <span class="text-[13px] font-medium">Settings</span>
             </div>
           </button>
 
