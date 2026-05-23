@@ -172,32 +172,10 @@
                   <button
                     type="button"
                     class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
-                    @click.stop="toggleConversationMenu(conv.id)"
+                    @click.stop="toggleConversationMenu($event, conv.id)"
                   >
                     <EllipsisHorizontalIcon class="h-4 w-4" />
                   </button>
-
-                  <!-- Context menu -->
-                  <div
-                    v-if="conversationMenuId === conv.id"
-                    class="absolute right-0 top-7 z-50 w-32 rounded-lg border border-[var(--color-border)] bg-[var(--color-panel-elevated)] py-1 shadow-lg"
-                    data-conversation-actions-menu
-                  >
-                    <button
-                      type="button"
-                      class="w-full px-3 py-1.5 text-left text-[12px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
-                      @click.stop="startEditingFromMenu(conv)"
-                    >
-                      Rename
-                    </button>
-                    <button
-                      type="button"
-                      class="w-full px-3 py-1.5 text-left text-[12px] font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
-                      @click.stop="confirmDeleteConversation(conv.id)"
-                    >
-                      Delete
-                    </button>
-                  </div>
                 </div>
               </template>
             </div>
@@ -389,6 +367,29 @@
     </Teleport>
     <Teleport to="body">
       <div
+        v-if="conversationMenuId"
+        class="fixed z-50 w-32 rounded-lg border border-[var(--color-border)] bg-[var(--color-panel-elevated)] py-1 shadow-lg"
+        :style="conversationMenuStyle"
+        data-conversation-actions-menu
+      >
+        <button
+          type="button"
+          class="w-full px-3 py-1.5 text-left text-[12px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
+          @click.stop="startEditingFromMenu(activeConversationMenuTarget)"
+        >
+          Rename
+        </button>
+        <button
+          type="button"
+          class="w-full px-3 py-1.5 text-left text-[12px] font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
+          @click.stop="confirmDeleteConversation(conversationMenuId)"
+        >
+          Delete
+        </button>
+      </div>
+    </Teleport>
+    <Teleport to="body">
+      <div
         v-if="multiConversationMenu.open"
         class="fixed z-50 w-40 rounded-lg border border-[var(--color-border)] bg-[var(--color-panel-elevated)] py-1 shadow-lg"
         :style="multiConversationMenuStyle"
@@ -439,6 +440,7 @@ const editInputs        = ref({})
 const isSaving          = ref(false)
 
 const conversationMenuId   = ref(null)
+const conversationMenuPosition = ref({ x: 0, y: 0 })
 const selectedConversationIds = ref(new Set())
 const lastSelectedConversationIndex = ref(-1)
 const multiConversationMenu = ref({
@@ -510,6 +512,17 @@ const multiConversationMenuStyle = computed(() => ({
   left: `${multiConversationMenu.value.x}px`,
   top: `${multiConversationMenu.value.y}px`,
 }))
+
+const conversationMenuStyle = computed(() => ({
+  left: `${conversationMenuPosition.value.x}px`,
+  top: `${conversationMenuPosition.value.y}px`,
+}))
+
+const activeConversationMenuTarget = computed(() => {
+  const id = String(conversationMenuId.value || '').trim()
+  if (!id) return null
+  return appStore.conversations.find((conversation) => String(conversation?.id || '').trim() === id) || null
+})
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function readDatasetSizeBytes(dataset) {
@@ -796,11 +809,40 @@ async function saveTitle(id) {
 }
 
 // ─── Conversation context menu ────────────────────────────────────────────────
-function toggleConversationMenu(conversationId) {
+function clampMenuPosition(x, y, width = 160, height = 96) {
+  const gap = 8
+  const viewportWidth = typeof window === 'undefined' ? width + gap * 2 : window.innerWidth
+  const viewportHeight = typeof window === 'undefined' ? height + gap * 2 : window.innerHeight
+  return {
+    x: Math.max(gap, Math.min(Number(x) || gap, viewportWidth - width - gap)),
+    y: Math.max(gap, Math.min(Number(y) || gap, viewportHeight - height - gap)),
+  }
+}
+
+function positionConversationMenuFromEvent(event) {
+  const rect = event?.currentTarget?.getBoundingClientRect?.()
+  if (rect) {
+    return clampMenuPosition(rect.right - 128, rect.bottom + 4, 128, 88)
+  }
+  return clampMenuPosition(event?.clientX || 0, event?.clientY || 0, 128, 88)
+}
+
+function openSingleConversationMenu(conversationId, position) {
   const id = String(conversationId || '').trim()
   if (!id) return
   closeMultiConversationMenu()
-  conversationMenuId.value = conversationMenuId.value === id ? null : id
+  conversationMenuPosition.value = position
+  conversationMenuId.value = id
+}
+
+function toggleConversationMenu(event, conversationId) {
+  const id = String(conversationId || '').trim()
+  if (!id) return
+  if (conversationMenuId.value === id) {
+    closeConversationMenu()
+    return
+  }
+  openSingleConversationMenu(id, positionConversationMenuFromEvent(event))
 }
 
 function openConversationContextMenu(event, conversationId) {
@@ -814,22 +856,28 @@ function openConversationContextMenu(event, conversationId) {
   }
   if (selectedConversationIds.value.size < 2) {
     closeMultiConversationMenu()
+    openSingleConversationMenu(id, clampMenuPosition(event?.clientX || 0, event?.clientY || 0, 128, 88))
     return
   }
+  closeConversationMenu()
   multiConversationMenu.value = {
     open: true,
-    x: Number(event?.clientX || 0),
-    y: Number(event?.clientY || 0),
+    ...clampMenuPosition(event?.clientX || 0, event?.clientY || 0, 160, 48),
   }
 }
 
 function startEditingFromMenu(conv) {
+  if (!conv?.id) {
+    closeConversationMenu()
+    return
+  }
   conversationMenuId.value = null
   startEditing(conv)
 }
 
 function closeConversationMenu() {
   conversationMenuId.value = null
+  conversationMenuPosition.value = { x: 0, y: 0 }
 }
 
 function closeMultiConversationMenu() {
