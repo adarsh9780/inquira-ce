@@ -17,7 +17,7 @@ test('sidebar adds workspace view entries and uses numbered conversation badges'
   assert.equal(sidebarSource.includes('Conversations and analysis'), true)
   assert.equal(sidebarSource.includes('Datasets and column metadata'), true)
   assert.equal(sidebarSource.includes('Turns across this workspace'), true)
-  assert.equal(sidebarSource.includes(`v-if="appStore.activeTab === 'workspace'"`), true)
+  assert.equal(sidebarSource.includes(`v-if="appStore.activeTab === 'workspace'"`), false)
   assert.equal(sidebarSource.includes('conversationBadgeLabel(index, appStore.conversations.length)'), true)
   assert.equal(sidebarSource.includes('const ordinal = total - offset'), true)
   assert.equal(sidebarSource.includes("if (ordinal > 99) return '99+'"), true)

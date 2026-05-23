@@ -136,7 +136,7 @@
       <div class="mx-1 mb-2 h-px bg-[var(--color-border)] opacity-60" />
 
       <!-- ─── Conversations ─── -->
-      <div v-if="appStore.activeTab === 'workspace'" class="flex min-h-0 flex-1 flex-col">
+      <div class="flex min-h-0 flex-1 flex-col">
 
         <!-- Section Header -->
         <div
