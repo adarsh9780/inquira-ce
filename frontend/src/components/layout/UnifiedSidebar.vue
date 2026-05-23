@@ -188,10 +188,11 @@
               class="group relative flex min-h-9 items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
               :class="[
                 appStore.isSidebarCollapsed ? 'justify-center px-0 py-1.5' : 'justify-start px-3 py-1.5',
-                appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : '',
+                isConversationSelected(conv.id) || appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : '',
               ]"
               :title="conv.title || 'Untitled'"
-              @click="selectConversation(conv.id)"
+              @click="handleConversationClick($event, conv.id, index)"
+              @contextmenu.prevent="openConversationContextMenu($event, conv.id)"
             >
               <!-- Active indicator line — only in expanded mode -->
               <div
@@ -216,7 +217,7 @@
                 <div class="flex h-6 w-6 shrink-0 items-center justify-center">
                   <span
                     class="inline-flex min-w-[1.5rem] items-center justify-center px-1 text-[11px] font-semibold leading-none tabular-nums tracking-[0.02em] transition-colors duration-200"
-                    :class="appStore.activeConversationId === conv.id
+                    :class="isConversationSelected(conv.id) || appStore.activeConversationId === conv.id
                       ? 'text-[var(--color-accent)]'
                       : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
                   >
@@ -231,7 +232,7 @@
                 >
                   <p
                     class="truncate text-[13px]"
-                    :class="appStore.activeConversationId === conv.id
+                    :class="isConversationSelected(conv.id) || appStore.activeConversationId === conv.id
                       ? 'font-medium text-[var(--color-text-main)]'
                       : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
                     :title="conv.title || 'Untitled'"
@@ -406,6 +407,22 @@
         </button>
       </div>
     </Teleport>
+    <Teleport to="body">
+      <div
+        v-if="multiConversationMenu.open"
+        class="fixed z-50 w-40 rounded-lg border border-[var(--color-border)] bg-[var(--color-panel-elevated)] py-1 shadow-lg"
+        :style="multiConversationMenuStyle"
+        data-conversation-actions-menu
+      >
+        <button
+          type="button"
+          class="w-full px-3 py-1.5 text-left text-[12px] font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
+          @click.stop="confirmDeleteSelectedConversations"
+        >
+          Delete {{ selectedConversationIds.size }}
+        </button>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -443,6 +460,13 @@ const editInputs        = ref({})
 const isSaving          = ref(false)
 
 const conversationMenuId   = ref(null)
+const selectedConversationIds = ref(new Set())
+const lastSelectedConversationIndex = ref(-1)
+const multiConversationMenu = ref({
+  open: false,
+  x: 0,
+  y: 0,
+})
 const profileMenuOpen      = ref(false)
 const profileMenuRef       = ref(null)
 const profileMenuButtonRef = ref(null)
@@ -459,6 +483,7 @@ const deleteDialogTitle   = ref('')
 const deleteDialogMessage = ref('')
 const pendingDeleteType   = ref('')
 const pendingDeleteId     = ref('')
+const pendingDeleteIds    = ref([])
 const workspaceDatasetSummary = ref({
   workspaceId: '',
   count: 0,
@@ -500,6 +525,11 @@ const profileInitials = computed(() => {
 const profileMenuStyle = computed(() => ({
   left: `${profileMenuPosition.value.left}px`,
   top: `${profileMenuPosition.value.top}px`,
+}))
+
+const multiConversationMenuStyle = computed(() => ({
+  left: `${multiConversationMenu.value.x}px`,
+  top: `${multiConversationMenu.value.y}px`,
 }))
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -644,6 +674,7 @@ function handleGlobalClick(event) {
   if (target.closest('[data-conversation-actions-menu]')) return
   if (profileMenuRef.value?.contains(target) || profileMenuButtonRef.value?.contains(target)) return
   closeConversationMenu()
+  closeMultiConversationMenu()
   closeProfileMenu()
 }
 
@@ -669,6 +700,7 @@ async function createConversation() {
 
 async function selectConversation(id) {
   conversationMenuId.value = null
+  closeMultiConversationMenu()
   const target = String(id || '').trim()
   if (!target) return
   const current = String(appStore.activeConversationId || '').trim()
@@ -680,6 +712,58 @@ async function selectConversation(id) {
   } catch (error) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to load conversation'))
   }
+}
+
+function handleConversationClick(event, conversationId, index) {
+  if (event?.shiftKey) {
+    selectConversationRange(index)
+    return
+  }
+  if (event?.ctrlKey || event?.metaKey) {
+    toggleConversationSelection(conversationId, index)
+    return
+  }
+  clearConversationSelection()
+  void selectConversation(conversationId)
+}
+
+function isConversationSelected(conversationId) {
+  return selectedConversationIds.value.has(String(conversationId || '').trim())
+}
+
+function clearConversationSelection() {
+  selectedConversationIds.value = new Set()
+  lastSelectedConversationIndex.value = -1
+  closeMultiConversationMenu()
+}
+
+function toggleConversationSelection(conversationId, index) {
+  closeConversationMenu()
+  closeMultiConversationMenu()
+  const id = String(conversationId || '').trim()
+  if (!id) return
+  const next = new Set(selectedConversationIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  selectedConversationIds.value = next
+  lastSelectedConversationIndex.value = Number.isFinite(Number(index)) ? Number(index) : -1
+}
+
+function selectConversationRange(index) {
+  closeConversationMenu()
+  closeMultiConversationMenu()
+  const endIndex = Number(index)
+  if (!Number.isFinite(endIndex) || endIndex < 0) return
+  const startIndex = lastSelectedConversationIndex.value >= 0 ? lastSelectedConversationIndex.value : endIndex
+  const min = Math.min(startIndex, endIndex)
+  const max = Math.max(startIndex, endIndex)
+  const next = new Set(selectedConversationIds.value)
+  for (let i = min; i <= max; i += 1) {
+    const id = String(appStore.conversations[i]?.id || '').trim()
+    if (id) next.add(id)
+  }
+  selectedConversationIds.value = next
+  lastSelectedConversationIndex.value = endIndex
 }
 
 // ─── Inline title editing ─────────────────────────────────────────────────────
@@ -740,7 +824,28 @@ async function saveTitle(id) {
 function toggleConversationMenu(conversationId) {
   const id = String(conversationId || '').trim()
   if (!id) return
+  closeMultiConversationMenu()
   conversationMenuId.value = conversationMenuId.value === id ? null : id
+}
+
+function openConversationContextMenu(event, conversationId) {
+  closeConversationMenu()
+  const id = String(conversationId || '').trim()
+  if (!id) return
+  if (!selectedConversationIds.value.has(id)) {
+    selectedConversationIds.value = new Set([id])
+    const index = appStore.conversations.findIndex((conversation) => String(conversation?.id || '').trim() === id)
+    lastSelectedConversationIndex.value = index
+  }
+  if (selectedConversationIds.value.size < 2) {
+    closeMultiConversationMenu()
+    return
+  }
+  multiConversationMenu.value = {
+    open: true,
+    x: Number(event?.clientX || 0),
+    y: Number(event?.clientY || 0),
+  }
 }
 
 function startEditingFromMenu(conv) {
@@ -752,6 +857,14 @@ function closeConversationMenu() {
   conversationMenuId.value = null
 }
 
+function closeMultiConversationMenu() {
+  multiConversationMenu.value = {
+    open: false,
+    x: 0,
+    y: 0,
+  }
+}
+
 // ─── Delete conversation ──────────────────────────────────────────────────────
 function confirmDeleteConversation(conversationId) {
   // Cancel any in-progress rename first — prevents blur from saving before delete fires
@@ -761,8 +874,27 @@ function confirmDeleteConversation(conversationId) {
   const target = appStore.conversations.find((c) => c.id === conversationId)
   pendingDeleteType.value   = 'conversation'
   pendingDeleteId.value     = conversationId
+  pendingDeleteIds.value    = []
   deleteDialogTitle.value   = 'Delete Conversation'
   deleteDialogMessage.value = `Are you sure you want to delete "${target?.title || 'Untitled'}"? This action cannot be undone.`
+  isDeleteDialogOpen.value  = true
+}
+
+function confirmDeleteSelectedConversations() {
+  cancelEditing()
+  closeConversationMenu()
+  closeMultiConversationMenu()
+
+  const ids = Array.from(selectedConversationIds.value)
+    .map((id) => String(id || '').trim())
+    .filter(Boolean)
+  if (ids.length === 0) return
+
+  pendingDeleteType.value   = 'conversations'
+  pendingDeleteId.value     = ''
+  pendingDeleteIds.value    = ids
+  deleteDialogTitle.value   = 'Delete Conversations'
+  deleteDialogMessage.value = `Are you sure you want to delete ${ids.length} conversations? This action cannot be undone.`
   isDeleteDialogOpen.value  = true
 }
 
@@ -770,16 +902,25 @@ function closeDeleteDialog() {
   isDeleteDialogOpen.value  = false
   pendingDeleteType.value   = ''
   pendingDeleteId.value     = ''
+  pendingDeleteIds.value    = []
   deleteDialogTitle.value   = ''
   deleteDialogMessage.value = ''
 }
 
 async function confirmDelete() {
-  if (!pendingDeleteId.value) return
+  if (!pendingDeleteId.value && pendingDeleteIds.value.length === 0) return
   try {
     if (pendingDeleteType.value === 'conversation') {
       await appStore.deleteConversationById(pendingDeleteId.value)
+      clearConversationSelection()
       toast.success('Conversation Deleted', 'Conversation has been removed.')
+    } else if (pendingDeleteType.value === 'conversations') {
+      const ids = [...pendingDeleteIds.value]
+      for (const id of ids) {
+        await appStore.deleteConversationById(id)
+      }
+      clearConversationSelection()
+      toast.success('Conversations Deleted', `${ids.length} conversations have been removed.`)
     }
     closeDeleteDialog()
   } catch (error) {
