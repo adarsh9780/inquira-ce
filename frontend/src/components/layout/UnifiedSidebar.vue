@@ -24,7 +24,7 @@
     </div>
 
     <!-- ─── Main Scroll Area ─── -->
-    <div class="flex min-h-0 flex-1 flex-col overflow-x-hidden px-2 custom-scrollbar">
+    <div class="flex min-h-0 flex-1 flex-col overflow-hidden px-2">
 
       <!-- Active Workspace -->
       <div class="pt-3 pb-2">
@@ -95,7 +95,7 @@
         </div>
 
         <!-- Conversation List -->
-        <div class="max-h-[11.75rem] flex-none overflow-y-auto overflow-x-hidden pb-1">
+        <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-1 custom-scrollbar">
           <div
             v-if="!appStore.hasWorkspace"
             class="px-3 py-2 text-[12px] text-[var(--color-text-muted)] transition-opacity"
