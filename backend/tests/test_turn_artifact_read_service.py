@@ -71,9 +71,12 @@ async def test_turn_artifact_read_service_reads_parquet_metadata_and_rows(monkey
 
     assert metadata["row_count"] == 2
     assert metadata["schema"][0]["name"] == "amount"
+    assert metadata["display_name"] == "Summary Df"
     assert rows["row_count"] == 2
     assert rows["rows"][0]["amount"] == 10
+    assert rows["display_name"] == "Summary Df"
     assert summaries[0]["logical_name"] == "summary_df"
+    assert summaries[0]["display_name"] == "Summary Df"
 
 
 @pytest.mark.asyncio

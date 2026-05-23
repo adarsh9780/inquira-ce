@@ -14,6 +14,7 @@ from ...data_access import ScratchpadRuntimeAdapter
 from ...services.artifact_scratchpad import ArtifactScratchpadStore
 from ..repositories.turn_artifact_repository import TurnArtifactRepository
 from ..repositories.conversation_repository import ConversationRepository
+from .turn_artifact_storage_service import TurnArtifactStorageService
 
 
 class TurnArtifactReadService:
@@ -135,6 +136,7 @@ class TurnArtifactReadService:
         return {
             "artifact_id": row.artifact_id,
             "logical_name": row.logical_name or row.artifact_id,
+            "display_name": TurnArtifactStorageService.display_name_for_artifact(row.logical_name or row.artifact_id),
             "kind": row.kind,
             "row_count": row_count,
             "schema": schema,
@@ -160,6 +162,7 @@ class TurnArtifactReadService:
             "run_id": row.turn_id,
             "workspace_id": row.workspace_id,
             "logical_name": row.logical_name or row.artifact_id,
+            "display_name": TurnArtifactStorageService.display_name_for_artifact(row.logical_name or row.artifact_id),
             "kind": row.kind,
             "pointer": str(path),
             "table_name": table_name,
@@ -239,6 +242,7 @@ class TurnArtifactReadService:
         return {
             "artifact_id": row.artifact_id,
             "name": row.logical_name or row.artifact_id,
+            "display_name": TurnArtifactStorageService.display_name_for_artifact(row.logical_name or row.artifact_id),
             "row_count": int((row_count or [0])[0] or 0),
             "columns": all_columns,
             "rows": rows,

@@ -157,6 +157,7 @@ class ExecuteResponse(BaseModel):
 class DataframeArtifactRowsResponse(BaseModel):
     artifact_id: str
     name: str
+    display_name: str | None = None
     row_count: int
     columns: list[str]
     rows: list[dict[str, Any]]
@@ -169,6 +170,7 @@ class ArtifactMetadataResponse(BaseModel):
     run_id: str
     workspace_id: str
     logical_name: str
+    display_name: str | None = None
     kind: str
     pointer: str
     table_name: str | None = None
@@ -184,6 +186,7 @@ class ArtifactMetadataResponse(BaseModel):
 class WorkspaceArtifactSummary(BaseModel):
     artifact_id: str
     logical_name: str
+    display_name: str | None = None
     kind: str
     row_count: int | None = None
     columns: list[dict[str, Any]] | None = None
@@ -951,6 +954,9 @@ async def _persist_runtime_execution_to_turn(
         workspace_duckdb_path=workspace_duckdb_path,
         artifacts=execution_result.artifacts,
     )
+    persisted_artifacts = TurnArtifactStorageService.response_artifacts_from_rows(artifact_rows)
+    if persisted_artifacts:
+        execution_result.artifacts = persisted_artifacts
 
     turn_dir = await TurnBundleService.create_turn_bundle(
         username=username,
@@ -973,6 +979,8 @@ async def _persist_runtime_execution_to_turn(
             "artifacts": [
                 {
                     "artifact_id": str(item.get("artifact_id") or ""),
+                    "logical_name": str(item.get("logical_name") or item.get("artifact_id") or ""),
+                    "display_name": str(item.get("display_name") or item.get("logical_name") or item.get("artifact_id") or ""),
                     "kind": str(item.get("kind") or ""),
                     "path": str(item.get("storage_path") or ""),
                     "payload_format": str(item.get("payload_format") or ""),
@@ -992,6 +1000,8 @@ async def _persist_runtime_execution_to_turn(
         [
             {
                 "artifact_id": str(item.get("artifact_id") or ""),
+                "logical_name": str(item.get("logical_name") or item.get("artifact_id") or ""),
+                "display_name": str(item.get("display_name") or item.get("logical_name") or item.get("artifact_id") or ""),
                 "kind": str(item.get("kind") or ""),
                 "path": str(item.get("storage_path") or ""),
                 "payload_format": str(item.get("payload_format") or ""),

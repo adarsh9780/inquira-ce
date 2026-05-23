@@ -239,7 +239,7 @@ const detailArtifacts = computed(() => {
     .map((event, index) => {
       const artifact = event.data || {}
       const kind = String(artifact.kind || 'artifact')
-      const label = String(artifact.logical_name || artifact.artifact_id || `artifact_${index + 1}`)
+      const label = String(artifact.display_name || artifact.logical_name || artifact.artifact_id || `artifact_${index + 1}`)
       const columns = Array.isArray(artifact.schema) ? artifact.schema.length : 0
       const rowCount = Number.isFinite(Number(artifact.row_count)) ? Number(artifact.row_count) : null
       const metaParts = []

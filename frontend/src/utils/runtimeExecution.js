@@ -101,6 +101,7 @@ function normalizeArtifactList(rawArtifacts) {
         kind,
         artifact_id: item.artifact_id ? String(item.artifact_id) : null,
         logical_name: item.logical_name ? String(item.logical_name) : '',
+        display_name: item.display_name ? String(item.display_name) : '',
         row_count: Number.isFinite(Number(item.row_count)) ? Number(item.row_count) : 0,
         schema,
         preview_rows: normalizeArtifactPreviewRows(item.preview_rows, schema),

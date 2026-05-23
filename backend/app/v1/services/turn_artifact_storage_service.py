@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,109 @@ class TurnArtifactStorageService:
     """Write artifact payloads to turn folders and mirror lightweight metadata to SQLite."""
 
     @staticmethod
+    def slugify_artifact_name(value: str | None, *, fallback: str = "artifact") -> str:
+        normalized = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value or "").strip())
+        normalized = re.sub(r"_+", "_", normalized).strip("._-")
+        return normalized[:96] or fallback
+
+    @staticmethod
+    def display_name_for_artifact(value: str | None, *, fallback: str = "Artifact") -> str:
+        normalized = str(value or "").strip().replace("_", " ").replace("-", " ")
+        normalized = " ".join(normalized.split())
+        return normalized.title() if normalized else fallback
+
+    @staticmethod
+    def _artifact_id_with_name(
+        *,
+        source_artifact_id: str,
+        logical_name: str,
+        kind: str,
+        used_ids: set[str],
+    ) -> str:
+        fallback = TurnArtifactStorageService.slugify_artifact_name(kind or "artifact")
+        name_slug = TurnArtifactStorageService.slugify_artifact_name(logical_name, fallback=fallback)
+        source_slug = TurnArtifactStorageService.slugify_artifact_name(source_artifact_id, fallback="")
+        if source_slug and name_slug.lower() in source_slug.lower():
+            candidate = source_slug
+        elif source_slug:
+            candidate = f"{name_slug}__{source_slug}"
+        else:
+            candidate = name_slug
+
+        base = candidate
+        suffix = 2
+        while candidate in used_ids:
+            candidate = f"{base}__{suffix}"
+            suffix += 1
+        used_ids.add(candidate)
+        return candidate
+
+    @staticmethod
+    def _normalize_artifact_identities(
+        artifacts: list[dict[str, Any]],
+        *,
+        turn_id: str,
+    ) -> list[dict[str, Any]]:
+        used_ids: set[str] = set()
+        normalized: list[dict[str, Any]] = []
+        for index, item in enumerate(artifacts, start=1):
+            kind = str(item.get("kind") or "").strip().lower() or "scalar"
+            source_artifact_id = str(item.get("artifact_id") or "").strip()
+            logical_name = str(
+                item.get("logical_name")
+                or item.get("display_name")
+                or item.get("name")
+                or item.get("result_name")
+                or source_artifact_id
+                or f"{kind}_{index}"
+            ).strip()
+            artifact_id = TurnArtifactStorageService._artifact_id_with_name(
+                source_artifact_id=source_artifact_id,
+                logical_name=logical_name,
+                kind=kind,
+                used_ids=used_ids,
+            )
+            normalized.append(
+                {
+                    **item,
+                    "artifact_id": artifact_id,
+                    "source_artifact_id": source_artifact_id or artifact_id,
+                    "kind": kind,
+                    "logical_name": logical_name,
+                    "display_name": str(item.get("display_name") or "").strip()
+                    or TurnArtifactStorageService.display_name_for_artifact(logical_name),
+                    "turn_id": turn_id,
+                }
+            )
+        return normalized
+
+    @staticmethod
+    def response_artifact_from_row(item: dict[str, Any]) -> dict[str, Any]:
+        logical_name = str(item.get("logical_name") or item.get("artifact_id") or "artifact")
+        display_name = str(item.get("display_name") or "").strip() or TurnArtifactStorageService.display_name_for_artifact(logical_name)
+        summary = {
+            "artifact_id": str(item.get("artifact_id") or ""),
+            "source_artifact_id": str(item.get("source_artifact_id") or item.get("artifact_id") or ""),
+            "kind": str(item.get("kind") or ""),
+            "logical_name": logical_name,
+            "display_name": display_name,
+            "storage_path": str(item.get("storage_path") or ""),
+            "payload_format": str(item.get("payload_format") or ""),
+            "row_count": item.get("row_count"),
+            "schema": item.get("schema"),
+            "preview_rows": item.get("preview_rows"),
+            "table_name": item.get("table_name"),
+            "created_at": str(item.get("created_at") or ""),
+        }
+        if item.get("payload") is not None:
+            summary["payload"] = item.get("payload")
+        return summary
+
+    @staticmethod
+    def response_artifacts_from_rows(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [TurnArtifactStorageService.response_artifact_from_row(item) for item in items]
+
+    @staticmethod
     async def persist_turn_artifacts(
         *,
         session: AsyncSession,
@@ -32,7 +136,10 @@ class TurnArtifactStorageService:
         artifacts: list[dict[str, Any]] | None,
         offline_lease_owner_token: str | None = None,
     ) -> list[dict[str, Any]]:
-        normalized_artifacts = [item for item in (artifacts or []) if isinstance(item, dict)]
+        normalized_artifacts = TurnArtifactStorageService._normalize_artifact_identities(
+            [item for item in (artifacts or []) if isinstance(item, dict)],
+            turn_id=turn_id,
+        )
         artifacts_dir = TurnBundleService.build_turn_artifacts_dir(
             username,
             workspace_id,
@@ -51,7 +158,7 @@ class TurnArtifactStorageService:
         materialized_sizes: dict[str, int | None] = {}
         kernel_specs = [
             {
-                "artifact_id": str(item.get("artifact_id") or "").strip(),
+                "artifact_id": str(item.get("source_artifact_id") or item.get("artifact_id") or "").strip(),
                 "kind": str(item.get("kind") or "").strip().lower() or "scalar",
                 "payload": item.get("payload"),
                 "table_name": item.get("table_name"),
@@ -67,7 +174,7 @@ class TurnArtifactStorageService:
                 ),
             }
             for item in normalized_artifacts
-            if str(item.get("artifact_id") or "").strip()
+            if str(item.get("source_artifact_id") or item.get("artifact_id") or "").strip()
         ]
         if kernel_specs:
             try:
@@ -145,8 +252,10 @@ class TurnArtifactStorageService:
         offline_lease_owner_token: str | None,
     ) -> dict[str, Any] | None:
         artifact_id = str(artifact.get("artifact_id") or "").strip()
+        source_artifact_id = str(artifact.get("source_artifact_id") or artifact_id).strip()
         kind = str(artifact.get("kind") or "").strip().lower() or "scalar"
         logical_name = str(artifact.get("logical_name") or artifact_id or kind).strip() or kind
+        display_name = str(artifact.get("display_name") or "").strip() or TurnArtifactStorageService.display_name_for_artifact(logical_name)
         payload_format = TurnBundleService.artifact_payload_format(kind)
         storage_path = TurnBundleService.build_turn_artifact_path(
             username,
@@ -164,11 +273,11 @@ class TurnArtifactStorageService:
         elif kind in {"figure", "scalar", "text", "structured"}:
             needs_scratchpad_lookup = artifact.get("payload") is None
         scratchpad_fallback_allowed = False
-        if needs_scratchpad_lookup and artifact_id:
+        if needs_scratchpad_lookup and source_artifact_id:
             try:
                 kernel_meta = await ScratchpadRuntimeAdapter().get_workspace_artifact_metadata(
                     workspace_id=workspace_id,
-                    artifact_id=artifact_id,
+                    artifact_id=source_artifact_id,
                 )
             except RuntimeError:
                 kernel_meta = None
@@ -182,11 +291,11 @@ class TurnArtifactStorageService:
                 ).get_workspace_artifact_metadata(
                     workspace_id=workspace_id,
                     workspace_duckdb_path=workspace_duckdb_path,
-                    artifact_id=artifact_id,
+                    artifact_id=source_artifact_id,
                 )
                 if isinstance(scratchpad_meta, dict):
                     source_meta = scratchpad_meta
-        size_bytes = kernel_materialized_sizes.get(artifact_id)
+        size_bytes = kernel_materialized_sizes.get(source_artifact_id)
         if size_bytes is None and not storage_path.exists():
             if kind == "dataframe" and not scratchpad_fallback_allowed:
                 TurnArtifactStorageService._log_artifact_shadow_skip(
@@ -245,14 +354,17 @@ class TurnArtifactStorageService:
 
         return {
             "artifact_id": artifact_id or logical_name,
+            "source_artifact_id": source_artifact_id or artifact_id or logical_name,
             "kind": kind,
             "logical_name": logical_name,
+            "display_name": display_name,
             "storage_path": str(storage_path),
             "payload_format": payload_format,
             "size_bytes": size_bytes,
             "status": "active",
             "row_count": source_meta.get("row_count"),
             "schema": source_meta.get("schema"),
+            "preview_rows": source_meta.get("preview_rows"),
             "table_name": source_meta.get("table_name"),
             "created_at": str(source_meta.get("created_at") or ""),
             "payload": source_meta.get("payload"),

@@ -263,8 +263,8 @@ const orderedFigures = computed(() => {
 const figureDropdownOptions = computed(() => orderedFigures.value.map((fig, index) => ({
   value: fig.artifact_id,
   label: fig.source === 'memory'
-    ? `${fig.logical_name || `Figure ${index + 1}`} (memory)`
-    : (fig.logical_name || `Figure ${index + 1}`),
+    ? `${fig.display_name || fig.logical_name || `Figure ${index + 1}`} (memory)`
+    : (fig.display_name || fig.logical_name || `Figure ${index + 1}`),
   key: fig.artifact_id || `${index}-figure`
 })))
 
@@ -277,7 +277,7 @@ const canDeleteSelectedFigure = computed(() => selectedFigureMeta.value?.source 
 const deleteDialogMessage = computed(() => {
   const artifactId = String(selectedArtifactId.value || '').trim()
   if (!artifactId) return 'Delete this chart? This cannot be undone.'
-  const logicalName = String(selectedFigureMeta.value?.logical_name || artifactId)
+  const logicalName = String(selectedFigureMeta.value?.display_name || selectedFigureMeta.value?.logical_name || artifactId)
   return `Delete chart "${logicalName}"? This cannot be undone.`
 })
 
@@ -672,7 +672,7 @@ async function renderPlot() {
 }
 
 function getExportBaseName() {
-  const logicalName = String(selectedFigureMeta.value?.logical_name || 'chart')
+  const logicalName = String(selectedFigureMeta.value?.logical_name || selectedFigureMeta.value?.display_name || 'chart')
     .replace(/[^A-Za-z0-9._-]+/g, '_')
     .replace(/^_+|_+$/g, '')
   return logicalName || 'chart'
@@ -728,7 +728,7 @@ async function downloadHtml() {
     const themeMode = resolvePlotThemeMode()
     const figureData = applyPlotlyTheme(rawFigureData, { mode: themeMode, context: 'export' }) || rawFigureData
     const plotlyConfig = applyPlotlyConfigTheme({}, { mode: themeMode })
-    const chartTitle = String(selectedFigureMeta.value?.logical_name || 'Chart Visualization')
+    const chartTitle = String(selectedFigureMeta.value?.display_name || selectedFigureMeta.value?.logical_name || 'Chart Visualization')
     const escapedChartTitle = escapeHtml(chartTitle)
     
     const htmlContent = `<!DOCTYPE html>

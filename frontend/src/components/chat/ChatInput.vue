@@ -1406,9 +1406,11 @@ async function handleSubmit() {
       const dataframeArtifacts = artifactItems
         .filter((item) => String(item?.kind || '') === 'dataframe')
         .map((item) => ({
-          name: String(item?.logical_name || 'dataframe'),
+          name: String(item?.display_name || item?.logical_name || 'dataframe'),
           data: {
             artifact_id: item?.artifact_id,
+            logical_name: item?.logical_name || undefined,
+            display_name: item?.display_name || undefined,
             row_count: Number(item?.row_count || 0),
             columns: Array.isArray(item?.schema) ? item.schema.map((col) => String(col?.name || '')) : [],
             data: Array.isArray(item?.preview_rows) ? item.preview_rows : [],
@@ -1421,8 +1423,10 @@ async function handleSubmit() {
           const figure = normalizePlotlyFigure(item?.payload?.figure ?? item?.payload)
           if (!figure) return null
           return {
-            name: String(item?.logical_name || 'figure'),
+            name: String(item?.display_name || item?.logical_name || 'figure'),
             artifact_id: item?.artifact_id || null,
+            logical_name: item?.logical_name || undefined,
+            display_name: item?.display_name || undefined,
             created_at: String(item?.created_at || ''),
             data: figure,
           }

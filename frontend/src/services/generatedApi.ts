@@ -121,6 +121,7 @@ export interface ArtifactMetadataResponse {
   run_id: string;
   workspace_id: string;
   logical_name: string;
+  display_name?: string;
   kind: string;
   pointer: string;
   table_name?: ArtifactMetadataResponseTableName;
@@ -261,6 +262,7 @@ export type DataframeArtifactRowsResponseRowsItem = { [key: string]: unknown };
 export interface DataframeArtifactRowsResponse {
   artifact_id: string;
   name: string;
+  display_name?: string;
   row_count: number;
   columns: string[];
   rows: DataframeArtifactRowsResponseRowsItem[];
@@ -738,6 +740,7 @@ export type WorkspaceArtifactSummaryColumns = WorkspaceArtifactSummaryColumnsAny
 export interface WorkspaceArtifactSummary {
   artifact_id: string;
   logical_name: string;
+  display_name?: string;
   kind: string;
   row_count?: WorkspaceArtifactSummaryRowCount;
   columns?: WorkspaceArtifactSummaryColumns;

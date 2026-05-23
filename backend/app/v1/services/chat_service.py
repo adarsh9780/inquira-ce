@@ -1630,6 +1630,12 @@ class ChatService:
             workspace_duckdb_path=str(data_path or ""),
             artifacts=artifacts,
         )
+        persisted_artifacts = TurnArtifactStorageService.response_artifacts_from_rows(artifact_rows)
+        if persisted_artifacts:
+            response_payload["artifacts"] = persisted_artifacts
+            turn.tool_events_json = json.dumps(
+                [{"type": "artifact", "data": item} for item in persisted_artifacts]
+            )
         turn_dir = await TurnBundleService.create_turn_bundle(
             username=username,
             workspace_id=workspace_id,
@@ -1645,6 +1651,8 @@ class ChatService:
                 "artifacts": [
                     {
                         "artifact_id": str(item.get("artifact_id") or ""),
+                        "logical_name": str(item.get("logical_name") or item.get("artifact_id") or ""),
+                        "display_name": str(item.get("display_name") or item.get("logical_name") or item.get("artifact_id") or ""),
                         "kind": str(item.get("kind") or ""),
                         "path": str(item.get("storage_path") or ""),
                         "payload_format": str(item.get("payload_format") or ""),
@@ -1664,6 +1672,8 @@ class ChatService:
             [
                 {
                     "artifact_id": str(item.get("artifact_id") or ""),
+                    "logical_name": str(item.get("logical_name") or item.get("artifact_id") or ""),
+                    "display_name": str(item.get("display_name") or item.get("logical_name") or item.get("artifact_id") or ""),
                     "kind": str(item.get("kind") or ""),
                     "path": str(item.get("storage_path") or ""),
                     "payload_format": str(item.get("payload_format") or ""),

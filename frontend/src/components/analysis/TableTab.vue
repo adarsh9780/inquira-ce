@@ -154,7 +154,7 @@
           <p class="text-sm mt-2 text-red-700 break-words">{{ tableError }}</p>
           <p class="text-xs mt-3" style="color: var(--color-text-muted);">
             Table:
-            <span class="font-medium">{{ selectedArtifactMeta?.logical_name || selectedArtifactId }}</span>
+            <span class="font-medium">{{ selectedArtifactMeta?.display_name || selectedArtifactMeta?.logical_name || selectedArtifactId }}</span>
           </p>
           <button
             class="mt-4 inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
@@ -400,7 +400,7 @@ const showArtifactListLoadingState = computed(() => {
 
 const tableDropdownOptions = computed(() => displayArtifacts.value.map((artifact) => {
   const isMemory = artifact.source === 'memory'
-  const label = artifact.logical_name || artifact.artifact_id
+  const label = artifact.display_name || artifact.logical_name || artifact.artifact_id
   return {
     value: artifact.artifact_id,
     label: isMemory ? `${label} (memory)` : label,
@@ -862,7 +862,7 @@ const canDeleteSelectedArtifact = computed(() => {
 const deleteDialogMessage = computed(() => {
   const artifactId = String(selectedArtifactId.value || '').trim()
   if (!artifactId) return 'Delete this table? This cannot be undone.'
-  const artifactLabel = String(selectedArtifactMeta.value?.logical_name || artifactId)
+  const artifactLabel = String(selectedArtifactMeta.value?.display_name || selectedArtifactMeta.value?.logical_name || artifactId)
   return `Delete table "${artifactLabel}"? This cannot be undone.`
 })
 
@@ -1260,7 +1260,7 @@ async function downloadCsv() {
   isDownloading.value = true
   try {
     const csvContent = convertToCSV(downloadRows.value)
-    const dfName = selectedArtifactMeta.value?.logical_name || 'dataframe'
+    const dfName = selectedArtifactMeta.value?.logical_name || selectedArtifactMeta.value?.display_name || 'dataframe'
     const filename = `${dfName}_${new Date().toISOString().split('T')[0]}.csv`
     const bytes = new TextEncoder().encode(csvContent)
     const exported = await persistExportFile({

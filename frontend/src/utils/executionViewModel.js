@@ -74,12 +74,14 @@ function buildArtifactDataframes(artifacts) {
         .filter(Boolean)
       const previewRows = normalizePreviewRows(item?.preview_rows, columns)
       const logicalName = String(item?.logical_name || '').trim()
-      const name = logicalName || `dataframe_${index + 1}`
+      const displayName = String(item?.display_name || '').trim()
+      const name = displayName || logicalName || `dataframe_${index + 1}`
       return {
         name,
         data: {
           artifact_id: item?.artifact_id || null,
           logical_name: logicalName || undefined,
+          display_name: displayName || undefined,
           row_count: Number.isFinite(Number(item?.row_count)) ? Number(item.row_count) : previewRows.length,
           columns,
           data: previewRows,
@@ -97,11 +99,13 @@ function buildArtifactFigures(artifacts) {
       const normalizedFigure = normalizePlotlyFigure(payload)
       if (!normalizedFigure) return null
       const logicalName = String(item?.logical_name || '').trim()
+      const displayName = String(item?.display_name || '').trim()
       const artifactId = String(item?.artifact_id || normalizedFigure?.artifact_id || '').trim()
       return {
-        name: logicalName || `figure_${index + 1}`,
+        name: displayName || logicalName || `figure_${index + 1}`,
         artifact_id: artifactId || undefined,
         logical_name: logicalName || undefined,
+        display_name: displayName || undefined,
         data: normalizedFigure,
       }
     })
@@ -114,12 +118,13 @@ function buildArtifactScalars(artifacts) {
     .filter((item) => String(item?.kind || '').toLowerCase() === 'scalar')
     .map((item, index) => {
       const logicalName = String(item?.logical_name || '').trim()
+      const displayName = String(item?.display_name || '').trim()
       const payload = item?.payload
       const value = payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'value')
         ? payload.value
         : payload
       return {
-        name: logicalName || `scalar_${index + 1}`,
+        name: displayName || logicalName || `scalar_${index + 1}`,
         value,
       }
     })
