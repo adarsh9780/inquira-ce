@@ -185,7 +185,7 @@
             <div
               v-for="(conv, index) in appStore.conversations"
               :key="conv.id"
-              class="group relative flex min-h-9 items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
+              class="group relative flex min-h-9 select-none items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
               :class="[
                 appStore.isSidebarCollapsed ? 'justify-center px-0 py-1.5' : 'justify-start px-3 py-1.5',
                 isConversationSelected(conv.id) || appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : '',

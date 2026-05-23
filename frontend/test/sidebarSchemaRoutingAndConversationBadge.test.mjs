@@ -19,7 +19,7 @@ test('sidebar adds workspace view entries and uses numbered conversation badges'
   assert.equal(sidebarSource.includes('Turns across this workspace'), true)
   assert.equal(sidebarSource.includes(`v-if="appStore.activeTab === 'workspace'"`), false)
   assert.equal(sidebarSource.includes('max-h-[11.75rem] flex-none overflow-y-auto overflow-x-hidden pb-1'), true)
-  assert.equal(sidebarSource.includes('min-h-9 items-center rounded-lg'), true)
+  assert.equal(sidebarSource.includes('min-h-9 select-none items-center rounded-lg'), true)
   assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'justify-center px-0 py-1.5' : 'justify-start px-3 py-1.5'"), true)
   assert.equal(sidebarSource.includes('conversationBadgeLabel(index, appStore.conversations.length)'), true)
   assert.equal(sidebarSource.includes('const ordinal = total - offset'), true)
