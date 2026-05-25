@@ -9,9 +9,22 @@ def test_build_run_wrapped_code_uses_real_newlines():
         [{"name": "result_df", "kind": "dataframe"}],
     )
     assert "set_active_run('run-1', conversation_id=None, turn_id=None, artifact_dir=None)\nx = 1\n" in wrapped
+    assert "export_dataframe" not in wrapped
+    assert "\\n" not in wrapped
+
+
+def test_build_run_wrapped_code_includes_auto_capture_when_artifact_dir_set():
+    wrapped = ChatService._build_run_wrapped_code(
+        "x = 1",
+        "run-1",
+        [{"name": "result_df", "kind": "dataframe"}],
+        conversation_id="conv-1",
+        turn_id="turn-1",
+        artifact_dir="/tmp/turn-1",
+    )
+    assert "artifact_dir='/tmp/turn-1'" in wrapped
     assert "\"name\": \"result_df\"" in wrapped
     assert "export_dataframe" in wrapped
-    assert "\\n" not in wrapped
 
 
 def test_finalize_script_uses_real_newlines():
@@ -70,6 +83,7 @@ def test_build_run_wrapped_code_embeds_inferred_fallback_candidate_names():
         "sample_data = conn.sql('select * from t').df()\nprint(sample_data)",
         "run-2",
         [],
+        artifact_dir="/tmp/turn-2",
     )
     assert "_inq_fallback_names" in wrapped
     assert '"sample_data"' in wrapped

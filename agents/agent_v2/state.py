@@ -23,6 +23,9 @@ class AgentInput(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
     workspace_id: str
     user_id: str
+    conversation_id: str | None
+    turn_id: str | None
+    artifact_dir: str | None
     table_names: list[str]
     data_path: str | None
     scratchpad_path: str | None
@@ -113,13 +116,18 @@ def build_input_state(
     schema_folder_path: str = "",
     workspace_id: str,
     user_id: str,
-    scratchpad_path: str,
+    scratchpad_path: str = "",
+    conversation_id: str | None = None,
+    turn_id: str | None = None,
+    artifact_dir: str | None = None,
     known_columns: list[dict[str, str]] | None = None,
     attachments: list[dict[str, str]] | None = None,
     privacy: dict[str, Any] | None = None,
     run_id: str | None = None,
     **_: Any,
 ) -> AgentInput:
+    resolved_artifact_dir = str(artifact_dir or scratchpad_path or "").strip() or None
+    resolved_scratchpad = str(scratchpad_path or artifact_dir or "").strip() or None
     normalized_table_names: list[str] = []
     seen_tables: set[str] = set()
     candidates = table_names if isinstance(table_names, list) else []
@@ -184,9 +192,12 @@ def build_input_state(
         messages=[HumanMessage(content=content_blocks or str(question or ""))],
         workspace_id=workspace_id,
         user_id=user_id,
+        conversation_id=str(conversation_id or "").strip() or None,
+        turn_id=str(turn_id or "").strip() or None,
+        artifact_dir=resolved_artifact_dir,
         table_names=normalized_table_names,
         data_path=data_path or None,
-        scratchpad_path=scratchpad_path or None,
+        scratchpad_path=resolved_scratchpad,
         run_id=str(run_id or uuid.uuid4()),
         system_info=default_system_info(),
         context=str(context or ""),

@@ -304,4 +304,6 @@ def build_run_wrapped_code(
         f"turn_id={turn_id!r}, "
         f"artifact_dir={artifact_dir!r})"
     )
+    if not str(artifact_dir or "").strip():
+        return f"{setup}\n{body}\n"
     return f"{setup}\n{body}\n{auto_capture_code}\n"

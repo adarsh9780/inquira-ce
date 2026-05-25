@@ -2395,6 +2395,7 @@ async def _run_execute_python_runtime(
     explanation: str,
 ) -> dict[str, Any]:
     analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
+    artifact_dir = str(state.get("artifact_dir") or state.get("scratchpad_path") or "").strip() or None
     return await execute_python(
         workspace_id=str(state.get("workspace_id") or ""),
         data_path=str(analysis_context.get("data_path") or "") or None,
@@ -2402,6 +2403,10 @@ async def _run_execute_python_runtime(
         timeout=max(5, int(args.get("timeout") or 90)),
         explanation=explanation,
         emit_tool_events=False,
+        run_id=str(state.get("run_id") or "").strip() or None,
+        conversation_id=str(state.get("conversation_id") or "").strip() or None,
+        turn_id=str(state.get("turn_id") or "").strip() or None,
+        artifact_dir=artifact_dir,
     )
 
 

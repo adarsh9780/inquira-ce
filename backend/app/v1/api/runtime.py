@@ -132,8 +132,13 @@ async def _read_table_columns_for_prompt(
 class ExecuteRequest(BaseModel):
     code: str = Field(..., description="Python code to execute")
     timeout: int = Field(60, ge=1, le=300, description="Max execution time in seconds")
+    run_id: str | None = Field(default=None, description="Optional stable run id for artifact export")
     conversation_id: str | None = Field(default=None, description="Owning conversation to update in-place")
     turn_id: str | None = Field(default=None, description="Owning turn to overwrite in-place")
+    artifact_dir: str | None = Field(
+        default=None,
+        description="Turn artifact directory for workspace-kernel export helpers",
+    )
 
 
 class ExecuteResponse(BaseModel):
@@ -847,8 +852,15 @@ async def _execute_workspace_code_impl(
             ),
         )
 
-    run_id = str(uuid.uuid4())
-    wrapped_code = build_run_wrapped_code(payload.code, run_id, [])
+    run_id = str(payload.run_id or "").strip() or str(uuid.uuid4())
+    wrapped_code = build_run_wrapped_code(
+        payload.code,
+        run_id,
+        [],
+        conversation_id=payload.conversation_id,
+        turn_id=payload.turn_id,
+        artifact_dir=payload.artifact_dir,
+    )
     result = await execute_code(
         code=wrapped_code,
         timeout=payload.timeout,

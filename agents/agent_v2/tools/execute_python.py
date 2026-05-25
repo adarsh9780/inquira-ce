@@ -36,6 +36,10 @@ async def execute_python(
     timeout: int = 90,
     explanation: str = "",
     emit_tool_events: bool = True,
+    run_id: str | None = None,
+    conversation_id: str | None = None,
+    turn_id: str | None = None,
+    artifact_dir: str | None = None,
 ) -> dict[str, Any]:
     _ = data_path
     started = time.perf_counter()
@@ -75,12 +79,21 @@ async def execute_python(
 
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(max(5, int(timeout)) + 10.0)) as client:
+            request_payload: dict[str, Any] = {
+                "code": str(code or ""),
+                "timeout": max(5, int(timeout)),
+            }
+            if str(run_id or "").strip():
+                request_payload["run_id"] = str(run_id).strip()
+            if str(conversation_id or "").strip():
+                request_payload["conversation_id"] = str(conversation_id).strip()
+            if str(turn_id or "").strip():
+                request_payload["turn_id"] = str(turn_id).strip()
+            if str(artifact_dir or "").strip():
+                request_payload["artifact_dir"] = str(artifact_dir).strip()
             response = await client.post(
                 url,
-                json={
-                    "code": str(code or ""),
-                    "timeout": max(5, int(timeout)),
-                },
+                json=request_payload,
                 headers=headers,
             )
     except Exception as exc:

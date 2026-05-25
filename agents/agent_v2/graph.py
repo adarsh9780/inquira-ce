@@ -53,6 +53,9 @@ class RuntimeInput(TypedDict, total=False):
     messages: list[Any]
     workspace_id: str
     user_id: str
+    conversation_id: str
+    turn_id: str
+    artifact_dir: str
     table_names: list[str]
     data_path: str
     scratchpad_path: str
@@ -85,13 +88,17 @@ def _prepare_input_node(state: dict[str, Any], config: RunnableConfig) -> dict[s
 
     messages = state.get("messages")
     if isinstance(messages, list) and messages and not str(state.get("question") or "").strip():
+        artifact_dir = str(state.get("artifact_dir") or state.get("scratchpad_path") or "").strip() or None
         return {
             "messages": messages,
             "workspace_id": str(state.get("workspace_id") or ""),
             "user_id": str(state.get("user_id") or ""),
+            "conversation_id": str(state.get("conversation_id") or "").strip() or None,
+            "turn_id": str(state.get("turn_id") or "").strip() or None,
+            "artifact_dir": artifact_dir,
             "table_names": table_names,
             "data_path": str(state.get("data_path") or "") or None,
-            "scratchpad_path": str(state.get("scratchpad_path") or "") or None,
+            "scratchpad_path": artifact_dir,
             "run_id": str(state.get("run_id") or ""),
             "system_info": state.get("system_info") if isinstance(state.get("system_info"), dict) else {},
             "context": str(state.get("context") or ""),
@@ -104,6 +111,7 @@ def _prepare_input_node(state: dict[str, Any], config: RunnableConfig) -> dict[s
             "privacy": state.get("privacy") if isinstance(state.get("privacy"), dict) else {},
         }
 
+    artifact_dir = str(state.get("artifact_dir") or state.get("scratchpad_path") or "").strip()
     prepared = build_input_state(
         question=str(state.get("question") or ""),
         current_code=str(state.get("current_code") or ""),
@@ -114,7 +122,10 @@ def _prepare_input_node(state: dict[str, Any], config: RunnableConfig) -> dict[s
         schema_folder_path=str(state.get("schema_folder_path") or ""),
         workspace_id=str(state.get("workspace_id") or ""),
         user_id=str(state.get("user_id") or ""),
-        scratchpad_path=str(state.get("scratchpad_path") or ""),
+        scratchpad_path=artifact_dir,
+        conversation_id=str(state.get("conversation_id") or "").strip() or None,
+        turn_id=str(state.get("turn_id") or "").strip() or None,
+        artifact_dir=artifact_dir or None,
         known_columns=state.get("known_columns") if isinstance(state.get("known_columns"), list) else [],
         attachments=state.get("attachments") if isinstance(state.get("attachments"), list) else [],
         privacy=state.get("privacy") if isinstance(state.get("privacy"), dict) else {},

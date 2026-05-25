@@ -103,6 +103,69 @@ async def test_execute_python_tool_call_event_includes_explanation(monkeypatch) 
 
 
 @pytest.mark.asyncio
+async def test_execute_python_forwards_turn_context_to_internal_runtime(monkeypatch) -> None:
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            _ = (args, kwargs)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            _ = (exc_type, exc, tb)
+            return False
+
+        async def post(self, url, json=None, headers=None):
+            assert json == {
+                "code": "print('ok')",
+                "timeout": 5,
+                "run_id": "run-1",
+                "conversation_id": "conv-1",
+                "turn_id": "turn-1",
+                "artifact_dir": "/tmp/turn-1",
+            }
+            return httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "stdout": "ok",
+                    "stderr": "",
+                    "error": None,
+                    "result": None,
+                    "result_type": None,
+                    "result_kind": "none",
+                    "result_name": None,
+                    "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
+                    "artifacts": [],
+                },
+            )
+
+    monkeypatch.setattr("agent_v2.tools.execute_python.httpx.AsyncClient", _Client)
+    monkeypatch.setattr(
+        "agent_v2.tools.execute_python.load_agent_runtime_config",
+        lambda: type(
+            "_Cfg",
+            (),
+            {"backend_base_url": "http://localhost:8000", "backend_shared_secret": "test-secret"},
+        )(),
+    )
+
+    result = await execute_python(
+        workspace_id="ws1",
+        data_path=__file__,
+        code="print('ok')",
+        timeout=5,
+        run_id="run-1",
+        conversation_id="conv-1",
+        turn_id="turn-1",
+        artifact_dir="/tmp/turn-1",
+        emit_tool_events=False,
+    )
+
+    assert result["success"] is True
+
+
+@pytest.mark.asyncio
 async def test_execute_python_uses_workspace_kernel_error_payload_on_http_failure(monkeypatch) -> None:
     class _Client:
         def __init__(self, *args, **kwargs):
