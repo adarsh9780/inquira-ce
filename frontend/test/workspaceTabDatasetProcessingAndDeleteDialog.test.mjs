@@ -7,8 +7,21 @@ function readSource(relativePath) {
   return readFileSync(resolve(process.cwd(), relativePath), 'utf-8')
 }
 
+function extractBlock(source, startMarker, endMarker) {
+  const start = source.indexOf(startMarker)
+  const end = source.indexOf(endMarker, start + startMarker.length)
+  assert.notEqual(start, -1, `Missing marker: ${startMarker}`)
+  assert.notEqual(end, -1, `Missing marker: ${endMarker}`)
+  return source.slice(start, end)
+}
+
 test('workspace tab shows inline dataset processing card and consumes websocket progress', () => {
   const source = readSource('src/components/modals/tabs/WorkspaceTab.vue')
+  const ingestBlock = extractBlock(
+    source,
+    'async function startBatchDatasetIngestion(paths) {',
+    'async function retryLastDatasetIngestion() {',
+  )
 
   assert.equal(source.includes('v-if="isDatasetIngesting"'), true)
   assert.equal(source.includes('{{ datasetIngestStatusLabel }}'), true)
@@ -16,15 +29,16 @@ test('workspace tab shows inline dataset processing card and consumes websocket 
   assert.equal(source.includes('settingsWebSocket.subscribeProgress(handleSettingsProgressUpdate)'), true)
   assert.equal(source.includes('function handleSettingsProgressUpdate(data) {'), true)
   assert.equal(source.includes('async function goToSetupStep(stepId) {'), true)
-  assert.equal(source.includes('const persisted = await ensureWorkspaceIdentityPersisted({ silent: true })'), true)
-  assert.equal(source.includes('async function ensureWorkspaceIdentityPersisted({ silent = false } = {}) {'), true)
+  assert.equal(source.includes('const persisted = await ensureWorkspaceNamePersisted({ silent: true })'), true)
+  assert.equal(source.includes('async function ensureWorkspaceIdentityPersisted({'), true)
   assert.equal(source.includes('startDatasetIngest(sourcePaths.length === 1 ? sourcePaths[0] : `${sourcePaths.length} selected files`)'), true)
-  assert.equal(source.includes('const identityReady = await ensureWorkspaceIdentityPersisted({ silent: true })'), true)
+  assert.equal(source.includes('const identityReady = await ensureWorkspaceNamePersisted({ silent: true })'), true)
   assert.equal(source.includes('if (!identityReady) return'), true)
   assert.equal(source.includes('trackDatasetIngestionJob(workspaceId, jobId)'), true)
   assert.equal(source.includes("setWorkspaceOperation('ingest', 'Importing selected datasets into the workspace.')"), true)
   assert.equal(source.includes('const completedCount = Number(job?.completed_count || 0)'), true)
-  assert.equal(source.includes('setupStep.value = 3'), false)
+  assert.equal(source.includes('setupStep.value = 3'), true)
+  assert.equal(ingestBlock.includes('await appStore.ensureWorkspaceKernelConnected(workspaceId)'), false)
   assert.equal(source.includes('void generateWorkspaceSchemas({'), false)
   assert.equal(source.includes('autoStart: true'), false)
   assert.equal(source.includes('clearWorkspaceOperation()'), true)

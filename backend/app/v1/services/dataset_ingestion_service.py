@@ -11,6 +11,7 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...services.code_executor import bootstrap_workspace_runtime
 from ..db.session import AppDataSessionLocal
 from ..repositories.dataset_ingestion_repository import DatasetIngestionRepository
 from ..repositories.principal_repository import PrincipalRepository
@@ -181,6 +182,10 @@ class DatasetIngestionService:
                 try:
                     async with await self._workspace_lock(workspace_id):
                         await self._heartbeat(job_id=job_id, worker_id=worker_id)
+                        await self._ensure_workspace_runtime_ready(
+                            principal_id=principal_id,
+                            workspace_id=workspace_id,
+                        )
                         async with AppDataSessionLocal() as session:
                             dataset = await DatasetService.add_dataset(
                                 session=session,
@@ -257,6 +262,19 @@ class DatasetIngestionService:
                 lock = asyncio.Lock()
                 self._workspace_locks[workspace_id] = lock
             return lock
+
+    async def _ensure_workspace_runtime_ready(self, *, principal_id: str, workspace_id: str) -> None:
+        async with AppDataSessionLocal() as session:
+            workspace = await WorkspaceRepository.get_by_id(session, workspace_id, principal_id)
+            if workspace is None:
+                raise RuntimeError("Workspace not found")
+            workspace_duckdb_path = str(workspace.duckdb_path or "").strip()
+        ready = await bootstrap_workspace_runtime(
+            workspace_id=workspace_id,
+            workspace_duckdb_path=workspace_duckdb_path,
+        )
+        if not ready:
+            raise RuntimeError("Workspace runtime bootstrap failed.")
 
     async def _enqueue_schema_generation(
         self,

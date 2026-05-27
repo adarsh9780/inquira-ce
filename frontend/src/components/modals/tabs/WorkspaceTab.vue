@@ -143,7 +143,7 @@
         mode="out-in"
         class="min-h-0 flex-1 overflow-y-auto pt-5"
       >
-        <!-- Step 1: Workspace identity — shared between create and detail -->
+        <!-- Step 1: Workspace name — shared between create and detail -->
         <div v-if="setupStep === 1" key="step-1" class="relative flex flex-col gap-5 px-4 pb-4 pt-2">
           <!-- Loading overlay shown only during creation -->
           <div
@@ -160,7 +160,7 @@
           </div>
 
           <p class="rounded-lg bg-[var(--color-base-muted)]/60 px-3 py-2.5 text-sm leading-relaxed text-[var(--color-text-muted)]">
-            A workspace is meant for related datasets that share business meaning, terminology, and schema context.
+            Give this workspace a short name. You can add context and data in the next steps.
           </p>
 
           <label class="flex flex-col gap-1.5">
@@ -172,25 +172,6 @@
               placeholder="e.g. Sales analysis"
               :disabled="isCreatingWorkspace || isSavingWorkspaceIdentity"
             />
-          </label>
-
-          <label class="flex flex-col gap-1.5">
-            <span class="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">
-              Workspace context
-              <span class="inline-flex items-center gap-1 rounded-md bg-[var(--color-base-muted)] px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-[var(--color-text-muted)]">
-                <svg class="h-2.5 w-2.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <path d="M8 1v14M1 8h14"/>
-                </svg>
-                Shared
-              </span>
-            </span>
-            <textarea
-              v-model="setupWorkspaceContext"
-              :rows="isCreatingMode ? 5 : 3"
-              class="input-base input-outlined resize-none"
-              placeholder="Describe the business purpose and schema context for this workspace..."
-              :disabled="isCreatingWorkspace || isSavingWorkspaceIdentity"
-            ></textarea>
           </label>
 
           <div class="mt-2 flex items-center justify-between border-t border-[var(--color-border)] pt-5">
@@ -208,16 +189,62 @@
               type="button"
               class="btn-primary px-5 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="isCreatingWorkspace || isSavingWorkspaceIdentity || !setupWorkspaceName.trim()"
-              @click="continueFromWorkspaceIdentity()"
+              @click="continueFromWorkspaceName()"
             >
               <span v-if="isCreatingWorkspace || isSavingWorkspaceIdentity">{{ isCreatingMode ? 'Creating...' : 'Saving...' }}</span>
-              <span v-else>Continue</span>
+              <span v-else>Next</span>
             </button>
           </div>
         </div>
 
-        <!-- Step 2: Datasets -->
-        <div v-else-if="setupStep === 2" key="step-2" class="space-y-5 px-4">
+        <!-- Step 2: Workspace context -->
+        <div v-else-if="setupStep === 2" key="step-2" class="relative flex flex-col gap-5 px-4 pb-4 pt-2">
+          <p class="rounded-lg bg-[var(--color-base-muted)]/60 px-3 py-2.5 text-sm leading-relaxed text-[var(--color-text-muted)]">
+            Add optional business context so schema descriptions and future answers use your terminology.
+          </p>
+
+          <label class="flex flex-col gap-1.5">
+            <span class="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">
+              Workspace context
+              <span class="inline-flex items-center gap-1 rounded-md bg-[var(--color-base-muted)] px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-[var(--color-text-muted)]">
+                <svg class="h-2.5 w-2.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M8 1v14M1 8h14"/>
+                </svg>
+                Optional
+              </span>
+            </span>
+            <textarea
+              v-model="setupWorkspaceContext"
+              rows="6"
+              class="input-base input-outlined resize-none"
+              placeholder="Describe the business purpose, terms, and schema context for this workspace..."
+              :disabled="isSavingWorkspaceIdentity"
+            ></textarea>
+          </label>
+
+          <div class="mt-2 flex items-center justify-between border-t border-[var(--color-border)] pt-5">
+            <button
+              type="button"
+              class="btn-ghost px-5 py-2 text-sm"
+              :disabled="isSavingWorkspaceIdentity"
+              @click="skipWorkspaceContext()"
+            >
+              Skip
+            </button>
+            <button
+              type="button"
+              class="btn-primary px-5 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="isSavingWorkspaceIdentity || !setupWorkspaceContext.trim()"
+              @click="saveWorkspaceContextAndContinue()"
+            >
+              <span v-if="isSavingWorkspaceIdentity">Saving...</span>
+              <span v-else>Next</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 3: Datasets -->
+        <div v-else-if="setupStep === 3" key="step-3" class="space-y-5 px-4">
           <div class="grid grid-cols-1 gap-4 border-b border-[var(--color-border)] pb-4 sm:grid-cols-3">
             <div>
               <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">Created</p>
@@ -507,7 +534,7 @@ let datasetSchemaPoller = null
 
 const isCreatingWorkspace = ref(false)
 const isCreatingWorkspaceRuntime = ref(false)
-const workspaceCreateMessage = ref('Saving the workspace name and shared context. You will move to dataset selection next.')
+const workspaceCreateMessage = ref('Saving the workspace name. You will add context next.')
 const runtimeProgressEntries = ref([])
 const runtimeProgressError = ref('')
 const runtimeActionMode = ref('')
@@ -521,8 +548,9 @@ const setupWorkspaceContext = ref('')
 const isSavingWorkspaceIdentity = ref(false)
 const isCheckingWorkspaceReadiness = ref(false)
 const setupSteps = [
-  { id: 1, label: 'Workspace context' },
-  { id: 2, label: 'Datasets' },
+  { id: 1, label: 'Name' },
+  { id: 2, label: 'Context' },
+  { id: 3, label: 'Data' },
 ]
 
 function normalizeWorkspaceName(value) {
@@ -722,7 +750,7 @@ watch(
   (nextStep) => {
     if (props.panelMode !== 'ws-detail') return
     const normalized = Number(nextStep)
-    if (![1, 2].includes(normalized)) return
+    if (![1, 2, 3].includes(normalized)) return
     setupStep.value = normalized
   },
   { immediate: true },
@@ -857,27 +885,31 @@ function syncSetupIdentity() {
 async function goToSetupStep(stepId) {
   if (notifyWorkspaceOperationBlocked()) return
   const normalized = Number(stepId)
-    if (![1, 2].includes(normalized)) return
+  if (![1, 2, 3].includes(normalized)) return
   if (props.panelMode === 'ws-create' && normalized !== 1) {
     await createWorkspace({ setupStep: normalized })
     return
   }
   if (props.panelMode === 'ws-detail' && setupStep.value === 1 && normalized > 1) {
-    const persisted = await ensureWorkspaceIdentityPersisted({ silent: true })
+    const persisted = await ensureWorkspaceNamePersisted({ silent: true })
+    if (!persisted) return
+  }
+  if (props.panelMode === 'ws-detail' && setupStep.value === 2 && normalized > 2 && setupWorkspaceContext.value.trim()) {
+    const persisted = await ensureWorkspaceContextPersisted({ silent: true })
     if (!persisted) return
   }
   setupStep.value = normalized
 }
 
-async function continueFromWorkspaceIdentity() {
+async function continueFromWorkspaceName() {
   if (props.panelMode === 'ws-create') {
     await createWorkspace({ setupStep: 2 })
     return
   }
-  await saveWorkspaceIdentityAndContinue()
+  await saveWorkspaceNameAndContinue()
 }
 
-async function saveWorkspaceIdentityAndContinue() {
+async function saveWorkspaceNameAndContinue() {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   const name = String(setupWorkspaceName.value || '').trim()
   if (!workspaceId) return
@@ -885,12 +917,25 @@ async function saveWorkspaceIdentityAndContinue() {
     toast.error('Workspace name required', 'Enter a workspace name to continue.')
     return
   }
-  const persisted = await ensureWorkspaceIdentityPersisted()
+  const persisted = await ensureWorkspaceNamePersisted()
   if (!persisted) return
   setupStep.value = 2
 }
 
-async function ensureWorkspaceIdentityPersisted({ silent = false } = {}) {
+async function skipWorkspaceContext() {
+  setupStep.value = 3
+}
+
+async function saveWorkspaceContextAndContinue() {
+  const workspaceId = String(props.activeWorkspaceId || '').trim()
+  if (!workspaceId) return
+  if (!String(setupWorkspaceContext.value || '').trim()) return
+  const persisted = await ensureWorkspaceContextPersisted()
+  if (!persisted) return
+  setupStep.value = 3
+}
+
+async function ensureWorkspaceNamePersisted({ silent = false } = {}) {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   const name = String(setupWorkspaceName.value || '').trim()
   if (!workspaceId || !name) {
@@ -900,24 +945,59 @@ async function ensureWorkspaceIdentityPersisted({ silent = false } = {}) {
     return false
   }
 
+  const currentContext = resolveWorkspaceContext()
+  return ensureWorkspaceIdentityPersisted({
+    name,
+    context: currentContext,
+    silent,
+    successMessage: 'Workspace name updated.',
+  })
+}
+
+async function ensureWorkspaceContextPersisted({ silent = false } = {}) {
+  const workspaceId = String(props.activeWorkspaceId || '').trim()
+  const name = String(setupWorkspaceName.value || activeWorkspace.value?.name || '').trim()
+  if (!workspaceId || !name) {
+    if (!silent) {
+      toast.error('Workspace name required', 'Enter a workspace name before saving context.')
+    }
+    return false
+  }
   const context = String(setupWorkspaceContext.value || '').trim()
+  return ensureWorkspaceIdentityPersisted({
+    name,
+    context,
+    silent,
+    successMessage: 'Workspace context updated.',
+  })
+}
+
+async function ensureWorkspaceIdentityPersisted({
+  name,
+  context,
+  silent = false,
+  successMessage = 'Workspace updated.',
+} = {}) {
+  const workspaceId = String(props.activeWorkspaceId || '').trim()
+  const normalizedName = String(name || '').trim()
+  if (!workspaceId || !normalizedName) return false
   const currentName = String(activeWorkspace.value?.name || '').trim()
   const currentContext = resolveWorkspaceContext()
-  const unchanged = name === currentName && context === currentContext
+  const unchanged = normalizedName === currentName && context === currentContext
   if (unchanged) return true
 
   isSavingWorkspaceIdentity.value = true
   try {
-    await appStore.renameWorkspace(workspaceId, name, context)
+    await appStore.renameWorkspace(workspaceId, normalizedName, context)
     await appStore.fetchWorkspaces()
     await loadWorkspaceDetail()
     if (!silent) {
-      toast.success('Workspace saved', 'Workspace name and context updated.')
+      toast.success('Workspace saved', successMessage)
     }
     return true
   } catch (error) {
     if (!silent) {
-      toast.error('Save failed', extractApiErrorMessage(error, 'Failed to save workspace identity.'))
+      toast.error('Save failed', extractApiErrorMessage(error, 'Failed to save workspace.'))
     } else {
       toast.error('Save failed', extractApiErrorMessage(error, 'Failed to save workspace before continuing.'))
     }
@@ -1321,18 +1401,14 @@ async function startBatchDatasetIngestion(paths) {
     toast.info('Activate workspace first', 'Activate this workspace before importing datasets.')
     return
   }
-  const identityReady = await ensureWorkspaceIdentityPersisted({ silent: true })
+  const identityReady = await ensureWorkspaceNamePersisted({ silent: true })
   if (!identityReady) return
 
   startDatasetIngest(sourcePaths.length === 1 ? sourcePaths[0] : `${sourcePaths.length} selected files`)
   lastSelectedDatasetPaths.value = [...sourcePaths]
   setWorkspaceOperation('ingest', 'Importing selected datasets into the workspace.')
-  datasetIngestMessage.value = 'Preparing workspace runtime...'
+  datasetIngestMessage.value = 'Preparing workspace...'
   try {
-    const kernelReady = await appStore.ensureWorkspaceKernelConnected(workspaceId)
-    if (!kernelReady) {
-      throw new Error(String(appStore.runtimeError || 'Workspace runtime bootstrap failed.'))
-    }
     datasetIngestMessage.value = 'Queueing dataset ingestion...'
     const job = await apiService.v1AddDatasetsBatch(workspaceId, sourcePaths)
     const jobId = String(job?.job_id || '').trim()
@@ -1344,7 +1420,7 @@ async function startBatchDatasetIngestion(paths) {
     }
     trackDatasetIngestionJob(workspaceId, jobId)
   } catch (error) {
-    markDatasetIngestFailed(extractApiErrorMessage(error, 'Backend still initializing. Please retry.'))
+    markDatasetIngestFailed(extractApiErrorMessage(error, 'Failed to queue dataset import.'))
     clearWorkspaceOperation()
     toast.error('Dataset Error', extractApiErrorMessage(error, 'Failed to add datasets.'))
   }
@@ -1643,21 +1719,15 @@ async function createWorkspace({ setupStep: targetSetupStep = 2 } = {}) {
   isCreatingWorkspaceRuntime.value = false
   clearRuntimeProgress()
   runtimeActionMode.value = 'create'
-  workspaceCreateMessage.value = 'Saving the workspace name and shared context. You will move to dataset selection next.'
-  setWorkspaceOperation('create', 'Creating workspace and preparing its runtime.')
+  workspaceCreateMessage.value = 'Saving the workspace name. You will add context next.'
+  setWorkspaceOperation('create', 'Creating workspace.')
   try {
-    const context = String(setupWorkspaceContext.value || '').trim()
+    const context = ''
     const workspace = await appStore.createWorkspace(name, context)
     workspaceId = String(workspace?.id || appStore.activeWorkspaceId || '').trim()
     if (!workspaceId) {
       throw new Error('Backend did not return a workspace id.')
     }
-    workspaceCreateMessage.value = 'Preparing workspace runtime...'
-    const kernelReady = await appStore.ensureWorkspaceKernelConnected(workspaceId)
-    if (!kernelReady) {
-      throw new Error(String(appStore.runtimeError || 'Workspace runtime bootstrap failed.'))
-    }
-    clearRuntimeProgress()
     await appStore.fetchWorkspaces()
     emit('workspace-created', {
       workspaceId,
@@ -1665,25 +1735,41 @@ async function createWorkspace({ setupStep: targetSetupStep = 2 } = {}) {
       context,
       setupStep: targetSetupStep,
     })
-    toast.success('Workspace ready', 'Workspace is ready for dataset selection.')
+    void warmWorkspaceRuntimeInBackground(workspaceId)
   } catch (error) {
-    if (workspaceId) {
-      emit('workspace-created', {
-        workspaceId,
-        name,
-        context: String(setupWorkspaceContext.value || '').trim(),
-        setupStep: 2,
-      })
-      runtimeProgressError.value = extractApiErrorMessage(error, 'Workspace runtime bootstrap failed.')
-      appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
-    }
     toast.error('Create failed', extractApiErrorMessage(error, 'Failed to create workspace.'))
   } finally {
     isCreatingWorkspace.value = false
+    if (!workspaceId) {
+      isCreatingWorkspaceRuntime.value = false
+      runtimeActionMode.value = ''
+    }
+    workspaceCreateMessage.value = 'Saving the workspace name. You will add context next.'
+    clearWorkspaceOperation()
+  }
+}
+
+async function warmWorkspaceRuntimeInBackground(workspaceId) {
+  const targetWorkspaceId = String(workspaceId || '').trim()
+  if (!targetWorkspaceId) return
+  clearRuntimeProgress()
+  runtimeActionMode.value = 'create'
+  isCreatingWorkspaceRuntime.value = true
+  try {
+    const ready = await appStore.ensureWorkspaceKernelConnected(targetWorkspaceId)
+    if (!ready) {
+      runtimeProgressError.value = String(appStore.runtimeError || 'Workspace runtime bootstrap failed.')
+      appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
+      return
+    }
+    clearRuntimeProgress()
+  } catch (error) {
+    runtimeProgressError.value = extractApiErrorMessage(error, 'Workspace runtime bootstrap failed.')
+    appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
+    appStore.setWorkspaceKernelStatus(targetWorkspaceId, 'error')
+  } finally {
     isCreatingWorkspaceRuntime.value = false
     runtimeActionMode.value = ''
-    workspaceCreateMessage.value = 'Saving the workspace name and shared context. You will move to dataset selection next.'
-    clearWorkspaceOperation()
   }
 }
 
@@ -1729,7 +1815,7 @@ function syncDatasetSchemaPolling() {
   }
   if (datasetSchemaPoller !== null) return
   datasetSchemaPoller = setInterval(async () => {
-    if (props.panelMode !== 'ws-detail' || setupStep.value !== 2) return
+    if (props.panelMode !== 'ws-detail' || setupStep.value !== 3) return
     await loadWorkspaceDatasets()
   }, 1500)
 }

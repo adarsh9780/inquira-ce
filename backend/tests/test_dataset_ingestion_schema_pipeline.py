@@ -102,6 +102,7 @@ async def test_ingestion_enqueues_schema_as_soon_as_each_import_completes(
         return SimpleNamespace(table_name=table_name, row_count=1)
 
     monkeypatch.setattr("app.v1.services.dataset_ingestion_service.DatasetService.add_dataset", fake_add_dataset)
+    monkeypatch.setattr("app.v1.services.dataset_ingestion_service.bootstrap_workspace_runtime", _ready_runtime)
 
     service = DatasetIngestionService(schema_generation_service=FakeSchemaGenerationService())
     await service._run_ingestion_job(
@@ -146,6 +147,7 @@ async def test_ingestion_keeps_importing_when_schema_enqueue_fails(
         return SimpleNamespace(table_name=table_name, row_count=1)
 
     monkeypatch.setattr("app.v1.services.dataset_ingestion_service.DatasetService.add_dataset", fake_add_dataset)
+    monkeypatch.setattr("app.v1.services.dataset_ingestion_service.bootstrap_workspace_runtime", _ready_runtime)
 
     service = DatasetIngestionService(schema_generation_service=FlakySchemaGenerationService())
     await service._run_ingestion_job(
@@ -163,3 +165,98 @@ async def test_ingestion_keeps_importing_when_schema_enqueue_fails(
     assert job.status == "completed"
     assert job.completed_count == 2
     assert job.failed_count == 0
+
+
+async def _ready_runtime(*, workspace_id: str, workspace_duckdb_path: str, progress_callback=None) -> bool:
+    _ = workspace_id, workspace_duckdb_path, progress_callback
+    return True
+
+
+@pytest.mark.asyncio
+async def test_ingestion_waits_for_workspace_runtime_before_import(
+    ingestion_session_factory,
+    monkeypatch,
+):
+    await _seed_ingestion_job(
+        ingestion_session_factory,
+        job_id="ingest-3",
+        workspace_id="ws-1",
+        source_paths=["/tmp/a.csv"],
+    )
+
+    monkeypatch.setattr("app.v1.services.dataset_ingestion_service.AppDataSessionLocal", ingestion_session_factory)
+    runtime_ready = asyncio.Event()
+    imports_started: list[str] = []
+
+    async def fake_bootstrap(*, workspace_id: str, workspace_duckdb_path: str, progress_callback=None):
+        _ = workspace_id, workspace_duckdb_path, progress_callback
+        await runtime_ready.wait()
+        return True
+
+    async def fake_add_dataset(*, session, user, workspace_id: str, source_path: str):
+        _ = session, user, workspace_id
+        imports_started.append(source_path)
+        return SimpleNamespace(table_name="table_a", row_count=1)
+
+    monkeypatch.setattr("app.v1.services.dataset_ingestion_service.bootstrap_workspace_runtime", fake_bootstrap)
+    monkeypatch.setattr("app.v1.services.dataset_ingestion_service.DatasetService.add_dataset", fake_add_dataset)
+
+    service = DatasetIngestionService()
+    task = asyncio.create_task(
+        service._run_ingestion_job(
+            job_id="ingest-3",
+            workspace_id="ws-1",
+            principal_id="principal-1",
+            username="alice",
+        )
+    )
+    await asyncio.sleep(0.05)
+    assert imports_started == []
+
+    runtime_ready.set()
+    await task
+    assert imports_started == ["/tmp/a.csv"]
+
+
+@pytest.mark.asyncio
+async def test_ingestion_marks_item_failed_when_runtime_bootstrap_fails(
+    ingestion_session_factory,
+    monkeypatch,
+):
+    await _seed_ingestion_job(
+        ingestion_session_factory,
+        job_id="ingest-4",
+        workspace_id="ws-1",
+        source_paths=["/tmp/a.csv"],
+    )
+
+    monkeypatch.setattr("app.v1.services.dataset_ingestion_service.AppDataSessionLocal", ingestion_session_factory)
+
+    async def fake_bootstrap(*, workspace_id: str, workspace_duckdb_path: str, progress_callback=None):
+        _ = workspace_id, workspace_duckdb_path, progress_callback
+        raise RuntimeError("runtime unavailable")
+
+    async def fake_add_dataset(*, session, user, workspace_id: str, source_path: str):
+        _ = session, user, workspace_id, source_path
+        raise AssertionError("import should not start when runtime bootstrap fails")
+
+    monkeypatch.setattr("app.v1.services.dataset_ingestion_service.bootstrap_workspace_runtime", fake_bootstrap)
+    monkeypatch.setattr("app.v1.services.dataset_ingestion_service.DatasetService.add_dataset", fake_add_dataset)
+
+    service = DatasetIngestionService()
+    await service._run_ingestion_job(
+        job_id="ingest-4",
+        workspace_id="ws-1",
+        principal_id="principal-1",
+        username="alice",
+    )
+
+    async with ingestion_session_factory() as session:
+        job = await DatasetIngestionRepository.get_by_id(session, "ingest-4")
+
+    items = json.loads(job.items_json)
+    assert job.status == "completed_with_errors"
+    assert job.completed_count == 0
+    assert job.failed_count == 1
+    assert items[0]["status"] == "failed"
+    assert "runtime unavailable" in items[0]["error_message"]

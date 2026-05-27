@@ -25,7 +25,7 @@ test('workspace creation activates the new workspace centrally in the store', ()
   assert.equal(createBlock.includes('await fetchWorkspaces()'), true)
 })
 
-test('workspace setup stepper captures shared context before dataset selection', () => {
+test('workspace setup stepper separates name context and data while warming runtime in the background', () => {
   const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue')
   const settingsPath = resolve(process.cwd(), 'src/components/modals/SettingsModal.vue')
   const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
@@ -35,19 +35,21 @@ test('workspace setup stepper captures shared context before dataset selection',
   const storeSource = readFileSync(storePath, 'utf-8')
   const appSource = readFileSync(appPath, 'utf-8')
 
-  assert.equal(source.includes('A workspace is meant for related datasets that share business meaning, terminology, and schema context.'), true)
-  assert.equal(source.includes('{ id: 1, label: \'Workspace context\' }'), true)
-  assert.equal(source.includes('{ id: 2, label: \'Datasets\' }'), true)
+  assert.equal(source.includes('Give this workspace a short name. You can add context and data in the next steps.'), true)
+  assert.equal(source.includes('{ id: 1, label: \'Name\' }'), true)
+  assert.equal(source.includes('{ id: 2, label: \'Context\' }'), true)
+  assert.equal(source.includes('{ id: 3, label: \'Data\' }'), true)
   assert.equal(source.includes('{ id: 3, label: \'Generate schema\' }'), false)
   assert.equal(source.includes('class="shrink-0 px-4 pb-4 pt-5"'), true)
   assert.equal(source.includes('class="mx-4 border-t border-[var(--color-border)]"'), true)
   assert.equal(source.includes('class="min-h-0 flex-1 overflow-y-auto pt-5"'), true)
   assert.equal(source.includes('await appStore.createWorkspace(name, context)'), true)
-  assert.equal(source.includes('await appStore.renameWorkspace(workspaceId, name, context)'), true)
+  assert.equal(source.includes('await appStore.renameWorkspace(workspaceId, normalizedName, context)'), true)
   assert.equal(source.includes('Creating workspace inside Settings...'), true)
   assert.equal(source.includes('Preparing workspace runtime inside Settings...'), true)
-  assert.equal(source.includes('await appStore.ensureWorkspaceKernelConnected(workspaceId)'), true)
-  assert.equal(source.includes("toast.success('Workspace ready', 'Workspace is ready for dataset selection.')"), true)
+  assert.equal(source.includes('async function warmWorkspaceRuntimeInBackground(workspaceId)'), true)
+  assert.equal(source.includes('await appStore.ensureWorkspaceKernelConnected(targetWorkspaceId)'), true)
+  assert.equal(source.includes("toast.success('Workspace ready', 'Workspace is ready for dataset selection.')"), false)
   assert.equal(source.includes('settingsWebSocket.subscribeComplete(handleRuntimeSocketComplete)'), true)
   assert.equal(source.includes('settingsWebSocket.subscribeError(handleRuntimeSocketError)'), true)
   assert.equal(source.includes('{{ currentRuntimeProgressMessage || workspaceCreateMessage }}'), true)
@@ -58,7 +60,7 @@ test('workspace setup stepper captures shared context before dataset selection',
   assert.equal(source.includes("const emit = defineEmits(['navigate', 'select-workspace', 'activate-workspace', 'workspace-operation-change', 'workspace-created'])"), true)
   assert.equal(source.includes("emit('workspace-operation-change', {"), true)
   assert.equal(source.includes("emit('workspace-created', {"), true)
-  assert.equal(source.includes("setWorkspaceOperation('create', 'Creating workspace and preparing its runtime.')"), true)
+  assert.equal(source.includes("setWorkspaceOperation('create', 'Creating workspace.')"), true)
   assert.equal(source.includes("setWorkspaceOperation('ingest', 'Importing selected datasets into the workspace.')"), true)
   assert.equal(source.includes('Generating dataset schemas in the background.'), false)
   assert.equal(source.includes('function syncDatasetSchemaPolling() {'), true)
@@ -74,7 +76,7 @@ test('workspace setup stepper captures shared context before dataset selection',
   assert.equal(appSource.includes('suppressWorkspaceRuntimeOverlay'), false)
 })
 
-test('workspace creation carries step one identity into dataset selection automatically', () => {
+test('workspace creation carries step one name into optional context automatically', () => {
   const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue')
   const settingsPath = resolve(process.cwd(), 'src/components/modals/SettingsModal.vue')
   const source = readFileSync(tabPath, 'utf-8')
@@ -82,7 +84,7 @@ test('workspace creation carries step one identity into dataset selection automa
   const createBlock = extractBlock(
     source,
     'async function createWorkspace({ setupStep: targetSetupStep = 2 } = {}) {',
-    'function datasetSchemaStatusState(dataset) {',
+    'async function warmWorkspaceRuntimeInBackground(workspaceId) {',
   )
   const createdHandlerBlock = extractBlock(
     settingsSource,
@@ -90,8 +92,10 @@ test('workspace creation carries step one identity into dataset selection automa
     'function closeModal() {',
   )
 
-  assert.equal(source.includes('@click="continueFromWorkspaceIdentity()"'), true)
-  assert.equal(source.includes('async function continueFromWorkspaceIdentity() {'), true)
+  assert.equal(source.includes('@click="continueFromWorkspaceName()"'), true)
+  assert.equal(source.includes('async function continueFromWorkspaceName() {'), true)
+  assert.equal(source.includes('@click="skipWorkspaceContext()"'), true)
+  assert.equal(source.includes('@click="saveWorkspaceContextAndContinue()"'), true)
   assert.equal(source.includes("await createWorkspace({ setupStep: normalized })"), true)
   assert.equal(source.includes("toast.info('Create workspace first'"), false)
   assert.equal(source.includes('requestedSetupStep'), true)
@@ -101,8 +105,8 @@ test('workspace creation carries step one identity into dataset selection automa
   assert.equal(source.includes('setupWorkspaceName.value = normalized'), true)
   assert.equal(source.includes('function resolveWorkspaceIdentityDraft() {'), true)
   assert.equal(createBlock.includes("emit('workspace-created', {"), true)
-  assert.equal(createBlock.includes('if (workspaceId) {'), true)
-  assert.equal(createBlock.includes('runtimeProgressError.value = extractApiErrorMessage(error, \'Workspace runtime bootstrap failed.\')'), true)
+  assert.equal(createBlock.includes('void warmWorkspaceRuntimeInBackground(workspaceId)'), true)
+  assert.equal(createBlock.includes('const context = \'\''), true)
   assert.equal(createBlock.includes('setupWorkspaceName.value = \'\''), false)
   assert.equal(createBlock.includes('setupWorkspaceContext.value = \'\''), false)
   assert.equal(settingsSource.includes(':requested-setup-step="workspaceDetailSetupStep"'), true)

@@ -36,18 +36,22 @@ test('workspace listing no longer bootstraps kernels as a side effect', () => {
   assert.equal(activateBlock.includes('ensureWorkspaceKernelConnected('), false)
 })
 
-test('dataset upload path is the runtime bootstrap trigger', () => {
-  const apiServicePath = resolve(process.cwd(), 'src/services/apiService.js')
-  const source = readFileSync(apiServicePath, 'utf-8')
+test('workspace creation starts hidden runtime warmup and batch dataset import does not block on frontend runtime readiness', () => {
+  const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue')
+  const source = readFileSync(tabPath, 'utf-8')
   const uploadBlock = extractBlock(
     source,
-    'async uploadDataPath(filePath) {',
-    'return {',
+    'async function startBatchDatasetIngestion(paths) {',
+    'async function retryLastDatasetIngestion() {',
   )
-  assert.equal(
-    uploadBlock.includes('await appStore.ensureWorkspaceKernelConnected(workspaceId)'),
-    true,
+  const warmupBlock = extractBlock(
+    source,
+    'async function warmWorkspaceRuntimeInBackground(workspaceId) {',
+    'function datasetSchemaStatusState(dataset) {',
   )
+  assert.equal(uploadBlock.includes('await appStore.ensureWorkspaceKernelConnected(workspaceId)'), false)
+  assert.equal(uploadBlock.includes('await apiService.v1AddDatasetsBatch(workspaceId, sourcePaths)'), true)
+  assert.equal(warmupBlock.includes('await appStore.ensureWorkspaceKernelConnected(targetWorkspaceId)'), true)
 })
 
 test('column catalog path bootstraps runtime before loading columns', () => {
