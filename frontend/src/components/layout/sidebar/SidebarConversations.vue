@@ -188,6 +188,8 @@ async function selectConversation(id) {
   try {
     if (id !== appStore.activeConversationId) {
       appStore.setActiveConversationId(id)
+    } else {
+      appStore.setWorkspacePane('chat')
     }
     await appStore.fetchConversationTurns({ reset: true })
     emit('select')

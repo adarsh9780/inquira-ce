@@ -312,12 +312,10 @@ const livePersistedArtifactIds = computed(() => {
   return new Set(ids)
 })
 const scopedPersistedArtifacts = computed(() => {
-  const turnId = String(appStore.activeTurnId || '').trim()
   const allowedIds = new Set([
     ...activeTurnArtifactIds.value,
     ...livePersistedArtifactIds.value,
   ])
-  if (!turnId) return allArtifacts.value
   if (allowedIds.size === 0) return []
   return allArtifacts.value.filter((artifact) => allowedIds.has(String(artifact?.artifact_id || '').trim()))
 })

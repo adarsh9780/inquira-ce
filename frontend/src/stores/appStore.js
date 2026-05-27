@@ -1509,10 +1509,8 @@ export const useAppStore = defineStore('app', () => {
     conversations.value = Array.isArray(items) ? items : []
   }
 
-  function setActiveConversationId(conversationId) {
-    activeConversationId.value = conversationId || ''
-    activeTab.value = 'workspace'
-    workspacePane.value = 'chat'
+  function clearConversationScopedState(options = {}) {
+    const preserveChatHistory = Boolean(options?.preserveChatHistory)
     activeTurnId.value = ''
     activeTurn.value = null
     activeTurnCode.value = ''
@@ -1521,7 +1519,33 @@ export const useAppStore = defineStore('app', () => {
     activeTurnTree.value = null
     finalTurnId.value = ''
     turnsNextCursor.value = null
+    generatedCode.value = ''
+    pythonFileContent.value = ''
+    resultData.value = null
+    plotlyFigure.value = null
+    setDataframes([])
+    setFigures([])
+    dataframeCount.value = 0
+    tableRowCount.value = 0
+    tableWindowStart.value = 0
+    tableWindowEnd.value = 0
+    if (activeWorkspaceId.value) {
+      setSelectedTableArtifact(activeWorkspaceId.value, '')
+      setSelectedFigureArtifact(activeWorkspaceId.value, '')
+    }
+    terminalOutput.value = ''
+    dataPaneError.value = ''
+    if (!preserveChatHistory) {
+      chatHistory.value = []
+    }
     clearLiveTokenUsage()
+  }
+
+  function setActiveConversationId(conversationId) {
+    activeConversationId.value = conversationId || ''
+    activeTab.value = 'workspace'
+    workspacePane.value = 'chat'
+    clearConversationScopedState({ preserveChatHistory: true })
     saveLocalConfig()
   }
 
@@ -1969,10 +1993,8 @@ export const useAppStore = defineStore('app', () => {
     if (!activeWorkspaceId.value) return null
     const conv = await apiService.v1CreateConversation(activeWorkspaceId.value, title)
     await fetchConversations()
-    activeConversationId.value = conv.id
-    chatHistory.value = []
-    turnsNextCursor.value = null
-    clearLiveTokenUsage()
+    setActiveConversationId(conv.id)
+    clearConversationScopedState()
     saveLocalConfig()
     return conv
   }
@@ -2007,16 +2029,12 @@ export const useAppStore = defineStore('app', () => {
           }
         }
       } else {
-        setActiveTurnId('')
-        setActiveTurnPayload(null)
-        setActiveTurnRelations(null)
+        clearConversationScopedState()
       }
       await loadFinalTurn(activeConversationId.value)
     }
     if (reset && turns.length === 0) {
-      setDataframes([])
-      setFigures([])
-      clearLiveTokenUsage()
+      clearConversationScopedState()
     }
     turnsNextCursor.value = response?.next_cursor || null
   }
@@ -2033,7 +2051,10 @@ export const useAppStore = defineStore('app', () => {
       ? conversations.value.some((conversation) => String(conversation?.id || '').trim() === currentActiveId)
       : false
 
-    if (activeStillExists) return targetId
+    if (activeStillExists) {
+      await loadWorkspaceTurnTree()
+      return targetId
+    }
 
     const fallbackConversationId = String(conversations.value[0]?.id || '').trim()
     if (currentActiveId !== fallbackConversationId) {
@@ -2042,16 +2063,14 @@ export const useAppStore = defineStore('app', () => {
       saveLocalConfig()
     }
 
-    chatHistory.value = []
-    turnsNextCursor.value = null
-    clearLiveTokenUsage()
+    clearConversationScopedState()
 
     if (fallbackConversationId) {
       await fetchConversationTurns({ reset: true })
     } else {
-      setDataframes([])
-      setFigures([])
+      clearConversationScopedState()
     }
+    await loadWorkspaceTurnTree()
 
     return targetId
   }

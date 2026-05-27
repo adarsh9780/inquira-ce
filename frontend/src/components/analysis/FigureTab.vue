@@ -216,12 +216,10 @@ const livePersistedFigureIds = computed(() => {
   return new Set(ids)
 })
 const scopedWorkspaceFigureArtifacts = computed(() => {
-  const turnId = String(appStore.activeTurnId || '').trim()
   const allowedIds = new Set([
     ...activeTurnFigureArtifactIds.value,
     ...livePersistedFigureIds.value,
   ])
-  if (!turnId) return Array.isArray(workspaceFigureArtifacts.value) ? workspaceFigureArtifacts.value : []
   if (allowedIds.size === 0) return []
   return (Array.isArray(workspaceFigureArtifacts.value) ? workspaceFigureArtifacts.value : [])
     .filter((fig) => allowedIds.has(String(fig?.artifact_id || '').trim()))

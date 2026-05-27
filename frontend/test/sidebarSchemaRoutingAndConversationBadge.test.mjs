@@ -42,5 +42,6 @@ test('activating a conversation returns the shell to workspace chat', () => {
   assert.equal(storeSource.includes("workspacePane.value = 'chat'"), true)
   assert.equal(sidebarSource.includes('if (target !== current) {'), true)
   assert.equal(sidebarSource.includes('appStore.setActiveConversationId(target)'), true)
+  assert.equal(sidebarSource.includes("appStore.setWorkspacePane('chat')"), true)
   assert.equal(sidebarSource.includes('await appStore.fetchConversationTurns({ reset: true })'), true)
 })

@@ -19,6 +19,7 @@ test('TableTab scopes persisted artifacts to selected turn ids while still allow
   assert.equal(source.includes('const scopedPersistedArtifacts = computed(() => {'), true)
   assert.equal(source.includes('...activeTurnArtifactIds.value,'), true)
   assert.equal(source.includes('...livePersistedArtifactIds.value,'), true)
+  assert.equal(source.includes('if (!turnId) return allArtifacts.value'), false)
   assert.equal(source.includes('const persistedArtifacts = scopedPersistedArtifacts.value.map((artifact) => ({'), true)
 })
 
@@ -30,5 +31,6 @@ test('FigureTab scopes persisted artifacts to selected turn ids while still allo
   assert.equal(source.includes('const scopedWorkspaceFigureArtifacts = computed(() => {'), true)
   assert.equal(source.includes('...activeTurnFigureArtifactIds.value,'), true)
   assert.equal(source.includes('...livePersistedFigureIds.value,'), true)
+  assert.equal(source.includes('if (!turnId) return Array.isArray(workspaceFigureArtifacts.value) ? workspaceFigureArtifacts.value : []'), false)
   assert.equal(source.includes("const persisted = scopedWorkspaceFigureArtifacts.value.map((fig) => ({ ...fig, source: 'artifact' }))"), true)
 })

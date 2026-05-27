@@ -12,9 +12,16 @@ test('conversation delete flow in store re-syncs active conversation and hydrate
 
   assert.equal(source.includes('async function deleteConversationById(conversationId) {'), true)
   assert.equal(source.includes('await apiService.v1DeleteConversation(targetId)'), true)
+  assert.equal(source.includes('function clearConversationScopedState(options = {})'), true)
+  assert.equal(source.includes("pythonFileContent.value = ''"), true)
+  assert.equal(source.includes('activeTurnArtifacts.value = []'), true)
+  assert.equal(source.includes('setSelectedTableArtifact(activeWorkspaceId.value, \'\')'), true)
+  assert.equal(source.includes('setSelectedFigureArtifact(activeWorkspaceId.value, \'\')'), true)
   assert.equal(source.includes('const activeStillExists = currentActiveId'), true)
+  assert.equal(source.includes('await loadWorkspaceTurnTree()'), true)
   assert.equal(source.includes('await fetchConversationTurns({ reset: true })'), true)
   assert.equal(source.includes('setActiveConversationId(fallbackConversationId)'), true)
+  assert.equal(source.includes('clearConversationScopedState()'), true)
 })
 
 test('sidebar conversation rows use an ellipsis menu and route deletes through store sync action', () => {

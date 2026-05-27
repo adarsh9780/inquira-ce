@@ -695,6 +695,8 @@ async function selectConversation(id) {
   try {
     if (target !== current) {
       appStore.setActiveConversationId(target)
+    } else {
+      appStore.setWorkspacePane('chat')
     }
     await appStore.fetchConversationTurns({ reset: true })
   } catch (error) {
