@@ -311,6 +311,41 @@ const livePersistedArtifactIds = computed(() => {
     : []
   return new Set(ids)
 })
+const livePersistedArtifactSummaries = computed(() => {
+  if (!Array.isArray(appStore.dataframes)) return []
+  const seen = new Set()
+  return appStore.dataframes
+    .map((df, index) => {
+      const artifactId = String(df?.data?.artifact_id || '').trim()
+      if (!artifactId || seen.has(artifactId)) return null
+      seen.add(artifactId)
+      const logicalName = String(df?.data?.logical_name || df?.name || '').trim() || `dataframe_${index + 1}`
+      const displayName = String(df?.data?.display_name || df?.name || logicalName).trim()
+      const columns = Array.isArray(df?.data?.columns)
+        ? df.data.columns.map((column) => {
+          if (column && typeof column === 'object') {
+            return {
+              name: String(column.name || ''),
+              dtype: String(column.dtype || ''),
+            }
+          }
+          return { name: String(column || ''), dtype: '' }
+        }).filter((column) => column.name)
+        : []
+      return {
+        artifact_id: artifactId,
+        logical_name: logicalName,
+        display_name: displayName || logicalName,
+        kind: 'dataframe',
+        row_count: Number(df?.data?.row_count || 0),
+        schema: columns,
+        created_at: String(df?.data?.created_at || ''),
+        status: 'active',
+        source: 'artifact',
+      }
+    })
+    .filter(Boolean)
+})
 const scopedPersistedArtifacts = computed(() => {
   const allowedIds = new Set([
     ...activeTurnArtifactIds.value,
@@ -382,7 +417,15 @@ const displayArtifacts = computed(() => {
     ...artifact,
     source: 'artifact',
   }))
-  return [...persistedArtifacts, ...memoryArtifacts.value]
+  const knownPersistedIds = new Set(
+    persistedArtifacts
+      .map((artifact) => String(artifact?.artifact_id || '').trim())
+      .filter(Boolean)
+  )
+  const optimisticPersistedArtifacts = livePersistedArtifactSummaries.value.filter((artifact) => (
+    !knownPersistedIds.has(String(artifact?.artifact_id || '').trim())
+  ))
+  return [...persistedArtifacts, ...optimisticPersistedArtifacts, ...memoryArtifacts.value]
 })
 
 const activeWorkspaceHasKnownSavedTables = computed(() => {
@@ -794,6 +837,8 @@ watch(selectedArtifactId, async (newId) => {
   }
   const isKnownPersistedArtifact = allArtifacts.value.some(
     (entry) => String(entry?.artifact_id || '').trim() === String(newId || '').trim(),
+  ) || displayArtifacts.value.some(
+    (entry) => entry?.source === 'artifact' && String(entry?.artifact_id || '').trim() === String(newId || '').trim(),
   )
   if (!isKnownPersistedArtifact) {
     if (appStore.activeWorkspaceId && appStore.hasWorkspace) {

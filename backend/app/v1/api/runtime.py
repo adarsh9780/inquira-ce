@@ -1264,14 +1264,26 @@ async def execute_workspace_code(
     current_user=Depends(get_current_user),
 ):
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
+    conversation_id = str(payload.conversation_id or "").strip()
+    turn_id = str(payload.turn_id or "").strip()
+    artifact_dir = str(payload.artifact_dir or "").strip()
+    if conversation_id and turn_id and not artifact_dir:
+        artifact_dir = str(
+            TurnBundleService.build_turn_artifacts_dir(
+                str(getattr(current_user, "username", "") or ""),
+                workspace_id,
+                conversation_id,
+                turn_id,
+            )
+        )
+        payload = payload.model_copy(update={"artifact_dir": artifact_dir})
+
     await _release_appdata_session_before_kernel(session)
     response = await _execute_workspace_code_impl(
         workspace_id=workspace_id,
         workspace_duckdb_path=str(workspace.duckdb_path),
         payload=payload,
     )
-    conversation_id = str(payload.conversation_id or "").strip()
-    turn_id = str(payload.turn_id or "").strip()
     if conversation_id and turn_id:
         await _persist_runtime_execution_to_turn(
             session=session,
