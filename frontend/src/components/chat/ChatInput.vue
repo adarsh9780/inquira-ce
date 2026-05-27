@@ -1126,6 +1126,33 @@ function applyCommandResultToStore(commandResult) {
   })
 }
 
+function appendChatExecutionOutput(response) {
+  const execution = response?.execution && typeof response.execution === 'object'
+    ? response.execution
+    : null
+  if (!execution) return false
+
+  const stdout = String(execution.stdout || response?.stdout || response?.terminal_output || '')
+  const stderr = String(execution.stderr || execution.error || '')
+  const hasOutput = Boolean(stdout.trim() || stderr.trim())
+  if (!hasOutput) return false
+
+  const success = execution.success !== false && String(execution.status || 'success').toLowerCase() !== 'failed'
+  appStore.setTerminalOutput(stderr || stdout)
+  appStore.appendTerminalEntry({
+    kind: 'output',
+    source: 'analysis',
+    label: 'Run output',
+    runId: String(response?.run_id || ''),
+    status: success ? 'success' : 'error',
+    stdout,
+    stderr,
+    exitCode: success ? 0 : 1,
+    durationMs: Number.isFinite(Number(execution.duration_ms)) ? Number(execution.duration_ms) : null,
+  })
+  return true
+}
+
 async function handleSlashCommand(questionText) {
   appStore.setLoading(true)
   let commandMessageCreated = false
@@ -1385,9 +1412,7 @@ async function handleSubmit() {
     }
 
     if (finalCode && finalCode.trim()) {
-      const executionStderr = response?.execution?.stderr || ''
-      const executionStdout = response?.execution?.stdout || ''
-      appStore.setTerminalOutput(executionStderr || executionStdout || response.stdout || response.terminal_output || 'Code generated and executed.')
+      const hasChatExecutionOutput = appendChatExecutionOutput(response)
 
       const inlineFigure = normalizePlotlyFigure(response.plotly_figure || response.result)
       if (inlineFigure) {
@@ -1398,6 +1423,8 @@ async function handleSubmit() {
         appStore.setResultData(response.result)
         appStore.setPlotlyFigure(null)
         appStore.revealArtifactsPane({ hasDataframes: true })
+      } else if (hasChatExecutionOutput) {
+        appStore.revealArtifactsPane({ hasOutput: true })
       }
     }
 
