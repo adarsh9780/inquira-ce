@@ -21,6 +21,7 @@ test('workspace setup uses name context and data steps', () => {
   assert.equal(source.includes('setupStep.value = 3'), true)
   assert.equal(source.includes('@click="skipWorkspaceContext()"'), true)
   assert.equal(source.includes('@click="saveWorkspaceContextAndContinue()"'), true)
+  assert.equal(source.includes('class="btn-secondary px-5 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"'), true)
   assert.equal(source.includes(':disabled="isSavingWorkspaceIdentity || !setupWorkspaceContext.trim()"'), true)
 })
 

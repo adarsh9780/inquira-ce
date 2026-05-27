@@ -1072,6 +1072,31 @@ async function handleDatasetSwitch(event) {
   }
 }
 
+async function handleDatasetSchemaReady(event) {
+  const workspaceId = String(event?.detail?.workspaceId || '').trim()
+  const activeWorkspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (workspaceId && activeWorkspaceId && workspaceId !== activeWorkspaceId) return
+
+  const tableName = String(event?.detail?.tableName || '').trim()
+  const dataPath = String(event?.detail?.dataPath || '').trim()
+  if (!tableName) return
+
+  schemaEdited.value = false
+  schema.value = []
+  schemaError.value = ''
+  previewService.clearSchemaCache()
+
+  await loadSchemaDatasets()
+  applyDatasetSelection(tableName, dataPath || appStore.dataFilePath || '')
+
+  if (dataPath) {
+    await fetchSchemaDataForPath(dataPath, tableName)
+    return
+  }
+
+  await fetchSchemaData(true)
+}
+
 onMounted(async () => {
   await loadWorkspaceContext()
   await loadSchemaDatasets()
@@ -1079,11 +1104,13 @@ onMounted(async () => {
     await fetchSchemaData()
   }
   window.addEventListener('dataset-switched', handleDatasetSwitch)
+  window.addEventListener('dataset-schema-ready', handleDatasetSchemaReady)
 })
 
 onUnmounted(() => {
   stopTimer()
   window.removeEventListener('dataset-switched', handleDatasetSwitch)
+  window.removeEventListener('dataset-schema-ready', handleDatasetSchemaReady)
 })
 
 watch(

@@ -155,7 +155,7 @@
             <div class="max-w-sm">
               <span class="mx-auto mb-4 block h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-accent-border)] border-t-[var(--color-accent)]"></span>
               <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ workspaceCreateTitle }}</p>
-              <p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ currentRuntimeProgressMessage || workspaceCreateMessage }}</p>
+              <p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ workspaceCreateMessage }}</p>
             </div>
           </div>
 
@@ -171,6 +171,7 @@
               class="input-base input-outlined"
               placeholder="e.g. Sales analysis"
               :disabled="isCreatingWorkspace || isSavingWorkspaceIdentity"
+              @keydown.enter.prevent="continueFromWorkspaceName()"
             />
           </label>
 
@@ -219,13 +220,14 @@
               class="input-base input-outlined resize-none"
               placeholder="Describe the business purpose, terms, and schema context for this workspace..."
               :disabled="isSavingWorkspaceIdentity"
+              @keydown.enter.exact.prevent="continueFromWorkspaceContext()"
             ></textarea>
           </label>
 
-          <div class="mt-2 flex items-center justify-between border-t border-[var(--color-border)] pt-5">
+          <div class="mt-2 flex items-center justify-end gap-2 border-t border-[var(--color-border)] pt-5">
             <button
               type="button"
-              class="btn-ghost px-5 py-2 text-sm"
+              class="btn-secondary px-5 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="isSavingWorkspaceIdentity"
               @click="skipWorkspaceContext()"
             >
@@ -527,6 +529,7 @@ const isWorkspaceDeleteDialogOpen = ref(false)
 const pendingWorkspaceDeletionId = ref('')
 const datasetDeletionPollers = new Map()
 const datasetIngestionPollers = new Map()
+const pendingSchemaReadyNotifications = new Set()
 let unsubscribeProgress = null
 let unsubscribeRuntimeError = null
 let unsubscribeRuntimeComplete = null
@@ -673,11 +676,7 @@ const workspaceReadinessSummary = computed(() => (
     ? 'Workspace setup is saved, active, and connected. Upload datasets when you are ready.'
     : 'Workspace setup is still settling. If the runtime stalls, retry it here before uploading data.'
 ))
-const workspaceCreateTitle = computed(() => (
-  isCreatingWorkspaceRuntime.value
-    ? 'Preparing workspace runtime inside Settings...'
-    : 'Creating workspace inside Settings...'
-))
+const workspaceCreateTitle = computed(() => 'Creating workspace inside Settings...')
 const workspaceDeleteDialogMessage = computed(() => {
   const targetId = String(pendingWorkspaceDeletionId.value || props.activeWorkspaceId || '').trim()
   const target = workspaceCards.value.find((workspace) => workspace.id === targetId)
@@ -935,6 +934,14 @@ async function saveWorkspaceContextAndContinue() {
   setupStep.value = 3
 }
 
+async function continueFromWorkspaceContext() {
+  if (!String(setupWorkspaceContext.value || '').trim()) {
+    await skipWorkspaceContext()
+    return
+  }
+  await saveWorkspaceContextAndContinue()
+}
+
 async function ensureWorkspaceNamePersisted({ silent = false } = {}) {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   const name = String(setupWorkspaceName.value || '').trim()
@@ -1027,6 +1034,7 @@ async function loadWorkspaceDatasets() {
       filename: formatFilename(item?.source_path || item?.table_name || ''),
     })).filter((item) => item.table_name)
     await enrichDatasetMetadata(workspaceId)
+    notifyReadyDatasetSchemas(datasetEntries.value)
     syncDatasetSchemaPolling()
   } catch (error) {
     datasetEntries.value = []
@@ -1089,6 +1097,48 @@ function applyDatasetSelectionFromUpload(uploadResult, fallbackPath = '') {
       dataPath: resolvedPath || null,
     },
   }))
+}
+
+function dispatchDatasetSchemaReady(dataset) {
+  const tableName = String(dataset?.table_name || '').trim()
+  if (!tableName) return
+  window.dispatchEvent(new CustomEvent('dataset-schema-ready', {
+    detail: {
+      workspaceId: String(props.activeWorkspaceId || '').trim() || null,
+      tableName,
+      dataPath: String(dataset?.source_path || '').trim() || null,
+    },
+  }))
+}
+
+function trackSchemaReadyNotificationsFromIngestionJob(job) {
+  const items = Array.isArray(job?.items) ? job.items : []
+  items.forEach((item) => {
+    if (String(item?.status || '').toLowerCase() !== 'completed') return
+    const tableName = String(item?.table_name || '').trim()
+    if (tableName) {
+      pendingSchemaReadyNotifications.add(tableName)
+    }
+  })
+}
+
+function notifyReadyDatasetSchemas(datasets) {
+  if (pendingSchemaReadyNotifications.size === 0) return
+  const entries = Array.isArray(datasets) ? datasets : []
+  entries.forEach((dataset) => {
+    const tableName = String(dataset?.table_name || '').trim()
+    if (!tableName || !pendingSchemaReadyNotifications.has(tableName)) return
+    const status = datasetSchemaStatusState(dataset)
+    if (status === 'ready') {
+      pendingSchemaReadyNotifications.delete(tableName)
+      toast.success('Schema ready', `Schema is ready for ${formatFilename(tableName)}.`)
+      dispatchDatasetSchemaReady(dataset)
+    } else if (status === 'failed') {
+      pendingSchemaReadyNotifications.delete(tableName)
+      toast.error('Schema generation failed', dataset?.schema_error_message || `Schema generation failed for ${formatFilename(tableName)}.`)
+      dispatchDatasetSchemaReady(dataset)
+    }
+  })
 }
 
 function finishDatasetIngest() {
@@ -1353,9 +1403,9 @@ function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = Infinity) {
       if (['completed', 'completed_with_errors', 'failed'].includes(status)) {
         datasetIngestionPollers.delete(normalizedJobId)
         applyDatasetSelectionFromIngestionJob(job)
+        trackSchemaReadyNotificationsFromIngestionJob(job)
         await loadWorkspaceDatasets()
         const failedCount = Number(job?.failed_count || 0)
-        const completedCount = Number(job?.completed_count || 0)
         datasetIngestPercent.value = 100
         datasetIngestMessage.value = failedCount > 0
           ? `Completed with ${failedCount} failed import${failedCount === 1 ? '' : 's'}.`
@@ -1365,8 +1415,6 @@ function trackDatasetIngestionJob(workspaceId, jobId, timeoutMs = Infinity) {
         clearWorkspaceOperation()
         if (status === 'failed' || failedCount > 0) {
           toast.error('Dataset ingestion completed with errors', `${failedCount || 'Some'} file${failedCount === 1 ? '' : 's'} failed to import.`)
-        } else {
-          toast.success('Datasets added', `${completedCount} dataset${completedCount === 1 ? '' : 's'} added to workspace.`)
         }
         return
       }
@@ -1735,7 +1783,11 @@ async function createWorkspace({ setupStep: targetSetupStep = 2 } = {}) {
       context,
       setupStep: targetSetupStep,
     })
-    void warmWorkspaceRuntimeInBackground(workspaceId)
+    isCreatingWorkspace.value = false
+    clearWorkspaceOperation()
+    setTimeout(() => {
+      void warmWorkspaceRuntimeInBackground(workspaceId)
+    }, 0)
   } catch (error) {
     toast.error('Create failed', extractApiErrorMessage(error, 'Failed to create workspace.'))
   } finally {
@@ -1753,8 +1805,6 @@ async function warmWorkspaceRuntimeInBackground(workspaceId) {
   const targetWorkspaceId = String(workspaceId || '').trim()
   if (!targetWorkspaceId) return
   clearRuntimeProgress()
-  runtimeActionMode.value = 'create'
-  isCreatingWorkspaceRuntime.value = true
   try {
     const ready = await appStore.ensureWorkspaceKernelConnected(targetWorkspaceId)
     if (!ready) {
@@ -1768,8 +1818,9 @@ async function warmWorkspaceRuntimeInBackground(workspaceId) {
     appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
     appStore.setWorkspaceKernelStatus(targetWorkspaceId, 'error')
   } finally {
-    isCreatingWorkspaceRuntime.value = false
-    runtimeActionMode.value = ''
+    if (runtimeActionMode.value === 'create') {
+      runtimeActionMode.value = ''
+    }
   }
 }
 

@@ -32,6 +32,19 @@ test('schema editor derives dataset options from workspace tables and does not r
   assert.equal(source.includes('if (!selected?.sourcePath) return'), false)
 })
 
+test('schema editor refreshes automatically when dataset schema becomes ready', () => {
+  const schemaEditorPath = resolve(process.cwd(), 'src/components/preview/SchemaEditorTab.vue')
+  const source = readFileSync(schemaEditorPath, 'utf-8')
+
+  assert.equal(source.includes('async function handleDatasetSchemaReady(event) {'), true)
+  assert.equal(source.includes("window.addEventListener('dataset-schema-ready', handleDatasetSchemaReady)"), true)
+  assert.equal(source.includes("window.removeEventListener('dataset-schema-ready', handleDatasetSchemaReady)"), true)
+  assert.equal(source.includes('await loadSchemaDatasets()'), true)
+  assert.equal(source.includes('applyDatasetSelection(tableName, dataPath || appStore.dataFilePath || \'\')'), true)
+  assert.equal(source.includes('await fetchSchemaDataForPath(dataPath, tableName)'), true)
+  assert.equal(source.includes('await fetchSchemaData(true)'), true)
+})
+
 test('schema editor does not label blank descriptions as active generation', () => {
   const schemaEditorPath = resolve(process.cwd(), 'src/components/preview/SchemaEditorTab.vue')
   const source = readFileSync(schemaEditorPath, 'utf-8')
