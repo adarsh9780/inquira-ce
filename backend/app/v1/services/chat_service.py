@@ -1553,7 +1553,6 @@ class ChatService:
         code = (
             result.get("final_code")
             or result.get("final_executed_code")
-            or result.get("current_code", "")
             or result.get("code", "")
             or ""
         )
