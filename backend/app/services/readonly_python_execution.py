@@ -282,8 +282,11 @@ class ReadOnlyPythonExecutionService:
                     "stdout": stdout,
                     "stderr": stderr,
                 }
-            payload.setdefault("stdout", _strip_worker_payload(stdout))
-            payload.setdefault("stderr", stderr)
+            stripped_stdout = _strip_worker_payload(stdout)
+            if not str(payload.get("stdout") or "").strip() and stripped_stdout:
+                payload["stdout"] = stripped_stdout
+            if not str(payload.get("stderr") or "").strip() and stderr:
+                payload["stderr"] = stderr
             payload.setdefault("duration_ms", max(1, int((time.perf_counter() - started) * 1000)))
             return payload
         finally:
