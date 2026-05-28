@@ -1096,7 +1096,8 @@ export const apiService = {
           },
         })
       }
-      return v1Api.chat.analyze(payload)
+      const response = await v1Api.chat.analyze(payload)
+      return response?.data || response
     }
   },
 
