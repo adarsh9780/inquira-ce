@@ -1717,30 +1717,6 @@ export const useAppStore = defineStore('app', () => {
     return true
   }
 
-  async function moveTurn(turnId, parentTurnId, conversationId = activeConversationId.value) {
-    const targetConversationId = String(conversationId || '').trim()
-    const targetTurnId = String(turnId || '').trim()
-    const targetParentId = String(parentTurnId || '').trim()
-    if (!targetConversationId || !targetTurnId || !targetParentId) return null
-    const turn = await apiService.v1MoveTurn(targetConversationId, targetTurnId, targetParentId)
-    if (targetConversationId === String(activeConversationId.value || '').trim()) {
-      await loadActiveTurnRelations(targetTurnId)
-    }
-    await loadWorkspaceTurnTree()
-    return turn
-  }
-
-  async function reorderTurnSiblings(parentTurnId, turnIds, conversationId = activeConversationId.value) {
-    const targetConversationId = String(conversationId || '').trim()
-    if (!targetConversationId || !Array.isArray(turnIds) || turnIds.length === 0) return null
-    const tree = await apiService.v1ReorderTurns(targetConversationId, parentTurnId || null, turnIds)
-    if (targetConversationId === String(activeConversationId.value || '').trim()) {
-      setActiveTurnTree(tree)
-    }
-    await loadWorkspaceTurnTree()
-    return tree
-  }
-
   async function loadFinalTurn(conversationId = activeConversationId.value) {
     const targetConversationId = String(conversationId || '').trim()
     if (!targetConversationId) {
@@ -3084,8 +3060,6 @@ export const useAppStore = defineStore('app', () => {
     loadActiveTurnTree,
     loadWorkspaceTurnTree,
     deleteTurn,
-    moveTurn,
-    reorderTurnSiblings,
     loadFinalTurn,
     goToPreviousTurn,
     goToNextTurn,

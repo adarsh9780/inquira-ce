@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const chatInputSource = readFileSync(new URL('../src/components/chat/ChatInput.vue', import.meta.url), 'utf8')
-const modalSource = readFileSync(new URL('../src/components/chat/TurnTreeModal.vue', import.meta.url), 'utf8')
 const treeViewSource = readFileSync(new URL('../src/components/chat/TurnTreeView.vue', import.meta.url), 'utf8')
 const sidebarSource = readFileSync(new URL('../src/components/layout/UnifiedSidebar.vue', import.meta.url), 'utf8')
 const rightPanelSource = readFileSync(new URL('../src/components/layout/RightPanel.vue', import.meta.url), 'utf8')
@@ -11,21 +10,23 @@ const globalTreeSource = readFileSync(new URL('../src/components/layout/sidebar/
 const apiServiceSource = readFileSync(new URL('../src/services/apiService.js', import.meta.url), 'utf8')
 const storeSource = readFileSync(new URL('../src/stores/appStore.js', import.meta.url), 'utf8')
 
-test('turn tree composer uses a tree-like icon instead of share icon', () => {
+test('turn tree is no longer opened from the composer', () => {
   assert.equal(chatInputSource.includes('ShareIcon'), false)
-  assert.equal(chatInputSource.includes('QueueListIcon'), true)
+  assert.equal(chatInputSource.includes('QueueListIcon'), false)
+  assert.equal(chatInputSource.includes('title="Open turn tree"'), false)
+  assert.equal(chatInputSource.includes('<TurnTreeModal'), false)
 })
 
-test('turn tree modal exposes safe edit actions and emits backend-backed operations', () => {
-  assert.equal(modalSource.includes('TurnTreeView'), true)
+test('turn tree exposes delete and final actions without unsupported moving controls', () => {
   assert.equal(treeViewSource.includes("handleContextAction('delete')"), true)
-  assert.equal(treeViewSource.includes("handleContextAction('move-to')"), true)
-  assert.equal(treeViewSource.includes("handleContextAction('move-up')"), true)
-  assert.equal(treeViewSource.includes("handleContextAction('move-down')"), true)
+  assert.equal(treeViewSource.includes("handleContextAction('move-to')"), false)
+  assert.equal(treeViewSource.includes("handleContextAction('move-up')"), false)
+  assert.equal(treeViewSource.includes("handleContextAction('move-down')"), false)
   assert.equal(treeViewSource.includes('selectedDeleteBlockReason'), true)
-  assert.equal(modalSource.includes("'delete-turn'"), true)
-  assert.equal(modalSource.includes("'move-turn'"), true)
-  assert.equal(modalSource.includes("'reorder-turns'"), true)
+  assert.equal(treeViewSource.includes("'delete-turn'"), true)
+  assert.equal(treeViewSource.includes("'move-turn'"), false)
+  assert.equal(treeViewSource.includes("'reorder-turns'"), false)
+  assert.equal(treeViewSource.includes('window.prompt'), false)
   assert.equal(treeViewSource.includes('conversationId'), true)
 })
 
@@ -36,16 +37,16 @@ test('frontend API and store expose turn edit and workspace tree calls', () => {
   assert.equal(apiServiceSource.includes('async v1ReorderTurns(conversationId, parentTurnId, turnIds)'), true)
   assert.equal(storeSource.includes('async function loadWorkspaceTurnTree'), true)
   assert.equal(storeSource.includes('async function deleteTurn(turnId, conversationId = activeConversationId.value)'), true)
-  assert.equal(storeSource.includes('async function moveTurn(turnId, parentTurnId, conversationId = activeConversationId.value)'), true)
-  assert.equal(storeSource.includes('async function reorderTurnSiblings(parentTurnId, turnIds, conversationId = activeConversationId.value)'), true)
+  assert.equal(storeSource.includes('async function moveTurn(turnId, parentTurnId, conversationId = activeConversationId.value)'), false)
+  assert.equal(storeSource.includes('async function reorderTurnSiblings(parentTurnId, turnIds, conversationId = activeConversationId.value)'), false)
 })
 
-test('global tree is routed as a full conversation tree view and opens turns', () => {
-  assert.equal(sidebarSource.includes('openConversationTree'), true)
-  assert.equal(sidebarSource.includes("appStore.activeTab === 'conversation-tree'"), true)
-  assert.equal(sidebarSource.includes('SidebarGlobalTurnTree'), false)
-  assert.equal(rightPanelSource.includes("appStore.activeTab === 'conversation-tree'"), true)
-  assert.equal(rightPanelSource.includes('<SidebarGlobalTurnTree variant="page" />'), true)
+test('global tree lives in the sidebar and opens turns', () => {
+  assert.equal(sidebarSource.includes('openConversationTree'), false)
+  assert.equal(sidebarSource.includes("appStore.activeTab === 'conversation-tree'"), false)
+  assert.equal(sidebarSource.includes('SidebarGlobalTurnTree'), true)
+  assert.equal(rightPanelSource.includes("appStore.activeTab === 'conversation-tree'"), false)
+  assert.equal(rightPanelSource.includes('<SidebarGlobalTurnTree variant="page" />'), false)
   assert.equal(globalTreeSource.includes('TurnTreeView'), true)
   assert.equal(globalTreeSource.includes('appStore.loadWorkspaceTurnTree()'), true)
   assert.equal(globalTreeSource.includes("appStore.setActiveTab('workspace')"), true)

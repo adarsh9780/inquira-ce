@@ -4,12 +4,11 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
-test('turn tree flow loads the full tree and restores state from modal selection', () => {
+test('sidebar turn tree flow loads the full tree and restores state from selection', () => {
   const testDir = dirname(fileURLToPath(import.meta.url))
   const apiSource = readFileSync(resolve(testDir, '../src/services/apiService.js'), 'utf-8')
   const storeSource = readFileSync(resolve(testDir, '../src/stores/appStore.js'), 'utf-8')
-  const chatInputSource = readFileSync(resolve(testDir, '../src/components/chat/ChatInput.vue'), 'utf-8')
-  const modalSource = readFileSync(resolve(testDir, '../src/components/chat/TurnTreeModal.vue'), 'utf-8')
+  const globalTreeSource = readFileSync(resolve(testDir, '../src/components/layout/sidebar/SidebarGlobalTurnTree.vue'), 'utf-8')
   const treeViewSource = readFileSync(resolve(testDir, '../src/components/chat/TurnTreeView.vue'), 'utf-8')
   const branchSource = readFileSync(resolve(testDir, '../src/components/chat/TurnTreeBranch.vue'), 'utf-8')
 
@@ -17,19 +16,16 @@ test('turn tree flow loads the full tree and restores state from modal selection
   assert.equal(apiSource.includes("return axios.get(`/api/v1/conversations/${conversationId}/turn-tree`, { params })"), true)
   assert.equal(storeSource.includes('function setActiveTurnTree(payload)'), true)
   assert.equal(storeSource.includes('setActiveTurnTree(payload)'), true)
-  assert.equal(chatInputSource.includes('await appStore.loadActiveTurnTree(conversationId, turnId)'), true)
-  assert.equal(chatInputSource.includes(':current-parent-turn-id="appStore.activeTurnRelations?.parent?.id || \'\'"'), true)
-  assert.equal(chatInputSource.includes(':conversation-id="appStore.activeConversationId"'), true)
-  assert.equal(chatInputSource.includes('@select="selectTurnTreeNode"'), true)
-  assert.equal(chatInputSource.includes('await appStore.loadActiveTurnRelations(turnId)'), true)
-  assert.equal(modalSource.includes('h-[78vh]'), true)
-  assert.equal(modalSource.includes('Select any turn to restore its chat, artifacts, and workspace state.'), true)
-  assert.equal(modalSource.includes('TurnTreeView'), true)
+  assert.equal(globalTreeSource.includes('appStore.loadWorkspaceTurnTree()'), true)
+  assert.equal(globalTreeSource.includes(':current-parent-turn-id="appStore.activeTurnRelations?.parent?.id || \'\'"'), true)
+  assert.equal(globalTreeSource.includes('@select="selectTurn"'), true)
+  assert.equal(globalTreeSource.includes('await appStore.loadActiveTurnRelations(targetTurnId)'), true)
+  assert.equal(globalTreeSource.includes("appStore.setActiveTab('workspace')"), true)
   assert.equal(treeViewSource.includes('data-turn-tree-context-menu'), true)
   assert.equal(treeViewSource.includes('View Details'), true)
   assert.equal(treeViewSource.includes('await apiService.v1GetTurn(conversationId, turnId)'), true)
   assert.equal(treeViewSource.includes("emit('delete-turn', { conversationId, turnId })"), true)
-  assert.equal(treeViewSource.includes("emit('move-turn', { conversationId, turnId, parentTurnId: normalizedParentId })"), true)
+  assert.equal(treeViewSource.includes("emit('move-turn'"), false)
   assert.equal(branchSource.includes('assistant_text'), true)
   assert.equal(branchSource.includes("@contextmenu.prevent=\"openContextMenu\""), true)
   assert.equal(branchSource.includes('No response saved'), true)
