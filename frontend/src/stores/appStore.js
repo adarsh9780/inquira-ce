@@ -1695,15 +1695,22 @@ export const useAppStore = defineStore('app', () => {
     const targetTurnId = String(turnId || '').trim()
     if (!targetConversationId || !targetTurnId) return null
     await apiService.v1DeleteTurn(targetConversationId, targetTurnId)
+    await fetchConversations()
     const isActiveConversation = targetConversationId === String(activeConversationId.value || '').trim()
-    if (isActiveConversation && targetTurnId === String(activeTurnId.value || '').trim()) {
-      const parentTurnId = String(activeTurnRelations.value?.parent?.id || '').trim()
-      if (parentTurnId) {
-        await loadActiveTurnRelations(parentTurnId)
-      } else {
-        await fetchConversationTurns({ reset: true })
-      }
+    const conversationStillExists = conversations.value.some(
+      (conversation) => String(conversation?.id || '').trim() === targetConversationId
+    )
+    if (isActiveConversation && conversationStillExists) {
+      await fetchConversationTurns({ reset: true })
     } else if (isActiveConversation) {
+      const fallbackConversationId = String(conversations.value[0]?.id || '').trim()
+      setActiveConversationId(fallbackConversationId)
+      if (fallbackConversationId) {
+        await fetchConversationTurns({ reset: true })
+      } else {
+        clearConversationScopedState()
+      }
+    } else if (conversationStillExists) {
       await loadActiveTurnTree(targetConversationId, activeTurnId.value)
     }
     await loadWorkspaceTurnTree()

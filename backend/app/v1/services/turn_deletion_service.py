@@ -25,22 +25,28 @@ class TurnDeletionService:
         if turn is None or turn.conversation_id != conversation_id:
             raise HTTPException(status_code=404, detail="Turn not found")
 
-        children = await ConversationRepository.list_child_turns(session, conversation_id, turn.id)
-        if children:
-            raise HTTPException(
-                status_code=409,
-                detail="Turn delete is blocked because child turns would become orphaned.",
-            )
-        if turn.seq_no == 1 or not str(turn.parent_turn_id or "").strip():
-            raise HTTPException(
-                status_code=409,
-                detail="Root turns cannot be deleted until branch rewiring is supported.",
-            )
-
+        all_turns = await ConversationRepository.list_turns_in_sequence(session, conversation_id)
+        children_by_parent = {}
+        for item in all_turns:
+            parent_id = str(getattr(item, "parent_turn_id", "") or "").strip()
+            if parent_id:
+                children_by_parent.setdefault(parent_id, []).append(item)
+        subtree_ids: set[str] = set()
+        stack = [turn]
+        while stack:
+            current = stack.pop()
+            current_id = str(getattr(current, "id", "") or "").strip()
+            if not current_id or current_id in subtree_ids:
+                continue
+            subtree_ids.add(current_id)
+            stack.extend(children_by_parent.get(current_id, []))
         marked_at = datetime.now(UTC)
-        turn.is_marked_for_deletion = True
-        turn.marked_for_deletion_at = marked_at
-        turn.deletion_status = "marked"
-        turn.deletion_error = None
-        await TurnArtifactRepository.mark_turn_for_deletion(session, turn_id)
+        for item in all_turns:
+            if item.id not in subtree_ids:
+                continue
+            item.is_marked_for_deletion = True
+            item.marked_for_deletion_at = marked_at
+            item.deletion_status = "marked"
+            item.deletion_error = None
+            await TurnArtifactRepository.mark_turn_for_deletion(session, item.id)
         await session.flush()

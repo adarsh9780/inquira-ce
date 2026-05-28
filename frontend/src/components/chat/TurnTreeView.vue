@@ -248,10 +248,6 @@ const selectedConversation = computed(() => selectedContext.value?.conversation 
 const selectedDeleteBlockReason = computed(() => {
   const node = selectedNode.value
   if (!node) return 'Turn not found'
-  if (!String(node.parent_turn_id || '').trim()) return 'Root turns cannot be deleted'
-  if (String(selectedConversation.value?.finalTurnId || '').trim() === String(node.id || '').trim()) return 'Final turn cannot be deleted'
-  if (Array.isArray(node.children) && node.children.length > 0) return 'Turns with child turns cannot be deleted'
-  if (String(props.currentTurnId || '').trim() === String(node.id || '').trim()) return 'Open another turn before deleting the active turn'
   return ''
 })
 const canDeleteSelected = computed(() => !selectedDeleteBlockReason.value)

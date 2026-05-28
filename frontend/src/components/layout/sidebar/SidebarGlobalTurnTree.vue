@@ -79,7 +79,7 @@ async function markTurnFinal(payload) {
 }
 
 async function deleteTurn(payload) {
-  const ok = window.confirm('Delete this leaf turn? This hides the turn and marks its artifacts for cleanup.')
+  const ok = window.confirm('Delete this turn and its replies? Deleting the root turn removes the whole conversation.')
   if (!ok) return
   try {
     await appStore.deleteTurn(payload?.turnId, payload?.conversationId)
