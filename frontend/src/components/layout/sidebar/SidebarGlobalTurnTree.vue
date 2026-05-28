@@ -19,6 +19,15 @@
       @mark-final="markTurnFinal"
       @delete-turn="deleteTurn"
     />
+    <ConfirmationModal
+      :is-open="deleteDialogOpen"
+      title="Delete Tree Node"
+      message="Delete this turn and all replies below it? If this is the root turn, the entire conversation will be deleted."
+      confirm-text="Delete"
+      cancel-text="Cancel"
+      @close="closeDeleteDialog"
+      @confirm="confirmDeleteTurn"
+    />
   </div>
 </template>
 
@@ -28,6 +37,7 @@ import { useAppStore } from '../../../stores/appStore'
 import { toast } from '../../../composables/useToast'
 import { extractApiErrorMessage } from '../../../utils/apiError'
 import TurnTreeView from '../../chat/TurnTreeView.vue'
+import ConfirmationModal from '../../modals/ConfirmationModal.vue'
 
 defineProps({
   variant: { type: String, default: 'sidebar' },
@@ -35,6 +45,8 @@ defineProps({
 
 const appStore = useAppStore()
 const isLoading = ref(false)
+const deleteDialogOpen = ref(false)
+const pendingDeletePayload = ref(null)
 
 const conversations = computed(() => {
   const raw = appStore.workspaceTurnTree?.conversations
@@ -78,9 +90,19 @@ async function markTurnFinal(payload) {
   }
 }
 
-async function deleteTurn(payload) {
-  const ok = window.confirm('Delete this turn and its replies? Deleting the root turn removes the whole conversation.')
-  if (!ok) return
+function deleteTurn(payload) {
+  pendingDeletePayload.value = payload || null
+  deleteDialogOpen.value = true
+}
+
+function closeDeleteDialog() {
+  deleteDialogOpen.value = false
+  pendingDeletePayload.value = null
+}
+
+async function confirmDeleteTurn() {
+  const payload = pendingDeletePayload.value
+  closeDeleteDialog()
   try {
     await appStore.deleteTurn(payload?.turnId, payload?.conversationId)
     toast.success('Turn deleted', 'The turn was removed from the tree.')
