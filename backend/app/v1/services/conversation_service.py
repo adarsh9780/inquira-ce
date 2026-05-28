@@ -381,36 +381,8 @@ class ConversationService:
         turn_id: str,
         parent_turn_id: str,
     ) -> dict:
-        conversation = await ConversationRepository.get_conversation(session, conversation_id)
-        if conversation is None:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
-        turn = await ConversationRepository.get_turn(session, turn_id)
-        if turn is None or turn.conversation_id != conversation_id:
-            raise HTTPException(status_code=404, detail="Turn not found")
-        if turn.seq_no == 1 or not str(turn.parent_turn_id or "").strip():
-            raise HTTPException(status_code=409, detail="Root turns cannot be moved.")
-        new_parent_id = str(parent_turn_id or "").strip()
-        if not new_parent_id:
-            raise HTTPException(status_code=400, detail="parent_turn_id is required")
-        if new_parent_id == turn.id:
-            raise HTTPException(status_code=409, detail="A turn cannot be moved under itself.")
-        parent_turn = await ConversationRepository.get_turn(session, new_parent_id)
-        if parent_turn is None or parent_turn.conversation_id != conversation_id:
-            raise HTTPException(status_code=404, detail="Parent turn not found")
-
-        all_turns = await ConversationRepository.list_turns_in_sequence(session, conversation_id)
-        parent_by_id = {item.id: str(item.parent_turn_id or "").strip() for item in all_turns}
-        cursor = new_parent_id
-        while cursor:
-            if cursor == turn.id:
-                raise HTTPException(status_code=409, detail="A turn cannot be moved under one of its descendants.")
-            cursor = parent_by_id.get(cursor, "")
-
-        turn.parent_turn_id = new_parent_id
-        turn.sibling_order = await ConversationRepository.max_child_sibling_order(session, conversation_id, new_parent_id) + 1
-        await session.commit()
-        return ConversationService._turn_to_dict(turn)
+        _ = session, principal_id, conversation_id, turn_id, parent_turn_id
+        raise HTTPException(status_code=410, detail="Moving conversation tree nodes is no longer supported.")
 
     @staticmethod
     async def reorder_turns(
@@ -420,28 +392,8 @@ class ConversationService:
         parent_turn_id: str | None,
         turn_ids: list[str],
     ) -> dict:
-        conversation = await ConversationRepository.get_conversation(session, conversation_id)
-        if conversation is None:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
-        normalized_ids = [str(item or "").strip() for item in turn_ids]
-        if not normalized_ids or any(not item for item in normalized_ids):
-            raise HTTPException(status_code=400, detail="turn_ids must contain visible turn IDs")
-        if len(set(normalized_ids)) != len(normalized_ids):
-            raise HTTPException(status_code=409, detail="Sibling order cannot contain duplicate turns.")
-        siblings = await ConversationRepository.list_visible_siblings(
-            session,
-            conversation_id,
-            str(parent_turn_id or "").strip() or None,
-        )
-        sibling_ids = [turn.id for turn in siblings]
-        if set(normalized_ids) != set(sibling_ids):
-            raise HTTPException(status_code=409, detail="Sibling order must include exactly the visible siblings for this parent.")
-        lookup = {turn.id: turn for turn in siblings}
-        for index, item_id in enumerate(normalized_ids, start=1):
-            lookup[item_id].sibling_order = index
-        await session.commit()
-        return await ConversationService.get_turn_tree(session, principal_id, conversation_id)
+        _ = session, principal_id, conversation_id, parent_turn_id, turn_ids
+        raise HTTPException(status_code=410, detail="Reordering conversation tree nodes is no longer supported.")
 
     @staticmethod
     async def get_final_turn(

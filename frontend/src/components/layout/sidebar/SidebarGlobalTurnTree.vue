@@ -18,8 +18,6 @@
       @select="selectTurn"
       @mark-final="markTurnFinal"
       @delete-turn="deleteTurn"
-      @move-turn="moveTurn"
-      @reorder-turns="reorderTurns"
     />
   </div>
 </template>
@@ -88,24 +86,6 @@ async function deleteTurn(payload) {
     toast.success('Turn deleted', 'The turn was removed from the tree.')
   } catch (error) {
     toast.error('Delete failed', extractApiErrorMessage(error, 'Unable to delete this turn.'))
-  }
-}
-
-async function moveTurn(payload) {
-  try {
-    await appStore.moveTurn(payload?.turnId, payload?.parentTurnId, payload?.conversationId)
-    toast.success('Turn moved', 'The turn was moved under the selected parent.')
-  } catch (error) {
-    toast.error('Move failed', extractApiErrorMessage(error, 'Unable to move this turn.'))
-  }
-}
-
-async function reorderTurns(payload) {
-  try {
-    await appStore.reorderTurnSiblings(payload?.parentTurnId || null, payload?.turnIds || [], payload?.conversationId)
-    toast.success('Tree order updated', 'Sibling order was updated.')
-  } catch (error) {
-    toast.error('Reorder failed', extractApiErrorMessage(error, 'Unable to reorder these turns.'))
   }
 }
 

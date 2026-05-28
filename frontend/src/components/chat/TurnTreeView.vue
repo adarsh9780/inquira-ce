@@ -77,36 +77,6 @@
       <button
         type="button"
         class="w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors"
-        :class="canMoveSelectedUp ? 'text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)]' : 'cursor-not-allowed text-[var(--color-text-muted)] opacity-60'"
-        :title="canMoveSelectedUp ? 'Move before previous sibling' : 'Already first among siblings'"
-        :disabled="!canMoveSelectedUp"
-        @click="handleContextAction('move-up')"
-      >
-        Move Up
-      </button>
-      <button
-        type="button"
-        class="w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors"
-        :class="canMoveSelectedDown ? 'text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)]' : 'cursor-not-allowed text-[var(--color-text-muted)] opacity-60'"
-        :title="canMoveSelectedDown ? 'Move after next sibling' : 'Already last among siblings'"
-        :disabled="!canMoveSelectedDown"
-        @click="handleContextAction('move-down')"
-      >
-        Move Down
-      </button>
-      <button
-        type="button"
-        class="w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors"
-        :class="canMoveSelected ? 'text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)]' : 'cursor-not-allowed text-[var(--color-text-muted)] opacity-60'"
-        :title="canMoveSelected ? 'Move under another turn by ID' : 'Root turns cannot be moved'"
-        :disabled="!canMoveSelected"
-        @click="handleContextAction('move-to')"
-      >
-        Move To
-      </button>
-      <button
-        type="button"
-        class="w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors"
         :class="canDeleteSelected ? 'text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)]' : 'cursor-not-allowed text-[var(--color-text-muted)] opacity-60'"
         :title="selectedDeleteBlockReason || 'Delete leaf turn'"
         :disabled="!canDeleteSelected"
@@ -217,7 +187,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['select', 'mark-final', 'delete-turn', 'move-turn', 'reorder-turns'])
+const emit = defineEmits(['select', 'mark-final', 'delete-turn'])
 const contextMenu = ref({
   open: false,
   conversationId: '',
@@ -275,14 +245,6 @@ const detailArtifacts = computed(() => {
 const selectedContext = computed(() => findNodeContext(contextMenu.value.conversationId, contextMenu.value.turnId))
 const selectedNode = computed(() => selectedContext.value?.node || null)
 const selectedConversation = computed(() => selectedContext.value?.conversation || null)
-const selectedSiblings = computed(() => selectedContext.value?.siblings || [])
-const selectedSiblingIndex = computed(() => {
-  const id = String(contextMenu.value.turnId || '').trim()
-  return selectedSiblings.value.findIndex((node) => String(node?.id || '').trim() === id)
-})
-const canMoveSelected = computed(() => Boolean(String(selectedNode.value?.parent_turn_id || '').trim()))
-const canMoveSelectedUp = computed(() => canMoveSelected.value && selectedSiblingIndex.value > 0)
-const canMoveSelectedDown = computed(() => canMoveSelected.value && selectedSiblingIndex.value >= 0 && selectedSiblingIndex.value < selectedSiblings.value.length - 1)
 const selectedDeleteBlockReason = computed(() => {
   const node = selectedNode.value
   if (!node) return 'Turn not found'
@@ -386,29 +348,6 @@ async function handleContextAction(action) {
   if (action === 'delete') {
     emit('delete-turn', { conversationId, turnId })
     return
-  }
-  if (action === 'move-to') {
-    const parentTurnId = window.prompt('Move under turn ID')
-    const normalizedParentId = String(parentTurnId || '').trim()
-    if (normalizedParentId) emit('move-turn', { conversationId, turnId, parentTurnId: normalizedParentId })
-    return
-  }
-  if (action === 'move-up' || action === 'move-down') {
-    const context = findNodeContext(conversationId, turnId)
-    if (!context) return
-    const ids = context.siblings.map((node) => String(node?.id || '').trim()).filter(Boolean)
-    const index = ids.indexOf(turnId)
-    const delta = action === 'move-up' ? -1 : 1
-    const nextIndex = index + delta
-    if (index < 0 || nextIndex < 0 || nextIndex >= ids.length) return
-    const reordered = [...ids]
-    const [moved] = reordered.splice(index, 1)
-    reordered.splice(nextIndex, 0, moved)
-    emit('reorder-turns', {
-      conversationId,
-      parentTurnId: String(context.parent?.id || '').trim() || null,
-      turnIds: reordered,
-    })
   }
 }
 
