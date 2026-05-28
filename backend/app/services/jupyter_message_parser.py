@@ -26,7 +26,7 @@ class ParsedExecutionOutput:
         stderr = "".join(self.stderr_parts).strip()
         has_stdout = bool(stdout)
         has_stderr = bool(stderr)
-        success = self.error is None and not stderr
+        success = self.error is None
         return {
             "success": success,
             "stdout": stdout,
