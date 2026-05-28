@@ -461,6 +461,32 @@ class ChatService:
         return "\n\n".join(section for section in sections if section).strip()
 
     @staticmethod
+    async def _resolve_selected_parent_turn(
+        session: AsyncSession,
+        *,
+        conversation_id: str,
+        use_selected_turn_context: bool,
+        selected_parent_turn_id: str | None,
+    ) -> Any | None:
+        if not use_selected_turn_context:
+            return None
+
+        parent_id = str(selected_parent_turn_id or "").strip()
+        if not parent_id:
+            raise HTTPException(
+                status_code=400,
+                detail="selected_parent_turn_id is required when selected turn context is enabled.",
+            )
+
+        selected_turn = await ConversationRepository.get_turn(session, parent_id)
+        if selected_turn is None or str(getattr(selected_turn, "conversation_id", "") or "") != str(conversation_id):
+            raise HTTPException(
+                status_code=409,
+                detail="Selected parent turn is no longer available in this conversation.",
+            )
+        return selected_turn
+
+    @staticmethod
     def _ollama_cloud_model_id(model_id: str) -> str:
         value = str(model_id or "").strip()
         if not value or ":" in value:
@@ -1415,16 +1441,20 @@ class ChatService:
             selected_turn = None
             parent_turn_id = None
             effective_context = context or ""
-            if use_selected_turn_context and conversation_id and selected_parent_turn_id:
-                selected_turn = await ConversationRepository.get_turn(session, selected_parent_turn_id)
-                if selected_turn is not None and selected_turn.conversation_id == conversation_id:
-                    parent_turn_id = selected_turn.id
-                    effective_context = ChatService._selected_turn_context_block(
-                        base_context=context,
-                        selected_turn=selected_turn,
-                        branch_summary_json=getattr(conversation, "branch_summary_json", None),
-                        schema_memory_json=getattr(conversation, "schema_memory_json", None),
-                    )
+            selected_turn = await ChatService._resolve_selected_parent_turn(
+                session,
+                conversation_id=conversation_id,
+                use_selected_turn_context=use_selected_turn_context,
+                selected_parent_turn_id=selected_parent_turn_id,
+            )
+            if selected_turn is not None:
+                parent_turn_id = selected_turn.id
+                effective_context = ChatService._selected_turn_context_block(
+                    base_context=context,
+                    selected_turn=selected_turn,
+                    branch_summary_json=getattr(conversation, "branch_summary_json", None),
+                    schema_memory_json=getattr(conversation, "schema_memory_json", None),
+                )
 
             reserved_turn, reserved_seq_no, reserved_turn_dir = await ChatService._reserve_turn(
                 session=session,
@@ -1852,16 +1882,20 @@ class ChatService:
             selected_turn = None
             parent_turn_id = None
             effective_context = context or ""
-            if use_selected_turn_context and resolved_conversation_id and selected_parent_turn_id:
-                selected_turn = await ConversationRepository.get_turn(session, selected_parent_turn_id)
-                if selected_turn is not None and selected_turn.conversation_id == resolved_conversation_id:
-                    parent_turn_id = selected_turn.id
-                    effective_context = ChatService._selected_turn_context_block(
-                        base_context=context,
-                        selected_turn=selected_turn,
-                        branch_summary_json=getattr(conversation, "branch_summary_json", None),
-                        schema_memory_json=getattr(conversation, "schema_memory_json", None),
-                    )
+            selected_turn = await ChatService._resolve_selected_parent_turn(
+                session,
+                conversation_id=resolved_conversation_id,
+                use_selected_turn_context=use_selected_turn_context,
+                selected_parent_turn_id=selected_parent_turn_id,
+            )
+            if selected_turn is not None:
+                parent_turn_id = selected_turn.id
+                effective_context = ChatService._selected_turn_context_block(
+                    base_context=context,
+                    selected_turn=selected_turn,
+                    branch_summary_json=getattr(conversation, "branch_summary_json", None),
+                    schema_memory_json=getattr(conversation, "schema_memory_json", None),
+                )
 
             reserved_turn, reserved_seq_no, reserved_turn_dir = await ChatService._reserve_turn(
                 session=session,
