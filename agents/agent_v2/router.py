@@ -189,7 +189,10 @@ async def decide_route_details(messages: list[AnyMessage], configurable: dict) -
         configurable.get("presence_penalty") if configurable.get("presence_penalty") is not None else 0.0
     )
     if provider_requires_api_key(provider) and not api_key:
-        return "analysis"
+        return RouteDecision(
+            route="analysis",
+            reasoning="LLM router unavailable because the selected provider requires an API key.",
+        )
 
     try:
         model = create_chat_model(
