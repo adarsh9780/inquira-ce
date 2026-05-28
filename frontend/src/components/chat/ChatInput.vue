@@ -1153,6 +1153,41 @@ function appendChatExecutionOutput(response) {
   return true
 }
 
+function scalarDisplayValue(value) {
+  if (value === undefined) return ''
+  if (value === null) return 'null'
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value)
+  }
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch (_error) {
+    return String(value)
+  }
+}
+
+function normalizeScalarResult(response) {
+  const execution = response?.execution && typeof response.execution === 'object'
+    ? response.execution
+    : {}
+  const resultKind = String(execution?.result_kind || response?.result_kind || '').trim().toLowerCase()
+  const resultType = String(execution?.result_type || response?.result_type || '').trim()
+  const hasExecutionResult = Object.prototype.hasOwnProperty.call(execution, 'result')
+  const hasResponseResult = Object.prototype.hasOwnProperty.call(response || {}, 'result')
+  if (resultKind !== 'scalar' && resultType.toLowerCase() !== 'scalar') return null
+  const value = hasExecutionResult ? execution.result : (hasResponseResult ? response.result : undefined)
+  if (value === undefined) return null
+  return {
+    name: String(execution?.result_name || response?.result_name || 'result'),
+    value,
+    display_value: scalarDisplayValue(value),
+    result_type: resultType || typeof value,
+    run_id: String(execution?.run_id || response?.run_id || ''),
+    created_at: new Date().toISOString(),
+  }
+}
+
 async function handleSlashCommand(questionText) {
   appStore.setLoading(true)
   let commandMessageCreated = false
@@ -1429,6 +1464,10 @@ async function handleSubmit() {
     }
 
     const artifactItems = sortArtifactsNewestFirst(Array.isArray(response?.artifacts) ? response.artifacts : [])
+    const inlineScalarResult = normalizeScalarResult(response)
+    if (artifactItems.length === 0 && !inlineScalarResult) {
+      appStore.setScalars([])
+    }
     if (artifactItems.length > 0) {
       const dataframeArtifacts = artifactItems
         .filter((item) => String(item?.kind || '') === 'dataframe')
@@ -1459,16 +1498,41 @@ async function handleSubmit() {
           }
         })
         .filter(Boolean)
+      const scalarArtifacts = artifactItems
+        .filter((item) => String(item?.kind || '') === 'scalar')
+        .map((item) => {
+          const payload = item?.payload && typeof item.payload === 'object' && !Array.isArray(item.payload) ? item.payload : {}
+          const hasPayloadValue = Object.prototype.hasOwnProperty.call(payload, 'value')
+          const value = hasPayloadValue ? payload.value : item?.payload
+          return {
+            name: String(item?.display_name || item?.logical_name || item?.name || 'scalar'),
+            artifact_id: item?.artifact_id || null,
+            logical_name: item?.logical_name || undefined,
+            display_name: item?.display_name || undefined,
+            created_at: String(item?.created_at || ''),
+            value,
+            display_value: scalarDisplayValue(value),
+            result_type: String(payload?.type || typeof value),
+          }
+        })
 
       appStore.setDataframes(dataframeArtifacts)
       appStore.setFigures(figureArtifacts)
+      appStore.setScalars(inlineScalarResult ? [...scalarArtifacts, inlineScalarResult] : scalarArtifacts)
       if (figureArtifacts.length > 0) {
         appStore.setPlotlyFigure(figureArtifacts[0].data)
         appStore.revealArtifactsPane({ hasFigures: true })
       } else if (dataframeArtifacts.length > 0) {
         appStore.setResultData(dataframeArtifacts[0].data)
         appStore.revealArtifactsPane({ hasDataframes: true })
+      } else if (scalarArtifacts.length > 0 || inlineScalarResult) {
+        appStore.revealArtifactsPane({ hasOutput: true })
       } else if (artifactItems.length > 0) {
+        appStore.revealArtifactsPane({ hasOutput: true })
+      }
+    } else {
+      if (inlineScalarResult) {
+        appStore.setScalars([inlineScalarResult])
         appStore.revealArtifactsPane({ hasOutput: true })
       }
     }

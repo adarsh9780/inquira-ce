@@ -106,6 +106,7 @@ export const useAppStore = defineStore('app', () => {
   const plotlyFigure = ref(null)
   const dataframes = ref([])
   const figures = ref([])
+  const scalars = ref([])
   const dataframeCount = ref(0)
   const tableRowCount = ref(0)
   const tableWindowStart = ref(0)
@@ -2237,6 +2238,10 @@ export const useAppStore = defineStore('app', () => {
     figureCount.value = figures.value.length
   }
 
+  function setScalars(items) {
+    scalars.value = Array.isArray(items) ? items : []
+  }
+
   function setDataframeCount(count) {
     dataframeCount.value = Number(count || 0)
   }
@@ -2952,6 +2957,7 @@ export const useAppStore = defineStore('app', () => {
     plotlyFigure,
     dataframes,
     figures,
+    scalars,
     dataframeCount,
     tableRowCount,
     tableWindowStart,
@@ -3098,6 +3104,7 @@ export const useAppStore = defineStore('app', () => {
     setPlotlyFigure,
     setDataframes,
     setFigures,
+    setScalars,
     setDataframeCount,
     setTableViewport,
     clearTableViewport,

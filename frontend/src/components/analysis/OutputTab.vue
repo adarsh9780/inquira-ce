@@ -172,6 +172,17 @@
                 Open in Chart tab
               </button>
             </template>
+
+            <template v-else-if="event.type === 'scalar'">
+              <div class="mt-1 rounded-md px-3 py-2 text-xs" style="background-color: color-mix(in srgb, var(--color-base) 85%, var(--color-surface)); color: var(--color-text-main);">
+                <p v-if="event.artifactId">Artifact: {{ event.artifactId }}</p>
+                <p v-if="event.resultType">Type: {{ event.resultType }}</p>
+              </div>
+              <pre
+                class="mt-2 whitespace-pre-wrap break-words rounded-md px-3 py-2 text-xs font-mono leading-5"
+                style="color: var(--color-text-main); background-color: color-mix(in srgb, var(--color-base) 90%, var(--color-surface));"
+              >{{ event.displayValue }}</pre>
+            </template>
           </div>
         </article>
       </div>
@@ -207,6 +218,7 @@ const filterOptions = [
   { value: 'errors', label: 'Errors' },
   { value: 'tables', label: 'Tables' },
   { value: 'charts', label: 'Charts' },
+  { value: 'scalars', label: 'Scalars' },
 ]
 
 onMounted(() => {
@@ -299,11 +311,35 @@ const chartEvents = computed(() => {
   })
 })
 
+const scalarEvents = computed(() => {
+  const entries = Array.isArray(appStore.scalars) ? appStore.scalars : []
+  return entries.map((item, index) => {
+    const artifactId = String(item?.artifact_id || '').trim()
+    const scalarName = String(item?.name || item?.logical_name || artifactId || `scalar_${index + 1}`)
+    const displayValue = formatPreviewCell(item?.display_value ?? item?.value)
+    const resultType = String(item?.result_type || item?.type || '').trim()
+    return {
+      id: `scalar:${artifactId || scalarName}:${index}`,
+      type: 'scalar',
+      badgeLabel: 'scalar',
+      title: scalarName,
+      meta: resultType || 'scalar result',
+      artifactId,
+      resultType,
+      displayValue,
+      status: 'success',
+      createdAt: String(item?.createdAt || item?.created_at || ''),
+      sequence: 30000 - index,
+    }
+  })
+})
+
 const timelineEvents = computed(() => {
   const combined = [
     ...analysisLogEvents.value,
     ...tableEvents.value,
     ...chartEvents.value,
+    ...scalarEvents.value,
   ]
   combined.sort((left, right) => {
     const leftTs = Date.parse(String(left?.createdAt || ''))
@@ -330,6 +366,9 @@ const filteredEvents = computed(() => {
   }
   if (activeFilter.value === 'charts') {
     return timelineEvents.value.filter((event) => event.type === 'chart')
+  }
+  if (activeFilter.value === 'scalars') {
+    return timelineEvents.value.filter((event) => event.type === 'scalar')
   }
   return timelineEvents.value
 })
