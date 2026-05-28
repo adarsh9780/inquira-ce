@@ -107,14 +107,6 @@
             <button
               type="button"
               class="btn-icon"
-              title="Open turn tree"
-              @click="openTurnTreeModal"
-            >
-              <QueueListIcon class="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              class="btn-icon"
               title="Next turn"
               :disabled="!appStore.activeTurnRelations?.next_turn"
               @click="appStore.goToNextTurn()"
@@ -200,22 +192,6 @@
       />
     </div>
 
-    <TurnTreeModal
-      :is-open="turnTreeModalOpen"
-      :roots="appStore.activeTurnTree?.roots || []"
-      :conversation-id="appStore.activeConversationId"
-      :current-turn-id="appStore.activeTurnId"
-      :current-parent-turn-id="appStore.activeTurnRelations?.parent?.id || ''"
-      :final-turn-id="appStore.finalTurnId"
-      @close="closeTurnTreeModal"
-      @select="selectTurnTreeNode"
-      @mark-final="markTurnFinal"
-      @rerun-final="rerunFinalTurn"
-      @delete-turn="deleteTurnTreeNode"
-      @move-turn="moveTurnTreeNode"
-      @reorder-turns="reorderTurnTreeNodes"
-    />
-
     <!-- Requirements Notice -->
     <div v-if="!appStore.canAnalyze" class="rounded-xl p-4 border" style="background-color: color-mix(in srgb, var(--color-error) 5%, transparent); border-color: color-mix(in srgb, var(--color-error) 20%, transparent);">
       <div class="flex items-start gap-3">
@@ -245,7 +221,6 @@ import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import { modelSupportsImages, SUPPORTED_CHAT_IMAGE_TYPES } from '../../utils/modelCapabilities'
 import ModelSelector from '../ui/ModelSelector.vue'
 import ColumnSuggest from './ColumnSuggest.vue'
-import TurnTreeModal from './TurnTreeModal.vue'
 import {
   PlusIcon,
   ExclamationTriangleIcon,
@@ -253,7 +228,6 @@ import {
   PhotoIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  QueueListIcon,
 } from '@heroicons/vue/24/outline'
 import { ArrowUpIcon, MicrophoneIcon, StopIcon } from '@heroicons/vue/24/solid'
 
@@ -282,7 +256,6 @@ const speechRecognition = ref(null)
 const voiceDraftPrefix = ref('')
 const activeAbortController = ref(null)
 const userRequestedStop = ref(false)
-const turnTreeModalOpen = ref(false)
 
 const showCommandSuggestions = computed(() => commandSuggestions.value.length > 0)
 const showColumnSuggestions = computed(() => columnSuggestions.value.length > 0)
@@ -424,69 +397,6 @@ function openAttachmentPicker() {
     return
   }
   attachmentInputRef.value?.click()
-}
-
-async function openTurnTreeModal() {
-  const conversationId = String(appStore.activeConversationId || '').trim()
-  const turnId = String(appStore.activeTurnId || '').trim()
-  if (!conversationId || !turnId) return
-  await appStore.loadActiveTurnTree(conversationId, turnId)
-  turnTreeModalOpen.value = true
-}
-
-function closeTurnTreeModal() {
-  turnTreeModalOpen.value = false
-}
-
-async function selectTurnTreeNode(turnId) {
-  closeTurnTreeModal()
-  await appStore.loadActiveTurnRelations(turnId)
-}
-
-async function markTurnFinal(turnId) {
-  try {
-    await appStore.markTurnFinal(turnId)
-    await appStore.loadActiveTurnTree()
-    toast.success('Final turn updated', 'This turn is now marked final.')
-  } catch (error) {
-    toast.error('Final turn failed', extractApiErrorMessage(error, 'Unable to mark final turn.'))
-  }
-}
-
-async function rerunFinalTurn() {
-  closeTurnTreeModal()
-  await appStore.rerunSelectedFinalTurn()
-}
-
-async function deleteTurnTreeNode(turnId) {
-  const ok = window.confirm('Delete this leaf turn? This hides the turn and marks its artifacts for cleanup.')
-  if (!ok) return
-  try {
-    await appStore.deleteTurn(turnId)
-    await appStore.loadActiveTurnTree()
-    toast.success('Turn deleted', 'The turn was removed from the tree.')
-  } catch (error) {
-    toast.error('Delete failed', extractApiErrorMessage(error, 'Unable to delete this turn.'))
-  }
-}
-
-async function moveTurnTreeNode(payload) {
-  try {
-    await appStore.moveTurn(payload?.turnId, payload?.parentTurnId)
-    await appStore.loadActiveTurnTree()
-    toast.success('Turn moved', 'The turn was moved under the selected parent.')
-  } catch (error) {
-    toast.error('Move failed', extractApiErrorMessage(error, 'Unable to move this turn.'))
-  }
-}
-
-async function reorderTurnTreeNodes(payload) {
-  try {
-    await appStore.reorderTurnSiblings(payload?.parentTurnId || null, payload?.turnIds || [])
-    toast.success('Tree order updated', 'Sibling order was updated.')
-  } catch (error) {
-    toast.error('Reorder failed', extractApiErrorMessage(error, 'Unable to reorder these turns.'))
-  }
 }
 
 async function fileToBase64(file) {
@@ -1650,15 +1560,10 @@ onUnmounted(() => {
 })
 
 watch(() => appStore.activeWorkspaceId, () => {
-  closeTurnTreeModal()
   clearSuggestions()
   if (appStore.activeWorkspaceId) {
     void appStore.fetchColumnCatalog({ force: true })
   }
-})
-
-watch(() => appStore.activeTurnId, () => {
-  closeTurnTreeModal()
 })
 
 watch(() => appStore.ingestedTableName, () => {

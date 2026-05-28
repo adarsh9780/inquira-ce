@@ -94,8 +94,8 @@
           </template>
         </div>
 
-        <!-- Conversation List -->
-        <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-1 custom-scrollbar">
+        <!-- Conversation Tree -->
+        <div class="min-h-0 flex-1 overflow-hidden pb-1">
           <div
             v-if="!appStore.hasWorkspace"
             class="px-3 py-2 text-[12px] text-[var(--color-text-muted)] transition-opacity"
@@ -103,83 +103,7 @@
           >
             Create a workspace to start.
           </div>
-
-          <div v-else class="space-y-0.5 mt-1">
-            <div
-              v-for="(conv, index) in appStore.conversations"
-              :key="conv.id"
-              class="group relative flex min-h-9 select-none items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
-              :class="[
-                appStore.isSidebarCollapsed ? 'justify-center px-0 py-1.5' : 'justify-start px-3 py-1.5',
-                isConversationSelected(conv.id) || appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : '',
-              ]"
-              :title="conv.title || 'Untitled'"
-              @click="handleConversationClick($event, conv.id, index)"
-              @contextmenu.prevent="openConversationContextMenu($event, conv.id)"
-            >
-              <!-- Active indicator line — only in expanded mode -->
-              <div
-                v-if="appStore.activeConversationId === conv.id && !appStore.isSidebarCollapsed"
-                class="absolute left-0 top-1/2 -translate-y-1/2 h-1/2 w-[3px] rounded-r-full bg-[var(--color-accent)]"
-              />
-
-              <!-- Inline edit mode -->
-              <div v-if="editingId === conv.id" class="flex w-full items-center gap-1 pl-9" @click.stop>
-                <input
-                  :ref="(el) => { if (el) editInputs[conv.id] = el }"
-                  v-model="editingTitleValue"
-                  class="w-full rounded border border-[var(--color-accent)] bg-[var(--color-surface)] px-2 py-1 text-[13px] text-[var(--color-text-main)] outline-none"
-                  @keydown.enter.prevent="saveTitle(conv.id)"
-                  @keydown.esc.prevent="cancelEditing"
-                  @blur="saveTitle(conv.id)"
-                />
-              </div>
-
-              <!-- Display mode -->
-              <template v-else>
-                <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-                  <span
-                    class="inline-flex min-w-[1.5rem] items-center justify-center px-1 text-[11px] font-semibold leading-none tabular-nums tracking-[0.02em] transition-colors duration-200"
-                    :class="isConversationSelected(conv.id) || appStore.activeConversationId === conv.id
-                      ? 'text-[var(--color-accent)]'
-                      : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
-                  >
-                    {{ conversationBadgeLabel(index, appStore.conversations.length) }}
-                  </span>
-                </div>
-
-                <!-- Title (hidden when collapsed) -->
-                <div
-                  class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-                  :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[200px] opacity-100 ml-3'"
-                >
-                  <p
-                    class="truncate text-[13px]"
-                    :class="isConversationSelected(conv.id) || appStore.activeConversationId === conv.id
-                      ? 'font-medium text-[var(--color-text-main)]'
-                      : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
-                    :title="conv.title || 'Untitled'"
-                  >
-                    {{ conv.title || 'Untitled' }}
-                  </p>
-                </div>
-
-                <!-- Ellipsis menu (expanded only) -->
-                <div
-                  v-if="!appStore.isSidebarCollapsed"
-                  class="relative shrink-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <button
-                    type="button"
-                    class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
-                    @click.stop="toggleConversationMenu($event, conv.id)"
-                  >
-                    <EllipsisHorizontalIcon class="h-4 w-4" />
-                  </button>
-                </div>
-              </template>
-            </div>
-          </div>
+          <SidebarGlobalTurnTree v-else />
         </div>
       </div>
 
@@ -212,31 +136,6 @@
             </div>
           </button>
 
-          <button
-            type="button"
-            class="flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
-            :class="[
-              appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
-              appStore.activeTab === 'conversation-tree' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
-            ]"
-            :title="appStore.isSidebarCollapsed ? 'Open conversation tree' : 'Conversation Tree'"
-            @click="openConversationTree"
-          >
-            <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-              <QueueListIcon class="h-5 w-5" :class="appStore.activeTab === 'conversation-tree' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
-            </div>
-            <div
-              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-              :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
-            >
-              <span class="block truncate text-[13px] font-medium leading-snug text-[var(--color-text-main)]">
-                Conversation Tree
-              </span>
-              <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
-                Turns across this workspace
-              </span>
-            </div>
-          </button>
         </div>
       </nav>
 
@@ -415,6 +314,7 @@ import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import SettingsModal from '../modals/SettingsModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
+import SidebarGlobalTurnTree from './sidebar/SidebarGlobalTurnTree.vue'
 import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 
@@ -423,7 +323,6 @@ import {
   PlusIcon,
   EllipsisHorizontalIcon,
   CircleStackIcon,
-  QueueListIcon,
   Cog6ToothIcon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
@@ -606,10 +505,6 @@ function handleBrandClick() {
 
 function openSchemaEditor() {
   appStore.setActiveTab('schema-editor')
-}
-
-function openConversationTree() {
-  appStore.setActiveTab('conversation-tree')
 }
 
 function conversationBadgeLabel(index, totalCount = appStore.conversations.length) {

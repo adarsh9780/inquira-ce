@@ -2582,7 +2582,7 @@ export const useAppStore = defineStore('app', () => {
       // Open the bottom terminal pane instead of navigating away
       activeTab.value = 'workspace'
       isTerminalOpen.value = true
-    } else if (normalized === 'preview') {
+    } else if (normalized === 'preview' || normalized === 'conversation-tree') {
       activeTab.value = 'workspace'
     } else {
       activeTab.value = normalized || 'workspace'
