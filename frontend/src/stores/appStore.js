@@ -1788,6 +1788,7 @@ export const useAppStore = defineStore('app', () => {
     if (rerunTurnId) {
       await fetchConversationTurns({ reset: true })
       await loadActiveTurnRelations(rerunTurnId)
+      await loadWorkspaceTurnTree()
     }
     return result
   }
@@ -1996,6 +1997,7 @@ export const useAppStore = defineStore('app', () => {
     await fetchConversations()
     setActiveConversationId(conv.id)
     clearConversationScopedState()
+    await loadWorkspaceTurnTree()
     saveLocalConfig()
     return conv
   }

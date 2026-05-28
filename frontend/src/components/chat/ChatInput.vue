@@ -1207,6 +1207,7 @@ async function handleSlashCommand(questionText) {
     }
     if (persistedConversationId) {
       await appStore.fetchConversations()
+      await appStore.loadWorkspaceTurnTree()
     }
     appStore.updateLastMessageExplanation(
       String(result?.output || `/${String(result?.name || 'command')} executed.`)
@@ -1426,6 +1427,7 @@ async function handleSubmit() {
         await appStore.loadActiveTurnRelations(responseTurnId)
         await appStore.loadFinalTurn()
       }
+      await appStore.loadWorkspaceTurnTree()
     }
 
     const { is_safe, code, current_code, explanation, result_explanation, code_explanation } = response
