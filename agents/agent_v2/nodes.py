@@ -3801,7 +3801,7 @@ async def analysis_validate_result_node(state: dict[str, Any], config: RunnableC
             "artifact_count": len([item for item in (execution.get("artifacts") or []) if isinstance(item, dict)]),
             "artifacts": [item for item in (execution.get("artifacts") or []) if isinstance(item, dict)],
         }
-    artifacts = [item for item in (result_summary.get("artifacts") or []) if isinstance(item, dict)]
+    artifacts = [item for item in (execution.get("artifacts") or []) if isinstance(item, dict)]
     analysis_context = state.get("analysis_context") if isinstance(state.get("analysis_context"), dict) else {}
     code = str(state.get("candidate_code") or "").strip()
     analysis_output = state.get("analysis_output") if isinstance(state.get("analysis_output"), dict) else {}
