@@ -254,9 +254,11 @@ class ConversationService:
         for turn in turns:
             node = node_lookup[turn.id]
             parent_id = str(turn.parent_turn_id or "").strip()
+            if not parent_id:
+                roots.append(node)
+                continue
             parent_node = node_lookup.get(parent_id)
             if parent_node is None:
-                roots.append(node)
                 continue
             parent_node["children"].append(node)
 
@@ -296,11 +298,14 @@ class ConversationService:
             }
         for turn in turns:
             node = node_lookup[turn.id]
-            parent_node = node_lookup.get(str(turn.parent_turn_id or "").strip())
-            if parent_node is None:
+            parent_id = str(turn.parent_turn_id or "").strip()
+            if not parent_id:
                 roots.append(node)
-            else:
-                parent_node["children"].append(node)
+                continue
+            parent_node = node_lookup.get(parent_id)
+            if parent_node is None:
+                continue
+            parent_node["children"].append(node)
 
         def sort_nodes(nodes: list[dict]) -> None:
             nodes.sort(key=lambda item: (
