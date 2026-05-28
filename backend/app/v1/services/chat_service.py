@@ -1599,6 +1599,7 @@ class ChatService:
         execution_payload = result.get("final_execution")
         normalized_execution = None
         if isinstance(execution_payload, dict):
+            artifacts = ChatService._normalize_artifacts(execution_payload.get("artifacts"))
             normalized_execution = {
                 "status": "success" if bool(execution_payload.get("success")) else "failed",
                 "stdout": str(execution_payload.get("stdout") or ""),
@@ -1610,6 +1611,14 @@ class ChatService:
                 "retry_count": int(execution_payload.get("retry_count") or 0),
                 "duration_ms": int(execution_payload.get("duration_ms") or 0),
                 "success": bool(execution_payload.get("success")),
+                "result": execution_payload.get("result"),
+                "result_type": str(execution_payload.get("result_type") or ""),
+                "result_kind": str(execution_payload.get("result_kind") or ""),
+                "result_name": str(execution_payload.get("result_name") or ""),
+                "variables": execution_payload.get("variables") if isinstance(execution_payload.get("variables"), dict) else {},
+                "artifacts": artifacts,
+                "artifact_count": len(artifacts),
+                "run_id": str(execution_payload.get("run_id") or result.get("run_id") or "") or None,
             }
 
         return {
