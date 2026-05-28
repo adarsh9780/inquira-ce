@@ -1397,8 +1397,8 @@ class ChatService:
         )
 
         await ChatService._claim_conversation_run(conversation_id)
-        normalized_attachments = ChatService._normalize_chat_attachments(attachments)
         try:
+            normalized_attachments = ChatService._normalize_chat_attachments(attachments)
             thread_id = f"{user.id}:{workspace_id}:{conversation_id}"
             llm_prefs = await ChatService._resolve_llm_preferences(session, str(user.id))
             resolved_api_key = (api_key or "").strip() or (
@@ -1411,124 +1411,122 @@ class ChatService:
                     status_code=400,
                     detail="The selected model does not support image attachments.",
                 )
-        except BaseException:
-            await ChatService._release_conversation_run(conversation_id)
-            raise
 
-        selected_turn = None
-        parent_turn_id = None
-        effective_context = context or ""
-        if use_selected_turn_context and conversation_id and selected_parent_turn_id:
-            selected_turn = await ConversationRepository.get_turn(session, selected_parent_turn_id)
-            if selected_turn is not None and selected_turn.conversation_id == conversation_id:
-                parent_turn_id = selected_turn.id
-                effective_context = ChatService._selected_turn_context_block(
-                    base_context=context,
-                    selected_turn=selected_turn,
-                    branch_summary_json=getattr(conversation, "branch_summary_json", None),
-                    schema_memory_json=getattr(conversation, "schema_memory_json", None),
-                )
+            selected_turn = None
+            parent_turn_id = None
+            effective_context = context or ""
+            if use_selected_turn_context and conversation_id and selected_parent_turn_id:
+                selected_turn = await ConversationRepository.get_turn(session, selected_parent_turn_id)
+                if selected_turn is not None and selected_turn.conversation_id == conversation_id:
+                    parent_turn_id = selected_turn.id
+                    effective_context = ChatService._selected_turn_context_block(
+                        base_context=context,
+                        selected_turn=selected_turn,
+                        branch_summary_json=getattr(conversation, "branch_summary_json", None),
+                        schema_memory_json=getattr(conversation, "schema_memory_json", None),
+                    )
 
-        reserved_turn, reserved_seq_no, reserved_turn_dir = await ChatService._reserve_turn(
-            session=session,
-            conversation=conversation,
-            username=str(user.username),
-            workspace_id=workspace_id,
-            conversation_id=conversation_id,
-            question=question,
-            parent_turn_id=parent_turn_id,
-        )
+            reserved_turn, reserved_seq_no, reserved_turn_dir = await ChatService._reserve_turn(
+                session=session,
+                conversation=conversation,
+                username=str(user.username),
+                workspace_id=workspace_id,
+                conversation_id=conversation_id,
+                question=question,
+                parent_turn_id=parent_turn_id,
+            )
 
-        await ChatService._release_session_before_agent(session)
+            await ChatService._release_session_before_agent(session)
 
-        payload = ChatService._build_remote_agent_payload(
-            request_id=thread_id,
-            user_id=str(user.id),
-            workspace_id=workspace_id,
-            conversation_id=conversation_id,
-            question=question,
-            current_code=current_code,
-            model=model,
-            context=effective_context,
-            table_names=ChatService._extract_schema_table_names(schema),
-            data_path=data_path,
-            workspace_schema=schema if isinstance(schema, dict) else {},
-            schema_folder_path=str(Path(data_path).parent / "meta") if data_path else "",
-            artifact_dir=str(reserved_turn_dir),
-            turn_id=reserved_turn.id,
-            attachments=normalized_attachments,
-            llm_prefs=llm_prefs,
-            resolved_api_key=resolved_api_key,
-            agent_profile=load_agent_service_config().default_agent,
-        )
-        agent_client = AgentClient()
-        try:
-            await agent_client.assert_health()
-            result = await agent_client.run(payload)
-        except AgentRuntimeError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+            payload = ChatService._build_remote_agent_payload(
+                request_id=thread_id,
+                user_id=str(user.id),
+                workspace_id=workspace_id,
+                conversation_id=conversation_id,
+                question=question,
+                current_code=current_code,
+                model=model,
+                context=effective_context,
+                table_names=ChatService._extract_schema_table_names(schema),
+                data_path=data_path,
+                workspace_schema=schema if isinstance(schema, dict) else {},
+                schema_folder_path=str(Path(data_path).parent / "meta") if data_path else "",
+                artifact_dir=str(reserved_turn_dir),
+                turn_id=reserved_turn.id,
+                attachments=normalized_attachments,
+                llm_prefs=llm_prefs,
+                resolved_api_key=resolved_api_key,
+                agent_profile=load_agent_service_config().default_agent,
+            )
+            agent_client = AgentClient()
+            try:
+                await agent_client.assert_health()
+                result = await agent_client.run(payload)
+            except AgentRuntimeError as exc:
+                raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-        response_payload = ChatService._build_response_payload(result)
-        run_id = str(response_payload.get("run_id") or result.get("run_id") or uuid.uuid4())
-        response_payload["run_id"] = run_id
-        response_payload["execution"] = response_payload.get("execution")
-        response_payload["artifacts"] = response_payload.get("artifacts") or []
-        response_payload["final_script_artifact_id"] = response_payload.get("final_script_artifact_id")
+            response_payload = ChatService._build_response_payload(result)
+            run_id = str(response_payload.get("run_id") or result.get("run_id") or uuid.uuid4())
+            response_payload["run_id"] = run_id
+            response_payload["execution"] = response_payload.get("execution")
+            response_payload["artifacts"] = response_payload.get("artifacts") or []
+            response_payload["final_script_artifact_id"] = response_payload.get("final_script_artifact_id")
 
-        code_to_execute = str(response_payload.get("code") or "").strip()
-        should_execute_runtime = (
-            code_to_execute
-            and ChatService._response_contains_generated_code(result)
-        )
-        if should_execute_runtime:
-            if ChatService._agent_execution_is_authoritative(
-                response_payload=response_payload,
-                result_payload=result,
-                code_to_execute=code_to_execute,
-            ):
-                await ChatService._finalize_with_existing_execution(
-                    workspace_id=workspace_id,
-                    workspace_duckdb_path=data_path,
-                    question=question,
-                    run_id=run_id,
-                    generated_code=code_to_execute,
+            code_to_execute = str(response_payload.get("code") or "").strip()
+            should_execute_runtime = (
+                code_to_execute
+                and ChatService._response_contains_generated_code(result)
+            )
+            if should_execute_runtime:
+                if ChatService._agent_execution_is_authoritative(
                     response_payload=response_payload,
                     result_payload=result,
-                )
-            else:
-                await ChatService._apply_authoritative_execution_to_response(
-                    workspace_id=workspace_id,
-                    workspace_duckdb_path=data_path,
-                    question=question,
-                    run_id=run_id,
-                    generated_code=code_to_execute,
-                    output_contract=response_payload.get("output_contract") or [],
-                    response_payload=response_payload,
-                    conversation_id=conversation_id,
-                    turn_id=reserved_turn.id,
-                    artifact_dir=str(reserved_turn_dir),
-                )
-            ChatService._reconcile_success_explanation(response_payload)
+                    code_to_execute=code_to_execute,
+                ):
+                    await ChatService._finalize_with_existing_execution(
+                        workspace_id=workspace_id,
+                        workspace_duckdb_path=data_path,
+                        question=question,
+                        run_id=run_id,
+                        generated_code=code_to_execute,
+                        response_payload=response_payload,
+                        result_payload=result,
+                    )
+                else:
+                    await ChatService._apply_authoritative_execution_to_response(
+                        workspace_id=workspace_id,
+                        workspace_duckdb_path=data_path,
+                        question=question,
+                        run_id=run_id,
+                        generated_code=code_to_execute,
+                        output_contract=response_payload.get("output_contract") or [],
+                        response_payload=response_payload,
+                        conversation_id=conversation_id,
+                        turn_id=reserved_turn.id,
+                        artifact_dir=str(reserved_turn_dir),
+                    )
+                ChatService._reconcile_success_explanation(response_payload)
 
-        turn_id = await ChatService._persist_turn(
-            session=session,
-            conversation=conversation,
-            turn=reserved_turn,
-            seq_no=reserved_seq_no,
-            username=str(user.username),
-            workspace_id=workspace_id,
-            workspace_schema=schema if isinstance(schema, dict) else {},
-            data_path=data_path,
-            conversation_id=conversation_id,
-            question=question,
-            attachments=normalized_attachments,
-            response_payload=response_payload,
-            result=result,
-            parent_turn_id=parent_turn_id,
-        )
+            turn_id = await ChatService._persist_turn(
+                session=session,
+                conversation=conversation,
+                turn=reserved_turn,
+                seq_no=reserved_seq_no,
+                username=str(user.username),
+                workspace_id=workspace_id,
+                workspace_schema=schema if isinstance(schema, dict) else {},
+                data_path=data_path,
+                conversation_id=conversation_id,
+                question=question,
+                attachments=normalized_attachments,
+                response_payload=response_payload,
+                result=result,
+                parent_turn_id=parent_turn_id,
+            )
 
-        await ChatService._release_conversation_run(conversation_id)
-        return response_payload, conversation_id, turn_id
+            return response_payload, conversation_id, turn_id
+        finally:
+            await ChatService._release_conversation_run(conversation_id)
 
     @staticmethod
     def _build_response_payload(result: dict[str, Any]) -> dict[str, Any]:
@@ -1837,205 +1835,207 @@ class ChatService:
         )
 
         await ChatService._claim_conversation_run(resolved_conversation_id)
-        normalized_attachments = ChatService._normalize_chat_attachments(attachments)
-        thread_id = f"{user.id}:{workspace_id}:{resolved_conversation_id}"
-        llm_prefs = await ChatService._resolve_llm_preferences(session, str(user.id))
-        resolved_api_key = (api_key or "").strip() or (
-            SecretStorageService.get_api_key(user.id, provider=llm_prefs["provider"]) or ""
-        )
-        if llm_prefs["requires_api_key"] and not resolved_api_key:
-            raise HTTPException(status_code=401, detail="API key not configured")
-        if normalized_attachments and not model_supports_vision(llm_prefs["provider"], model):
-            raise HTTPException(
-                status_code=400,
-                detail="The selected model does not support image attachments.",
+        try:
+            normalized_attachments = ChatService._normalize_chat_attachments(attachments)
+            thread_id = f"{user.id}:{workspace_id}:{resolved_conversation_id}"
+            llm_prefs = await ChatService._resolve_llm_preferences(session, str(user.id))
+            resolved_api_key = (api_key or "").strip() or (
+                SecretStorageService.get_api_key(user.id, provider=llm_prefs["provider"]) or ""
+            )
+            if llm_prefs["requires_api_key"] and not resolved_api_key:
+                raise HTTPException(status_code=401, detail="API key not configured")
+            if normalized_attachments and not model_supports_vision(llm_prefs["provider"], model):
+                raise HTTPException(
+                    status_code=400,
+                    detail="The selected model does not support image attachments.",
+                )
+
+            selected_turn = None
+            parent_turn_id = None
+            effective_context = context or ""
+            if use_selected_turn_context and resolved_conversation_id and selected_parent_turn_id:
+                selected_turn = await ConversationRepository.get_turn(session, selected_parent_turn_id)
+                if selected_turn is not None and selected_turn.conversation_id == resolved_conversation_id:
+                    parent_turn_id = selected_turn.id
+                    effective_context = ChatService._selected_turn_context_block(
+                        base_context=context,
+                        selected_turn=selected_turn,
+                        branch_summary_json=getattr(conversation, "branch_summary_json", None),
+                        schema_memory_json=getattr(conversation, "schema_memory_json", None),
+                    )
+
+            reserved_turn, reserved_seq_no, reserved_turn_dir = await ChatService._reserve_turn(
+                session=session,
+                conversation=conversation,
+                username=str(user.username),
+                workspace_id=workspace_id,
+                conversation_id=resolved_conversation_id,
+                question=question,
+                parent_turn_id=parent_turn_id,
             )
 
-        selected_turn = None
-        parent_turn_id = None
-        effective_context = context or ""
-        if use_selected_turn_context and resolved_conversation_id and selected_parent_turn_id:
-            selected_turn = await ConversationRepository.get_turn(session, selected_parent_turn_id)
-            if selected_turn is not None and selected_turn.conversation_id == resolved_conversation_id:
-                parent_turn_id = selected_turn.id
-                effective_context = ChatService._selected_turn_context_block(
-                    base_context=context,
-                    selected_turn=selected_turn,
-                    branch_summary_json=getattr(conversation, "branch_summary_json", None),
-                    schema_memory_json=getattr(conversation, "schema_memory_json", None),
-                )
+            await ChatService._release_session_before_agent(session)
 
-        reserved_turn, reserved_seq_no, reserved_turn_dir = await ChatService._reserve_turn(
-            session=session,
-            conversation=conversation,
-            username=str(user.username),
-            workspace_id=workspace_id,
-            conversation_id=resolved_conversation_id,
-            question=question,
-            parent_turn_id=parent_turn_id,
-        )
-
-        await ChatService._release_session_before_agent(session)
-
-        payload = ChatService._build_remote_agent_payload(
-            request_id=thread_id,
-            user_id=str(user.id),
-            workspace_id=workspace_id,
-            conversation_id=resolved_conversation_id,
-            question=question,
-            current_code=current_code,
-            model=model,
-            context=effective_context,
-            table_names=ChatService._extract_schema_table_names(schema),
-            data_path=data_path,
-            workspace_schema=schema if isinstance(schema, dict) else {},
-            schema_folder_path=str(Path(data_path).parent / "meta") if data_path else "",
-            artifact_dir=str(reserved_turn_dir),
-            turn_id=reserved_turn.id,
-            attachments=normalized_attachments,
-            llm_prefs=llm_prefs,
-            resolved_api_key=resolved_api_key,
-            agent_profile=load_agent_service_config().default_agent,
-        )
-        agent_client = AgentClient()
-        try:
-            await agent_client.assert_health()
-        except AgentRuntimeError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-        yield {"event": "status", "data": {"stage": "start", "message": "Starting analysis"}}
-
-        aggregated: dict[str, Any] = {}
-        stream_run_id = ""
-        retried_with_cloud_suffix = False
-        while True:
-            aggregated = {}
-            final_values_snapshot: dict[str, Any] | None = None
-            stream_run_id = ""
+            payload = ChatService._build_remote_agent_payload(
+                request_id=thread_id,
+                user_id=str(user.id),
+                workspace_id=workspace_id,
+                conversation_id=resolved_conversation_id,
+                question=question,
+                current_code=current_code,
+                model=model,
+                context=effective_context,
+                table_names=ChatService._extract_schema_table_names(schema),
+                data_path=data_path,
+                workspace_schema=schema if isinstance(schema, dict) else {},
+                schema_folder_path=str(Path(data_path).parent / "meta") if data_path else "",
+                artifact_dir=str(reserved_turn_dir),
+                turn_id=reserved_turn.id,
+                attachments=normalized_attachments,
+                llm_prefs=llm_prefs,
+                resolved_api_key=resolved_api_key,
+                agent_profile=load_agent_service_config().default_agent,
+            )
+            agent_client = AgentClient()
             try:
-                async for item in agent_client.stream(payload):
-                    event_name = str(item.get("event") or "message").strip() or "message"
-                    data = item.get("data")
-                    payload_dict = data if isinstance(data, dict) else {"value": data}
-                    if event_name == "custom" and isinstance(data, dict):
-                        custom_event = str(data.get("event") or "").strip()
-                        custom_data = data.get("data")
-                        if custom_event:
-                            event_name = custom_event
-                            payload_dict = custom_data if isinstance(custom_data, dict) else {"value": custom_data}
-                    if event_name == "metadata":
-                        stream_run_id = str(payload_dict.get("run_id") or stream_run_id)
-                    elif event_name == "values" and isinstance(data, dict):
-                        aggregated.update(data)
-                        final_values_snapshot = dict(data)
-                    elif event_name == "updates" and isinstance(data, dict):
-                        for node_payload in data.values():
-                            if isinstance(node_payload, dict):
-                                aggregated.update(node_payload)
-                    elif event_name == "final":
-                        # Defensive compatibility for legacy stream fakes that emit a synthetic final payload.
-                        candidate = payload_dict.get("result")
-                        if isinstance(candidate, dict):
-                            aggregated.update(candidate)
-                        continue
-                    yield {"event": event_name, "data": payload_dict}
+                await agent_client.assert_health()
             except AgentRuntimeError as exc:
-                if ChatService._should_retry_with_ollama_cloud_suffix(
-                    provider=llm_prefs["provider"],
-                    model=str(payload.get("model") or ""),
-                    error=exc,
-                    already_retried=retried_with_cloud_suffix,
-                ):
-                    payload, retried_model = ChatService._with_ollama_cloud_retry_models(payload)
-                    retried_with_cloud_suffix = True
-                    yield {
-                        "event": "status",
-                        "data": {
-                            "stage": "retry",
-                            "message": f"Retrying with Ollama cloud model '{retried_model}'",
-                        },
-                    }
-                    continue
                 raise HTTPException(status_code=502, detail=str(exc)) from exc
-            if isinstance(final_values_snapshot, dict):
-                aggregated = final_values_snapshot
-            break
 
-        if not aggregated:
-            raise HTTPException(status_code=502, detail="Agent stream completed without final result")
+            yield {"event": "status", "data": {"stage": "start", "message": "Starting analysis"}}
 
-        response_payload = ChatService._build_response_payload(aggregated)
-        run_id = str(
-            response_payload.get("run_id")
-            or aggregated.get("run_id")
-            or stream_run_id
-            or uuid.uuid4()
-        )
-        response_payload["run_id"] = run_id
-        response_payload["execution"] = response_payload.get("execution")
-        response_payload["artifacts"] = response_payload.get("artifacts") or []
-        response_payload["final_script_artifact_id"] = response_payload.get("final_script_artifact_id")
+            aggregated: dict[str, Any] = {}
+            stream_run_id = ""
+            retried_with_cloud_suffix = False
+            while True:
+                aggregated = {}
+                final_values_snapshot: dict[str, Any] | None = None
+                stream_run_id = ""
+                try:
+                    async for item in agent_client.stream(payload):
+                        event_name = str(item.get("event") or "message").strip() or "message"
+                        data = item.get("data")
+                        payload_dict = data if isinstance(data, dict) else {"value": data}
+                        if event_name == "custom" and isinstance(data, dict):
+                            custom_event = str(data.get("event") or "").strip()
+                            custom_data = data.get("data")
+                            if custom_event:
+                                event_name = custom_event
+                                payload_dict = custom_data if isinstance(custom_data, dict) else {"value": custom_data}
+                        if event_name == "metadata":
+                            stream_run_id = str(payload_dict.get("run_id") or stream_run_id)
+                        elif event_name == "values" and isinstance(data, dict):
+                            aggregated.update(data)
+                            final_values_snapshot = dict(data)
+                        elif event_name == "updates" and isinstance(data, dict):
+                            for node_payload in data.values():
+                                if isinstance(node_payload, dict):
+                                    aggregated.update(node_payload)
+                        elif event_name == "final":
+                            # Defensive compatibility for legacy stream fakes that emit a synthetic final payload.
+                            candidate = payload_dict.get("result")
+                            if isinstance(candidate, dict):
+                                aggregated.update(candidate)
+                            continue
+                        yield {"event": event_name, "data": payload_dict}
+                except AgentRuntimeError as exc:
+                    if ChatService._should_retry_with_ollama_cloud_suffix(
+                        provider=llm_prefs["provider"],
+                        model=str(payload.get("model") or ""),
+                        error=exc,
+                        already_retried=retried_with_cloud_suffix,
+                    ):
+                        payload, retried_model = ChatService._with_ollama_cloud_retry_models(payload)
+                        retried_with_cloud_suffix = True
+                        yield {
+                            "event": "status",
+                            "data": {
+                                "stage": "retry",
+                                "message": f"Retrying with Ollama cloud model '{retried_model}'",
+                            },
+                        }
+                        continue
+                    raise HTTPException(status_code=502, detail=str(exc)) from exc
+                if isinstance(final_values_snapshot, dict):
+                    aggregated = final_values_snapshot
+                break
 
-        code_to_execute = str(response_payload.get("code") or "").strip()
-        should_execute_runtime = (
-            code_to_execute
-            and ChatService._response_contains_generated_code(aggregated)
-        )
-        if should_execute_runtime:
-            if ChatService._agent_execution_is_authoritative(
-                response_payload=response_payload,
-                result_payload=aggregated,
-                code_to_execute=code_to_execute,
-            ):
-                await ChatService._finalize_with_existing_execution(
-                    workspace_id=workspace_id,
-                    workspace_duckdb_path=data_path,
-                    question=question,
-                    run_id=run_id,
-                    generated_code=code_to_execute,
+            if not aggregated:
+                raise HTTPException(status_code=502, detail="Agent stream completed without final result")
+
+            response_payload = ChatService._build_response_payload(aggregated)
+            run_id = str(
+                response_payload.get("run_id")
+                or aggregated.get("run_id")
+                or stream_run_id
+                or uuid.uuid4()
+            )
+            response_payload["run_id"] = run_id
+            response_payload["execution"] = response_payload.get("execution")
+            response_payload["artifacts"] = response_payload.get("artifacts") or []
+            response_payload["final_script_artifact_id"] = response_payload.get("final_script_artifact_id")
+
+            code_to_execute = str(response_payload.get("code") or "").strip()
+            should_execute_runtime = (
+                code_to_execute
+                and ChatService._response_contains_generated_code(aggregated)
+            )
+            if should_execute_runtime:
+                if ChatService._agent_execution_is_authoritative(
                     response_payload=response_payload,
                     result_payload=aggregated,
-                )
-            else:
-                await ChatService._apply_authoritative_execution_to_response(
-                    workspace_id=workspace_id,
-                    workspace_duckdb_path=data_path,
-                    question=question,
-                    run_id=run_id,
-                    generated_code=code_to_execute,
-                    output_contract=response_payload.get("output_contract") or [],
-                    response_payload=response_payload,
-                    conversation_id=resolved_conversation_id,
-                    turn_id=reserved_turn.id,
-                    artifact_dir=str(reserved_turn_dir),
-                )
-            ChatService._reconcile_success_explanation(response_payload)
+                    code_to_execute=code_to_execute,
+                ):
+                    await ChatService._finalize_with_existing_execution(
+                        workspace_id=workspace_id,
+                        workspace_duckdb_path=data_path,
+                        question=question,
+                        run_id=run_id,
+                        generated_code=code_to_execute,
+                        response_payload=response_payload,
+                        result_payload=aggregated,
+                    )
+                else:
+                    await ChatService._apply_authoritative_execution_to_response(
+                        workspace_id=workspace_id,
+                        workspace_duckdb_path=data_path,
+                        question=question,
+                        run_id=run_id,
+                        generated_code=code_to_execute,
+                        output_contract=response_payload.get("output_contract") or [],
+                        response_payload=response_payload,
+                        conversation_id=resolved_conversation_id,
+                        turn_id=reserved_turn.id,
+                        artifact_dir=str(reserved_turn_dir),
+                    )
+                ChatService._reconcile_success_explanation(response_payload)
 
-        turn_id = await ChatService._persist_turn(
-            session=session,
-            conversation=conversation,
-            turn=reserved_turn,
-            seq_no=reserved_seq_no,
-            username=str(user.username),
-            workspace_id=workspace_id,
-            workspace_schema=schema if isinstance(schema, dict) else {},
-            data_path=data_path,
-            conversation_id=resolved_conversation_id,
-            question=question,
-            attachments=normalized_attachments,
-            response_payload=response_payload,
-            result=aggregated,
-            parent_turn_id=parent_turn_id,
-        )
+            turn_id = await ChatService._persist_turn(
+                session=session,
+                conversation=conversation,
+                turn=reserved_turn,
+                seq_no=reserved_seq_no,
+                username=str(user.username),
+                workspace_id=workspace_id,
+                workspace_schema=schema if isinstance(schema, dict) else {},
+                data_path=data_path,
+                conversation_id=resolved_conversation_id,
+                question=question,
+                attachments=normalized_attachments,
+                response_payload=response_payload,
+                result=aggregated,
+                parent_turn_id=parent_turn_id,
+            )
 
-        response_payload.update(
-            {
-                "conversation_id": resolved_conversation_id,
-                "turn_id": turn_id,
-            }
-        )
-        yield {"event": "final", "data": response_payload}
-        await ChatService._release_conversation_run(resolved_conversation_id)
+            response_payload.update(
+                {
+                    "conversation_id": resolved_conversation_id,
+                    "turn_id": turn_id,
+                }
+            )
+            yield {"event": "final", "data": response_payload}
+        finally:
+            await ChatService._release_conversation_run(resolved_conversation_id)
 
     @staticmethod
     async def rerun_final_turn(
