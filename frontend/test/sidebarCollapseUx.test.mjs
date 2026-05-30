@@ -16,7 +16,7 @@ test('sidebar uses the unified compact workspace/chat layout', () => {
   assert.equal(source.includes('Create a workspace to start.'), true)
   assert.equal(source.includes('SidebarWorkspaces'), false)
   assert.equal(source.includes('SidebarDatasets'), false)
-  assert.equal(source.includes('SidebarConversations'), false)
+  assert.equal(source.includes('SidebarConversations'), true)
   assert.equal(source.includes("appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0'"), true)
   assert.equal(source.includes('Kernel'), false)
 })

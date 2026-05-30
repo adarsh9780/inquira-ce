@@ -211,11 +211,7 @@ async function createConversation() {
 
 async function deleteConv(id) {
   try {
-    await apiService.v1DeleteConversation(id)
-    await appStore.fetchConversations()
-    if (appStore.activeConversationId) {
-      await appStore.fetchConversationTurns({ reset: true })
-    }
+    await appStore.deleteConversationById(id)
   } catch (error) {
     toast.error('Failed to delete conversation', extractApiErrorMessage(error))
   }

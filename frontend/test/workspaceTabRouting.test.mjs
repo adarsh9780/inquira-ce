@@ -22,8 +22,8 @@ test('right panel includes unified workspace layout', () => {
   assert.equal(source.includes('WorkspaceLeftPane'), true)
   assert.equal(source.includes('WorkspaceRightPane'), true)
   assert.equal(source.includes("appStore.activeTab === 'workspace'"), true)
-  assert.equal(source.includes("appStore.activeTab === 'conversation-tree'"), false)
-  assert.equal(source.includes('SidebarGlobalTurnTree'), false)
+  assert.equal(source.includes("appStore.activeTab === 'conversation-tree'"), true)
+  assert.equal(source.includes('SidebarGlobalTurnTree'), true)
 })
 
 test('preview tab is removed from sidebar navigation and runtime API client', () => {

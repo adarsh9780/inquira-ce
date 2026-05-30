@@ -41,12 +41,13 @@ test('frontend API and store expose turn edit and workspace tree calls', () => {
   assert.equal(storeSource.includes('async function reorderTurnSiblings(parentTurnId, turnIds, conversationId = activeConversationId.value)'), false)
 })
 
-test('global tree lives in the sidebar and opens turns', () => {
-  assert.equal(sidebarSource.includes('openConversationTree'), false)
-  assert.equal(sidebarSource.includes("appStore.activeTab === 'conversation-tree'"), false)
-  assert.equal(sidebarSource.includes('SidebarGlobalTurnTree'), true)
-  assert.equal(rightPanelSource.includes("appStore.activeTab === 'conversation-tree'"), false)
-  assert.equal(rightPanelSource.includes('<SidebarGlobalTurnTree variant="page" />'), false)
+test('global tree lives in the dedicated page and opens turns', () => {
+  assert.equal(sidebarSource.includes('openConversationTree'), true)
+  assert.equal(sidebarSource.includes("appStore.activeTab === 'conversation-tree'"), true)
+  assert.equal(sidebarSource.includes('SidebarGlobalTurnTree'), false)
+  assert.equal(sidebarSource.includes('SidebarConversations'), true)
+  assert.equal(rightPanelSource.includes("appStore.activeTab === 'conversation-tree'"), true)
+  assert.equal(rightPanelSource.includes('<SidebarGlobalTurnTree variant="page" />'), true)
   assert.equal(globalTreeSource.includes('TurnTreeView'), true)
   assert.equal(globalTreeSource.includes('appStore.loadWorkspaceTurnTree()'), true)
   assert.equal(globalTreeSource.includes("appStore.setActiveTab('workspace')"), true)

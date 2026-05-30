@@ -24,14 +24,19 @@ test('conversation delete flow in store re-syncs active conversation and hydrate
   assert.equal(source.includes('clearConversationScopedState()'), true)
 })
 
-test('sidebar uses the workspace turn tree as the canonical conversation list', () => {
+test('sidebar uses a simple conversation list and keeps the tree in the dedicated page', () => {
   const sidebarSource = readSource('src/components/layout/UnifiedSidebar.vue')
   const chatTabSource = readSource('src/components/chat/ChatTab.vue')
   const globalTreeSource = readSource('src/components/layout/sidebar/SidebarGlobalTurnTree.vue')
+  const rightPanelSource = readSource('src/components/layout/RightPanel.vue')
+  const sidebarConversationsSource = readSource('src/components/layout/sidebar/SidebarConversations.vue')
 
-  assert.equal(sidebarSource.includes('<SidebarGlobalTurnTree v-else />'), true)
+  assert.equal(sidebarSource.includes('<SidebarConversations'), true)
+  assert.equal(sidebarSource.includes('<SidebarGlobalTurnTree v-else />'), false)
+  assert.equal(rightPanelSource.includes('<SidebarGlobalTurnTree variant="page" />'), true)
   assert.equal(sidebarSource.includes('data-conversation-actions-menu'), false)
   assert.equal(sidebarSource.includes('toggleConversationMenu($event, conv.id)'), false)
+  assert.equal(sidebarConversationsSource.includes('await appStore.deleteConversationById(id)'), true)
   assert.equal(globalTreeSource.includes('appStore.deleteTurn(payload?.turnId, payload?.conversationId)'), true)
   assert.equal(globalTreeSource.includes('ConfirmationModal'), true)
   assert.equal(globalTreeSource.includes('window.confirm'), false)

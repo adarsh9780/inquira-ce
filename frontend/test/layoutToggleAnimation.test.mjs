@@ -24,7 +24,7 @@ test('sidebar keeps the current animated text-collapse and scroll layout', () =>
   assert.equal(sidebarSource.includes('activeWorkspaceName'), true)
   assert.equal(sidebarSource.includes('class="flex min-h-0 flex-1 flex-col overflow-hidden px-2"'), true)
   assert.equal(sidebarSource.includes('class="min-h-0 flex-1 overflow-hidden pb-1"'), true)
-  assert.equal(sidebarSource.includes('<SidebarGlobalTurnTree v-else />'), true)
+  assert.equal(sidebarSource.includes('<SidebarConversations'), true)
   assert.equal(sidebarSource.includes('<Transition name="sidebar-section">'), false)
 })
 

@@ -16,6 +16,13 @@ test('app store persists selected table/figure artifacts per workspace', () => {
   assert.equal(source.includes('function getSelectedFigureArtifact(workspaceId) {'), true)
 })
 
+test('active turn hydration selects that turn artifacts for the data panes', () => {
+  const source = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf-8')
+
+  assert.equal(source.includes("setSelectedTableArtifact(workspaceId, dataframeArtifacts[0]?.data?.artifact_id || '')"), true)
+  assert.equal(source.includes("setSelectedFigureArtifact(workspaceId, figureArtifacts[0]?.artifact_id || '')"), true)
+})
+
 test('table and figure tabs restore and persist selected artifacts through app store', () => {
   const tableSource = readFileSync(resolve(process.cwd(), 'src/components/analysis/TableTab.vue'), 'utf-8')
   const figureSource = readFileSync(resolve(process.cwd(), 'src/components/analysis/FigureTab.vue'), 'utf-8')

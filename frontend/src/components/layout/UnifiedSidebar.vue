@@ -61,40 +61,7 @@
       <!-- ─── Conversations ─── -->
       <div class="flex min-h-0 flex-1 flex-col">
 
-        <!-- Section Header -->
-        <div
-          class="flex h-10 w-full items-center transition-all duration-300"
-          :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'"
-        >
-          <!-- Collapsed: just the plus icon centered -->
-          <button
-            v-if="appStore.isSidebarCollapsed && appStore.hasWorkspace"
-            type="button"
-            class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none transition-colors"
-            title="New Conversation"
-            @click.stop="createConversation"
-          >
-            <PlusIcon class="h-4 w-4" />
-          </button>
-
-          <!-- Expanded: label + plus -->
-          <template v-if="!appStore.isSidebarCollapsed">
-            <span class="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] opacity-80">
-              Chats
-            </span>
-            <button
-              v-if="appStore.hasWorkspace"
-              type="button"
-              class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none"
-              title="New Conversation"
-              @click.stop="createConversation"
-            >
-              <PlusIcon class="h-4 w-4" />
-            </button>
-          </template>
-        </div>
-
-        <!-- Workspace turn tree -->
+        <!-- Conversation list -->
         <div class="min-h-0 flex-1 overflow-hidden pb-1">
           <div
             v-if="!appStore.hasWorkspace"
@@ -103,7 +70,11 @@
           >
             Create a workspace to start.
           </div>
-          <SidebarGlobalTurnTree v-else />
+          <SidebarConversations
+            v-else
+            :is-collapsed="appStore.isSidebarCollapsed"
+            @select="appStore.setActiveTab('workspace')"
+          />
         </div>
       </div>
 
@@ -132,6 +103,32 @@
               </span>
               <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
                 Datasets and column metadata
+              </span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            class="flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
+            :class="[
+              appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
+              appStore.activeTab === 'conversation-tree' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
+            ]"
+            :title="appStore.isSidebarCollapsed ? 'Open conversation tree' : 'Conversation tree'"
+            @click="openConversationTree"
+          >
+            <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+              <QueueListIcon class="h-5 w-5" :class="appStore.activeTab === 'conversation-tree' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
+            </div>
+            <div
+              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+              :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+            >
+              <span class="block truncate text-[13px] font-medium leading-snug text-[var(--color-text-main)]">
+                Conversation Tree
+              </span>
+              <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
+                Turns across this workspace
               </span>
             </div>
           </button>
@@ -275,14 +272,14 @@ import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import SettingsModal from '../modals/SettingsModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
-import SidebarGlobalTurnTree from './sidebar/SidebarGlobalTurnTree.vue'
+import SidebarConversations from './sidebar/SidebarConversations.vue'
 import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 
 import {
   FolderOpenIcon,
-  PlusIcon,
   CircleStackIcon,
+  QueueListIcon,
   Cog6ToothIcon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
@@ -437,6 +434,10 @@ function openSchemaEditor() {
   appStore.setActiveTab('schema-editor')
 }
 
+function openConversationTree() {
+  appStore.setActiveTab('conversation-tree')
+}
+
 // ─── Profile menu ─────────────────────────────────────────────────────────────
 function updateProfileMenuPosition() {
   const rect = profileMenuButtonRef.value?.getBoundingClientRect?.()
@@ -484,19 +485,6 @@ function handleOpenSettingsRequest(event) {
   const tab  = String(event?.detail?.tab  || 'api').trim() || 'api'
   const step = Number(event?.detail?.step || 1)
   openSettings(tab, step)
-}
-
-// ─── Conversations ────────────────────────────────────────────────────────────
-async function createConversation() {
-  try {
-    const conversation = await appStore.createConversation()
-    if (conversation?.id) {
-      appStore.setActiveConversationId(conversation.id)
-      await appStore.fetchConversationTurns({ reset: true })
-    }
-  } catch (error) {
-    toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to create conversation'))
-  }
 }
 
 function closeDeleteDialog() {

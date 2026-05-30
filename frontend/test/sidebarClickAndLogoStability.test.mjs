@@ -13,7 +13,7 @@ test('collapsed sidebar expands only on explicit click and not on hover', () => 
   assert.equal(sidebarSource.includes('@mouseleave='), false)
   assert.equal(sidebarSource.includes('@click="handleBrandClick"'), true)
   assert.equal(sidebarSource.includes('function openWorkspaceRail(target = \'\') {'), false)
-  assert.equal(sidebarSource.includes('title="New Conversation"'), true)
+  assert.equal(sidebarSource.includes('SidebarConversations'), true)
   assert.equal(sidebarSource.includes('title="Settings"'), true)
   assert.equal(sidebarSource.includes('<ChevronDoubleLeftIcon'), true)
   assert.equal(sidebarSource.includes('<ChevronDoubleRightIcon'), true)

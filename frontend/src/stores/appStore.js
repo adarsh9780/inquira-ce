@@ -1609,6 +1609,12 @@ export const useAppStore = defineStore('app', () => {
     setDataframes(dataframeArtifacts)
     setFigures(figureArtifacts)
 
+    const workspaceId = String(activeWorkspaceId.value || '').trim()
+    if (workspaceId) {
+      setSelectedTableArtifact(workspaceId, dataframeArtifacts[0]?.data?.artifact_id || '')
+      setSelectedFigureArtifact(workspaceId, figureArtifacts[0]?.artifact_id || '')
+    }
+
     if (figureArtifacts.length > 0) {
       setPlotlyFigure(figureArtifacts[0].data)
       setResultData(null)
@@ -2565,7 +2571,7 @@ export const useAppStore = defineStore('app', () => {
       // Open the bottom terminal pane instead of navigating away
       activeTab.value = 'workspace'
       isTerminalOpen.value = true
-    } else if (normalized === 'preview' || normalized === 'conversation-tree') {
+    } else if (normalized === 'preview') {
       activeTab.value = 'workspace'
     } else {
       activeTab.value = normalized || 'workspace'

@@ -17,7 +17,8 @@ test('sidebar keeps the bottom action stack and expanded-only labels', () => {
   assert.equal(source.includes('sidebar-initials-avatar'), true)
   assert.equal(source.includes('UserCircleIcon'), false)
   assert.equal(source.includes('Open workspace settings'), true)
-  assert.equal(source.includes('Chats'), true)
+  assert.equal(source.includes('SidebarConversations'), true)
+  assert.equal(source.includes('Conversation Tree'), true)
 })
 
 test('sidebar profile menu routes terms, account, and appearance through settings', () => {
