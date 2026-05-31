@@ -78,7 +78,7 @@
         type="button"
         class="w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors"
         :class="canDeleteSelected ? 'text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)]' : 'cursor-not-allowed text-[var(--color-text-muted)] opacity-60'"
-        :title="selectedDeleteBlockReason || 'Delete leaf turn'"
+        :title="selectedDeleteBlockReason || 'Delete turn and replies'"
         :disabled="!canDeleteSelected"
         @click="handleContextAction('delete')"
       >

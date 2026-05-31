@@ -21,7 +21,7 @@
     />
     <ConfirmationModal
       :is-open="deleteDialogOpen"
-      title="Delete Tree Node"
+      title="Delete Turn and Replies"
       message="Delete this turn and all replies below it? If this is the root turn, the entire conversation will be deleted."
       confirm-text="Delete"
       cancel-text="Cancel"
