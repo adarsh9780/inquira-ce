@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import shutil
 import uuid
 from pathlib import Path
 
@@ -242,7 +241,6 @@ class WorkspaceService:
             workspace_dir / "workspace.db",
             workspace_dir / "workspace.duckdb",
         }
-        scratchpad_dir = workspace_dir / "scratchpad"
 
         def _clear_files() -> bool:
             removed_any = False
@@ -268,19 +266,6 @@ class WorkspaceService:
                         removed_any = True
                 except OSError:
                     continue
-
-            if scratchpad_dir.exists():
-                try:
-                    shutil.rmtree(scratchpad_dir)
-                    removed_any = True
-                except OSError as exc:
-                    raise HTTPException(
-                        status_code=409,
-                        detail=(
-                            "Could not clear workspace scratchpad because files are locked. "
-                            f"Path: {scratchpad_dir} ({exc})"
-                        ),
-                    ) from exc
 
             return removed_any
 

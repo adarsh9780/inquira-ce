@@ -507,7 +507,7 @@ async def test_workspace_artifact_metadata_endpoint(monkeypatch, tmp_path):
             "workspace_id": "ws-5",
             "logical_name": "chart_one",
             "kind": "figure",
-            "pointer": "duckdb://scratchpad/artifacts.duckdb#artifact=fig-1",
+            "pointer": str(workspace_dir / "artifacts" / "fig-1.json"),
             "table_name": None,
             "schema": None,
             "row_count": None,

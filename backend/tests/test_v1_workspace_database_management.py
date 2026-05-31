@@ -79,14 +79,11 @@ async def test_rename_workspace_updates_name_and_manifest(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_clear_workspace_database_removes_workspace_db_and_scratchpad(monkeypatch, tmp_path):
+async def test_clear_workspace_database_removes_workspace_db_and_schema(monkeypatch, tmp_path):
     workspace_dir = tmp_path / ".inquira" / "alice" / "workspaces" / "ws-1"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     workspace_db = workspace_dir / "workspace.db"
     workspace_db.write_text("db", encoding="utf-8")
-    scratchpad_db = workspace_dir / "scratchpad" / "artifacts.duckdb"
-    scratchpad_db.parent.mkdir(parents=True, exist_ok=True)
-    scratchpad_db.write_text("scratch", encoding="utf-8")
     schema_path = workspace_dir / "meta" / "table_schema.json"
     schema_path.parent.mkdir(parents=True, exist_ok=True)
     schema_path.write_text("{}", encoding="utf-8")
@@ -154,7 +151,6 @@ async def test_clear_workspace_database_removes_workspace_db_and_scratchpad(monk
     assert calls["deleted"] is True
     assert calls["committed"] is True
     assert workspace_db.exists() is False
-    assert scratchpad_db.parent.exists() is False
     assert schema_path.exists() is False
 
 

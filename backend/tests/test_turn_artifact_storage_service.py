@@ -26,7 +26,7 @@ def test_artifact_identity_keeps_logical_name_in_artifact_id_and_dedupes() -> No
 
 
 @pytest.mark.asyncio
-async def test_persist_turn_artifacts_uses_existing_turn_files_without_scratchpad(monkeypatch, tmp_path) -> None:
+async def test_persist_turn_artifacts_uses_existing_turn_files(monkeypatch, tmp_path) -> None:
     workspace_dir = tmp_path / "workspace-1"
     captured: dict[str, object] = {}
 

@@ -17,8 +17,6 @@ __all__ = [
     "DatabaseRole",
     "DatabaseSpec",
     "OwnershipMode",
-    "ScratchpadOfflineAdapter",
-    "ScratchpadRuntimeAdapter",
     "WorkspaceOfflineAdapter",
     "WorkspaceRuntimeAdapter",
     "can_accessor_use_database",
@@ -28,13 +26,6 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    if name in {"ScratchpadOfflineAdapter", "ScratchpadRuntimeAdapter"}:
-        from .scratchpad_db import ScratchpadOfflineAdapter, ScratchpadRuntimeAdapter
-
-        return {
-            "ScratchpadOfflineAdapter": ScratchpadOfflineAdapter,
-            "ScratchpadRuntimeAdapter": ScratchpadRuntimeAdapter,
-        }[name]
     if name in {"WorkspaceOfflineAdapter", "WorkspaceRuntimeAdapter"}:
         from .workspace_db import WorkspaceOfflineAdapter, WorkspaceRuntimeAdapter
 

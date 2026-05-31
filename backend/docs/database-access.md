@@ -1,6 +1,6 @@
 # Database Access Rules
 
-This backend uses five storage resources. Each one has one owner and one approved access path.
+This backend uses four storage resources. Each one has one owner and one approved access path.
 
 ## Registry
 
@@ -20,13 +20,6 @@ This backend uses five storage resources. Each one has one owner and one approve
   - Live access path: `backend/app/data_access/workspace_db.py` runtime adapter
   - Offline access path: `backend/app/data_access/workspace_db.py` offline adapter with a maintenance lease
 
-- `scratchpad_duckdb`
-  - Role: `artifact_scratchpad`
-  - Owner: workspace kernel while runtime is active
-  - Live access path: `backend/app/data_access/scratchpad_db.py` runtime adapter
-  - Offline access path: `backend/app/data_access/scratchpad_db.py` offline adapter with a maintenance lease
-  - Low-level storage implementation: `backend/app/services/artifact_scratchpad.py`
-
 - `turn_blob_store`
   - Role: `artifact_blob`
   - Owner: filesystem-backed turn/conversation storage
@@ -36,7 +29,7 @@ This backend uses five storage resources. Each one has one owner and one approve
 
 - Use a runtime adapter when the workspace kernel owns the DuckDB file.
 - Use an offline adapter only after the workspace runtime is drained and a maintenance lease is held.
-- Do not open workspace or scratchpad DuckDB files directly from feature code.
+- Do not open workspace DuckDB files directly from feature code.
 
 ## Adding a New Database
 

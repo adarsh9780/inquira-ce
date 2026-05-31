@@ -1,6 +1,5 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from queue import Empty as QueueEmpty
 from types import SimpleNamespace
 
@@ -14,13 +13,11 @@ from app.services.jupyter_message_parser import ParsedExecutionOutput
 
 
 def _session(workspace_id: str, workspace_duckdb_path: str) -> WorkspaceKernelSession:
-    scratchpad_db_path = str(Path(workspace_duckdb_path).parent / "scratchpad" / "artifacts.duckdb")
     return WorkspaceKernelSession(
         workspace_id=workspace_id,
         workspace_duckdb_path=workspace_duckdb_path,
         manager=SimpleNamespace(),
         client=SimpleNamespace(),
-        scratchpad_db_path=scratchpad_db_path,
     )
 
 
@@ -382,93 +379,6 @@ async def test_execute_on_session_sets_result_name_for_identifier_dataframe_sele
 
 
 @pytest.mark.asyncio
-async def test_get_dataframe_rows_reads_paginated_chunk(tmp_path):
-    manager = WorkspaceKernelManager(idle_minutes=30)
-    workspace_db = tmp_path / "workspace.duckdb"
-    workspace_db.touch()
-    session = _session("ws-2", str(workspace_db))
-    manager._sessions["ws-2"] = session
-
-    calls = {"count": 0}
-
-    async def fake_execute_request(current_session, code):
-        _ = current_session
-        calls["count"] += 1
-        parsed = ParsedExecutionOutput()
-        if calls["count"] == 1:
-            assert "artifact_manifest" in code
-            assert "table_name" in code
-            parsed.result = {
-                "name": "summary",
-                "table_name": "art_table",
-                "columns": ["a"],
-            }
-            parsed.result_type = "scalar"
-            return parsed
-        assert "SELECT * FROM" in code
-        parsed.result = {
-            "artifact_id": "artifact-1",
-            "name": "summary",
-            "row_count": 3,
-            "columns": ["a"],
-            "rows": [{"a": 2}, {"a": 3}],
-            "offset": 1,
-            "limit": 2,
-        }
-        parsed.result_type = "scalar"
-        return parsed
-
-    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
-
-    rows = await manager.get_dataframe_rows(
-        workspace_id="ws-2",
-        artifact_id="artifact-1",
-        offset=1,
-        limit=2,
-    )
-
-    assert rows is not None
-    assert rows["artifact_id"] == "artifact-1"
-    assert rows["row_count"] == 3
-    assert rows["rows"] == [{"a": 2}, {"a": 3}]
-
-
-@pytest.mark.asyncio
-async def test_delete_workspace_artifact_executes_manifest_delete_via_kernel():
-    manager = WorkspaceKernelManager(idle_minutes=30)
-    session = _session("ws-del", "/tmp/ws-del.duckdb")
-    manager._sessions["ws-del"] = session
-
-    async def fake_execute_request(current_session, code):
-        _ = current_session
-        assert "SELECT kind, table_name FROM artifact_manifest" in code
-        assert "DELETE FROM artifact_manifest WHERE artifact_id = ?" in code
-        parsed = ParsedExecutionOutput()
-        parsed.result = True
-        parsed.result_type = "scalar"
-        return parsed
-
-    manager._execute_request = fake_execute_request  # type: ignore[method-assign]
-
-    deleted = await manager.delete_workspace_artifact(
-        workspace_id="ws-del",
-        artifact_id="artifact-1",
-    )
-
-    assert deleted is True
-
-
-@pytest.mark.asyncio
-async def test_delete_workspace_artifact_returns_false_without_session():
-    manager = WorkspaceKernelManager(idle_minutes=30)
-    deleted = await manager.delete_workspace_artifact(
-        workspace_id="missing-ws",
-        artifact_id="artifact-1",
-    )
-    assert deleted is False
-
-
-@pytest.mark.asyncio
 async def test_execute_on_session_returns_empty_artifacts_when_probe_fails():
     manager = WorkspaceKernelManager(idle_minutes=30)
     session = _session("ws-3", "/tmp/a.duckdb")
@@ -518,7 +428,7 @@ async def test_shutdown_session_attempts_kernel_resource_cleanup_before_shutdown
 
     async def fake_execute_request(current_session, code):
         _ = current_session
-        if "scratchpad_conn.close()" in code and "conn.close()" in code:
+        if "conn.close()" in code:
             events.append("cleanup_code")
         return ParsedExecutionOutput()
 
@@ -565,43 +475,14 @@ async def test_shutdown_session_releases_runtime_lease():
 
 
 @pytest.mark.asyncio
-async def test_bootstrap_workspace_creates_scratchpad_parent_dir(tmp_path):
-    manager = WorkspaceKernelManager(idle_minutes=30)
-    workspace_db = tmp_path / "ws" / "workspace.duckdb"
-    workspace_db.parent.mkdir(parents=True, exist_ok=True)
-    workspace_db.touch()
-    scratchpad_db = tmp_path / "ws" / "scratchpad" / "artifacts.duckdb"
-    session = WorkspaceKernelSession(
-        workspace_id="ws-boot",
-        workspace_duckdb_path=str(workspace_db),
-        manager=SimpleNamespace(),
-        client=SimpleNamespace(),
-        scratchpad_db_path=str(scratchpad_db),
-    )
-
-    async def fake_execute_on_session(current_session, code):
-        _ = current_session
-        assert "scratchpad_conn = duckdb.connect" in code
-        return {"success": True}
-
-    manager._execute_on_session = fake_execute_on_session  # type: ignore[method-assign]
-
-    assert not scratchpad_db.parent.exists()
-    await manager._bootstrap_workspace(session)
-    assert scratchpad_db.parent.exists()
-
-
-@pytest.mark.asyncio
 async def test_bootstrap_workspace_creates_missing_workspace_duckdb(tmp_path):
     manager = WorkspaceKernelManager(idle_minutes=30)
     workspace_db = tmp_path / "ws-new" / "workspace.duckdb"
-    scratchpad_db = tmp_path / "ws-new" / "scratchpad" / "artifacts.duckdb"
     session = WorkspaceKernelSession(
         workspace_id="ws-new",
         workspace_duckdb_path=str(workspace_db),
         manager=SimpleNamespace(),
         client=SimpleNamespace(),
-        scratchpad_db_path=str(scratchpad_db),
     )
 
     async def fake_execute_on_session(current_session, code):
@@ -622,13 +503,11 @@ async def test_bootstrap_workspace_exports_figure_payload_in_run_envelope(tmp_pa
     workspace_db = tmp_path / "ws-fig" / "workspace.duckdb"
     workspace_db.parent.mkdir(parents=True, exist_ok=True)
     workspace_db.touch()
-    scratchpad_db = tmp_path / "ws-fig" / "scratchpad" / "artifacts.duckdb"
     session = WorkspaceKernelSession(
         workspace_id="ws-fig",
         workspace_duckdb_path=str(workspace_db),
         manager=SimpleNamespace(),
         client=SimpleNamespace(),
-        scratchpad_db_path=str(scratchpad_db),
     )
 
     captured: dict[str, str] = {}

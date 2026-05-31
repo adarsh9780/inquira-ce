@@ -240,17 +240,9 @@ async def test_turn_artifact_read_service_usage_counts_only_turn_artifact_files(
         _ = (session, workspace_id, kind, statuses)
         return [row]
 
-    def fail_if_called(*args, **kwargs):
-        _ = (args, kwargs)
-        raise AssertionError("scratchpad usage fallback should not be used")
-
     monkeypatch.setattr(
         "app.v1.services.turn_artifact_read_service.TurnArtifactRepository.list_for_workspace",
         fake_list_for_workspace,
-    )
-    monkeypatch.setattr(
-        "app.v1.services.turn_artifact_read_service.ArtifactScratchpadStore.get_workspace_artifact_usage",
-        fail_if_called,
     )
 
     usage = await TurnArtifactReadService.get_workspace_artifact_usage(

@@ -11,7 +11,6 @@ class DatabaseRole(StrEnum):
 
     CONTROL_PLANE = "control_plane"
     WORKSPACE_DATA = "workspace_data"
-    ARTIFACT_SCRATCHPAD = "artifact_scratchpad"
     ARTIFACT_BLOB = "artifact_blob"
 
 
@@ -73,15 +72,6 @@ _DATABASE_SPECS: dict[str, DatabaseSpec] = {
         migration_strategy="filesystem-bootstrap",
         healthcheck="kernel-describe-main",
         allowed_accessors=("workspace_runtime_adapter", "workspace_offline_adapter"),
-    ),
-    "scratchpad_duckdb": DatabaseSpec(
-        db_id="scratchpad_duckdb",
-        role=DatabaseRole.ARTIFACT_SCRATCHPAD,
-        ownership_mode=OwnershipMode.KERNEL_OWNED,
-        path_builder="WorkspaceStorageService.build_scratchpad_db_path",
-        migration_strategy="scratchpad-bootstrap",
-        healthcheck="kernel-artifact-manifest-count",
-        allowed_accessors=("scratchpad_runtime_adapter", "scratchpad_offline_adapter"),
     ),
     "turn_blob_store": DatabaseSpec(
         db_id="turn_blob_store",

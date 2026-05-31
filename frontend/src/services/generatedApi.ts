@@ -1419,7 +1419,7 @@ const deleteWorkspaceApiV1WorkspacesWorkspaceIdDelete = <TData = AxiosResponse<W
   }
 
 /**
- * Clear workspace DB/scratchpad content and reset dataset catalog metadata.
+ * Clear workspace DB content and reset dataset catalog metadata.
  * @summary Clear Workspace Database
  */
 const clearWorkspaceDatabaseApiV1WorkspacesWorkspaceIdDatabaseClearPost = <TData = AxiosResponse<WorkspaceDatabaseClearResponse>>(
@@ -2113,7 +2113,7 @@ const getWorkspaceArtifactRowsApiV1WorkspacesWorkspaceIdArtifactsArtifactIdRowsG
   }
 
 /**
- * Return scratchpad usage summary used by status-bar artifact pressure warning.
+ * Return turn artifact usage summary used by status-bar artifact pressure warning.
  * @summary Get Workspace Artifact Usage
  */
 const getWorkspaceArtifactUsageApiV1WorkspacesWorkspaceIdArtifactsUsageGet = <TData = AxiosResponse<WorkspaceArtifactUsageResponse>>(
@@ -2125,7 +2125,7 @@ const getWorkspaceArtifactUsageApiV1WorkspacesWorkspaceIdArtifactsUsageGet = <TD
   }
 
 /**
- * Stream scratchpad usage snapshots for status-bar warnings.
+ * Stream turn artifact usage snapshots for status-bar warnings.
  * @summary Stream Workspace Artifact Usage
  */
 const streamWorkspaceArtifactUsageApiV1WorkspacesWorkspaceIdArtifactsUsageStreamGet = <TData = AxiosResponse<unknown>>(

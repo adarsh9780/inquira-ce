@@ -10,7 +10,6 @@ DOC_PATH = ROOT / "docs" / "database-access.md"
 
 ALLOWED_DUCKDB_FILE_CONNECT_PATHS = {
     Path("app/data_access/workspace_db.py"),
-    Path("app/services/artifact_scratchpad.py"),
     Path("app/services/workspace_kernel_manager.py"),
 }
 ALLOWED_SQLITE3_CONNECT_PATHS = {
@@ -60,7 +59,6 @@ def test_database_access_docs_cover_registered_resources() -> None:
         "auth_sqlite",
         "appdata_sqlite",
         "workspace_duckdb",
-        "scratchpad_duckdb",
         "turn_blob_store",
     ):
         assert resource_name in content

@@ -416,7 +416,7 @@ const artifactUsageWarningTitle = computed(() => {
   const details = []
   if (artifactUsage.value.duckdbWarning) {
     details.push(
-      `DuckDB artifacts: ${formatBytes(artifactUsage.value.duckdbBytes)} (limit ${formatBytes(artifactUsage.value.duckdbWarningThresholdBytes)})`
+      `Turn artifacts: ${formatBytes(artifactUsage.value.duckdbBytes)} (limit ${formatBytes(artifactUsage.value.duckdbWarningThresholdBytes)})`
     )
   }
   if (artifactUsage.value.figureWarning) {
@@ -424,8 +424,8 @@ const artifactUsageWarningTitle = computed(() => {
       `Charts saved: ${Number(artifactUsage.value.figureCount || 0)} (limit ${Number(artifactUsage.value.figureWarningThresholdCount || 20)})`
     )
   }
-  if (!details.length) return 'Scratchpad artifact usage is within safe limits.'
-  return `Scratchpad usage warning. ${details.join(' | ')}. Delete unused artifacts to avoid performance issues.`
+  if (!details.length) return 'Turn artifact usage is within safe limits.'
+  return `Turn artifact usage warning. ${details.join(' | ')}. Delete unused artifacts to avoid performance issues.`
 })
 
 function updateWebSocketStatus(connected) {

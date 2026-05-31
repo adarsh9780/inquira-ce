@@ -37,8 +37,6 @@ class ExecutionRuntimeConfig:
     terminal_enabled: bool = False
     runner_install_max_packages_per_request: int = 1
     kernel_idle_minutes: int = 30
-    scratchpad_ttl_hours: int = 48
-    scratchpad_max_size_gb: int = 10
     plotly_theme_mode: str = "soft"
     runner_policy: RunnerPolicyConfig = field(default_factory=RunnerPolicyConfig)
 
@@ -155,8 +153,6 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
         1,
     )
     kernel_idle_minutes = _as_int(runner.get("kernel-idle-minutes", 30), 30)
-    scratchpad_ttl_hours = _as_int(runner.get("scratchpad-ttl-hours", 48), 48)
-    scratchpad_max_size_gb = _as_int(runner.get("scratchpad-max-size-gb", 10), 10)
     plotly_theme_mode = _normalize_plotly_theme_mode(ui.get("plotly-theme-mode", "soft"))
 
     policy = RunnerPolicyConfig(
@@ -179,8 +175,6 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
         terminal_enabled=terminal_enabled,
         runner_install_max_packages_per_request=max(1, runner_install_max_packages_per_request),
         kernel_idle_minutes=max(1, kernel_idle_minutes),
-        scratchpad_ttl_hours=max(1, scratchpad_ttl_hours),
-        scratchpad_max_size_gb=max(1, scratchpad_max_size_gb),
         plotly_theme_mode=plotly_theme_mode,
         runner_policy=policy,
     )

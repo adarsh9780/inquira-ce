@@ -1334,7 +1334,7 @@ async def get_workspace_artifact_usage(
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
-    """Return scratchpad usage summary used by status-bar artifact pressure warning."""
+    """Return turn artifact usage summary used by status-bar artifact pressure warning."""
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     return await _read_workspace_artifact_usage_response(
         session=session,
@@ -1352,7 +1352,7 @@ async def stream_workspace_artifact_usage(
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
-    """Stream scratchpad usage snapshots for status-bar warnings."""
+    """Stream turn artifact usage snapshots for status-bar warnings."""
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
 
     async def event_stream():

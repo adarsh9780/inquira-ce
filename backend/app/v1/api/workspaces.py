@@ -141,7 +141,7 @@ async def clear_workspace_database(
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
-    """Clear workspace DB/scratchpad content and reset dataset catalog metadata."""
+    """Clear workspace DB content and reset dataset catalog metadata."""
     cleared, detail = await WorkspaceService.clear_workspace_database(
         session=session,
         user=current_user,

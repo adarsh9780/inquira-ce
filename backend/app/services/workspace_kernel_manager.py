@@ -23,7 +23,6 @@ from app.services.jupyter_message_parser import (
     ParsedExecutionOutput,
     update_from_iopub_message,
 )
-from app.services.artifact_scratchpad import ArtifactScratchpadStore
 from app.core.logger import logprint
 from app.services.runner_env import ensure_runner_kernel_dependencies, resolve_runner_python
 
@@ -71,65 +70,6 @@ _EXPORTS_PROBE_CODE = """
 _inquira_get_active_exports()
 """
 
-_RUN_EXPORTS_PROBE_TEMPLATE = """
-_inquira_get_active_exports(run_id={run_id!r})
-"""
-
-_MATERIALIZE_EXPORTS_SPECS_SENTINEL = "__INQUIRA_MATERIALIZE_EXPORT_SPECS__"
-
-_MATERIALIZE_EXPORTS_TEMPLATE = """
-import json as _json
-from pathlib import Path as _Path
-
-_inquira_export_specs = _json.loads(__INQUIRA_MATERIALIZE_EXPORT_SPECS__)
-_inquira_materialized = []
-for _spec in _inquira_export_specs:
-    if not isinstance(_spec, dict):
-        continue
-    _artifact_id = str(_spec.get('artifact_id') or '').strip()
-    _kind = str(_spec.get('kind') or '').strip().lower()
-    _storage_path = str(_spec.get('storage_path') or '').strip()
-    if not _artifact_id or not _storage_path:
-        continue
-    _target = _Path(_storage_path)
-    _target.parent.mkdir(parents=True, exist_ok=True)
-    if _kind == 'dataframe':
-        _table_name = str(_spec.get('table_name') or '').strip()
-        if not _table_name:
-            _manifest_row = scratchpad_conn.execute(
-                "SELECT table_name FROM artifact_manifest WHERE artifact_id = ? LIMIT 1",
-                [_artifact_id],
-            ).fetchone()
-            if _manifest_row is not None:
-                _table_name = str(_manifest_row[0] or '').strip()
-        if not _table_name:
-            continue
-        else:
-            _escaped_table = _table_name.replace('"', '""')
-            _escaped_path = str(_target).replace("'", "''")
-            scratchpad_conn.execute(
-                f"COPY (SELECT * FROM \\\"{_escaped_table}\\\") TO '{_escaped_path}' (FORMAT PARQUET)"
-            )
-    elif _kind == 'text':
-        _payload = _spec.get('payload')
-        if isinstance(_payload, dict):
-            _payload = _payload.get('value')
-        _target.write_text(str(_payload or ''), encoding='utf-8')
-    else:
-        _payload = _spec.get('payload')
-        if _payload is None:
-            _payload = _spec
-        _target.write_text(
-            _json.dumps(_payload, indent=2, ensure_ascii=False, default=str),
-            encoding='utf-8',
-        )
-    _inquira_materialized.append({
-        'artifact_id': _artifact_id,
-        'size_bytes': int(_target.stat().st_size) if _target.exists() else None,
-    })
-_inquira_materialized
-"""
-
 def _build_identifier_result_probe_code(identifier: str) -> str:
     target = repr(str(identifier))
     return (
@@ -161,12 +101,6 @@ def _build_identifier_result_probe_code(identifier: str) -> str:
 
 _KERNEL_RESOURCE_CLEANUP_CODE = """
 try:
-    if "scratchpad_conn" in globals() and scratchpad_conn is not None:
-        scratchpad_conn.close()
-except Exception:
-    pass
-
-try:
     if "conn" in globals() and conn is not None:
         conn.close()
 except Exception:
@@ -184,7 +118,6 @@ class WorkspaceKernelSession:
     workspace_duckdb_path: str
     manager: AsyncKernelManager
     client: Any
-    scratchpad_db_path: str
     status: str = "starting"
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     last_used: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -311,45 +244,6 @@ class WorkspaceKernelManager:
         except Exception:
             session.status = "error"
             return False
-
-    async def get_run_exports(
-        self,
-        *,
-        workspace_id: str,
-        run_id: str,
-    ) -> list[dict[str, Any]]:
-        async with self._sessions_lock:
-            session = self._sessions.get(workspace_id)
-        if session is None:
-            return []
-        probe_code = _RUN_EXPORTS_PROBE_TEMPLATE.format(run_id=str(run_id))
-        async with session.lock:
-            await self._touch_session(session)
-            parsed = await self._execute_request(session, probe_code)
-        if parsed.error is not None or not isinstance(parsed.result, list):
-            return []
-        return [item for item in parsed.result if isinstance(item, dict)]
-
-    async def materialize_exports(
-        self,
-        *,
-        workspace_id: str,
-        specs: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
-        async with self._sessions_lock:
-            session = self._sessions.get(workspace_id)
-        if session is None:
-            raise RuntimeError("Workspace kernel is not active")
-        probe_code = _MATERIALIZE_EXPORTS_TEMPLATE.replace(
-            _MATERIALIZE_EXPORTS_SPECS_SENTINEL,
-            json.dumps(json.dumps(specs, ensure_ascii=True, default=str)),
-        )
-        async with session.lock:
-            await self._touch_session(session)
-            parsed = await self._execute_request(session, probe_code)
-        if parsed.error is not None or not isinstance(parsed.result, list):
-            raise RuntimeError(str(parsed.error or "Failed to materialize run artifacts"))
-        return [item for item in parsed.result if isinstance(item, dict)]
 
     async def get_workspace_columns(
         self,
@@ -534,309 +428,6 @@ class WorkspaceKernelManager:
             raise RuntimeError("Dataset import failed in workspace kernel.")
         return parsed.result
 
-    async def get_dataframe_rows(
-        self,
-        *,
-        workspace_id: str,
-        artifact_id: str,
-        offset: int,
-        limit: int,
-        sort_model: list[dict[str, Any]] | None = None,
-        filter_model: dict[str, Any] | None = None,
-        search_text: str | None = None,
-    ) -> dict[str, Any] | None:
-        async with self._sessions_lock:
-            session = self._sessions.get(workspace_id)
-        if session is None:
-            return None
-
-        safe_limit = max(1, min(1000, int(limit)))
-        safe_offset = max(0, int(offset))
-        artifact_token = str(artifact_id).strip()
-        probe_code = (
-            "import json as _json\n"
-            f"_artifact_id = {json.dumps(artifact_token, ensure_ascii=True)}\n"
-            "_art = scratchpad_conn.execute(\n"
-            "    \"SELECT logical_name, table_name FROM artifact_manifest \"\n"
-            "    \"WHERE artifact_id = ? AND kind = 'dataframe' LIMIT 1\",\n"
-            "    [_artifact_id],\n"
-            ").fetchone()\n"
-            "if _art is None:\n"
-            "    _meta = None\n"
-            "else:\n"
-            "    _name, _table_name = _art\n"
-            "    _escaped = str(_table_name).replace('\"', '\"\"')\n"
-            "    _cols = [str(_row[1]) for _row in scratchpad_conn.execute(f'PRAGMA table_info(\"{_escaped}\")').fetchall()]\n"
-            "    _meta = {\n"
-            "        'name': str(_name),\n"
-            "        'table_name': str(_table_name),\n"
-            "        'columns': _cols,\n"
-            "    }\n"
-            "_meta\n"
-        )
-
-        async with session.lock:
-            await self._touch_session(session)
-            parsed_meta = await self._execute_request(session, probe_code)
-
-        if parsed_meta.error is not None or parsed_meta.result is None:
-            return None
-        if not isinstance(parsed_meta.result, dict):
-            return None
-
-        table_name = str(parsed_meta.result.get("table_name") or "").strip()
-        display_name = str(parsed_meta.result.get("name") or "dataframe")
-        column_names = parsed_meta.result.get("columns")
-        if not table_name or not isinstance(column_names, list):
-            return None
-        safe_column_names = [str(column) for column in column_names]
-
-        where_sql, where_params = ArtifactScratchpadStore.build_dataframe_where_clause(
-            column_names=safe_column_names,
-            filter_model=filter_model if isinstance(filter_model, dict) else {},
-            search_text=search_text,
-        )
-        order_sql = ArtifactScratchpadStore.build_dataframe_order_clause(
-            column_names=safe_column_names,
-            sort_model=sort_model if isinstance(sort_model, list) else [],
-        )
-
-        escaped_table = table_name.replace('"', '""')
-        page_sql = f'SELECT * FROM "{escaped_table}" {where_sql} {order_sql} LIMIT {safe_limit} OFFSET {safe_offset}'
-        count_sql = f'SELECT COUNT(*) FROM "{escaped_table}" {where_sql}'
-
-        rows_code = (
-            "import json as _json\n"
-            f"_artifact_id = {json.dumps(artifact_token, ensure_ascii=True)}\n"
-            f"_display_name = {json.dumps(display_name, ensure_ascii=True)}\n"
-            f"_query_params = {repr(where_params)}\n"
-            f"_page_sql = {json.dumps(page_sql, ensure_ascii=True)}\n"
-            f"_count_sql = {json.dumps(count_sql, ensure_ascii=True)}\n"
-            "_rows_df = scratchpad_conn.execute(_page_sql, _query_params).fetchdf()\n"
-            "_count = int(scratchpad_conn.execute(_count_sql, _query_params).fetchone()[0])\n"
-            "_result = {\n"
-            "    'artifact_id': _artifact_id,\n"
-            "    'name': _display_name,\n"
-            "    'row_count': _count,\n"
-            "    'columns': [str(_col) for _col in list(_rows_df.columns)],\n"
-            "    'rows': _json.loads(_rows_df.to_json(orient='records', date_format='iso')),\n"
-            f"    'offset': {safe_offset},\n"
-            f"    'limit': {safe_limit},\n"
-            "}\n"
-            "_result\n"
-        )
-
-        async with session.lock:
-            await self._touch_session(session)
-            parsed = await self._execute_request(session, rows_code)
-
-        if parsed.error is not None or parsed.result is None:
-            return None
-        if not isinstance(parsed.result, dict):
-            return None
-        return parsed.result
-
-    async def list_workspace_artifacts(
-        self,
-        *,
-        workspace_id: str,
-        kind: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """List non-expired artifacts via the kernel's in-process scratchpad connection."""
-        async with self._sessions_lock:
-            session = self._sessions.get(workspace_id)
-        if session is None:
-            return []
-
-        escaped_kind = str(kind or "").replace("'", "''") if kind else ""
-        if kind:
-            where_clause = f"kind = '{escaped_kind}' AND"
-        else:
-            where_clause = ""
-        list_code = (
-            "import json as _json\n"
-            "from datetime import datetime as _dt, timezone as _tz\n"
-            "_now = _dt.now(_tz.utc)\n"
-            f"_rows = scratchpad_conn.execute(\"\"\"\n"
-            f"    SELECT artifact_id, logical_name, kind, row_count, schema_json, created_at, status\n"
-            f"    FROM artifact_manifest\n"
-            f"    WHERE {where_clause} expires_at > ? AND status = 'ready'\n"
-            f"    ORDER BY created_at DESC\n"
-            f"\"\"\", [_now]).fetchall()\n"
-            "_result = []\n"
-            "for _r in _rows:\n"
-            "    _schema = None\n"
-            "    try:\n"
-            "        if _r[4]:\n"
-            "            _schema = _json.loads(str(_r[4]))\n"
-            "    except Exception:\n"
-            "        pass\n"
-            "    _result.append({\n"
-            "        'artifact_id': str(_r[0]),\n"
-            "        'logical_name': str(_r[1]),\n"
-            "        'kind': str(_r[2]),\n"
-            "        'row_count': int(_r[3] or 0) if _r[3] is not None else None,\n"
-            "        'schema': _schema,\n"
-            "        'created_at': str(_r[5]),\n"
-            "        'status': str(_r[6]),\n"
-            "    })\n"
-            "_result\n"
-        )
-
-        async with session.lock:
-            await self._touch_session(session)
-            parsed = await self._execute_request(session, list_code)
-
-        if parsed.error is not None or not isinstance(parsed.result, list):
-            return []
-        return [item for item in parsed.result if isinstance(item, dict)]
-
-    async def get_workspace_artifact_usage(
-        self,
-        *,
-        workspace_id: str,
-    ) -> dict[str, int]:
-        """Return workspace scratchpad usage via kernel-owned connection."""
-        async with self._sessions_lock:
-            session = self._sessions.get(workspace_id)
-        if session is None:
-            return {"duckdb_bytes": 0, "figure_count": 0}
-
-        try:
-            duckdb_bytes = int(Path(session.scratchpad_db_path).stat().st_size)
-        except OSError:
-            duckdb_bytes = 0
-
-        usage_code = (
-            "from datetime import datetime as _dt, timezone as _tz\n"
-            "_now = _dt.now(_tz.utc)\n"
-            "_figure_count = int(scratchpad_conn.execute(\n"
-            "    \"SELECT COUNT(*) FROM artifact_manifest WHERE kind = 'figure' AND expires_at > ? AND status = 'ready'\",\n"
-            "    [_now],\n"
-            ").fetchone()[0])\n"
-            "{'figure_count': _figure_count}\n"
-        )
-
-        async with session.lock:
-            await self._touch_session(session)
-            parsed = await self._execute_request(session, usage_code)
-
-        if parsed.error is not None or not isinstance(parsed.result, dict):
-            return {"duckdb_bytes": duckdb_bytes, "figure_count": 0}
-
-        figure_count = int(parsed.result.get("figure_count") or 0)
-        return {"duckdb_bytes": duckdb_bytes, "figure_count": max(0, figure_count)}
-
-    async def get_workspace_artifact(
-        self,
-        *,
-        workspace_id: str,
-        artifact_id: str,
-    ) -> dict[str, Any] | None:
-        """Read one artifact via the kernel's in-process scratchpad connection."""
-        async with self._sessions_lock:
-            session = self._sessions.get(workspace_id)
-        if session is None:
-            return None
-
-        escaped_artifact_id = str(artifact_id).replace("'", "''")
-        meta_code = (
-            "import json as _json\n"
-            "from datetime import datetime as _dt, timezone as _tz\n"
-            "_now = _dt.now(_tz.utc)\n"
-            f"_row = scratchpad_conn.execute(\"\"\"\n"
-            f"    SELECT artifact_id, run_id, workspace_id, logical_name, kind, table_name,\n"
-            f"           payload_json, schema_json, row_count, created_at, expires_at, status, error\n"
-            f"    FROM artifact_manifest\n"
-            f"    WHERE artifact_id = '{escaped_artifact_id}' AND expires_at > ?\n"
-            f"    LIMIT 1\n"
-            f"\"\"\", [_now]).fetchone()\n"
-            "if _row is None:\n"
-            "    _result = None\n"
-            "else:\n"
-            "    _payload = None\n"
-            "    _schema = None\n"
-            "    try:\n"
-            "        if _row[6]:\n"
-            "            _payload = _json.loads(str(_row[6]))\n"
-            "    except Exception:\n"
-            "        _payload = None\n"
-            "    try:\n"
-            "        if _row[7]:\n"
-            "            _schema = _json.loads(str(_row[7]))\n"
-            "    except Exception:\n"
-            "        _schema = None\n"
-            "    _result = {\n"
-            "        'artifact_id': str(_row[0]),\n"
-            "        'run_id': str(_row[1]),\n"
-            "        'workspace_id': str(_row[2]),\n"
-            "        'logical_name': str(_row[3]),\n"
-            "        'kind': str(_row[4]),\n"
-            "        'table_name': str(_row[5]) if _row[5] is not None else None,\n"
-            "        'payload': _payload,\n"
-            "        'schema': _schema,\n"
-            "        'row_count': int(_row[8] or 0) if _row[8] is not None else None,\n"
-            "        'created_at': str(_row[9]),\n"
-            "        'expires_at': str(_row[10]),\n"
-            "        'status': str(_row[11]),\n"
-            "        'error': str(_row[12]) if _row[12] is not None else None,\n"
-            "        'pointer': f'duckdb://scratchpad/artifacts.duckdb#artifact={_row[0]}',\n"
-            "    }\n"
-            "_result\n"
-        )
-
-        async with session.lock:
-            await self._touch_session(session)
-            parsed = await self._execute_request(session, meta_code)
-
-        if parsed.error is not None:
-            return None
-        if parsed.result is None:
-            return None
-        if not isinstance(parsed.result, dict):
-            return None
-        return parsed.result
-
-    async def delete_workspace_artifact(
-        self,
-        *,
-        workspace_id: str,
-        artifact_id: str,
-    ) -> bool:
-        """Delete one artifact through the kernel-owned scratchpad connection."""
-        async with self._sessions_lock:
-            session = self._sessions.get(workspace_id)
-        if session is None:
-            return False
-
-        escaped_artifact_id = str(artifact_id).replace("'", "''")
-        delete_code = (
-            f"_aid = '{escaped_artifact_id}'\n"
-            "_row = scratchpad_conn.execute(\n"
-            "    \"SELECT kind, table_name FROM artifact_manifest WHERE artifact_id = ? LIMIT 1\",\n"
-            "    [_aid],\n"
-            ").fetchone()\n"
-            "if _row is None:\n"
-            "    _deleted = False\n"
-            "else:\n"
-            "    _kind, _table_name = _row\n"
-            "    if str(_kind) == 'dataframe' and _table_name:\n"
-            "        _escaped = str(_table_name).replace('\"', '\"\"')\n"
-            "        try:\n"
-            "            scratchpad_conn.execute('DROP TABLE IF EXISTS \"' + _escaped + '\"')\n"
-            "        except Exception:\n"
-            "            pass\n"
-            "    scratchpad_conn.execute('DELETE FROM artifact_manifest WHERE artifact_id = ?', [_aid])\n"
-            "    _deleted = True\n"
-            "_deleted\n"
-        )
-
-        async with session.lock:
-            await self._touch_session(session)
-            parsed = await self._execute_request(session, delete_code)
-
-        return parsed.error is None and bool(parsed.result)
-
     async def ensure_ready(
         self,
         *,
@@ -968,7 +559,6 @@ class WorkspaceKernelManager:
                 workspace_duckdb_path=workspace_duckdb_path,
                 manager=km,
                 client=kc,
-                scratchpad_db_path=str(Path(workspace_duckdb_path).parent / "scratchpad" / "artifacts.duckdb"),
                 status="ready",
                 runtime_lease_owner_token=f"kernel:{workspace_id}:{uuid.uuid4()}",
             )
@@ -993,9 +583,6 @@ class WorkspaceKernelManager:
     async def _bootstrap_workspace(self, session: WorkspaceKernelSession) -> None:
         await WorkspaceOfflineAdapter().ensure_database_file(session.workspace_duckdb_path)
         duckdb_path = Path(session.workspace_duckdb_path).as_posix()
-        scratchpad_file = Path(session.scratchpad_db_path)
-        scratchpad_file.parent.mkdir(parents=True, exist_ok=True)
-        scratchpad_path = scratchpad_file.as_posix()
         bootstrap_code = (
             "import duckdb\n"
             "import json as _json\n"
@@ -1011,42 +598,6 @@ class WorkspaceKernelManager:
             "except Exception:\n"
             "    pass\n"
             f"conn = duckdb.connect(r'''{duckdb_path}''', read_only=True)\n"
-            f"scratchpad_conn = duckdb.connect(r'''{scratchpad_path}''', read_only=False)\n"
-            "scratchpad_conn.execute(\"\"\"\n"
-            "CREATE TABLE IF NOT EXISTS artifact_manifest (\n"
-            "  artifact_id VARCHAR PRIMARY KEY,\n"
-            "  run_id VARCHAR NOT NULL,\n"
-            "  workspace_id VARCHAR NOT NULL,\n"
-            "  logical_name VARCHAR NOT NULL,\n"
-            "  kind VARCHAR NOT NULL,\n"
-            "  table_name VARCHAR,\n"
-            "  payload_json TEXT,\n"
-            "  schema_json TEXT,\n"
-            "  row_count BIGINT,\n"
-            "  created_at TIMESTAMP NOT NULL,\n"
-            "  expires_at TIMESTAMP NOT NULL,\n"
-            "  status VARCHAR NOT NULL,\n"
-            "  error TEXT,\n"
-            "  UNIQUE (workspace_id, kind, logical_name)\n"
-            ")\n"
-            "\"\"\")\n"
-            "scratchpad_conn.execute(\"\"\"\n"
-            "CREATE TABLE IF NOT EXISTS run_manifest (\n"
-            "  run_id VARCHAR PRIMARY KEY,\n"
-            "  workspace_id VARCHAR NOT NULL,\n"
-            "  conversation_id VARCHAR,\n"
-            "  turn_id VARCHAR,\n"
-            "  question TEXT,\n"
-            "  generated_code TEXT,\n"
-            "  executed_code TEXT,\n"
-            "  stdout TEXT,\n"
-            "  stderr TEXT,\n"
-            "  execution_status VARCHAR NOT NULL,\n"
-            "  retry_count INTEGER NOT NULL,\n"
-            "  created_at TIMESTAMP NOT NULL,\n"
-            "  expires_at TIMESTAMP NOT NULL\n"
-            ")\n"
-            "\"\"\")\n"
             "if \"_inquira_run_exports\" not in globals():\n"
             "    _inquira_run_exports = {}\n"
             "if \"_inquira_active_run_id\" not in globals():\n"

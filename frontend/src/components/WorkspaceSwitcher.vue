@@ -266,7 +266,7 @@ function closeClearDbDialog() {
 const clearDbDialogMessage = computed(() => {
   const target = appStore.workspaces.find((ws) => ws.id === pendingClearDbWorkspaceId.value)
   const name = target?.name || 'this workspace'
-  return `Clear ${name} database and scratchpad artifacts? You will need to re-select the original dataset to rebuild workspace data.`
+  return `Clear ${name} database? You will need to re-select the original dataset to rebuild workspace data.`
 })
 
 async function clearWorkspaceDatabase() {

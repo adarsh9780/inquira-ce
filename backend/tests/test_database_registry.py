@@ -19,7 +19,6 @@ def test_database_registry_contains_expected_specs() -> None:
         "auth_sqlite",
         "appdata_sqlite",
         "workspace_duckdb",
-        "scratchpad_duckdb",
         "turn_blob_store",
     }
     assert specs["auth_sqlite"].role == DatabaseRole.CONTROL_PLANE
@@ -41,7 +40,6 @@ def test_each_known_database_has_one_ownership_mode() -> None:
         ("repository", "appdata_sqlite", AccessMode.READ_LIVE),
         ("workspace_runtime_adapter", "workspace_duckdb", AccessMode.READ_LIVE),
         ("workspace_offline_adapter", "workspace_duckdb", AccessMode.METADATA),
-        ("scratchpad_runtime_adapter", "scratchpad_duckdb", AccessMode.WRITE_LIVE),
         ("artifact_blob_store", "turn_blob_store", AccessMode.READ_OFFLINE),
     ],
 )
@@ -53,8 +51,6 @@ def test_access_policy_allows_supported_combinations(accessor: str, db_id: str, 
     ("accessor", "db_id", "mode"),
     [
         ("workspace_runtime_adapter", "workspace_duckdb", AccessMode.READ_OFFLINE),
-        ("sqlalchemy_session", "scratchpad_duckdb", AccessMode.READ_LIVE),
-        ("scratchpad_offline_adapter", "scratchpad_duckdb", AccessMode.WRITE_LIVE),
         ("repository", "turn_blob_store", AccessMode.READ_OFFLINE),
         ("artifact_blob_store", "turn_blob_store", AccessMode.WRITE_LIVE),
     ],

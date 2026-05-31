@@ -1,7 +1,7 @@
 from app.v1.services.chat_service import ChatService
 
 
-def test_build_response_payload_prefers_final_explanation_when_code_present():
+def test_build_response_payload_does_not_expose_request_current_code():
     result = {
         "metadata": {"is_safe": True, "is_relevant": True},
         "current_code": "print('hello')",
@@ -12,11 +12,12 @@ def test_build_response_payload_prefers_final_explanation_when_code_present():
 
     payload = ChatService._build_response_payload(result)
 
-    assert payload["code"] == "print('hello')"
-    assert payload["explanation"] == "I generated a simple script and ran it."
+    assert payload["code"] == ""
+    assert payload["explanation"] == ""
+    assert payload["result_explanation"] == "I generated a simple script and ran it."
 
 
-def test_build_response_payload_falls_back_to_plan_when_final_explanation_missing():
+def test_build_response_payload_does_not_use_plan_without_current_turn_code():
     result = {
         "metadata": {"is_safe": True, "is_relevant": True},
         "current_code": "print('hello')",
@@ -27,7 +28,8 @@ def test_build_response_payload_falls_back_to_plan_when_final_explanation_missin
 
     payload = ChatService._build_response_payload(result)
 
-    assert payload["explanation"] == "Plan fallback explanation"
+    assert payload["code"] == ""
+    assert payload["explanation"] == ""
 
 
 def test_build_node_stream_payload_includes_safety_reasoning():
@@ -96,7 +98,7 @@ def test_reconcile_success_explanation_promotes_success_for_renderable_table_art
             {
                 "kind": "dataframe",
                 "artifact_id": "art-1",
-                "pointer": "duckdb://scratchpad/artifacts.duckdb#artifact=art-1",
+                "pointer": "/tmp/inquira/artifacts/art-1.parquet",
                 "preview_rows": [],
                 "status": "ready",
             }

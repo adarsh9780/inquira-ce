@@ -10,7 +10,10 @@ from typing import Any
 import duckdb
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...services.artifact_scratchpad import ArtifactScratchpadStore
+from ...services.dataframe_query import (
+    build_dataframe_order_clause,
+    build_dataframe_where_clause,
+)
 from ..repositories.turn_artifact_repository import TurnArtifactRepository
 from ..repositories.conversation_repository import ConversationRepository
 from .turn_artifact_storage_service import TurnArtifactStorageService
@@ -290,12 +293,12 @@ class TurnArtifactReadService:
                 [str(storage_path)],
             ).fetchdf()
             all_columns = [str(col) for col in list(sample_df.columns)]
-            where_sql, where_params = ArtifactScratchpadStore.build_dataframe_where_clause(
+            where_sql, where_params = build_dataframe_where_clause(
                 column_names=all_columns,
                 filter_model=filter_model,
                 search_text=search_text,
             )
-            order_sql = ArtifactScratchpadStore.build_dataframe_order_clause(
+            order_sql = build_dataframe_order_clause(
                 column_names=all_columns,
                 sort_model=sort_model,
             )
