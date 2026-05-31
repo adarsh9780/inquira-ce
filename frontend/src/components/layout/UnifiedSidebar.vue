@@ -598,7 +598,8 @@ function conversationBadgeLabel(index, totalCount = appStore.conversations.lengt
 }
 
 function formatConversationTimestamp(conversation) {
-  return formatTimestamp(conversation?.updated_at || conversation?.created_at)
+  if (appStore.isConversationRunning(conversation?.id)) return 'Running...'
+  return formatTimestamp(conversation?.last_turn_at || conversation?.updated_at || conversation?.created_at)
 }
 
 // ─── Profile menu ─────────────────────────────────────────────────────────────

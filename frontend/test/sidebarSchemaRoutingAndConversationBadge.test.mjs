@@ -25,6 +25,8 @@ test('sidebar adds workspace view entries and uses numbered conversation badges'
   assert.equal(sidebarSource.includes('<SidebarConversations'), false)
   assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'justify-center px-0 py-1.5' : 'justify-start px-3 py-1.5'"), true)
   assert.equal(sidebarSource.includes('conversationBadgeLabel(index, appStore.conversations.length)'), true)
+  assert.equal(sidebarSource.includes('conversation?.last_turn_at || conversation?.updated_at || conversation?.created_at'), true)
+  assert.equal(sidebarSource.includes("return 'Running...'"), true)
   assert.equal(sidebarSource.includes('const ordinal = total - offset'), true)
   assert.equal(sidebarSource.includes("if (ordinal > 99) return '99+'"), true)
   assert.equal(sidebarSource.includes('rounded-md bg-[var(--color-accent)]/10'), false)
