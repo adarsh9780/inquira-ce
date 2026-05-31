@@ -269,7 +269,7 @@ class ResourceLeaseCoordinator:
             session.add(lease)
             await session.flush()
             return lease
-        if lease.owner_token != owner_token and lease.leased_until > datetime.now(UTC):
+        if lease.owner_token != owner_token and self._normalize_dt(lease.leased_until) > datetime.now(UTC):
             raise LeaseConflictError(
                 f"Active lease {lease_kind} already exists for {resource_type}:{resource_key}."
             )
@@ -364,7 +364,7 @@ class ResourceLeaseCoordinator:
                 ResourceLease.resource_key == resource_key,
                 ResourceLease.resource_type == resource_type,
                 ResourceLease.leased_until <= datetime.now(UTC),
-            )
+            ).execution_options(synchronize_session=False)
         )
         await session.flush()
 

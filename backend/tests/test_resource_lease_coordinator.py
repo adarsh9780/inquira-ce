@@ -76,6 +76,25 @@ async def test_resource_lease_coordinator_rejects_conflicting_workspace_leases(l
 
 
 @pytest.mark.asyncio
+async def test_resource_lease_coordinator_handles_naive_active_existing_lease(lease_session) -> None:
+    coordinator = ResourceLeaseCoordinator(lease_seconds=30)
+    lease = await coordinator.acquire_workspace_runtime_lease(
+        lease_session,
+        workspace_id="workspace-1",
+        owner_token="owner-1",
+    )
+    lease.leased_until = datetime.now(UTC).replace(tzinfo=None) + timedelta(seconds=30)
+    await lease_session.commit()
+
+    with pytest.raises(LeaseConflictError, match="Active lease"):
+        await coordinator.acquire_workspace_runtime_lease(
+            lease_session,
+            workspace_id="workspace-1",
+            owner_token="owner-2",
+        )
+
+
+@pytest.mark.asyncio
 async def test_resource_lease_coordinator_reclaims_expired_lease(lease_session) -> None:
     coordinator = ResourceLeaseCoordinator(lease_seconds=30)
     lease = await coordinator.acquire_workspace_runtime_lease(
