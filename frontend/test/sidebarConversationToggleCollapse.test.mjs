@@ -5,11 +5,12 @@ import { resolve } from 'node:path'
 
 test('clicking the active conversation keeps the sidebar open', () => {
   const source = readFileSync(
-    resolve(process.cwd(), 'src/components/layout/sidebar/SidebarConversations.vue'),
+    resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'),
     'utf-8',
   )
 
-  assert.equal(source.includes('if (id === appStore.activeConversationId) {'), true)
+  assert.equal(source.includes('if (target !== current) {'), true)
+  assert.equal(source.includes("appStore.setWorkspacePane('chat')"), true)
+  assert.equal(source.includes("appStore.setActiveTab('workspace')"), true)
   assert.equal(source.includes('appStore.setSidebarCollapsed(true)'), false)
-  assert.equal(source.includes("emit('select')"), true)
 })

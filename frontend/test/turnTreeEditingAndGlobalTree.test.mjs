@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const chatInputSource = readFileSync(new URL('../src/components/chat/ChatInput.vue', import.meta.url), 'utf8')
@@ -9,12 +9,16 @@ const rightPanelSource = readFileSync(new URL('../src/components/layout/RightPan
 const globalTreeSource = readFileSync(new URL('../src/components/layout/sidebar/SidebarGlobalTurnTree.vue', import.meta.url), 'utf8')
 const apiServiceSource = readFileSync(new URL('../src/services/apiService.js', import.meta.url), 'utf8')
 const storeSource = readFileSync(new URL('../src/stores/appStore.js', import.meta.url), 'utf8')
+const turnTreeModalPath = new URL('../src/components/chat/TurnTreeModal.vue', import.meta.url)
+const sidebarConversationsPath = new URL('../src/components/layout/sidebar/SidebarConversations.vue', import.meta.url)
 
 test('turn tree is no longer opened from the composer', () => {
   assert.equal(chatInputSource.includes('ShareIcon'), false)
   assert.equal(chatInputSource.includes('QueueListIcon'), false)
   assert.equal(chatInputSource.includes('title="Open turn tree"'), false)
   assert.equal(chatInputSource.includes('<TurnTreeModal'), false)
+  assert.equal(existsSync(turnTreeModalPath), false)
+  assert.equal(existsSync(sidebarConversationsPath), false)
 })
 
 test('turn tree exposes delete and final actions without unsupported moving controls', () => {

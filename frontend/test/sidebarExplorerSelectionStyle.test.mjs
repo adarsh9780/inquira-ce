@@ -12,19 +12,14 @@ test('sidebar renders minimal explorer style with compact brand active highlight
     resolve(process.cwd(), 'src/components/layout/sidebar/SidebarDatasets.vue'),
     'utf-8',
   )
-  const conversationsSource = readFileSync(
-    resolve(process.cwd(), 'src/components/layout/sidebar/SidebarConversations.vue'),
-    'utf-8',
-  )
 
   assert.equal(unifiedSource.includes('Workspace explorer'), false)
   assert.equal(datasetsSource.includes("bg-[var(--color-accent-soft)] text-[var(--color-accent)]"), true)
-  assert.equal(conversationsSource.includes("bg-[var(--color-accent-soft)] text-[var(--color-text-main)]"), true)
-  assert.equal(conversationsSource.includes("font-semibold text-[var(--color-text-main)]"), true)
+  assert.equal(unifiedSource.includes("appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : ''"), true)
+  assert.equal(unifiedSource.includes("font-medium text-[var(--color-text-main)]"), true)
   assert.equal(datasetsSource.includes("bg-emerald-50 text-emerald-800"), false)
-  assert.equal(conversationsSource.includes("bg-emerald-50 text-emerald-800"), false)
+  assert.equal(unifiedSource.includes("bg-emerald-50 text-emerald-800"), false)
   assert.equal(datasetsSource.includes('ChevronRightIcon'), true)
-  assert.equal(conversationsSource.includes('ChevronRightIcon'), true)
   assert.equal(datasetsSource.includes('text-[11px] uppercase tracking'), true)
-  assert.equal(conversationsSource.includes('text-[11px] uppercase tracking'), true)
+  assert.equal(unifiedSource.includes('text-[11px] font-semibold uppercase tracking-widest'), true)
 })
