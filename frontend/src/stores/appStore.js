@@ -1995,7 +1995,7 @@ export const useAppStore = defineStore('app', () => {
     return conv
   }
 
-  async function fetchConversationTurns({ reset = true } = {}) {
+  async function fetchConversationTurns({ reset = true, preferLatest = false } = {}) {
     if (!activeConversationId.value) return
     const preferredTurnId = String(activeTurnId.value || '').trim()
     const response = await apiService.v1ListTurns(
@@ -2011,7 +2011,7 @@ export const useAppStore = defineStore('app', () => {
     prependChatHistoryFromTurns(turns)
     if (reset) {
       const newestTurnId = String(turns[0]?.id || '').trim()
-      const targetTurnId = preferredTurnId || newestTurnId
+      const targetTurnId = preferLatest ? newestTurnId : (preferredTurnId || newestTurnId)
       if (targetTurnId) {
         try {
           await loadActiveTurnRelations(targetTurnId)

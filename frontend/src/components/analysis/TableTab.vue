@@ -1098,7 +1098,7 @@ async function prepareArtifact(artifactId) {
   try {
     const workspaceId = appStore.activeWorkspaceId
     await enqueueSerializedRequest(async () => {
-      await waitForKernelReady(workspaceId, listAbortController?.signal || null)
+      await waitForKernelReady(workspaceId, null)
       if (workspaceId !== appStore.activeWorkspaceId) throw createAbortError()
       // Always use server infinite model for persisted artifacts
       clientRows.value = []

@@ -678,7 +678,7 @@ async function selectConversation(id) {
       appStore.setWorkspacePane('chat')
       appStore.setActiveTab('workspace')
     }
-    await appStore.fetchConversationTurns({ reset: true })
+    await appStore.fetchConversationTurns({ reset: true, preferLatest: true })
   } catch (error) {
     toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to load conversation'))
   }
