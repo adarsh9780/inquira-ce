@@ -4,6 +4,7 @@ import time
 import duckdb
 import pytest
 
+from app.services.output_capture import build_run_wrapped_code
 from app.services.readonly_python_execution import (
     ReadOnlyExecutionBlockedError,
     ReadOnlyPythonExecutionService,
@@ -25,11 +26,20 @@ def _workspace_db(tmp_path):
 async def test_readonly_python_worker_executes_readonly_query(tmp_path):
     db_path = _workspace_db(tmp_path)
     service = ReadOnlyPythonExecutionService()
+    artifact_dir = tmp_path / "turn-1"
+    code = build_run_wrapped_code(
+        'df = conn.execute("SELECT * FROM numbers ORDER BY value").fetchdf()\nexport_dataframe(df, "numbers")',
+        "run-1",
+        [],
+        conversation_id="conversation-1",
+        turn_id="turn-1",
+        artifact_dir=str(artifact_dir),
+    )
 
     result = await service.execute(
         workspace_id="workspace-1",
         workspace_duckdb_path=str(db_path),
-        code='df = conn.execute("SELECT * FROM numbers ORDER BY value").fetchdf()\nexport_dataframe(df, "numbers")',
+        code=code,
         timeout=10,
         run_id="run-1",
     )
@@ -80,21 +90,35 @@ async def test_readonly_python_runtime_rejects_dynamic_write_sql(tmp_path):
 async def test_readonly_python_worker_allows_parallel_runs_across_conversations(tmp_path):
     db_path = _workspace_db(tmp_path)
     service = ReadOnlyPythonExecutionService(max_parallel_per_workspace=2)
-    code = 'import time\ntime.sleep(0.8)\nresult = conn.execute("SELECT COUNT(*) FROM numbers").fetchone()[0]\nexport_scalar(result, "count_" + _RUN_ID)'
+    base_code = 'import time\ntime.sleep(0.8)\nresult = conn.execute("SELECT COUNT(*) FROM numbers").fetchone()[0]\nexport_scalar(result, "count_" + _RUN_ID)'
 
     started = time.perf_counter()
     first, second = await asyncio.gather(
         service.execute(
             workspace_id="workspace-1",
             workspace_duckdb_path=str(db_path),
-            code=code,
+            code=build_run_wrapped_code(
+                base_code,
+                "run-a",
+                [],
+                conversation_id="conversation-1",
+                turn_id="turn-a",
+                artifact_dir=str(tmp_path / "turn-a"),
+            ),
             timeout=10,
             run_id="run-a",
         ),
         service.execute(
             workspace_id="workspace-1",
             workspace_duckdb_path=str(db_path),
-            code=code,
+            code=build_run_wrapped_code(
+                base_code,
+                "run-b",
+                [],
+                conversation_id="conversation-1",
+                turn_id="turn-b",
+                artifact_dir=str(tmp_path / "turn-b"),
+            ),
             timeout=10,
             run_id="run-b",
         ),

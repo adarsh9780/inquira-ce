@@ -295,6 +295,10 @@ async def test_dataset_ingestion_service_serializes_same_workspace_but_allows_ot
         return SimpleNamespace(table_name=f"table_{workspace_id}", row_count=1)
 
     monkeypatch.setattr("app.v1.services.dataset_ingestion_service.DatasetService.add_dataset", fake_add_dataset)
+    monkeypatch.setattr(
+        "app.v1.services.dataset_ingestion_service.DatasetIngestionService._ensure_workspace_runtime_ready",
+        lambda *_args, **_kwargs: asyncio.sleep(0),
+    )
 
     service = DatasetIngestionService()
     await asyncio.gather(

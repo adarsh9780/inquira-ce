@@ -13,7 +13,7 @@ def test_build_response_payload_does_not_expose_request_current_code():
     payload = ChatService._build_response_payload(result)
 
     assert payload["code"] == ""
-    assert payload["explanation"] == ""
+    assert payload["explanation"] == "I generated a simple script and ran it."
     assert payload["result_explanation"] == "I generated a simple script and ran it."
 
 

@@ -36,6 +36,10 @@ def _llm_preferences() -> dict[str, object]:
     }
 
 
+async def _fake_reserve_turn(**_kwargs):
+    return SimpleNamespace(id="reserved-turn"), 1, "/tmp/inquira-test-turn"
+
+
 @pytest.mark.asyncio
 async def test_workspace_schema_releases_db_transaction_before_live_columns(monkeypatch):
     session = _TrackingSession()
@@ -123,6 +127,7 @@ async def test_stream_chat_releases_db_transaction_before_agent_stream(monkeypat
     monkeypatch.setattr(ChatService, "_preflight_check", staticmethod(_fake_preflight))
     monkeypatch.setattr(ChatService, "_resolve_llm_preferences", staticmethod(_fake_resolve_llm_preferences))
     monkeypatch.setattr(ChatService, "_persist_turn", staticmethod(_fake_persist_turn))
+    monkeypatch.setattr(ChatService, "_reserve_turn", staticmethod(_fake_reserve_turn))
     monkeypatch.setattr("app.v1.services.chat_service.AgentClient.assert_health", _fake_health)
     monkeypatch.setattr("app.v1.services.chat_service.AgentClient.stream", _fake_stream)
 
@@ -177,6 +182,7 @@ async def test_non_stream_chat_releases_db_transaction_before_agent_run(monkeypa
     monkeypatch.setattr(ChatService, "_preflight_check", staticmethod(_fake_preflight))
     monkeypatch.setattr(ChatService, "_resolve_llm_preferences", staticmethod(_fake_resolve_llm_preferences))
     monkeypatch.setattr(ChatService, "_persist_turn", staticmethod(_fake_persist_turn))
+    monkeypatch.setattr(ChatService, "_reserve_turn", staticmethod(_fake_reserve_turn))
     monkeypatch.setattr("app.v1.services.chat_service.AgentClient.assert_health", _fake_health)
     monkeypatch.setattr("app.v1.services.chat_service.AgentClient.run", _fake_run)
 

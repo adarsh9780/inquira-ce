@@ -6,6 +6,10 @@ from app.services.agent_client import AgentRuntimeError
 from app.v1.services.chat_service import ChatService
 
 
+async def _fake_reserve_turn(**_kwargs):
+    return SimpleNamespace(id="reserved-turn"), 1, "/tmp/inquira-test-turn"
+
+
 @pytest.mark.asyncio
 async def test_v1_chat_stream_emits_token_events_before_final(monkeypatch):
     async def _fake_preflight(**_kwargs):
@@ -16,6 +20,7 @@ async def test_v1_chat_stream_emits_token_events_before_final(monkeypatch):
 
     monkeypatch.setattr(ChatService, "_preflight_check", staticmethod(_fake_preflight))
     monkeypatch.setattr(ChatService, "_persist_turn", staticmethod(_fake_persist_turn))
+    monkeypatch.setattr(ChatService, "_reserve_turn", staticmethod(_fake_reserve_turn))
     monkeypatch.setattr(
         "app.v1.services.chat_service.SecretStorageService.get_api_key",
         lambda _uid, provider="openrouter": "key",
@@ -90,6 +95,7 @@ async def test_v1_chat_stream_passthrough_langgraph_events_and_finalize(monkeypa
 
     monkeypatch.setattr(ChatService, "_preflight_check", staticmethod(_fake_preflight))
     monkeypatch.setattr(ChatService, "_persist_turn", staticmethod(_fake_persist_turn))
+    monkeypatch.setattr(ChatService, "_reserve_turn", staticmethod(_fake_reserve_turn))
     monkeypatch.setattr(
         "app.v1.services.chat_service.SecretStorageService.get_api_key",
         lambda _uid, provider="openrouter": "key",
@@ -221,6 +227,7 @@ async def test_v1_chat_stream_persists_selected_turn_as_parent(monkeypatch):
 
     monkeypatch.setattr(ChatService, "_preflight_check", staticmethod(_fake_preflight))
     monkeypatch.setattr(ChatService, "_persist_turn", staticmethod(_fake_persist_turn))
+    monkeypatch.setattr(ChatService, "_reserve_turn", staticmethod(_fake_reserve_turn))
     monkeypatch.setattr(ChatService, "_resolve_llm_preferences", staticmethod(_fake_resolve_llm_preferences))
     monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.get_turn", _fake_get_turn)
     monkeypatch.setattr(
@@ -309,6 +316,7 @@ async def test_v1_chat_stream_retries_ollama_model_with_cloud_suffix_on_not_foun
 
     monkeypatch.setattr(ChatService, "_preflight_check", staticmethod(_fake_preflight))
     monkeypatch.setattr(ChatService, "_persist_turn", staticmethod(_fake_persist_turn))
+    monkeypatch.setattr(ChatService, "_reserve_turn", staticmethod(_fake_reserve_turn))
     monkeypatch.setattr(
         ChatService,
         "_resolve_llm_preferences",

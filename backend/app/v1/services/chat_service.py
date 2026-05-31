@@ -1222,6 +1222,7 @@ class ChatService:
             }
             for dataset in datasets
         ]
+        await ChatService._release_session_before_agent(session)
         tables: list[dict[str, Any]] = []
         for dataset in dataset_descriptors:
             table_name = str(dataset.get("table_name") or "").strip()
@@ -1594,7 +1595,7 @@ class ChatService:
             or ""
         ).strip()
         code_explanation = str(result.get("code_explanation") or "").strip()
-        explanation = result_explanation if code else ""
+        explanation = result_explanation
 
         if not code and code_guard_feedback:
             explanation = (

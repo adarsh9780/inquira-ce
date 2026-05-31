@@ -89,10 +89,9 @@ async def test_migrate_conversation_backfills_linear_lineage_and_turn_bundles(mo
             / "ws-1"
             / "conversations"
             / "conv-1"
-            / "turns"
             / "turn-2"
         )
-        artifacts_dir = turn_dir / "artifacts"
+        artifacts_dir = turn_dir
         artifacts_dir.mkdir(parents=True, exist_ok=True)
         stored_path = artifacts_dir / "df-1.parquet"
         stored_path.write_bytes(b"PAR1")
@@ -180,14 +179,13 @@ async def test_migrate_conversation_backfills_linear_lineage_and_turn_bundles(mo
         / "ws-1"
         / "conversations"
         / "conv-1"
-        / "turns"
         / "turn-2"
     )
     assert turn_two_dir.joinpath("analysis.py").read_text(encoding="utf-8") == "print('two')\n"
     manifest = json.loads(turn_two_dir.joinpath("turn.json").read_text(encoding="utf-8"))
     assert manifest["parent_turn_id"] == "turn-1"
     assert manifest["artifacts"][0]["artifact_id"] == "df-1"
-    assert manifest["artifacts"][0]["path"] == str(turn_two_dir / "artifacts" / "df-1.parquet")
+    assert manifest["artifacts"][0]["path"] == str(turn_two_dir / "df-1.parquet")
 
 
 @pytest.mark.asyncio

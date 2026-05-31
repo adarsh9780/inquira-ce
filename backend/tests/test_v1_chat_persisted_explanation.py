@@ -5,6 +5,10 @@ import pytest
 from app.v1.services.chat_service import ChatService
 
 
+async def _fake_reserve_turn(**kwargs):
+    return SimpleNamespace(id=str(kwargs.get("turn_id") or "reserved-turn")), 1, "/tmp/inquira-test-turn"
+
+
 def _build_execution_result() -> dict:
     return {
         "success": True,
@@ -34,12 +38,13 @@ async def test_analyze_and_persist_turn_uses_final_explanation_for_assistant_tex
 
     monkeypatch.setattr(ChatService, "_preflight_check", staticmethod(fake_preflight))
     monkeypatch.setattr(ChatService, "_persist_turn", staticmethod(fake_persist_turn))
+    monkeypatch.setattr(ChatService, "_reserve_turn", staticmethod(_fake_reserve_turn))
     monkeypatch.setattr(ChatService, "_execute_generated_code_with_retries", staticmethod(fake_execute))
     monkeypatch.setattr(ChatService, "_finalize_kernel_run", staticmethod(fake_finalize))
 
     result = {
         "metadata": {"is_safe": True, "is_relevant": True},
-        "current_code": "print('hello')",
+        "final_code": "print('hello')",
         "final_explanation": "This code prints a greeting and verifies runtime execution.",
         "plan": "Fallback plan explanation",
         "messages": [],
@@ -93,12 +98,13 @@ async def test_analyze_and_persist_turn_falls_back_to_plan_when_final_explanatio
 
     monkeypatch.setattr(ChatService, "_preflight_check", staticmethod(fake_preflight))
     monkeypatch.setattr(ChatService, "_persist_turn", staticmethod(fake_persist_turn))
+    monkeypatch.setattr(ChatService, "_reserve_turn", staticmethod(_fake_reserve_turn))
     monkeypatch.setattr(ChatService, "_execute_generated_code_with_retries", staticmethod(fake_execute))
     monkeypatch.setattr(ChatService, "_finalize_kernel_run", staticmethod(fake_finalize))
 
     result = {
         "metadata": {"is_safe": True, "is_relevant": True},
-        "current_code": "print('fallback')",
+        "final_code": "print('fallback')",
         "final_explanation": "",
         "plan": "Fallback explanation from plan node.",
         "messages": [],
@@ -153,6 +159,7 @@ async def test_analyze_and_persist_turn_does_not_execute_stale_current_code(monk
 
     monkeypatch.setattr(ChatService, "_preflight_check", staticmethod(fake_preflight))
     monkeypatch.setattr(ChatService, "_persist_turn", staticmethod(fake_persist_turn))
+    monkeypatch.setattr(ChatService, "_reserve_turn", staticmethod(_fake_reserve_turn))
     monkeypatch.setattr(ChatService, "_execute_generated_code_with_retries", staticmethod(fail_execute))
     monkeypatch.setattr(ChatService, "_finalize_kernel_run", staticmethod(fail_finalize))
 

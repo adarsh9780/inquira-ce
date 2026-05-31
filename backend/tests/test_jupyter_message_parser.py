@@ -4,7 +4,7 @@ from app.services.jupyter_message_parser import (
 )
 
 
-def test_stream_messages_are_aggregated_to_stdout_and_stderr():
+def test_stderr_stream_warning_does_not_fail_execution():
     output = ParsedExecutionOutput()
     update_from_iopub_message(
         output,
@@ -21,7 +21,7 @@ def test_stream_messages_are_aggregated_to_stdout_and_stderr():
     assert payload["stderr"] == "warn"
     assert payload["has_stdout"] is True
     assert payload["has_stderr"] is True
-    assert payload["success"] is False
+    assert payload["success"] is True
 
 
 def test_execute_result_prefers_plotly_payload_and_sets_figure_type():
