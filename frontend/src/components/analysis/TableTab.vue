@@ -229,7 +229,6 @@ import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import { toast } from '../../composables/useToast'
 import { persistExportFile } from '../../utils/exportFile'
-import { chooseTableSelectionAfterRefresh } from '../../utils/tableSelection'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 import {
@@ -242,18 +241,16 @@ import {
 const appStore = useAppStore()
 
 const pageSize = 100
-const MEMORY_ARTIFACT_PREFIX = 'memory:'
 const isDownloading = ref(false)
 const isDeletingArtifact = ref(false)
 const isDeleteDialogOpen = ref(false)
 const isPageLoading = ref(false)
 const isLoadingArtifacts = ref(false)
-const workspaceKnownSavedTables = ref({})
 
 // The artifact_id the user has explicitly selected (null = nothing selected)
 const selectedArtifactId = ref(null)
 
-// Artifacts fetched from the workspace scratchpad (persisted from previous runs)
+// Artifacts fetched from the active conversation turn.
 const workspaceArtifacts = ref([])
 
 const isMounted = ref(false)
@@ -273,11 +270,8 @@ let listAbortController = null
 let serializedRequestQueue = Promise.resolve()
 let selectedArtifactLoadToken = 0
 let currentDatasourceToken = 0
-let isRecoveringMissingArtifact = false
 let tableSearchDebounceTimer = null
-let kernelRecoveryPoller = null
 const pendingRestorePageByArtifact = new Map()
-const pendingAutoSelectArtifactId = ref('')
 
 onMounted(() => {
   isMounted.value = true
@@ -286,7 +280,6 @@ onMounted(() => {
 onUnmounted(() => {
   cancelPendingRequests()
   listAbortController?.abort()
-  stopKernelRecoveryPolling()
   if (tableSearchDebounceTimer) {
     clearTimeout(tableSearchDebounceTimer)
     tableSearchDebounceTimer = null
@@ -295,156 +288,22 @@ onUnmounted(() => {
 })
 
 const allArtifacts = computed(() => (Array.isArray(workspaceArtifacts.value) ? workspaceArtifacts.value : []))
-const activeTurnArtifactIds = computed(() => {
-  if (!String(appStore.activeTurnId || '').trim()) return new Set()
-  const ids = (Array.isArray(appStore.activeTurnArtifacts) ? appStore.activeTurnArtifacts : [])
-    .filter((artifact) => String(artifact?.kind || '').trim().toLowerCase() === 'dataframe')
-    .map((artifact) => String(artifact?.artifact_id || '').trim())
-    .filter(Boolean)
-  return new Set(ids)
-})
-const livePersistedArtifactIds = computed(() => {
-  const ids = Array.isArray(appStore.dataframes)
-    ? appStore.dataframes
-      .map((df) => String(df?.data?.artifact_id || '').trim())
-      .filter(Boolean)
-    : []
-  return new Set(ids)
-})
-const livePersistedArtifactSummaries = computed(() => {
-  if (!Array.isArray(appStore.dataframes)) return []
-  const seen = new Set()
-  return appStore.dataframes
-    .map((df, index) => {
-      const artifactId = String(df?.data?.artifact_id || '').trim()
-      if (!artifactId || seen.has(artifactId)) return null
-      seen.add(artifactId)
-      const logicalName = String(df?.data?.logical_name || df?.name || '').trim() || `dataframe_${index + 1}`
-      const displayName = String(df?.data?.display_name || df?.name || logicalName).trim()
-      const columns = Array.isArray(df?.data?.columns)
-        ? df.data.columns.map((column) => {
-          if (column && typeof column === 'object') {
-            return {
-              name: String(column.name || ''),
-              dtype: String(column.dtype || ''),
-            }
-          }
-          return { name: String(column || ''), dtype: '' }
-        }).filter((column) => column.name)
-        : []
-      return {
-        artifact_id: artifactId,
-        logical_name: logicalName,
-        display_name: displayName || logicalName,
-        kind: 'dataframe',
-        row_count: Number(df?.data?.row_count || 0),
-        schema: columns,
-        created_at: String(df?.data?.created_at || ''),
-        status: 'active',
-        source: 'artifact',
-      }
-    })
-    .filter(Boolean)
-})
-const scopedPersistedArtifacts = computed(() => {
-  const allowedIds = new Set([
-    ...activeTurnArtifactIds.value,
-    ...livePersistedArtifactIds.value,
-  ])
-  if (allowedIds.size === 0) return []
-  return allArtifacts.value.filter((artifact) => allowedIds.has(String(artifact?.artifact_id || '').trim()))
-})
-
-function getMemoryArtifactId(name, index = 0) {
-  const normalizedName = String(name || '').trim() || `dataframe_${index + 1}`
-  return `${MEMORY_ARTIFACT_PREFIX}${normalizedName}`
-}
-
-function isMemoryArtifactId(artifactId) {
-  return String(artifactId || '').startsWith(MEMORY_ARTIFACT_PREFIX)
-}
-
-function normalizeRowsFromDataframeValue(value) {
-  if (Array.isArray(value)) {
-    return value
-      .filter((row) => row && typeof row === 'object' && !Array.isArray(row))
-      .map((row) => ({ ...row }))
-  }
-  if (!value || typeof value !== 'object') return []
-
-  const rawRows = Array.isArray(value.data) ? value.data : []
-  if (!rawRows.length) return []
-  if (typeof rawRows[0] === 'object' && !Array.isArray(rawRows[0])) {
-    return rawRows.map((row) => ({ ...row }))
-  }
-
-  const columns = Array.isArray(value.columns) ? value.columns.map((col) => String(col)) : []
-  if (!columns.length) return []
-  return rawRows.map((row) => {
-    if (!Array.isArray(row)) return {}
-    const mapped = {}
-    columns.forEach((col, idx) => {
-      mapped[col] = row[idx]
-    })
-    return mapped
-  })
-}
-
-const memoryArtifacts = computed(() => {
-  if (!Array.isArray(appStore.dataframes)) return []
-  return appStore.dataframes
-    .map((df, index) => {
-      const artifactId = String(df?.data?.artifact_id || '').trim()
-      if (artifactId) return null
-
-      const rows = normalizeRowsFromDataframeValue(df?.data)
-      if (!rows.length) return null
-
-      const logicalName = String(df?.name || '').trim() || `dataframe_${index + 1}`
-      return {
-        artifact_id: getMemoryArtifactId(logicalName, index),
-        logical_name: logicalName,
-        row_count: Number(df?.data?.row_count || rows.length || 0),
-        source: 'memory',
-        memory_rows: rows,
-      }
-    })
-    .filter(Boolean)
-})
-
 const displayArtifacts = computed(() => {
-  const persistedArtifacts = scopedPersistedArtifacts.value.map((artifact) => ({
+  return allArtifacts.value.map((artifact) => ({
     ...artifact,
     source: 'artifact',
   }))
-  const knownPersistedIds = new Set(
-    persistedArtifacts
-      .map((artifact) => String(artifact?.artifact_id || '').trim())
-      .filter(Boolean)
-  )
-  const optimisticPersistedArtifacts = livePersistedArtifactSummaries.value.filter((artifact) => (
-    !knownPersistedIds.has(String(artifact?.artifact_id || '').trim())
-  ))
-  return [...persistedArtifacts, ...optimisticPersistedArtifacts, ...memoryArtifacts.value]
-})
-
-const activeWorkspaceHasKnownSavedTables = computed(() => {
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
-  if (!workspaceId) return false
-  return workspaceKnownSavedTables.value[workspaceId] === true
 })
 
 const showArtifactListLoadingState = computed(() => {
-  if (!isLoadingArtifacts.value) return false
-  return activeWorkspaceHasKnownSavedTables.value
+  return isLoadingArtifacts.value && Boolean(String(appStore.activeTurnId || '').trim())
 })
 
 const tableDropdownOptions = computed(() => displayArtifacts.value.map((artifact) => {
-  const isMemory = artifact.source === 'memory'
   const label = artifact.display_name || artifact.logical_name || artifact.artifact_id
   return {
     value: artifact.artifact_id,
-    label: isMemory ? `${label} (memory)` : label,
+    label,
     key: artifact.artifact_id,
   }
 }))
@@ -454,9 +313,7 @@ watch(allArtifacts, (list) => {
   if (
     selectedArtifactId.value
     && !list.some((item) => item.artifact_id === selectedArtifactId.value)
-    && !livePersistedArtifactIds.value.has(String(selectedArtifactId.value || '').trim())
   ) {
-    if (isMemoryArtifactId(selectedArtifactId.value)) return
     selectedArtifactId.value = null
   }
 }, { immediate: true })
@@ -468,68 +325,11 @@ watch(displayArtifacts, (list) => {
   }
 }, { immediate: true })
 
-function resolveLatestMemoryArtifactId() {
-  const latestFrame = appStore.dataframes?.[0]
-  if (!latestFrame || typeof latestFrame !== 'object') return ''
-  const latestPersistedArtifactId = String(latestFrame?.data?.artifact_id || '').trim()
-  if (latestPersistedArtifactId) return ''
-  const latestName = String(latestFrame?.name || '').trim()
-  if (!latestName) return ''
-  const memoryArtifactId = getMemoryArtifactId(latestName)
-  const exists = memoryArtifacts.value.some((entry) => entry.artifact_id === memoryArtifactId)
-  return exists ? memoryArtifactId : ''
+function resolvePreferredTableSelectionId(availableArtifactIds) {
+  const currentSelection = String(selectedArtifactId.value || '').trim()
+  if (currentSelection && availableArtifactIds.has(currentSelection)) return currentSelection
+  return displayArtifacts.value[0]?.artifact_id || null
 }
-
-function resolvePreferredTableSelectionId(workspaceId, availableArtifactIds) {
-  return chooseTableSelectionAfterRefresh({
-    currentSelectionId: selectedArtifactId.value,
-    availableArtifactIds,
-    rememberedArtifactId: appStore.getSelectedTableArtifact(workspaceId),
-    latestArtifactId: appStore.dataframes?.[0]?.data?.artifact_id,
-    latestMemoryArtifactId: resolveLatestMemoryArtifactId(),
-    pendingAutoSelectArtifactId: pendingAutoSelectArtifactId.value,
-  })
-}
-
-watch(
-  () => (Array.isArray(appStore.dataframes) ? appStore.dataframes.map((df) => String(df?.data?.artifact_id || '')).filter(Boolean).join('|') : ''),
-  () => {
-    const latestArtifactId = String(appStore.dataframes?.[0]?.data?.artifact_id || '').trim()
-    if (latestArtifactId && latestArtifactId !== selectedArtifactId.value) {
-      pendingAutoSelectArtifactId.value = latestArtifactId
-      const existsInArtifactList = allArtifacts.value.some(
-        (item) => String(item?.artifact_id || '').trim() === latestArtifactId,
-      )
-      if (existsInArtifactList) {
-        selectedArtifactId.value = latestArtifactId
-        pendingAutoSelectArtifactId.value = ''
-      }
-    } else {
-      const latestMemoryId = resolveLatestMemoryArtifactId()
-      if (latestMemoryId && latestMemoryId !== selectedArtifactId.value) {
-        selectedArtifactId.value = latestMemoryId
-      }
-      pendingAutoSelectArtifactId.value = ''
-    }
-    if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) return
-    void loadWorkspaceArtifacts(appStore.activeWorkspaceId)
-  }
-)
-
-watch(
-  () => (
-    Array.isArray(appStore.dataframes)
-      ? appStore.dataframes.map((df, index) => `${index}:${String(df?.name || '')}:${String(df?.data?.artifact_id || '')}`).join('|')
-      : ''
-  ),
-  () => {
-    if (String(appStore.dataframes?.[0]?.data?.artifact_id || '').trim()) return
-    const latestMemoryId = resolveLatestMemoryArtifactId()
-    if (latestMemoryId && latestMemoryId !== selectedArtifactId.value) {
-      selectedArtifactId.value = latestMemoryId
-    }
-  },
-)
 
 function createAbortError(message = 'Request aborted') {
   const error = new Error(message)
@@ -541,133 +341,19 @@ function isAbortError(error) {
   return error?.name === 'AbortError'
 }
 
-function isKernelReadinessTimeoutMessage(message) {
-  return String(message || '').includes('Kernel did not become ready in 120 seconds')
-}
-
-function isMissingArtifactRowsError(error) {
-  const message = String(error?.message || '')
-  if (!message) return false
-  return message.includes('Artifact rows not found') || message.includes('Artifact row fetch failed (404)')
-}
-
 function enqueueSerializedRequest(task) {
   const next = serializedRequestQueue.catch(() => {}).then(task)
   serializedRequestQueue = next.catch(() => {})
   return next
 }
 
-function waitMs(ms, signal) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      cleanup()
-      resolve()
-    }, ms)
-    const onAbort = () => {
-      cleanup()
-      reject(createAbortError())
-    }
-    const cleanup = () => {
-      clearTimeout(timer)
-      signal?.removeEventListener?.('abort', onAbort)
-    }
-    if (signal?.aborted) {
-      cleanup()
-      reject(createAbortError())
-      return
-    }
-    signal?.addEventListener?.('abort', onAbort, { once: true })
-  })
-}
-
-async function waitForKernelReady(workspaceId, signal) {
-  const normalizedWorkspaceId = String(workspaceId || '').trim()
-  if (!normalizedWorkspaceId) {
-    throw new Error('No active workspace selected.')
-  }
-  if (appStore.getWorkspaceKernelStatus(normalizedWorkspaceId) === 'ready') {
-    return
-  }
-
-  const timeoutMs = 120000
-  const pollIntervalMs = 700
-  const start = Date.now()
-  let lastStatus = 'unknown'
-
-  while (Date.now() - start < timeoutMs) {
-    if (signal?.aborted) throw createAbortError()
-
-    const statusPayload = await apiService.v1GetWorkspaceKernelStatus(normalizedWorkspaceId)
-    const status = String(statusPayload?.status || '').trim().toLowerCase()
-    appStore.setWorkspaceKernelStatus(normalizedWorkspaceId, status)
-    lastStatus = status || lastStatus
-
-    if (status === 'ready') {
-      return
-    }
-
-    await waitMs(pollIntervalMs, signal)
-  }
-
-  appStore.setWorkspaceKernelStatus(normalizedWorkspaceId, lastStatus === 'unknown' ? 'error' : lastStatus)
-  throw new Error(`Kernel did not become ready in 120 seconds (last status: ${lastStatus}).`)
-}
-
-function stopKernelRecoveryPolling() {
-  if (kernelRecoveryPoller) {
-    clearInterval(kernelRecoveryPoller)
-    kernelRecoveryPoller = null
-  }
-}
-
-async function recoverTableStateAfterKernelReady() {
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
-  if (!workspaceId || !appStore.hasWorkspace || appStore.dataPane !== 'table') return
-
-  try {
-    let status = appStore.getWorkspaceKernelStatus(workspaceId)
-    if (status !== 'ready') {
-      const statusPayload = await apiService.v1GetWorkspaceKernelStatus(workspaceId)
-      status = String(statusPayload?.status || '').trim().toLowerCase() || status
-      appStore.setWorkspaceKernelStatus(workspaceId, status)
-    }
-    if (status !== 'ready') return
-
-    stopKernelRecoveryPolling()
-    artifactListError.value = ''
-    tableError.value = ''
-    appStore.clearDataPaneError()
-
-    await loadWorkspaceArtifacts(workspaceId)
-
-    const selectedId = String(selectedArtifactId.value || '').trim()
-    if (!selectedId || isMemoryArtifactId(selectedId)) return
-    const artifactStillExists = allArtifacts.value.some(
-      (entry) => String(entry?.artifact_id || '').trim() === selectedId,
-    )
-    if (!artifactStillExists) return
-    await prepareArtifact(selectedId)
-  } catch (error) {
-    if (isAbortError(error)) return
-  }
-}
-
-function startKernelRecoveryPolling() {
-  if (kernelRecoveryPoller) return
-  void recoverTableStateAfterKernelReady()
-  kernelRecoveryPoller = setInterval(() => {
-    if (!document.hidden) {
-      void recoverTableStateAfterKernelReady()
-    }
-  }, 5000)
-}
-
 // ---------------------------------------------------------------------------
-// Load workspace artifact list whenever the workspace changes
+// Load active turn artifact list whenever the conversation turn changes
 // ---------------------------------------------------------------------------
-async function loadWorkspaceArtifacts(workspaceId) {
-  const normalizedWorkspaceId = String(workspaceId || '').trim()
-  if (!normalizedWorkspaceId || !appStore.hasWorkspace) {
+async function loadActiveTurnArtifacts() {
+  const conversationId = String(appStore.activeConversationId || '').trim()
+  const turnId = String(appStore.activeTurnId || '').trim()
+  if (!conversationId || !turnId || !appStore.hasWorkspace) {
     workspaceArtifacts.value = []
     selectedArtifactId.value = null
     return
@@ -678,31 +364,22 @@ async function loadWorkspaceArtifacts(workspaceId) {
   artifactListError.value = ''
   appStore.clearDataPaneError()
   try {
-    const response = await enqueueSerializedRequest(async () => {
-      await waitForKernelReady(normalizedWorkspaceId, listAbortController.signal)
-      return apiService.v1ListWorkspaceArtifacts(
-        normalizedWorkspaceId,
-        'dataframe',
-        { signal: listAbortController.signal }
-      )
-    })
+    const response = await enqueueSerializedRequest(() => apiService.v1ListTurnArtifacts(
+      conversationId,
+      turnId,
+      'dataframe',
+      { signal: listAbortController.signal }
+    ))
     const artifacts = Array.isArray(response?.artifacts) ? response.artifacts : []
     workspaceArtifacts.value = artifacts
-    workspaceKnownSavedTables.value = {
-      ...workspaceKnownSavedTables.value,
-      [normalizedWorkspaceId]: artifacts.length > 0
-    }
     const availableArtifactIds = new Set(
       displayArtifacts.value
         .map((item) => String(item?.artifact_id || '').trim())
         .filter(Boolean),
     )
-    const preferredSelection = resolvePreferredTableSelectionId(normalizedWorkspaceId, availableArtifactIds)
+    const preferredSelection = resolvePreferredTableSelectionId(availableArtifactIds)
     if (preferredSelection) {
       selectedArtifactId.value = preferredSelection
-      if (preferredSelection === String(pendingAutoSelectArtifactId.value || '').trim()) {
-        pendingAutoSelectArtifactId.value = ''
-      }
     } else {
       const currentSelection = String(selectedArtifactId.value || '').trim()
       const hasCurrentSelection = Boolean(currentSelection && availableArtifactIds.has(currentSelection))
@@ -712,84 +389,43 @@ async function loadWorkspaceArtifacts(workspaceId) {
     }
   } catch (error) {
     if (isAbortError(error)) return
-    console.warn('Failed to load workspace artifacts:', error)
+    console.warn('Failed to load active turn artifacts:', error)
     const brief = error?.response?.data?.detail || error?.message || 'Failed to load tables'
     artifactListError.value = brief
     appStore.setDataPaneError(brief)
-    if (isKernelReadinessTimeoutMessage(brief)) {
-      startKernelRecoveryPolling()
-    }
     workspaceArtifacts.value = []
   } finally {
     isLoadingArtifacts.value = false
   }
 }
 
-async function recoverFromMissingArtifact(artifactId) {
-  const missingArtifactId = String(artifactId || '').trim()
-  if (!missingArtifactId || !appStore.activeWorkspaceId || !appStore.hasWorkspace) return
-  if (isRecoveringMissingArtifact) return
-  isRecoveringMissingArtifact = true
-  try {
-    tableError.value = 'Selected table was removed. Refreshing table list...'
-    await loadWorkspaceArtifacts(appStore.activeWorkspaceId)
-    const stillExists = allArtifacts.value.some((item) => item.artifact_id === missingArtifactId)
-    if (stillExists) {
-      tableError.value = ''
-      return
-    }
-    const fallbackId = displayArtifacts.value[0]?.artifact_id || null
-    selectedArtifactId.value = fallbackId
-    if (!fallbackId) {
-      tableError.value = 'Selected table no longer exists. Run code to create a new table.'
-    } else {
-      tableError.value = ''
-    }
-  } finally {
-    isRecoveringMissingArtifact = false
-  }
-}
-
-watch(() => appStore.activeWorkspaceId, (id) => {
-  stopKernelRecoveryPolling()
+watch(() => appStore.activeWorkspaceId, () => {
   tableSearch.value = ''
   pendingRestorePageByArtifact.clear()
-  pendingAutoSelectArtifactId.value = ''
   selectedArtifactLoadToken += 1
   selectedArtifactId.value = null
+  workspaceArtifacts.value = []
   resetTableState()
-  loadWorkspaceArtifacts(id)
 }, { immediate: true })
 
 watch(
   () => [
+    String(appStore.activeConversationId || '').trim(),
     String(appStore.activeTurnId || '').trim(),
     String(appStore.activeTurnArtifactRefreshKey || 0),
-    Array.from(activeTurnArtifactIds.value).sort().join('|'),
-    Array.from(livePersistedArtifactIds.value).sort().join('|'),
   ].join('||'),
   async () => {
-    const workspaceId = String(appStore.activeWorkspaceId || '').trim()
-    if (!workspaceId || !appStore.hasWorkspace) return
+    if (!appStore.hasWorkspace) return
 
     const previousSelection = String(selectedArtifactId.value || '').trim()
-    await loadWorkspaceArtifacts(workspaceId)
+    await loadActiveTurnArtifacts()
 
     const nextSelection = String(selectedArtifactId.value || '').trim()
     if (!nextSelection || nextSelection !== previousSelection) return
 
     resetTableState()
 
-    if (isMemoryArtifactId(nextSelection)) {
-      const memoryArtifact = displayArtifacts.value.find(
-        (entry) => entry.artifact_id === nextSelection && entry.source === 'memory',
-      )
-      if (memoryArtifact) {
-        loadInMemoryArtifact(memoryArtifact)
-      }
-      return
-    }
-
+    const workspaceId = String(appStore.activeWorkspaceId || '').trim()
     const rememberedPage = appStore.getTablePageOffset(workspaceId, nextSelection)
     if (Number.isInteger(rememberedPage) && rememberedPage > 0) {
       pendingRestorePageByArtifact.set(nextSelection, rememberedPage)
@@ -802,15 +438,6 @@ watch(
     } catch (error) {
       if (isAbortError(error)) return
       tableError.value = error?.message || 'Failed to load selected table.'
-    }
-  },
-)
-
-watch(
-  () => appStore.getWorkspaceKernelStatus(appStore.activeWorkspaceId),
-  (status) => {
-    if (status === 'ready' && kernelRecoveryPoller) {
-      void recoverTableStateAfterKernelReady()
     }
   },
 )
@@ -833,22 +460,11 @@ watch(selectedArtifactId, async (newId) => {
     appStore.clearTableViewport()
     return
   }
-  if (isMemoryArtifactId(newId)) {
-    const memoryArtifact = displayArtifacts.value.find((entry) => entry.artifact_id === newId && entry.source === 'memory')
-    if (memoryArtifact) {
-      loadInMemoryArtifact(memoryArtifact)
-      return
-    }
-  }
   const isKnownPersistedArtifact = allArtifacts.value.some(
     (entry) => String(entry?.artifact_id || '').trim() === String(newId || '').trim(),
-  ) || displayArtifacts.value.some(
-    (entry) => entry?.source === 'artifact' && String(entry?.artifact_id || '').trim() === String(newId || '').trim(),
   )
   if (!isKnownPersistedArtifact) {
-    if (appStore.activeWorkspaceId && appStore.hasWorkspace) {
-      void loadWorkspaceArtifacts(appStore.activeWorkspaceId)
-    }
+    tableError.value = 'Selected table is not available for this turn.'
     return
   }
   const rememberedPage = appStore.getTablePageOffset(appStore.activeWorkspaceId, newId)
@@ -882,17 +498,6 @@ watch(tableSearch, () => {
     })
   }, 200)
 })
-
-watch(
-  () => [tableError.value, artifactListError.value, appStore.dataPaneError].join('||'),
-  (combinedMessage) => {
-    if (isKernelReadinessTimeoutMessage(combinedMessage)) {
-      startKernelRecoveryPolling()
-      return
-    }
-    stopKernelRecoveryPolling()
-  }
-)
 
 // ---------------------------------------------------------------------------
 // Computed helpers
@@ -1004,19 +609,6 @@ function resetTableState() {
   }
 }
 
-function loadInMemoryArtifact(artifact) {
-  const rows = Array.isArray(artifact?.memory_rows) ? artifact.memory_rows : []
-  useClientFallback.value = true
-  tableError.value = ''
-  clientRows.value = rows
-  serverRows.value = []
-  serverColumns.value = rows[0] ? Object.keys(rows[0]) : []
-  rowCountValue.value = Number(artifact?.row_count || rows.length || 0)
-  windowStart.value = rows.length > 0 ? 1 : 0
-  windowEnd.value = rows.length > 0 ? Math.min(pageSize, rowCountValue.value || rows.length) : 0
-  appStore.setTableViewport(windowStart.value, windowEnd.value, rowCountValue.value)
-}
-
 function onGridReady(params) {
   gridApi = params.api
   if (useInfiniteModel.value) {
@@ -1091,15 +683,18 @@ function columnsChanged(nextColumns) {
 // Data loading
 // ---------------------------------------------------------------------------
 async function prepareArtifact(artifactId) {
-  if (!artifactId || !appStore.activeWorkspaceId) return
+  if (!artifactId || !appStore.activeWorkspaceId || !appStore.activeConversationId || !appStore.activeTurnId) return
   tableError.value = ''
   useClientFallback.value = false
 
   try {
     const workspaceId = appStore.activeWorkspaceId
+    const conversationId = appStore.activeConversationId
+    const turnId = appStore.activeTurnId
     await enqueueSerializedRequest(async () => {
-      await waitForKernelReady(workspaceId, null)
       if (workspaceId !== appStore.activeWorkspaceId) throw createAbortError()
+      if (conversationId !== appStore.activeConversationId) throw createAbortError()
+      if (turnId !== appStore.activeTurnId) throw createAbortError()
       // Always use server infinite model for persisted artifacts
       clientRows.value = []
       await loadInitialServerPage(artifactId)
@@ -1114,13 +709,16 @@ async function prepareArtifact(artifactId) {
 }
 
 async function loadInitialServerPage(artifactId) {
-  if (!artifactId || !appStore.activeWorkspaceId) return
+  const conversationId = String(appStore.activeConversationId || '').trim()
+  const turnId = String(appStore.activeTurnId || '').trim()
+  if (!artifactId || !conversationId || !turnId) return
   isPageLoading.value = true
   const controller = new AbortController()
   pendingControllers.add(controller)
   try {
-    const payload = await apiService.getDataframeArtifactRows(
-      appStore.activeWorkspaceId,
+    const payload = await apiService.getTurnDataframeArtifactRows(
+      conversationId,
+      turnId,
       artifactId,
       0,
       pageSize,
@@ -1144,10 +742,6 @@ async function loadInitialServerPage(artifactId) {
     appStore.setTableViewport(windowStart.value, windowEnd.value, rowCountValue.value)
   } catch (error) {
     if (isAbortError(error)) return
-    if (isMissingArtifactRowsError(error)) {
-      await recoverFromMissingArtifact(artifactId)
-      return
-    }
     console.error('Failed to load initial dataframe page:', error)
     tableError.value = error?.message || 'Failed to load table data.'
     serverRows.value = []
@@ -1165,13 +759,14 @@ async function loadInitialServerPage(artifactId) {
 
 async function attachInfiniteDatasource(artifactId) {
   const aid = artifactId || selectedArtifactId.value
-  if (!aid || !appStore.activeWorkspaceId) return
+  const conversationId = String(appStore.activeConversationId || '').trim()
+  const turnId = String(appStore.activeTurnId || '').trim()
+  if (!aid || !conversationId || !turnId) return
   cancelPendingRequests()
   currentDatasourceToken += 1
   if (!isGridAlive()) return
   const datasourceTag = currentDatasourceToken
 
-  const workspaceId = appStore.activeWorkspaceId
   const datasource = {
     rowCount: null,
     getRows: async (params) => {
@@ -1189,8 +784,9 @@ async function attachInfiniteDatasource(artifactId) {
             typeof params.filterModel === 'object' &&
             !Array.isArray(params.filterModel)
           ) ? params.filterModel : {}
-          return apiService.getDataframeArtifactRows(
-            workspaceId,
+          return apiService.getTurnDataframeArtifactRows(
+            conversationId,
+            turnId,
             aid,
             startRow,
             requestLimit,
@@ -1225,12 +821,6 @@ async function attachInfiniteDatasource(artifactId) {
         appStore.setTableViewport(windowStart.value, windowEnd.value, rowCountValue.value)
       } catch (error) {
         if (isAbortError(error)) return
-        if (isMissingArtifactRowsError(error)) {
-          await recoverFromMissingArtifact(aid)
-          if (!isGridAlive() || datasourceTag !== currentDatasourceToken) return
-          params.successCallback([], 0)
-          return
-        }
         console.error('Failed to load dataframe page:', error)
         if (!isGridAlive() || datasourceTag !== currentDatasourceToken) return
         tableError.value = error?.message || 'Failed to load paginated table data.'
@@ -1368,20 +958,20 @@ function closeDeleteDialog() {
 }
 
 async function deleteSelectedArtifact() {
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  const conversationId = String(appStore.activeConversationId || '').trim()
+  const turnId = String(appStore.activeTurnId || '').trim()
   const artifactId = String(selectedArtifactId.value || '').trim()
-  if (!workspaceId || !artifactId || isDeletingArtifact.value) return
-  if (isMemoryArtifactId(artifactId)) return
+  if (!conversationId || !turnId || !artifactId || isDeletingArtifact.value) return
 
   isDeleteDialogOpen.value = false
   isDeletingArtifact.value = true
   tableError.value = ''
   try {
-    await apiService.v1DeleteWorkspaceArtifact(workspaceId, artifactId)
-    await loadWorkspaceArtifacts(workspaceId)
-    const fallbackId = allArtifacts.value[0]?.artifact_id || null
-    selectedArtifactId.value = fallbackId
-    if (!fallbackId) {
+    await apiService.v1DeleteTurnArtifact(conversationId, turnId, artifactId)
+    await loadActiveTurnArtifacts()
+    const remainingArtifactId = allArtifacts.value[0]?.artifact_id || null
+    selectedArtifactId.value = remainingArtifactId
+    if (!remainingArtifactId) {
       resetTableState()
       appStore.clearTableViewport()
     }

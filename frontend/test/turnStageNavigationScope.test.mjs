@@ -11,16 +11,18 @@ test('active turn payload syncs the editor code and keys pane state by active tu
   assert.equal(source.includes("return `${workspaceKey}::${turnKey || 'workspace'}`"), true)
 })
 
-test('TableTab scopes persisted artifacts to selected turn ids while still allowing live artifacts', () => {
+test('TableTab loads persisted artifacts only from the selected turn API', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/analysis/TableTab.vue'), 'utf-8')
 
-  assert.equal(source.includes('const activeTurnArtifactIds = computed(() => {'), true)
-  assert.equal(source.includes('const livePersistedArtifactIds = computed(() => {'), true)
-  assert.equal(source.includes('const scopedPersistedArtifacts = computed(() => {'), true)
-  assert.equal(source.includes('...activeTurnArtifactIds.value,'), true)
-  assert.equal(source.includes('...livePersistedArtifactIds.value,'), true)
+  assert.equal(source.includes('const activeTurnArtifactIds = computed(() => {'), false)
+  assert.equal(source.includes('const livePersistedArtifactIds = computed(() => {'), false)
+  assert.equal(source.includes('const scopedPersistedArtifacts = computed(() => {'), false)
+  assert.equal(source.includes('...activeTurnArtifactIds.value,'), false)
+  assert.equal(source.includes('...livePersistedArtifactIds.value,'), false)
   assert.equal(source.includes('if (!turnId) return allArtifacts.value'), false)
-  assert.equal(source.includes('const persistedArtifacts = scopedPersistedArtifacts.value.map((artifact) => ({'), true)
+  assert.equal(source.includes('apiService.v1ListTurnArtifacts('), true)
+  assert.equal(source.includes('apiService.getTurnDataframeArtifactRows('), true)
+  assert.equal(source.includes('apiService.v1ListWorkspaceArtifacts('), false)
 })
 
 test('FigureTab scopes persisted artifacts to selected turn ids while still allowing live artifacts', () => {

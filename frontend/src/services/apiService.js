@@ -567,6 +567,72 @@ export const apiService = {
     return withAbortSignal(inFlight, options?.signal || null)
   },
 
+  async getTurnDataframeArtifactRows(conversationId, turnId, artifactId, offset = 0, limit = 1000, options = {}) {
+    const normalizedSortModel = Array.isArray(options?.sortModel) ? options.sortModel : []
+    const normalizedFilterModel = (
+      options?.filterModel &&
+      typeof options.filterModel === 'object' &&
+      !Array.isArray(options.filterModel)
+    ) ? options.filterModel : {}
+    const normalizedSearchText = String(options?.searchText || '').trim()
+    const sortModelPayload = JSON.stringify(normalizedSortModel)
+    const filterModelPayload = JSON.stringify(normalizedFilterModel)
+
+    const requestKey = [
+      'turn',
+      conversationId,
+      turnId,
+      artifactId,
+      Number(offset || 0),
+      Number(limit || 0),
+      sortModelPayload,
+      filterModelPayload,
+      normalizedSearchText,
+    ].join(':')
+    const cached = readArtifactRowsCache(requestKey)
+    if (cached) {
+      return withAbortSignal(Promise.resolve(cached), options?.signal || null)
+    }
+    let inFlight = artifactRowsInFlight.get(requestKey)
+
+    if (!inFlight) {
+      inFlight = (async () => {
+        const queryParams = new URLSearchParams({
+          offset: String(offset),
+          limit: String(limit),
+        })
+        if (sortModelPayload !== '[]') {
+          queryParams.set('sort_model', sortModelPayload)
+        }
+        if (filterModelPayload !== '{}') {
+          queryParams.set('filter_model', filterModelPayload)
+        }
+        if (normalizedSearchText) {
+          queryParams.set('search', normalizedSearchText)
+        }
+        const response = await authorizedFetch(
+          `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/conversations/${conversationId}/turns/${turnId}/artifacts/${artifactId}/rows?${queryParams.toString()}`,
+          {
+            method: 'GET',
+          }
+        )
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}))
+          throw new Error(detail.detail || `Turn artifact row fetch failed (${response.status})`)
+        }
+        const payload = await response.json()
+        writeArtifactRowsCache(requestKey, payload)
+        return cloneArtifactRowsPayload(payload)
+      })().finally(() => {
+        artifactRowsInFlight.delete(requestKey)
+      })
+
+      artifactRowsInFlight.set(requestKey, inFlight)
+    }
+
+    return withAbortSignal(inFlight, options?.signal || null)
+  },
+
   async executeTerminalCommand(workspaceId, payload) {
     const response = await authorizedFetch(
       `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/workspaces/${workspaceId}/terminal/execute`,
@@ -1110,6 +1176,51 @@ export const apiService = {
     if (!response.ok) {
       const detail = await response.json().catch(() => ({}))
       const err = new Error(detail.detail || `Artifact list fetch failed (${response.status})`)
+      err.status = response.status
+      throw err
+    }
+    return response.json()
+  },
+
+  async v1ListTurnArtifacts(conversationId, turnId, kind = 'dataframe', options = {}) {
+    const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/conversations/${conversationId}/turns/${turnId}/artifacts?kind=${encodeURIComponent(kind)}`
+    const response = await authorizedFetch(url, {
+      method: 'GET',
+      signal: options?.signal || null,
+    })
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}))
+      const err = new Error(detail.detail || `Turn artifact list fetch failed (${response.status})`)
+      err.status = response.status
+      throw err
+    }
+    return response.json()
+  },
+
+  async v1GetTurnArtifactMetadata(conversationId, turnId, artifactId, options = {}) {
+    const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/conversations/${conversationId}/turns/${turnId}/artifacts/${artifactId}`
+    const response = await authorizedFetch(url, {
+      method: 'GET',
+      signal: options?.signal || null,
+    })
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}))
+      const err = new Error(detail.detail || `Turn artifact metadata fetch failed (${response.status})`)
+      err.status = response.status
+      throw err
+    }
+    return response.json()
+  },
+
+  async v1DeleteTurnArtifact(conversationId, turnId, artifactId, options = {}) {
+    const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/conversations/${conversationId}/turns/${turnId}/artifacts/${artifactId}`
+    const response = await authorizedFetch(url, {
+      method: 'DELETE',
+      signal: options?.signal || null,
+    })
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}))
+      const err = new Error(detail.detail || `Turn artifact delete failed (${response.status})`)
       err.status = response.status
       throw err
     }

@@ -4,15 +4,17 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-test('TableTab serializes artifact requests and gates list fetch on kernel readiness', () => {
+test('TableTab serializes artifact requests without kernel readiness gating', () => {
   const __filename = fileURLToPath(import.meta.url)
   const __dirname = path.dirname(__filename)
   const filePath = path.resolve(__dirname, '..', 'src', 'components', 'analysis', 'TableTab.vue')
   const source = fs.readFileSync(filePath, 'utf8')
 
   assert.equal(source.includes('function enqueueSerializedRequest(task)'), true)
-  assert.equal(source.includes('async function waitForKernelReady(workspaceId, signal)'), true)
-  assert.equal(source.includes('await waitForKernelReady(normalizedWorkspaceId, listAbortController.signal)'), true)
+  assert.equal(source.includes('async function waitForKernelReady(workspaceId, signal)'), false)
+  assert.equal(source.includes('await waitForKernelReady('), false)
+  assert.equal(source.includes('apiService.v1ListTurnArtifacts('), true)
+  assert.equal(source.includes('apiService.getTurnDataframeArtifactRows('), true)
   assert.equal(source.includes('watch(() => appStore.dataframes.length'), false)
   assert.equal(source.includes('params.failCallback()'), false)
   assert.equal(source.includes('`infinite-${selectedArtifactId}-${datasourceVersion}`'), false)

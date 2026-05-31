@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('status bar and table tab use app store as the single kernel status source of truth', () => {
+test('status bar owns kernel status while table tab reads saved artifacts without kernel gating', () => {
   const statusBarSource = readFileSync(
     resolve(process.cwd(), 'src/components/layout/StatusBar.vue'),
     'utf-8',
@@ -18,7 +18,8 @@ test('status bar and table tab use app store as the single kernel status source 
   assert.equal(statusBarSource.includes('appStore.setWorkspaceKernelStatus(normalizedWorkspaceId, status)'), true)
 
   assert.equal(tableTabSource.includes('kernelReadyWorkspaceId'), false)
-  assert.equal(tableTabSource.includes("if (appStore.getWorkspaceKernelStatus(normalizedWorkspaceId) === 'ready') {"), true)
-  assert.equal(tableTabSource.includes('appStore.setWorkspaceKernelStatus(normalizedWorkspaceId, status)'), true)
-  assert.equal(tableTabSource.includes('() => appStore.getWorkspaceKernelStatus(appStore.activeWorkspaceId)'), true)
+  assert.equal(tableTabSource.includes('appStore.getWorkspaceKernelStatus'), false)
+  assert.equal(tableTabSource.includes('appStore.setWorkspaceKernelStatus'), false)
+  assert.equal(tableTabSource.includes('apiService.v1GetWorkspaceKernelStatus'), false)
+  assert.equal(tableTabSource.includes('apiService.v1ListTurnArtifacts('), true)
 })
