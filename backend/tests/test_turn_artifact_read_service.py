@@ -219,7 +219,7 @@ async def test_turn_artifact_read_service_delete_removes_file_and_manifest_entry
 
 
 @pytest.mark.asyncio
-async def test_turn_artifact_read_service_prefers_kernel_usage_for_legacy_scratchpad(monkeypatch, tmp_path) -> None:
+async def test_turn_artifact_read_service_usage_counts_only_turn_artifact_files(monkeypatch, tmp_path) -> None:
     artifact_path = tmp_path / "artifact.json"
     artifact_path.write_text('{"figure": {"data": []}}', encoding="utf-8")
     row = SimpleNamespace(
@@ -240,22 +240,13 @@ async def test_turn_artifact_read_service_prefers_kernel_usage_for_legacy_scratc
         _ = (session, workspace_id, kind, statuses)
         return [row]
 
-    async def fake_kernel_usage(self, workspace_id: str):
-        _ = self
-        assert workspace_id == "workspace-1"
-        return {"duckdb_bytes": 128, "figure_count": 3}
-
     def fail_if_called(*args, **kwargs):
         _ = (args, kwargs)
-        raise AssertionError("scratchpad usage fallback should not be used when kernel usage succeeds")
+        raise AssertionError("scratchpad usage fallback should not be used")
 
     monkeypatch.setattr(
         "app.v1.services.turn_artifact_read_service.TurnArtifactRepository.list_for_workspace",
         fake_list_for_workspace,
-    )
-    monkeypatch.setattr(
-        "app.v1.services.turn_artifact_read_service.ScratchpadRuntimeAdapter.get_workspace_artifact_usage",
-        fake_kernel_usage,
     )
     monkeypatch.setattr(
         "app.v1.services.turn_artifact_read_service.ArtifactScratchpadStore.get_workspace_artifact_usage",
@@ -269,6 +260,6 @@ async def test_turn_artifact_read_service_prefers_kernel_usage_for_legacy_scratc
     )
 
     assert usage == {
-        "duckdb_bytes": artifact_path.stat().st_size + 128,
-        "figure_count": 4,
+        "duckdb_bytes": artifact_path.stat().st_size,
+        "figure_count": 1,
     }

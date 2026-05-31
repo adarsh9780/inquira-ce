@@ -17,12 +17,10 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...data_access import ScratchpadRuntimeAdapter
 from ...services.code_executor import (
     bootstrap_workspace_runtime,
     execute_code,
     get_workspace_columns_via_kernel,
-    get_workspace_dataframe_rows,
     get_workspace_kernel_status,
     get_workspace_run_exports,
     get_workspace_table_schema_via_kernel,
@@ -1340,20 +1338,6 @@ async def get_workspace_dataframe_artifact_rows(
         search_text=search_text,
     )
     if rows is None:
-        await _release_appdata_session_before_kernel(session)
-        try:
-            rows = await get_workspace_dataframe_rows(
-                workspace_id=workspace_id,
-                artifact_id=artifact_id,
-                offset=offset,
-                limit=limit,
-                sort_model=cast(list[dict[str, Any]], parsed_sort_model),
-                filter_model=cast(dict[str, Any], parsed_filter_model),
-                search_text=search_text,
-            )
-        except RuntimeError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-    if rows is None:
         raise HTTPException(status_code=404, detail="Dataframe artifact not found")
     return DataframeArtifactRowsResponse(**rows)
 
@@ -1399,20 +1383,6 @@ async def get_workspace_artifact_rows(
         filter_model=cast(dict[str, Any], parsed_filter_model),
         search_text=search_text,
     )
-    if rows is None:
-        await _release_appdata_session_before_kernel(session)
-        try:
-            rows = await get_workspace_dataframe_rows(
-                workspace_id=workspace_id,
-                artifact_id=artifact_id,
-                offset=offset,
-                limit=limit,
-                sort_model=cast(list[dict[str, Any]], parsed_sort_model),
-                filter_model=cast(dict[str, Any], parsed_filter_model),
-                search_text=search_text,
-            )
-        except RuntimeError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
     if rows is None:
         raise HTTPException(status_code=404, detail="Artifact rows not found")
     return DataframeArtifactRowsResponse(**rows)
@@ -1499,15 +1469,6 @@ async def get_workspace_artifact_metadata(
         artifact_id=artifact_id,
     )
     if artifact is None:
-        await _release_appdata_session_before_kernel(session)
-        try:
-            artifact = await ScratchpadRuntimeAdapter().get_workspace_artifact_metadata(
-                workspace_id=workspace_id,
-                artifact_id=artifact_id,
-            )
-        except RuntimeError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-    if artifact is None:
         raise HTTPException(status_code=404, detail="Artifact not found")
     return ArtifactMetadataResponse(**artifact)
 
@@ -1528,15 +1489,6 @@ async def delete_workspace_artifact(
         workspace_id=workspace_id,
         artifact_id=artifact_id,
     )
-    if not deleted:
-        await _release_appdata_session_before_kernel(session)
-        try:
-            deleted = await ScratchpadRuntimeAdapter().delete_workspace_artifact(
-                workspace_id=workspace_id,
-                artifact_id=artifact_id,
-            )
-        except RuntimeError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not deleted:
         raise HTTPException(status_code=404, detail="Artifact not found")
     return ArtifactDeleteResponse(artifact_id=artifact_id, deleted=True)
@@ -1562,19 +1514,6 @@ async def list_workspace_artifacts(
         workspace_id=workspace_id,
         kind=kind,
     )
-    seen_artifact_ids = {str(item.get("artifact_id") or "") for item in items}
-    await _release_appdata_session_before_kernel(session)
-    try:
-        legacy_items = await ScratchpadRuntimeAdapter().list_workspace_artifacts(
-            workspace_id=workspace_id,
-            kind=kind,
-        )
-    except RuntimeError:
-        legacy_items = []
-    for legacy_item in legacy_items:
-        artifact_id = str(legacy_item.get("artifact_id") or "")
-        if artifact_id and artifact_id not in seen_artifact_ids:
-            items.append(legacy_item)
     summaries = [
         WorkspaceArtifactSummary(
             artifact_id=item["artifact_id"],

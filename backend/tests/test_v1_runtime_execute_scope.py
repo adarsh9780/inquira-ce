@@ -439,15 +439,8 @@ async def test_workspace_dataframe_artifact_rows_endpoint(monkeypatch, tmp_path)
         _ = (session, user_id, workspace_id)
         return workspace
 
-    async def fake_get_rows(
-        workspace_id: str,
-        artifact_id: str,
-        offset: int,
-        limit: int,
-        sort_model=None,
-        filter_model=None,
-        search_text=None,
-    ):
+    async def fake_get_rows(session, *, workspace_id, artifact_id, offset, limit, sort_model=None, filter_model=None, search_text=None):
+        _ = session
         assert workspace_id == "ws-5"
         assert artifact_id == "art-1"
         assert offset == 0
@@ -466,12 +459,7 @@ async def test_workspace_dataframe_artifact_rows_endpoint(monkeypatch, tmp_path)
         }
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    async def fake_get_turn_rows(session, *, workspace_id, artifact_id, offset, limit, sort_model=None, filter_model=None, search_text=None):
-        _ = (session, workspace_id, artifact_id, offset, limit, sort_model, filter_model, search_text)
-        return None
-
-    monkeypatch.setattr(runtime_api.TurnArtifactReadService, "get_dataframe_rows", fake_get_turn_rows)
-    monkeypatch.setattr(runtime_api, "get_workspace_dataframe_rows", fake_get_rows)
+    monkeypatch.setattr(runtime_api.TurnArtifactReadService, "get_dataframe_rows", fake_get_rows)
 
     response = await runtime_api.get_workspace_dataframe_artifact_rows(
         workspace_id="ws-5",
@@ -500,15 +488,8 @@ async def test_workspace_dataframe_artifact_rows_endpoint_forwards_sort_filter_a
         return workspace
 
     captured = {}
-    async def fake_get_rows(
-        workspace_id: str,
-        artifact_id: str,
-        offset: int,
-        limit: int,
-        sort_model=None,
-        filter_model=None,
-        search_text=None,
-    ):
+    async def fake_get_rows(session, *, workspace_id, artifact_id, offset, limit, sort_model=None, filter_model=None, search_text=None):
+        _ = session
         captured["workspace_id"] = workspace_id
         captured["artifact_id"] = artifact_id
         captured["offset"] = offset
@@ -527,12 +508,7 @@ async def test_workspace_dataframe_artifact_rows_endpoint_forwards_sort_filter_a
         }
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    async def fake_get_turn_rows(session, *, workspace_id, artifact_id, offset, limit, sort_model=None, filter_model=None, search_text=None):
-        _ = (session, workspace_id, artifact_id, offset, limit, sort_model, filter_model, search_text)
-        return None
-
-    monkeypatch.setattr(runtime_api.TurnArtifactReadService, "get_dataframe_rows", fake_get_turn_rows)
-    monkeypatch.setattr(runtime_api, "get_workspace_dataframe_rows", fake_get_rows)
+    monkeypatch.setattr(runtime_api.TurnArtifactReadService, "get_dataframe_rows", fake_get_rows)
 
     response = await runtime_api.get_workspace_dataframe_artifact_rows(
         workspace_id="ws-5",
@@ -568,8 +544,8 @@ async def test_workspace_artifact_metadata_endpoint(monkeypatch, tmp_path):
         _ = (session, user_id, workspace_id)
         return workspace
 
-    async def fake_get_meta(self, workspace_id: str, artifact_id: str):
-        _ = self
+    async def fake_get_meta(session, *, workspace_id, artifact_id):
+        _ = session
         assert workspace_id == "ws-5"
         assert artifact_id == "fig-1"
         return {
@@ -590,12 +566,7 @@ async def test_workspace_artifact_metadata_endpoint(monkeypatch, tmp_path):
         }
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    async def fake_get_turn_meta(session, *, workspace_id, artifact_id):
-        _ = (session, workspace_id, artifact_id)
-        return None
-
-    monkeypatch.setattr(runtime_api.TurnArtifactReadService, "get_workspace_artifact", fake_get_turn_meta)
-    monkeypatch.setattr(runtime_api.ScratchpadRuntimeAdapter, "get_workspace_artifact_metadata", fake_get_meta)
+    monkeypatch.setattr(runtime_api.TurnArtifactReadService, "get_workspace_artifact", fake_get_meta)
 
     response = await runtime_api.get_workspace_artifact_metadata(
         workspace_id="ws-5",
@@ -622,19 +593,14 @@ async def test_workspace_artifact_delete_endpoint(monkeypatch, tmp_path):
         _ = (session, user_id, workspace_id)
         return workspace
 
-    async def fake_delete_artifact_via_kernel(self, workspace_id: str, artifact_id: str) -> bool:
-        _ = self
+    async def fake_delete_turn_artifact(session, *, workspace_id, artifact_id):
+        _ = session
         assert workspace_id == "ws-5"
         assert artifact_id == "fig-1"
         return True
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    async def fake_delete_turn_artifact(session, *, workspace_id, artifact_id):
-        _ = (session, workspace_id, artifact_id)
-        return False
-
     monkeypatch.setattr(runtime_api.TurnArtifactReadService, "delete_workspace_artifact", fake_delete_turn_artifact)
-    monkeypatch.setattr(runtime_api.ScratchpadRuntimeAdapter, "delete_workspace_artifact", fake_delete_artifact_via_kernel)
 
     response = await runtime_api.delete_workspace_artifact(
         workspace_id="ws-5",
@@ -659,17 +625,12 @@ async def test_workspace_artifact_metadata_endpoint_returns_404_when_missing(mon
         _ = (session, user_id, workspace_id)
         return workspace
 
-    async def fake_get_meta(self, workspace_id: str, artifact_id: str):
-        _ = (self, workspace_id, artifact_id)
-        return None
-
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     async def fake_get_turn_meta(session, *, workspace_id, artifact_id):
         _ = (session, workspace_id, artifact_id)
         return None
 
     monkeypatch.setattr(runtime_api.TurnArtifactReadService, "get_workspace_artifact", fake_get_turn_meta)
-    monkeypatch.setattr(runtime_api.ScratchpadRuntimeAdapter, "get_workspace_artifact_metadata", fake_get_meta)
 
     with pytest.raises(runtime_api.HTTPException) as exc:
         await runtime_api.get_workspace_artifact_metadata(
@@ -695,17 +656,12 @@ async def test_workspace_artifact_delete_endpoint_returns_404_when_missing(monke
         _ = (session, user_id, workspace_id)
         return workspace
 
-    async def fake_delete_artifact_via_kernel(self, workspace_id: str, artifact_id: str) -> bool:
-        _ = (self, workspace_id, artifact_id)
-        return False
-
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     async def fake_delete_turn_artifact(session, *, workspace_id, artifact_id):
         _ = (session, workspace_id, artifact_id)
         return False
 
     monkeypatch.setattr(runtime_api.TurnArtifactReadService, "delete_workspace_artifact", fake_delete_turn_artifact)
-    monkeypatch.setattr(runtime_api.ScratchpadRuntimeAdapter, "delete_workspace_artifact", fake_delete_artifact_via_kernel)
 
     with pytest.raises(runtime_api.HTTPException) as exc:
         await runtime_api.delete_workspace_artifact(
@@ -829,7 +785,7 @@ async def test_workspace_artifact_usage_endpoint_uses_workspace_storage_path(mon
 
 
 @pytest.mark.asyncio
-async def test_workspace_artifact_list_endpoint_merges_metadata_and_legacy_items(monkeypatch, tmp_path):
+async def test_workspace_artifact_list_endpoint_returns_only_turn_artifact_metadata(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws-list"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     duckdb_path = workspace_dir / "workspace.duckdb"
@@ -854,32 +810,8 @@ async def test_workspace_artifact_list_endpoint_merges_metadata_and_legacy_items
             }
         ]
 
-    async def fake_list_legacy_artifacts(self, workspace_id, kind=None):
-        _ = (self, workspace_id, kind)
-        return [
-            {
-                "artifact_id": "artifact-1",
-                "logical_name": "summary_df",
-                "kind": "dataframe",
-                "row_count": 2,
-                "schema": [{"name": "amount", "dtype": "INTEGER"}],
-                "created_at": "2026-05-17T00:00:00+00:00",
-                "status": "ready",
-            },
-            {
-                "artifact_id": "legacy-1",
-                "logical_name": "legacy_chart",
-                "kind": "figure",
-                "row_count": None,
-                "schema": None,
-                "created_at": "2026-05-17T00:00:00+00:00",
-                "status": "ready",
-            },
-        ]
-
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(runtime_api.TurnArtifactReadService, "list_workspace_artifacts", fake_list_turn_artifacts)
-    monkeypatch.setattr(runtime_api.ScratchpadRuntimeAdapter, "list_workspace_artifacts", fake_list_legacy_artifacts)
 
     response = await runtime_api.list_workspace_artifacts(
         workspace_id="ws-list",
@@ -888,8 +820,8 @@ async def test_workspace_artifact_list_endpoint_merges_metadata_and_legacy_items
         current_user=SimpleNamespace(id="user-1"),
     )
 
-    assert response.total == 2
-    assert {item.artifact_id for item in response.artifacts} == {"artifact-1", "legacy-1"}
+    assert response.total == 1
+    assert {item.artifact_id for item in response.artifacts} == {"artifact-1"}
 
 
 @pytest.mark.asyncio
