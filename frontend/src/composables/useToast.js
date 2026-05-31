@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 const toasts = ref([])
 const notificationHistory = ref([])
 const MAX_NOTIFICATION_HISTORY = 100
+const DUPLICATE_NOTIFICATION_WINDOW_MS = 60_000
 let toastId = 0
 
 function normalizeDuration(duration, fallback) {
@@ -29,6 +30,16 @@ function trimNotificationHistory() {
   notificationHistory.value.splice(MAX_NOTIFICATION_HISTORY)
 }
 
+function isDuplicateNotification(candidate, createdAt) {
+  return notificationHistory.value.some((entry) => (
+    createdAt - Number(entry?.createdAt || 0) <= DUPLICATE_NOTIFICATION_WINDOW_MS
+    && String(entry?.type || '') === candidate.type
+    && String(entry?.title || '') === candidate.title
+    && String(entry?.message || '') === candidate.message
+    && String(entry?.category || '') === candidate.category
+  ))
+}
+
 export function useToast() {
   function showToast(type, title, message = '', durationOrOptions = 5000, options = {}) {
     const { duration, options: normalizedOptions } = normalizeToastOptions(
@@ -43,6 +54,17 @@ export function useToast() {
     const metadata = normalizedOptions?.metadata && typeof normalizedOptions.metadata === 'object'
       ? { ...normalizedOptions.metadata }
       : {}
+    const category = String(normalizedOptions?.category || '').trim()
+
+    const duplicateCandidate = {
+      type,
+      title: normalizedTitle,
+      message: normalizedMessage,
+      category,
+    }
+    if (isDuplicateNotification(duplicateCandidate, createdAt)) {
+      return 0
+    }
 
     const toast = {
       id,
@@ -55,7 +77,7 @@ export function useToast() {
       statusCode: Number.isFinite(Number(normalizedOptions?.statusCode))
         ? Number(normalizedOptions.statusCode)
         : null,
-      category: String(normalizedOptions?.category || '').trim(),
+      category,
       metadata,
       isVisible: true,
     }
