@@ -21,6 +21,6 @@ test('table and figure delete flows use shared confirmation modal before delete 
   assert.equal(figureSource.includes('window.confirm'), false)
   assert.equal(figureSource.includes('@click="openDeleteDialog"'), true)
   assert.equal(figureSource.includes('const deleteDialogMessage = computed(() => {'), true)
-  assert.equal(figureSource.includes('await apiService.v1DeleteWorkspaceArtifact(workspaceId, artifactId)'), true)
+  assert.equal(figureSource.includes('await apiService.v1DeleteTurnArtifact(conversationId, turnId, artifactId)'), true)
   assert.equal(figureSource.includes('type="button"'), true)
 })

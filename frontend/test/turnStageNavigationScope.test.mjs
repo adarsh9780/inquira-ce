@@ -25,14 +25,16 @@ test('TableTab loads persisted artifacts only from the selected turn API', () =>
   assert.equal(source.includes('apiService.v1ListWorkspaceArtifacts('), false)
 })
 
-test('FigureTab scopes persisted artifacts to selected turn ids while still allowing live artifacts', () => {
+test('FigureTab loads persisted artifacts only from the selected turn API', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/analysis/FigureTab.vue'), 'utf-8')
 
-  assert.equal(source.includes('const activeTurnFigureArtifactIds = computed(() => {'), true)
-  assert.equal(source.includes('const livePersistedFigureIds = computed(() => {'), true)
-  assert.equal(source.includes('const scopedWorkspaceFigureArtifacts = computed(() => {'), true)
-  assert.equal(source.includes('...activeTurnFigureArtifactIds.value,'), true)
-  assert.equal(source.includes('...livePersistedFigureIds.value,'), true)
+  assert.equal(source.includes('const activeTurnFigureArtifactIds = computed(() => {'), false)
+  assert.equal(source.includes('const livePersistedFigureIds = computed(() => {'), false)
+  assert.equal(source.includes('const scopedWorkspaceFigureArtifacts = computed(() => {'), false)
+  assert.equal(source.includes('...activeTurnFigureArtifactIds.value,'), false)
+  assert.equal(source.includes('...livePersistedFigureIds.value,'), false)
   assert.equal(source.includes('if (!turnId) return Array.isArray(workspaceFigureArtifacts.value) ? workspaceFigureArtifacts.value : []'), false)
-  assert.equal(source.includes("const persisted = scopedWorkspaceFigureArtifacts.value.map((fig) => ({ ...fig, source: 'artifact' }))"), true)
+  assert.equal(source.includes('apiService.v1ListTurnArtifacts('), true)
+  assert.equal(source.includes('apiService.v1GetTurnArtifactMetadata('), true)
+  assert.equal(source.includes('apiService.v1ListWorkspaceArtifacts('), false)
 })
