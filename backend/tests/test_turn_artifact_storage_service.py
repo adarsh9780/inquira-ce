@@ -97,7 +97,7 @@ async def test_persist_turn_artifacts_uses_existing_turn_files_without_scratchpa
 
 
 @pytest.mark.asyncio
-async def test_persist_turn_artifacts_writes_inline_payload_when_file_missing(monkeypatch, tmp_path) -> None:
+async def test_persist_turn_artifacts_fails_when_json_export_file_missing(monkeypatch, tmp_path) -> None:
     workspace_dir = tmp_path / "workspace-2"
     captured: dict[str, object] = {}
 
@@ -114,33 +114,32 @@ async def test_persist_turn_artifacts_writes_inline_payload_when_file_missing(mo
         "app.v1.services.workspace_storage_service.WorkspaceStorageService.build_workspace_dir",
         lambda username, workspace_id: tmp_path / username / workspace_id,
     )
-    rows = await TurnArtifactStorageService.persist_turn_artifacts(
-        session=SimpleNamespace(),
-        username="alice",
-        workspace_id="workspace-2",
-        conversation_id="conversation-2",
-        turn_id="turn-2",
-        workspace_duckdb_path=str(workspace_dir / "workspace.db"),
-        artifacts=[
-            {
-                "artifact_id": "fig-2",
-                "kind": "figure",
-                "logical_name": "trend_chart",
-                "payload": {"figure": {"data": [1], "layout": {}}},
-                "created_at": "2026-05-18T04:00:00+00:00",
-            },
-        ],
-    )
+    missing_path = tmp_path / "missing-chart.json"
+    with pytest.raises(FileNotFoundError, match="Turn artifact file is missing"):
+        await TurnArtifactStorageService.persist_turn_artifacts(
+            session=SimpleNamespace(),
+            username="alice",
+            workspace_id="workspace-2",
+            conversation_id="conversation-2",
+            turn_id="turn-2",
+            workspace_duckdb_path=str(workspace_dir / "workspace.db"),
+            artifacts=[
+                {
+                    "artifact_id": "fig-2",
+                    "kind": "figure",
+                    "logical_name": "trend_chart",
+                    "storage_path": str(missing_path),
+                    "payload": {"figure": {"data": [1], "layout": {}}},
+                    "created_at": "2026-05-18T04:00:00+00:00",
+                },
+            ],
+        )
 
-    assert rows[0]["payload"]["figure"]["data"] == [1]
-    assert rows[0]["artifact_id"] == "trend_chart__fig-2"
-    assert rows[0]["source_artifact_id"] == "fig-2"
-    assert rows[0]["display_name"] == "Trend Chart"
-    assert captured["items"][0]["payload"]["figure"]["data"] == [1]
+    assert "items" not in captured
 
 
 @pytest.mark.asyncio
-async def test_persist_turn_artifacts_skips_dataframe_when_kernel_export_missing(monkeypatch, tmp_path) -> None:
+async def test_persist_turn_artifacts_fails_when_dataframe_export_file_missing(monkeypatch, tmp_path) -> None:
     workspace_dir = tmp_path / "workspace-3"
     captured: dict[str, object] = {}
 
@@ -160,22 +159,23 @@ async def test_persist_turn_artifacts_skips_dataframe_when_kernel_export_missing
         "app.v1.services.workspace_storage_service.WorkspaceStorageService.build_workspace_dir",
         lambda username, workspace_id: tmp_path / username / workspace_id,
     )
-    rows = await TurnArtifactStorageService.persist_turn_artifacts(
-        session=SimpleNamespace(),
-        username="alice",
-        workspace_id="workspace-3",
-        conversation_id="conversation-3",
-        turn_id="turn-3",
-        workspace_duckdb_path=str(workspace_dir / "workspace.db"),
-        artifacts=[
-            {
-                "artifact_id": "df-3",
-                "kind": "dataframe",
-                "logical_name": "summary_df",
-            },
-        ],
-    )
+    missing_path = tmp_path / "missing-df.parquet"
+    with pytest.raises(FileNotFoundError, match="Turn artifact file is missing"):
+        await TurnArtifactStorageService.persist_turn_artifacts(
+            session=SimpleNamespace(),
+            username="alice",
+            workspace_id="workspace-3",
+            conversation_id="conversation-3",
+            turn_id="turn-3",
+            workspace_duckdb_path=str(workspace_dir / "workspace.db"),
+            artifacts=[
+                {
+                    "artifact_id": "df-3",
+                    "kind": "dataframe",
+                    "logical_name": "summary_df",
+                    "storage_path": str(missing_path),
+                },
+            ],
+        )
 
-    assert rows == []
-    assert captured["items"] == []
-    assert captured["workspace_id"] == "workspace-3"
+    assert "items" not in captured

@@ -31,7 +31,6 @@ async def test_execute_workspace_code_impl_passes_turn_context_into_wrapped_code
         }
 
     monkeypatch.setattr(runtime_api, "execute_code", fake_execute_code)
-    monkeypatch.setattr(runtime_api, "get_workspace_run_exports", lambda **_: [])
 
     payload = runtime_api.ExecuteRequest(
         code="result_df = 1",

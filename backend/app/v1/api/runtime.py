@@ -22,7 +22,6 @@ from ...services.code_executor import (
     execute_code,
     get_workspace_columns_via_kernel,
     get_workspace_kernel_status,
-    get_workspace_run_exports,
     get_workspace_table_schema_via_kernel,
     interrupt_workspace_kernel,
     reset_workspace_kernel,
@@ -869,71 +868,9 @@ async def _execute_workspace_code_impl(
     artifacts = [
         item for item in (result.get("artifacts") or []) if isinstance(item, dict)
     ]
-    if not artifacts:
-        try:
-            exports = await get_workspace_run_exports(
-                workspace_id=workspace_id,
-                run_id=run_id,
-            )
-            artifacts = [item for item in exports if isinstance(item, dict)]
-        except Exception:
-            artifacts = []
-    if not artifacts:
-        artifacts = _build_inline_artifact_fallback(
-            run_id=run_id,
-            execution_result=result,
-        )
     result["run_id"] = run_id
     result["artifacts"] = artifacts
     return ExecuteResponse(**result)
-
-
-def _build_inline_artifact_fallback(
-    *,
-    run_id: str,
-    execution_result: dict[str, Any],
-) -> list[dict[str, Any]]:
-    result = execution_result.get("result")
-    result_type = str(execution_result.get("result_type") or "").lower()
-    if result_type != "dataframe":
-        return []
-    if not isinstance(result, dict):
-        return []
-    columns = result.get("columns")
-    rows = result.get("data")
-    if not isinstance(columns, list) or not isinstance(rows, list):
-        return []
-
-    column_names = [str(col) for col in columns]
-    preview_rows: list[dict[str, Any]] = []
-    for row in rows[:25]:
-        if isinstance(row, dict):
-            preview_rows.append({str(key): value for key, value in row.items()})
-            continue
-        if isinstance(row, list):
-            mapped = {
-                str(column_names[idx]): row[idx]
-                for idx in range(min(len(column_names), len(row)))
-            }
-            preview_rows.append(mapped)
-
-    return [
-        {
-            "artifact_id": None,
-            "run_id": run_id,
-            "kind": "dataframe",
-            "pointer": None,
-            "logical_name": "result",
-            "row_count": len(rows),
-            "schema": [{"name": str(col), "dtype": ""} for col in column_names],
-            "preview_rows": preview_rows,
-            "created_at": "",
-            "expires_at": "",
-            "status": "ready",
-            "error": None,
-            "table_name": None,
-        }
-    ]
 
 
 async def _persist_runtime_execution_to_turn(

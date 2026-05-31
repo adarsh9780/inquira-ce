@@ -54,11 +54,6 @@ async def test_execute_workspace_code_passes_workspace_context(monkeypatch, tmp_
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(runtime_api, "execute_code", fake_execute_code_with_workspace)
-    async def fake_get_workspace_run_exports(workspace_id: str, run_id: str):
-        _ = (workspace_id, run_id)
-        return []
-
-    monkeypatch.setattr(runtime_api, "get_workspace_run_exports", fake_get_workspace_run_exports)
 
     payload = runtime_api.ExecuteRequest(code="result = conn.sql('select 1').fetchall()", timeout=30)
     current_user = SimpleNamespace(id="user-1")
@@ -117,16 +112,11 @@ async def test_execute_workspace_code_defaults_artifact_dir_for_turn_rerun(monke
             "artifacts": [],
         }
 
-    async def fake_get_workspace_run_exports(workspace_id: str, run_id: str):
-        _ = (workspace_id, run_id)
-        return []
-
     async def fake_persist_runtime_execution_to_turn(**kwargs):
         captured["persist"] = kwargs
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(runtime_api, "execute_code", fake_execute_code_with_workspace)
-    monkeypatch.setattr(runtime_api, "get_workspace_run_exports", fake_get_workspace_run_exports)
     monkeypatch.setattr(runtime_api, "_persist_runtime_execution_to_turn", fake_persist_runtime_execution_to_turn)
 
     payload = runtime_api.ExecuteRequest(
@@ -190,13 +180,8 @@ async def test_execute_workspace_code_wraps_arbitrary_dataframe_variable_name(mo
             "variables": {"dataframes": {}, "figures": {}, "scalars": {}},
         }
 
-    async def fake_get_workspace_run_exports(workspace_id: str, run_id: str):
-        _ = (workspace_id, run_id)
-        return []
-
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(runtime_api, "execute_code", fake_execute_code_with_workspace)
-    monkeypatch.setattr(runtime_api, "get_workspace_run_exports", fake_get_workspace_run_exports)
     async def fake_persist_runtime_execution_to_turn(**kwargs):
         _ = kwargs
 
@@ -254,11 +239,6 @@ async def test_execute_workspace_code_returns_upstream_result(monkeypatch, tmp_p
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(runtime_api, "execute_code", fake_execute_code)
-    async def fake_get_workspace_run_exports(workspace_id: str, run_id: str):
-        _ = (workspace_id, run_id)
-        return []
-
-    monkeypatch.setattr(runtime_api, "get_workspace_run_exports", fake_get_workspace_run_exports)
 
     payload = runtime_api.ExecuteRequest(code='print("x")', timeout=30)
     response = await runtime_api.execute_workspace_code(
@@ -274,7 +254,7 @@ async def test_execute_workspace_code_returns_upstream_result(monkeypatch, tmp_p
 
 
 @pytest.mark.asyncio
-async def test_execute_workspace_code_populates_artifacts_from_run_exports(monkeypatch, tmp_path):
+async def test_execute_workspace_code_does_not_fabricate_artifacts_without_execution_payload(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws2-exports"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     duckdb_path = workspace_dir / "workspace.duckdb"
@@ -305,32 +285,8 @@ async def test_execute_workspace_code_populates_artifacts_from_run_exports(monke
             "artifacts": [],
         }
 
-    captured = {}
-
-    async def fake_get_workspace_run_exports(workspace_id: str, run_id: str):
-        captured["workspace_id"] = workspace_id
-        captured["run_id"] = run_id
-        return [
-            {
-                "artifact_id": "art-1",
-                "run_id": run_id,
-                "kind": "dataframe",
-                "pointer": "duckdb://scratchpad/artifacts.duckdb#artifact=art-1",
-                "logical_name": "summary_df",
-                "row_count": 3,
-                "schema": [{"name": "a", "dtype": "INTEGER"}],
-                "preview_rows": [{"a": 1}],
-                "created_at": "2026-01-01T00:00:00Z",
-                "expires_at": "2026-01-03T00:00:00Z",
-                "status": "ready",
-                "error": None,
-                "table_name": "art_1",
-            }
-        ]
-
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(runtime_api, "execute_code", fake_execute_code)
-    monkeypatch.setattr(runtime_api, "get_workspace_run_exports", fake_get_workspace_run_exports)
 
     payload = runtime_api.ExecuteRequest(code='print("x")', timeout=30)
     response = await runtime_api.execute_workspace_code(
@@ -342,10 +298,7 @@ async def test_execute_workspace_code_populates_artifacts_from_run_exports(monke
 
     assert response.success is True
     assert isinstance(response.run_id, str)
-    assert captured["workspace_id"] == "ws-2"
-    assert captured["run_id"] == response.run_id
-    assert len(response.artifacts) == 1
-    assert response.artifacts[0]["artifact_id"] == "art-1"
+    assert response.artifacts == []
 
 
 @pytest.mark.asyncio

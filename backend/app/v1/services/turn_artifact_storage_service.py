@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import re
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...core.logger import logprint
 from ..repositories.turn_artifact_repository import TurnArtifactRepository
 from .turn_bundle_service import TurnBundleService
 
@@ -147,31 +145,17 @@ class TurnArtifactStorageService:
 
         persisted_rows: list[dict[str, Any]] = []
         for item in normalized_artifacts:
-            try:
-                persisted = await TurnArtifactStorageService._persist_one_artifact(
-                    username=username,
-                    workspace_id=workspace_id,
-                    conversation_id=conversation_id,
-                    turn_id=turn_id,
-                    workspace_duckdb_path=workspace_duckdb_path,
-                    artifact=item,
-                    session=session,
-                    offline_lease_owner_token=offline_lease_owner_token,
-                )
-            except Exception as exc:  # noqa: BLE001
-                logprint(
-                    "Skipping turn artifact shadow persistence after artifact write failure.",
-                    level="WARNING",
-                    workspace_id=workspace_id,
-                    conversation_id=conversation_id,
-                    turn_id=turn_id,
-                    artifact_id=str(item.get("artifact_id") or ""),
-                    kind=str(item.get("kind") or ""),
-                    error=str(exc),
-                )
-                continue
-            if persisted is not None:
-                persisted_rows.append(persisted)
+            persisted = await TurnArtifactStorageService._persist_one_artifact(
+                username=username,
+                workspace_id=workspace_id,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+                workspace_duckdb_path=workspace_duckdb_path,
+                artifact=item,
+                session=session,
+                offline_lease_owner_token=offline_lease_owner_token,
+            )
+            persisted_rows.append(persisted)
 
         await TurnArtifactRepository.replace_for_turn(
             session,
@@ -203,34 +187,15 @@ class TurnArtifactStorageService:
         raw_storage_path = str(artifact.get("storage_path") or "").strip()
         storage_path = Path(raw_storage_path).expanduser() if raw_storage_path else None
         if storage_path is None:
-            storage_path = TurnBundleService.build_turn_artifact_path(
-                username,
-                workspace_id,
-                conversation_id,
-                turn_id,
-                artifact_id or logical_name,
-                kind,
+            raise FileNotFoundError(
+                f"Turn artifact {artifact_id or logical_name!r} does not include a storage_path."
             )
 
         source_meta: dict[str, Any] = artifact
-        if not storage_path.exists() and kind != "dataframe":
-            await asyncio.to_thread(
-                TurnArtifactStorageService._write_artifact_payload,
-                storage_path,
-                kind,
-                source_meta,
-            )
-
         if not storage_path.exists():
-            TurnArtifactStorageService._log_artifact_shadow_skip(
-                workspace_id=workspace_id,
-                conversation_id=conversation_id,
-                turn_id=turn_id,
-                artifact_id=artifact_id,
-                kind=kind,
-                reason="Turn artifact file is missing.",
+            raise FileNotFoundError(
+                f"Turn artifact file is missing for {artifact_id or logical_name!r}: {storage_path}"
             )
-            return None
         size_bytes = int(storage_path.stat().st_size)
 
         return {
@@ -250,44 +215,3 @@ class TurnArtifactStorageService:
             "created_at": str(source_meta.get("created_at") or ""),
             "payload": source_meta.get("payload"),
         }
-
-    @staticmethod
-    def _log_artifact_shadow_skip(
-        *,
-        workspace_id: str,
-        conversation_id: str,
-        turn_id: str,
-        artifact_id: str,
-        kind: str,
-        reason: str,
-    ) -> None:
-        logprint(
-            "Skipping turn artifact local shadow copy.",
-            level="WARNING",
-            workspace_id=workspace_id,
-            conversation_id=conversation_id,
-            turn_id=turn_id,
-            artifact_id=artifact_id,
-            kind=kind,
-            reason=reason,
-        )
-
-    @staticmethod
-    def _write_artifact_payload(storage_path: Path, kind: str, source_meta: dict[str, Any]) -> None:
-        storage_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = source_meta.get("payload")
-        if kind == "text":
-            if isinstance(payload, dict):
-                text_value = payload.get("value")
-            else:
-                text_value = payload
-            storage_path.write_text(str(text_value or ""), encoding="utf-8")
-            return
-
-        serializable_payload = payload
-        if serializable_payload is None:
-            serializable_payload = source_meta
-        storage_path.write_text(
-            json.dumps(serializable_payload, indent=2, ensure_ascii=False, default=str),
-            encoding="utf-8",
-        )
