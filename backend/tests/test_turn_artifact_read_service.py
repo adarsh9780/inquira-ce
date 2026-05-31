@@ -80,6 +80,78 @@ async def test_turn_artifact_read_service_reads_parquet_metadata_and_rows(monkey
 
 
 @pytest.mark.asyncio
+async def test_turn_artifact_read_service_uses_turn_scope_for_duplicate_artifact_ids(monkeypatch, tmp_path) -> None:
+    turn_one_path = tmp_path / "turn-one.parquet"
+    turn_two_path = tmp_path / "turn-two.parquet"
+    con = duckdb.connect()
+    try:
+        con.execute(
+            f"COPY (SELECT 1 AS value) TO '{str(turn_one_path).replace("'", "''")}' (FORMAT PARQUET)"
+        )
+        con.execute(
+            f"COPY (SELECT 2 AS value) TO '{str(turn_two_path).replace("'", "''")}' (FORMAT PARQUET)"
+        )
+    finally:
+        con.close()
+
+    rows_by_turn = {
+        "turn-1": SimpleNamespace(
+            id="row-1",
+            artifact_id="shared-artifact",
+            workspace_id="workspace-1",
+            conversation_id="conversation-1",
+            turn_id="turn-1",
+            logical_name="summary",
+            kind="dataframe",
+            payload_format="parquet",
+            storage_path=str(turn_one_path),
+            created_at=SimpleNamespace(isoformat=lambda: "2026-05-17T00:00:00+00:00"),
+            status="active",
+        ),
+        "turn-2": SimpleNamespace(
+            id="row-2",
+            artifact_id="shared-artifact",
+            workspace_id="workspace-1",
+            conversation_id="conversation-1",
+            turn_id="turn-2",
+            logical_name="summary",
+            kind="dataframe",
+            payload_format="parquet",
+            storage_path=str(turn_two_path),
+            created_at=SimpleNamespace(isoformat=lambda: "2026-05-17T00:01:00+00:00"),
+            status="active",
+        ),
+    }
+
+    async def fake_get_for_turn(session, *, turn_id, artifact_id, statuses=("active",)):
+        _ = (session, artifact_id, statuses)
+        return rows_by_turn[turn_id]
+
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_read_service.TurnArtifactRepository.get_for_turn",
+        fake_get_for_turn,
+    )
+
+    turn_one_rows = await TurnArtifactReadService.get_turn_dataframe_rows(
+        SimpleNamespace(),
+        turn_id="turn-1",
+        artifact_id="shared-artifact",
+        offset=0,
+        limit=100,
+    )
+    turn_two_rows = await TurnArtifactReadService.get_turn_dataframe_rows(
+        SimpleNamespace(),
+        turn_id="turn-2",
+        artifact_id="shared-artifact",
+        offset=0,
+        limit=100,
+    )
+
+    assert turn_one_rows["rows"] == [{"value": 1}]
+    assert turn_two_rows["rows"] == [{"value": 2}]
+
+
+@pytest.mark.asyncio
 async def test_turn_artifact_read_service_delete_removes_file_and_manifest_entry(monkeypatch, tmp_path) -> None:
     artifact_path = tmp_path / "artifact.json"
     artifact_path.write_text('{"figure": {"data": []}}', encoding="utf-8")

@@ -18,9 +18,15 @@ class TurnArtifactRepository:
         session: AsyncSession,
         turn_id: str,
         *,
+        kind: str | None = None,
+        statuses: tuple[str, ...] = ("active",),
         include_deleted: bool = False,
     ) -> list[TurnArtifact]:
         stmt = select(TurnArtifact).where(TurnArtifact.turn_id == turn_id)
+        if kind:
+            stmt = stmt.where(TurnArtifact.kind == kind)
+        if statuses:
+            stmt = stmt.where(TurnArtifact.status.in_(statuses))
         if not include_deleted:
             stmt = stmt.where(TurnArtifact.status != "deleted")
         result = await session.execute(stmt.order_by(TurnArtifact.created_at.asc(), TurnArtifact.id.asc()))
@@ -52,6 +58,23 @@ class TurnArtifactRepository:
     ) -> TurnArtifact | None:
         stmt = select(TurnArtifact).where(
             TurnArtifact.workspace_id == workspace_id,
+            TurnArtifact.artifact_id == artifact_id,
+        )
+        if statuses:
+            stmt = stmt.where(TurnArtifact.status.in_(statuses))
+        result = await session.execute(stmt.limit(1))
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_for_turn(
+        session: AsyncSession,
+        *,
+        turn_id: str,
+        artifact_id: str,
+        statuses: tuple[str, ...] = ("active",),
+    ) -> TurnArtifact | None:
+        stmt = select(TurnArtifact).where(
+            TurnArtifact.turn_id == turn_id,
             TurnArtifact.artifact_id == artifact_id,
         )
         if statuses:

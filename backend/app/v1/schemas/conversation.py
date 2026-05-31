@@ -71,6 +71,66 @@ class TurnRelationsResponse(BaseModel):
     next_turn: TurnResponse | None
 
 
+class TurnArtifactSummary(BaseModel):
+    """Turn-owned artifact summary."""
+
+    artifact_id: str
+    logical_name: str
+    display_name: str | None = None
+    kind: str
+    row_count: int | None = None
+    columns: list[dict] | None = None
+    created_at: str
+    status: str
+
+
+class TurnArtifactListResponse(BaseModel):
+    """Turn-owned artifact list response."""
+
+    artifacts: list[TurnArtifactSummary]
+    total: int
+
+
+class TurnArtifactMetadataResponse(BaseModel):
+    """Turn-owned artifact metadata response."""
+
+    artifact_id: str
+    run_id: str
+    workspace_id: str
+    logical_name: str
+    display_name: str | None = None
+    kind: str
+    pointer: str
+    table_name: str | None = None
+    schema_columns: list[dict] | None = Field(default=None, alias="schema")
+    row_count: int | None = None
+    payload: dict | None = None
+    created_at: str
+    expires_at: str
+    status: str
+    error: str | None = None
+
+
+class TurnDataframeArtifactRowsResponse(BaseModel):
+    """Rows for one turn-owned dataframe artifact."""
+
+    artifact_id: str
+    name: str
+    display_name: str | None = None
+    row_count: int
+    columns: list[str]
+    rows: list[dict]
+    offset: int
+    limit: int
+
+
+class TurnArtifactDeleteResponse(BaseModel):
+    """Turn artifact deletion response."""
+
+    artifact_id: str
+    deleted: bool
+
+
 class TurnTreeNodeResponse(BaseModel):
     """Recursive turn tree node."""
 

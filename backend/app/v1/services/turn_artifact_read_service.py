@@ -31,6 +31,16 @@ class TurnArtifactReadService:
         return [await TurnArtifactReadService._summary_from_row(row) for row in rows]
 
     @staticmethod
+    async def list_turn_artifacts(
+        session: AsyncSession,
+        *,
+        turn_id: str,
+        kind: str | None = None,
+    ) -> list[dict[str, Any]]:
+        rows = await TurnArtifactRepository.list_for_turn(session, turn_id, kind=kind)
+        return [await TurnArtifactReadService._summary_from_row(row) for row in rows]
+
+    @staticmethod
     async def get_workspace_artifact(
         session: AsyncSession,
         *,
@@ -40,6 +50,22 @@ class TurnArtifactReadService:
         row = await TurnArtifactRepository.get_for_workspace(
             session,
             workspace_id=workspace_id,
+            artifact_id=artifact_id,
+        )
+        if row is None:
+            return None
+        return await TurnArtifactReadService._metadata_from_row(row)
+
+    @staticmethod
+    async def get_turn_artifact(
+        session: AsyncSession,
+        *,
+        turn_id: str,
+        artifact_id: str,
+    ) -> dict[str, Any] | None:
+        row = await TurnArtifactRepository.get_for_turn(
+            session,
+            turn_id=turn_id,
             artifact_id=artifact_id,
         )
         if row is None:
@@ -76,6 +102,35 @@ class TurnArtifactReadService:
         )
 
     @staticmethod
+    async def get_turn_dataframe_rows(
+        session: AsyncSession,
+        *,
+        turn_id: str,
+        artifact_id: str,
+        offset: int,
+        limit: int,
+        sort_model: list[dict[str, Any]] | None = None,
+        filter_model: dict[str, Any] | None = None,
+        search_text: str | None = None,
+    ) -> dict[str, Any] | None:
+        row = await TurnArtifactRepository.get_for_turn(
+            session,
+            turn_id=turn_id,
+            artifact_id=artifact_id,
+        )
+        if row is None or row.payload_format != "parquet":
+            return None
+        return await asyncio.to_thread(
+            TurnArtifactReadService._read_parquet_rows,
+            row,
+            offset,
+            limit,
+            sort_model or [],
+            filter_model or {},
+            search_text,
+        )
+
+    @staticmethod
     async def delete_workspace_artifact(
         session: AsyncSession,
         *,
@@ -85,6 +140,29 @@ class TurnArtifactReadService:
         row = await TurnArtifactRepository.get_for_workspace(
             session,
             workspace_id=workspace_id,
+            artifact_id=artifact_id,
+        )
+        if row is None:
+            return False
+
+        storage_path = Path(str(row.storage_path or ""))
+        if storage_path.exists():
+            await asyncio.to_thread(storage_path.unlink)
+        await TurnArtifactRepository.delete_by_id(session, row.id)
+        await TurnArtifactReadService._remove_artifact_from_turn_manifest(session, row.turn_id, artifact_id)
+        await session.commit()
+        return True
+
+    @staticmethod
+    async def delete_turn_artifact(
+        session: AsyncSession,
+        *,
+        turn_id: str,
+        artifact_id: str,
+    ) -> bool:
+        row = await TurnArtifactRepository.get_for_turn(
+            session,
+            turn_id=turn_id,
             artifact_id=artifact_id,
         )
         if row is None:

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from typing import Any, cast
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_appdata_db_session
@@ -18,6 +20,11 @@ from ..schemas.conversation import (
     TurnTreeNodeResponse,
     TurnTreeResponse,
     ConversationUpdateRequest,
+    TurnArtifactDeleteResponse,
+    TurnArtifactListResponse,
+    TurnArtifactMetadataResponse,
+    TurnArtifactSummary,
+    TurnDataframeArtifactRowsResponse,
     TurnPageResponse,
     TurnOrderUpdateRequest,
     TurnParentUpdateRequest,
@@ -25,6 +32,8 @@ from ..schemas.conversation import (
 )
 from ..services.conversation_service import ConversationService
 from ..services.chat_service import ChatService
+from ..services.turn_artifact_read_service import TurnArtifactReadService
+from .runtime import _normalize_search_query, _parse_grid_query_model
 from .deps import ensure_appdata_principal, get_current_user
 
 router = APIRouter(
@@ -181,6 +190,153 @@ async def get_turn_relations(
         previous_turn=TurnResponse(**payload["previous_turn"]) if payload["previous_turn"] else None,
         next_turn=TurnResponse(**payload["next_turn"]) if payload["next_turn"] else None,
     )
+
+
+async def _ensure_turn_access(
+    *,
+    session: AsyncSession,
+    principal_id: str,
+    conversation_id: str,
+    turn_id: str,
+) -> TurnResponse:
+    turn = await ConversationService.get_turn(
+        session=session,
+        principal_id=principal_id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+    )
+    return TurnResponse(**turn)
+
+
+@router.get(
+    "/conversations/{conversation_id}/turns/{turn_id}/artifacts",
+    response_model=TurnArtifactListResponse,
+)
+async def list_turn_artifacts(
+    conversation_id: str,
+    turn_id: str,
+    kind: str | None = Query(default=None, description="Filter by artifact kind, e.g. dataframe or figure"),
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """List artifacts owned by one turn only."""
+    await _ensure_turn_access(
+        session=session,
+        principal_id=current_user.id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+    )
+    items = await TurnArtifactReadService.list_turn_artifacts(session, turn_id=turn_id, kind=kind)
+    summaries = [
+        TurnArtifactSummary(
+            artifact_id=item["artifact_id"],
+            logical_name=item["logical_name"],
+            display_name=item.get("display_name"),
+            kind=item["kind"],
+            row_count=item.get("row_count"),
+            columns=item.get("schema"),
+            created_at=item["created_at"],
+            status=item["status"],
+        )
+        for item in items
+    ]
+    return TurnArtifactListResponse(artifacts=summaries, total=len(summaries))
+
+
+@router.get(
+    "/conversations/{conversation_id}/turns/{turn_id}/artifacts/{artifact_id}",
+    response_model=TurnArtifactMetadataResponse,
+)
+async def get_turn_artifact_metadata(
+    conversation_id: str,
+    turn_id: str,
+    artifact_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Fetch metadata for one artifact owned by one turn."""
+    await _ensure_turn_access(
+        session=session,
+        principal_id=current_user.id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+    )
+    artifact = await TurnArtifactReadService.get_turn_artifact(
+        session,
+        turn_id=turn_id,
+        artifact_id=artifact_id,
+    )
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="Turn artifact not found")
+    return TurnArtifactMetadataResponse(**artifact)
+
+
+@router.get(
+    "/conversations/{conversation_id}/turns/{turn_id}/artifacts/{artifact_id}/rows",
+    response_model=TurnDataframeArtifactRowsResponse,
+)
+async def get_turn_artifact_rows(
+    conversation_id: str,
+    turn_id: str,
+    artifact_id: str,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=1000, ge=1, le=1000),
+    sort_model: str | None = Query(default=None, description="AG Grid sort model JSON"),
+    filter_model: str | None = Query(default=None, description="AG Grid filter model JSON"),
+    search: str | None = Query(default=None, description="Global text search applied across columns"),
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Fetch rows for one dataframe artifact owned by one turn."""
+    await _ensure_turn_access(
+        session=session,
+        principal_id=current_user.id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+    )
+    parsed_sort_model = _parse_grid_query_model(raw_value=sort_model, field_name="sort_model", expected_kind=list)
+    parsed_filter_model = _parse_grid_query_model(raw_value=filter_model, field_name="filter_model", expected_kind=dict)
+    rows = await TurnArtifactReadService.get_turn_dataframe_rows(
+        session,
+        turn_id=turn_id,
+        artifact_id=artifact_id,
+        offset=offset,
+        limit=limit,
+        sort_model=cast(list[dict[str, Any]], parsed_sort_model),
+        filter_model=cast(dict[str, Any], parsed_filter_model),
+        search_text=_normalize_search_query(search),
+    )
+    if rows is None:
+        raise HTTPException(status_code=404, detail="Turn dataframe artifact not found")
+    return TurnDataframeArtifactRowsResponse(**rows)
+
+
+@router.delete(
+    "/conversations/{conversation_id}/turns/{turn_id}/artifacts/{artifact_id}",
+    response_model=TurnArtifactDeleteResponse,
+)
+async def delete_turn_artifact(
+    conversation_id: str,
+    turn_id: str,
+    artifact_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Delete one artifact owned by one turn."""
+    await _ensure_turn_access(
+        session=session,
+        principal_id=current_user.id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+    )
+    deleted = await TurnArtifactReadService.delete_turn_artifact(
+        session,
+        turn_id=turn_id,
+        artifact_id=artifact_id,
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Turn artifact not found")
+    return TurnArtifactDeleteResponse(artifact_id=artifact_id, deleted=True)
 
 
 def _build_turn_tree_node(payload: dict) -> TurnTreeNodeResponse:
