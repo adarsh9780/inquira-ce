@@ -451,7 +451,11 @@ const tableDropdownOptions = computed(() => displayArtifacts.value.map((artifact
 
 // Expose dataframe count to the store so StatusBar can read it
 watch(allArtifacts, (list) => {
-  if (selectedArtifactId.value && !list.some((item) => item.artifact_id === selectedArtifactId.value)) {
+  if (
+    selectedArtifactId.value
+    && !list.some((item) => item.artifact_id === selectedArtifactId.value)
+    && !livePersistedArtifactIds.value.has(String(selectedArtifactId.value || '').trim())
+  ) {
     if (isMemoryArtifactId(selectedArtifactId.value)) return
     selectedArtifactId.value = null
   }
@@ -760,6 +764,7 @@ watch(() => appStore.activeWorkspaceId, (id) => {
 watch(
   () => [
     String(appStore.activeTurnId || '').trim(),
+    String(appStore.activeTurnArtifactRefreshKey || 0),
     Array.from(activeTurnArtifactIds.value).sort().join('|'),
     Array.from(livePersistedArtifactIds.value).sort().join('|'),
   ].join('||'),

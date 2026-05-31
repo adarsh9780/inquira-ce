@@ -21,6 +21,9 @@ test('active turn hydration selects that turn artifacts for the data panes', () 
 
   assert.equal(source.includes("setSelectedTableArtifact(workspaceId, dataframeArtifacts[0]?.data?.artifact_id || '')"), true)
   assert.equal(source.includes("setSelectedFigureArtifact(workspaceId, figureArtifacts[0]?.artifact_id || '')"), true)
+  assert.equal(source.includes('activeTurnArtifactRefreshKey.value += 1'), true)
+  assert.equal(source.includes('logical_name: artifact?.logical_name || logicalName || undefined'), true)
+  assert.equal(source.includes('display_name: artifact?.display_name || artifact?.logical_name || logicalName || undefined'), true)
 })
 
 test('table and figure tabs restore and persist selected artifacts through app store', () => {
@@ -29,6 +32,10 @@ test('table and figure tabs restore and persist selected artifacts through app s
 
   assert.equal(tableSource.includes('appStore.getSelectedTableArtifact(workspaceId)'), true)
   assert.equal(tableSource.includes('appStore.setSelectedTableArtifact(normalizedWorkspaceId, String(newId || \'\').trim())'), true)
+  assert.equal(tableSource.includes('String(appStore.activeTurnArtifactRefreshKey || 0)'), true)
+  assert.equal(tableSource.includes('!livePersistedArtifactIds.value.has(String(selectedArtifactId.value || \'\').trim())'), true)
   assert.equal(figureSource.includes('appStore.getSelectedFigureArtifact(workspaceId)'), true)
   assert.equal(figureSource.includes('appStore.setSelectedFigureArtifact(normalizedWorkspaceId, String(artifactId || \'\').trim())'), true)
+  assert.equal(figureSource.includes('String(appStore.activeTurnArtifactRefreshKey || 0)'), true)
+  assert.equal(figureSource.includes('const liveFigurePayload = normalizePlotlyFigure(liveFigure?.data ?? liveFigure)'), true)
 })

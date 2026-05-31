@@ -92,6 +92,7 @@ export const useAppStore = defineStore('app', () => {
   const activeTurnArtifacts = ref([])
   const activeTurnRelations = ref(null)
   const activeTurnTree = ref(null)
+  const activeTurnArtifactRefreshKey = ref(0)
   const workspaceTurnTree = ref(null)
   const finalTurnId = ref('')
   const turnsNextCursor = ref(null)
@@ -1583,6 +1584,8 @@ export const useAppStore = defineStore('app', () => {
           name: logicalName || 'dataframe',
           data: {
             artifact_id: artifact?.artifact_id || null,
+            logical_name: artifact?.logical_name || logicalName || undefined,
+            display_name: artifact?.display_name || artifact?.logical_name || logicalName || undefined,
             row_count: Number(artifact?.row_count || 0),
             columns: Array.isArray(artifact?.schema)
               ? artifact.schema.map((col) => String(col?.name || '')).filter(Boolean)
@@ -1639,6 +1642,7 @@ export const useAppStore = defineStore('app', () => {
           .map((event) => ({ ...event.data }))
       : []
     hydrateArtifactsFromToolEvents(payload?.current?.tool_events)
+    activeTurnArtifactRefreshKey.value += 1
   }
 
   function setActiveTurnTree(payload) {
@@ -2939,6 +2943,7 @@ export const useAppStore = defineStore('app', () => {
     activeTurnArtifacts,
     activeTurnRelations,
     activeTurnTree,
+    activeTurnArtifactRefreshKey,
     workspaceTurnTree,
     finalTurnId,
     turnsNextCursor,

@@ -335,6 +335,7 @@ watch(() => appStore.activeWorkspaceId, (workspaceId) => {
 watch(
   () => [
     String(appStore.activeTurnId || '').trim(),
+    String(appStore.activeTurnArtifactRefreshKey || 0),
     Array.from(activeTurnFigureArtifactIds.value).sort().join('|'),
     Array.from(livePersistedFigureIds.value).sort().join('|'),
   ].join('||'),
@@ -573,6 +574,19 @@ async function loadSelectedFigurePayload(artifactId) {
       if (selectedArtifactId.value !== normalizedArtifactId) return
       selectedFigurePayload.value = figurePayload
       appStore.setPlotlyFigure(figurePayload)
+      return
+    }
+
+    const liveFigure = Array.isArray(appStore.figures)
+      ? appStore.figures.find((fig) => (
+        String(fig?.artifact_id || fig?.data?.artifact_id || '').trim() === normalizedArtifactId
+      ))
+      : null
+    const liveFigurePayload = normalizePlotlyFigure(liveFigure?.data ?? liveFigure)
+    if (liveFigurePayload) {
+      if (selectedArtifactId.value !== normalizedArtifactId) return
+      selectedFigurePayload.value = liveFigurePayload
+      appStore.setPlotlyFigure(liveFigurePayload)
       return
     }
 
