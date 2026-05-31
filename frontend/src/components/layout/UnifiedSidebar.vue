@@ -61,8 +61,39 @@
       <!-- ─── Conversations ─── -->
       <div class="flex min-h-0 flex-1 flex-col">
 
-        <!-- Conversation list -->
-        <div class="min-h-0 flex-1 overflow-hidden pb-1">
+        <!-- Section Header -->
+        <div
+          class="flex h-10 w-full items-center transition-all duration-300"
+          :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'"
+        >
+          <button
+            v-if="appStore.isSidebarCollapsed && appStore.hasWorkspace"
+            type="button"
+            class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none transition-colors"
+            title="New Conversation"
+            @click.stop="createConversation"
+          >
+            <PlusIcon class="h-4 w-4" />
+          </button>
+
+          <template v-if="!appStore.isSidebarCollapsed">
+            <span class="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] opacity-80">
+              Chats
+            </span>
+            <button
+              v-if="appStore.hasWorkspace"
+              type="button"
+              class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none"
+              title="New Conversation"
+              @click.stop="createConversation"
+            >
+              <PlusIcon class="h-4 w-4" />
+            </button>
+          </template>
+        </div>
+
+        <!-- Conversation List -->
+        <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-1 custom-scrollbar">
           <div
             v-if="!appStore.hasWorkspace"
             class="px-3 py-2 text-[12px] text-[var(--color-text-muted)] transition-opacity"
@@ -70,11 +101,87 @@
           >
             Create a workspace to start.
           </div>
-          <SidebarConversations
-            v-else
-            :is-collapsed="appStore.isSidebarCollapsed"
-            @select="appStore.setActiveTab('workspace')"
-          />
+
+          <div v-else class="space-y-0.5 mt-1">
+            <div
+              v-for="(conv, index) in appStore.conversations"
+              :key="conv.id"
+              class="group relative flex min-h-11 select-none items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
+              :class="[
+                appStore.isSidebarCollapsed ? 'justify-center px-0 py-1.5' : 'justify-start px-3 py-1.5',
+                appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : '',
+              ]"
+              :title="conv.title || 'Untitled'"
+              @click="selectConversation(conv.id)"
+              @contextmenu.prevent="openConversationContextMenu($event, conv.id)"
+            >
+              <div
+                v-if="appStore.activeConversationId === conv.id && !appStore.isSidebarCollapsed"
+                class="absolute left-0 top-1/2 -translate-y-1/2 h-1/2 w-[3px] rounded-r-full bg-[var(--color-accent)]"
+              />
+
+              <div v-if="editingId === conv.id" class="flex w-full items-center gap-1 pl-9" @click.stop>
+                <input
+                  :ref="(el) => { if (el) editInputs[conv.id] = el }"
+                  v-model="editingTitleValue"
+                  class="w-full rounded border border-[var(--color-accent)] bg-[var(--color-surface)] px-2 py-1 text-[13px] text-[var(--color-text-main)] outline-none"
+                  @keydown.enter.prevent="saveTitle(conv.id)"
+                  @keydown.esc.prevent="cancelEditing"
+                  @blur="saveTitle(conv.id)"
+                />
+              </div>
+
+              <template v-else>
+                <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+                  <span
+                    class="inline-flex min-w-[1.5rem] items-center justify-center px-1 text-[11px] font-semibold leading-none tabular-nums tracking-[0.02em] transition-colors duration-200"
+                    :class="appStore.activeConversationId === conv.id
+                      ? 'text-[var(--color-accent)]'
+                      : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
+                  >
+                    {{ conversationBadgeLabel(index, appStore.conversations.length) }}
+                  </span>
+                </div>
+
+                <div
+                  class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+                  :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[200px] opacity-100 ml-3'"
+                >
+                  <p
+                    class="truncate text-[13px]"
+                    :class="appStore.activeConversationId === conv.id
+                      ? 'font-medium text-[var(--color-text-main)]'
+                      : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
+                    :title="conv.title || 'Untitled'"
+                  >
+                    {{ conv.title || 'Untitled' }}
+                  </p>
+                  <p
+                    class="mt-0.5 truncate text-[10px] leading-none"
+                    :class="appStore.activeConversationId === conv.id
+                      ? 'text-[var(--color-accent)]/80'
+                      : 'text-[var(--color-text-muted)]/80'"
+                  >
+                    {{ formatConversationTimestamp(conv) }}
+                  </p>
+                </div>
+
+                <div
+                  v-if="!appStore.isSidebarCollapsed"
+                  class="relative shrink-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <button
+                    type="button"
+                    class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
+                    title="Conversation actions"
+                    @click.stop="toggleConversationMenu($event, conv.id)"
+                  >
+                    <EllipsisHorizontalIcon class="h-4 w-4" />
+                  </button>
+                </div>
+              </template>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -261,6 +368,29 @@
         </button>
       </div>
     </Teleport>
+    <Teleport to="body">
+      <div
+        v-if="conversationMenuId"
+        class="fixed z-50 w-32 rounded-lg border border-[var(--color-border)] bg-[var(--color-panel-elevated)] py-1 shadow-lg"
+        :style="conversationMenuStyle"
+        data-conversation-actions-menu
+      >
+        <button
+          type="button"
+          class="w-full px-3 py-1.5 text-left text-[12px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
+          @click.stop="startEditingFromMenu(activeConversationMenuTarget)"
+        >
+          Rename
+        </button>
+        <button
+          type="button"
+          class="w-full px-3 py-1.5 text-left text-[12px] font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
+          @click.stop="confirmDeleteConversation(conversationMenuId)"
+        >
+          Delete
+        </button>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -270,14 +400,16 @@ import { useAppStore } from '../../stores/appStore'
 import { useAuthStore } from '../../stores/authStore'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
+import { formatTimestamp } from '../../utils/dateUtils'
 import SettingsModal from '../modals/SettingsModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
-import SidebarConversations from './sidebar/SidebarConversations.vue'
 import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 
 import {
   FolderOpenIcon,
+  PlusIcon,
+  EllipsisHorizontalIcon,
   CircleStackIcon,
   QueueListIcon,
   Cog6ToothIcon,
@@ -290,6 +422,13 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 
 // ─── UI State ────────────────────────────────────────────────────────────────
+const editingId         = ref(null)
+const editingTitleValue = ref('')
+const editInputs        = ref({})
+const isSaving          = ref(false)
+
+const conversationMenuId       = ref(null)
+const conversationMenuPosition = ref({ x: 0, y: 0 })
 const profileMenuOpen      = ref(false)
 const profileMenuRef       = ref(null)
 const profileMenuButtonRef = ref(null)
@@ -349,6 +488,17 @@ const profileMenuStyle = computed(() => ({
   left: `${profileMenuPosition.value.left}px`,
   top: `${profileMenuPosition.value.top}px`,
 }))
+
+const conversationMenuStyle = computed(() => ({
+  left: `${conversationMenuPosition.value.x}px`,
+  top: `${conversationMenuPosition.value.y}px`,
+}))
+
+const activeConversationMenuTarget = computed(() => {
+  const id = String(conversationMenuId.value || '').trim()
+  if (!id) return null
+  return appStore.conversations.find((conversation) => String(conversation?.id || '').trim() === id) || null
+})
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function readDatasetSizeBytes(dataset) {
@@ -438,6 +588,19 @@ function openConversationTree() {
   appStore.setActiveTab('conversation-tree')
 }
 
+function conversationBadgeLabel(index, totalCount = appStore.conversations.length) {
+  const total = Number(totalCount)
+  const offset = Number(index)
+  const ordinal = total - offset
+  if (!Number.isFinite(ordinal) || ordinal <= 0) return '1'
+  if (ordinal > 99) return '99+'
+  return String(ordinal)
+}
+
+function formatConversationTimestamp(conversation) {
+  return formatTimestamp(conversation?.updated_at || conversation?.created_at)
+}
+
 // ─── Profile menu ─────────────────────────────────────────────────────────────
 function updateProfileMenuPosition() {
   const rect = profileMenuButtonRef.value?.getBoundingClientRect?.()
@@ -476,7 +639,9 @@ function openProfileSection(tab) {
 function handleGlobalClick(event) {
   const target = event?.target
   if (!(target instanceof Element)) return
+  if (target.closest('[data-conversation-actions-menu]')) return
   if (profileMenuRef.value?.contains(target) || profileMenuButtonRef.value?.contains(target)) return
+  closeConversationMenu()
   closeProfileMenu()
 }
 
@@ -485,6 +650,161 @@ function handleOpenSettingsRequest(event) {
   const tab  = String(event?.detail?.tab  || 'api').trim() || 'api'
   const step = Number(event?.detail?.step || 1)
   openSettings(tab, step)
+}
+
+// ─── Conversations ────────────────────────────────────────────────────────────
+async function createConversation() {
+  try {
+    const conversation = await appStore.createConversation()
+    if (conversation?.id) {
+      appStore.setActiveConversationId(conversation.id)
+      await appStore.fetchConversationTurns({ reset: true })
+    }
+  } catch (error) {
+    toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to create conversation'))
+  }
+}
+
+async function selectConversation(id) {
+  closeConversationMenu()
+  const target = String(id || '').trim()
+  if (!target) return
+  const current = String(appStore.activeConversationId || '').trim()
+  try {
+    if (target !== current) {
+      appStore.setActiveConversationId(target)
+    } else {
+      appStore.setWorkspacePane('chat')
+      appStore.setActiveTab('workspace')
+    }
+    await appStore.fetchConversationTurns({ reset: true })
+  } catch (error) {
+    toast.error('Conversation Error', extractApiErrorMessage(error, 'Failed to load conversation'))
+  }
+}
+
+// ─── Inline title editing ─────────────────────────────────────────────────────
+function startEditing(conv) {
+  closeConversationMenu()
+  editingId.value         = conv.id
+  editingTitleValue.value = conv.title || 'Untitled'
+  setTimeout(() => {
+    const el = editInputs.value[conv.id]
+    if (el) {
+      el.focus()
+      el.select()
+    }
+  }, 50)
+}
+
+function cancelEditing() {
+  editingId.value         = null
+  editingTitleValue.value = ''
+}
+
+async function saveTitle(id) {
+  if (editingId.value !== id || isSaving.value) return
+
+  const newTitle = editingTitleValue.value.trim()
+  const conv = appStore.conversations.find((conversation) => conversation.id === id)
+
+  if (!newTitle || newTitle === (conv?.title || 'Untitled')) {
+    cancelEditing()
+    return
+  }
+
+  if (newTitle.length < 2) {
+    cancelEditing()
+    return
+  }
+
+  isSaving.value = true
+  try {
+    if (id === appStore.activeConversationId) {
+      await appStore.updateConversationTitle(newTitle)
+    } else {
+      const updated = await apiService.v1UpdateConversation(id, newTitle)
+      const idx = appStore.conversations.findIndex((conversation) => conversation.id === id)
+      if (idx !== -1) {
+        appStore.conversations[idx] = { ...appStore.conversations[idx], title: updated.title }
+      }
+    }
+  } catch (error) {
+    toast.error('Rename Failed', extractApiErrorMessage(error, 'Failed to update title'))
+  } finally {
+    isSaving.value = false
+    cancelEditing()
+  }
+}
+
+// ─── Conversation context menu ────────────────────────────────────────────────
+function clampMenuPosition(x, y, width = 160, height = 96) {
+  const gap = 8
+  const viewportWidth = typeof window === 'undefined' ? width + gap * 2 : window.innerWidth
+  const viewportHeight = typeof window === 'undefined' ? height + gap * 2 : window.innerHeight
+  return {
+    x: Math.max(gap, Math.min(Number(x) || gap, viewportWidth - width - gap)),
+    y: Math.max(gap, Math.min(Number(y) || gap, viewportHeight - height - gap)),
+  }
+}
+
+function positionConversationMenuFromEvent(event) {
+  const rect = event?.currentTarget?.getBoundingClientRect?.()
+  if (rect) {
+    return clampMenuPosition(rect.right - 128, rect.bottom + 4, 128, 88)
+  }
+  return clampMenuPosition(event?.clientX || 0, event?.clientY || 0, 128, 88)
+}
+
+function openSingleConversationMenu(conversationId, position) {
+  const id = String(conversationId || '').trim()
+  if (!id) return
+  conversationMenuPosition.value = position
+  conversationMenuId.value = id
+}
+
+function toggleConversationMenu(event, conversationId) {
+  const id = String(conversationId || '').trim()
+  if (!id) return
+  if (conversationMenuId.value === id) {
+    closeConversationMenu()
+    return
+  }
+  openSingleConversationMenu(id, positionConversationMenuFromEvent(event))
+}
+
+function openConversationContextMenu(event, conversationId) {
+  closeConversationMenu()
+  const id = String(conversationId || '').trim()
+  if (!id) return
+  openSingleConversationMenu(id, clampMenuPosition(event?.clientX || 0, event?.clientY || 0, 128, 88))
+}
+
+function startEditingFromMenu(conv) {
+  if (!conv?.id) {
+    closeConversationMenu()
+    return
+  }
+  startEditing(conv)
+}
+
+function closeConversationMenu() {
+  conversationMenuId.value = null
+  conversationMenuPosition.value = { x: 0, y: 0 }
+}
+
+// ─── Delete conversation ──────────────────────────────────────────────────────
+function confirmDeleteConversation(conversationId) {
+  cancelEditing()
+  closeConversationMenu()
+
+  const target = appStore.conversations.find((conversation) => conversation.id === conversationId)
+  pendingDeleteType.value   = 'conversation'
+  pendingDeleteId.value     = conversationId
+  pendingDeleteIds.value    = []
+  deleteDialogTitle.value   = 'Delete Conversation'
+  deleteDialogMessage.value = `Are you sure you want to delete "${target?.title || 'Untitled'}"? This action cannot be undone.`
+  isDeleteDialogOpen.value  = true
 }
 
 function closeDeleteDialog() {

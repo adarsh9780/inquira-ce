@@ -21,10 +21,10 @@ test('collapsed sidebar rows keep centered fixed-size icon containers', () => {
   assert.ok(sidebarSource.includes("appStore.isSidebarCollapsed ? 'justify-center px-0'"))
 })
 
-test('conversation ellipsis menu is removed from the canonical sidebar tree', () => {
+test('conversation ellipsis menu is restored on the sidebar conversation list', () => {
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
   assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'hidden' :"), false)
-  assert.equal(sidebarSource.includes('data-conversation-actions-menu'), false)
-  assert.equal(sidebarSource.includes('EllipsisHorizontalIcon'), false)
+  assert.equal(sidebarSource.includes('data-conversation-actions-menu'), true)
+  assert.equal(sidebarSource.includes('EllipsisHorizontalIcon'), true)
 })
