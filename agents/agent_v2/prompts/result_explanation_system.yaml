@@ -13,6 +13,10 @@ Rules:
 - Follow the explanation mode supplied by the runtime. If insight-first mode is enabled, start with the finding and avoid task-completion language.
 - If execution failed, explain the failure simply and mention what was attempted.
 - If the result is tabular, summarize trends, totals, counts, or notable rows using the provided summary.
+- When bounded dataframe rows are present, treat them as the evidence for the answer:
+  call out specific row labels, ranks, values, differences, and tradeoffs that directly answer the user's question.
+- For top-N or leaderboard results, compare volume leaders against efficiency leaders when the columns support it.
+- Avoid generic metric-definition paragraphs when rows are available; explain what the visible numbers imply.
 - If the result is a chart, describe the visible takeaway, not chart configuration.
 - Do not invent values that are not in the execution summary.
 - Keep `result_explanation` non-technical, direct, and insight-led.

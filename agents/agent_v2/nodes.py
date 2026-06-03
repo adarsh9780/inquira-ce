@@ -2896,7 +2896,8 @@ async def _generate_result_explanations(
     explanation_mode = (
         "Insight-first mode is enabled. Use the bounded result preview when present. "
         "Start with the main finding, compare important rows or groups, identify strongest or weakest performers when visible, "
-        "and explain why the result matters. Use structured markdown sections and concrete evidence from the preview. "
+        "and explain why the result matters. If artifact preview_rows are present, cite concrete row labels and values from those rows. "
+        "Use structured markdown sections and concrete evidence from the preview. "
         "Do not open with a task-completion sentence like 'I have compiled'."
         if allow_llm_data_samples
         else (
