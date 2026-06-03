@@ -1936,8 +1936,6 @@ class ChatService:
             except AgentRuntimeError as exc:
                 raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-            yield {"event": "status", "data": {"stage": "start", "message": "Starting analysis"}}
-
             aggregated: dict[str, Any] = {}
             stream_run_id = ""
             retried_with_cloud_suffix = False
@@ -1956,6 +1954,14 @@ class ChatService:
                             if custom_event:
                                 event_name = custom_event
                                 payload_dict = custom_data if isinstance(custom_data, dict) else {"value": custom_data}
+                        if event_name == "llm_progress":
+                            message = str(payload_dict.get("message") or "").strip()
+                            if not message:
+                                continue
+                            payload_dict = {
+                                "stage": str(payload_dict.get("stage") or "").strip(),
+                                "message": message,
+                            }
                         if event_name == "metadata":
                             stream_run_id = str(payload_dict.get("run_id") or stream_run_id)
                         elif event_name == "values" and isinstance(data, dict):
