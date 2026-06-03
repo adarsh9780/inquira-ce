@@ -397,12 +397,7 @@ export const useAppStore = defineStore('app', () => {
     if (typeof ui.is_sidebar_collapsed === 'boolean') {
       isSidebarCollapsed.value = ui.is_sidebar_collapsed
     }
-    if (typeof ui.workspace_layout_mode === 'string' && ui.workspace_layout_mode.trim()) {
-      const restoredMode = ui.workspace_layout_mode.trim().toLowerCase()
-      workspaceLayoutMode.value = ['chat', 'split', 'data'].includes(restoredMode) ? restoredMode : 'chat'
-    } else if (typeof ui.data_focus_mode === 'boolean') {
-      workspaceLayoutMode.value = ui.data_focus_mode ? 'data' : 'split'
-    }
+    workspaceLayoutMode.value = 'chat'
     if (typeof ui.hide_shortcuts_modal === 'boolean') {
       hideShortcutsModal.value = ui.hide_shortcuts_modal
     }
