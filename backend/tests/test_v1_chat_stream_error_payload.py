@@ -32,6 +32,19 @@ def test_error_event_payload_maps_agent_rate_limit_to_429():
     assert "rate limit" in payload["detail"].lower()
 
 
+def test_error_event_payload_maps_wrapped_agent_rate_limit_to_429():
+    payload = _error_event_payload(
+        HTTPException(
+            status_code=502,
+            detail="Agent stream error: {'error': 'RateLimitError', 'message': 'An internal error occurred'}",
+        )
+    )
+
+    assert payload["status_code"] == 429
+    assert payload["provider_error"] == "RateLimitError"
+    assert "rate limit" in payload["detail"].lower()
+
+
 @pytest.mark.asyncio
 async def test_stream_analyze_preserves_original_error_detail(monkeypatch):
     async def _failing_stream(**_kwargs):

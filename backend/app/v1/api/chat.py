@@ -89,6 +89,9 @@ def _error_event_payload(exc: BaseException) -> dict[str, Any]:
             detail = "Streaming analysis failed."
         else:
             detail = str(raw_detail)
+        normalized_agent_error = _normalize_agent_stream_error(detail)
+        if normalized_agent_error is not None:
+            return normalized_agent_error
         return {"detail": detail, "status_code": status}
 
     detail = str(exc).strip() or exc.__class__.__name__
