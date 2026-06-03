@@ -25,9 +25,13 @@
 
       <!-- Right Pane (Table / Figure / Output) -->
       <div 
-        v-if="appStore.showRightPane"
-        class="flex h-full min-w-0 flex-col workspace-data-pane"
-        :style="{ width: rightPaneWidth + '%' }"
+        class="flex h-full min-w-0 flex-col overflow-hidden workspace-data-pane"
+        :class="{ 'workspace-data-pane-hidden': !appStore.showRightPane }"
+        :aria-hidden="!appStore.showRightPane"
+        :style="{
+          width: appStore.showRightPane ? `${rightPaneWidth}%` : '0%',
+          opacity: appStore.showRightPane ? 1 : 0
+        }"
       >
         <WorkspaceRightPane />
       </div>
@@ -183,11 +187,19 @@ onUnmounted(() => {
 .workspace-center-pane {
   background-color: var(--color-workspace-surface);
   box-shadow: inset -1px 0 0 color-mix(in srgb, var(--color-text-main) 3%, transparent);
+  transition: width 220ms ease, border-color 180ms ease;
 }
 
 .workspace-data-pane {
   background-color: var(--color-workspace-surface);
   box-shadow: inset 1px 0 0 color-mix(in srgb, var(--color-text-main) 2%, transparent);
+  transition: width 220ms ease, opacity 180ms ease;
+  will-change: width, opacity;
+}
+
+.workspace-data-pane-hidden {
+  pointer-events: none;
+  box-shadow: none;
 }
 
 .pane-resizer-x:hover,
