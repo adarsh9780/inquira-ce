@@ -51,6 +51,7 @@ class RouteDecision(BaseModel):
 
     route: Literal["analysis", "general_chat", "unsafe"]
     reasoning: str = Field(default="")
+    progress_message: str | None = None
 
 
 def _summarize_user_text(user_text: str, limit: int = 120) -> str:
@@ -76,14 +77,16 @@ def _normalize_decision(candidate: object, user_text: str) -> RouteDecision:
     if isinstance(candidate, RouteDecision):
         route = str(candidate.route or "").strip().lower()
         reasoning = str(candidate.reasoning or "").strip()
+        progress_message = str(candidate.progress_message or "").strip() or None
     else:
         route = str(getattr(candidate, "route", "") or "").strip().lower()
         reasoning = str(getattr(candidate, "reasoning", "") or "").strip()
+        progress_message = str(getattr(candidate, "progress_message", "") or "").strip() or None
     if route not in {"analysis", "general_chat", "unsafe"}:
         route = "analysis"
     if not reasoning:
         reasoning = _fallback_reasoning(route, user_text)
-    return RouteDecision(route=route, reasoning=reasoning)
+    return RouteDecision(route=route, reasoning=reasoning, progress_message=progress_message)
 
 
 def _structured_output_methods(model: object) -> tuple[str | None, ...]:

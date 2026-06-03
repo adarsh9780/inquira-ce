@@ -25,6 +25,7 @@ Rules:
 - If you request `search_schema_queries`, leave `code` empty so the runtime can enrich context first.
 - `search_schema` returns matched column names with dtype and description (aliases are internal for matching and are not returned).
 - Fill `selected_tables` with the tables you used or plan to use.
+- Fill `progress_message` with one short user-facing sentence describing the analysis code you just prepared or the specific schema lookup you need next.
 - Set `joins_used` to true only if the final query/code joins across tables.
 - Reuse column references from prior code/messages when possible.
 - Do not read external files.
@@ -34,3 +35,4 @@ Rules:
 - When converting DuckDB relations to dataframes, use `.df()` or `.fetchdf()` (not `.fetch_df()`).
 - Keep code deterministic and concise.
 - Return plain markdown explanation for non-technical users.
+- Keep `progress_message` concrete, concise, and free of code, JSON, hidden reasoning, or internal node names.

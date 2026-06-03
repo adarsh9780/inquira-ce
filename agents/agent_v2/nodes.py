@@ -57,6 +57,7 @@ _ASSESS_CONTEXT_PROMPT = (
     "- enough_context: boolean\n"
     "- missing_context: string[] (short gaps)\n"
     "- tool_plan: list of tool actions, each with a very short explanation string.\n"
+    "- progress_message: one short user-facing sentence describing what you just decided.\n"
     "Allowed tool actions:\n"
     "- {{tool: \"search_schema\", query: string, table_name?: string, limit?: int, explanation: string}}\n"
     "- {{tool: \"scan_schema_chunks\", query: string, table_name?: string, limit?: int, explanation: string}}\n"
@@ -74,6 +75,7 @@ _CONTEXT_ENRICHMENT_TOOL_PROMPT = (
     "- enough_context: boolean\n"
     "- missing_context: string[]\n"
     "- notes: string\n"
+    "- progress_message: one short user-facing sentence describing what you just decided.\n"
     "- tools: list of tool actions. Each tool action must have:\n"
     "  - tool: one of search_schema, scan_schema_chunks, sample_data\n"
     "  - args: an object with all allowed argument keys; use null or [] for keys that do not apply\n"
@@ -88,6 +90,7 @@ _CONTEXT_ENRICHMENT_TOOL_PROMPT = (
     "- Prefer search_schema first; use scan_schema_chunks only when search_schema matches are weak.\n"
     "- Avoid repeating identical tool calls.\n"
     "- Keep explanations short, concrete, and about the operation rather than internal reasoning.\n"
+    "- Keep progress_message concrete, user-facing, and free of code, JSON, hidden reasoning, or node names.\n"
     "- When enough_context=true, tools must be empty.\n"
 )
 
@@ -96,6 +99,7 @@ class ChatOutput(BaseModel):
     model_config = ConfigDict(extra="forbid", json_schema_extra=openai_strict_json_schema)
 
     answer: str | None = None
+    progress_message: str | None = None
 
 
 class ResultExplanation(BaseModel):
@@ -103,6 +107,7 @@ class ResultExplanation(BaseModel):
 
     result_explanation: str | None = None
     code_explanation: str | None = None
+    progress_message: str | None = None
 
 
 class AnalysisToolPlanItem(BaseModel):
@@ -122,6 +127,7 @@ class AnalysisContextAssessment(BaseModel):
     enough_context: bool = False
     missing_context: list[str] = Field(default_factory=list)
     tool_plan: list[AnalysisToolPlanItem] = Field(default_factory=list)
+    progress_message: str | None = None
 
 
 class ContextEnrichmentDecision(BaseModel):
@@ -159,6 +165,7 @@ class ContextEnrichmentPlan(BaseModel):
     enough_context: bool = False
     missing_context: list[str] = Field(default_factory=list)
     notes: str = ""
+    progress_message: str | None = None
     tools: list[StructuredToolCall] = Field(default_factory=list)
 
 

@@ -20,6 +20,7 @@ class AnalysisOutput(BaseModel):
 
     code: str | None = None
     explanation: str | None = None
+    progress_message: str | None = None
     output_contract: list[OutputContractItem] = Field(default_factory=list)
     search_schema_queries: list[str] = Field(default_factory=list)
     selected_tables: list[str] = Field(default_factory=list)
