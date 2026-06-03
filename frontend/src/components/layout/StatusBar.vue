@@ -89,7 +89,7 @@
     <div class="flex items-center gap-3 h-full">
       <!-- Workspace Layout Toggle -->
       <button
-        @click="appStore.cycleWorkspaceLayoutMode()"
+        @click="appStore.toggleDataPaneVisibility()"
         class="flex items-center gap-1.5 h-full px-1.5 hover:bg-[var(--color-base)] transition-colors"
         :class="appStore.workspaceLayoutMode !== 'chat' ? 'text-[var(--color-accent)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
         :title="workspaceLayoutTitle"
@@ -264,7 +264,8 @@ const workspaceLayoutLabel = computed(() => {
 })
 
 const workspaceLayoutTitle = computed(() => {
-  return 'Cycle workspace layout: Chat Only, Split, Data Only (Cmd/Ctrl+Shift+D)'
+  if (appStore.workspaceLayoutMode === 'chat') return 'Show data pane'
+  return 'Hide data pane'
 })
 
 const unreadNotificationBadge = computed(() => {

@@ -2662,6 +2662,12 @@ export const useAppStore = defineStore('app', () => {
     const nextMode = current === 'chat' ? 'split' : current === 'split' ? 'data' : 'chat'
     setWorkspaceLayoutMode(nextMode)
   }
+
+  function toggleDataPaneVisibility() {
+    const current = String(workspaceLayoutMode.value || 'chat')
+    setWorkspaceLayoutMode(current === 'chat' ? 'split' : 'chat')
+  }
+
   function setHideShortcutsModal(hide) {
     hideShortcutsModal.value = !!hide
     saveLocalConfig()
@@ -3139,6 +3145,7 @@ export const useAppStore = defineStore('app', () => {
     toggleDataFocusMode,
     setWorkspaceLayoutMode,
     cycleWorkspaceLayoutMode,
+    toggleDataPaneVisibility,
     setHideShortcutsModal,
     setEditorPosition,
     setEditorFocused,
