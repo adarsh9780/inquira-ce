@@ -519,6 +519,25 @@ def _to_response(prefs, api_key_presence: dict[str, bool]) -> PreferencesRespons
     )
 
 
+def _apply_llm_runtime_preferences(prefs, payload) -> None:
+    if payload.llm_temperature is not None:
+        prefs.llm_temperature = float(payload.llm_temperature)
+    if payload.llm_max_tokens is not None:
+        prefs.llm_max_tokens = int(payload.llm_max_tokens)
+    if payload.llm_top_p is not None:
+        prefs.llm_top_p = float(payload.llm_top_p)
+    if payload.llm_top_k is not None:
+        prefs.llm_top_k = int(payload.llm_top_k)
+    if payload.llm_frequency_penalty is not None:
+        prefs.llm_frequency_penalty = float(payload.llm_frequency_penalty)
+    if payload.llm_presence_penalty is not None:
+        prefs.llm_presence_penalty = float(payload.llm_presence_penalty)
+    if payload.slow_request_warning_seconds is not None:
+        prefs.slow_request_warning_seconds = int(payload.slow_request_warning_seconds)
+    if payload.allow_llm_data_samples is not None:
+        prefs.allow_llm_data_samples = bool(payload.allow_llm_data_samples)
+
+
 def _resolved_ollama_base_url(base_url: str | None) -> str:
     return str(base_url or "").strip().rstrip("/") or _DEFAULT_OLLAMA_BASE_URL
 
@@ -591,26 +610,11 @@ async def update_preferences(
         selected_coding_model = str(payload.selected_coding_model or "").strip()
         if selected_coding_model in enabled_models:
             prefs.selected_coding_model = selected_coding_model
-    if payload.llm_temperature is not None:
-        prefs.llm_temperature = float(payload.llm_temperature)
-    if payload.llm_max_tokens is not None:
-        prefs.llm_max_tokens = int(payload.llm_max_tokens)
-    if payload.llm_top_p is not None:
-        prefs.llm_top_p = float(payload.llm_top_p)
-    if payload.llm_top_k is not None:
-        prefs.llm_top_k = int(payload.llm_top_k)
-    if payload.llm_frequency_penalty is not None:
-        prefs.llm_frequency_penalty = float(payload.llm_frequency_penalty)
-    if payload.llm_presence_penalty is not None:
-        prefs.llm_presence_penalty = float(payload.llm_presence_penalty)
-    if payload.slow_request_warning_seconds is not None:
-        prefs.slow_request_warning_seconds = int(payload.slow_request_warning_seconds)
+    _apply_llm_runtime_preferences(prefs, payload)
     if payload.schema_context is not None:
         prefs.schema_context = payload.schema_context
     if payload.allow_schema_sample_values is not None:
         prefs.allow_schema_sample_values = payload.allow_schema_sample_values
-    if payload.allow_llm_data_samples is not None:
-        prefs.allow_llm_data_samples = bool(payload.allow_llm_data_samples)
     if payload.terminal_risk_acknowledged is not None:
         prefs.terminal_risk_acknowledged = bool(payload.terminal_risk_acknowledged)
     if payload.chat_overlay_width is not None:
@@ -823,22 +827,7 @@ async def set_api_key(
         if selected_coding_model in _clean_models(catalog.get("main_models", []), provider):
             prefs.selected_coding_model = selected_coding_model
 
-    if payload.llm_temperature is not None:
-        prefs.llm_temperature = float(payload.llm_temperature)
-    if payload.llm_max_tokens is not None:
-        prefs.llm_max_tokens = int(payload.llm_max_tokens)
-    if payload.llm_top_p is not None:
-        prefs.llm_top_p = float(payload.llm_top_p)
-    if payload.llm_top_k is not None:
-        prefs.llm_top_k = int(payload.llm_top_k)
-    if payload.llm_frequency_penalty is not None:
-        prefs.llm_frequency_penalty = float(payload.llm_frequency_penalty)
-    if payload.llm_presence_penalty is not None:
-        prefs.llm_presence_penalty = float(payload.llm_presence_penalty)
-    if payload.slow_request_warning_seconds is not None:
-        prefs.slow_request_warning_seconds = int(payload.slow_request_warning_seconds)
-    if payload.allow_llm_data_samples is not None:
-        prefs.allow_llm_data_samples = bool(payload.allow_llm_data_samples)
+    _apply_llm_runtime_preferences(prefs, payload)
 
     try:
         refresh_result = await refresh_provider_model_catalog(
