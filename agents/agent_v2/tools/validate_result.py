@@ -21,21 +21,39 @@ def _json_preview(value: Any, *, limit: int = 3000) -> str:
     return _truncate_text(rendered, limit=limit)
 
 
-def _normalize_artifacts(raw: Any, *, max_items: int) -> list[dict[str, Any]]:
+def _normalize_artifacts(raw: Any, *, max_items: int, max_rows: int) -> list[dict[str, Any]]:
     artifacts = raw if isinstance(raw, list) else []
     normalized: list[dict[str, Any]] = []
+    safe_max_rows = max(1, min(20, int(max_rows)))
     for item in artifacts:
         if not isinstance(item, dict):
             continue
-        normalized.append(
-            {
-                "artifact_id": str(item.get("artifact_id") or "").strip(),
-                "name": str(item.get("name") or "").strip(),
-                "kind": str(item.get("kind") or "").strip().lower(),
-                "path": str(item.get("path") or "").strip(),
-                "mime_type": str(item.get("mime_type") or "").strip(),
-            }
-        )
+        kind = str(item.get("kind") or "").strip().lower()
+        summary = {
+            "artifact_id": str(item.get("artifact_id") or "").strip(),
+            "name": str(item.get("name") or item.get("logical_name") or "").strip(),
+            "kind": kind,
+            "path": str(item.get("path") or item.get("storage_path") or "").strip(),
+            "mime_type": str(item.get("mime_type") or "").strip(),
+        }
+        if item.get("row_count") is not None:
+            summary["row_count"] = item.get("row_count")
+        if kind == "dataframe":
+            schema = item.get("schema")
+            if isinstance(schema, list):
+                summary["schema"] = schema[:50]
+            preview_rows = item.get("preview_rows")
+            if isinstance(preview_rows, list):
+                summary["preview_rows"] = preview_rows[:safe_max_rows]
+        payload = item.get("payload")
+        if isinstance(payload, dict):
+            title = str(payload.get("title") or "").strip()
+            insight = str(payload.get("insight") or "").strip()
+            if title:
+                summary["title"] = _truncate_text(title, limit=160)
+            if insight:
+                summary["insight"] = _truncate_text(insight, limit=500)
+        normalized.append(summary)
         if len(normalized) >= max_items:
             break
     return normalized
@@ -108,6 +126,7 @@ async def validate_and_summarize_result(
     artifacts = _normalize_artifacts(
         execution_result.get("artifacts"),
         max_items=safe_max_artifacts,
+        max_rows=safe_max_rows,
     )
     result_kind = _infer_result_kind(execution_result=execution_result, artifacts=artifacts)
     stdout = _truncate_text(execution_result.get("stdout"), limit=1800)

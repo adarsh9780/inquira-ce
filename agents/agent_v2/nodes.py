@@ -1886,6 +1886,17 @@ def _sanitize_result_summary_for_llm(
     if allow_llm_data_samples:
         return summary
     summary.pop("result_preview", None)
+    redacted_artifacts: list[dict[str, Any]] = []
+    for item in summary.get("artifacts") or []:
+        if not isinstance(item, dict):
+            continue
+        redacted = dict(item)
+        if "preview_rows" in redacted:
+            redacted.pop("preview_rows", None)
+            redacted["preview_rows_redacted"] = True
+        redacted_artifacts.append(redacted)
+    if redacted_artifacts:
+        summary["artifacts"] = redacted_artifacts
     summary["result_preview_redacted"] = True
     summary["privacy_note"] = "Row-level result previews are withheld because LLM data samples are disabled."
     return summary
