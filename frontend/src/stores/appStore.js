@@ -2189,10 +2189,16 @@ export const useAppStore = defineStore('app', () => {
     return dataPane.value
   }
 
+  function producedOutputFlags(payload = {}) {
+    return {
+      hasFigures: payload?.hasFigures === true,
+      hasDataframes: payload?.hasDataframes === true,
+      hasOutput: payload?.hasOutput === true,
+    }
+  }
+
   function revealArtifactsPane(payload = {}) {
-    const hasFigures = Boolean(payload.hasFigures)
-    const hasDataframes = Boolean(payload.hasDataframes)
-    const hasOutput = Boolean(payload.hasOutput)
+    const { hasFigures, hasDataframes, hasOutput } = producedOutputFlags(payload)
     if (!hasFigures && !hasDataframes && !hasOutput) return dataPane.value
     if (workspaceLayoutMode.value === 'chat') {
       workspaceLayoutMode.value = 'split'
