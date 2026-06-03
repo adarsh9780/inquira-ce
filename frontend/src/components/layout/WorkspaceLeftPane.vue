@@ -26,7 +26,10 @@
       <div id="workspace-left-pane-toolbar" class="flex-1 min-w-0 flex items-center justify-end"></div>
     </div>
 
-    <div class="min-h-0 flex-1 flex flex-col p-3 sm:p-4 pb-0">
+    <div
+      class="min-h-0 flex-1 flex flex-col p-3 sm:p-4 pb-0 workspace-left-content"
+      :class="{ 'workspace-left-content-chat-only': isChatOnlyMode }"
+    >
       <div class="min-h-0 flex-1">
       <div v-show="appStore.workspacePane === 'code'" class="h-full">
         <CodeTab />
@@ -44,12 +47,14 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useAppStore } from '../../stores/appStore'
 import CodeTab from '../analysis/CodeTab.vue'
 import ChatTab from '../chat/ChatTab.vue'
 import ChatInput from '../chat/ChatInput.vue'
 
 const appStore = useAppStore()
+const isChatOnlyMode = computed(() => appStore.workspacePane === 'chat' && appStore.workspaceLayoutMode === 'chat')
 </script>
 
 <style scoped>
@@ -64,5 +69,11 @@ const appStore = useAppStore()
 
 .workspace-pane-tab:hover {
   color: var(--color-text-main);
+}
+
+.workspace-left-content-chat-only {
+  width: min(100%, 920px);
+  margin-left: auto;
+  margin-right: auto;
 }
 </style>
