@@ -1297,6 +1297,14 @@ async function handleSubmit() {
             appStore.setLastMessageInterventionResponse(evt.data, localMessageId)
             return
           }
+          if (evt.event === 'error') {
+            const streamErrorMessage = extractApiErrorMessage(
+              { data: evt.data },
+              'Streaming analysis failed.',
+            )
+            appStore.updateLastMessageExplanation(streamErrorMessage, localMessageId)
+            return
+          }
           if (evt.event === 'token_usage' && evt.data && typeof evt.data === 'object') {
             const tokenUsage = evt.data?.token_usage
             if (tokenUsage && typeof tokenUsage === 'object') {

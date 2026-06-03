@@ -1,4 +1,5 @@
 import asyncio
+import ast
 import json
 import math
 import traceback
@@ -45,6 +46,39 @@ def _to_sse(event: str, payload: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {serialized_payload}\n\n"
 
 
+def _parse_agent_stream_error_detail(detail: str) -> dict[str, Any] | None:
+    text = str(detail or "").strip()
+    if not text.startswith("Agent stream error:"):
+        return None
+    raw_payload = text.split("Agent stream error:", 1)[1].strip()
+    if not raw_payload:
+        return None
+    try:
+        parsed = ast.literal_eval(raw_payload)
+    except (SyntaxError, ValueError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _normalize_agent_stream_error(detail: str) -> dict[str, Any] | None:
+    parsed = _parse_agent_stream_error_detail(detail)
+    if not parsed:
+        return None
+    error_name = str(parsed.get("error") or "").strip()
+    message = str(parsed.get("message") or parsed.get("detail") or "").strip()
+    if error_name.lower() == "ratelimiterror":
+        return {
+            "detail": "The selected model or provider hit a rate limit. Please wait a moment and try again, or switch to another model.",
+            "status_code": 429,
+            "provider_error": error_name,
+        }
+    return {
+        "detail": message or error_name or detail,
+        "status_code": 500,
+        "provider_error": error_name or None,
+    }
+
+
 def _error_event_payload(exc: BaseException) -> dict[str, Any]:
     if isinstance(exc, HTTPException):
         status = int(getattr(exc, "status_code", 500) or 500)
@@ -58,6 +92,9 @@ def _error_event_payload(exc: BaseException) -> dict[str, Any]:
         return {"detail": detail, "status_code": status}
 
     detail = str(exc).strip() or exc.__class__.__name__
+    normalized_agent_error = _normalize_agent_stream_error(detail)
+    if normalized_agent_error is not None:
+        return normalized_agent_error
     return {"detail": detail, "status_code": 500}
 
 
