@@ -549,7 +549,12 @@ function streamToolCalls(message) {
   return Array.isArray(calls) ? calls : []
 }
 
+function hasFinalResponse(message) {
+  return Boolean(String(message?.explanation || '').trim())
+}
+
 function toolActivityRows(message) {
+  if (hasFinalResponse(message)) return []
   return streamToolCalls(message).filter((activity) => String(activity?.tool || '').trim().toLowerCase() !== 'execute_python')
 }
 
@@ -564,6 +569,7 @@ function pendingIntervention(message) {
 }
 
 function reasoningRows(message) {
+  if (hasFinalResponse(message)) return []
   return []
 }
 
@@ -733,6 +739,7 @@ function normalizeEphemeralText(value) {
 }
 
 function ephemeralRows(message) {
+  if (hasFinalResponse(message)) return []
   const events = streamTraceEvents(message)
   return events
     .filter((event) => {
