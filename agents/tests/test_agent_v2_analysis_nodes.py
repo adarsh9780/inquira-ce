@@ -41,6 +41,7 @@ from agent_v2.nodes import (
 from agent_v2.coding_subagent.schema import AnalysisOutput
 from agent_v2.coding_subagent.generator import StructuredOutputEmptyError
 import agent_v2.nodes as nodes_module
+from agent_v2.tools.validate_result import validate_and_summarize_result
 
 
 def test_resolve_memory_limits_scales_with_context_window() -> None:
@@ -1334,7 +1335,8 @@ async def test_generate_result_explanations_uses_lite_model(monkeypatch) -> None
         "explanation_mode": (
             "Insight-first mode is enabled. Use the bounded result preview when present. "
             "Start with the main finding, compare important rows or groups, identify strongest or weakest performers when visible, "
-            "and explain why the result matters. Use structured markdown sections and concrete evidence from the preview. "
+            "and explain why the result matters. If artifact preview_rows are present, cite concrete row labels and values from those rows. "
+            "Use structured markdown sections and concrete evidence from the preview. "
             "Do not open with a task-completion sentence like 'I have compiled'."
         ),
         "result_summary_json": "{\"success\": true, \"result_kind\": \"scalar\", \"result_preview\": \"{\\\"value\\\": 10}\"}",
@@ -1371,6 +1373,12 @@ async def test_generate_result_explanations_redacts_preview_when_samples_disable
             "result_kind": "dataframe",
             "result_preview": "{\"rows\": [{\"customer\": \"Acme\", \"revenue\": 100}]}",
             "row_count_preview": 1,
+            "artifacts": [
+                {
+                    "kind": "dataframe",
+                    "preview_rows": [{"customer": "Acme", "revenue": 100}],
+                }
+            ],
         },
         allow_llm_data_samples=False,
         config={"configurable": {"model": "test-model"}},
@@ -1379,10 +1387,94 @@ async def test_generate_result_explanations_redacts_preview_when_samples_disable
     payload = captured["payload"]
     assert captured["lite"] is True
     assert '"result_preview":' not in str(payload["result_summary_json"])
+    assert '"preview_rows":' not in str(payload["result_summary_json"])
     assert "Acme" not in str(payload["result_summary_json"])
     assert "result_preview_redacted" in str(payload["result_summary_json"])
+    assert "preview_rows_redacted" in str(payload["result_summary_json"])
     assert "Private metadata-only mode is enabled" in str(payload["explanation_mode"])
     assert "structured markdown" in str(payload["explanation_mode"])
+
+
+@pytest.mark.asyncio
+async def test_generate_result_explanations_includes_artifact_preview_rows_when_samples_enabled(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_get_model(config, lite=False):
+        _ = config, lite
+        return object()
+
+    async def fake_invoke(prompt, model, schema, payload):
+        _ = prompt, model, schema
+        captured["payload"] = payload
+        return {
+            "result_explanation": "Chris Gayle stands out on strike rate while AB de Villiers leads on average.",
+            "code_explanation": "Returned top batsmen with rate metrics.",
+        }
+
+    monkeypatch.setattr("agent_v2.nodes._get_model", fake_get_model)
+    monkeypatch.setattr("agent_v2.nodes._ainvoke_provider_structured_chain", fake_invoke)
+
+    await nodes_module._generate_result_explanations(
+        question="Top batsmen and strike rate",
+        code="result = top_batsmen",
+        code_explanation="Ranked batsmen by runs.",
+        result_summary={
+            "success": True,
+            "result_kind": "dataframe",
+            "artifacts": [
+                {
+                    "kind": "dataframe",
+                    "name": "Top Batsmen",
+                    "preview_rows": [
+                        {"batsman": "Chris Gayle", "runs": 3651, "strike_rate": 151.56},
+                        {"batsman": "AB de Villiers", "runs": 3403, "strike_rate": 148.47},
+                    ],
+                }
+            ],
+        },
+        allow_llm_data_samples=True,
+        config={"configurable": {"model": "test-model"}},
+    )
+
+    summary_json = str(captured["payload"]["result_summary_json"])
+    assert "preview_rows" in summary_json
+    assert "Chris Gayle" in summary_json
+    assert "151.56" in summary_json
+    assert "cite concrete row labels and values" in str(captured["payload"]["explanation_mode"])
+
+
+@pytest.mark.asyncio
+async def test_validate_result_summary_bounds_artifact_preview_rows() -> None:
+    result = await validate_and_summarize_result(
+        workspace_id="ws1",
+        run_id="run1",
+        execution_result={
+            "success": True,
+            "result_kind": "dataframe",
+            "artifacts": [
+                {
+                    "artifact_id": "a1",
+                    "kind": "dataframe",
+                    "logical_name": "Top Batsmen",
+                    "row_count": 3,
+                    "preview_rows": [
+                        {"batsman": "A", "runs": 100},
+                        {"batsman": "B", "runs": 90},
+                        {"batsman": "C", "runs": 80},
+                    ],
+                }
+            ],
+        },
+        max_rows=2,
+    )
+
+    artifact = result["artifacts"][0]
+    assert artifact["name"] == "Top Batsmen"
+    assert artifact["row_count"] == 3
+    assert artifact["preview_rows"] == [
+        {"batsman": "A", "runs": 100},
+        {"batsman": "B", "runs": 90},
+    ]
 
 
 @pytest.mark.asyncio
