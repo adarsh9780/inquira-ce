@@ -1653,6 +1653,7 @@ async def route_node(state: dict[str, Any], config: RunnableConfig) -> dict[str,
         }
 
     decision = await decide_route_details(messages, config.get("configurable", {}))
+    _emit_llm_progress("routing", decision)
     route = str(decision.route or "").strip().lower()
     reasoning = str(decision.reasoning or "").strip()
     if reasoning:
@@ -2833,6 +2834,45 @@ def _emit_agent_status(
     emit_agent_event("agent_status", payload)
 
 
+def _normalize_progress_message(message: Any, *, limit: int = 260) -> str:
+    text = str(message or "")
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return ""
+    if (
+        (text.startswith("{") and text.endswith("}"))
+        or (text.startswith("[") and text.endswith("]"))
+        or "```" in text
+    ):
+        return ""
+    return _truncate_text(text, limit=limit)
+
+
+def _progress_message_from_output(output: Any) -> str:
+    if output is None:
+        return ""
+    if isinstance(output, dict):
+        return _normalize_progress_message(output.get("progress_message"))
+    return _normalize_progress_message(getattr(output, "progress_message", None))
+
+
+def _emit_llm_progress(stage: str, output_or_message: Any) -> None:
+    message = (
+        _normalize_progress_message(output_or_message)
+        if isinstance(output_or_message, str)
+        else _progress_message_from_output(output_or_message)
+    )
+    if not message:
+        return
+    emit_agent_event(
+        "llm_progress",
+        {
+            "stage": str(stage or "").strip(),
+            "message": message,
+        },
+    )
+
+
 async def _generate_result_explanations(
     *,
     question: str,
@@ -2887,8 +2927,11 @@ async def _generate_result_explanations(
         },
     )
     if isinstance(output, ResultExplanation):
+        _emit_llm_progress("result_explanation", output)
         return output
-    return ResultExplanation.model_validate(output)
+    explained = ResultExplanation.model_validate(output)
+    _emit_llm_progress("result_explanation", explained)
+    return explained
 
 
 async def analysis_collect_context_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
@@ -3045,6 +3088,7 @@ async def analysis_assess_context_node(state: dict[str, Any], config: RunnableCo
             assessed = output
         else:
             assessed = AnalysisContextAssessment.model_validate(output)
+        _emit_llm_progress("context_assessment", assessed)
     except Exception as exc:
         # Structured parsing may fail when provider truncates response (length finish).
         if "LengthFinishReasonError" not in type(exc).__name__ and "length limit" not in str(exc).lower():
@@ -3235,13 +3279,6 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
         allow_llm_data_samples=allow_llm_data_samples,
     )
 
-    _emit_agent_status(
-        step="assessing_context",
-        message="Assessing schema context...",
-        detail="Deciding whether more schema/data lookup is required before code generation.",
-        next_action="If needed, schedule the next schema lookup tool.",
-    )
-
     model = _get_model(config, lite=False)
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -3257,6 +3294,7 @@ async def analysis_enrich_context_node(state: dict[str, Any], config: RunnableCo
             {"tool_request_prompt": prompt_payload},
         )
         plan = output if isinstance(output, ContextEnrichmentPlan) else ContextEnrichmentPlan.model_validate(output)
+        _emit_llm_progress("context_enrichment", plan)
     except Exception as exc:
         if not _is_recoverable_structured_output_error(exc):
             raise
@@ -3527,13 +3565,6 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
     table_names = _normalize_table_names(analysis_context.get("table_names"), max_items=16)
     table_hint = table_names[0] if table_names else ""
 
-    _emit_agent_status(
-        step="generating_code",
-        message="Generating analysis code...",
-        detail="Creating executable Python code from available schema and context.",
-        next_action="Validate generated code and execute it.",
-    )
-
     model = _get_model(config, lite=False)
     output = None
     last_exc: Exception | None = None
@@ -3586,6 +3617,7 @@ async def analysis_generate_code_node(state: dict[str, Any], config: RunnableCon
         if last_exc is not None:
             raise last_exc
         raise RuntimeError("Code generation structured output failed without an error.")
+    _emit_llm_progress("code_generation", output)
     candidate_code = str(output.code or "").strip()
     requested_queries = _normalize_search_queries(output.search_schema_queries)
     if not requested_queries:
@@ -4059,6 +4091,7 @@ async def chat_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, 
         output = await _ainvoke_structured_chain(fallback_chain, messages_payload)
 
     text = _extract_chat_text(output)
+    _emit_llm_progress("general_chat", output)
     if not text:
         text = "I can help you analyze your dataset. Tell me what insight you want."
     _emit_text_chunks("chat", text)
