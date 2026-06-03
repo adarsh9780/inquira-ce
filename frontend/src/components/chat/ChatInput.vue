@@ -1268,30 +1268,12 @@ async function handleSubmit() {
             }
             return
           }
-          if (evt.event === 'status' && evt.data?.message) {
+          if (evt.event === 'llm_progress' && evt.data?.message) {
             appStore.appendLastMessageTraceEvent({
-              type: 'status',
+              type: 'llm_progress',
               stage: evt.data?.stage || '',
               message: evt.data.message,
-              output: evt.data?.output || ''
-            }, localMessageId)
-            return
-          }
-          if (evt.event === 'reasoning' && evt.data?.message) {
-            appStore.appendLastMessageReasoningEvent({
-              stage: evt.data?.stage || 'intent',
-              message: evt.data.message,
-              route: evt.data?.route || ''
-            }, localMessageId)
-            return
-          }
-          if (evt.event === 'agent_status' && evt.data?.message) {
-            appStore.appendLastMessageTraceEvent({
-              type: 'status',
-              node: 'agent_status',
-              stage: evt.data.step || '',
-              message: evt.data.message,
-              output: evt.data?.detail || evt.data?.output || ''
+              output: ''
             }, localMessageId)
             return
           }

@@ -218,7 +218,6 @@ import {
 } from '@heroicons/vue/24/outline'
 import ToolActivityCard from './ToolActivityCard.vue'
 import AgentIntervention from './AgentIntervention.vue'
-import { toolOutputHasRenderableContent } from '../../utils/toolOutputPreview'
 import MarkdownIt from 'markdown-it'
 import markdownItKatex from 'markdown-it-katex'
 import DOMPurify from 'dompurify'
@@ -555,13 +554,7 @@ function toolActivityRows(message) {
 }
 
 function isToolActivityOutputCollapsed(message, activityIndex) {
-  const rows = toolActivityRows(message)
-  const activity = rows[activityIndex]
-  if (!toolOutputHasRenderableContent(activity)) return false
-  if (String(message?.explanation || '').trim()) return true
-  return rows
-    .slice(activityIndex + 1)
-    .some((nextActivity) => toolOutputHasRenderableContent(nextActivity))
+  return false
 }
 
 function pendingIntervention(message) {
@@ -571,13 +564,7 @@ function pendingIntervention(message) {
 }
 
 function reasoningRows(message) {
-  return streamReasoningEvents(message)
-    .map((event, index) => ({
-      id: `${message?.id || 'msg'}-reasoning-${String(event?.stage || 'intent')}-${index}`,
-      message: normalizeEphemeralText(event?.message),
-      sections: parseReasoningSections(event?.message),
-    }))
-    .filter((row) => row.message && !isGenericReasoningMessage(row.message))
+  return []
 }
 
 const GENERIC_REASONING_PATTERNS = [
@@ -750,34 +737,17 @@ function ephemeralRows(message) {
   return events
     .filter((event) => {
       const type = String(event?.type || '').toLowerCase()
-      const stage = String(event?.stage || '').trim().toLowerCase()
-      const node = normalizeNodeName(event?.node)
-      return !(type === 'status' && stage === 'start')
-        && !HIDDEN_EPHEMERAL_NODES.has(node)
+      return type === 'llm_progress'
     })
     .map((event, index) => {
     const type = String(event?.type || '').toLowerCase()
-    const node = normalizeNodeName(event?.node)
     const stage = String(event?.stage || '').trim().toLowerCase()
     const eventMessage = String(event?.message || '').trim()
 
-    let action = 'Progress'
-    if (type === 'node') {
-      action = describeNode(node) || 'Processing step'
-    } else if (type === 'status' && node === 'agent_status') {
-      action = eventMessage || 'Progress'
-    } else if (type === 'status') {
-      action = String(stage || 'status')
-        .split('_')
-        .filter(Boolean)
-        .map((part) => part[0].toUpperCase() + part.slice(1))
-        .join(' ') || 'Status'
-    }
-
-    const detail = normalizeEphemeralText(eventOutputText(event, message))
+    const detail = ''
     return {
-      id: `${message?.id || 'msg'}-${type || 'event'}-${node || stage || index}-${index}`,
-      action: normalizeEphemeralText(action) || 'Progress',
+      id: `${message?.id || 'msg'}-${type || 'event'}-${stage || index}-${index}`,
+      action: normalizeEphemeralText(eventMessage),
       detail,
     }
     })
@@ -1091,25 +1061,14 @@ watch(() => appStore.activeConversationIsLoading, (isLoading, wasLoading) => {
 .stream-action-section {
   position: relative;
   display: grid;
-  gap: 0.95rem;
-  margin-top: 1.15rem;
-  padding-top: 1.05rem;
+  gap: 1.05rem;
+  margin-top: 1.05rem;
+  padding-top: 0.7rem;
 }
-
-.stream-action-section::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0.75rem;
-  width: 1.5rem;
-  height: 1px;
-  background-color: color-mix(in srgb, var(--color-border) 86%, transparent);
-}
-
 
 .ephemeral-trace-list {
   display: grid;
-  gap: 1rem;
+  gap: 1.15rem;
 }
 
 .ephemeral-trace-item {
@@ -1118,10 +1077,9 @@ watch(() => appStore.activeConversationIsLoading, (isLoading, wasLoading) => {
 
 .ephemeral-trace-action {
   margin: 0;
-  font-size: 0.8rem;
-  line-height: 1.3;
-  letter-spacing: 0.01em;
-  color: color-mix(in srgb, var(--color-text-muted) 90%, var(--color-text-main) 10%);
+  font-size: 0.96rem;
+  line-height: 1.7;
+  color: var(--color-text-main);
 }
 
 .ephemeral-trace-detail {
