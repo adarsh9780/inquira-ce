@@ -454,6 +454,7 @@ async function saveKey() {
   await apiService.v1SetApiKey({
     provider: selectedProvider,
     api_key: key,
+    allow_llm_data_samples: Boolean(allowLlmDataSamples.value),
   })
   apiKeyPresenceByProvider.value = {
     ...apiKeyPresenceByProvider.value,
@@ -464,6 +465,17 @@ async function saveKey() {
   apiKey.value = keyMask.value
   usingMaskedKey.value = true
   return { ok: true }
+}
+
+async function saveDataSamplesPreference() {
+  const response = await apiService.v1UpdatePreferences({
+    allow_llm_data_samples: Boolean(allowLlmDataSamples.value),
+  })
+  const store = getAppStore()
+  if (response && store && typeof store.applyPreferencesResponse === 'function') {
+    store.applyPreferencesResponse(response)
+  }
+  return response
 }
 
 async function deleteKey() {
@@ -509,6 +521,7 @@ async function verifyAndSaveKey() {
     return { ok: false, stage: 'save_key', error: saveResult.error || 'save_key_failed' }
   }
 
+  await saveDataSamplesPreference()
   verifySuccess.value = 'Key verified'
   return { ok: true }
 }
@@ -699,6 +712,7 @@ export const useLLMConfig = () => {
     setMainModel,
     verifyKey,
     saveKey,
+    saveDataSamplesPreference,
     verifyAndSaveKey,
     deleteKey,
     refreshModels,

@@ -180,6 +180,7 @@
               <input
                 v-model="allowLlmDataSamples"
                 type="checkbox"
+                :disabled="dataSamplesSaving"
                 class="mt-1 rounded border-[var(--color-border-strong)]"
               />
               <span class="min-w-0">
@@ -188,6 +189,13 @@
                 </span>
                 <span class="mt-1 block text-xs leading-relaxed text-[var(--color-text-muted)]">
                   Off keeps row previews local. On allows small table samples and result previews to be sent to your selected LLM provider, so the agent can write more concrete, analyst-style markdown explanations instead of generic summaries.
+                </span>
+                <span
+                  v-if="dataSamplesMessage"
+                  class="mt-2 block text-xs"
+                  :class="dataSamplesMessageType === 'error' ? 'text-[var(--color-danger)]' : 'text-[var(--color-success)]'"
+                >
+                  {{ dataSamplesMessage }}
                 </span>
               </span>
             </label>
@@ -359,6 +367,7 @@ const {
   deleteKey,
   refreshModels,
   saveConfig,
+  saveDataSamplesPreference,
   getModelMeta,
   setMainModel,
   clearTransientMessages,
@@ -368,6 +377,11 @@ const {
 const showKey = ref(false)
 const showAdvanced = ref(false)
 const deleteLoading = ref(false)
+const dataSamplesSaving = ref(false)
+const dataSamplesMessage = ref('')
+const dataSamplesMessageType = ref('')
+const preferencesLoaded = ref(false)
+const suppressDataSamplesSave = ref(false)
 
 const providerOptions = [
   { value: 'openai', label: 'OpenAI' },
@@ -400,6 +414,7 @@ const advancedFields = computed(() => {
 
 onMounted(async () => {
   await loadPreferences(null, false)
+  preferencesLoaded.value = true
 })
 
 watch(
@@ -407,11 +422,36 @@ watch(
   async (newUserId, oldUserId) => {
     if (!newUserId || newUserId === oldUserId) return
     showKey.value = false
+    preferencesLoaded.value = false
     resetForAuthBoundary()
     try {
       await loadPreferences(null, false)
+      preferencesLoaded.value = true
     } catch (_error) {
       toast.error('Provider Error', 'Could not load provider configuration.')
+    }
+  },
+)
+
+watch(
+  () => allowLlmDataSamples.value,
+  async (nextValue, previousValue) => {
+    if (suppressDataSamplesSave.value || !preferencesLoaded.value || nextValue === previousValue) return
+    dataSamplesSaving.value = true
+    dataSamplesMessage.value = ''
+    dataSamplesMessageType.value = ''
+    try {
+      await saveDataSamplesPreference()
+      dataSamplesMessage.value = 'Preference saved'
+      dataSamplesMessageType.value = 'success'
+    } catch (_error) {
+      suppressDataSamplesSave.value = true
+      allowLlmDataSamples.value = previousValue
+      suppressDataSamplesSave.value = false
+      dataSamplesMessage.value = 'Could not save this preference'
+      dataSamplesMessageType.value = 'error'
+    } finally {
+      dataSamplesSaving.value = false
     }
   },
 )

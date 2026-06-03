@@ -376,6 +376,7 @@ async function verifyAndSaveProviderConfig() {
       selected_model: appStore.selectedModel,
       selected_lite_model: appStore.selectedLiteModel,
       selected_coding_model: appStore.selectedModel,
+      allow_llm_data_samples: appStore.allowLlmDataSamples,
     }
     if (requiresApiKey.value) {
       payload.api_key = key
@@ -426,6 +427,7 @@ async function saveApiSettings() {
       selected_model: appStore.selectedModel,
       selected_lite_model: appStore.selectedLiteModel,
       selected_coding_model: appStore.selectedModel,
+      allow_llm_data_samples: appStore.allowLlmDataSamples,
     })
     
     // Sync store state with backend response (especially providerRequiresApiKey)
