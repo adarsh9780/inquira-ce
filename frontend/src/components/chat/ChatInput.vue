@@ -1277,6 +1277,24 @@ async function handleSubmit() {
             }, localMessageId)
             return
           }
+          if (evt.event === 'reasoning' && evt.data?.message) {
+            appStore.appendLastMessageReasoningEvent({
+              stage: evt.data?.stage || 'intent',
+              message: evt.data.message,
+              route: evt.data?.route || ''
+            }, localMessageId)
+            return
+          }
+          if (evt.event === 'agent_status' && evt.data?.message) {
+            appStore.appendLastMessageTraceEvent({
+              type: 'status',
+              node: 'agent_status',
+              stage: evt.data.step || '',
+              message: evt.data.message,
+              output: evt.data?.detail || evt.data?.output || ''
+            }, localMessageId)
+            return
+          }
           if (evt.event === 'tool_call' && evt.data?.call_id) {
             appStore.appendLastMessageToolCall(evt.data, localMessageId)
             return

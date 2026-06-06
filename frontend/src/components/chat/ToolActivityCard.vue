@@ -16,11 +16,18 @@
       {{ errorSummary }}
     </p>
 
+    <ToolOutputPreview
+      v-if="shouldRenderOutputPreview"
+      :activity="activity"
+      :collapsed="collapsed"
+    />
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import ToolOutputPreview from './ToolOutputPreview.vue'
+import { toolOutputHasRenderableContent } from '../../utils/toolOutputPreview'
 
 const props = defineProps({
   activity: {
@@ -211,6 +218,11 @@ const errorSummary = computed(() => {
     return String(payload.error || payload.stderr || payload.message || 'Tool returned an error.')
   }
   return String(payload)
+})
+
+const shouldRenderOutputPreview = computed(() => {
+  if (toolStatus.value === 'running') return false
+  return toolOutputHasRenderableContent(props.activity)
 })
 
 </script>

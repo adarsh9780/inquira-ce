@@ -218,6 +218,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import ToolActivityCard from './ToolActivityCard.vue'
 import AgentIntervention from './AgentIntervention.vue'
+import { toolOutputHasRenderableContent } from '../../utils/toolOutputPreview'
 import MarkdownIt from 'markdown-it'
 import markdownItKatex from 'markdown-it-katex'
 import DOMPurify from 'dompurify'
@@ -554,12 +555,17 @@ function hasFinalResponse(message) {
 }
 
 function toolActivityRows(message) {
-  if (hasFinalResponse(message)) return []
   return streamToolCalls(message).filter((activity) => String(activity?.tool || '').trim().toLowerCase() !== 'execute_python')
 }
 
 function isToolActivityOutputCollapsed(message, activityIndex) {
-  return false
+  const rows = toolActivityRows(message)
+  const activity = rows[activityIndex]
+  if (!toolOutputHasRenderableContent(activity)) return false
+  if (String(message?.explanation || '').trim()) return true
+  return rows
+    .slice(activityIndex + 1)
+    .some((nextActivity) => toolOutputHasRenderableContent(nextActivity))
 }
 
 function pendingIntervention(message) {
@@ -570,7 +576,13 @@ function pendingIntervention(message) {
 
 function reasoningRows(message) {
   if (hasFinalResponse(message)) return []
-  return []
+  return streamReasoningEvents(message)
+    .map((event, index) => ({
+      id: `${message?.id || 'msg'}-reasoning-${String(event?.stage || 'intent')}-${index}`,
+      message: normalizeEphemeralText(event?.message),
+      sections: parseReasoningSections(event?.message),
+    }))
+    .filter((row) => row.message && !isGenericReasoningMessage(row.message))
 }
 
 const GENERIC_REASONING_PATTERNS = [
@@ -744,17 +756,34 @@ function ephemeralRows(message) {
   return events
     .filter((event) => {
       const type = String(event?.type || '').toLowerCase()
-      return type === 'llm_progress'
+      const stage = String(event?.stage || '').trim().toLowerCase()
+      const node = normalizeNodeName(event?.node)
+      return !(type === 'status' && stage === 'start')
+        && !HIDDEN_EPHEMERAL_NODES.has(node)
     })
     .map((event, index) => {
     const type = String(event?.type || '').toLowerCase()
+    const node = normalizeNodeName(event?.node)
     const stage = String(event?.stage || '').trim().toLowerCase()
     const eventMessage = String(event?.message || '').trim()
 
-    const detail = ''
+    let action = 'Progress'
+    if (type === 'node') {
+      action = describeNode(node) || 'Processing step'
+    } else if (type === 'status' && node === 'agent_status') {
+      action = eventMessage || 'Progress'
+    } else if (type === 'status') {
+      action = String(stage || 'status')
+        .split('_')
+        .filter(Boolean)
+        .map((part) => part[0].toUpperCase() + part.slice(1))
+        .join(' ') || 'Status'
+    }
+
+    const detail = normalizeEphemeralText(eventOutputText(event, message))
     return {
-      id: `${message?.id || 'msg'}-${type || 'event'}-${stage || index}-${index}`,
-      action: normalizeEphemeralText(eventMessage),
+      id: `${message?.id || 'msg'}-${type || 'event'}-${node || stage || index}-${index}`,
+      action: normalizeEphemeralText(action) || 'Progress',
       detail,
     }
     })
@@ -1068,7 +1097,7 @@ watch(() => appStore.activeConversationIsLoading, (isLoading, wasLoading) => {
 .stream-action-section {
   position: relative;
   display: grid;
-  gap: 1.05rem;
+  gap: 1rem;
   margin-top: 1.05rem;
   padding-top: 0.7rem;
 }

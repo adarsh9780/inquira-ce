@@ -27,8 +27,8 @@
     </div>
 
     <div
-      class="min-h-0 flex-1 flex flex-col p-3 sm:p-4 pb-0 workspace-left-content"
-      :class="{ 'workspace-left-content-chat-only': isChatOnlyMode }"
+      class="min-h-0 flex-1 flex flex-col p-3 sm:p-4 pb-0"
+      :class="['workspace-left-content', { 'workspace-left-content-chat-only': isChatOnlyMode }]"
     >
       <div class="min-h-0 flex-1">
       <div v-show="appStore.workspacePane === 'code'" class="h-full">
