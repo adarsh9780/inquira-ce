@@ -63,6 +63,12 @@
           <p class="text-xs font-medium uppercase tracking-wider text-[var(--color-danger-text)]">Error</p>
           <p class="mt-2 text-sm text-[var(--color-danger-text)]">{{ startupFailure }}</p>
         </div>
+        <StartupFailureActions
+          :message="startupRecoveryMessage"
+          @restart="restartDesktopApp"
+          @open-logs="openStartupLogs"
+          @copy-diagnostics="copyStartupDiagnostics"
+        />
       </div>
     </div>
 
@@ -150,6 +156,7 @@ import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
 import StatusBar from './components/layout/StatusBar.vue'
 import ToastContainer from './components/ui/ToastContainer.vue'
+import StartupFailureActions from './components/startup/StartupFailureActions.vue'
 import ConnectionStatusIndicator from './components/ui/ConnectionStatusIndicator.vue'
 
 const appStore = useAppStore()
@@ -174,6 +181,7 @@ const wsUnsubscribers = ref([])
 const lastRuntimeErrorToast = ref('')
 const activeSnapshotUserId = ref('')
 const startupFailure = ref('')
+const startupRecoveryMessage = ref('')
 const startupTimeline = ref([])
 const desktopStartupTimeline = ref([])
 const startupClock = ref(Date.now())
@@ -452,7 +460,43 @@ async function readDesktopStartupState() {
     return await invoke('get_startup_state')
   } catch (error) {
     console.warn('⚠️ Failed to read desktop startup state from Tauri:', error)
-    return { ready: true, error: '', message: '' }
+    return {
+      ready: false,
+      error: 'Could not read desktop service startup state. Restart the app or open the logs for details.',
+      message: '',
+    }
+  }
+}
+
+async function invokeDesktopRecovery(command) {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
+    startupRecoveryMessage.value = 'Desktop recovery actions are only available in the installed app.'
+    return
+  }
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    await invoke(command)
+  } catch (error) {
+    startupRecoveryMessage.value = String(error?.message || error || 'Recovery action failed.')
+  }
+}
+
+async function restartDesktopApp() {
+  startupRecoveryMessage.value = 'Restarting desktop app...'
+  await invokeDesktopRecovery('restart_desktop_app')
+}
+
+async function openStartupLogs() {
+  startupRecoveryMessage.value = ''
+  await invokeDesktopRecovery('open_startup_logs')
+}
+
+async function copyStartupDiagnostics() {
+  try {
+    await navigator.clipboard.writeText(`Inquira startup failure\n${startupFailure.value}`)
+    startupRecoveryMessage.value = 'Startup diagnostics copied.'
+  } catch (error) {
+    startupRecoveryMessage.value = String(error?.message || 'Could not copy startup diagnostics.')
   }
 }
 
@@ -512,19 +556,6 @@ async function waitForDesktopStartupReady() {
       }
 
       if (state?.ready) {
-        desktopStartup.message = 'Waiting for backend API...'
-        recordDesktopStartupStage(desktopStartup.message)
-        try {
-          await apiService.waitForBackendReady()
-        } catch (error) {
-          const detail = String(error?.message || 'Backend did not become ready in time.').trim()
-          desktopStartup.error = detail
-          closeCurrentDesktopStartupStage()
-          startupFailure.value = detail
-          desktopStartup.active = false
-          desktopStartup.ready = false
-          return false
-        }
         closeCurrentDesktopStartupStage()
         desktopStartup.active = false
         desktopStartup.ready = true

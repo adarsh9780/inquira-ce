@@ -1052,13 +1052,14 @@ function appendChatExecutionOutput(response) {
   appStore.appendTerminalEntry({
     kind: 'output',
     source: 'analysis',
-    label: 'Run output',
+    label: execution.output_truncated ? 'Run output (truncated)' : 'Run output',
     runId: String(response?.run_id || ''),
     status: success ? 'success' : 'error',
     stdout,
     stderr,
     exitCode: success ? 0 : 1,
     durationMs: Number.isFinite(Number(execution.duration_ms)) ? Number(execution.duration_ms) : null,
+    truncated: Boolean(execution.output_truncated),
   })
   return true
 }

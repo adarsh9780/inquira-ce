@@ -3,12 +3,12 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('desktop startup waits for the backend health endpoint before auth boot begins', () => {
+test('desktop startup treats native Tauri readiness as the single service authority', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf-8')
 
-  assert.equal(source.includes("desktopStartup.message = 'Waiting for backend API...'"), true)
-  assert.equal(source.includes('await apiService.waitForBackendReady()'), true)
-  assert.equal(source.includes("startupFailure.value = detail"), true)
+  assert.equal(source.includes("desktopStartup.message = 'Waiting for backend API...'"), false)
+  assert.equal(source.includes('await apiService.waitForBackendReady()'), false)
+  assert.equal(source.includes('if (state?.ready) {'), true)
 })
 
 test('authenticated workspace shell mounts only after account bootstrap completes', () => {

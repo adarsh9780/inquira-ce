@@ -597,7 +597,11 @@ async def test_analysis_runtime_tools_node_emits_tool_messages_and_trace_hooks(m
         ),
     )
     state = {
-        "analysis_context": {"data_path": "/tmp/ws.db", "sample_table": "orders"},
+        "analysis_context": {
+            "data_path": "/tmp/ws.db",
+            "sample_table": "orders",
+            "privacy": {"allow_llm_data_samples": True},
+        },
         "pending_tools": [
             {
                 "tool": "sample_data_runtime",
@@ -649,6 +653,7 @@ async def test_analysis_runtime_tools_node_runs_independent_tools_concurrently(m
     releaser = asyncio.create_task(release_after_start())
     result = await analysis_runtime_tools_node(
         {
+            "analysis_context": {"privacy": {"allow_llm_data_samples": True}},
             "pending_tools": [
                 {"tool": "sample_data_runtime", "args": {}, "explanation": "Sample first."},
                 {"tool": "validate_result_runtime", "args": {}, "explanation": "Validate too."},

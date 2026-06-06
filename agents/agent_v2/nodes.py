@@ -2476,6 +2476,7 @@ _PARALLEL_READ_ONLY_TOOL_NAMES = {
     "scan_schema_chunks",
     "sample_data",
     "sample_data_runtime",
+    "validate_result_runtime",
 }
 
 

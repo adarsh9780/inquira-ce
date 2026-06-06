@@ -133,3 +133,13 @@ test('preserves run id and normalizes artifact previews from execute response', 
   assert.equal(normalized.artifacts[0].artifact_id, 'art-1')
   assert.deepEqual(normalized.artifacts[0].preview_rows, [{ a: 1 }, { a: 2 }])
 })
+
+test('preserves honest output truncation metadata', () => {
+  const normalized = normalizeExecutionResponse({
+    success: true,
+    stdout: 'bounded output',
+    output_truncated: true,
+  })
+
+  assert.equal(normalized.output_truncated, true)
+})

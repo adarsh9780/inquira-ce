@@ -698,6 +698,37 @@ fn get_startup_state(app: tauri::AppHandle) -> StartupSnapshot {
 }
 
 #[tauri::command]
+fn open_startup_logs(app: tauri::AppHandle) -> Result<(), String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let log_dir = startup_log_paths(&data_dir)
+        .desktop
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| "Startup log directory is unavailable.".to_string())?;
+    fs::create_dir_all(&log_dir).map_err(|e| e.to_string())?;
+
+    #[cfg(target_os = "macos")]
+    let mut command = Command::new("open");
+    #[cfg(target_os = "windows")]
+    let mut command = Command::new("explorer");
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    let mut command = Command::new("xdg-open");
+
+    command.arg(&log_dir).spawn().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn restart_desktop_app(app: tauri::AppHandle) -> Result<(), String> {
+    let executable = env::current_exe().map_err(|e| e.to_string())?;
+    Command::new(executable)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    app.exit(0);
+    Ok(())
+}
+
+#[tauri::command]
 fn open_external_url(url: String) -> Result<(), String> {
     let value = url.trim();
     if value.is_empty() {
@@ -2065,6 +2096,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_backend_url,
             get_startup_state,
+            open_startup_logs,
+            restart_desktop_app,
             auth_start_loopback_listener,
             open_external_url,
             tauri_terminal_start,
@@ -2118,8 +2151,11 @@ mod tests {
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::process::Command;
+    use std::sync::Mutex;
     #[cfg(target_os = "windows")]
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+    static ENV_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn bootstrap_required_when_venv_missing() {
@@ -2385,6 +2421,7 @@ mod tests {
 
     #[test]
     fn uv_index_url_defaults_to_pypi_when_not_configured() {
+        let _env_guard = ENV_TEST_LOCK.lock().expect("lock environment tests");
         std::env::remove_var("INQUIRA_UV_INDEX_URL");
         let config = InquiraConfig {
             python: None,
@@ -2399,6 +2436,7 @@ mod tests {
 
     #[test]
     fn shared_console_log_level_defaults_to_error() {
+        let _env_guard = ENV_TEST_LOCK.lock().expect("lock environment tests");
         std::env::remove_var("INQUIRA_LOG_CONSOLE_LEVEL");
         let config = InquiraConfig {
             python: None,
@@ -2413,6 +2451,7 @@ mod tests {
 
     #[test]
     fn shared_console_log_level_uses_toml_and_env_override() {
+        let _env_guard = ENV_TEST_LOCK.lock().expect("lock environment tests");
         std::env::remove_var("INQUIRA_LOG_CONSOLE_LEVEL");
         let config = InquiraConfig {
             python: None,
@@ -2433,6 +2472,7 @@ mod tests {
 
     #[test]
     fn uv_index_url_uses_toml_when_env_missing() {
+        let _env_guard = ENV_TEST_LOCK.lock().expect("lock environment tests");
         std::env::remove_var("INQUIRA_UV_INDEX_URL");
         let config = base_config_with_index(Some("https://company.example/simple"));
         assert_eq!(
@@ -2443,6 +2483,7 @@ mod tests {
 
     #[test]
     fn uv_index_url_env_overrides_toml() {
+        let _env_guard = ENV_TEST_LOCK.lock().expect("lock environment tests");
         let config = base_config_with_index(Some("https://company.example/simple"));
         std::env::set_var("INQUIRA_UV_INDEX_URL", "https://override.example/simple");
         assert_eq!(
@@ -2526,6 +2567,7 @@ mod tests {
 
     #[test]
     fn uv_search_candidates_include_env_override_and_manifest_bundle() {
+        let _env_guard = ENV_TEST_LOCK.lock().expect("lock environment tests");
         let base = std::env::temp_dir().join("inq_uv_candidates");
         let _ = fs::remove_dir_all(&base);
         fs::create_dir_all(&base).expect("create resource dir");
