@@ -89,14 +89,17 @@
     <div class="flex items-center gap-3 h-full">
       <!-- Workspace Layout Toggle -->
       <button
-        @click="appStore.toggleDataPaneVisibility()"
+        @click="appStore.cycleWorkspaceLayoutMode()"
         class="flex items-center gap-1.5 h-full px-1.5 hover:bg-[var(--color-base)] transition-colors"
-        :class="appStore.workspaceLayoutMode !== 'chat' ? 'text-[var(--color-accent)] font-medium' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]'"
+        :class="'text-[var(--color-accent)] font-medium'"
         :title="workspaceLayoutTitle"
+        :aria-label="workspaceLayoutTitle"
+        :aria-keyshortcuts="workspaceLayoutAriaShortcut"
       >
         <ViewColumnsIcon class="w-3.5 h-3.5" />
         <span>{{ workspaceLayoutLabel }}</span>
       </button>
+      <span class="sr-only" aria-live="polite">{{ workspaceLayoutAnnouncement }}</span>
 
       <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
 
@@ -258,15 +261,18 @@ const artifactUsage = ref({
 })
 
 const workspaceLayoutLabel = computed(() => {
-  if (appStore.workspaceLayoutMode === 'data') return 'Data Only'
-  if (appStore.workspaceLayoutMode === 'split') return 'Split'
-  return 'Chat Only'
+  if (appStore.workspaceLayoutMode === 'chat') return 'Chat'
+  if (appStore.workspaceLayoutMode === 'output') return 'Output'
+  return 'View'
 })
 
 const workspaceLayoutTitle = computed(() => {
-  if (appStore.workspaceLayoutMode === 'chat') return 'Show data pane'
-  return 'Hide data pane'
+  return `${workspaceLayoutLabel.value} layout. Click to cycle View, Chat, and Output.`
 })
+
+const workspaceLayoutAriaShortcut = 'Control+Alt+V Meta+Alt+V Control+Alt+C Meta+Alt+C Control+Alt+O Meta+Alt+O'
+
+const workspaceLayoutAnnouncement = computed(() => `${workspaceLayoutLabel.value} layout active`)
 
 const unreadNotificationBadge = computed(() => {
   const count = Number(unreadNotificationCount.value || 0)

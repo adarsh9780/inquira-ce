@@ -12,7 +12,7 @@ test('layout defines elevated light surfaces for sidebar and active workspace pa
   assert.equal(styleSource.includes('--color-workspace-surface: #FAF9F6;'), true)
   assert.equal(appSource.includes('class="flex-1 flex overflow-hidden app-shell-frame relative"'), true)
   assert.equal(appSource.includes('class="h-full shrink-0 app-nav-pane"'), true)
-  assert.equal(appSource.includes(":class=\"{ 'app-nav-pane-collapsed': appStore.isSidebarCollapsed }\""), true)
+  assert.equal(appSource.includes("'app-nav-pane-collapsed': appStore.showSidebar && appStore.isSidebarCollapsed"), true)
   assert.equal(appSource.includes('.app-nav-pane-collapsed {'), true)
   assert.equal(appSource.includes('class="flex-1 flex flex-col overflow-hidden app-workspace-pane"'), true)
   assert.equal(appSource.includes('.app-nav-pane {'), true)

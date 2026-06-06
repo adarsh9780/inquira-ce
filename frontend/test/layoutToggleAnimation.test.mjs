@@ -12,10 +12,11 @@ test('right panel animates terminal open and close via height and opacity transi
   assert.equal(panelSource.includes('transition-[height,opacity,border-color] motion-slow'), true)
   assert.equal(panelSource.includes('h-0 pointer-events-none opacity-0'), true)
   assert.equal(panelSource.includes('v-if="appStore.showLeftPane"'), true)
-  assert.equal(panelSource.includes('v-if="appStore.showRightPane"'), true)
+  assert.equal(panelSource.includes(':aria-hidden="!appStore.showRightPane"'), true)
+  assert.equal(panelSource.includes("'workspace-data-pane-hidden': !appStore.showRightPane"), true)
   assert.equal(panelSource.includes('const leftPaneWidth = computed(() => appStore.showRightPane ? appStore.leftPaneWidth : 100)'), true)
   assert.equal(panelSource.includes('const rightPaneWidth = computed(() => appStore.showLeftPane ? (100 - appStore.leftPaneWidth) : 100)'), true)
-  assert.equal(panelSource.includes(':style="{ width: rightPaneWidth + \'%\' }"'), true)
+  assert.equal(panelSource.includes("width: appStore.showRightPane ? `${rightPaneWidth}%` : '0%'"), true)
 })
 
 test('sidebar keeps the current animated text-collapse and scroll layout', () => {

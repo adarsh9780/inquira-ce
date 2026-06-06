@@ -71,7 +71,12 @@
       <div class="flex-1 flex overflow-hidden app-shell-frame relative">
         <div
           class="h-full shrink-0 app-nav-pane"
-          :class="{ 'app-nav-pane-collapsed': appStore.isSidebarCollapsed }"
+          :class="{
+            'app-nav-pane-collapsed': appStore.showSidebar && appStore.isSidebarCollapsed,
+            'app-nav-pane-hidden': !appStore.showSidebar,
+          }"
+          :aria-hidden="!appStore.showSidebar"
+          :inert="!appStore.showSidebar"
         >
           <UnifiedSidebar />
         </div>
@@ -139,6 +144,7 @@ import { fontService } from './services/fontService'
 import { toast } from './composables/useToast'
 import { normalizeThemeId } from './constants/themes'
 import { normalizeAppFontId, normalizeCodeFontId } from './constants/fonts'
+import { resolveWorkspaceLayoutShortcut, WORKSPACE_LAYOUT_MODES } from './utils/workspaceLayout'
 import logo from './assets/favicon.svg'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
 import RightPanel from './components/layout/RightPanel.vue'
@@ -395,6 +401,11 @@ function applyDocumentCodeFont(fontId) {
 }
 
 function toggleSidebarVisibility() {
+  if (!appStore.showSidebar) {
+    appStore.setSidebarCollapsed(false)
+    appStore.setWorkspaceLayoutMode(WORKSPACE_LAYOUT_MODES.VIEW)
+    return
+  }
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
 }
 
@@ -405,6 +416,12 @@ function handleGlobalShortcuts(event) {
 
   const key = String(event.key || '').toLowerCase()
   const hasPrimaryModifier = event.metaKey || event.ctrlKey
+  const layoutShortcut = resolveWorkspaceLayoutShortcut(event)
+  if (layoutShortcut) {
+    event.preventDefault()
+    appStore.setWorkspaceLayoutMode(layoutShortcut)
+    return
+  }
   if (!hasPrimaryModifier || event.altKey) return
 
   if (key === 'b') {
@@ -807,6 +824,13 @@ onUnmounted(() => {
 
 .app-nav-pane-collapsed {
   width: 64px;
+}
+
+.app-nav-pane-hidden {
+  width: 0;
+  border-right-color: transparent;
+  pointer-events: none;
+  box-shadow: none;
 }
 
 .app-workspace-pane {

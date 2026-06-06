@@ -4,6 +4,12 @@ import { apiService } from '../services/apiService'
 import { localStateService } from '../services/localStateService'
 import { useAuthStore } from './authStore'
 import { normalizePlotlyFigure } from '../utils/figurePayload'
+import {
+  WORKSPACE_LAYOUT_MODES,
+  nextWorkspaceLayoutMode,
+  normalizeWorkspaceLayoutMode,
+  workspaceLayoutVisibility,
+} from '../utils/workspaceLayout'
 import { DEFAULT_THEME_ID, THEME_OPTIONS, normalizeThemeId } from '../constants/themes'
 import {
   APP_FONT_OPTIONS,
@@ -133,7 +139,7 @@ export const useAppStore = defineStore('app', () => {
   const isChatOverlayOpen = ref(true)
   const chatOverlayWidth = ref(0.25) // 25% of area
   const isSidebarCollapsed = ref(false)
-  const workspaceLayoutMode = ref('chat') // 'chat' | 'split' | 'data'
+  const workspaceLayoutMode = ref(WORKSPACE_LAYOUT_MODES.VIEW)
   const hideShortcutsModal = ref(false)
 
   // Editor State
@@ -155,9 +161,11 @@ export const useAppStore = defineStore('app', () => {
     if (!activeId) return false
     return workspaces.value.some((ws) => ws.id === activeId)
   })
-  const isDataFocusMode = computed(() => workspaceLayoutMode.value === 'data')
-  const showLeftPane = computed(() => workspaceLayoutMode.value !== 'data')
-  const showRightPane = computed(() => workspaceLayoutMode.value !== 'chat')
+  const layoutVisibility = computed(() => workspaceLayoutVisibility(workspaceLayoutMode.value))
+  const isDataFocusMode = computed(() => workspaceLayoutMode.value === WORKSPACE_LAYOUT_MODES.OUTPUT)
+  const showSidebar = computed(() => layoutVisibility.value.showSidebar)
+  const showLeftPane = computed(() => layoutVisibility.value.showLeftPane)
+  const showRightPane = computed(() => layoutVisibility.value.showRightPane)
   const canAnalyze = computed(() => {
     const hasProviderAccess = providerRequiresApiKey.value
       ? selectedProviderApiKeyPresent.value
@@ -286,8 +294,8 @@ export const useAppStore = defineStore('app', () => {
         terminal_open: !!isTerminalOpen.value,
         terminal_height: Number(terminalHeight.value || 30),
         is_sidebar_collapsed: !!isSidebarCollapsed.value,
-        workspace_layout_mode: workspaceLayoutMode.value || 'chat',
-        data_focus_mode: workspaceLayoutMode.value === 'data',
+        workspace_layout_mode: normalizeWorkspaceLayoutMode(workspaceLayoutMode.value),
+        data_focus_mode: workspaceLayoutMode.value === WORKSPACE_LAYOUT_MODES.OUTPUT,
         hide_shortcuts_modal: !!hideShortcutsModal.value,
         table_row_count: Number(tableRowCount.value || 0),
         table_window_start: Number(tableWindowStart.value || 0),
@@ -397,7 +405,7 @@ export const useAppStore = defineStore('app', () => {
     if (typeof ui.is_sidebar_collapsed === 'boolean') {
       isSidebarCollapsed.value = ui.is_sidebar_collapsed
     }
-    workspaceLayoutMode.value = 'chat'
+    workspaceLayoutMode.value = normalizeWorkspaceLayoutMode(ui.workspace_layout_mode)
     if (typeof ui.hide_shortcuts_modal === 'boolean') {
       hideShortcutsModal.value = ui.hide_shortcuts_modal
     }
@@ -613,7 +621,7 @@ export const useAppStore = defineStore('app', () => {
     runtimeError.value = ''
     terminalConsentGranted.value = false
     terminalCwd.value = ''
-    workspaceLayoutMode.value = 'chat'
+    workspaceLayoutMode.value = WORKSPACE_LAYOUT_MODES.VIEW
     historicalCodeBlocks.value = []
   }
 
@@ -2200,8 +2208,8 @@ export const useAppStore = defineStore('app', () => {
   function revealArtifactsPane(payload = {}) {
     const { hasFigures, hasDataframes, hasOutput } = producedOutputFlags(payload)
     if (!hasFigures && !hasDataframes && !hasOutput) return dataPane.value
-    if (workspaceLayoutMode.value === 'chat') {
-      workspaceLayoutMode.value = 'split'
+    if (workspaceLayoutMode.value === WORKSPACE_LAYOUT_MODES.CHAT) {
+      setWorkspaceLayoutMode(WORKSPACE_LAYOUT_MODES.VIEW)
     }
     return selectDataPaneForArtifacts({ hasFigures, hasDataframes, hasOutput })
   }
@@ -2643,14 +2651,17 @@ export const useAppStore = defineStore('app', () => {
     saveLocalConfig()
   }
   function setWorkspaceLayoutMode(mode) {
-    const normalizedMode = String(mode || '').trim().toLowerCase()
-    workspaceLayoutMode.value = ['chat', 'split', 'data'].includes(normalizedMode) ? normalizedMode : 'chat'
+    const normalizedMode = normalizeWorkspaceLayoutMode(mode)
+    workspaceLayoutMode.value = normalizedMode
+    if ([WORKSPACE_LAYOUT_MODES.VIEW, WORKSPACE_LAYOUT_MODES.CHAT].includes(normalizedMode)) {
+      workspacePane.value = 'chat'
+    }
     activeTab.value = 'workspace'
     saveLocalConfig()
   }
 
   function setDataFocusMode(enabled) {
-    setWorkspaceLayoutMode(enabled ? 'data' : 'split')
+    setWorkspaceLayoutMode(enabled ? WORKSPACE_LAYOUT_MODES.OUTPUT : WORKSPACE_LAYOUT_MODES.VIEW)
   }
 
   function toggleDataFocusMode() {
@@ -2658,14 +2669,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function cycleWorkspaceLayoutMode() {
-    const current = String(workspaceLayoutMode.value || 'chat')
-    const nextMode = current === 'chat' ? 'split' : current === 'split' ? 'data' : 'chat'
-    setWorkspaceLayoutMode(nextMode)
-  }
-
-  function toggleDataPaneVisibility() {
-    const current = String(workspaceLayoutMode.value || 'chat')
-    setWorkspaceLayoutMode(current === 'chat' ? 'split' : 'chat')
+    setWorkspaceLayoutMode(nextWorkspaceLayoutMode(workspaceLayoutMode.value))
   }
 
   function setHideShortcutsModal(hide) {
@@ -2740,7 +2744,7 @@ export const useAppStore = defineStore('app', () => {
     workspacePane.value = 'chat'
     dataPane.value = 'table'
     leftPaneWidth.value = 50
-    workspaceLayoutMode.value = 'chat'
+    workspaceLayoutMode.value = WORKSPACE_LAYOUT_MODES.VIEW
     isTerminalOpen.value = false
     terminalConsentGranted.value = false
     terminalCwd.value = ''
@@ -2980,6 +2984,7 @@ export const useAppStore = defineStore('app', () => {
     dataPane,
     leftPaneWidth,
     workspaceLayoutMode,
+    showSidebar,
     showLeftPane,
     showRightPane,
     isTerminalOpen,
@@ -3145,7 +3150,6 @@ export const useAppStore = defineStore('app', () => {
     toggleDataFocusMode,
     setWorkspaceLayoutMode,
     cycleWorkspaceLayoutMode,
-    toggleDataPaneVisibility,
     setHideShortcutsModal,
     setEditorPosition,
     setEditorFocused,
