@@ -1,7 +1,7 @@
 <template>
   <div class="p-6">
     <h2 class="text-xl font-semibold mb-4 flex items-center">
-      <KeyIcon class="w-6 h-6 mr-2 text-green-600" />
+      <KeyIcon class="w-6 h-6 mr-2 text-[var(--color-accent)]" />
       Models Configuration
     </h2>
 
@@ -63,8 +63,8 @@
                 class="absolute inset-y-0 right-0 pr-3 flex items-center"
                 type="button"
               >
-                <EyeIcon v-if="!showApiKey" class="w-4 h-4 text-gray-400 hover:text-gray-600" />
-                <EyeSlashIcon v-else class="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                <EyeIcon v-if="!showApiKey" class="w-4 h-4 text-[var(--color-icon-muted)] hover:text-[var(--color-text-main)]" />
+                <EyeSlashIcon v-else class="w-4 h-4 text-[var(--color-icon-muted)] hover:text-[var(--color-text-main)]" />
               </button>
             </div>
             <div class="flex items-center gap-2">
@@ -100,7 +100,7 @@
       </div>
 
       <div v-else class="space-y-3 max-w-md">
-        <p class="text-xs text-green-700">
+        <p class="text-xs text-[var(--color-success)]">
           Ollama does not require an API key.
         </p>
         <div>
@@ -129,7 +129,7 @@
         </button>
       </div>
 
-      <p v-if="requiresApiKey && appStore.selectedProviderApiKeyPresent" class="text-xs text-green-700">
+      <p v-if="requiresApiKey && appStore.selectedProviderApiKeyPresent" class="text-xs text-[var(--color-success)]">
         A key for {{ appStore.llmProvider }} is already configured in secure storage.
       </p>
 
@@ -205,7 +205,7 @@
         class="w-full px-4 py-2 btn-primary"
       >
         <span v-if="isSavingSettings" class="inline-flex items-center">
-          <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+          <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-[var(--color-on-accent)] mr-2"></div>
           Saving...
         </span>
         <span v-else>Save Model Settings</span>
@@ -243,12 +243,12 @@ const liteModelOptions = computed(() => appStore.providerLiteModels.map(m => ({ 
 
 const messageTypeClass = computed(() => {
   if (messageType.value === 'success') {
-    return 'bg-green-50 border border-green-200 text-green-800'
+    return 'bg-[var(--color-success-bg)] border border-[var(--color-border)] text-[var(--color-success)]'
   }
   if (messageType.value === 'warning') {
-    return 'bg-yellow-50 border border-yellow-200 text-yellow-800'
+    return 'bg-[var(--color-warning-bg)] border border-[var(--color-border)] text-[var(--color-warning-text)]'
   }
-  return 'bg-red-50 border border-red-200 text-red-800'
+  return 'bg-[var(--color-danger-bg)] border border-[var(--color-border)] text-[var(--color-danger-text)]'
 })
 const requiresApiKey = computed(() => !!appStore.providerRequiresApiKey)
 const hasSavedProviderApiKey = computed(() => !requiresApiKey.value || !!appStore.selectedProviderApiKeyPresent)

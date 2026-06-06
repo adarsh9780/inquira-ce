@@ -32,7 +32,7 @@
         @update:model-value="selectTheme"
       />
       <p class="mt-2 text-xs text-[var(--color-text-muted)]">
-        Applies instantly across app surfaces. Midnight keeps the brand accent while reducing glare.
+        Applies instantly across app surfaces. Bluehour keeps the brand accent while reducing glare.
       </p>
     </div>
 

@@ -168,7 +168,7 @@
             <button
               type="button"
               class="flex w-full items-start justify-between gap-3 px-3 py-2 text-left text-sm transition-colors"
-              :class="index === selectedCommandIndex ? 'bg-black/[0.05]' : 'hover:bg-black/[0.03]'"
+              :class="index === selectedCommandIndex ? 'bg-[var(--color-selected-surface)]' : 'hover:bg-[var(--color-surface-subtle)]'"
               @mousedown.prevent="acceptCommandSuggestion(item)"
             >
               <span class="min-w-0">

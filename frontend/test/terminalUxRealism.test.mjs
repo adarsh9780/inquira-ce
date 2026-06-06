@@ -8,7 +8,7 @@ test('terminal tab uses inline prompt input with terminal-like caret styling', (
   const source = readFileSync(terminalPath, 'utf-8')
 
   assert.equal(source.includes('style="background-color: var(--color-base); color: var(--color-text-main);"'), true)
-  assert.equal(source.includes('class="w-full bg-transparent outline-none placeholder:text-slate-400"'), true)
+  assert.equal(source.includes('class="w-full bg-transparent outline-none placeholder:text-[var(--color-text-muted)]"'), true)
   assert.equal(source.includes('caret-color: var(--color-accent);'), true)
   assert.equal(source.includes('bg-[#0b1228]'), false)
   assert.equal(source.includes('{{ promptPrefix }}'), true)

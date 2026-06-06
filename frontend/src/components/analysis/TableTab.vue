@@ -24,7 +24,7 @@
         <div v-if="tableStatusMessage" class="flex items-center gap-2 text-[12px] leading-[1.3] mr-1" :class="tableStatusClass">
           <div
             v-if="isPageLoading"
-            class="h-3.5 w-3.5 animate-spin rounded-full border border-gray-300 border-t-gray-800"
+            class="h-3.5 w-3.5 animate-spin rounded-full border border-[var(--color-border)] border-t-[var(--color-text-main)]"
             aria-hidden="true"
           ></div>
           <span>{{ tableStatusMessage }}</span>
@@ -65,7 +65,7 @@
         >
           <div
             v-if="isDeletingArtifact"
-            class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-red-500"
+            class="h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-error)]"
           ></div>
           <TrashIcon v-else class="h-4 w-4" />
         </button>
@@ -81,7 +81,7 @@
           :aria-label="isDownloading ? 'Exporting CSV' : 'Export CSV'"
         >
           <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4" />
-          <div v-else class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"></div>
+          <div v-else class="h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-text-main)]"></div>
         </button>
       </div>
     </Teleport>
@@ -147,17 +147,17 @@
         style="background-color: var(--color-base);"
       >
         <div class="max-w-3xl w-full text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-10 w-10 mx-auto mb-3 text-red-500">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-10 w-10 mx-auto mb-3 text-[var(--color-error)]">
             <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clip-rule="evenodd" />
           </svg>
-          <p class="text-base font-semibold text-red-700">Failed to load selected table</p>
-          <p class="text-sm mt-2 text-red-700 break-words">{{ tableError }}</p>
+          <p class="text-base font-semibold text-[var(--color-danger-text)]">Failed to load selected table</p>
+          <p class="text-sm mt-2 text-[var(--color-danger-text)] break-words">{{ tableError }}</p>
           <p class="text-xs mt-3" style="color: var(--color-text-muted);">
             Table:
             <span class="font-medium">{{ selectedArtifactMeta?.display_name || selectedArtifactMeta?.logical_name || selectedArtifactId }}</span>
           </p>
           <button
-            class="mt-4 inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+            class="btn-secondary mt-4 px-3 py-1.5 text-sm leading-4"
             @click="retrySelectedArtifact"
           >
             Retry
@@ -172,7 +172,7 @@
         style="background-color: var(--color-base);"
       >
         <div class="text-center">
-          <div class="h-8 w-8 mx-auto mb-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700"></div>
+          <div class="h-8 w-8 mx-auto mb-3 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-text-main)]"></div>
           <p class="text-xs" style="color: var(--color-text-muted);">Loading saved tables…</p>
         </div>
       </div>
@@ -184,10 +184,10 @@
         style="background-color: var(--color-base);"
       >
         <div class="text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-10 w-10 mx-auto mb-3 text-red-400">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-10 w-10 mx-auto mb-3 text-[var(--color-error)]">
             <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clip-rule="evenodd" />
           </svg>
-          <p class="text-sm font-medium text-red-600">{{ artifactListError }}</p>
+          <p class="text-sm font-medium text-[var(--color-danger-text)]">{{ artifactListError }}</p>
           <p class="text-xs mt-1" style="color: var(--color-text-muted);">Try restarting the kernel</p>
         </div>
       </div>
@@ -546,8 +546,8 @@ const tableStatusMessage = computed(() => {
 })
 
 const tableStatusClass = computed(() => {
-  if (tableError.value) return 'text-red-700'
-  return 'text-gray-800'
+  if (tableError.value) return 'text-[var(--color-danger-text)]'
+  return 'text-[var(--color-text-main)]'
 })
 
 const columnDefs = computed(() => {
@@ -873,7 +873,7 @@ function getCellRenderer(value) {
   if (typeof value === 'number') {
     return (params) => {
       const v = params.value
-      if (v == null) return '<span class="text-gray-400 italic">null</span>'
+      if (v == null) return '<span class="text-[var(--color-text-muted)] italic">null</span>'
       const s = typeof v === 'number' ? v.toLocaleString() : String(v)
       const display = s.length > truncateLen ? s.slice(0, truncateLen) + '…' : s
       const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -882,7 +882,7 @@ function getCellRenderer(value) {
   }
   return (params) => {
     const v = params.value
-    if (v == null) return '<span class="text-gray-400 italic">null</span>'
+    if (v == null) return '<span class="text-[var(--color-text-muted)] italic">null</span>'
     const s = String(v)
     const display = s.length > truncateLen ? s.slice(0, truncateLen) + '…' : s
     const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')

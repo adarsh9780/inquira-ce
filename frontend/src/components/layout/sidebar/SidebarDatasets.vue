@@ -2,7 +2,7 @@
   <div class="flex flex-col w-full">
     <div
       class="flex items-center justify-between w-full py-2 transition-colors"
-      :class="!appStore.hasWorkspace ? 'opacity-50 cursor-not-allowed' : 'hover:bg-zinc-100/60'"
+      :class="!appStore.hasWorkspace ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[var(--color-surface-subtle)]'"
       @click="toggleExpanded"
     >
       <div class="flex items-center gap-2 min-w-0">
@@ -61,10 +61,10 @@
           :key="ds.table_name"
           type="button"
           class="group/item relative flex items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors text-xs"
-          :class="isSelectedDataset(ds) ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : 'text-zinc-600 hover:bg-zinc-100/60 hover:text-zinc-800'"
+          :class="isSelectedDataset(ds) ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-subtle)] hover:text-[var(--color-text-main)]'"
           @click="selectDataset(ds)"
         >
-          <CircleStackIcon class="w-3.5 h-3.5 shrink-0" :class="isSelectedDataset(ds) ? 'text-[var(--color-accent)]' : 'text-zinc-400'" />
+          <CircleStackIcon class="w-3.5 h-3.5 shrink-0" :class="isSelectedDataset(ds) ? 'text-[var(--color-accent)]' : 'text-[var(--color-icon-muted)]'" />
           <div class="min-w-0 flex-1">
             <p class="truncate" :class="isSelectedDataset(ds) ? 'font-semibold' : 'font-medium'" :title="ds.table_name">
               {{ datasetFriendlyName(ds.table_name) }}
@@ -72,7 +72,7 @@
             <p
               v-if="ds.file_path"
               class="truncate text-[10px]"
-              :class="isSelectedDataset(ds) ? 'text-[var(--color-accent)] opacity-75' : 'text-zinc-400'"
+              :class="isSelectedDataset(ds) ? 'text-[var(--color-accent)] opacity-75' : 'text-[var(--color-icon-muted)]'"
               :title="ds.file_path"
             >
               {{ datasetCaption(ds.file_path) }}

@@ -17,8 +17,8 @@
     </div>
 
     <div class="pb-2">
-      <div v-if="appStore.workspaceDeletionJobs.length > 0" class="mb-2 px-2.5 py-2 bg-amber-50 text-amber-800 text-[11px] flex items-center gap-1.5 rounded-xl">
-        <svg class="animate-spin h-3 w-3 text-amber-700 shrink-0" viewBox="0 0 24 24" fill="none">
+      <div v-if="appStore.workspaceDeletionJobs.length > 0" class="mb-2 px-2.5 py-2 bg-[var(--color-warning-bg)] text-[var(--color-warning-text)] text-[11px] flex items-center gap-1.5 rounded-xl">
+        <svg class="animate-spin h-3 w-3 text-[var(--color-warning)] shrink-0" viewBox="0 0 24 24" fill="none">
           <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-90" d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="4" />
         </svg>
@@ -36,7 +36,7 @@
       <Listbox v-else :model-value="selectedWorkspaceId" @update:model-value="selectWorkspace">
         <div class="relative">
           <ListboxButton
-            class="w-full rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-zinc-100/60"
+            class="w-full rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-[var(--color-surface-subtle)]"
             style="background-color: color-mix(in srgb, var(--color-surface) 62%, transparent);"
           >
             <div class="flex items-center gap-3 min-w-0">
@@ -65,7 +65,7 @@
                 <li
                   class="group/item flex items-center justify-between gap-2 rounded-lg px-3 py-2 transition-colors"
                   :class="[
-                    active ? 'bg-zinc-100/80' : '',
+                    active ? 'bg-[var(--color-surface-subtle)]' : '',
                     selected ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : '',
                     isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
                   ]"
@@ -78,7 +78,7 @@
                   <button
                     v-if="!isWorkspaceDeleting(ws.id)"
                     @click.stop="confirmDeleteWorkspace(ws.id)"
-                    class="btn-icon p-1 text-zinc-400 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0"
+                    class="btn-icon p-1 text-[var(--color-icon-muted)] hover:text-[var(--color-danger-text)] opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0"
                     title="Delete Workspace"
                   >
                     <TrashIcon class="w-3.5 h-3.5" />

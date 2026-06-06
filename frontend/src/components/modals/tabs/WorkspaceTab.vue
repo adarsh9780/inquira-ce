@@ -1872,7 +1872,7 @@ function syncDatasetSchemaPolling() {
 }
 
 function stepDotClass(stepId) {
-  if (setupStep.value === stepId) return 'border-[var(--color-accent)] bg-[var(--color-accent)] text-white shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-accent)_20%,transparent)]'
+  if (setupStep.value === stepId) return 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-on-accent)] shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-accent)_20%,transparent)]'
   if (setupStep.value > stepId) return 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
   return 'border-[var(--color-border)] bg-[var(--color-base)] text-[var(--color-text-muted)]'
 }

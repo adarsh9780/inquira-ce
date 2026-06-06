@@ -13,7 +13,7 @@
         <button
           type="button"
           class="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors"
-          :class="index === selectedIndex ? 'bg-black/[0.05]' : 'hover:bg-black/[0.03]'"
+          :class="index === selectedIndex ? 'bg-[var(--color-selected-surface)]' : 'hover:bg-[var(--color-surface-subtle)]'"
           @mousedown.prevent="$emit('select', item)"
         >
           <span

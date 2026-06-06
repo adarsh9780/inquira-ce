@@ -59,9 +59,9 @@
         </p>
 
         <!-- Error details -->
-        <div class="mt-8 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-left">
-          <p class="text-xs font-medium uppercase tracking-wider text-red-600">Error</p>
-          <p class="mt-2 text-sm text-red-800">{{ startupFailure }}</p>
+        <div class="mt-8 rounded-lg border border-[var(--color-accent-border)] bg-[var(--color-danger-bg)] px-4 py-3 text-left">
+          <p class="text-xs font-medium uppercase tracking-wider text-[var(--color-danger-text)]">Error</p>
+          <p class="mt-2 text-sm text-[var(--color-danger-text)]">{{ startupFailure }}</p>
         </div>
       </div>
     </div>

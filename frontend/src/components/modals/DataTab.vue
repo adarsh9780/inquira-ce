@@ -167,7 +167,7 @@
           />
           <span>Allow sample values in schema generation prompts</span>
         </label>
-        <p class="mt-1 text-xs text-gray-500">
+        <p class="mt-1 text-xs text-[var(--color-text-muted)]">
           Off by default. When disabled, sample cell values are stripped before schema metadata is saved.
         </p>
       </div>
@@ -297,8 +297,8 @@ const updateNeeded = computed(() => {
 
 const messageTypeClass = computed(() => {
   return messageType.value === 'success'
-    ? 'bg-green-50 border border-green-200 text-green-800'
-    : 'bg-red-50 border border-red-200 text-red-800'
+    ? 'bg-[var(--color-success-bg)] border border-[var(--color-border)] text-[var(--color-success)]'
+    : 'bg-[var(--color-danger-bg)] border border-[var(--color-border)] text-[var(--color-danger-text)]'
 })
 
 function applyDatasetSelection({ dataPath, tableName, columns = [] }) {

@@ -1,7 +1,7 @@
 <template>
   <div class="p-6">
     <h2 class="text-xl font-semibold mb-4 flex items-center">
-      <UserIcon class="w-6 h-6 mr-2 text-purple-600" />
+      <UserIcon class="w-6 h-6 mr-2 text-[var(--color-accent)]" />
       Account Settings
     </h2>
 
@@ -33,7 +33,7 @@
           class="w-full px-4 py-2 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span v-if="isSigningIn" class="inline-flex items-center">
-            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-[var(--color-on-accent)] mr-2"></div>
             Connecting to Google...
           </span>
           <span v-else>Continue with Google</span>
@@ -55,7 +55,7 @@
             class="w-full px-4 py-2 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span v-if="isOpeningManageAccount" class="inline-flex items-center">
-              <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-[var(--color-on-accent)] mr-2"></div>
               Opening Browser...
             </span>
             <span v-else>Manage Account</span>
@@ -99,8 +99,8 @@ const messageType = ref('')
 
 const messageTypeClass = computed(() => {
   return messageType.value === 'success'
-    ? 'bg-green-50 border border-green-200 text-green-800'
-    : 'bg-red-50 border border-red-200 text-red-800'
+    ? 'bg-[var(--color-success-bg)] border border-[var(--color-border)] text-[var(--color-success)]'
+    : 'bg-[var(--color-danger-bg)] border border-[var(--color-border)] text-[var(--color-danger-text)]'
 })
 
 function showMessage(text, type) {

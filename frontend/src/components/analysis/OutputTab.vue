@@ -42,7 +42,7 @@
           style="border-color: color-mix(in srgb, var(--color-border) 85%, transparent); background-color: color-mix(in srgb, var(--color-surface) 70%, var(--color-base));"
         >
           <button
-            class="flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-black/[0.02]"
+            class="flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--color-surface-subtle)]"
             :style="isExpanded(event.id) ? 'background-color: color-mix(in srgb, var(--color-surface) 82%, transparent);' : ''"
             @click="toggleExpanded(event.id)"
           >

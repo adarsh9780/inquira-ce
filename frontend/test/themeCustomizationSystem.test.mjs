@@ -2,26 +2,25 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { normalizeThemeId, THEME_IDS } from '../src/constants/themes.js'
 
 function read(relativePath) {
   return readFileSync(resolve(process.cwd(), relativePath), 'utf-8')
 }
 
-test('theme catalog exposes supported ids and normalizer helpers', () => {
+test('theme catalog exposes only Foundry and Bluehour with legacy migration', () => {
   const source = read('src/constants/themes.js')
 
   assert.equal(source.includes("id: 'warm'"), true)
-  assert.equal(source.includes("id: 'classiclight'"), true)
-  assert.equal(source.includes("id: 'classicdark'"), true)
-  assert.equal(source.includes("id: 'evergreen'"), true)
   assert.equal(source.includes("id: 'midnight'"), true)
-  assert.equal(source.includes("label: 'Northbound'"), true)
-  assert.equal(source.includes("label: 'Afterhours'"), true)
   assert.equal(source.includes("label: 'Foundry'"), true)
-  assert.equal(source.includes("label: 'Canopy'"), true)
   assert.equal(source.includes("label: 'Bluehour'"), true)
-  assert.equal(source.includes("label: 'Atelier'"), true)
-  assert.equal(source.includes("label: 'Ledger'"), true)
+  assert.deepEqual(THEME_IDS, ['warm', 'midnight'])
+  assert.equal(normalizeThemeId('classiclight'), 'warm')
+  assert.equal(normalizeThemeId('evergreen'), 'warm')
+  assert.equal(normalizeThemeId('daddylight'), 'warm')
+  assert.equal(normalizeThemeId('classicdark'), 'midnight')
+  assert.equal(normalizeThemeId('daddydark'), 'midnight')
   assert.equal(source.includes("export const DEFAULT_THEME_ID = 'warm'"), true)
   assert.equal(source.includes('export function normalizeThemeId(value)'), true)
   assert.equal(source.includes('return THEME_IDS.includes(normalized) ? normalized : DEFAULT_THEME_ID'), true)
@@ -74,10 +73,12 @@ test('style sheet declares theme presets and shared token aliases', () => {
   const source = read('src/style.css')
 
   assert.equal(source.includes(':root[data-theme="warm"]'), true)
-  assert.equal(source.includes(':root[data-theme="classiclight"]'), true)
-  assert.equal(source.includes(':root[data-theme="classicdark"]'), true)
-  assert.equal(source.includes(':root[data-theme="evergreen"]'), true)
   assert.equal(source.includes(':root[data-theme="midnight"]'), true)
+  assert.equal(source.includes(':root[data-theme="classiclight"]'), false)
+  assert.equal(source.includes(':root[data-theme="classicdark"]'), false)
+  assert.equal(source.includes(':root[data-theme="evergreen"]'), false)
+  assert.equal(source.includes(':root[data-theme="daddylight"]'), false)
+  assert.equal(source.includes(':root[data-theme="daddydark"]'), false)
   assert.equal(source.includes('--color-text-sub: var(--color-text-muted);'), true)
   assert.equal(source.includes('--color-base-soft: var(--color-surface);'), true)
   assert.equal(source.includes('--color-base-muted:'), true)
@@ -97,4 +98,5 @@ test('appearance tab previews a miniature shell instead of only color swatches',
   assert.equal(source.includes('class="mt-3 rounded-xl border p-2"'), true)
   assert.equal(source.includes('class="flex h-20 overflow-hidden rounded-lg border"'), true)
   assert.equal(source.includes("backgroundColor: theme.preview[0]"), true)
+  assert.equal(source.includes('bg-black/10'), false)
 })

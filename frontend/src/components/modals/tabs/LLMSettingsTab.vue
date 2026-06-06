@@ -310,7 +310,7 @@
         @click="saveConfiguration"
       >
         <span v-if="saveLoading" class="inline-flex items-center gap-2">
-          <span class="h-3 w-3 animate-spin rounded-full border-2 border-white/60 border-t-white"></span>
+          <span class="h-3 w-3 animate-spin rounded-full border-2 border-[var(--color-on-accent)]/60 border-t-[var(--color-on-accent)]"></span>
           Saving...
         </span>
         <span v-else>Save configuration</span>

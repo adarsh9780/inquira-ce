@@ -9,13 +9,13 @@
     </Teleport>
 
     <div v-if="!appStore.terminalConsentGranted" class="flex-1 p-5">
-      <div class="mx-auto max-w-xl rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+      <div class="mx-auto max-w-xl rounded-lg border border-[var(--color-accent-border)] bg-[var(--color-warning-bg)] p-4 text-sm text-[var(--color-warning-text)]">
         <p class="font-semibold">Local terminal access</p>
         <p class="mt-2">Commands here run on your machine with your user permissions in the active workspace context.</p>
         <p class="mt-1">Consent is required before terminal use and is remembered for your account.</p>
         <p class="mt-1 text-xs">Some commands may be blocked by terminal security policy.</p>
         <button
-          class="mt-4 rounded bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700"
+          class="mt-4 rounded bg-[var(--color-warning)] px-3 py-2 text-sm font-medium text-[var(--color-on-accent)] hover:opacity-90"
           @click="grantConsent"
         >
           Enable terminal
@@ -43,40 +43,40 @@
         <div v-for="(entry, idx) in entries" :key="idx" class="mb-3">
           <template v-if="entry.kind !== 'output'">
             <div class="flex items-center gap-2">
-              <span class="text-emerald-700">{{ promptPrefix }}</span>
-              <span class="text-blue-700">{{ entry.command }}</span>
+              <span class="text-[var(--color-success)]">{{ promptPrefix }}</span>
+              <span class="text-[var(--color-info)]">{{ entry.command }}</span>
             </div>
             <pre v-if="entry.stdout" class="whitespace-pre-wrap break-words">{{ entry.stdout }}</pre>
-            <pre v-if="entry.stderr" class="whitespace-pre-wrap break-words text-red-700">{{ entry.stderr }}</pre>
-            <div class="text-xs" :class="entry.exitCode === 0 ? 'text-emerald-700' : 'text-amber-700'">
+            <pre v-if="entry.stderr" class="whitespace-pre-wrap break-words text-[var(--color-danger-text)]">{{ entry.stderr }}</pre>
+            <div class="text-xs" :class="entry.exitCode === 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-warning-text)]'">
               exit {{ entry.exitCode }}
             </div>
           </template>
           <template v-else>
             <div class="text-xs uppercase tracking-wide" style="color: var(--color-text-muted);">{{ entry.label || 'Output' }}</div>
             <pre v-if="entry.stdout" class="whitespace-pre-wrap break-words">{{ entry.stdout }}</pre>
-            <pre v-if="entry.stderr" class="whitespace-pre-wrap break-words text-red-700">{{ entry.stderr }}</pre>
+            <pre v-if="entry.stderr" class="whitespace-pre-wrap break-words text-[var(--color-danger-text)]">{{ entry.stderr }}</pre>
           </template>
         </div>
 
         <div v-if="isRunning && liveCommand" class="mb-3">
           <div class="flex items-center gap-2">
-            <span class="text-emerald-700">{{ promptPrefix }}</span>
-            <span class="text-blue-700">{{ liveCommand }}</span>
+            <span class="text-[var(--color-success)]">{{ promptPrefix }}</span>
+            <span class="text-[var(--color-info)]">{{ liveCommand }}</span>
           </div>
           <pre v-if="liveStdout" class="whitespace-pre-wrap break-words">{{ liveStdout }}</pre>
-          <pre v-if="liveStderr" class="whitespace-pre-wrap break-words text-red-700">{{ liveStderr }}</pre>
-          <div class="text-xs text-amber-700">running...</div>
+          <pre v-if="liveStderr" class="whitespace-pre-wrap break-words text-[var(--color-danger-text)]">{{ liveStderr }}</pre>
+          <div class="text-xs text-[var(--color-warning-text)]">running...</div>
         </div>
 
         <form class="mt-2 pt-3" style="border-top: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);" @submit.prevent="runCommand">
           <div class="flex items-center gap-2">
-            <span class="text-emerald-700">{{ promptPrefix }}</span>
+            <span class="text-[var(--color-success)]">{{ promptPrefix }}</span>
             <input
               ref="commandInputRef"
               v-model="command"
               type="text"
-              class="w-full bg-transparent outline-none placeholder:text-slate-400"
+              class="w-full bg-transparent outline-none placeholder:text-[var(--color-text-muted)]"
               style="color: var(--color-text-main); caret-color: var(--color-accent);"
               placeholder="type command..."
               autocomplete="off"
