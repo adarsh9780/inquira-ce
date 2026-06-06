@@ -7,6 +7,7 @@ from typing import Any
 from urllib.parse import quote
 
 import httpx
+from fastapi import HTTPException
 
 from ..core.settings import settings
 from ..models.enums import UserPlan
@@ -59,16 +60,27 @@ class SupabaseAuthService:
         if not token:
             return DEFAULT_GUEST_USER
         if not settings.supabase_url or not settings.supabase_publishable_key:
-            return DEFAULT_GUEST_USER
+            raise HTTPException(
+                status_code=503,
+                detail="Sign-in validation is unavailable. Your session was not changed to guest mode.",
+            )
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 profile = await SupabaseAuthService._fetch_supabase_user(client, token)
                 if not profile:
-                    return DEFAULT_GUEST_USER
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Your signed-in session is no longer valid. Sign in again to continue.",
+                    )
                 plan = await SupabaseAuthService._fetch_plan_for_user(client, profile["id"])
+        except HTTPException:
+            raise
         except Exception:
-            return DEFAULT_GUEST_USER
+            raise HTTPException(
+                status_code=503,
+                detail="Sign-in validation is temporarily unavailable. Your session was not changed to guest mode.",
+            ) from None
 
         email = str(profile.get("email") or "").strip()
         metadata = profile.get("user_metadata") or {}

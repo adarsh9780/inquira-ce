@@ -147,6 +147,34 @@ async def test_execute_workspace_code_defaults_artifact_dir_for_turn_rerun(monke
 
 
 @pytest.mark.asyncio
+async def test_execute_workspace_code_rejects_client_owned_artifact_directory(monkeypatch, tmp_path):
+    workspace_dir = tmp_path / "ws-client-artifact-dir"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    duckdb_path = workspace_dir / "workspace.db"
+    duckdb_path.touch()
+
+    async def fake_require_workspace_access(session, user_id, workspace_id):
+        _ = (session, user_id, workspace_id)
+        return SimpleNamespace(duckdb_path=str(duckdb_path))
+
+    monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
+
+    with pytest.raises(runtime_api.HTTPException) as exc:
+        await runtime_api.execute_workspace_code(
+            workspace_id="ws-client-artifact-dir",
+            payload=runtime_api.ExecuteRequest(
+                code="print('unsafe')",
+                artifact_dir=str(tmp_path / "external"),
+            ),
+            session=object(),
+            current_user=SimpleNamespace(id="user-1", username="alice"),
+        )
+
+    assert exc.value.status_code == 400
+    assert "server-managed" in str(exc.value.detail)
+
+
+@pytest.mark.asyncio
 async def test_execute_workspace_code_wraps_arbitrary_dataframe_variable_name(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws1-any-var"
     workspace_dir.mkdir(parents=True, exist_ok=True)

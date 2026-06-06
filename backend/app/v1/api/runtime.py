@@ -134,7 +134,8 @@ class ExecuteRequest(BaseModel):
     turn_id: str | None = Field(default=None, description="Owning turn to overwrite in-place")
     artifact_dir: str | None = Field(
         default=None,
-        description="Turn artifact directory for workspace-kernel export helpers",
+        description="Internal server-owned turn artifact directory",
+        exclude=True,
     )
 
 
@@ -1201,8 +1202,12 @@ async def execute_workspace_code(
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     conversation_id = str(payload.conversation_id or "").strip()
     turn_id = str(payload.turn_id or "").strip()
-    artifact_dir = str(payload.artifact_dir or "").strip()
-    if conversation_id and turn_id and not artifact_dir:
+    if str(payload.artifact_dir or "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail="artifact_dir is server-managed and cannot be supplied by clients.",
+        )
+    if conversation_id and turn_id:
         artifact_dir = str(
             TurnBundleService.build_turn_artifacts_dir(
                 str(getattr(current_user, "username", "") or ""),

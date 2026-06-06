@@ -114,7 +114,15 @@ async def test_persist_turn_artifacts_fails_when_json_export_file_missing(monkey
         "app.v1.services.workspace_storage_service.WorkspaceStorageService.build_workspace_dir",
         lambda username, workspace_id: tmp_path / username / workspace_id,
     )
-    missing_path = tmp_path / "missing-chart.json"
+    missing_path = (
+        tmp_path
+        / "alice"
+        / "workspace-2"
+        / "conversations"
+        / "conversation-2"
+        / "turn-2"
+        / "missing-chart.json"
+    )
     with pytest.raises(FileNotFoundError, match="Turn artifact file is missing"):
         await TurnArtifactStorageService.persist_turn_artifacts(
             session=SimpleNamespace(),
@@ -159,7 +167,15 @@ async def test_persist_turn_artifacts_fails_when_dataframe_export_file_missing(m
         "app.v1.services.workspace_storage_service.WorkspaceStorageService.build_workspace_dir",
         lambda username, workspace_id: tmp_path / username / workspace_id,
     )
-    missing_path = tmp_path / "missing-df.parquet"
+    missing_path = (
+        tmp_path
+        / "alice"
+        / "workspace-3"
+        / "conversations"
+        / "conversation-3"
+        / "turn-3"
+        / "missing-df.parquet"
+    )
     with pytest.raises(FileNotFoundError, match="Turn artifact file is missing"):
         await TurnArtifactStorageService.persist_turn_artifacts(
             session=SimpleNamespace(),
@@ -179,3 +195,31 @@ async def test_persist_turn_artifacts_fails_when_dataframe_export_file_missing(m
         )
 
     assert "items" not in captured
+
+
+@pytest.mark.asyncio
+async def test_persist_turn_artifacts_rejects_file_outside_owned_turn(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        "app.v1.services.workspace_storage_service.WorkspaceStorageService.build_workspace_dir",
+        lambda username, workspace_id: tmp_path / username / workspace_id,
+    )
+    external_path = tmp_path / "external-secret.json"
+    external_path.write_text('{"secret": true}', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="must remain inside"):
+        await TurnArtifactStorageService.persist_turn_artifacts(
+            session=SimpleNamespace(),
+            username="alice",
+            workspace_id="workspace-4",
+            conversation_id="conversation-4",
+            turn_id="turn-4",
+            workspace_duckdb_path=str(tmp_path / "alice" / "workspace-4" / "workspace.db"),
+            artifacts=[
+                {
+                    "artifact_id": "external",
+                    "kind": "structured",
+                    "logical_name": "external",
+                    "storage_path": str(external_path),
+                },
+            ],
+        )

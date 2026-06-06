@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..repositories.turn_artifact_repository import TurnArtifactRepository
+from .storage_path_policy import resolve_owned_path
 from .turn_bundle_service import TurnBundleService
 
 
@@ -190,6 +191,18 @@ class TurnArtifactStorageService:
             raise FileNotFoundError(
                 f"Turn artifact {artifact_id or logical_name!r} does not include a storage_path."
             )
+
+        owned_artifacts_dir = TurnBundleService.build_turn_artifacts_dir(
+            username,
+            workspace_id,
+            conversation_id,
+            turn_id,
+        )
+        storage_path = resolve_owned_path(
+            storage_path,
+            root=owned_artifacts_dir,
+            label="Turn artifact path",
+        )
 
         source_meta: dict[str, Any] = artifact
         if not storage_path.exists():

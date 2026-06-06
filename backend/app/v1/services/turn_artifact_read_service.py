@@ -16,6 +16,8 @@ from ...services.dataframe_query import (
 )
 from ..repositories.turn_artifact_repository import TurnArtifactRepository
 from ..repositories.conversation_repository import ConversationRepository
+from ..repositories.workspace_repository import WorkspaceRepository
+from .storage_path_policy import resolve_owned_path, workspace_root_from_duckdb_path
 from .turn_artifact_storage_service import TurnArtifactStorageService
 
 
@@ -30,7 +32,7 @@ class TurnArtifactReadService:
         kind: str | None = None,
     ) -> list[dict[str, Any]]:
         rows = await TurnArtifactRepository.list_for_workspace(session, workspace_id, kind=kind)
-        return [await TurnArtifactReadService._summary_from_row(row) for row in rows]
+        return [await TurnArtifactReadService._summary_from_row(session, row) for row in rows]
 
     @staticmethod
     async def list_turn_artifacts(
@@ -40,7 +42,7 @@ class TurnArtifactReadService:
         kind: str | None = None,
     ) -> list[dict[str, Any]]:
         rows = await TurnArtifactRepository.list_for_turn(session, turn_id, kind=kind)
-        return [await TurnArtifactReadService._summary_from_row(row) for row in rows]
+        return [await TurnArtifactReadService._summary_from_row(session, row) for row in rows]
 
     @staticmethod
     async def get_workspace_artifact(
@@ -56,7 +58,7 @@ class TurnArtifactReadService:
         )
         if row is None:
             return None
-        return await TurnArtifactReadService._metadata_from_row(row)
+        return await TurnArtifactReadService._metadata_from_row(session, row)
 
     @staticmethod
     async def get_turn_artifact(
@@ -72,7 +74,7 @@ class TurnArtifactReadService:
         )
         if row is None:
             return None
-        return await TurnArtifactReadService._metadata_from_row(row)
+        return await TurnArtifactReadService._metadata_from_row(session, row)
 
     @staticmethod
     async def get_dataframe_rows(
@@ -93,9 +95,11 @@ class TurnArtifactReadService:
         )
         if row is None or row.payload_format != "parquet":
             return None
+        storage_path = await TurnArtifactReadService._owned_storage_path(session, row)
         return await asyncio.to_thread(
             TurnArtifactReadService._read_parquet_rows,
             row,
+            storage_path,
             offset,
             limit,
             sort_model or [],
@@ -122,9 +126,11 @@ class TurnArtifactReadService:
         )
         if row is None or row.payload_format != "parquet":
             return None
+        storage_path = await TurnArtifactReadService._owned_storage_path(session, row)
         return await asyncio.to_thread(
             TurnArtifactReadService._read_parquet_rows,
             row,
+            storage_path,
             offset,
             limit,
             sort_model or [],
@@ -147,11 +153,17 @@ class TurnArtifactReadService:
         if row is None:
             return False
 
-        storage_path = Path(str(row.storage_path or ""))
+        storage_path = await TurnArtifactReadService._owned_storage_path(session, row)
+        workspace_root = await TurnArtifactReadService._workspace_root_for_row(session, row)
         if storage_path.exists():
             await asyncio.to_thread(storage_path.unlink)
         await TurnArtifactRepository.delete_by_id(session, row.id)
-        await TurnArtifactReadService._remove_artifact_from_turn_manifest(session, row.turn_id, artifact_id)
+        await TurnArtifactReadService._remove_artifact_from_turn_manifest(
+            session,
+            row.turn_id,
+            artifact_id,
+            workspace_root=workspace_root,
+        )
         await session.commit()
         return True
 
@@ -170,11 +182,17 @@ class TurnArtifactReadService:
         if row is None:
             return False
 
-        storage_path = Path(str(row.storage_path or ""))
+        storage_path = await TurnArtifactReadService._owned_storage_path(session, row)
+        workspace_root = await TurnArtifactReadService._workspace_root_for_row(session, row)
         if storage_path.exists():
             await asyncio.to_thread(storage_path.unlink)
         await TurnArtifactRepository.delete_by_id(session, row.id)
-        await TurnArtifactReadService._remove_artifact_from_turn_manifest(session, row.turn_id, artifact_id)
+        await TurnArtifactReadService._remove_artifact_from_turn_manifest(
+            session,
+            row.turn_id,
+            artifact_id,
+            workspace_root=workspace_root,
+        )
         await session.commit()
         return True
 
@@ -186,10 +204,15 @@ class TurnArtifactReadService:
         workspace_duckdb_path: str,
     ) -> dict[str, int]:
         rows = await TurnArtifactRepository.list_for_workspace(session, workspace_id, statuses=("active",))
+        workspace_root = workspace_root_from_duckdb_path(workspace_duckdb_path)
         file_bytes = 0
         figure_count = 0
         for row in rows:
-            path = Path(str(row.storage_path or ""))
+            path = resolve_owned_path(
+                str(row.storage_path or ""),
+                root=workspace_root,
+                label="Artifact path",
+            )
             if path.exists():
                 file_bytes += int(path.stat().st_size)
             if str(row.kind or "").strip().lower() == "figure":
@@ -201,8 +224,8 @@ class TurnArtifactReadService:
         }
 
     @staticmethod
-    async def _summary_from_row(row) -> dict[str, Any]:
-        path = Path(str(row.storage_path or ""))
+    async def _summary_from_row(session: AsyncSession, row) -> dict[str, Any]:
+        path = await TurnArtifactReadService._owned_storage_path(session, row)
         row_count = None
         schema = None
         if row.payload_format == "parquet" and path.exists():
@@ -219,8 +242,8 @@ class TurnArtifactReadService:
         }
 
     @staticmethod
-    async def _metadata_from_row(row) -> dict[str, Any]:
-        path = Path(str(row.storage_path or ""))
+    async def _metadata_from_row(session: AsyncSession, row) -> dict[str, Any]:
+        path = await TurnArtifactReadService._owned_storage_path(session, row)
         row_count = None
         schema = None
         payload = None
@@ -277,6 +300,7 @@ class TurnArtifactReadService:
     @staticmethod
     def _read_parquet_rows(
         row,
+        storage_path: Path,
         offset: int,
         limit: int,
         sort_model: list[dict[str, Any]],
@@ -285,7 +309,6 @@ class TurnArtifactReadService:
     ) -> dict[str, Any]:
         safe_offset = max(0, int(offset))
         safe_limit = max(1, min(1000, int(limit)))
-        storage_path = Path(str(row.storage_path or ""))
         con = duckdb.connect()
         try:
             sample_df = con.execute(
@@ -329,6 +352,7 @@ class TurnArtifactReadService:
         session: AsyncSession,
         turn_id: str,
         artifact_id: str,
+        workspace_root: Path,
     ) -> None:
         turn = await ConversationRepository.get_turn(session, turn_id)
         if turn is None:
@@ -346,7 +370,11 @@ class TurnArtifactReadService:
                 ]
         turn.artifact_summary_json = json.dumps(artifacts)
 
-        manifest_path = Path(str(turn.manifest_path or ""))
+        manifest_path = resolve_owned_path(
+            str(turn.manifest_path or ""),
+            root=workspace_root,
+            label="Turn manifest path",
+        )
         if manifest_path.is_file():
             try:
                 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -363,3 +391,19 @@ class TurnArtifactReadService:
                     json.dumps(manifest, indent=2),
                     encoding="utf-8",
                 )
+
+    @staticmethod
+    async def _owned_storage_path(session: AsyncSession, row) -> Path:
+        workspace_root = await TurnArtifactReadService._workspace_root_for_row(session, row)
+        return resolve_owned_path(
+            str(row.storage_path or ""),
+            root=workspace_root,
+            label="Artifact path",
+        )
+
+    @staticmethod
+    async def _workspace_root_for_row(session: AsyncSession, row) -> Path:
+        workspace = await WorkspaceRepository.get_any_by_id(session, str(row.workspace_id))
+        if workspace is None:
+            raise FileNotFoundError("Owning workspace is missing for persisted artifact.")
+        return workspace_root_from_duckdb_path(str(workspace.duckdb_path))

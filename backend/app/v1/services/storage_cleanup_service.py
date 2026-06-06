@@ -11,6 +11,8 @@ from pathlib import Path
 from ...data_access.coordinator import LeaseConflictError, LeaseKinds, ResourceLeaseCoordinator
 from ..db.session import AppDataSessionLocal
 from ..repositories.conversation_repository import ConversationRepository
+from ..repositories.workspace_repository import WorkspaceRepository
+from .storage_path_policy import resolve_owned_path, workspace_root_from_duckdb_path
 
 
 SOFT_DELETE_GRACE_PERIOD = timedelta(hours=24)
@@ -89,7 +91,15 @@ class StorageCleanupService:
             conversation.deletion_error = None
             await session.commit()
 
-            await asyncio.to_thread(self._delete_path_if_present, conversation.storage_path)
+            workspace = await WorkspaceRepository.get_any_by_id(session, str(conversation.workspace_id))
+            if workspace is None:
+                raise FileNotFoundError("Owning workspace is missing for conversation cleanup.")
+            owned_path = resolve_owned_path(
+                str(conversation.storage_path or ""),
+                root=workspace_root_from_duckdb_path(str(workspace.duckdb_path)),
+                label="Conversation cleanup path",
+            )
+            await asyncio.to_thread(self._delete_path_if_present, str(owned_path))
             await ConversationRepository.delete_conversation(session, conversation)
             await session.commit()
         except Exception as exc:  # noqa: BLE001
@@ -104,7 +114,21 @@ class StorageCleanupService:
             turn.deletion_error = None
             await session.commit()
 
-            await asyncio.to_thread(self._delete_path_if_present, turn.storage_path)
+            conversation = await ConversationRepository.get_conversation(
+                session,
+                str(getattr(turn, "conversation_id", "") or ""),
+                include_deleted=True,
+            )
+            workspace_id = str(getattr(conversation, "workspace_id", "") or "")
+            workspace = await WorkspaceRepository.get_any_by_id(session, workspace_id)
+            if workspace is None:
+                raise FileNotFoundError("Owning workspace is missing for turn cleanup.")
+            owned_path = resolve_owned_path(
+                str(turn.storage_path or ""),
+                root=workspace_root_from_duckdb_path(str(workspace.duckdb_path)),
+                label="Turn cleanup path",
+            )
+            await asyncio.to_thread(self._delete_path_if_present, str(owned_path))
             await session.delete(turn)
             await session.commit()
         except Exception as exc:  # noqa: BLE001

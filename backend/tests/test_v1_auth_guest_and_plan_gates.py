@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -89,3 +90,25 @@ def test_supabase_plan_order_matches_expected_tiers():
     assert SupabaseAuthService.plan_rank('PRO') < SupabaseAuthService.plan_rank('ENTERPRISE')
     assert SupabaseAuthService.has_minimum_plan('ENTERPRISE', 'PRO') is True
     assert SupabaseAuthService.has_minimum_plan('FREE', 'PRO') is False
+
+
+@pytest.mark.asyncio
+async def test_signed_in_session_does_not_fall_back_to_guest_when_auth_is_unconfigured(monkeypatch):
+    monkeypatch.setattr(
+        "app.v1.services.supabase_auth_service.settings",
+        SimpleNamespace(supabase_url="", supabase_publishable_key=""),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        await SupabaseAuthService.resolve_current_user("Bearer signed-in-token")
+
+    assert exc.value.status_code == 503
+    assert "not changed to guest" in str(exc.value.detail)
+
+
+@pytest.mark.asyncio
+async def test_anonymous_session_remains_guest_when_auth_is_unavailable():
+    user = await SupabaseAuthService.resolve_current_user(None)
+
+    assert user.is_guest is True
+    assert user.id == "local-user"

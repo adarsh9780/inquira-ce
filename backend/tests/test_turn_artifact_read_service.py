@@ -9,6 +9,18 @@ import pytest
 from app.v1.services.turn_artifact_read_service import TurnArtifactReadService
 
 
+@pytest.fixture(autouse=True)
+def _owned_workspace_root(monkeypatch, tmp_path):
+    async def fake_workspace(session, workspace_id):
+        _ = (session, workspace_id)
+        return SimpleNamespace(duckdb_path=str(tmp_path / "workspace.db"))
+
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_read_service.WorkspaceRepository.get_any_by_id",
+        fake_workspace,
+    )
+
+
 @pytest.mark.asyncio
 async def test_turn_artifact_read_service_reads_parquet_metadata_and_rows(monkeypatch, tmp_path) -> None:
     parquet_path = tmp_path / "summary.parquet"
@@ -255,3 +267,32 @@ async def test_turn_artifact_read_service_usage_counts_only_turn_artifact_files(
         "duckdb_bytes": artifact_path.stat().st_size,
         "figure_count": 1,
     }
+
+
+@pytest.mark.asyncio
+async def test_turn_artifact_read_service_rejects_external_file(monkeypatch, tmp_path) -> None:
+    external_root = tmp_path.parent / "external-artifacts"
+    external_root.mkdir(exist_ok=True)
+    external_path = external_root / "secret.json"
+    external_path.write_text('{"secret": true}', encoding="utf-8")
+    row = SimpleNamespace(
+        workspace_id="workspace-1",
+        storage_path=str(external_path),
+        payload_format="json",
+    )
+
+    async def fake_get_for_workspace(session, *, workspace_id, artifact_id, statuses=("active",)):
+        _ = (session, workspace_id, artifact_id, statuses)
+        return row
+
+    monkeypatch.setattr(
+        "app.v1.services.turn_artifact_read_service.TurnArtifactRepository.get_for_workspace",
+        fake_get_for_workspace,
+    )
+
+    with pytest.raises(ValueError, match="must remain inside"):
+        await TurnArtifactReadService.get_workspace_artifact(
+            SimpleNamespace(),
+            workspace_id="workspace-1",
+            artifact_id="external",
+        )

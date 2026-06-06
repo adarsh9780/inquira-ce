@@ -30,6 +30,7 @@ async def test_cleanup_conversation_deletes_folder_and_row(monkeypatch, tmp_path
     (conversation_dir / "turns").mkdir(parents=True, exist_ok=True)
     conversation = SimpleNamespace(
         id="conversation-1",
+        workspace_id="workspace-1",
         storage_path=str(conversation_dir),
         deletion_status="marked",
         deletion_error=None,
@@ -41,9 +42,17 @@ async def test_cleanup_conversation_deletes_folder_and_row(monkeypatch, tmp_path
         _ = session_obj, conversation_obj
         captured["deleted"] = True
 
+    async def fake_workspace(session_obj, workspace_id):
+        _ = (session_obj, workspace_id)
+        return SimpleNamespace(duckdb_path=str(tmp_path / "workspace.db"))
+
     monkeypatch.setattr(
         "app.v1.services.storage_cleanup_service.ConversationRepository.delete_conversation",
         fake_delete_conversation,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.storage_cleanup_service.WorkspaceRepository.get_any_by_id",
+        fake_workspace,
     )
 
     service = StorageCleanupService()
@@ -56,15 +65,33 @@ async def test_cleanup_conversation_deletes_folder_and_row(monkeypatch, tmp_path
 
 
 @pytest.mark.asyncio
-async def test_cleanup_turn_is_idempotent_when_folder_missing(tmp_path) -> None:
+async def test_cleanup_turn_is_idempotent_when_folder_missing(monkeypatch, tmp_path) -> None:
     missing_turn_dir = tmp_path / "missing-turn"
     turn = SimpleNamespace(
         id="turn-1",
+        conversation_id="conversation-1",
         storage_path=str(missing_turn_dir),
         deletion_status="marked",
         deletion_error=None,
     )
     session = _FakeSession()
+
+    async def fake_conversation(session_obj, conversation_id, *, include_deleted=False):
+        _ = (session_obj, conversation_id, include_deleted)
+        return SimpleNamespace(workspace_id="workspace-1")
+
+    async def fake_workspace(session_obj, workspace_id):
+        _ = (session_obj, workspace_id)
+        return SimpleNamespace(duckdb_path=str(tmp_path / "workspace.db"))
+
+    monkeypatch.setattr(
+        "app.v1.services.storage_cleanup_service.ConversationRepository.get_conversation",
+        fake_conversation,
+    )
+    monkeypatch.setattr(
+        "app.v1.services.storage_cleanup_service.WorkspaceRepository.get_any_by_id",
+        fake_workspace,
+    )
 
     service = StorageCleanupService()
     await service._cleanup_turn(session, turn)
