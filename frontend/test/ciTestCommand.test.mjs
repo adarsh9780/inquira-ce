@@ -9,7 +9,7 @@ test("frontend npm test script does not require forwarded --run arg", () => {
   const __dirname = path.dirname(__filename);
   const pkgPath = path.resolve(__dirname, "..", "package.json");
   const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-  const testScript = pkg?.scripts?.test ?? "";
+  const testScript = pkg?.scripts?.["test:source"] ?? "";
 
   assert.equal(typeof testScript, "string");
   assert.match(testScript, /node\s+--test/);
@@ -21,9 +21,20 @@ test("frontend npm test script keeps the glob unquoted for Node 20 CI shells", (
   const __dirname = path.dirname(__filename);
   const pkgPath = path.resolve(__dirname, "..", "package.json");
   const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-  const testScript = pkg?.scripts?.test ?? "";
+  const testScript = pkg?.scripts?.["test:source"] ?? "";
 
   assert.equal(typeof testScript, "string");
   assert.match(testScript, /node\s+--test\s+test\/\*\.test\.mjs/);
   assert.doesNotMatch(testScript, /node\s+--test\s+"test\/\*\.test\.mjs"/);
+});
+
+test("frontend npm test runs source contracts and runtime component tests", () => {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const pkgPath = path.resolve(__dirname, "..", "package.json");
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+
+  assert.match(pkg?.scripts?.test ?? "", /test:source/);
+  assert.match(pkg?.scripts?.test ?? "", /test:runtime/);
+  assert.match(pkg?.scripts?.["test:runtime"] ?? "", /vitest\s+run/);
 });

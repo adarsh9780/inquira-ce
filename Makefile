@@ -5,7 +5,7 @@ POS_VERSION := $(word 2,$(MAKECMDGOALS))
 EFFECTIVE_VERSION := $(if $(VERSION),$(VERSION),$(POS_VERSION))
 INLINE_GIT_COMMIT_MESSAGE := $(strip $(filter-out git-commit,$(MAKECMDGOALS)))
 
-.PHONY: help help-push check-version check-version-pretty check-message check-input-version check-input-version-greater check-version-file set-version test test-pretty ruff-test ruff-test-pretty mypy-test mypy-test-pretty test-backend test-backend-pretty test-frontend test-frontend-pretty test-e2e build build-frontend sync-frontend-dist build-wheel git-add git-commit git-push push
+.PHONY: help help-push check-version check-version-pretty check-message check-input-version check-input-version-greater check-version-file set-version test test-fast test-slow test-pretty ruff-test ruff-test-pretty mypy-test mypy-test-pretty test-backend test-backend-pretty test-agent test-rust test-frontend test-frontend-pretty test-e2e test-packaged-smoke build build-frontend sync-frontend-dist build-wheel git-add git-commit git-push push
 
 help:
 	@echo "Usage:"
@@ -17,7 +17,10 @@ help:
 	@echo "  make mypy-test-pretty"
 	@echo "  make test-backend-pretty"
 	@echo "  make test-frontend-pretty"
+	@echo "  make test-agent"
+	@echo "  make test-rust"
 	@echo "  make test-e2e"
+	@echo "  make test-packaged-smoke"
 	@echo "  make check-version-pretty"
 	@echo "  make build"
 	@echo "  make build-frontend"
@@ -36,13 +39,17 @@ help:
 	@echo "  set-version        Update VERSION and apply across backend/frontend/tauri source files"
 	@echo "  check-version      Print current versions from source-owned version files"
 	@echo "  check-version-pretty Pretty formatted version check output (rich text + wrapping)"
-	@echo "  test               Run backend and frontend test suites"
+	@echo "  test               Run all fast required validation suites and frontend build"
+	@echo "  test-fast          Run required PR validation suites"
+	@echo "  test-slow          Run browser E2E tests"
 	@echo "  test-pretty        Run full validation suite with rich formatting, spacing, and wrapped output"
 	@echo "  ruff-test          Run backend Ruff checks (CI-aligned scope)"
 	@echo "  ruff-test-pretty   Rich-formatted Ruff checks"
 	@echo "  mypy-test          Run backend mypy checks (CI-aligned scope)"
 	@echo "  mypy-test-pretty   Rich-formatted mypy checks"
 	@echo "  test-backend       Run backend pytest suite"
+	@echo "  test-agent         Run external agent runtime tests"
+	@echo "  test-rust          Run Tauri/Rust tests"
 	@echo "  test-backend-pretty Rich-formatted backend pytest run"
 	@echo "  test-frontend      Run frontend npm test suite"
 	@echo "  test-frontend-pretty Rich-formatted frontend test run"
@@ -95,7 +102,11 @@ check-version-pretty:
 set-version: check-input-version-greater
 	uv run python scripts/maintenance/bump_versions.py --version "$(EFFECTIVE_VERSION)" --write-version-file
 
-test: ruff-test mypy-test test-backend test-frontend
+test: test-fast
+
+test-fast: ruff-test mypy-test test-backend test-agent test-rust test-frontend build-frontend
+
+test-slow: test-e2e
 
 test-pretty:
 	uv run --with rich python scripts/maintenance/pretty_make.py test-pretty
@@ -115,6 +126,12 @@ mypy-test-pretty:
 test-backend:
 	cd backend && uv run --group dev pytest
 
+test-agent:
+	uv run --project agents --with pytest --with pytest-asyncio pytest agents/tests
+
+test-rust:
+	cd src-tauri && cargo test
+
 test-backend-pretty:
 	uv run --with rich python scripts/maintenance/pretty_make.py test-backend-pretty
 
@@ -126,6 +143,10 @@ test-frontend-pretty:
 
 test-e2e:
 	cd frontend && npm ci && npx playwright install chromium webkit && npm run e2e
+
+test-packaged-smoke:
+	@echo "Packaged desktop smoke tests require a built installer and platform runner."
+	@test -n "$(INQUIRA_PACKAGED_APP)" || (echo "Set INQUIRA_PACKAGED_APP to the packaged application path."; exit 1)
 
 build:
 	uv run python scripts/maintenance/bundle_uv.py

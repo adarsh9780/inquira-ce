@@ -2,6 +2,10 @@ name: CI
 
 on:
   workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
 
 jobs:
   backend:
@@ -28,6 +32,19 @@ jobs:
       - name: Backend tests
         run: uv run pytest tests -q
 
+  agent:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agents
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Run agent runtime tests
+        run: uv run --with pytest --with pytest-asyncio pytest tests -q
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -46,6 +63,19 @@ jobs:
         run: npm test
       - name: Frontend build
         run: npm run build
+
+  tauri:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux desktop dependencies
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: Run Rust tests
+        run: cargo test
 
   e2e:
     runs-on: ${{ matrix.os }}

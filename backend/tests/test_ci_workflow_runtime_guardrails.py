@@ -21,9 +21,18 @@ def test_ci_workflow_pins_supported_python_for_uv_jobs():
     assert "uv sync --project backend --group dev" in text
 
 
-def test_ci_workflow_is_manual_only():
+def test_ci_workflow_runs_for_pull_requests_and_main_pushes():
     text = CI_WORKFLOW.read_text(encoding="utf-8")
 
     assert "workflow_dispatch:" in text
-    assert "\n  push:" not in text
-    assert "\n  pull_request:" not in text
+    assert "\n  push:" in text
+    assert "\n  pull_request:" in text
+
+
+def test_ci_workflow_runs_agent_and_tauri_tests():
+    text = CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "\n  agent:" in text
+    assert "pytest tests -q" in text
+    assert "\n  tauri:" in text
+    assert "cargo test" in text

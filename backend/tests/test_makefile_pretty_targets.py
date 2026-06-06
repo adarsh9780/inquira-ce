@@ -29,3 +29,12 @@ def test_makefile_exposes_pretty_targets_via_rich_runner():
         "uv run --with rich python scripts/maintenance/pretty_make.py check-version-pretty"
         in text
     )
+
+
+def test_makefile_fast_suite_covers_agent_rust_frontend_build_and_core_tests():
+    text = MAKEFILE.read_text(encoding="utf-8")
+
+    assert "test: test-fast" in text
+    assert "test-fast: ruff-test mypy-test test-backend test-agent test-rust test-frontend build-frontend" in text
+    assert "uv run --project agents --with pytest --with pytest-asyncio pytest agents/tests" in text
+    assert "cd src-tauri && cargo test" in text
