@@ -74,7 +74,7 @@ async def test_rename_workspace_updates_name_and_manifest(monkeypatch):
     assert workspace.name == "New Workspace Name"
     assert workspace.name_normalized == "new workspace name"
     assert calls["lookup"] == ("ws-1", "user-1")
-    assert calls["manifest"][0] == "alice"
+    assert calls["manifest"][0] == "user-1"
     assert calls["manifest"][2] == "New Workspace Name"
 
 

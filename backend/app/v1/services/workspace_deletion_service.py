@@ -11,7 +11,6 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import AppDataSessionLocal
-from ..repositories.principal_repository import PrincipalRepository
 from ..repositories.workspace_deletion_repository import WorkspaceDeletionRepository
 from ..repositories.workspace_repository import WorkspaceRepository
 from .workspace_maintenance_service import WorkspaceMaintenanceService
@@ -60,7 +59,7 @@ class WorkspaceDeletionService:
             job_id=job.id,
             workspace_id=workspace_id,
             principal_id=user.id,
-            username=user.username,
+            username=user.id,
             langgraph_manager=langgraph_manager,
         )
         return job
@@ -94,8 +93,7 @@ class WorkspaceDeletionService:
             await WorkspaceDeletionRepository.reset_claims_for_active_jobs(session)
             jobs = await WorkspaceDeletionRepository.list_pending_jobs(session)
             for job in jobs:
-                principal = await PrincipalRepository.get_by_id(session, str(job.owner_principal_id))
-                username = str(getattr(principal, "username_cached", "") or "")
+                username = str(job.owner_principal_id)
                 await self._schedule_job(
                     job_id=str(job.id),
                     workspace_id=str(job.workspace_id),

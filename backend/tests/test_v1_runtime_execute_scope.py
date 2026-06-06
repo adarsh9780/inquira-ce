@@ -135,7 +135,7 @@ async def test_execute_workspace_code_defaults_artifact_dir_for_turn_rerun(monke
     assert response.success is True
     wrapped = str(captured["code"])
     expected_dir = runtime_api.TurnBundleService.build_turn_artifacts_dir(
-        "alice",
+        "user-1",
         "ws-1",
         "conv-1",
         "turn-1",
@@ -399,7 +399,7 @@ async def test_execute_workspace_code_persists_active_turn_artifacts(monkeypatch
     )
 
     assert response.success is True
-    assert captured["username"] == "alice"
+    assert captured["username"] == "user-1"
     assert captured["workspace_id"] == "ws-2"
     assert captured["workspace_duckdb_path"] == str(duckdb_path)
     assert captured["conversation_id"] == "conv-1"

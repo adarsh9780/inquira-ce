@@ -146,6 +146,9 @@ class ExecuteResponse(BaseModel):
     stderr: str = ""
     has_stdout: bool = False
     has_stderr: bool = False
+    stdout_truncated: bool = False
+    stderr_truncated: bool = False
+    output_truncated: bool = False
     error: str | None = None
     result: object | None = None
     result_type: str | None = None
@@ -1210,7 +1213,7 @@ async def execute_workspace_code(
     if conversation_id and turn_id:
         artifact_dir = str(
             TurnBundleService.build_turn_artifacts_dir(
-                str(getattr(current_user, "username", "") or ""),
+                str(getattr(current_user, "id", "") or ""),
                 workspace_id,
                 conversation_id,
                 turn_id,
@@ -1227,7 +1230,7 @@ async def execute_workspace_code(
     if conversation_id and turn_id:
         await _persist_runtime_execution_to_turn(
             session=session,
-            username=str(getattr(current_user, "username", "") or ""),
+            username=str(getattr(current_user, "id", "") or ""),
             workspace_id=workspace_id,
             workspace_duckdb_path=str(workspace.duckdb_path),
             conversation_id=conversation_id,

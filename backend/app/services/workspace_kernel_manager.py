@@ -126,6 +126,7 @@ class WorkspaceKernelSession:
     runtime_lease_owner_token: str | None = None
     runtime_lease_expires_at: datetime | None = None
     runtime_lease_renew_after: datetime | None = None
+    max_output_chars: int = 512 * 1024
 
 
 class WorkspaceKernelManager:
@@ -174,6 +175,10 @@ class WorkspaceKernelManager:
 
         async with session.lock:
             session.status = "busy"
+            session.max_output_chars = max(
+                1,
+                int(getattr(config.runner_policy, "max_output_kb", 512) or 512),
+            ) * 1024
             await self._touch_session(session)
             try:
                 response = await asyncio.wait_for(
@@ -849,7 +854,7 @@ class WorkspaceKernelManager:
         iopub_idle_timeout: float = 90.0,
     ) -> ParsedExecutionOutput:
         msg_id = session.client.execute(code, store_history=True, stop_on_error=True)
-        parsed = ParsedExecutionOutput()
+        parsed = ParsedExecutionOutput(max_output_chars=session.max_output_chars)
         deadline = time.monotonic() + max(1.0, float(iopub_idle_timeout))
 
         while True:

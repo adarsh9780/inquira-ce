@@ -7,7 +7,9 @@ into worker threads.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+import re
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -19,8 +21,17 @@ class WorkspaceStorageService:
     """Create and delete workspace directory trees."""
 
     @staticmethod
-    def _user_root(username: str) -> Path:
-        return Path.home() / ".inquira" / username / "workspaces"
+    def storage_owner_key(principal_id: str) -> str:
+        """Return a stable single-directory component for one principal."""
+        candidate = str(principal_id or "").strip()
+        if candidate and candidate not in {".", ".."} and re.fullmatch(r"[A-Za-z0-9._-]+", candidate):
+            return candidate
+        digest = hashlib.sha256(candidate.encode("utf-8")).hexdigest()[:24]
+        return f"principal-{digest}"
+
+    @staticmethod
+    def _user_root(principal_id: str) -> Path:
+        return Path.home() / ".inquira" / WorkspaceStorageService.storage_owner_key(principal_id) / "workspaces"
 
     @staticmethod
     def build_workspace_dir(username: str, workspace_id: str) -> Path:

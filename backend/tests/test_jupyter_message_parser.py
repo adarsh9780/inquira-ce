@@ -49,3 +49,14 @@ def test_error_message_produces_failure_payload():
     assert payload["success"] is False
     assert payload["has_stderr"] is True
     assert "Traceback line 1" in (payload["error"] or "")
+
+
+def test_stream_output_is_bounded_and_reports_truncation():
+    output = ParsedExecutionOutput(max_output_chars=5)
+    update_from_iopub_message(output, "stream", {"name": "stdout", "text": "123456789"})
+
+    payload = output.as_response()
+
+    assert payload["stdout"] == "12345"
+    assert payload["stdout_truncated"] is True
+    assert payload["output_truncated"] is True

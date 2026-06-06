@@ -236,8 +236,8 @@ async def test_migrate_pending_conversations_once_only_processes_outdated_rows(m
     await ConversationMigrationService.migrate_pending_conversations_once()
 
     assert migrated == [
-        ("principal-1", "conv-1", "user-principal-1"),
-        ("principal-2", "conv-2", "user-principal-2"),
+        ("principal-1", "conv-1", "principal-1"),
+        ("principal-2", "conv-2", "principal-2"),
     ]
 
 

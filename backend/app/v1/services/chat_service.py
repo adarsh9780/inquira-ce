@@ -1460,7 +1460,7 @@ class ChatService:
             reserved_turn, reserved_seq_no, reserved_turn_dir = await ChatService._reserve_turn(
                 session=session,
                 conversation=conversation,
-                username=str(user.username),
+                username=str(user.id),
                 workspace_id=workspace_id,
                 conversation_id=conversation_id,
                 question=question,
@@ -1543,7 +1543,7 @@ class ChatService:
                 conversation=conversation,
                 turn=reserved_turn,
                 seq_no=reserved_seq_no,
-                username=str(user.username),
+                username=str(user.id),
                 workspace_id=workspace_id,
                 workspace_schema=schema if isinstance(schema, dict) else {},
                 data_path=data_path,
@@ -1636,6 +1636,9 @@ class ChatService:
                     or execution_payload.get("error")
                     or ""
                 ),
+                "stdout_truncated": bool(execution_payload.get("stdout_truncated")),
+                "stderr_truncated": bool(execution_payload.get("stderr_truncated")),
+                "output_truncated": bool(execution_payload.get("output_truncated")),
                 "retry_count": int(execution_payload.get("retry_count") or 0),
                 "duration_ms": int(execution_payload.get("duration_ms") or 0),
                 "success": bool(execution_payload.get("success")),
@@ -1901,7 +1904,7 @@ class ChatService:
             reserved_turn, reserved_seq_no, reserved_turn_dir = await ChatService._reserve_turn(
                 session=session,
                 conversation=conversation,
-                username=str(user.username),
+                username=str(user.id),
                 workspace_id=workspace_id,
                 conversation_id=resolved_conversation_id,
                 question=question,
@@ -2055,7 +2058,7 @@ class ChatService:
                 conversation=conversation,
                 turn=reserved_turn,
                 seq_no=reserved_seq_no,
-                username=str(user.username),
+                username=str(user.id),
                 workspace_id=workspace_id,
                 workspace_schema=schema if isinstance(schema, dict) else {},
                 data_path=data_path,
@@ -2138,7 +2141,7 @@ class ChatService:
         reserved_turn, reserved_seq_no, reserved_turn_dir = await ChatService._reserve_turn(
             session=session,
             conversation=conversation,
-            username=str(user.username),
+            username=str(user.id),
             workspace_id=workspace.id,
             conversation_id=conversation_id,
             question=str(final_turn.user_text or ""),
@@ -2162,7 +2165,7 @@ class ChatService:
             conversation=conversation,
             turn=reserved_turn,
             seq_no=reserved_seq_no,
-            username=str(user.username),
+            username=str(user.id),
             workspace_id=workspace.id,
             workspace_schema=schema if isinstance(schema, dict) else {},
             data_path=data_path,

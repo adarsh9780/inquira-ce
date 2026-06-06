@@ -86,6 +86,42 @@ async def test_add_dataset_skips_ingest_when_source_unchanged(monkeypatch, tmp_p
     assert session.added is None
 
 
+def test_dataset_capacity_rejects_oversized_excel(monkeypatch, tmp_path):
+    source = tmp_path / "unsafe.xlsx"
+    source.write_bytes(b"x" * 10)
+    monkeypatch.setenv("INQUIRA_DATASET_MAX_EXCEL_BYTES", "5")
+
+    with pytest.raises(Exception) as exc:
+        DatasetService._validate_ingestion_capacity(
+            source=source,
+            file_type="xlsx",
+            workspace_duckdb_path=str(tmp_path / "workspace.db"),
+        )
+
+    assert getattr(exc.value, "status_code", None) == 413
+    assert "too large" in str(getattr(exc.value, "detail", "")).lower()
+
+
+def test_dataset_capacity_rejects_low_disk_space(monkeypatch, tmp_path):
+    source = tmp_path / "demo.csv"
+    source.write_bytes(b"x" * 10)
+    monkeypatch.setattr(
+        dataset_service_module.shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(free=1),
+    )
+
+    with pytest.raises(Exception) as exc:
+        DatasetService._validate_ingestion_capacity(
+            source=source,
+            file_type="csv",
+            workspace_duckdb_path=str(tmp_path / "workspace.db"),
+        )
+
+    assert getattr(exc.value, "status_code", None) == 507
+    assert "free disk space" in str(getattr(exc.value, "detail", "")).lower()
+
+
 @pytest.mark.asyncio
 async def test_add_dataset_reingests_when_source_changed(monkeypatch, tmp_path):
     source = tmp_path / "demo.csv"

@@ -19,6 +19,29 @@ class ParsedExecutionOutput:
     error: str | None = None
     result: Any | None = None
     result_type: str | None = None
+    max_output_chars: int = 512 * 1024
+    stdout_truncated: bool = False
+    stderr_truncated: bool = False
+    stdout_chars: int = 0
+    stderr_chars: int = 0
+
+    def append_stream(self, name: str, text: str) -> None:
+        """Append bounded stream output and record truncation honestly."""
+        parts = self.stderr_parts if name == "stderr" else self.stdout_parts
+        current_size = self.stderr_chars if name == "stderr" else self.stdout_chars
+        remaining = max(0, int(self.max_output_chars) - current_size)
+        if remaining:
+            bounded_text = text[:remaining]
+            parts.append(bounded_text)
+            if name == "stderr":
+                self.stderr_chars += len(bounded_text)
+            else:
+                self.stdout_chars += len(bounded_text)
+        if len(text) > remaining:
+            if name == "stderr":
+                self.stderr_truncated = True
+            else:
+                self.stdout_truncated = True
 
     def as_response(self) -> dict[str, Any]:
         """Return the legacy execution payload consumed by the frontend."""
@@ -36,6 +59,9 @@ class ParsedExecutionOutput:
             "error": self.error if not success else None,
             "result": self.result,
             "result_type": self.result_type,
+            "stdout_truncated": self.stdout_truncated,
+            "stderr_truncated": self.stderr_truncated,
+            "output_truncated": self.stdout_truncated or self.stderr_truncated,
         }
 
 
@@ -58,10 +84,7 @@ def update_from_iopub_message(
 def _handle_stream(output: ParsedExecutionOutput, content: dict[str, Any]) -> None:
     name = str(content.get("name", "stdout"))
     text = _strip_ansi(str(content.get("text", "")))
-    if name == "stderr":
-        output.stderr_parts.append(text)
-    else:
-        output.stdout_parts.append(text)
+    output.append_stream(name, text)
 
 
 def _handle_error(output: ParsedExecutionOutput, content: dict[str, Any]) -> None:
@@ -72,8 +95,8 @@ def _handle_error(output: ParsedExecutionOutput, content: dict[str, Any]) -> Non
         ename = str(content.get("ename", "ExecutionError"))
         evalue = str(content.get("evalue", ""))
         traceback_text = _strip_ansi(f"{ename}: {evalue}".strip())
-    output.stderr_parts.append(traceback_text + "\n")
-    output.error = traceback_text
+    output.append_stream("stderr", traceback_text + "\n")
+    output.error = "".join(output.stderr_parts).strip()
 
 
 def _handle_rich_output(output: ParsedExecutionOutput, content: dict[str, Any]) -> None:

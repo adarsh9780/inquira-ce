@@ -19,6 +19,10 @@ class RunnerPolicyConfig:
     max_output_kb: int = 512
     blocked_imports: list[str] = field(default_factory=list)
     blocked_builtins: list[str] = field(default_factory=list)
+    memory_limit_enforced: bool = False
+    blocked_imports_enforced: bool = False
+    blocked_builtins_enforced: bool = False
+    output_limit_enforced: bool = True
 
 
 @dataclass(frozen=True)

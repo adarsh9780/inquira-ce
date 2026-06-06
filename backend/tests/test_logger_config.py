@@ -92,3 +92,19 @@ def test_logging_config_defaults_keep_uvicorn_visible():
     cfg = LoggingConfig()
     assert cfg.uvicorn_access_log is True
     assert cfg.uvicorn_log_level == "info"
+
+
+def test_logger_redacts_nested_credentials_and_bearer_tokens():
+    from app.core.logger import redact_sensitive
+
+    payload = redact_sensitive(
+        {
+            "api_key": "sk-sensitive-value",
+            "nested": {"Authorization": "Bearer abc.def.ghi"},
+            "message": "provider returned sk-anothersecret",
+        }
+    )
+
+    assert payload["api_key"] == "[REDACTED]"
+    assert payload["nested"]["Authorization"] == "[REDACTED]"
+    assert "sk-anothersecret" not in payload["message"]

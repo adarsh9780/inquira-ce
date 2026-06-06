@@ -105,8 +105,8 @@ async def test_free_plan_can_create_a_second_workspace(monkeypatch):
 
     assert workspace.id == "ws-2"
     assert workspace.is_active == 0
-    assert calls["ensure_dirs"] == ("alice", "ws-2")
-    assert calls["manifest"][0] == "alice"
+    assert calls["ensure_dirs"] == ("user-1", "ws-2")
+    assert calls["manifest"][0] == "user-1"
     assert calls["manifest"][1] == "ws-2"
     assert calls["manifest"][2] == "Analytics"
     assert calls["manifest"][3] == "analytics"

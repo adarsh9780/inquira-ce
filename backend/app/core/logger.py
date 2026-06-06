@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +26,30 @@ _LEVEL_VALUES = {
     "ERROR": 40,
     "CRITICAL": 50,
 }
+_SENSITIVE_KEY_PARTS = ("api_key", "apikey", "authorization", "password", "secret", "token")
+_SENSITIVE_VALUE_PATTERNS = (
+    re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+"),
+    re.compile(r"\bsk-[A-Za-z0-9_-]{8,}\b"),
+)
+
+
+def redact_sensitive(value: Any, *, key: str = "") -> Any:
+    """Recursively redact common credential fields and token-shaped strings."""
+    normalized_key = str(key or "").strip().lower().replace("-", "_")
+    if normalized_key and any(part in normalized_key for part in _SENSITIVE_KEY_PARTS):
+        return "[REDACTED]"
+    if isinstance(value, dict):
+        return {str(item_key): redact_sensitive(item_value, key=str(item_key)) for item_key, item_value in value.items()}
+    if isinstance(value, list):
+        return [redact_sensitive(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(redact_sensitive(item) for item in value)
+    if not isinstance(value, str):
+        return value
+    rendered = value
+    for pattern in _SENSITIVE_VALUE_PATTERNS:
+        rendered = pattern.sub("[REDACTED]", rendered)
+    return rendered
 
 
 def _normalize_level(level: Any, default: str) -> str:
@@ -204,7 +229,8 @@ def logprint(
     """
     init_logger()
 
-    message = " ".join(str(a) for a in args)
+    message = " ".join(str(redact_sensitive(a)) for a in args)
+    extra = redact_sensitive(extra)
     level_upper = _normalize_level(level, "INFO")
 
     try:
@@ -281,4 +307,4 @@ def patch_print() -> None:
     builtins.print = _wrapped_print  # type: ignore
 
 
-__all__ = ["init_logger", "logprint", "patch_print", "LOG_DIR"]
+__all__ = ["init_logger", "logprint", "patch_print", "redact_sensitive", "LOG_DIR"]

@@ -139,8 +139,8 @@ async def test_create_workspace_writes_manifest(monkeypatch):
     workspace = await WorkspaceService.create_workspace(session=DummySession(), user=user, name="  Data Lab  ")
 
     assert workspace.id == "ws-123"
-    assert calls["ensure_dirs"] == ("alice", "ws-123")
-    assert calls["manifest"][0] == "alice"
+    assert calls["ensure_dirs"] == ("user-1", "ws-123")
+    assert calls["manifest"][0] == "user-1"
     assert calls["manifest"][1] == "ws-123"
     assert calls["manifest"][2] == "Data Lab"
     assert calls["manifest"][3] == "data lab"
@@ -244,5 +244,5 @@ async def test_activate_workspace_refreshes_manifest(monkeypatch):
     assert calls["active_workspace"] == ("user-1", "ws-9")
     assert calls["terminal_cleanup"] == ("user-1", "ws-1")
     assert calls["kernel_cleanup"] == "ws-1"
-    assert calls["manifest"][0] == "alice"
+    assert calls["manifest"][0] == "user-1"
     assert calls["manifest"][1] == "ws-9"

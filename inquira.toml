@@ -61,12 +61,14 @@ scratchpad-ttl-hours = 48
 scratchpad-max-size-gb = 10
 # Runtime timeout guardrails.
 timeout-seconds = 60
+# Advisory only until the execution-isolation design is implemented.
 memory-limit-mb = 512
+# Enforced for captured stdout/stderr. It is not a process memory limit.
 max-output-kb = 512
 
 [terminal]
 # Terminal access is opt-in for technical users.
-enable = true
+enable = false
 
 [backend.phoenix]
 # Enable Phoenix tracing for LangGraph/LangChain (used by backend startup)

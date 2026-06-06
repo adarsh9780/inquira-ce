@@ -81,7 +81,7 @@ class WorkspaceService:
         count = await WorkspaceRepository.count_for_principal(session, user.id)
         is_active = 1 if count == 0 and not principal.active_workspace_id else 0
         placeholder_id = "temp"
-        duckdb_path = str(WorkspaceStorageService.build_duckdb_path(user.username, placeholder_id))
+        duckdb_path = str(WorkspaceStorageService.build_duckdb_path(user.id, placeholder_id))
 
         workspace = await WorkspaceRepository.create(
             session=session,
@@ -93,8 +93,8 @@ class WorkspaceService:
             schema_context=str(schema_context or ""),
         )
 
-        await WorkspaceStorageService.ensure_workspace_dirs(user.username, workspace.id)
-        workspace.duckdb_path = str(WorkspaceStorageService.build_duckdb_path(user.username, workspace.id))
+        await WorkspaceStorageService.ensure_workspace_dirs(user.id, workspace.id)
+        workspace.duckdb_path = str(WorkspaceStorageService.build_duckdb_path(user.id, workspace.id))
         if count == 0 or not principal.active_workspace_id:
             await WorkspaceService._set_active_workspace_atomic(
                 session=session,
@@ -104,7 +104,7 @@ class WorkspaceService:
         await session.commit()
         await session.refresh(workspace)
         await WorkspaceStorageService.write_workspace_manifest(
-            username=user.username,
+            username=user.id,
             workspace_id=workspace.id,
             workspace_name=workspace.name,
             normalized_name=workspace.name_normalized,
@@ -156,7 +156,7 @@ class WorkspaceService:
                 )
 
         await WorkspaceStorageService.write_workspace_manifest(
-            username=user.username,
+            username=user.id,
             workspace_id=workspace.id,
             workspace_name=workspace.name,
             normalized_name=workspace.name_normalized,
@@ -193,7 +193,7 @@ class WorkspaceService:
         await session.commit()
         await session.refresh(workspace)
         await WorkspaceStorageService.write_workspace_manifest(
-            username=user.username,
+            username=user.id,
             workspace_id=workspace.id,
             workspace_name=workspace.name,
             normalized_name=workspace.name_normalized,
@@ -318,7 +318,7 @@ class WorkspaceService:
                     workspace_id=next_workspace_id,
                 )
             await session.commit()
-            await WorkspaceStorageService.hard_delete_workspace(user.username, workspace_id)
+            await WorkspaceStorageService.hard_delete_workspace(user.id, workspace_id)
         finally:
             await WorkspaceMaintenanceService.release_lease(
                 session,

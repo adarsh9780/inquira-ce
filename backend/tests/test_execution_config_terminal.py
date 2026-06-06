@@ -53,3 +53,19 @@ def test_plotly_theme_mode_invalid_value_falls_back_to_soft(monkeypatch, tmp_pat
 
     runtime = load_execution_runtime_config()
     assert runtime.plotly_theme_mode == "soft"
+
+
+def test_runner_policy_discloses_which_limits_are_enforced(monkeypatch, tmp_path):
+    cfg = tmp_path / "inquira.toml"
+    cfg.write_text(
+        "[execution]\nprovider = 'local_jupyter'\n[execution.runner]\nmax-output-kb = 8\nmemory-limit-mb = 32\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("INQUIRA_TOML_PATH", str(cfg))
+    load_execution_runtime_config.cache_clear()
+
+    policy = load_execution_runtime_config().runner_policy
+
+    assert policy.output_limit_enforced is True
+    assert policy.memory_limit_enforced is False
+    assert policy.blocked_imports_enforced is False

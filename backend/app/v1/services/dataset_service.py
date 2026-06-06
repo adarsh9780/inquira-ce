@@ -10,6 +10,7 @@ import asyncio
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -32,6 +33,57 @@ class DatasetService:
     SCHEMA_STATUS_GENERATING = "generating"
     SCHEMA_STATUS_READY = "ready"
     SCHEMA_STATUS_FAILED = "failed"
+    DEFAULT_MAX_SOURCE_BYTES = 2 * 1024 * 1024 * 1024
+    DEFAULT_MAX_EXCEL_BYTES = 100 * 1024 * 1024
+    MIN_FREE_SPACE_BYTES = 256 * 1024 * 1024
+
+    @staticmethod
+    def _configured_size_limit(env_name: str, default: int) -> int:
+        try:
+            return max(1, int(os.getenv(env_name, str(default))))
+        except ValueError:
+            return default
+
+    @staticmethod
+    def _validate_ingestion_capacity(
+        *,
+        source: Path,
+        file_type: str,
+        workspace_duckdb_path: str,
+    ) -> None:
+        source_size = source.stat().st_size
+        limit = DatasetService._configured_size_limit(
+            "INQUIRA_DATASET_MAX_SOURCE_BYTES",
+            DatasetService.DEFAULT_MAX_SOURCE_BYTES,
+        )
+        if file_type in {"xlsx", "xls"}:
+            limit = min(
+                limit,
+                DatasetService._configured_size_limit(
+                    "INQUIRA_DATASET_MAX_EXCEL_BYTES",
+                    DatasetService.DEFAULT_MAX_EXCEL_BYTES,
+                ),
+            )
+        if source_size > limit:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"Dataset is too large for safe local ingestion ({source_size} bytes; "
+                    f"limit {limit} bytes). Split or convert the file and try again."
+                ),
+            )
+
+        workspace_root = Path(workspace_duckdb_path).expanduser().resolve(strict=False).parent
+        free_bytes = int(shutil.disk_usage(workspace_root).free)
+        required_free = max(DatasetService.MIN_FREE_SPACE_BYTES, source_size * 2)
+        if free_bytes < required_free:
+            raise HTTPException(
+                status_code=507,
+                detail=(
+                    f"Not enough free disk space to ingest this dataset safely. "
+                    f"At least {required_free} bytes are required."
+                ),
+            )
 
     @staticmethod
     def _normalize_table_name(source_path: str) -> str:
@@ -82,6 +134,11 @@ class DatasetService:
         source_mtime = os.path.getmtime(source)
         if file_type not in {"csv", "tsv", "parquet", "json", "xlsx", "xls"}:
             raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_type}")
+        DatasetService._validate_ingestion_capacity(
+            source=source,
+            file_type=file_type,
+            workspace_duckdb_path=workspace_duckdb_path,
+        )
 
         existing_result = await session.execute(
             select(WorkspaceDataset).where(

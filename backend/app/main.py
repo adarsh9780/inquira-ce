@@ -6,7 +6,7 @@ import uuid
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, Request, status
+from fastapi import FastAPI, WebSocket, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import aiosqlite
@@ -22,9 +22,6 @@ if not hasattr(aiosqlite.Connection, "is_alive"):
 
 
 from .v1.api.router import router as v1_router
-from .v1.db.session import AppDataSessionLocal
-from .v1.repositories.workspace_repository import WorkspaceRepository
-
 from .v1.db.init import init_v1_database
 from .v1.services.langgraph_workspace_manager import WorkspaceLangGraphManager
 from .v1.services.workspace_deletion_service import WorkspaceDeletionService
@@ -33,6 +30,7 @@ from .v1.services.dataset_ingestion_service import DatasetIngestionService
 from .v1.services.dataset_schema_generation_service import DatasetSchemaGenerationService
 from .v1.services.conversation_migration_service import ConversationMigrationService
 from .v1.services.storage_cleanup_service import StorageCleanupService
+from .v1.services.workspace_storage_migration_service import WorkspaceStorageMigrationService
 from .core.config_models import AppConfig
 from .core.logger import logprint, patch_print
 from .services.code_executor import (
@@ -134,6 +132,9 @@ async def lifespan(app: FastAPI):
     try:
         await init_v1_database()
         logprint("API v1 ORM schema initialized")
+        migrated_workspaces = await WorkspaceStorageMigrationService.migrate_all()
+        if migrated_workspaces:
+            logprint(f"Migrated {migrated_workspaces} workspace storage roots to stable principal IDs")
     except Exception as e:
         logprint(f"Failed to initialize API v1 ORM schema: {e}", level="error")
         raise

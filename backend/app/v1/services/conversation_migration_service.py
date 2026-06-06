@@ -84,7 +84,7 @@ class ConversationMigrationService:
                     session=session,
                     principal_id=principal.id,
                     conversation_id=conversation.id,
-                    username=principal.username_cached,
+                    username=principal.id,
                 )
 
     @staticmethod
