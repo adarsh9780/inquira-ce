@@ -177,7 +177,7 @@ class TurnArtifactStorageService:
         artifact: dict[str, Any],
         session: AsyncSession,
         offline_lease_owner_token: str | None,
-    ) -> dict[str, Any] | None:
+    ) -> dict[str, Any]:
         artifact_id = str(artifact.get("artifact_id") or "").strip()
         source_artifact_id = str(artifact.get("source_artifact_id") or artifact_id).strip()
         kind = str(artifact.get("kind") or "").strip().lower() or "scalar"

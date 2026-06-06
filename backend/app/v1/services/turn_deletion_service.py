@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +27,7 @@ class TurnDeletionService:
             raise HTTPException(status_code=404, detail="Turn not found")
 
         all_turns = await ConversationRepository.list_turns_in_sequence(session, conversation_id)
-        children_by_parent = {}
+        children_by_parent: dict[str, list[Any]] = {}
         for item in all_turns:
             parent_id = str(getattr(item, "parent_turn_id", "") or "").strip()
             if parent_id:
