@@ -86,16 +86,7 @@
                     <UserIcon class="h-4 w-4 shrink-0" />
                     <span>Account</span>
                   </button>
-                  <template v-if="false">
-                    <button
-                      type="button"
-                      :class="activeSection === 'terms' ? activeNavClass : inactiveNavClass"
-                      @click="openLeafSection('terms')"
-                    >
-                      <DocumentTextIcon class="h-4 w-4 shrink-0" />
-                      <span>Terms &amp; Conditions</span>
-                    </button>
-                  </template>
+
                 </div>
               </div>
             </div>
@@ -113,7 +104,7 @@
                 <LLMSettingsTab @close-request="closeModal" />
               </section>
 
-              <section :class="panelClass('ws-list')" class="scrollbar-hidden absolute inset-0 overflow-y-auto pb-5 pl-5 pr-12 pt-5">
+              <section :class="panelClass('ws-list')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
                 <WorkspaceTab
                   panel-mode="ws-list"
                   :active-workspace-id="activeWorkspaceId"
@@ -125,7 +116,7 @@
                 />
               </section>
 
-              <section :class="panelClass('ws-detail')" class="scrollbar-hidden absolute inset-0 overflow-y-auto pb-5 pl-5 pr-12 pt-5">
+              <section :class="panelClass('ws-detail')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
                 <WorkspaceTab
                   panel-mode="ws-detail"
                   :active-workspace-id="activeWorkspaceId"
@@ -140,7 +131,7 @@
                 />
               </section>
 
-              <section :class="panelClass('ws-create')" class="scrollbar-hidden absolute inset-0 overflow-y-auto pb-5 pl-5 pr-12 pt-5">
+              <section :class="panelClass('ws-create')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
                 <WorkspaceTab
                   panel-mode="ws-create"
                   :active-workspace-id="activeWorkspaceId"
@@ -157,9 +148,7 @@
                 <AppearanceTab />
               </section>
 
-              <section :class="panelClass('terms')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
-                <TermsTab :active="currentPanel === 'terms'" />
-              </section>
+
 
               <section :class="panelClass('account')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
                 <AccountTab />
@@ -181,14 +170,12 @@ import LLMSettingsTab from './tabs/LLMSettingsTab.vue'
 import WorkspaceTab from './tabs/WorkspaceTab.vue'
 import AppearanceTab from './tabs/AppearanceTab.vue'
 import AccountTab from './tabs/AccountTab.vue'
-import TermsTab from './tabs/TermsTab.vue'
 import {
   FolderIcon,
   ListBulletIcon,
   KeyIcon,
   PaintBrushIcon,
   UserIcon,
-  DocumentTextIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -227,7 +214,6 @@ const activeSectionTitle = computed(() => {
     return 'Manage Workspaces'
   }
   if (activeSection.value === 'appearance') return 'Appearance Preferences'
-  if (activeSection.value === 'terms') return 'Terms & Conditions'
   if (activeSection.value === 'account') return 'Account Settings'
   return 'Settings'
 })
@@ -240,7 +226,6 @@ const activeSectionDescription = computed(() => {
     return 'Browse, rename, activate, or delete your existing workspaces.'
   }
   if (activeSection.value === 'appearance') return 'Customize application theme presets, typography sizing, and code block fonts.'
-  if (activeSection.value === 'terms') return 'Read licenses, service agreements, and legal guidelines.'
   if (activeSection.value === 'account') return 'Manage your user profile configuration and application connection logs.'
   return 'Customize application settings.'
 })
@@ -299,8 +284,7 @@ function normalizeTab(tab) {
   const candidate = String(tab || '').toLowerCase()
   if (candidate === 'api') return 'llm'
   if (candidate === 'data') return 'workspace'
-  if (candidate === 'legal') return 'terms'
-  if (candidate === 'llm' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'account' || candidate === 'terms') {
+  if (candidate === 'llm' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'account') {
     return candidate
   }
   return 'llm'
@@ -412,7 +396,7 @@ function notifyWorkspaceOperationBlocked() {
 
 <style scoped>
 .settings-panel-transition {
-  transition: transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1) !important,
-              opacity 220ms ease-in-out !important;
+  transition: transform var(--motion-duration-slow) var(--motion-ease-emphasized),
+              opacity var(--motion-duration-slow) var(--motion-ease-standard);
 }
 </style>

@@ -1,19 +1,10 @@
 <template>
   <section class="scrollbar-hidden h-full overflow-y-auto">
-    <div class="mb-4">
-      <h2 class="text-lg font-bold text-[var(--color-text-main)]">Terms &amp; Conditions</h2>
-      <p class="mt-1 text-sm text-[var(--color-text-muted)]">
-        Review the current desktop usage terms inside the app.
-      </p>
-      <p v-if="termsLastUpdated" class="mt-2 text-xs text-[var(--color-text-muted)]">
-        Last updated: {{ termsLastUpdated }}
-      </p>
+    <div v-if="termsLastUpdated" class="mb-3 text-right text-xs text-[var(--color-text-muted)]">
+      Last updated: {{ termsLastUpdated }}
     </div>
 
-    <div
-      class="rounded-xl border bg-[var(--color-base)] p-4 text-sm leading-6"
-      style="border-color: var(--color-border);"
-    >
+    <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-base)] p-4 text-sm leading-6">
       <p v-if="isTermsLoading" class="text-[var(--color-text-muted)]">Loading terms...</p>
       <p
         v-else-if="termsError"
@@ -34,7 +25,7 @@
 import { computed, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
-import apiService from '../../../services/apiService'
+import { apiService } from '../../../services/apiService'
 
 const props = defineProps({
   active: {

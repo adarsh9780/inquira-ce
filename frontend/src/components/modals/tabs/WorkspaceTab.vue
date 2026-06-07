@@ -5,7 +5,7 @@
       <!-- Left Column: Workspace Switch & Create Navigator -->
       <aside class="flex flex-col border-r border-[var(--color-border)] pr-4 h-full min-h-0 select-none">
         <header class="mb-3 flex items-center justify-between">
-          <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--color-text-muted)]">Workspaces</h3>
+          <h3 class="section-label">Workspaces</h3>
           <button
             type="button"
             class="text-xs font-semibold text-[var(--color-accent)] hover:underline"
@@ -101,22 +101,22 @@
             <!-- Active workspace statistics card -->
             <div class="grid grid-cols-3 gap-3 bg-[var(--color-base-soft)] p-3 rounded-lg border border-[var(--color-border)]">
               <div>
-                <span class="text-[10px] uppercase font-bold text-[var(--color-text-muted)]">Workspace Name</span>
+                <span class="section-label block mb-1">Workspace Name</span>
                 <p class="text-sm font-semibold truncate text-[var(--color-text-main)]">{{ activeWorkspace.name }}</p>
               </div>
               <div>
-                <span class="text-[10px] uppercase font-bold text-[var(--color-text-muted)]">Conversations</span>
+                <span class="section-label block mb-1">Conversations</span>
                 <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ activeWorkspace.conversationCount }}</p>
               </div>
               <div>
-                <span class="text-[10px] uppercase font-bold text-[var(--color-text-muted)]">Last Active</span>
+                <span class="section-label block mb-1">Last Active</span>
                 <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ activeWorkspace.lastActiveLabel }}</p>
               </div>
             </div>
 
             <!-- Ingested datasets list -->
             <div class="space-y-2">
-              <h4 class="text-xs font-bold uppercase tracking-wider text-[var(--color-text-muted)]">Linked Datasets</h4>
+              <h4 class="section-label mb-2">Linked Datasets</h4>
               <div v-if="datasetEntries.length" class="space-y-2">
                 <div
                   v-for="dataset in datasetEntries"
@@ -262,7 +262,7 @@
               </p>
 
               <label class="flex flex-col gap-1.5">
-                <span class="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-sub)]">Workspace name</span>
+                <span class="section-label">Workspace name</span>
                 <input
                   v-model="setupWorkspaceName"
                   type="text"
@@ -303,7 +303,7 @@
               </p>
 
               <label class="flex flex-col gap-1.5">
-                <span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-sub)]">
+                <span class="section-label inline-flex items-center gap-1.5">
                   Workspace context
                   <span class="inline-flex items-center gap-1 rounded bg-[var(--color-base-muted)] px-1 py-0.5 text-[9px] normal-case tracking-normal text-[var(--color-text-muted)]">
                     <svg class="h-2 w-2" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -347,7 +347,7 @@
             <div v-else-if="setupStep === 3" key="step-3" class="space-y-4">
               <!-- Visual Connection/Pipeline Graph -->
               <div class="p-3 bg-[var(--color-base-soft)] rounded-xl border border-[var(--color-border)] overflow-hidden">
-                <p class="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-muted)] mb-3">System Pipeline Graph</p>
+                <p class="section-label mb-3">System Pipeline Graph</p>
                 <div class="flex items-center justify-between gap-2 text-center select-none">
                   <!-- Node 1: Files -->
                   <div class="flex-1 flex flex-col items-center p-2 rounded-lg bg-[var(--color-base)] border border-[var(--color-border)] shadow-sm">
@@ -448,15 +448,15 @@
               <!-- Metadata dashboard grid -->
               <div class="grid grid-cols-1 gap-3 border-b border-[var(--color-border)] pb-3 sm:grid-cols-3">
                 <div>
-                  <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">Created</p>
+                  <p class="section-label">Created</p>
                   <p class="mt-1 text-sm text-[var(--color-text-main)]">{{ detailCreatedAt }}</p>
                 </div>
                 <div>
-                  <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">Conversations</p>
+                  <p class="section-label">Conversations</p>
                   <p class="mt-1 text-sm text-[var(--color-text-main)]">{{ detailConversationCount }}</p>
                 </div>
                 <div>
-                  <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">Last active</p>
+                  <p class="section-label">Last active</p>
                   <p class="mt-1 text-sm text-[var(--color-text-main)]">{{ detailLastActive }}</p>
                 </div>
               </div>
@@ -465,7 +465,7 @@
               <section class="space-y-3 border-b border-[var(--color-border)] pb-5">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">Workspace runtime</p>
+                    <p class="section-label">Workspace runtime</p>
                     <div class="mt-2 flex flex-wrap items-center gap-2">
                       <span
                         class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium"
@@ -514,7 +514,7 @@
               <!-- Datasets Area -->
               <div class="space-y-3">
                 <div class="flex items-center justify-between gap-3">
-                  <p class="text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]">Datasets</p>
+                  <p class="section-label">Datasets</p>
                   <button
                     type="button"
                     data-testid="workspace-import-datasets-header"

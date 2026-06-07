@@ -1,7 +1,7 @@
 <template>
   <section class="scrollbar-hidden h-full overflow-y-auto">
 
-    <div class="mb-5 flex items-center gap-3 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] p-4">
+    <div class="mb-5 flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] p-4">
       <div class="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-sm font-medium text-[var(--color-accent)]">
         {{ initials }}
       </div>
@@ -24,7 +24,7 @@
       <template v-if="authStore.isGuest">
         <button
           type="button"
-          class="flex w-full items-center justify-center gap-3 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base)] py-2.5 text-sm font-medium text-[var(--color-text-main)] transition-colors hover:bg-[var(--color-base-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+          class="flex w-full items-center justify-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-base)] py-2.5 text-sm font-medium text-[var(--color-text-main)] transition-colors hover:bg-[var(--color-base-soft)] disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="isSigningIn || !authStore.canStartGoogleLogin"
           @click="startGoogleSignIn"
         >
@@ -49,7 +49,7 @@
         </div>
         <button
           type="button"
-          class="flex w-full items-center justify-center gap-3 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base)] py-2.5 text-sm font-medium text-[var(--color-text-main)] transition-colors hover:bg-[var(--color-base-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+          class="flex w-full items-center justify-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-base)] py-2.5 text-sm font-medium text-[var(--color-text-main)] transition-colors hover:bg-[var(--color-base-soft)] disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="isSigningOut"
           @click="signOutGoogle"
         >
