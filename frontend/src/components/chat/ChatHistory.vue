@@ -27,15 +27,6 @@
       <!-- User Message -->
       <div class="w-full mb-1">
         <div class="user-turn-bubble px-3 py-2.5 rounded-2xl rounded-tl-sm">
-          <button
-            @click.stop="copyQuestion(message.question)"
-            type="button"
-            aria-label="Copy question"
-            class="user-turn-copy-btn"
-            title="Copy question"
-          >
-            <DocumentDuplicateIcon class="h-3.5 w-3.5" />
-          </button>
           <div v-if="message.attachments && message.attachments.length" class="mb-3 grid grid-cols-2 gap-2">
             <img
               v-for="attachment in message.attachments"
@@ -52,8 +43,17 @@
             v-html="renderQuestionWithHighlights(message.question)"
           ></p>
         </div>
-        <div class="mt-1 px-1">
-          <p class="text-[12px] font-normal leading-[1.3]" style="color: var(--color-text-muted);">{{ formatTimestamp(message.timestamp) }}</p>
+        <div class="mt-1 px-1 flex items-center gap-1.5">
+          <span class="text-[12px] font-normal leading-[1.3]" style="color: var(--color-text-muted);">{{ formatTimestamp(message.timestamp) }}</span>
+          <button
+            @click.stop="copyQuestion(message.question)"
+            type="button"
+            aria-label="Copy question"
+            class="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] inline-flex items-center"
+            title="Copy question"
+          >
+            <DocumentDuplicateIcon class="h-3 w-3" />
+          </button>
         </div>
       </div>
 
@@ -1040,37 +1040,6 @@ watch(() => appStore.activeConversationIsLoading, (isLoading, wasLoading) => {
   border-radius: 1.25rem !important;
 }
 
-.user-turn-copy-btn {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  background: var(--color-surface);
-  opacity: 0;
-  transform: scale(0.92);
-  box-shadow: var(--shadow-button);
-  transition: opacity var(--motion-duration-standard) var(--motion-ease-standard),
-              background-color var(--motion-duration-standard) var(--motion-ease-standard),
-              border-color var(--motion-duration-standard) var(--motion-ease-standard),
-              color var(--motion-duration-standard) var(--motion-ease-standard),
-              transform var(--motion-duration-standard) var(--motion-ease-standard);
-}
-
-.group:hover .user-turn-copy-btn,
-.group:focus-within .user-turn-copy-btn {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.user-turn-copy-btn:hover {
-  color: var(--color-text-main);
-  border-color: var(--color-border-hover);
-  background-color: var(--color-base);
-}
 
 .stream-reasoning-list {
   display: grid;
