@@ -91,6 +91,11 @@
         </div>
       </div>
       <StatusBar />
+      <SettingsModal
+        v-model="appStore.isSettingsOpen"
+        :initial-tab="appStore.settingsInitialTab"
+        :initial-step="appStore.settingsInitialStep"
+      />
     </div>
 
     <Teleport to="body">
@@ -158,6 +163,7 @@ import StatusBar from './components/layout/StatusBar.vue'
 import ToastContainer from './components/ui/ToastContainer.vue'
 import StartupFailureActions from './components/startup/StartupFailureActions.vue'
 import ConnectionStatusIndicator from './components/ui/ConnectionStatusIndicator.vue'
+import SettingsModal from './components/modals/SettingsModal.vue'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()

@@ -91,11 +91,7 @@
       </Listbox>
     </div>
 
-    <SettingsModal
-      v-model="isSettingsOpen"
-      :initial-tab="settingsInitialTab"
-      :initial-step="settingsInitialStep"
-    />
+
 
     <ConfirmationModal
       :is-open="isDeleteDialogOpen"
@@ -115,7 +111,6 @@ import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headless
 import { useAppStore } from '../../../stores/appStore'
 import { toast } from '../../../composables/useToast'
 import { extractApiErrorMessage } from '../../../utils/apiError'
-import SettingsModal from '../../modals/SettingsModal.vue'
 import ConfirmationModal from '../../modals/ConfirmationModal.vue'
 import {
   BuildingOffice2Icon,
@@ -132,9 +127,6 @@ defineProps({
 const emit = defineEmits(['header-click', 'select'])
 
 const appStore = useAppStore()
-const isSettingsOpen = ref(false)
-const settingsInitialTab = ref('workspace')
-const settingsInitialStep = ref(1)
 const isDeleteDialogOpen = ref(false)
 const pendingDeleteWorkspaceId = ref('')
 
@@ -163,9 +155,7 @@ async function selectWorkspace(id) {
 }
 
 function openWorkspaceSettings() {
-  settingsInitialTab.value = 'workspace'
-  settingsInitialStep.value = 1
-  isSettingsOpen.value = true
+  appStore.openSettings('workspace', 1)
 }
 
 function isWorkspaceDeleting(workspaceId) {

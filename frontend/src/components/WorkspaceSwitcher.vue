@@ -77,11 +77,6 @@
     </button>
   </div>
 
-  <SettingsModal
-    v-model="isSettingsOpen"
-    :initial-tab="settingsInitialTab"
-    :initial-step="settingsInitialStep"
-  />
 
   <WorkspaceRenameModal
     :is-open="isRenameDialogOpen"
@@ -117,16 +112,12 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAppStore } from '../stores/appStore'
 import { toast } from '../composables/useToast'
 import { extractApiErrorMessage } from '../utils/apiError'
-import SettingsModal from './modals/SettingsModal.vue'
 import WorkspaceRenameModal from './modals/WorkspaceRenameModal.vue'
 import ConfirmationModal from './modals/ConfirmationModal.vue'
 
 const appStore = useAppStore()
 const isOpen = ref(false)
 const containerRef = ref(null)
-const isSettingsOpen = ref(false)
-const settingsInitialTab = ref('workspace')
-const settingsInitialStep = ref(1)
 const isDeleteDialogOpen = ref(false)
 const pendingDeleteWorkspaceId = ref('')
 const isClearDbDialogOpen = ref(false)
@@ -166,9 +157,7 @@ async function activateWorkspace(workspaceId) {
 function openWorkspaceSettings() {
   closeWorkspaceContextMenu()
   isOpen.value = false
-  settingsInitialTab.value = 'workspace'
-  settingsInitialStep.value = 1
-  isSettingsOpen.value = true
+  appStore.openSettings('workspace', 1)
 }
 
 function isWorkspaceDeleting(workspaceId) {

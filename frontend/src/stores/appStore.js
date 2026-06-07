@@ -151,7 +151,24 @@ export const useAppStore = defineStore('app', () => {
   const isLoading = ref(false)
   const isCodeRunning = ref(false)
 
-  // Settings trigger - removed, no longer needed
+  // Settings trigger
+  const isSettingsOpen = ref(false)
+  const settingsInitialTab = ref('llm')
+  const settingsInitialStep = ref(1)
+
+  function openSettings(tab = 'llm', step = 1) {
+    const n = String(tab || '').trim().toLowerCase()
+    if      (n === 'api'    || n === 'llm')        settingsInitialTab.value = 'llm'
+    else if (n === 'workspace' || n === 'data')     settingsInitialTab.value = 'workspace'
+    else if (n === 'account')                       settingsInitialTab.value = 'account'
+    else if (n === 'appearance' || n === 'theme')   settingsInitialTab.value = 'appearance'
+    else if (n === 'terms'  || n === 'legal')       settingsInitialTab.value = 'terms'
+    else                                            settingsInitialTab.value = 'llm'
+
+    const parsed = Number(step)
+    settingsInitialStep.value = Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : 1
+    isSettingsOpen.value = true
+  }
 
   // Computed
   const hasDataFile = computed(() => dataFilePath.value.trim() !== '')
@@ -3161,6 +3178,10 @@ export const useAppStore = defineStore('app', () => {
     setCodeRunning,
     resetSession,
     fetchChatHistory,
-    addHistoricalCodeBlock
+    addHistoricalCodeBlock,
+    isSettingsOpen,
+    settingsInitialTab,
+    settingsInitialStep,
+    openSettings
   }
 })

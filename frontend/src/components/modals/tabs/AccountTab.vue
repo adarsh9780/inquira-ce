@@ -1,6 +1,5 @@
 <template>
   <section class="scrollbar-hidden h-full overflow-y-auto">
-    <h2 class="mb-4 text-lg font-bold text-[var(--color-text-main)]">Account</h2>
 
     <div class="mb-5 flex items-center gap-3 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] p-4">
       <div class="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-sm font-medium text-[var(--color-accent)]">
@@ -10,30 +9,15 @@
         <p class="truncate text-sm font-medium text-[var(--color-text-main)]">{{ displayName }}</p>
         <p v-if="displayEmail" class="truncate text-xs text-[var(--color-text-muted)]">{{ displayEmail }}</p>
         <p v-if="authStore.isGuest" class="mt-1 text-xs text-[var(--color-text-muted)]">
-          Local User mode active. Add Google account sync session.
+          Local User mode active. Add a Google account to sync sessions.
         </p>
         <p v-else-if="isGoogleLinked" class="mt-1 text-xs text-[var(--color-text-muted)]">
-          Google account added already.
+          Google account linked.
         </p>
         <p v-else class="mt-1 text-xs text-[var(--color-text-muted)]">
           Account connected.
         </p>
       </div>
-    </div>
-
-    <div class="mb-5 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-base-soft)] p-4">
-      <label class="mb-1.5 block section-label">Theme</label>
-      <HeaderDropdown
-        :model-value="appStore.uiTheme"
-        :options="themeOptions"
-        placeholder="Select theme"
-        aria-label="UI theme"
-        max-width-class="w-full"
-        @update:model-value="selectTheme"
-      />
-      <p class="mt-2 text-xs text-[var(--color-text-muted)]">
-        Applies instantly across app surfaces. Bluehour keeps the brand accent while reducing glare.
-      </p>
     </div>
 
     <div class="space-y-4">
@@ -60,8 +44,8 @@
 
       <template v-else>
         <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] px-3 py-2">
-          <p class="text-xs text-[var(--color-text-main)]">Google account linked current session.</p>
-          <p class="mt-1 text-xs text-[var(--color-text-muted)]">Sign out from Google converts account back Local User mode.</p>
+          <p class="text-xs text-[var(--color-text-main)]">Your Google account is linked to the current session.</p>
+          <p class="mt-1 text-xs text-[var(--color-text-muted)]">Signing out from Google converts the account back to Local User mode.</p>
         </div>
         <button
           type="button"
@@ -75,22 +59,12 @@
       </template>
     </div>
 
-    <div class="mt-5 flex justify-end border-t border-[var(--color-border)] pt-4">
-      <div class="flex items-center gap-2">
-        <button type="button" class="btn-secondary px-4 py-2 text-sm">
-          Cancel
-        </button>
-        <button type="button" class="btn-primary px-4 py-2 text-sm">
-          Save preferences
-        </button>
-      </div>
-    </div>
+
   </section>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
-import HeaderDropdown from '../../ui/HeaderDropdown.vue'
 import { useAppStore } from '../../../stores/appStore'
 import { useAuthStore } from '../../../stores/authStore'
 import { toast } from '../../../composables/useToast'
@@ -106,13 +80,6 @@ const isGoogleLinked = computed(() => {
 })
 const displayName = computed(() => String(authStore.username || 'Local User').trim() || 'Local User')
 const displayEmail = computed(() => String(authStore.user?.email || '').trim())
-const themeOptions = computed(() => {
-  const options = Array.isArray(appStore.availableThemes) ? appStore.availableThemes : []
-  return options.map((theme) => ({
-    value: theme.id,
-    label: theme.label,
-  }))
-})
 
 const initials = computed(() => {
   const parts = String(displayName.value || '').trim().split(/\s+/).filter(Boolean)
@@ -142,7 +109,7 @@ async function signOutGoogle() {
     if (!success) {
       throw new Error(authStore.error || 'Sign-out did not complete.')
     }
-    toast.success('Signed out from Google', 'Account switched back Local User mode.')
+    toast.success('Signed out from Google', 'Account switched back to Local User mode.')
   } catch (error) {
     console.error('Failed to sign out from Google:', error)
     toast.error('Sign-out failed', String(error?.message || 'Could not sign out from Google.'))
@@ -151,7 +118,5 @@ async function signOutGoogle() {
   }
 }
 
-function selectTheme(themeId) {
-  appStore.setUiTheme(themeId)
-}
+
 </script>

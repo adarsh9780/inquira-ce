@@ -36,7 +36,7 @@
             'text-[var(--color-text-muted)]',
           ]"
           :title="appStore.isSidebarCollapsed ? activeWorkspaceName : 'Open workspace settings'"
-          @click="openSettings('workspace', 1)"
+          @click="appStore.openSettings('workspace', 1)"
         >
           <div class="flex h-6 w-6 shrink-0 items-center justify-center">
             <FolderOpenIcon class="h-5 w-5 text-[var(--color-text-main)]" />
@@ -286,7 +286,7 @@
             class="flex w-full items-center rounded-lg py-2 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/5 hover:text-[var(--color-text-main)] focus:outline-none"
             :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3'"
             title="Settings"
-            @click="openSettings('llm', 1)"
+            @click="appStore.openSettings('llm', 1)"
           >
             <div class="flex h-6 w-6 shrink-0 items-center justify-center">
               <Cog6ToothIcon class="h-5 w-5" />
@@ -333,12 +333,7 @@
       </nav>
     </div>
 
-    <!-- ─── Modals ─── -->
-    <SettingsModal
-      v-model="isSettingsOpen"
-      :initial-tab="settingsInitialTab"
-      :initial-step="settingsInitialStep"
-    />
+
     <ConfirmationModal
       :is-open="isDeleteDialogOpen"
       :title="deleteDialogTitle"
@@ -425,7 +420,6 @@ import { useAuthStore } from '../../stores/authStore'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { formatTimestamp } from '../../utils/dateUtils'
-import SettingsModal from '../modals/SettingsModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import TermsModal from '../modals/TermsModal.vue'
 import logo from '../../assets/favicon.svg'
@@ -460,9 +454,6 @@ const profileMenuButtonRef = ref(null)
 const profileMenuPosition  = ref({ left: 0, top: 0 })
 
 // ─── Settings Modal ───────────────────────────────────────────────────────────
-const isSettingsOpen      = ref(false)
-const settingsInitialTab  = ref('llm')
-const settingsInitialStep = ref(1)
 const isTermsOpen         = ref(false)
 
 // ─── Delete Dialog ────────────────────────────────────────────────────────────
@@ -659,7 +650,7 @@ function closeProfileMenu() {
 
 function openProfileSection(tab) {
   closeProfileMenu()
-  openSettings(tab)
+  appStore.openSettings(tab)
 }
 
 function openTermsModal() {
@@ -681,7 +672,7 @@ function handleGlobalClick(event) {
 function handleOpenSettingsRequest(event) {
   const tab  = String(event?.detail?.tab  || 'api').trim() || 'api'
   const step = Number(event?.detail?.step || 1)
-  openSettings(tab, step)
+  appStore.openSettings(tab, step)
 }
 
 // ─── Conversations ────────────────────────────────────────────────────────────
@@ -867,20 +858,7 @@ async function confirmDelete() {
   }
 }
 
-// ─── Settings ─────────────────────────────────────────────────────────────────
-function openSettings(tab = 'llm', step = 1) {
-  const n = String(tab || '').trim().toLowerCase()
-  if      (n === 'api'    || n === 'llm')        settingsInitialTab.value = 'llm'
-  else if (n === 'workspace' || n === 'data')     settingsInitialTab.value = 'workspace'
-  else if (n === 'account')                       settingsInitialTab.value = 'account'
-  else if (n === 'appearance' || n === 'theme')   settingsInitialTab.value = 'appearance'
-  else if (n === 'terms'  || n === 'legal')       settingsInitialTab.value = 'terms'
-  else                                            settingsInitialTab.value = 'llm'
 
-  const parsed = Number(step)
-  settingsInitialStep.value = Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : 1
-  isSettingsOpen.value = true
-}
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 onMounted(async () => {
