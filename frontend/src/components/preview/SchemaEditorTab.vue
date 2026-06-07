@@ -8,7 +8,6 @@
       </div>
       <div class="flex items-center gap-2">
         <button @click="fetchWorkspaceSchema(true)" :disabled="schemaLoading" class="px-3 py-1.5 rounded-md text-[13px] font-medium hover:bg-[var(--color-base-muted)] transition-colors disabled:opacity-50 text-[var(--color-text-main)]">Refresh</button>
-        <button @click="regenerateWorkspaceSchema" :disabled="schemaLoading || !hasWorkspace" class="px-3 py-1.5 rounded-md text-[13px] font-medium hover:bg-[var(--color-base-muted)] transition-colors disabled:opacity-50 text-[var(--color-text-main)]" title="Regenerate schema with AI descriptions">Regenerate AI Descriptions</button>
         <button @click="saveAllSchema" :disabled="!schemaEdited || schemaLoading" class="px-3 py-1.5 rounded-md text-[13px] font-medium bg-[var(--color-accent)] text-[var(--color-on-accent)] disabled:opacity-50 hover:brightness-95 transition-all shadow-sm">Save Changes</button>
       </div>
     </div>
@@ -83,7 +82,7 @@
               <div class="flex items-center gap-2.5">
                 <button @click="regenerateTableSchema(group.tableName)" :disabled="schemaLoading" class="text-[12px] font-medium text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 px-2 py-0.5 rounded transition-colors flex items-center gap-1" title="Regenerate descriptions for this table only">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 21l-.813-5.096L3 15l5.187-.813L9 9l.813 5.187L15 15l-5.187.813zM18 5.25L16.5 9l-1.5-3.75L11.25 3.75 15 2.25l1.5 3.75 3.75 1.5-3.75 1.5zM22 13.5l-1 2.5-2.5 1 2.5 1 1 2.5 1-2.5 2.5-1-2.5-1-1-2.5z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                   </svg>
                   Regenerate
                 </button>
@@ -363,52 +362,6 @@ async function saveAllSchema() {
   }
 }
 
-async function regenerateWorkspaceSchema() {
-  if (!appStore.activeWorkspaceId) return
-  schemaLoading.value = true
-  try {
-    const workspaceId = appStore.activeWorkspaceId
-    const datasetResponse = await apiService.v1ListDatasets(workspaceId)
-    const datasets = datasetResponse?.datasets || []
-    
-    if (datasets.length === 0) {
-      toast.info('No datasets', 'There are no datasets in this workspace to regenerate.')
-      return
-    }
-
-    toast.info('Regenerating schema', `Starting AI description generation for ${datasets.length} tables...`)
-    
-    const regeneratedSchemas = []
-    for (const ds of datasets) {
-      const regenerated = await apiService.v1RegenerateDatasetSchema(workspaceId, ds.table_name, {
-        context: schemaContext.value || ''
-      })
-      regeneratedSchemas.push(regenerated)
-    }
-
-    const columns = []
-    regeneratedSchemas.forEach(schema => {
-      const tableName = schema.table_name
-      const cols = schema.columns || []
-      cols.forEach(c => {
-        columns.push({
-          ...c,
-          table_name: tableName,
-          aliases: normalizeAliasList(c.aliases)
-        })
-      })
-    })
-    
-    workspaceColumns.value = columns
-    dirtyTables.value.clear()
-    schemaEdited.value = false
-    toast.success('Schema regenerated', 'AI descriptions updated for all tables.')
-  } catch (error) {
-    toast.error('Regeneration failed', error?.message || 'Unable to regenerate schema.')
-  } finally {
-    schemaLoading.value = false
-  }
-}
 
 async function regenerateTableSchema(tableName) {
   if (!appStore.activeWorkspaceId || !tableName) return
