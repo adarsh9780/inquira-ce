@@ -82,7 +82,8 @@ test('workspace tab disables dataset mutation until the inspected workspace is a
   const source = readSource('src/components/modals/tabs/WorkspaceTab.vue')
 
   assert.equal(source.includes('const requiresWorkspaceActivation = computed(() => !isWorkspaceActive.value)'), true)
-  assert.equal(source.includes('Activate workspace to add files'), true)
+  assert.equal(source.includes('v-if="isWorkspaceActive"'), true)
+  assert.equal(source.includes('Activate this workspace to add datasets.'), true)
   assert.equal(source.includes("toast.info('Activate workspace first', 'Activate this workspace before importing datasets.')"), true)
   assert.equal(source.includes("toast.info('Activate workspace first', 'Activate this workspace before generating schemas.')"), true)
 })

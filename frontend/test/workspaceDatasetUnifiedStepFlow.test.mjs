@@ -6,9 +6,9 @@ import { resolve } from 'node:path'
 const source = readFileSync(resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue'), 'utf-8')
 
 test('workspace setup combines context and dataset management without steps', () => {
-  assert.equal(source.includes('Workspace context'), true)
-  assert.equal(source.includes('Files'), true)
-  assert.equal(source.includes('Save context'), true)
+  assert.equal(source.includes('Workspace Context'), true)
+  assert.equal(source.includes('Linked Datasets'), true)
+  assert.equal(source.includes('@click="saveWorkspaceContext"'), true)
   assert.equal(source.includes('setupSteps'), false)
   assert.equal(source.includes('setupStep'), false)
   assert.equal(source.includes('workspace-stepper'), false)

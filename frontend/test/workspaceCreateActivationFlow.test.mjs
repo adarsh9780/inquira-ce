@@ -18,28 +18,30 @@ test('workspace creation activates the new workspace centrally in the store', ()
   assert.equal(block.includes('await fetchWorkspaces()'), true)
 })
 
-test('workspace creation opens the combined context and files editor while warming runtime', () => {
+test('workspace creation opens inline context editing on the active workspace summary while warming runtime', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
   const settings = read('src/components/modals/SettingsModal.vue')
 
   assert.equal(workspace.includes('async function createWorkspace()'), true)
   assert.equal(workspace.includes('await appStore.createWorkspace(name, context)'), true)
-  assert.equal(workspace.includes("editorOpenedAfterCreate.value = true"), true)
-  assert.equal(workspace.includes("workspaceSurface.value = 'editor'"), true)
+  assert.equal(workspace.includes('isEditingContext.value = true'), true)
+  assert.equal(workspace.includes('workspaceSurface'), false)
   assert.equal(workspace.includes('async function warmWorkspaceRuntimeInBackground(workspaceId)'), true)
   assert.equal(workspace.includes('void warmWorkspaceRuntimeInBackground(workspaceId)'), true)
   assert.equal(settings.includes('@workspace-created="handleWorkspaceCreated"'), true)
   assert.equal(settings.includes("currentPanel.value = 'ws-detail'"), false)
 })
 
-test('existing workspace summary supports inspect-first activation and editing', () => {
+test('existing workspace summary supports inspect-first activation and active-only editing', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
   const settings = read('src/components/modals/SettingsModal.vue')
 
   assert.equal(workspace.includes('const requiresWorkspaceActivation = computed(() => !isWorkspaceActive.value)'), true)
   assert.equal(workspace.includes("emit('select-workspace', id)"), true)
   assert.equal(workspace.includes("emit('activate-workspace', id)"), true)
-  assert.equal(workspace.includes('function openWorkspaceEditor()'), true)
+  assert.equal(workspace.includes('v-if="isWorkspaceActive && !isEditingContext"'), true)
+  assert.equal(workspace.includes('v-if="isWorkspaceActive" type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="startRename"'), true)
+  assert.equal(workspace.includes('function startContextEdit()'), true)
   assert.equal(settings.includes('@select-workspace="selectWorkspace"'), true)
   assert.equal(settings.includes('@activate-workspace="activateWorkspace"'), true)
 })

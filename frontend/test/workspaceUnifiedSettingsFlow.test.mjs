@@ -7,7 +7,7 @@ function read(relativePath) {
   return readFileSync(resolve(process.cwd(), relativePath), 'utf-8')
 }
 
-test('workspace settings uses one summary and editor surface', () => {
+test('workspace settings uses one active-workspace management surface', () => {
   const settings = read('src/components/modals/SettingsModal.vue')
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
   const template = workspace.slice(0, workspace.indexOf('<script setup>'))
@@ -17,47 +17,50 @@ test('workspace settings uses one summary and editor surface', () => {
   assert.equal(settings.includes("panelClass('ws-list')"), false)
   assert.equal(settings.includes("panelClass('ws-detail')"), false)
   assert.equal(settings.includes("panelClass('ws-create')"), false)
-  assert.equal(workspace.includes("const workspaceSurface = ref('summary')"), true)
-  assert.equal(workspace.includes("workspaceSurface === 'summary'"), true)
+  assert.equal(workspace.includes('workspaceSurface'), false)
   assert.equal(workspace.includes('Selected Workspace Summary'), true)
   assert.equal(template.includes('workspace-stepper'), false)
   assert.equal(template.includes('System Pipeline Graph'), false)
   assert.equal(template.includes('Workspace runtime'), false)
 })
 
-test('new workspace is created from an autofocus inline row and opens the combined editor', () => {
+test('new workspace is created from an autofocus inline row and opens inline context editing', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
 
   assert.equal(workspace.includes('ref="newWorkspaceInputRef"'), true)
   assert.equal(workspace.includes('@keydown.enter.prevent="createWorkspace"'), true)
   assert.equal(workspace.includes('async function beginInlineCreate()'), true)
   assert.equal(workspace.includes('newWorkspaceInputRef.value?.focus?.()'), true)
-  assert.equal(workspace.includes("editorOpenedAfterCreate.value = true"), true)
-  assert.equal(workspace.includes("workspaceSurface.value = 'editor'"), true)
-  assert.equal(workspace.includes('← Back to workspace summary'), true)
-  assert.equal(workspace.includes("editorOpenedAfterCreate ? 'Set up' : 'Edit'"), true)
+  assert.equal(workspace.includes('isEditingContext.value = true'), true)
+  assert.equal(workspace.includes('← Back to workspace summary'), false)
   assert.equal(workspace.includes('Quick create + Enter'), false)
 })
 
-test('combined editor saves context explicitly and accepts desktop file drops', () => {
+test('active workspace summary saves context explicitly and accepts desktop file drops', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
 
-  assert.equal(workspace.includes('Save context'), true)
+  assert.equal(workspace.includes('@click="saveWorkspaceContext"'), true)
   assert.equal(workspace.includes('@click="saveWorkspaceContext"'), true)
   assert.equal(workspace.includes('async function saveWorkspaceContext()'), true)
   assert.equal(workspace.includes('@drop.prevent="handleDatasetDrop"'), true)
+  assert.equal(workspace.includes("import('@tauri-apps/api/webview')"), true)
+  assert.equal(workspace.includes('getCurrentWebview().onDragDropEvent'), true)
+  assert.equal(workspace.includes('event?.payload?.paths || []'), true)
   assert.equal(workspace.includes("new Set(['.csv', '.tsv', '.parquet', '.json', '.xlsx', '.xls'])"), true)
   assert.equal(workspace.includes('await startBatchDatasetIngestion(droppedPaths)'), true)
   assert.equal(workspace.includes("filters: [{ name: 'Data files', extensions: ['csv', 'parquet', 'xlsx', 'xls', 'json', 'tsv'] }]"), true)
 })
 
-test('selected summary exposes activate edit and rename actions', () => {
+test('selected summary exposes only activation until the workspace is active', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
 
   assert.equal(workspace.includes('@click="selectWorkspaceSummary(workspace.id)"'), true)
   assert.equal(workspace.includes('@click="activateSelectedWorkspace"'), true)
-  assert.equal(workspace.includes('@click="openWorkspaceEditor"'), true)
+  assert.equal(workspace.includes('@click="startContextEdit"'), true)
+  assert.equal(workspace.includes('v-if="isWorkspaceActive && !isEditingContext"'), true)
   assert.equal(workspace.includes('@click="startRename"'), true)
+  assert.equal(workspace.includes('v-if="isWorkspaceActive" type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="startRename"'), true)
+  assert.equal(workspace.includes('@click="openWorkspaceEditor"'), false)
 })
 
 test('selected summary puts actions in the header and uses context instead of duplicate metrics', () => {
@@ -65,13 +68,14 @@ test('selected summary puts actions in the header and uses context instead of du
   const template = workspace.slice(0, workspace.indexOf('<script setup>'))
 
   assert.equal(template.includes('<span>New workspace</span>'), false)
-  assert.equal(template.includes('Workspace context'), true)
+  assert.equal(template.includes('Workspace Context'), true)
   assert.equal(template.includes('No workspace context added yet.'), true)
   assert.equal(workspace.includes('const selectedWorkspaceContext = computed('), true)
   assert.equal(workspace.includes('workspaceDetail.value = null'), true)
   assert.equal(template.includes('<span class="section-label mb-1 block">Conversations</span>'), false)
   assert.equal(template.includes('<span class="section-label mb-1 block">Last Active</span>'), false)
   assert.equal(template.includes('flex min-w-0 items-center justify-between gap-3 border-b'), true)
+  assert.equal(template.includes('aria-label="Add dataset"'), true)
   assert.equal(template.match(/@click="beginInlineCreate"/g)?.length, 2)
 })
 
@@ -88,7 +92,7 @@ test('settings sidebar is flat, ordered, and starts with LLM settings', () => {
   assert.equal(template.indexOf('<span>Appearance</span>') < template.indexOf('<span>Account</span>'), true)
 })
 
-test('workspace editor clearly separates selection, saved context, and file import actions', () => {
+test('active workspace summary clearly separates selection, saved context, and file import actions', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
   const template = workspace.slice(0, workspace.indexOf('<script setup>'))
 
@@ -101,7 +105,8 @@ test('workspace editor clearly separates selection, saved context, and file impo
   assert.equal(template.includes(':disabled="isSavingWorkspaceIdentity || !isWorkspaceContextDirty"'), true)
   assert.equal(template.includes("isWorkspaceContextDirty ? 'Unsaved changes' : 'Saved'"), true)
   assert.equal(template.includes('data-testid="workspace-import-datasets-dropzone"'), true)
-  assert.equal(template.includes(':disabled="isDatasetIngesting || isDeletingDataset || requiresWorkspaceActivation"'), true)
+  assert.equal(template.includes('v-if="isWorkspaceActive"'), true)
+  assert.equal(template.includes(':disabled="isDatasetIngesting || isDeletingDataset"'), true)
   assert.equal(template.includes('data-testid="workspace-import-datasets-header"'), false)
   assert.equal(template.includes('data-testid="workspace-import-datasets-empty"'), false)
   assert.equal(template.match(/CSV, TSV, Parquet, JSON, XLSX, and XLS/g)?.length, 1)
