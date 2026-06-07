@@ -86,14 +86,16 @@
                     <UserIcon class="h-4 w-4 shrink-0" />
                     <span>Account</span>
                   </button>
-                  <button
-                    type="button"
-                    :class="activeSection === 'terms' ? activeNavClass : inactiveNavClass"
-                    @click="openLeafSection('terms')"
-                  >
-                    <DocumentTextIcon class="h-4 w-4 shrink-0" />
-                    <span>Terms &amp; Conditions</span>
-                  </button>
+                  <template v-if="false">
+                    <button
+                      type="button"
+                      :class="activeSection === 'terms' ? activeNavClass : inactiveNavClass"
+                      @click="openLeafSection('terms')"
+                    >
+                      <DocumentTextIcon class="h-4 w-4 shrink-0" />
+                      <span>Terms &amp; Conditions</span>
+                    </button>
+                  </template>
                 </div>
               </div>
             </div>

@@ -348,6 +348,10 @@
       @close="closeDeleteDialog"
       @confirm="confirmDelete"
     />
+    <TermsModal
+      :is-open="isTermsOpen"
+      @close="isTermsOpen = false"
+    />
     <Teleport to="body">
       <div
         v-if="profileMenuOpen"
@@ -370,12 +374,21 @@
           Theme Preference
         </button>
         <div class="h-px bg-[var(--color-border)] my-1 opacity-60" />
+        <template v-if="false">
+          <button
+            type="button"
+            class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
+            @click="openProfileSection('terms')"
+          >
+            Legal &amp; Terms
+          </button>
+        </template>
         <button
           type="button"
           class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
-          @click="openProfileSection('terms')"
+          @click="openTermsModal"
         >
-          Legal &amp; Terms
+          Terms &amp; Conditions
         </button>
       </div>
     </Teleport>
@@ -414,6 +427,7 @@ import { extractApiErrorMessage } from '../../utils/apiError'
 import { formatTimestamp } from '../../utils/dateUtils'
 import SettingsModal from '../modals/SettingsModal.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
+import TermsModal from '../modals/TermsModal.vue'
 import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 
@@ -449,6 +463,7 @@ const profileMenuPosition  = ref({ left: 0, top: 0 })
 const isSettingsOpen      = ref(false)
 const settingsInitialTab  = ref('llm')
 const settingsInitialStep = ref(1)
+const isTermsOpen         = ref(false)
 
 // ─── Delete Dialog ────────────────────────────────────────────────────────────
 const isDeleteDialogOpen  = ref(false)
@@ -645,6 +660,11 @@ function closeProfileMenu() {
 function openProfileSection(tab) {
   closeProfileMenu()
   openSettings(tab)
+}
+
+function openTermsModal() {
+  closeProfileMenu()
+  isTermsOpen.value = true
 }
 
 // ─── Global click — close menus ───────────────────────────────────────────────
