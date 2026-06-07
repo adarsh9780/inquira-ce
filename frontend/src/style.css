@@ -481,13 +481,17 @@ body {
 
   /* Default nav tab */
   .nav-tab {
-    @apply w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors gap-3;
+    @apply w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg gap-3;
     color: var(--color-text-muted);
+    transition: background-color var(--motion-duration-standard) var(--motion-ease-standard),
+                color var(--motion-duration-standard) var(--motion-ease-standard),
+                transform var(--motion-duration-standard) var(--motion-ease-standard);
   }
 
   .nav-tab:hover {
     background-color: color-mix(in srgb, var(--color-text-main) 6%, transparent);
     color: var(--color-text-main);
+    transform: translateX(3px);
   }
 
   /* Active nav tab */
@@ -496,6 +500,21 @@ body {
     background-color: var(--color-selected-surface);
     color: var(--color-text-main);
     box-shadow: inset 0 0 0 1px var(--color-selected-border);
+    position: relative;
+    transition: background-color var(--motion-duration-standard) var(--motion-ease-standard),
+                color var(--motion-duration-standard) var(--motion-ease-standard),
+                transform var(--motion-duration-standard) var(--motion-ease-standard);
+  }
+
+  .nav-tab-active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 25%;
+    height: 50%;
+    width: 3px;
+    border-radius: 0 9999px 9999px 0;
+    background-color: var(--color-accent);
   }
 
   /* ============================================================
