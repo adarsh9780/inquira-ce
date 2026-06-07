@@ -1937,6 +1937,10 @@ export const useAppStore = defineStore('app', () => {
     if (workspaceDeletionJobs.value.some((job) => job.workspace_id === workspaceId)) return
     await apiService.v1ActivateWorkspace(workspaceId)
     activeWorkspaceId.value = workspaceId
+    workspaces.value = workspaces.value.map((workspace) => ({
+      ...workspace,
+      is_active: workspace.id === workspaceId,
+    }))
     conversations.value = []
     activeConversationId.value = ''
     chatHistory.value = []

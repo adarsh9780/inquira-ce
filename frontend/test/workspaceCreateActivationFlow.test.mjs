@@ -44,6 +44,20 @@ test('existing workspace summary supports inspect-first activation and editing',
   assert.equal(settings.includes('@activate-workspace="activateWorkspace"'), true)
 })
 
+test('workspace activation updates active state immediately without waiting for a list refresh', () => {
+  const store = read('src/stores/appStore.js')
+  const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
+  const start = store.indexOf('async function activateWorkspace(workspaceId) {')
+  const end = store.indexOf('async function renameWorkspace(', start)
+  const activationBlock = store.slice(start, end)
+
+  assert.equal(activationBlock.includes('activeWorkspaceId.value = workspaceId'), true)
+  assert.equal(activationBlock.includes('workspaces.value = workspaces.value.map((workspace) => ({'), true)
+  assert.equal(activationBlock.includes('is_active: workspace.id === workspaceId'), true)
+  assert.equal(workspace.includes('workspace.id === appStore.activeWorkspaceId'), true)
+  assert.equal(workspace.includes("activeWorkspace.value.id === String(appStore.activeWorkspaceId || '').trim()"), true)
+})
+
 test('workspace launchers open the unified workspace settings surface without step routing', () => {
   const paths = [
     'src/components/WorkspaceSwitcher.vue',

@@ -60,14 +60,32 @@ test('selected summary exposes activate edit and rename actions', () => {
   assert.equal(workspace.includes('@click="startRename"'), true)
 })
 
-test('selected summary keeps actions separate from metrics and uses one create entry point', () => {
+test('selected summary puts actions in the header and uses context instead of duplicate metrics', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
   const template = workspace.slice(0, workspace.indexOf('<script setup>'))
 
   assert.equal(template.includes('<span>New workspace</span>'), false)
-  assert.equal(template.includes('class="grid grid-cols-2 gap-x-6 gap-y-3"'), true)
-  assert.equal(template.includes('class="grid min-w-0 flex-1 grid-cols-3 gap-3"'), false)
+  assert.equal(template.includes('Workspace context'), true)
+  assert.equal(template.includes('No workspace context added yet.'), true)
+  assert.equal(workspace.includes('const selectedWorkspaceContext = computed('), true)
+  assert.equal(workspace.includes('workspaceDetail.value = null'), true)
+  assert.equal(template.includes('<span class="section-label mb-1 block">Conversations</span>'), false)
+  assert.equal(template.includes('<span class="section-label mb-1 block">Last Active</span>'), false)
+  assert.equal(template.includes('flex min-w-0 items-center justify-between gap-3 border-b'), true)
   assert.equal(template.match(/@click="beginInlineCreate"/g)?.length, 2)
+})
+
+test('settings sidebar is flat, ordered, and starts with LLM settings', () => {
+  const settings = read('src/components/modals/SettingsModal.vue')
+  const template = settings.slice(0, settings.indexOf('<script setup>'))
+
+  assert.equal(template.includes('Workspace Setup'), false)
+  assert.equal(template.includes('App Config'), false)
+  assert.equal(template.includes('User &amp; System'), false)
+  assert.equal(template.includes('Switch &amp; Create'), false)
+  assert.equal(template.indexOf('LLM &amp; API Keys') < template.indexOf('<span>Workspace</span>'), true)
+  assert.equal(template.indexOf('<span>Workspace</span>') < template.indexOf('<span>Appearance</span>'), true)
+  assert.equal(template.indexOf('<span>Appearance</span>') < template.indexOf('<span>Account</span>'), true)
 })
 
 test('workspace editor clearly separates selection, saved context, and file import actions', () => {

@@ -40,7 +40,7 @@
               <p class="min-w-0 flex-1 truncate text-xs font-medium text-[var(--color-text-main)]">{{ workspace.name || 'Untitled workspace' }}</p>
               <div class="flex shrink-0 items-center gap-1.5">
                 <span v-if="workspace.id === activeWorkspaceId" class="rounded-full bg-[var(--color-accent-soft)] px-1.5 py-0.5 text-[9px] text-[var(--color-accent)]">Selected</span>
-                <span v-if="workspace.is_active" class="rounded-full bg-[var(--color-success-bg)] px-1.5 py-0.5 text-[9px] text-[var(--color-success)]">Active</span>
+                <span v-if="workspace.id === appStore.activeWorkspaceId" class="rounded-full bg-[var(--color-success-bg)] px-1.5 py-0.5 text-[9px] text-[var(--color-success)]">Active</span>
                 <button
                   type="button"
                   class="rounded p-1 text-[var(--color-text-muted)] opacity-40 transition-all hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger)] focus-visible:opacity-100 group-hover:opacity-100"
@@ -63,47 +63,35 @@
 
       <div class="flex h-full min-w-0 flex-col">
         <div v-if="workspaceSurface === 'summary'" class="flex h-full flex-1 flex-col space-y-4">
-          <header class="border-b border-[var(--color-border)] pb-2">
-            <h2 class="text-sm font-bold text-[var(--color-text-main)]">Selected Workspace Summary</h2>
+          <header class="flex min-w-0 items-center justify-between gap-3 border-b border-[var(--color-border)] pb-2">
+            <input
+              v-if="isRenamingInline"
+              ref="renameInputRef"
+              v-model="renameValue"
+              class="input-base input-outlined min-w-0 flex-1 py-1 text-sm"
+              aria-label="Workspace name"
+              @keydown.enter.prevent="saveRename"
+              @keydown.escape.prevent="cancelRename"
+            />
+            <h2 v-else class="min-w-0 truncate text-sm font-bold text-[var(--color-text-main)]">Selected Workspace Summary</h2>
+            <div v-if="activeWorkspace" class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <template v-if="isRenamingInline">
+                <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="cancelRename">Cancel</button>
+                <button type="button" class="btn-primary px-3 py-1.5 text-xs" @click="saveRename">Save</button>
+              </template>
+              <template v-else>
+                <button v-if="!isWorkspaceActive" type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="activateSelectedWorkspace">Activate</button>
+                <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="startRename">Rename</button>
+                <button type="button" class="btn-primary px-3 py-1.5 text-xs" @click="openWorkspaceEditor">Edit</button>
+              </template>
+            </div>
           </header>
 
           <div v-if="activeWorkspace" class="flex-1 space-y-4 overflow-y-auto scrollbar-thin">
             <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] p-3">
-              <div class="mb-3 flex min-w-0 items-start justify-between gap-3 border-b border-[var(--color-border)] pb-3">
-                <div class="min-w-0">
-                  <span class="section-label mb-1 block">Selected workspace</span>
-                  <input
-                    v-if="isRenamingInline"
-                    ref="renameInputRef"
-                    v-model="renameValue"
-                    class="input-base input-outlined w-full py-1 text-sm"
-                    @keydown.enter.prevent="saveRename"
-                    @keydown.escape.prevent="cancelRename"
-                  />
-                  <p v-else class="truncate text-sm font-semibold text-[var(--color-text-main)]">{{ activeWorkspace.name }}</p>
-                </div>
-                <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                  <template v-if="isRenamingInline">
-                    <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="cancelRename">Cancel</button>
-                    <button type="button" class="btn-primary px-3 py-1.5 text-xs" @click="saveRename">Save</button>
-                  </template>
-                  <template v-else>
-                    <button v-if="!isWorkspaceActive" type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="activateSelectedWorkspace">Activate</button>
-                    <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="startRename">Rename</button>
-                    <button type="button" class="btn-primary px-3 py-1.5 text-xs" @click="openWorkspaceEditor">Edit</button>
-                  </template>
-                </div>
-              </div>
-              <div class="grid grid-cols-2 gap-x-6 gap-y-3">
-                <div class="min-w-0">
-                  <span class="section-label mb-1 block">Conversations</span>
-                  <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ activeWorkspace.conversationCount }}</p>
-                </div>
-                <div class="min-w-0">
-                  <span class="section-label mb-1 block">Last Active</span>
-                  <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ activeWorkspace.lastActiveLabel }}</p>
-                </div>
-              </div>
+              <span class="section-label mb-2 block">Workspace context</span>
+              <p v-if="selectedWorkspaceContext" class="whitespace-pre-wrap text-xs leading-relaxed text-[var(--color-text-main)]">{{ selectedWorkspaceContext }}</p>
+              <p v-else class="text-xs text-[var(--color-text-muted)]">No workspace context added yet.</p>
             </div>
 
             <div class="space-y-2">
@@ -347,7 +335,8 @@ const workspaceCards = computed(() => {
 })
 
 const activeWorkspace = computed(() => workspaceCards.value.find((workspace) => workspace.id === String(props.activeWorkspaceId || '').trim()) || null)
-const isWorkspaceActive = computed(() => !!activeWorkspace.value && !!activeWorkspace.value.is_active)
+const isWorkspaceActive = computed(() => !!activeWorkspace.value && activeWorkspace.value.id === String(appStore.activeWorkspaceId || '').trim())
+const selectedWorkspaceContext = computed(() => String(workspaceDetail.value?.schema_context ?? activeWorkspace.value?.schema_context ?? '').trim())
 const normalizedSetupWorkspaceContext = computed(() => String(setupWorkspaceContext.value || '').trim())
 const isWorkspaceContextDirty = computed(() => normalizedSetupWorkspaceContext.value !== String(savedWorkspaceContext.value || '').trim())
 const detailWorkspaceSelected = computed(() => Boolean(String(props.activeWorkspaceId || '').trim()))
@@ -577,8 +566,8 @@ async function activateSelectedWorkspace() {
 
 async function loadWorkspaceDetail() {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
+  workspaceDetail.value = null
   if (!workspaceId) {
-    workspaceDetail.value = null
     syncSetupIdentity()
     return
   }

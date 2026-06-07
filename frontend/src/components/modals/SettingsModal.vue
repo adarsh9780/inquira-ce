@@ -27,60 +27,39 @@
 
         <div class="flex h-full">
           <aside class="w-[190px] shrink-0 border-r border-[var(--color-border)] bg-[var(--color-base-soft)] px-3 py-4 flex flex-col justify-between select-none">
-            <div class="space-y-4">
-              <!-- WORKSPACE SETUP -->
-              <div>
-                <p class="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-muted)] opacity-80">Workspace Setup</p>
-                <div class="space-y-0.5">
-                  <button
-                    type="button"
-                    :class="activeSection === 'workspace' ? activeNavClass : inactiveNavClass"
-                    @click="openWorkspaceSection"
-                  >
-                    <ListBulletIcon class="h-4 w-4 shrink-0" />
-                    <span>Switch &amp; Create</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- APPLICATION CONFIG -->
-              <div>
-                <p class="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-muted)] opacity-80">App Config</p>
-                <div class="space-y-0.5">
-                  <button
-                    type="button"
-                    :class="activeSection === 'llm' ? activeNavClass : inactiveNavClass"
-                    @click="openLeafSection('llm')"
-                  >
-                    <KeyIcon class="h-4 w-4 shrink-0" />
-                    <span>LLM &amp; API Keys</span>
-                  </button>
-                  <button
-                    type="button"
-                    :class="activeSection === 'appearance' ? activeNavClass : inactiveNavClass"
-                    @click="openLeafSection('appearance')"
-                  >
-                    <PaintBrushIcon class="h-4 w-4 shrink-0" />
-                    <span>Appearance</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- USER & SYSTEM -->
-              <div>
-                <p class="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-muted)] opacity-80">User &amp; System</p>
-                <div class="space-y-0.5">
-                  <button
-                    type="button"
-                    :class="activeSection === 'account' ? activeNavClass : inactiveNavClass"
-                    @click="openLeafSection('account')"
-                  >
-                    <UserIcon class="h-4 w-4 shrink-0" />
-                    <span>Account</span>
-                  </button>
-
-                </div>
-              </div>
+            <div class="space-y-0.5">
+              <button
+                type="button"
+                :class="activeSection === 'llm' ? activeNavClass : inactiveNavClass"
+                @click="openLeafSection('llm')"
+              >
+                <KeyIcon class="h-4 w-4 shrink-0" />
+                <span>LLM &amp; API Keys</span>
+              </button>
+              <button
+                type="button"
+                :class="activeSection === 'workspace' ? activeNavClass : inactiveNavClass"
+                @click="openWorkspaceSection"
+              >
+                <ListBulletIcon class="h-4 w-4 shrink-0" />
+                <span>Workspace</span>
+              </button>
+              <button
+                type="button"
+                :class="activeSection === 'appearance' ? activeNavClass : inactiveNavClass"
+                @click="openLeafSection('appearance')"
+              >
+                <PaintBrushIcon class="h-4 w-4 shrink-0" />
+                <span>Appearance</span>
+              </button>
+              <button
+                type="button"
+                :class="activeSection === 'account' ? activeNavClass : inactiveNavClass"
+                @click="openLeafSection('account')"
+              >
+                <UserIcon class="h-4 w-4 shrink-0" />
+                <span>Account</span>
+              </button>
             </div>
           </aside>
 
