@@ -80,7 +80,13 @@
                 <svg class="w-4 h-4 text-[var(--color-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
                 {{ group.tableName }}
               </h3>
-              <span class="text-[12px] font-medium text-[var(--color-text-muted)] bg-[var(--color-base)] px-2 py-1 rounded-md border border-[var(--color-border)]">{{ group.columns.length }} columns</span>
+              <div class="flex items-center gap-2.5">
+                <button @click="regenerateTableSchema(group.tableName)" :disabled="schemaLoading" class="text-[12px] font-medium text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 px-2 py-0.5 rounded transition-colors flex items-center gap-1" title="Regenerate descriptions for this table only">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3 3 3m-3-3v12"></path></svg>
+                  Regenerate
+                </button>
+                <span class="text-[12px] font-medium text-[var(--color-text-muted)] bg-[var(--color-base)] px-2 py-1 rounded-md border border-[var(--color-border)]">{{ group.columns.length }} columns</span>
+              </div>
             </div>
             
             <div class="overflow-x-auto">
@@ -203,11 +209,34 @@ async function fetchWorkspaceSchema(forceRefresh = false) {
   if (!appStore.activeWorkspaceId) return
   schemaLoading.value = true
   try {
-    const response = await apiService.getWorkspaceColumns(appStore.activeWorkspaceId)
-    workspaceColumns.value = (response?.columns || []).map(col => ({
-      ...col,
-      aliases: normalizeAliasList(col.aliases)
-    }))
+    const workspaceId = appStore.activeWorkspaceId
+    const datasetResponse = await apiService.v1ListDatasets(workspaceId)
+    const datasets = datasetResponse?.datasets || []
+
+    const schemas = await Promise.all(
+      datasets.map(async (ds) => {
+        try {
+          return await apiService.v1GetDatasetSchema(workspaceId, ds.table_name)
+        } catch (err) {
+          return { table_name: ds.table_name, context: '', columns: [] }
+        }
+      })
+    )
+
+    const columns = []
+    schemas.forEach(schema => {
+      const tableName = schema.table_name
+      const cols = schema.columns || []
+      cols.forEach(c => {
+        columns.push({
+          ...c,
+          table_name: tableName,
+          aliases: normalizeAliasList(c.aliases)
+        })
+      })
+    })
+
+    workspaceColumns.value = columns
     dirtyTables.value.clear()
     schemaEdited.value = false
     if (forceRefresh) toast.success('Schema refreshed', 'Loaded latest workspace schema.')
@@ -334,13 +363,92 @@ async function saveAllSchema() {
 
 async function regenerateWorkspaceSchema() {
   if (!appStore.activeWorkspaceId) return
-  toast.info('Feature under construction', 'Workspace-wide schema regeneration will be supported soon.')
-  // To implement this fully we would call v1RegenerateDatasetSchema for each table, or a new workspace level endpoint.
+  schemaLoading.value = true
+  try {
+    const workspaceId = appStore.activeWorkspaceId
+    const datasetResponse = await apiService.v1ListDatasets(workspaceId)
+    const datasets = datasetResponse?.datasets || []
+    
+    if (datasets.length === 0) {
+      toast.info('No datasets', 'There are no datasets in this workspace to regenerate.')
+      return
+    }
+
+    toast.info('Regenerating schema', `Starting AI description generation for ${datasets.length} tables...`)
+    
+    const regeneratedSchemas = []
+    for (const ds of datasets) {
+      const regenerated = await apiService.v1RegenerateDatasetSchema(workspaceId, ds.table_name, {
+        context: schemaContext.value || ''
+      })
+      regeneratedSchemas.push(regenerated)
+    }
+
+    const columns = []
+    regeneratedSchemas.forEach(schema => {
+      const tableName = schema.table_name
+      const cols = schema.columns || []
+      cols.forEach(c => {
+        columns.push({
+          ...c,
+          table_name: tableName,
+          aliases: normalizeAliasList(c.aliases)
+        })
+      })
+    })
+    
+    workspaceColumns.value = columns
+    dirtyTables.value.clear()
+    schemaEdited.value = false
+    toast.success('Schema regenerated', 'AI descriptions updated for all tables.')
+  } catch (error) {
+    toast.error('Regeneration failed', error?.message || 'Unable to regenerate schema.')
+  } finally {
+    schemaLoading.value = false
+  }
+}
+
+async function regenerateTableSchema(tableName) {
+  if (!appStore.activeWorkspaceId || !tableName) return
+  schemaLoading.value = true
+  try {
+    toast.info('Regenerating table schema', `Generating AI descriptions for ${tableName}...`)
+    const regenerated = await apiService.v1RegenerateDatasetSchema(appStore.activeWorkspaceId, tableName, {
+      context: schemaContext.value || ''
+    })
+    
+    const restColumns = workspaceColumns.value.filter(c => c.table_name !== tableName)
+    const newColumns = (regenerated.columns || []).map(c => ({
+      ...c,
+      table_name: tableName,
+      aliases: normalizeAliasList(c.aliases)
+    }))
+    
+    workspaceColumns.value = [...restColumns, ...newColumns]
+    dirtyTables.value.delete(tableName)
+    if (dirtyTables.value.size === 0) {
+      schemaEdited.value = false
+    }
+    toast.success('Table schema regenerated', `AI descriptions updated for ${tableName}.`)
+  } catch (error) {
+    toast.error('Regeneration failed', error?.message || 'Unable to regenerate schema.')
+  } finally {
+    schemaLoading.value = false
+  }
+}
+
+async function handleDatasetSchemaReady(event) {
+  await fetchWorkspaceSchema()
 }
 
 onMounted(async () => {
   await loadWorkspaceContext()
   await fetchWorkspaceSchema()
+  window.addEventListener('dataset-schema-ready', handleDatasetSchemaReady)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('dataset-schema-ready', handleDatasetSchemaReady)
 })
 
 watch(() => appStore.activeWorkspaceId, async (newId) => {
