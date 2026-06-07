@@ -62,22 +62,15 @@
 
       <div class="flex h-full min-w-0 flex-col">
         <div v-if="workspaceSurface === 'summary'" class="flex h-full flex-1 flex-col space-y-4">
-          <header class="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
+          <header class="border-b border-[var(--color-border)] pb-2">
             <h2 class="text-sm font-bold text-[var(--color-text-main)]">Selected Workspace Summary</h2>
-            <button
-              type="button"
-              class="inline-flex items-center gap-1 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-base)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-accent)] shadow-sm transition-all hover:border-[var(--color-accent-border)] hover:bg-[var(--color-accent-soft)]"
-              @click="beginInlineCreate"
-            >
-              <span class="text-sm leading-none">+</span><span>New workspace</span>
-            </button>
           </header>
 
           <div v-if="activeWorkspace" class="flex-1 space-y-4 overflow-y-auto scrollbar-thin">
-            <div class="flex items-start justify-between gap-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] p-3">
-              <div class="grid min-w-0 flex-1 grid-cols-3 gap-3">
+            <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] p-3">
+              <div class="mb-3 flex min-w-0 items-start justify-between gap-3 border-b border-[var(--color-border)] pb-3">
                 <div class="min-w-0">
-                  <span class="section-label mb-1 block">Workspace Name</span>
+                  <span class="section-label mb-1 block">Selected workspace</span>
                   <input
                     v-if="isRenamingInline"
                     ref="renameInputRef"
@@ -88,19 +81,27 @@
                   />
                   <p v-else class="truncate text-sm font-semibold text-[var(--color-text-main)]">{{ activeWorkspace.name }}</p>
                 </div>
-                <div><span class="section-label mb-1 block">Conversations</span><p class="text-sm font-semibold text-[var(--color-text-main)]">{{ activeWorkspace.conversationCount }}</p></div>
-                <div><span class="section-label mb-1 block">Last Active</span><p class="text-sm font-semibold text-[var(--color-text-main)]">{{ activeWorkspace.lastActiveLabel }}</p></div>
+                <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  <template v-if="isRenamingInline">
+                    <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="cancelRename">Cancel</button>
+                    <button type="button" class="btn-primary px-3 py-1.5 text-xs" @click="saveRename">Save</button>
+                  </template>
+                  <template v-else>
+                    <button v-if="!isWorkspaceActive" type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="activateSelectedWorkspace">Activate</button>
+                    <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="startRename">Rename</button>
+                    <button type="button" class="btn-primary px-3 py-1.5 text-xs" @click="openWorkspaceEditor">Edit</button>
+                  </template>
+                </div>
               </div>
-              <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                <template v-if="isRenamingInline">
-                  <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="cancelRename">Cancel</button>
-                  <button type="button" class="btn-primary px-3 py-1.5 text-xs" @click="saveRename">Save</button>
-                </template>
-                <template v-else>
-                  <button v-if="!isWorkspaceActive" type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="activateSelectedWorkspace">Activate</button>
-                  <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="startRename">Rename</button>
-                  <button type="button" class="btn-primary px-3 py-1.5 text-xs" @click="openWorkspaceEditor">Edit</button>
-                </template>
+              <div class="grid grid-cols-2 gap-x-6 gap-y-3">
+                <div class="min-w-0">
+                  <span class="section-label mb-1 block">Conversations</span>
+                  <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ activeWorkspace.conversationCount }}</p>
+                </div>
+                <div class="min-w-0">
+                  <span class="section-label mb-1 block">Last Active</span>
+                  <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ activeWorkspace.lastActiveLabel }}</p>
+                </div>
               </div>
             </div>
 

@@ -58,3 +58,13 @@ test('selected summary exposes activate edit and rename actions', () => {
   assert.equal(workspace.includes('@click="openWorkspaceEditor"'), true)
   assert.equal(workspace.includes('@click="startRename"'), true)
 })
+
+test('selected summary keeps actions separate from metrics and uses one create entry point', () => {
+  const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
+  const template = workspace.slice(0, workspace.indexOf('<script setup>'))
+
+  assert.equal(template.includes('<span>New workspace</span>'), false)
+  assert.equal(template.includes('class="grid grid-cols-2 gap-x-6 gap-y-3"'), true)
+  assert.equal(template.includes('class="grid min-w-0 flex-1 grid-cols-3 gap-3"'), false)
+  assert.equal(template.match(/@click="beginInlineCreate"/g)?.length, 2)
+})
