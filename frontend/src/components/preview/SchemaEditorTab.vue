@@ -82,7 +82,9 @@
               </h3>
               <div class="flex items-center gap-2.5">
                 <button @click="regenerateTableSchema(group.tableName)" :disabled="schemaLoading" class="text-[12px] font-medium text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 px-2 py-0.5 rounded transition-colors flex items-center gap-1" title="Regenerate descriptions for this table only">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3 3 3m-3-3v12"></path></svg>
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 21l-.813-5.096L3 15l5.187-.813L9 9l.813 5.187L15 15l-5.187.813zM18 5.25L16.5 9l-1.5-3.75L11.25 3.75 15 2.25l1.5 3.75 3.75 1.5-3.75 1.5zM22 13.5l-1 2.5-2.5 1 2.5 1 1 2.5 1-2.5 2.5-1-2.5-1-1-2.5z" />
+                  </svg>
                   Regenerate
                 </button>
                 <span class="text-[12px] font-medium text-[var(--color-text-muted)] bg-[var(--color-base)] px-2 py-1 rounded-md border border-[var(--color-border)]">{{ group.columns.length }} columns</span>
@@ -91,7 +93,7 @@
             
             <div class="overflow-x-auto">
               <table class="w-full text-left border-collapse min-w-[600px]">
-                <thead class="sticky top-[49px] z-20 bg-[var(--color-base)] border-b border-[var(--color-border)] shadow-sm">
+                <thead class="sticky top-[45px] z-20 bg-[var(--color-surface)] border-b border-[var(--color-border)]">
                   <tr>
                     <th class="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)] w-12 text-center border-b border-[var(--color-border)]">#</th>
                     <th class="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-muted)] w-1/4 border-b border-[var(--color-border)]">Column</th>
@@ -101,34 +103,34 @@
                 </thead>
                 <tbody class="divide-y divide-[var(--color-border)]">
                   <tr v-for="(col, i) in group.columns" :key="col.name" class="hover:bg-[var(--color-base-muted)] transition-colors group/row align-top">
-                    <td class="px-4 py-3 text-[12px] text-[var(--color-text-sub)] text-center w-12 pt-4">{{ i + 1 }}</td>
-                    <td class="px-4 py-3 text-[13px] font-mono font-semibold text-[var(--color-text-main)] w-1/4 pt-4">{{ col.name }}</td>
+                    <td class="px-4 py-3.5 text-[12px] text-[var(--color-text-sub)] text-center w-12">{{ i + 1 }}</td>
+                    <td class="px-4 py-3.5 text-[13px] font-mono font-semibold text-[var(--color-text-main)] w-1/4">{{ col.name }}</td>
                     <td class="px-4 py-2 w-1/3 cursor-pointer group/cell relative" @click="startInlineEdit(col, 'description')">
-                      <div v-if="editingCell?.col === col && editingCell?.field === 'description'" class="relative pt-1" @click.stop>
+                      <div v-if="editingCell?.col === col && editingCell?.field === 'description'" class="relative pt-1.5" @click.stop>
                         <textarea v-focus v-model="editingCell.value" @blur="saveInlineEdit" @keydown.esc.prevent="cancelInlineEdit" @keydown.enter.ctrl.prevent="saveInlineEdit" class="w-full bg-[var(--color-base)] border border-[var(--color-accent)] rounded-md p-2 text-[13px] text-[var(--color-text-main)] resize-y min-h-[60px] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 shadow-sm" placeholder="Enter description..."></textarea>
                         <div class="absolute right-2 bottom-3 text-[10px] text-[var(--color-text-muted)] pointer-events-none">Ctrl+Enter to save</div>
                       </div>
-                      <div v-else class="min-h-[36px] py-2 text-[13px] text-[var(--color-text-main)] whitespace-pre-wrap pr-8">
+                      <div v-else class="min-h-[28px] py-1.5 text-[13px] text-[var(--color-text-main)] whitespace-pre-wrap pr-8">
                         <span v-if="col.description">{{ col.description }}</span>
                         <span v-else class="text-[var(--color-text-muted)] italic text-[12px]">Click to add description...</span>
-                        <div class="absolute right-3 top-2 opacity-0 group-hover/cell:opacity-100 text-[var(--color-text-muted)] bg-[var(--color-base)] rounded p-1 shadow-sm border border-[var(--color-border)] transition-opacity">
+                        <div class="absolute right-3 top-2.5 opacity-0 group-hover/cell:opacity-100 text-[var(--color-text-muted)] bg-[var(--color-base)] rounded p-1 shadow-sm border border-[var(--color-border)] transition-opacity">
                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                         </div>
                       </div>
                     </td>
                     <td class="px-4 py-2 w-1/3 cursor-pointer group/cell relative" @click="startInlineEdit(col, 'aliases')">
-                      <div v-if="editingCell?.col === col && editingCell?.field === 'aliases'" class="relative pt-1" @click.stop>
+                      <div v-if="editingCell?.col === col && editingCell?.field === 'aliases'" class="relative pt-1.5" @click.stop>
                         <input v-focus v-model="editingCell.value" @blur="saveInlineEdit" @keydown.esc.prevent="cancelInlineEdit" @keydown.enter.prevent="saveInlineEdit" class="w-full bg-[var(--color-base)] border border-[var(--color-accent)] rounded-md p-2 text-[13px] text-[var(--color-text-main)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 shadow-sm" placeholder="alias1, alias2" />
                         <div class="absolute right-2 top-3 text-[10px] text-[var(--color-text-muted)] pointer-events-none">Enter to save</div>
                       </div>
-                      <div v-else class="min-h-[36px] py-2 text-[13px]">
+                      <div v-else class="min-h-[28px] py-1.5 text-[13px]">
                         <div v-if="col.aliases && col.aliases.length > 0" class="flex flex-wrap gap-1.5 pr-8">
                           <span v-for="(alias, ai) in col.aliases" :key="ai" class="inline-flex items-center px-2 py-0.5 rounded border border-[var(--color-border)] bg-[var(--color-base-muted)] text-[var(--color-text-main)] text-[11px] font-mono shadow-sm">
                             {{ alias }}
                           </span>
                         </div>
                         <span v-else class="text-[var(--color-text-muted)] italic text-[12px]">Click to add aliases...</span>
-                        <div class="absolute right-3 top-2 opacity-0 group-hover/cell:opacity-100 text-[var(--color-text-muted)] bg-[var(--color-base)] rounded p-1 shadow-sm border border-[var(--color-border)] transition-opacity">
+                        <div class="absolute right-3 top-2.5 opacity-0 group-hover/cell:opacity-100 text-[var(--color-text-muted)] bg-[var(--color-base)] rounded p-1 shadow-sm border border-[var(--color-border)] transition-opacity">
                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                         </div>
                       </div>
