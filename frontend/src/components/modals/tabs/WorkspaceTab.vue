@@ -1,649 +1,203 @@
 <template>
   <section class="scrollbar-hidden h-full overflow-y-auto">
-    <div class="grid grid-cols-[240px_1fr] gap-6 h-full min-h-0">
-      
-      <!-- Left Column: Workspace Switch & Create Navigator -->
-      <aside class="flex flex-col border-r border-[var(--color-border)] pr-4 h-full min-h-0 select-none">
+    <div class="grid h-full min-h-0 grid-cols-[240px_1fr] gap-6">
+      <aside class="flex h-full min-h-0 flex-col border-r border-[var(--color-border)] pr-4 select-none">
         <header class="mb-3 flex items-center justify-between">
           <h3 class="section-label">Workspaces</h3>
-          <button
-            type="button"
-            class="text-xs font-semibold text-[var(--color-accent)] hover:underline"
-            @click="emit('navigate', 'ws-create', 'forward')"
-          >
+          <button type="button" class="text-xs font-semibold text-[var(--color-accent)] hover:underline" @click="beginInlineCreate">
             + New
           </button>
         </header>
 
-        <!-- Search / Filter / Inline Create -->
-        <div class="mb-3 space-y-2">
-          <!-- Inline quick-create panel -->
-          <div class="relative">
+        <div class="flex-1 space-y-2 overflow-y-auto pr-1 scrollbar-thin">
+          <div
+            v-if="isInlineCreating"
+            class="rounded-lg bg-[var(--color-accent-soft)] px-3 py-2.5 ring-1 ring-[var(--color-accent-border)]"
+          >
             <input
-              v-model="quickCreateName"
+              ref="newWorkspaceInputRef"
+              v-model="setupWorkspaceName"
               type="text"
-              class="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-base)] px-2.5 py-1.5 text-xs text-[var(--color-text-main)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
-              placeholder="Quick create + Enter"
-              @keydown.enter.prevent="handleQuickCreate"
+              class="w-full bg-transparent text-xs font-medium text-[var(--color-text-main)] outline-none placeholder:text-[var(--color-text-muted)]"
+              placeholder="New workspace name"
+              :disabled="isCreatingWorkspace"
+              @keydown.enter.prevent="createWorkspace"
+              @keydown.escape.prevent="cancelInlineCreate"
             />
+            <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">Press Enter to create</p>
           </div>
-        </div>
 
-        <!-- Scrollable list of workspaces -->
-        <div class="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-          <div v-if="workspaceCards.length" class="space-y-2">
-            <div
-              v-for="workspace in workspaceCards"
-              :key="workspace.id"
-              class="group relative flex flex-col w-full cursor-pointer rounded-lg px-3 py-2.5 text-left transition-all"
-              :class="workspace.id === activeWorkspaceId
-                ? 'bg-[var(--color-accent-soft)] ring-1 ring-[var(--color-accent-border)]'
-                : 'bg-[var(--color-base-soft)] hover:bg-[var(--color-base-muted)]'"
-              @click="openWorkspaceDetail(workspace.id)"
-            >
-              <div class="flex items-start justify-between gap-2">
-                <p
-                  class="truncate text-xs font-medium"
-                  :class="workspace.id === activeWorkspaceId ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'"
+          <div
+            v-for="workspace in workspaceCards"
+            :key="workspace.id"
+            class="group relative flex w-full cursor-pointer flex-col rounded-lg px-3 py-2.5 text-left transition-all"
+            :class="workspace.id === activeWorkspaceId
+              ? 'bg-[var(--color-accent-soft)] ring-1 ring-[var(--color-accent-border)]'
+              : 'bg-[var(--color-base-soft)] hover:bg-[var(--color-base-muted)]'"
+            @click="selectWorkspaceSummary(workspace.id)"
+          >
+            <div class="flex items-start justify-between gap-2">
+              <p class="truncate text-xs font-medium text-[var(--color-text-main)]">{{ workspace.name || 'Untitled workspace' }}</p>
+              <div class="flex shrink-0 items-center gap-1.5">
+                <span v-if="workspace.is_active" class="rounded-full bg-[var(--color-success-bg)] px-1.5 py-0.5 text-[9px] text-[var(--color-success)]">Active</span>
+                <button
+                  type="button"
+                  class="rounded p-1 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger)]"
+                  title="Delete workspace"
+                  aria-label="Delete workspace"
+                  @click.stop="requestDeleteWorkspace(workspace.id)"
                 >
-                  {{ workspace.name || 'Untitled workspace' }}
-                </p>
-                <div class="flex shrink-0 items-center gap-1.5">
-                  <span
-                    v-if="workspace.id === activeWorkspaceId"
-                    class="rounded-full bg-[var(--color-success-bg)] px-1.5 py-0.25 text-[9px] text-[var(--color-success)]"
-                  >
-                    Active
-                  </span>
-                  <button
-                    type="button"
-                    class="rounded p-1 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger)]"
-                    title="Delete workspace"
-                    aria-label="Delete workspace"
-                    @click.stop="requestDeleteWorkspace(workspace.id)"
-                  >
-                    <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8">
-                      <path d="M5 7h14" />
-                      <path d="M9 7V5h6v2" />
-                      <path d="M8 7l1 12h6l1-12" />
-                    </svg>
-                  </button>
-                </div>
+                  <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M5 7h14" /><path d="M9 7V5h6v2" /><path d="M8 7l1 12h6l1-12" />
+                  </svg>
+                </button>
               </div>
-              <p class="text-[10px] text-[var(--color-text-muted)] mt-1">
-                {{ workspace.conversationCount }} convs · {{ workspace.lastActiveLabel }}
-              </p>
             </div>
+            <p class="mt-1 text-[10px] text-[var(--color-text-muted)]">{{ workspace.conversationCount }} convs · {{ workspace.lastActiveLabel }}</p>
           </div>
-          <div v-else class="text-center py-4">
-            <p class="text-xs text-[var(--color-text-muted)]">No workspaces yet</p>
-          </div>
+
+          <p v-if="!workspaceCards.length && !isInlineCreating" class="py-4 text-center text-xs text-[var(--color-text-muted)]">No workspaces yet</p>
         </div>
       </aside>
 
-      <!-- Right Column: Detail / Configuration / Ingest Dashboard -->
-      <div class="flex flex-col min-w-0 h-full">
-        <!-- If in ws-list mode but no workspace is active / selected, or just show active detail -->
-        <div v-if="panelMode === 'ws-list'" class="flex-1 flex flex-col justify-between h-full space-y-4">
-          <header class="flex items-center justify-between pb-2 border-b border-[var(--color-border)]">
-            <h2 class="text-sm font-bold text-[var(--color-text-main)]">Active Workspace Summary</h2>
+      <div class="flex h-full min-w-0 flex-col">
+        <div v-if="workspaceSurface === 'summary'" class="flex h-full flex-1 flex-col space-y-4">
+          <header class="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
+            <h2 class="text-sm font-bold text-[var(--color-text-main)]">Selected Workspace Summary</h2>
             <button
               type="button"
-              class="inline-flex items-center gap-1 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-base)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-accent)] shadow-sm transition-all hover:border-[var(--color-accent-border)] hover:bg-[var(--color-accent-soft)] hover:shadow-none"
-              @click="emit('navigate', 'ws-create', 'forward')"
+              class="inline-flex items-center gap-1 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-base)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-accent)] shadow-sm transition-all hover:border-[var(--color-accent-border)] hover:bg-[var(--color-accent-soft)]"
+              @click="beginInlineCreate"
             >
-              <span class="text-sm leading-none">+</span>
-              <span>New workspace</span>
+              <span class="text-sm leading-none">+</span><span>New workspace</span>
             </button>
           </header>
 
-          <div v-if="activeWorkspace" class="space-y-4 flex-1 overflow-y-auto scrollbar-thin">
-            <!-- Active workspace statistics card -->
-            <div class="grid grid-cols-3 gap-3 bg-[var(--color-base-soft)] p-3 rounded-lg border border-[var(--color-border)]">
-              <div>
-                <span class="section-label block mb-1">Workspace Name</span>
-                <p class="text-sm font-semibold truncate text-[var(--color-text-main)]">{{ activeWorkspace.name }}</p>
+          <div v-if="activeWorkspace" class="flex-1 space-y-4 overflow-y-auto scrollbar-thin">
+            <div class="flex items-start justify-between gap-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] p-3">
+              <div class="grid min-w-0 flex-1 grid-cols-3 gap-3">
+                <div class="min-w-0">
+                  <span class="section-label mb-1 block">Workspace Name</span>
+                  <input
+                    v-if="isRenamingInline"
+                    ref="renameInputRef"
+                    v-model="renameValue"
+                    class="input-base input-outlined w-full py-1 text-sm"
+                    @keydown.enter.prevent="saveRename"
+                    @keydown.escape.prevent="cancelRename"
+                  />
+                  <p v-else class="truncate text-sm font-semibold text-[var(--color-text-main)]">{{ activeWorkspace.name }}</p>
+                </div>
+                <div><span class="section-label mb-1 block">Conversations</span><p class="text-sm font-semibold text-[var(--color-text-main)]">{{ activeWorkspace.conversationCount }}</p></div>
+                <div><span class="section-label mb-1 block">Last Active</span><p class="text-sm font-semibold text-[var(--color-text-main)]">{{ activeWorkspace.lastActiveLabel }}</p></div>
               </div>
-              <div>
-                <span class="section-label block mb-1">Conversations</span>
-                <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ activeWorkspace.conversationCount }}</p>
-              </div>
-              <div>
-                <span class="section-label block mb-1">Last Active</span>
-                <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ activeWorkspace.lastActiveLabel }}</p>
+              <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                <template v-if="isRenamingInline">
+                  <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="cancelRename">Cancel</button>
+                  <button type="button" class="btn-primary px-3 py-1.5 text-xs" @click="saveRename">Save</button>
+                </template>
+                <template v-else>
+                  <button v-if="!isWorkspaceActive" type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="activateSelectedWorkspace">Activate</button>
+                  <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="startRename">Rename</button>
+                  <button type="button" class="btn-primary px-3 py-1.5 text-xs" @click="openWorkspaceEditor">Edit</button>
+                </template>
               </div>
             </div>
 
-            <!-- Ingested datasets list -->
             <div class="space-y-2">
               <h4 class="section-label mb-2">Linked Datasets</h4>
               <div v-if="datasetEntries.length" class="space-y-2">
-                <div
-                  v-for="dataset in datasetEntries"
-                  :key="dataset.table_name"
-                  class="rounded-lg bg-[var(--color-base-soft)] px-3 py-2.5 flex items-center justify-between border border-[var(--color-border)]"
-                >
-                  <div class="min-w-0">
-                    <p class="text-xs font-medium text-[var(--color-text-main)] truncate">{{ dataset.filename }}</p>
-                    <p class="text-[10px] text-[var(--color-text-muted)] mt-0.5">{{ datasetMetadata(dataset) }}</p>
-                  </div>
-                  <span
-                    class="rounded-full px-2 py-0.5 text-[9px] font-medium"
-                    :class="datasetSchemaStatusBadgeClass(dataset)"
-                  >
-                    {{ datasetSchemaStatusLabel(dataset) }}
-                  </span>
+                <div v-for="dataset in datasetEntries" :key="dataset.table_name" class="flex items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-base-soft)] px-3 py-2.5">
+                  <div class="min-w-0"><p class="truncate text-xs font-medium text-[var(--color-text-main)]">{{ dataset.filename }}</p><p class="mt-0.5 text-[10px] text-[var(--color-text-muted)]">{{ datasetMetadata(dataset) }}</p></div>
+                  <span class="rounded-full px-2 py-0.5 text-[9px] font-medium" :class="datasetSchemaStatusBadgeClass(dataset)">{{ datasetSchemaStatusLabel(dataset) }}</span>
                 </div>
               </div>
-              <div v-else class="text-center py-6 border border-dashed border-[var(--color-border)] rounded-lg bg-[var(--color-base-soft)]/20">
+              <div v-else class="rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-base-soft)]/20 py-6 text-center">
                 <p class="text-xs text-[var(--color-text-muted)]">No datasets loaded yet.</p>
-                <button
-                  type="button"
-                  class="text-xs font-semibold text-[var(--color-accent)] hover:underline mt-1"
-                  @click="openWorkspaceDetail(activeWorkspace.id)"
-                >
-                  Configure and import data &rarr;
-                </button>
+                <button type="button" class="mt-1 text-xs font-semibold text-[var(--color-accent)] hover:underline" @click="openWorkspaceEditor">Edit workspace to add data →</button>
               </div>
             </div>
           </div>
-          
-          <div v-else-if="workspaceCards.length" class="flex-1 flex flex-col items-center justify-center p-6 text-center">
-            <svg viewBox="0 0 24 24" class="h-10 w-10 text-[var(--color-text-muted)] mb-3" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M3 7h6l2 2h10v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
-            </svg>
-            <p class="text-xs text-[var(--color-text-muted)]">Select a workspace from the list to view its details or activate it.</p>
-          </div>
 
-          <div v-else class="rounded-lg bg-[var(--color-base-soft)] px-5 py-8 text-center flex-1 flex flex-col items-center justify-center">
-            <svg viewBox="0 0 24 24" class="mx-auto mb-3 h-8 w-8 text-[var(--color-text-muted)]" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M3 7h6l2 2h10v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
-            </svg>
-            <p class="mb-4 text-sm text-[var(--color-text-sub)]">No workspaces yet</p>
-            <button
-              type="button"
-              class="btn-primary px-4 py-2 text-sm"
-              @click="emit('navigate', 'ws-create', 'forward')"
-            >
-              Create your first workspace
-            </button>
+          <div v-else class="flex flex-1 flex-col items-center justify-center rounded-lg bg-[var(--color-base-soft)] px-5 py-8 text-center">
+            <p class="mb-4 text-sm text-[var(--color-text-sub)]">Create a workspace to add context and datasets.</p>
+            <button type="button" class="btn-primary px-4 py-2 text-sm" @click="beginInlineCreate">Create your first workspace</button>
           </div>
         </div>
 
-        <div v-else class="flex h-full flex-col min-h-0">
-          <!-- Header -->
-          <header class="flex shrink-0 items-center justify-between gap-3 pt-1 pb-3 border-b border-[var(--color-border)]">
-            <div class="flex min-w-0 flex-1 items-center gap-2">
-              <button
-                v-if="isCreatingMode"
-                type="button"
-                class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--color-text-sub)] transition-all hover:bg-[var(--color-base-soft)] hover:text-[var(--color-text-main)]"
-                title="Back to workspace list"
-                aria-label="Back to workspace list"
-                @click="emit('navigate', 'ws-list', 'backward')"
-              >
-                <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <path d="M12.5 4.5L7 10l5.5 5.5" />
-                </svg>
-              </button>
-              <h2 class="truncate text-sm font-bold text-[var(--color-text-main)]">
-                {{ isCreatingMode ? 'New workspace' : (setupWorkspaceName || activeWorkspace?.name || 'Workspace detail') }}
-              </h2>
-            </div>
-            <div v-if="!isCreatingMode" class="flex items-center gap-2">
-              <button
-                v-if="!isWorkspaceActive"
-                type="button"
-                class="rounded-full border border-[var(--color-border-strong)] px-2.5 py-1 text-xs font-medium text-[var(--color-text-main)] transition-colors hover:border-[var(--color-accent-border)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)]"
-                @click="activateSelectedWorkspace"
-              >
-                Activate workspace
-              </button>
-              <span
-                v-else
-                class="inline-flex items-center rounded-full bg-[var(--color-success-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-success)]"
-              >
-                Active
-              </span>
-            </div>
+        <div v-else class="flex h-full min-h-0 flex-col">
+          <header class="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] pb-3 pt-1">
+            <button type="button" class="text-xs font-semibold text-[var(--color-accent)] hover:underline" @click="returnToWorkspaceSummary">
+              {{ editorOpenedAfterCreate ? '< New Workspace' : '< Workspace Summary' }}
+            </button>
+            <span v-if="isWorkspaceActive" class="inline-flex items-center rounded-full bg-[var(--color-success-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-success)]">Active</span>
           </header>
 
-          <!-- Stepper (single shared instance) -->
-          <div class="shrink-0 px-4 pb-4 pt-5">
-            <div class="workspace-stepper">
-              <button
-                v-for="(step, index) in setupSteps"
-                :key="step.id"
-                type="button"
-                class="workspace-stepper-item"
-                @click="goToSetupStep(step.id)"
-              >
-                <span
-                  v-if="index > 0"
-                  class="workspace-stepper-line"
-                  :class="setupStep > step.id - 1 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-border)]'"
-                ></span>
-                <span class="workspace-stepper-dot" :class="stepDotClass(step.id)">{{ step.id }}</span>
-                <span class="mt-2 block truncate text-[10px] font-semibold" :class="stepLabelClass(step.id)">{{ step.label }}</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Step content separator -->
-          <div class="mx-4 border-t border-[var(--color-border)]"></div>
-
-          <!-- Step content -->
-          <Transition
-            enter-active-class="dialog-fade-enter-active"
-            enter-from-class="dialog-fade-enter-from"
-            leave-active-class="dialog-fade-leave-active"
-            leave-to-class="dialog-fade-leave-to"
-            mode="out-in"
-            class="min-h-0 flex-1 overflow-y-auto pt-5"
+          <div
+            class="min-h-0 flex-1 space-y-5 overflow-y-auto pt-5 scrollbar-thin"
+            @dragenter.prevent="handleDropDragEnter"
+            @dragover.prevent="handleDropDragOver"
+            @dragleave.prevent="handleDropDragLeave"
+            @drop.prevent="handleDatasetDrop"
           >
-            <!-- Step 1: Workspace name — shared between create and detail -->
-            <div v-if="setupStep === 1" key="step-1" class="relative flex flex-col gap-4 pb-4 pt-1">
-              <!-- Loading overlay shown only during creation -->
-              <div
-                v-if="isCreatingWorkspace"
-                class="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-base)]/85 px-6 text-center backdrop-blur-sm"
-                role="status"
-                aria-live="polite"
-              >
-                <div class="max-w-sm">
-                  <span class="mx-auto mb-4 block h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-accent-border)] border-t-[var(--color-accent)]"></span>
-                  <p class="text-sm font-semibold text-[var(--color-text-main)]">{{ workspaceCreateTitle }}</p>
-                  <p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ workspaceCreateMessage }}</p>
-                </div>
+            <section class="space-y-3 border-b border-[var(--color-border)] pb-5">
+              <div>
+                <h2 class="text-sm font-bold text-[var(--color-text-main)]">{{ activeWorkspace?.name || 'Workspace setup' }}</h2>
+                <p class="mt-1 text-xs text-[var(--color-text-muted)]">Add optional context and import the files used in this workspace.</p>
               </div>
-
-              <p class="rounded-lg bg-[var(--color-base-muted)]/60 px-3 py-2 text-xs leading-relaxed text-[var(--color-text-muted)]">
-                Give this workspace a short name. You can add context and data in the next steps.
-              </p>
-
               <label class="flex flex-col gap-1.5">
-                <span class="section-label">Workspace name</span>
-                <input
-                  v-model="setupWorkspaceName"
-                  type="text"
-                  class="input-base input-outlined py-1.5 text-xs"
-                  placeholder="e.g. Sales analysis"
-                  :disabled="isCreatingWorkspace || isSavingWorkspaceIdentity"
-                  @keydown.enter.prevent="continueFromWorkspaceName()"
-                />
+                <span class="section-label">Workspace context <span class="normal-case tracking-normal text-[var(--color-text-muted)]">(Optional)</span></span>
+                <textarea v-model="setupWorkspaceContext" rows="5" class="input-base input-outlined resize-none py-1.5 text-xs" placeholder="Describe the business purpose, terms, and schema context for this workspace..." :disabled="isSavingWorkspaceIdentity"></textarea>
               </label>
-
-              <div class="mt-2 flex items-center justify-between border-t border-[var(--color-border)] pt-4">
-                <button
-                  v-if="!isCreatingMode"
-                  type="button"
-                  class="btn-ghost text-xs text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] py-1.5 px-3"
-                  :disabled="isSavingWorkspaceIdentity"
-                  @click="requestDeleteWorkspace(activeWorkspaceId)"
-                >
-                  Delete workspace
-                </button>
-                <span v-else />
-                <button
-                  type="button"
-                  class="btn-primary px-4 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-60"
-                  :disabled="isCreatingWorkspace || isSavingWorkspaceIdentity || !setupWorkspaceName.trim()"
-                  @click="continueFromWorkspaceName()"
-                >
-                  <span v-if="isCreatingWorkspace || isSavingWorkspaceIdentity">{{ isCreatingMode ? 'Creating...' : 'Saving...' }}</span>
-                  <span v-else>Next</span>
+              <div class="flex justify-end">
+                <button type="button" class="btn-primary px-4 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-60" :disabled="isSavingWorkspaceIdentity" @click="saveWorkspaceContext">
+                  {{ isSavingWorkspaceIdentity ? 'Saving...' : 'Save context' }}
                 </button>
               </div>
-            </div>
+            </section>
 
-            <!-- Step 2: Workspace context -->
-            <div v-else-if="setupStep === 2" key="step-2" class="relative flex flex-col gap-4 pb-4 pt-1">
-              <p class="rounded-lg bg-[var(--color-base-muted)]/60 px-3 py-2 text-xs leading-relaxed text-[var(--color-text-muted)]">
-                Add optional business context so schema descriptions and future answers use your terminology.
-              </p>
-
-              <label class="flex flex-col gap-1.5">
-                <span class="section-label inline-flex items-center gap-1.5">
-                  Workspace context
-                  <span class="inline-flex items-center gap-1 rounded bg-[var(--color-base-muted)] px-1 py-0.5 text-[9px] normal-case tracking-normal text-[var(--color-text-muted)]">
-                    <svg class="h-2 w-2" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-                      <path d="M8 1v14M1 8h14"/>
-                    </svg>
-                    Optional
-                  </span>
-                </span>
-                <textarea
-                  v-model="setupWorkspaceContext"
-                  rows="5"
-                  class="input-base input-outlined resize-none py-1.5 text-xs"
-                  placeholder="Describe the business purpose, terms, and schema context for this workspace..."
-                  :disabled="isSavingWorkspaceIdentity"
-                  @keydown.enter.exact.prevent="continueFromWorkspaceContext()"
-                ></textarea>
-              </label>
-
-              <div class="mt-2 flex items-center justify-end gap-2 border-t border-[var(--color-border)] pt-4">
-                <button
-                  type="button"
-                  class="btn-secondary px-5 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                  :disabled="isSavingWorkspaceIdentity"
-                  @click="skipWorkspaceContext()"
-                >
-                  Skip
-                </button>
-                <button
-                  type="button"
-                  class="btn-primary px-4 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-60"
-                  :disabled="isSavingWorkspaceIdentity || !setupWorkspaceContext.trim()"
-                  @click="saveWorkspaceContextAndContinue()"
-                >
-                  <span v-if="isSavingWorkspaceIdentity">Saving...</span>
-                  <span v-else>Next</span>
+            <section class="space-y-3">
+              <div class="flex items-center justify-between gap-3">
+                <div><p class="section-label">Files</p><p class="mt-1 text-xs text-[var(--color-text-muted)]">CSV, TSV, Parquet, JSON, XLSX, and XLS</p></div>
+                <button type="button" data-testid="workspace-import-datasets-header" class="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" :disabled="isDatasetIngesting || isDeletingDataset || requiresWorkspaceActivation" @click="openDatasetPicker">
+                  <span v-if="isDatasetIngesting">Processing dataset...</span><span v-else-if="requiresWorkspaceActivation">Activate workspace to add data</span><span v-else>Import datasets</span>
                 </button>
               </div>
-            </div>
 
-            <!-- Step 3: Datasets -->
-            <div v-else-if="setupStep === 3" key="step-3" class="space-y-4">
-              <!-- Visual Connection/Pipeline Graph -->
-              <div class="p-3 bg-[var(--color-base-soft)] rounded-xl border border-[var(--color-border)] overflow-hidden">
-                <p class="section-label mb-3">System Pipeline Graph</p>
-                <div class="flex items-center justify-between gap-2 text-center select-none">
-                  <!-- Node 1: Files -->
-                  <div class="flex-1 flex flex-col items-center p-2 rounded-lg bg-[var(--color-base)] border border-[var(--color-border)] shadow-sm">
-                    <svg viewBox="0 0 24 24" class="h-5 w-5 text-[var(--color-accent)] mb-1" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                    </svg>
-                    <span class="text-[9px] font-bold text-[var(--color-text-main)] truncate max-w-full">Data Files</span>
-                    <span class="text-[8px] text-[var(--color-text-muted)] mt-0.5">{{ datasetEntries.length }} Active</span>
-                  </div>
+              <div v-if="isDropActive" class="rounded-xl border-2 border-dashed border-[var(--color-accent-border)] bg-[var(--color-accent-soft)] px-5 py-8 text-center text-sm font-medium text-[var(--color-accent)]">
+                Drop accepted data files to import them
+              </div>
 
-                  <!-- Connector Arrow -->
-                  <div class="flex items-center justify-center text-[var(--color-text-muted)]">
-                    <svg viewBox="0 0 24 24" class="h-4 w-4 animate-pulse" fill="none" stroke="currentColor" stroke-width="2">
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                      <polyline points="12 5 19 12 12 19" />
-                    </svg>
-                  </div>
-
-                  <!-- Node 2: Profiler -->
-                  <div class="flex-1 flex flex-col items-center p-2 rounded-lg bg-[var(--color-base)] border border-[var(--color-border)] shadow-sm">
-                    <svg viewBox="0 0 24 24" class="h-5 w-5 text-[var(--color-accent)] mb-1" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                      <line x1="12" y1="22.08" x2="12" y2="12" />
-                    </svg>
-                    <span class="text-[9px] font-bold text-[var(--color-text-main)]">LLM Profiler</span>
-                    <span class="text-[8px] text-[var(--color-text-muted)] mt-0.5">Auto-Schemas</span>
-                  </div>
-
-                  <!-- Connector Arrow -->
-                  <div class="flex items-center justify-center text-[var(--color-text-muted)]">
-                    <svg viewBox="0 0 24 24" class="h-4 w-4 animate-pulse" fill="none" stroke="currentColor" stroke-width="2">
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                      <polyline points="12 5 19 12 12 19" />
-                    </svg>
-                  </div>
-
-                  <!-- Node 3: Database -->
-                  <div class="flex-1 flex flex-col items-center p-2 rounded-lg bg-[var(--color-base)] border border-[var(--color-border)] shadow-sm">
-                    <svg viewBox="0 0 24 24" class="h-5 w-5 text-[var(--color-accent)] mb-1" fill="none" stroke="currentColor" stroke-width="2">
-                      <ellipse cx="12" cy="5" rx="9" ry="3" />
-                      <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-                      <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
-                    </svg>
-                    <span class="text-[9px] font-bold text-[var(--color-text-main)]">DuckDB</span>
-                    <span class="text-[8px] text-[var(--color-text-muted)] mt-0.5">Local DB</span>
-                  </div>
-
-                  <!-- Connector Arrow -->
-                  <div class="flex items-center justify-center text-[var(--color-text-muted)]">
-                    <svg viewBox="0 0 24 24" class="h-4 w-4 animate-pulse" fill="none" stroke="currentColor" stroke-width="2">
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                      <polyline points="12 5 19 12 12 19" />
-                    </svg>
-                  </div>
-
-                  <!-- Node 4: Kernel -->
-                  <div 
-                    class="flex-1 flex flex-col items-center p-2 rounded-lg bg-[var(--color-base)] border shadow-sm transition-all"
-                    :class="{
-                      'node-success': runtimeStatusTone === 'success',
-                      'node-danger': runtimeStatusTone === 'danger',
-                      'node-accent': runtimeStatusTone === 'accent',
-                      'border-[var(--color-border)]': runtimeStatusTone === 'muted'
-                    }"
-                  >
-                    <svg 
-                      viewBox="0 0 24 24" 
-                      class="h-5 w-5 mb-1" 
-                      :class="{
-                        'text-[var(--color-success)]': runtimeStatusTone === 'success',
-                        'text-[var(--color-danger)]': runtimeStatusTone === 'danger',
-                        'text-[var(--color-accent)] animate-spin': runtimeStatusTone === 'accent',
-                        'text-[var(--color-text-muted)]': runtimeStatusTone === 'muted'
-                      }" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      stroke-width="2"
-                    >
-                      <rect x="4" y="4" width="16" height="16" rx="2" />
-                      <rect x="9" y="9" width="6" height="6" />
-                      <line x1="9" y1="1" x2="9" y2="4" />
-                      <line x1="15" y1="1" x2="15" y2="4" />
-                      <line x1="9" y1="20" x2="9" y2="23" />
-                      <line x1="15" y1="20" x2="15" y2="23" />
-                      <line x1="20" y1="9" x2="23" y2="9" />
-                      <line x1="20" y1="15" x2="23" y2="15" />
-                      <line x1="1" y1="9" x2="4" y2="9" />
-                      <line x1="1" y1="15" x2="4" y2="15" />
-                    </svg>
-                    <span class="text-[9px] font-bold text-[var(--color-text-main)]">AI Agent</span>
-                    <span class="text-[8px] text-[var(--color-text-muted)] mt-0.5 truncate max-w-full">{{ runtimeStatusLabel }}</span>
-                  </div>
+              <div v-if="isDatasetIngesting" class="rounded-lg px-4 py-3" :class="datasetIngestHasError ? 'bg-[var(--color-danger-bg)]' : 'bg-[var(--color-accent-soft)]'" aria-live="polite">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0"><p class="truncate text-sm font-medium" :class="datasetIngestHasError ? 'text-[var(--color-danger)]' : 'text-[var(--color-accent)]'">{{ datasetIngestFilename || 'Selected dataset' }}</p><p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ datasetIngestStatusLabel }}</p></div>
+                  <button v-if="datasetIngestHasError" type="button" class="btn-secondary px-2 py-1 text-xs" @click="retryLastDatasetIngestion">Retry</button>
+                  <span v-else class="mt-0.5 h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-accent)]/40 border-t-[var(--color-accent)]"></span>
                 </div>
               </div>
 
-              <!-- Metadata dashboard grid -->
-              <div class="grid grid-cols-1 gap-3 border-b border-[var(--color-border)] pb-3 sm:grid-cols-3">
-                <div>
-                  <p class="section-label">Created</p>
-                  <p class="mt-1 text-sm text-[var(--color-text-main)]">{{ detailCreatedAt }}</p>
-                </div>
-                <div>
-                  <p class="section-label">Conversations</p>
-                  <p class="mt-1 text-sm text-[var(--color-text-main)]">{{ detailConversationCount }}</p>
-                </div>
-                <div>
-                  <p class="section-label">Last active</p>
-                  <p class="mt-1 text-sm text-[var(--color-text-main)]">{{ detailLastActive }}</p>
-                </div>
-              </div>
-
-              <!-- Runtime Operations -->
-              <section class="space-y-3 border-b border-[var(--color-border)] pb-5">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div class="min-w-0">
-                    <p class="section-label">Workspace runtime</p>
-                    <div class="mt-2 flex flex-wrap items-center gap-2">
-                      <span
-                        class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium"
-                        :class="{
-                          'bg-[var(--color-success-bg)] text-[var(--color-success)]': runtimeStatusTone === 'success',
-                          'bg-[var(--color-danger-bg)] text-[var(--color-danger)]': runtimeStatusTone === 'danger',
-                          'bg-[var(--color-accent-soft)] text-[var(--color-accent)]': runtimeStatusTone === 'accent',
-                          'bg-[var(--color-base-soft)] text-[var(--color-text-muted)]': runtimeStatusTone === 'muted',
-                        }"
-                      >
-                        {{ runtimeStatusLabel }}
-                      </span>
-                      <span v-if="requiresWorkspaceActivation" class="text-xs text-[var(--color-text-muted)]">Inspecting only. Activate this workspace before changing data.</span>
-                    </div>
-                    <p v-if="runtimeStatusMessage" class="mt-2 max-w-2xl text-sm text-[var(--color-text-muted)]">{{ runtimeStatusMessage }}</p>
-                  </div>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <button
-                      v-if="requiresWorkspaceActivation"
-                      type="button"
-                      class="rounded-full border border-[var(--color-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-main)] transition-colors hover:border-[var(--color-accent-border)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)]"
-                      @click="activateSelectedWorkspace"
-                    >
-                      Activate workspace
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-full border border-[var(--color-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-main)] transition-colors hover:border-[var(--color-accent-border)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
-                      :disabled="isRetryingWorkspaceRuntime || isHardResettingWorkspaceRuntime || isCreatingWorkspace"
-                      @click="retryWorkspaceRuntime"
-                    >
-                      {{ isRetryingWorkspaceRuntime ? 'Retrying...' : 'Retry runtime' }}
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-full border border-[var(--color-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-main)] transition-colors hover:border-[var(--color-danger)]/35 hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-60"
-                      :disabled="isRetryingWorkspaceRuntime || isHardResettingWorkspaceRuntime || isCreatingWorkspace"
-                      @click="hardResetWorkspaceRuntime"
-                    >
-                      {{ isHardResettingWorkspaceRuntime ? 'Rebuilding...' : 'Hard reset runtime' }}
-                    </button>
-                  </div>
-                </div>
-              </section>
-
-              <!-- Datasets Area -->
-              <div class="space-y-3">
-                <div class="flex items-center justify-between gap-3">
-                  <p class="section-label">Datasets</p>
-                  <button
-                    type="button"
-                    data-testid="workspace-import-datasets-header"
-                    class="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                    :disabled="isDatasetIngesting || isDeletingDataset || requiresWorkspaceActivation"
-                    @click="openDatasetPicker"
-                  >
-                    <span v-if="isDatasetIngesting">Processing dataset...</span>
-                    <span v-else-if="requiresWorkspaceActivation">Activate workspace to add data</span>
-                    <span v-else>Import datasets</span>
-                  </button>
-                </div>
-
-                <!-- Dataset Ingestion Loading -->
-                <div
-                  v-if="isDatasetIngesting"
-                  class="rounded-lg px-4 py-3"
-                  :class="datasetIngestHasError ? 'bg-[var(--color-danger-bg)]' : 'bg-[var(--color-accent-soft)]'"
-                  aria-live="polite"
-                >
+              <div v-if="datasetEntries.length" class="space-y-2">
+                <div v-for="dataset in datasetEntries" :key="dataset.table_name" class="rounded-lg bg-[var(--color-base-soft)] px-4 py-3">
                   <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                      <p class="truncate text-sm font-medium" :class="datasetIngestHasError ? 'text-[var(--color-danger)]' : 'text-[var(--color-accent)]'">{{ datasetIngestFilename || 'Selected dataset' }}</p>
-                      <p class="mt-1 text-xs" :class="datasetIngestHasError ? 'text-[var(--color-danger)]/90' : 'text-[var(--color-accent)]/90'">{{ datasetIngestStatusLabel }}</p>
+                    <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><p class="min-w-0 truncate text-sm font-medium text-[var(--color-text-main)]">{{ dataset.filename }}</p><span class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium" :class="datasetSchemaStatusBadgeClass(dataset)">{{ datasetSchemaStatusLabel(dataset) }}</span></div><p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ datasetMetadata(dataset) }}</p></div>
+                    <div class="flex items-center gap-1">
+                      <button type="button" class="rounded p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]" title="Regenerate schema" :disabled="isDatasetIngesting || isDeletingDataset || isSchemaRegenerateSubmitting" @click="requestRegenerateDatasetSchema(dataset)">↻</button>
+                      <button type="button" class="rounded p-1 text-[var(--color-text-muted)] hover:text-[var(--color-danger)]" title="Remove dataset" :disabled="isDatasetIngesting || isDeletingDataset" @click="requestRemoveDataset(dataset)">×</button>
                     </div>
-                    <button
-                      v-if="datasetIngestHasError"
-                      type="button"
-                      class="rounded-md border border-[var(--color-danger)]/30 bg-[var(--color-danger-bg)] px-2 py-1 text-xs font-medium text-[var(--color-danger)] transition-colors hover:border-[var(--color-danger)]/45"
-                      @click="retryLastDatasetIngestion"
-                    >
-                      Retry
-                    </button>
-                    <span v-else class="mt-0.5 h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-accent)]/40 border-t-[var(--color-accent)]"></span>
                   </div>
-                  <div v-if="datasetIngestPercent !== null" class="mt-2">
-                    <div class="h-1.5 overflow-hidden rounded-full" :class="datasetIngestHasError ? 'bg-[var(--color-danger)]/25' : 'bg-[var(--color-accent-border)]/80'">
-                      <div
-                        class="h-full rounded-full transition-all duration-300"
-                        :class="datasetIngestHasError ? 'bg-[var(--color-danger)]' : 'bg-[var(--color-accent)]'"
-                        :style="{ width: `${datasetIngestPercent}%` }"
-                      ></div>
-                    </div>
-                    <p class="mt-1 text-right text-[11px]" :class="datasetIngestHasError ? 'text-[var(--color-danger)]' : 'text-[var(--color-accent)]'">{{ datasetIngestPercent }}%</p>
-                  </div>
-                </div>
-
-                <!-- Dataset List -->
-                <div v-if="datasetEntries.length" class="space-y-2">
-                  <div
-                    v-for="dataset in datasetEntries"
-                    :key="dataset.table_name"
-                    class="mb-2 rounded-lg bg-[var(--color-base-soft)] px-4 py-3"
-                  >
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="min-w-0">
-                        <div class="flex flex-wrap items-center gap-2">
-                          <p class="min-w-0 truncate text-sm font-medium text-[var(--color-text-main)]">{{ dataset.filename }}</p>
-                          <span
-                            class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium"
-                            :class="datasetSchemaStatusBadgeClass(dataset)"
-                          >
-                            {{ datasetSchemaStatusLabel(dataset) }}
-                          </span>
-                        </div>
-                      </div>
-                      <div class="flex items-center gap-1">
-                        <button
-                          type="button"
-                          class="rounded p-1 text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)] disabled:cursor-not-allowed disabled:opacity-50"
-                          title="Regenerate schema"
-                          :disabled="isDatasetIngesting || isDeletingDataset || isSchemaRegenerateSubmitting"
-                          @click="requestRegenerateDatasetSchema(dataset)"
-                        >
-                          <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
-                            <path d="M20 12a8 8 0 1 1-2.34-5.66" />
-                            <path d="M20 4v6h-6" />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded p-1 text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)] disabled:cursor-not-allowed disabled:opacity-50"
-                          title="Remove dataset"
-                          :disabled="isDatasetIngesting || isDeletingDataset"
-                          @click="requestRemoveDataset(dataset)"
-                        >
-                          <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
-                            <path d="M5 7h14" />
-                            <path d="M9 7V5h6v2" />
-                            <path d="M8 7l1 12h6l1-12" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                    <p class="mt-1 text-xs text-[var(--color-text-muted)]">
-                      {{ datasetMetadata(dataset) }}
-                    </p>
-                  </div>
-                </div>
-
-                <!-- Empty Upload Dropzone -->
-                <div
-                  v-else
-                  class="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-base-soft)]/50 px-5 py-6 text-center cursor-pointer hover:bg-[var(--color-base-soft)]/80 transition-colors"
-                  data-testid="workspace-import-datasets-empty"
-                  @click="openDatasetPicker"
-                >
-                  <p class="text-sm font-medium text-[var(--color-text-main)]">No datasets loaded yet.</p>
-                  <p class="mt-1 text-sm text-[var(--color-text-muted)]">Import one or more files to start profiling data and generating schemas automatically.</p>
-                  <button
-                    type="button"
-                    class="btn-primary mt-4 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                    :disabled="isDatasetIngesting || isDeletingDataset || requiresWorkspaceActivation"
-                    @click.stop="openDatasetPicker"
-                  >
-                    <span v-if="isDatasetIngesting">Processing dataset...</span>
-                    <span v-else-if="requiresWorkspaceActivation">Activate workspace to add data</span>
-                    <span v-else>Import datasets</span>
-                  </button>
                 </div>
               </div>
-            </div>
-          </Transition>
+
+              <div v-else class="cursor-pointer rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-base-soft)]/50 px-5 py-8 text-center transition-colors hover:bg-[var(--color-base-soft)]/80" data-testid="workspace-import-datasets-empty" @click="openDatasetPicker">
+                <p class="text-sm font-medium text-[var(--color-text-main)]">Drop files here or choose files to import.</p>
+                <p class="mt-1 text-xs text-[var(--color-text-muted)]">Accepted: CSV, TSV, Parquet, JSON, XLSX, and XLS.</p>
+              </div>
+            </section>
+          </div>
         </div>
       </div>
-
     </div>
 
-    <!-- Confirmations -->
     <ConfirmationModal
       :is-open="isDatasetDeleteDialogOpen"
       title="Delete Dataset"
@@ -687,10 +241,6 @@ import { extractApiErrorMessage } from '../../../utils/apiError'
 import ConfirmationModal from '../ConfirmationModal.vue'
 
 const props = defineProps({
-  panelMode: {
-    type: String,
-    default: 'ws-list',
-  },
   activeWorkspaceId: {
     type: String,
     default: '',
@@ -699,17 +249,9 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  requestedSetupStep: {
-    type: Number,
-    default: 1,
-  },
-  workspaceIdentityDraft: {
-    type: Object,
-    default: null,
-  },
 })
 
-const emit = defineEmits(['navigate', 'select-workspace', 'activate-workspace', 'workspace-operation-change', 'workspace-created'])
+const emit = defineEmits(['select-workspace', 'activate-workspace', 'workspace-operation-change', 'workspace-created'])
 
 const appStore = useAppStore()
 
@@ -753,25 +295,17 @@ const isRetryingWorkspaceRuntime = ref(false)
 const isHardResettingWorkspaceRuntime = ref(false)
 const activeWorkspaceOperation = ref('')
 const activeWorkspaceOperationMessage = ref('')
-const setupStep = ref(1)
 const setupWorkspaceName = ref('')
 const setupWorkspaceContext = ref('')
 const isSavingWorkspaceIdentity = ref(false)
 const isCheckingWorkspaceReadiness = ref(false)
-const setupSteps = [
-  { id: 1, label: 'Name' },
-  { id: 2, label: 'Context' },
-  { id: 3, label: 'Data' },
-]
-
-const quickCreateName = ref('')
-async function handleQuickCreate() {
-  const name = String(quickCreateName.value || '').trim()
-  if (!name) return
-  setupWorkspaceName.value = name
-  quickCreateName.value = ''
-  await createWorkspace({ setupStep: 3 })
-}
+const workspaceSurface = ref('summary')
+const isInlineCreating = ref(false)
+const editorOpenedAfterCreate = ref(false)
+const newWorkspaceInputRef = ref(null)
+const isDropActive = ref(false)
+const dropDepth = ref(0)
+const SUPPORTED_DATASET_EXTENSIONS = new Set(['.csv', '.tsv', '.parquet', '.json', '.xlsx', '.xls'])
 
 function normalizeWorkspaceName(value) {
   return String(value || '').toUpperCase()
@@ -799,10 +333,9 @@ const workspaceCards = computed(() => {
 })
 
 const activeWorkspace = computed(() => workspaceCards.value.find((workspace) => workspace.id === String(props.activeWorkspaceId || '').trim()) || null)
-const isCreatingMode = computed(() => props.panelMode === 'ws-create')
 const isWorkspaceActive = computed(() => !!activeWorkspace.value && !!activeWorkspace.value.is_active)
 const detailWorkspaceSelected = computed(() => Boolean(String(props.activeWorkspaceId || '').trim()))
-const requiresWorkspaceActivation = computed(() => !isCreatingMode.value && !isWorkspaceActive.value)
+const requiresWorkspaceActivation = computed(() => !isWorkspaceActive.value)
 const detailCreatedAt = computed(() => formatCreatedDate(workspaceDetail.value?.created_at || activeWorkspace.value?.created_at))
 const detailConversationCount = computed(() => Number(workspaceDetail.value?.conversation_count || 0))
 const detailLastActive = computed(() => formatRelativeTime(workspaceDetail.value?.updated_at || activeWorkspace.value?.updated_at))
@@ -845,8 +378,7 @@ const currentRuntimeProgressMessage = computed(() => {
 })
 const workspaceReadinessItems = computed(() => {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
-  const draft = resolveWorkspaceIdentityDraft()
-  const registeredName = String(activeWorkspace.value?.name || draft?.name || '').trim()
+  const registeredName = String(activeWorkspace.value?.name || '').trim()
   const context = String(resolveWorkspaceContext()).trim()
   const registered = Boolean(workspaceId && registeredName)
   const active = Boolean(workspaceId && String(appStore.activeWorkspaceId || '').trim() === workspaceId)
@@ -909,35 +441,8 @@ const schemaRegenerateDialogMessage = computed(() => {
   return `Regenerated schema may differ from the current version because it is generated by the LLM. Continue regenerating "${filename || 'this dataset'}"?`
 })
 watch(
-  () => props.panelMode,
-  async (nextMode) => {
-    if (nextMode === 'ws-list') {
-      stopDatasetSchemaPolling()
-      await hydrateWorkspaceCards()
-    }
-    if (nextMode === 'ws-detail') {
-      await loadWorkspaceDetail()
-      await loadWorkspaceDatasets()
-      await loadActiveDatasetDeletionJobs()
-      syncSetupIdentity()
-    }
-    if (nextMode === 'ws-create') {
-      stopDatasetSchemaPolling()
-      setupStep.value = 1
-      setupWorkspaceName.value = ''
-      setupWorkspaceContext.value = ''
-    }
-  },
-  { immediate: true },
-)
-
-watch(
   () => props.workspaces,
-  async () => {
-    if (props.panelMode === 'ws-list') {
-      await hydrateWorkspaceCards()
-    }
-  },
+  async () => { await hydrateWorkspaceCards() },
   { deep: true },
 )
 
@@ -953,54 +458,21 @@ watch(
 watch(
   () => props.activeWorkspaceId,
   async () => {
-    if (props.panelMode !== 'ws-detail') return
     await loadWorkspaceDetail()
     await loadWorkspaceDatasets()
     await loadActiveDatasetDeletionJobs()
     syncSetupIdentity()
   },
-)
-
-watch(
-  () => props.requestedSetupStep,
-  (nextStep) => {
-    if (props.panelMode !== 'ws-detail') return
-    const normalized = Number(nextStep)
-    if (![1, 2, 3].includes(normalized)) return
-    setupStep.value = normalized
-  },
   { immediate: true },
-)
-
-watch(
-  () => props.workspaceIdentityDraft,
-  () => {
-    if (props.panelMode !== 'ws-detail') return
-    syncSetupIdentity()
-  },
-  { deep: true },
-)
-
-watch(
-  () => setupStep.value,
-  (nextStep) => {
-    if (props.panelMode !== 'ws-detail') return
-    if (Number(nextStep) !== 1) return
-    syncSetupIdentity()
-  },
 )
 
 onMounted(async () => {
   unsubscribeProgress = settingsWebSocket.subscribeProgress(handleSettingsProgressUpdate)
   unsubscribeRuntimeError = settingsWebSocket.subscribeError(handleRuntimeSocketError)
   unsubscribeRuntimeComplete = settingsWebSocket.subscribeComplete(handleRuntimeSocketComplete)
-  if (props.panelMode === 'ws-list') {
-    await hydrateWorkspaceCards()
-  }
-  if (props.panelMode === 'ws-detail') {
-    await loadActiveDatasetDeletionJobs()
-    syncSetupIdentity()
-  }
+  await hydrateWorkspaceCards()
+  await loadActiveDatasetDeletionJobs()
+  syncSetupIdentity()
 })
 
 onUnmounted(() => {
@@ -1042,9 +514,37 @@ async function hydrateWorkspaceCards() {
   workspaceSummaries.value = summaries
 }
 
-async function openWorkspaceDetail(workspaceId) {
+async function selectWorkspaceSummary(workspaceId) {
+  workspaceSurface.value = 'summary'
+  editorOpenedAfterCreate.value = false
+  isInlineCreating.value = false
   await emitSelectedWorkspace(workspaceId)
-  emit('navigate', 'ws-detail', 'forward')
+}
+
+async function beginInlineCreate() {
+  workspaceSurface.value = 'summary'
+  isInlineCreating.value = true
+  setupWorkspaceName.value = ''
+  await nextTick()
+  newWorkspaceInputRef.value?.focus?.()
+}
+
+function cancelInlineCreate() {
+  if (isCreatingWorkspace.value) return
+  isInlineCreating.value = false
+  setupWorkspaceName.value = ''
+}
+
+function openWorkspaceEditor() {
+  if (!activeWorkspace.value) return
+  editorOpenedAfterCreate.value = false
+  syncSetupIdentity()
+  workspaceSurface.value = 'editor'
+}
+
+function returnToWorkspaceSummary() {
+  workspaceSurface.value = 'summary'
+  editorOpenedAfterCreate.value = false
 }
 
 async function emitSelectedWorkspace(workspaceId) {
@@ -1076,87 +576,18 @@ async function loadWorkspaceDetail() {
 }
 
 function resolveWorkspaceContext() {
-  const draft = resolveWorkspaceIdentityDraft()
-  return String(workspaceDetail.value?.schema_context ?? activeWorkspace.value?.schema_context ?? draft?.context ?? '').trim()
-}
-
-function resolveWorkspaceIdentityDraft() {
-  const draft = props.workspaceIdentityDraft
-  const draftWorkspaceId = String(draft?.workspaceId || '').trim()
-  const activeId = String(props.activeWorkspaceId || '').trim()
-  if (!draftWorkspaceId || draftWorkspaceId !== activeId) return null
-  return {
-    name: String(draft?.name || '').trim(),
-    context: String(draft?.context || '').trim(),
-  }
+  return String(workspaceDetail.value?.schema_context ?? activeWorkspace.value?.schema_context ?? '').trim()
 }
 
 function syncSetupIdentity() {
-  if (props.panelMode !== 'ws-detail') return
-  const draft = resolveWorkspaceIdentityDraft()
-  setupWorkspaceName.value = normalizeWorkspaceName(String(activeWorkspace.value?.name || draft?.name || '').trim())
+  setupWorkspaceName.value = normalizeWorkspaceName(String(activeWorkspace.value?.name || '').trim())
   setupWorkspaceContext.value = resolveWorkspaceContext()
 }
 
-async function goToSetupStep(stepId) {
-  if (notifyWorkspaceOperationBlocked()) return
-  const normalized = Number(stepId)
-  if (![1, 2, 3].includes(normalized)) return
-  if (props.panelMode === 'ws-create' && normalized !== 1) {
-    await createWorkspace({ setupStep: normalized })
-    return
-  }
-  if (props.panelMode === 'ws-detail' && setupStep.value === 1 && normalized > 1) {
-    const persisted = await ensureWorkspaceNamePersisted({ silent: true })
-    if (!persisted) return
-  }
-  if (props.panelMode === 'ws-detail' && setupStep.value === 2 && normalized > 2 && setupWorkspaceContext.value.trim()) {
-    const persisted = await ensureWorkspaceContextPersisted({ silent: true })
-    if (!persisted) return
-  }
-  setupStep.value = normalized
-}
-
-async function continueFromWorkspaceName() {
-  if (props.panelMode === 'ws-create') {
-    await createWorkspace({ setupStep: 2 })
-    return
-  }
-  await saveWorkspaceNameAndContinue()
-}
-
-async function saveWorkspaceNameAndContinue() {
-  const workspaceId = String(props.activeWorkspaceId || '').trim()
-  const name = String(setupWorkspaceName.value || '').trim()
-  if (!workspaceId) return
-  if (!name) {
-    toast.error('Workspace name required', 'Enter a workspace name to continue.')
-    return
-  }
-  const persisted = await ensureWorkspaceNamePersisted()
-  if (!persisted) return
-  setupStep.value = 2
-}
-
-async function skipWorkspaceContext() {
-  setupStep.value = 3
-}
-
-async function saveWorkspaceContextAndContinue() {
+async function saveWorkspaceContext() {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   if (!workspaceId) return
-  if (!String(setupWorkspaceContext.value || '').trim()) return
-  const persisted = await ensureWorkspaceContextPersisted()
-  if (!persisted) return
-  setupStep.value = 3
-}
-
-async function continueFromWorkspaceContext() {
-  if (!String(setupWorkspaceContext.value || '').trim()) {
-    await skipWorkspaceContext()
-    return
-  }
-  await saveWorkspaceContextAndContinue()
+  await ensureWorkspaceContextPersisted()
 }
 
 async function ensureWorkspaceNamePersisted({ silent = false } = {}) {
@@ -1380,7 +811,7 @@ function handleSettingsProgressUpdate(data) {
   if (stage.startsWith('workspace_runtime')) {
     runtimeProgressError.value = ''
     appendRuntimeProgress(stage, data?.message || '')
-    if (isCreatingWorkspace.value && props.panelMode === 'ws-create') {
+    if (isCreatingWorkspace.value) {
       isCreatingWorkspaceRuntime.value = true
       workspaceCreateMessage.value = String(data?.message || '').trim() || 'Preparing workspace runtime...'
     }
@@ -1876,6 +1307,45 @@ async function confirmRegenerateDatasetSchema() {
   }
 }
 
+function getDroppedDatasetPaths(files) {
+  return Array.from(files || [])
+    .map((file) => {
+      const path = String(file?.path || '').trim()
+      const lowerPath = path.toLowerCase()
+      const extension = lowerPath.includes('.') ? lowerPath.slice(lowerPath.lastIndexOf('.')) : ''
+      if (!path || !SUPPORTED_DATASET_EXTENSIONS.has(extension)) return null
+      return path
+    })
+    .filter(Boolean)
+}
+
+function handleDropDragEnter() {
+  dropDepth.value += 1
+  isDropActive.value = true
+}
+
+function handleDropDragOver() {
+  isDropActive.value = true
+}
+
+function handleDropDragLeave() {
+  dropDepth.value = Math.max(0, dropDepth.value - 1)
+  if (dropDepth.value === 0) {
+    isDropActive.value = false
+  }
+}
+
+async function handleDatasetDrop(event) {
+  dropDepth.value = 0
+  isDropActive.value = false
+  const droppedPaths = getDroppedDatasetPaths(event?.dataTransfer?.files || [])
+  if (droppedPaths.length === 0) {
+    toast.error('Unsupported Files', 'Drop CSV, TSV, Parquet, JSON, XLSX, or XLS files.')
+    return
+  }
+  await startBatchDatasetIngestion(droppedPaths)
+}
+
 async function openDatasetPicker() {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   if (!workspaceId) return
@@ -1964,7 +1434,7 @@ async function deleteWorkspace() {
     if (fallbackId) {
       emit('select-workspace', fallbackId)
     }
-    emit('navigate', 'ws-list', 'backward')
+    workspaceSurface.value = 'summary'
     toast.success('Workspace deletion started', 'Workspace deletion is running in background.')
   } catch (error) {
     toast.error('Delete failed', extractApiErrorMessage(error, 'Failed to delete workspace.'))
@@ -1973,7 +1443,7 @@ async function deleteWorkspace() {
   }
 }
 
-async function createWorkspace({ setupStep: targetSetupStep = 2 } = {}) {
+async function createWorkspace() {
   const name = String(setupWorkspaceName.value || '').trim()
   if (!name) {
     toast.error('Workspace name required', 'Enter a workspace name to continue.')
@@ -1998,8 +1468,10 @@ async function createWorkspace({ setupStep: targetSetupStep = 2 } = {}) {
       workspaceId,
       name,
       context,
-      setupStep: targetSetupStep,
     })
+    isInlineCreating.value = false
+    editorOpenedAfterCreate.value = true
+    workspaceSurface.value = 'editor'
     isCreatingWorkspace.value = false
     clearWorkspaceOperation()
     setTimeout(() => {
@@ -2083,21 +1555,8 @@ function syncDatasetSchemaPolling() {
   }
   if (datasetSchemaPoller !== null) return
   datasetSchemaPoller = setInterval(async () => {
-    if (props.panelMode !== 'ws-detail' || setupStep.value !== 3) return
     await loadWorkspaceDatasets()
   }, 1500)
-}
-
-function stepDotClass(stepId) {
-  if (setupStep.value === stepId) return 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-on-accent)] shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-accent)_20%,transparent)]'
-  if (setupStep.value > stepId) return 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
-  return 'border-[var(--color-border)] bg-[var(--color-base)] text-[var(--color-text-muted)]'
-}
-
-function stepLabelClass(stepId) {
-  if (setupStep.value === stepId) return 'text-[var(--color-accent)] font-semibold'
-  if (setupStep.value > stepId) return 'text-[var(--color-text-main)]'
-  return 'text-[var(--color-text-muted)]'
 }
 
 function formatFilename(raw) {
@@ -2226,56 +1685,6 @@ function formatRelativeTime(raw) {
 .workspace-readiness-dot-pending {
   background: var(--color-base-muted);
   color: var(--color-text-muted);
-}
-
-.workspace-stepper {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-}
-
-.workspace-stepper-item {
-  position: relative;
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  align-items: center;
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-
-.workspace-stepper-item:focus-visible {
-  outline: none;
-}
-
-.workspace-stepper-line {
-  position: absolute;
-  right: 0;
-  left: -50%;
-  top: 1.25rem;
-  height: 1.5px;
-  background: var(--color-border);
-  transition: background var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease);
-}
-
-.workspace-stepper-dot {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  height: 2.25rem;
-  width: 2.25rem;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--color-border);
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  transition:
-    background var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease),
-    border-color var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease),
-    color var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease),
-    box-shadow var(--motion-duration-standard, 200ms) var(--motion-ease-standard, ease);
 }
 
 .node-success {

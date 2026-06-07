@@ -94,7 +94,6 @@
       <SettingsModal
         v-model="appStore.isSettingsOpen"
         :initial-tab="appStore.settingsInitialTab"
-        :initial-step="appStore.settingsInitialStep"
       />
     </div>
 

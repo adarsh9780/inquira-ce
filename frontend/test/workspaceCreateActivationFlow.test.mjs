@@ -3,189 +3,59 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-function extractBlock(source, startMarker, endMarker) {
-  const start = source.indexOf(startMarker)
-  const end = source.indexOf(endMarker, start + startMarker.length)
-  assert.notEqual(start, -1, `Missing marker: ${startMarker}`)
-  assert.notEqual(end, -1, `Missing marker: ${endMarker}`)
-  return source.slice(start, end)
+function read(relativePath) {
+  return readFileSync(resolve(process.cwd(), relativePath), 'utf-8')
 }
 
 test('workspace creation activates the new workspace centrally in the store', () => {
-  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
-  const source = readFileSync(storePath, 'utf-8')
-  const createBlock = extractBlock(
-    source,
-    'async function createWorkspace(name, schemaContext = \'\') {',
-    'async function activateWorkspace(workspaceId) {',
-  )
+  const source = read('src/stores/appStore.js')
+  const start = source.indexOf("async function createWorkspace(name, schemaContext = '') {")
+  const end = source.indexOf('async function activateWorkspace(workspaceId) {', start)
+  const block = source.slice(start, end)
 
-  assert.equal(createBlock.includes('const ws = await apiService.v1CreateWorkspace(name, schemaContext)'), true)
-  assert.equal(createBlock.includes('await activateWorkspace(ws.id)'), true)
-  assert.equal(createBlock.includes('await fetchWorkspaces()'), true)
+  assert.equal(block.includes('const ws = await apiService.v1CreateWorkspace(name, schemaContext)'), true)
+  assert.equal(block.includes('await activateWorkspace(ws.id)'), true)
+  assert.equal(block.includes('await fetchWorkspaces()'), true)
 })
 
-test('workspace setup stepper separates name context and data while warming runtime in the background', () => {
-  const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue')
-  const settingsPath = resolve(process.cwd(), 'src/components/modals/SettingsModal.vue')
-  const storePath = resolve(process.cwd(), 'src/stores/appStore.js')
-  const appPath = resolve(process.cwd(), 'src/App.vue')
-  const source = readFileSync(tabPath, 'utf-8')
-  const settingsSource = readFileSync(settingsPath, 'utf-8')
-  const storeSource = readFileSync(storePath, 'utf-8')
-  const appSource = readFileSync(appPath, 'utf-8')
+test('workspace creation opens the combined context and files editor while warming runtime', () => {
+  const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
+  const settings = read('src/components/modals/SettingsModal.vue')
 
-  assert.equal(source.includes('Give this workspace a short name. You can add context and data in the next steps.'), true)
-  assert.equal(source.includes('{ id: 1, label: \'Name\' }'), true)
-  assert.equal(source.includes('{ id: 2, label: \'Context\' }'), true)
-  assert.equal(source.includes('{ id: 3, label: \'Data\' }'), true)
-  assert.equal(source.includes('{ id: 3, label: \'Generate schema\' }'), false)
-  assert.equal(source.includes('class="shrink-0 px-4 pb-4 pt-5"'), true)
-  assert.equal(source.includes('class="mx-4 border-t border-[var(--color-border)]"'), true)
-  assert.equal(source.includes('class="min-h-0 flex-1 overflow-y-auto pt-5"'), true)
-  assert.equal(source.includes('await appStore.createWorkspace(name, context)'), true)
-  assert.equal(source.includes('await appStore.renameWorkspace(workspaceId, normalizedName, context)'), true)
-  assert.equal(source.includes('Creating workspace inside Settings...'), true)
-  assert.equal(source.includes('Preparing workspace runtime inside Settings...'), false)
-  assert.equal(source.includes('async function warmWorkspaceRuntimeInBackground(workspaceId)'), true)
-  assert.equal(source.includes('await appStore.ensureWorkspaceKernelConnected(targetWorkspaceId)'), true)
-  assert.equal(source.includes("toast.success('Workspace ready', 'Workspace is ready for dataset selection.')"), false)
-  assert.equal(source.includes('settingsWebSocket.subscribeComplete(handleRuntimeSocketComplete)'), true)
-  assert.equal(source.includes('settingsWebSocket.subscribeError(handleRuntimeSocketError)'), true)
-  assert.equal(source.includes('{{ workspaceCreateMessage }}'), true)
-  assert.equal(source.includes('Runtime activity'), false)
-  assert.equal(source.includes('function normalizeWorkspaceName(value) {'), true)
-  assert.equal(source.includes("return String(value || '').toUpperCase()"), true)
-  assert.equal(source.includes('placeholder="e.g. Sales analysis"'), true)
-  assert.equal(source.includes("const emit = defineEmits(['navigate', 'select-workspace', 'activate-workspace', 'workspace-operation-change', 'workspace-created'])"), true)
-  assert.equal(source.includes("emit('workspace-operation-change', {"), true)
-  assert.equal(source.includes("emit('workspace-created', {"), true)
-  assert.equal(source.includes("setWorkspaceOperation('create', 'Creating workspace.')"), true)
-  assert.equal(source.includes("setWorkspaceOperation('ingest', 'Importing selected datasets into the workspace.')"), true)
-  assert.equal(source.includes('Generating dataset schemas in the background.'), false)
-  assert.equal(source.includes('function syncDatasetSchemaPolling() {'), true)
-  assert.equal(settingsSource.includes("const activeWorkspaceOperation = ref('')"), true)
-  assert.equal(settingsSource.includes('@workspace-operation-change="setActiveWorkspaceOperation"'), true)
-  assert.equal(settingsSource.includes('notifyWorkspaceOperationBlocked()'), true)
-  assert.equal(settingsSource.includes("if (activeSection.value === 'workspace')"), true)
-  assert.equal(settingsSource.includes("toast.info(\n    'Workspace setup in progress'"), true)
-  assert.equal(appSource.includes('data-testid="workspace-runtime-dialog"'), false)
-  assert.equal(appSource.includes('const startupOverlayActive = computed(() => {'), true)
-  assert.equal(appSource.includes('return Boolean(appBootstrap.active)'), true)
-  assert.equal(storeSource.includes('suppressWorkspaceRuntimeOverlay'), false)
-  assert.equal(appSource.includes('suppressWorkspaceRuntimeOverlay'), false)
+  assert.equal(workspace.includes('async function createWorkspace()'), true)
+  assert.equal(workspace.includes('await appStore.createWorkspace(name, context)'), true)
+  assert.equal(workspace.includes("editorOpenedAfterCreate.value = true"), true)
+  assert.equal(workspace.includes("workspaceSurface.value = 'editor'"), true)
+  assert.equal(workspace.includes('async function warmWorkspaceRuntimeInBackground(workspaceId)'), true)
+  assert.equal(workspace.includes('void warmWorkspaceRuntimeInBackground(workspaceId)'), true)
+  assert.equal(settings.includes('@workspace-created="handleWorkspaceCreated"'), true)
+  assert.equal(settings.includes("currentPanel.value = 'ws-detail'"), false)
 })
 
-test('workspace creation carries step one name into optional context automatically', () => {
-  const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue')
-  const settingsPath = resolve(process.cwd(), 'src/components/modals/SettingsModal.vue')
-  const source = readFileSync(tabPath, 'utf-8')
-  const settingsSource = readFileSync(settingsPath, 'utf-8')
-  const createBlock = extractBlock(
-    source,
-    'async function createWorkspace({ setupStep: targetSetupStep = 2 } = {}) {',
-    'async function warmWorkspaceRuntimeInBackground(workspaceId) {',
-  )
-  const createdHandlerBlock = extractBlock(
-    settingsSource,
-    'function handleWorkspaceCreated(payload) {',
-    'function closeModal() {',
-  )
+test('existing workspace summary supports inspect-first activation and editing', () => {
+  const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
+  const settings = read('src/components/modals/SettingsModal.vue')
 
-  assert.equal(source.includes('@click="continueFromWorkspaceName()"'), true)
-  assert.equal(source.includes('async function continueFromWorkspaceName() {'), true)
-  assert.equal(source.includes('@keydown.enter.prevent="continueFromWorkspaceName()"'), true)
-  assert.equal(source.includes('@keydown.enter.exact.prevent="continueFromWorkspaceContext()"'), true)
-  assert.equal(source.includes('@click="skipWorkspaceContext()"'), true)
-  assert.equal(source.includes('@click="saveWorkspaceContextAndContinue()"'), true)
-  assert.equal(source.includes('async function continueFromWorkspaceContext() {'), true)
-  assert.equal(source.includes("await createWorkspace({ setupStep: normalized })"), true)
-  assert.equal(source.includes("toast.info('Create workspace first'"), false)
-  assert.equal(source.includes('requestedSetupStep'), true)
-  assert.equal(source.includes('workspaceIdentityDraft'), true)
-  assert.equal(source.includes('() => setupWorkspaceName.value,'), true)
-  assert.equal(source.includes('const normalized = normalizeWorkspaceName(nextValue)'), true)
-  assert.equal(source.includes('setupWorkspaceName.value = normalized'), true)
-  assert.equal(source.includes('function resolveWorkspaceIdentityDraft() {'), true)
-  assert.equal(createBlock.includes("emit('workspace-created', {"), true)
-  assert.equal(createBlock.includes('setTimeout(() => {'), true)
-  assert.equal(createBlock.includes('void warmWorkspaceRuntimeInBackground(workspaceId)'), true)
-  assert.equal(createBlock.includes('const context = \'\''), true)
-  assert.equal(createBlock.includes('setupWorkspaceName.value = \'\''), false)
-  assert.equal(createBlock.includes('setupWorkspaceContext.value = \'\''), false)
-  assert.equal(settingsSource.includes(':requested-setup-step="workspaceDetailSetupStep"'), true)
-  assert.equal(settingsSource.includes(':workspace-identity-draft="workspaceIdentityDraft"'), true)
-  assert.equal(settingsSource.includes('@workspace-created="handleWorkspaceCreated"'), true)
-  assert.equal(settingsSource.includes('function handleWorkspaceCreated(payload) {'), true)
-  assert.equal(createdHandlerBlock.includes("currentPanel.value = 'ws-detail'"), true)
-  assert.equal(createdHandlerBlock.includes("activeSection.value = 'workspace'"), true)
-  assert.equal(createdHandlerBlock.includes("navigateTo('ws-detail', 'forward')"), false)
+  assert.equal(workspace.includes('const requiresWorkspaceActivation = computed(() => !isWorkspaceActive.value)'), true)
+  assert.equal(workspace.includes("emit('select-workspace', id)"), true)
+  assert.equal(workspace.includes("emit('activate-workspace', id)"), true)
+  assert.equal(workspace.includes('function openWorkspaceEditor()'), true)
+  assert.equal(settings.includes('@select-workspace="selectWorkspace"'), true)
+  assert.equal(settings.includes('@activate-workspace="activateWorkspace"'), true)
 })
 
-test('workspace detail shows runtime recovery actions and inspect-first activation flow', () => {
-  const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue')
-  const settingsPath = resolve(process.cwd(), 'src/components/modals/SettingsModal.vue')
-  const source = readFileSync(tabPath, 'utf-8')
-  const settingsSource = readFileSync(settingsPath, 'utf-8')
-
-  assert.equal(source.includes('Workspace runtime'), true)
-  assert.equal(source.includes('Activate workspace'), true)
-  assert.equal(source.includes('Retry runtime'), true)
-  assert.equal(source.includes('Hard reset runtime'), true)
-  assert.equal(source.includes('class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"'), true)
-  assert.equal(source.includes('const currentRuntimeProgressMessage = computed(() => {'), true)
-  assert.equal(source.includes('clearRuntimeProgress()'), true)
-  assert.equal(source.includes('async function retryWorkspaceRuntime() {'), true)
-  assert.equal(source.includes('async function hardResetWorkspaceRuntime() {'), true)
-  assert.equal(source.includes('requiresWorkspaceActivation'), true)
-  assert.equal(source.includes("emit('select-workspace', id)"), true)
-  assert.equal(source.includes("emit('activate-workspace', id)"), true)
-  assert.equal(settingsSource.includes('@select-workspace="selectWorkspace"'), true)
-  assert.equal(settingsSource.includes('@activate-workspace="activateWorkspace"'), true)
-  assert.equal(settingsSource.includes('async function activateWorkspace(workspaceId) {'), true)
-  assert.equal(settingsSource.includes('function selectWorkspace(workspaceId) {'), true)
-})
-
-test('workspace flow routes through settings panels and workspace list/detail/create modes', () => {
-  const settingsPath = resolve(process.cwd(), 'src/components/modals/SettingsModal.vue')
-  const tabPath = resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue')
-
-  const settingsSource = readFileSync(settingsPath, 'utf-8')
-  const tabSource = readFileSync(tabPath, 'utf-8')
-
-  assert.equal(settingsSource.includes('openWorkspaceSection'), true)
-  assert.equal(settingsSource.includes("panelClass('ws-list')"), true)
-  assert.equal(settingsSource.includes("panelClass('ws-detail')"), true)
-  assert.equal(settingsSource.includes("panelClass('ws-create')"), true)
-  assert.equal(tabSource.includes("panelMode === 'ws-list'"), true)
-  assert.equal(tabSource.includes("panelMode === 'ws-detail'"), true)
-  assert.equal(tabSource.includes("@click=\"emit('navigate', 'ws-create', 'forward')\""), true)
-  assert.equal(tabSource.includes("@click=\"emit('navigate', 'ws-list', 'backward')\""), true)
-  assert.equal(tabSource.includes('title="Regenerate schema"'), true)
-  assert.equal(tabSource.includes('title="Remove dataset"'), true)
-  assert.equal(tabSource.includes('openWorkspaceDetail(workspace.id)'), true)
-})
-
-test('workspace launchers open settings modal at workspace step 1 instead of old create modal', () => {
-  const launcherPaths = [
-    resolve(process.cwd(), 'src/components/WorkspaceSwitcher.vue'),
-    resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'),
-    resolve(process.cwd(), 'src/components/layout/sidebar/SidebarWorkspaces.vue'),
+test('workspace launchers open the unified workspace settings surface without step routing', () => {
+  const paths = [
+    'src/components/WorkspaceSwitcher.vue',
+    'src/components/layout/UnifiedSidebar.vue',
+    'src/components/layout/sidebar/SidebarWorkspaces.vue',
   ]
 
-  for (const filePath of launcherPaths) {
-    const source = readFileSync(filePath, 'utf-8')
-    assert.equal(source.includes('WorkspaceCreateModal'), false)
-    assert.equal(source.includes('SettingsModal'), true)
-    assert.equal(source.includes('initial-step'), true)
+  for (const path of paths) {
+    const source = read(path)
+    assert.equal(source.includes("openSettings('workspace')"), true)
+    assert.equal(source.includes("openSettings('workspace', 1)"), false)
   }
-})
-
-test('apiService exposes workspace summary route for lazy workspace detail loading', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/services/apiService.js'), 'utf-8')
-
-  assert.equal(source.includes('async v1GetWorkspaceSummary(workspaceId) {'), true)
-  assert.equal(source.includes('return v1Api.workspaces.summary(workspaceId)'), true)
-  assert.equal(source.includes('async v1RetryWorkspaceRuntime(workspaceId) {'), true)
-  assert.equal(source.includes('async v1HardResetWorkspaceRuntime(workspaceId) {'), true)
+  assert.equal(read('src/App.vue').includes('initial-step'), false)
+  assert.equal(read('src/stores/appStore.js').includes('settingsInitialStep'), false)
 })

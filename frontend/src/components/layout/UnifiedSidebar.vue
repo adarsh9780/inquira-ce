@@ -36,7 +36,7 @@
             'text-[var(--color-text-muted)]',
           ]"
           :title="appStore.isSidebarCollapsed ? activeWorkspaceName : 'Open workspace settings'"
-          @click="appStore.openSettings('workspace', 1)"
+          @click="appStore.openSettings('workspace')"
         >
           <div class="flex h-6 w-6 shrink-0 items-center justify-center">
             <FolderOpenIcon class="h-5 w-5 text-[var(--color-text-main)]" />
@@ -286,7 +286,7 @@
             class="flex w-full items-center rounded-lg py-2 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/5 hover:text-[var(--color-text-main)] focus:outline-none"
             :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3'"
             title="Settings"
-            @click="appStore.openSettings('llm', 1)"
+            @click="appStore.openSettings('llm')"
           >
             <div class="flex h-6 w-6 shrink-0 items-center justify-center">
               <Cog6ToothIcon class="h-5 w-5" />
@@ -671,8 +671,7 @@ function handleGlobalClick(event) {
 // ─── Settings open-from-outside ───────────────────────────────────────────────
 function handleOpenSettingsRequest(event) {
   const tab  = String(event?.detail?.tab  || 'api').trim() || 'api'
-  const step = Number(event?.detail?.step || 1)
-  appStore.openSettings(tab, step)
+  appStore.openSettings(tab)
 }
 
 // ─── Conversations ────────────────────────────────────────────────────────────

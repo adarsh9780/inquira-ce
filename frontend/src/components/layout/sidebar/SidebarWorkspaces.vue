@@ -155,7 +155,7 @@ async function selectWorkspace(id) {
 }
 
 function openWorkspaceSettings() {
-  appStore.openSettings('workspace', 1)
+  appStore.openSettings('workspace')
 }
 
 function isWorkspaceDeleting(workspaceId) {

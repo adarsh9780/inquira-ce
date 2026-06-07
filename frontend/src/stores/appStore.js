@@ -154,9 +154,8 @@ export const useAppStore = defineStore('app', () => {
   // Settings trigger
   const isSettingsOpen = ref(false)
   const settingsInitialTab = ref('llm')
-  const settingsInitialStep = ref(1)
 
-  function openSettings(tab = 'llm', step = 1) {
+  function openSettings(tab = 'llm') {
     const n = String(tab || '').trim().toLowerCase()
     if      (n === 'api'    || n === 'llm')        settingsInitialTab.value = 'llm'
     else if (n === 'workspace' || n === 'data')     settingsInitialTab.value = 'workspace'
@@ -165,8 +164,6 @@ export const useAppStore = defineStore('app', () => {
     else if (n === 'terms'  || n === 'legal')       settingsInitialTab.value = 'terms'
     else                                            settingsInitialTab.value = 'llm'
 
-    const parsed = Number(step)
-    settingsInitialStep.value = Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : 1
     isSettingsOpen.value = true
   }
 
@@ -3181,7 +3178,6 @@ export const useAppStore = defineStore('app', () => {
     addHistoricalCodeBlock,
     isSettingsOpen,
     settingsInitialTab,
-    settingsInitialStep,
     openSettings
   }
 })

@@ -157,7 +157,7 @@ async function activateWorkspace(workspaceId) {
 function openWorkspaceSettings() {
   closeWorkspaceContextMenu()
   isOpen.value = false
-  appStore.openSettings('workspace', 1)
+  appStore.openSettings('workspace')
 }
 
 function isWorkspaceDeleting(workspaceId) {

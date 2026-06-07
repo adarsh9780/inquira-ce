@@ -34,15 +34,7 @@
                 <div class="space-y-0.5">
                   <button
                     type="button"
-                    :class="activeSection === 'workspace' && currentPanel === 'ws-detail' ? activeNavClass : inactiveNavClass"
-                    @click="openActiveWorkspace"
-                  >
-                    <FolderIcon class="h-4 w-4 shrink-0" />
-                    <span>Active Details</span>
-                  </button>
-                  <button
-                    type="button"
-                    :class="activeSection === 'workspace' && currentPanel !== 'ws-detail' ? activeNavClass : inactiveNavClass"
+                    :class="activeSection === 'workspace' ? activeNavClass : inactiveNavClass"
                     @click="openWorkspaceSection"
                   >
                     <ListBulletIcon class="h-4 w-4 shrink-0" />
@@ -104,39 +96,10 @@
                 <LLMSettingsTab @close-request="closeModal" />
               </section>
 
-              <section :class="panelClass('ws-list')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
+              <section :class="panelClass('workspace')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
                 <WorkspaceTab
-                  panel-mode="ws-list"
                   :active-workspace-id="activeWorkspaceId"
                   :workspaces="workspaceItems"
-                  @navigate="navigateTo"
-                  @workspace-operation-change="setActiveWorkspaceOperation"
-                  @select-workspace="selectWorkspace"
-                  @activate-workspace="activateWorkspace"
-                />
-              </section>
-
-              <section :class="panelClass('ws-detail')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
-                <WorkspaceTab
-                  panel-mode="ws-detail"
-                  :active-workspace-id="activeWorkspaceId"
-                  :workspaces="workspaceItems"
-                  :requested-setup-step="workspaceDetailSetupStep"
-                  :workspace-identity-draft="workspaceIdentityDraft"
-                  @navigate="navigateTo"
-                  @workspace-operation-change="setActiveWorkspaceOperation"
-                  @select-workspace="selectWorkspace"
-                  @activate-workspace="activateWorkspace"
-                  @workspace-created="handleWorkspaceCreated"
-                />
-              </section>
-
-              <section :class="panelClass('ws-create')" class="scrollbar-hidden absolute inset-0 overflow-y-auto px-6 py-5">
-                <WorkspaceTab
-                  panel-mode="ws-create"
-                  :active-workspace-id="activeWorkspaceId"
-                  :workspaces="workspaceItems"
-                  @navigate="navigateTo"
                   @workspace-operation-change="setActiveWorkspaceOperation"
                   @select-workspace="selectWorkspace"
                   @activate-workspace="activateWorkspace"
@@ -171,7 +134,6 @@ import WorkspaceTab from './tabs/WorkspaceTab.vue'
 import AppearanceTab from './tabs/AppearanceTab.vue'
 import AccountTab from './tabs/AccountTab.vue'
 import {
-  FolderIcon,
   ListBulletIcon,
   KeyIcon,
   PaintBrushIcon,
@@ -200,19 +162,13 @@ const currentPanel = ref('llm')
 const panelDirection = ref('forward')
 const activeWorkspaceOperation = ref('')
 const activeWorkspaceOperationMessage = ref('')
-const workspaceDetailSetupStep = ref(1)
-const workspaceIdentityDraft = ref(null)
 
 const activeNavClass = 'nav-tab-active'
 const inactiveNavClass = 'nav-tab'
 
 const activeSectionTitle = computed(() => {
   if (activeSection.value === 'llm') return 'LLM & API Keys'
-  if (activeSection.value === 'workspace') {
-    if (currentPanel.value === 'ws-detail') return 'Active Workspace Details'
-    if (currentPanel.value === 'ws-create') return 'Create Workspace'
-    return 'Manage Workspaces'
-  }
+  if (activeSection.value === 'workspace') return 'Manage Workspaces'
   if (activeSection.value === 'appearance') return 'Appearance Preferences'
   if (activeSection.value === 'account') return 'Account Settings'
   return 'Settings'
@@ -220,30 +176,11 @@ const activeSectionTitle = computed(() => {
 
 const activeSectionDescription = computed(() => {
   if (activeSection.value === 'llm') return 'Configure model providers, search credentials, and LLM preferences.'
-  if (activeSection.value === 'workspace') {
-    if (currentPanel.value === 'ws-detail') return 'View column catalog, ingested datasets, database sync status, and metadata.'
-    if (currentPanel.value === 'ws-create') return 'Initialize a new workspace and sync a primary dataset.'
-    return 'Browse, rename, activate, or delete your existing workspaces.'
-  }
+  if (activeSection.value === 'workspace') return 'Browse, create, configure, activate, or delete your workspaces.'
   if (activeSection.value === 'appearance') return 'Customize application theme presets, typography sizing, and code block fonts.'
   if (activeSection.value === 'account') return 'Manage your user profile configuration and application connection logs.'
   return 'Customize application settings.'
 })
-
-function openActiveWorkspace() {
-  if (notifyWorkspaceOperationBlocked()) return
-  if (!activeWorkspaceId.value) {
-    const initialWorkspace = String(appStore.activeWorkspaceId || '').trim() || String(workspaceItems.value[0]?.id || '').trim()
-    if (initialWorkspace) {
-      activeWorkspaceId.value = initialWorkspace
-    } else {
-      navigateTo('ws-create', 'forward')
-      return
-    }
-  }
-  activeSection.value = 'workspace'
-  navigateTo('ws-detail', 'forward')
-}
 
 const workspaceItems = computed(() => {
   const items = Array.isArray(appStore.workspaces) ? appStore.workspaces : []
@@ -294,7 +231,7 @@ function initializePanelState(tab) {
   const normalized = normalizeTab(tab)
   if (normalized === 'workspace') {
     activeSection.value = 'workspace'
-    currentPanel.value = 'ws-list'
+    currentPanel.value = 'workspace'
     return
   }
 
@@ -314,7 +251,7 @@ function navigateTo(panel, direction = 'forward') {
   if (notifyWorkspaceOperationBlocked()) return
   panelDirection.value = direction
   currentPanel.value = panel
-  if (panel.startsWith('ws-')) {
+  if (panel === 'workspace') {
     activeSection.value = 'workspace'
   }
 }
@@ -328,14 +265,13 @@ function openLeafSection(section) {
 function openWorkspaceSection() {
   if (notifyWorkspaceOperationBlocked()) return
   activeSection.value = 'workspace'
-  navigateTo('ws-list', 'forward')
+  navigateTo('workspace', 'forward')
 }
 
 function selectWorkspace(workspaceId) {
   if (notifyWorkspaceOperationBlocked()) return
   const nextId = String(workspaceId || '').trim()
   if (!nextId) return
-  workspaceIdentityDraft.value = null
   if (activeWorkspaceId.value !== nextId) {
     activeWorkspaceId.value = nextId
   }
@@ -345,7 +281,6 @@ async function activateWorkspace(workspaceId) {
   if (notifyWorkspaceOperationBlocked()) return
   const nextId = String(workspaceId || '').trim()
   if (!nextId) return
-  workspaceIdentityDraft.value = null
   activeWorkspaceId.value = nextId
   if (String(appStore.activeWorkspaceId || '').trim() === nextId) return
   await appStore.activateWorkspace(nextId)
@@ -355,14 +290,6 @@ function handleWorkspaceCreated(payload) {
   const workspaceId = String(payload?.workspaceId || '').trim()
   if (!workspaceId) return
   activeWorkspaceId.value = workspaceId
-  workspaceIdentityDraft.value = {
-    workspaceId,
-    name: String(payload?.name || '').trim(),
-    context: String(payload?.context || '').trim(),
-  }
-  workspaceDetailSetupStep.value = Number(payload?.setupStep || 2)
-  panelDirection.value = 'forward'
-  currentPanel.value = 'ws-detail'
   activeSection.value = 'workspace'
 }
 

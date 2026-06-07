@@ -9,5 +9,5 @@ test('workspace detail header no longer shows primary dataset filename subtitle'
 
   assert.equal(source.includes('const primaryDatasetFilename = computed(() =>'), false)
   assert.equal(source.includes('<p v-if="primaryDatasetFilename"'), false)
-  assert.equal(source.includes("<p class=\"text-xs font-medium uppercase tracking-wider text-[var(--color-text-sub)]\">Datasets</p>"), true)
+  assert.equal(source.includes('<p class="section-label">Files</p>'), true)
 })
