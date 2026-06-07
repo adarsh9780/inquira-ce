@@ -2,46 +2,46 @@
   <div ref="containerRef" class="relative">
     <button
       @click="toggleOpen"
-      class="flex items-center space-x-2 px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+      class="flex items-center space-x-2 px-3 py-2 text-sm border rounded-lg workspace-trigger-btn focus:outline-none"
     >
-      <span class="font-medium text-gray-700">Workspace:</span>
-      <span class="max-w-[180px] truncate">{{ activeWorkspaceName || 'Select Workspace' }}</span>
-      <svg class="w-4 h-4 text-gray-400" :class="{ 'rotate-180': isOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <span class="font-medium text-[var(--color-text-muted)]">Workspace:</span>
+      <span class="max-w-[180px] truncate text-[var(--color-text-main)] font-semibold">{{ activeWorkspaceName || 'Select Workspace' }}</span>
+      <svg class="w-4 h-4 text-[var(--color-text-muted)]" :class="{ 'rotate-180': isOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
       </svg>
     </button>
 
-    <div v-if="isOpen" class="absolute top-full left-0 mt-1 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
-      <div class="p-2 border-b border-gray-100 flex justify-between items-center">
-        <span class="text-xs text-gray-500">Workspaces</span>
-        <button class="text-xs px-2 py-1 rounded bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)]" @click="openWorkspaceSettings">New</button>
+    <div v-if="isOpen" class="absolute top-full left-0 mt-1 w-80 rounded-lg border z-50 overflow-hidden workspace-dropdown-menu">
+      <div class="p-2 border-b flex justify-between items-center" style="border-color: var(--color-border);">
+        <span class="text-xs text-[var(--color-text-muted)] font-medium">Workspaces</span>
+        <button class="text-xs px-2 py-1 rounded bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] font-medium transition-colors" @click="openWorkspaceSettings">New</button>
       </div>
 
-      <div v-if="appStore.workspaceDeletionJobs.length > 0" class="px-3 py-2 border-b border-gray-100 bg-amber-50 text-amber-800 text-xs flex items-center space-x-2">
-        <svg class="animate-spin h-3.5 w-3.5 text-amber-700" viewBox="0 0 24 24" fill="none">
+      <div v-if="appStore.workspaceDeletionJobs.length > 0" class="px-3 py-2 border-b bg-[var(--color-warning-bg)] text-[var(--color-warning-text)] text-xs flex items-center space-x-2" style="border-color: var(--color-border);">
+        <svg class="animate-spin h-3.5 w-3.5 text-[var(--color-warning)]" viewBox="0 0 24 24" fill="none">
           <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-90" d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="4" />
         </svg>
         <span>Deleting...</span>
       </div>
 
-      <div v-if="appStore.workspaces.length === 0" class="p-3 text-sm text-center text-gray-500">No workspaces yet</div>
+      <div v-if="appStore.workspaces.length === 0" class="p-3 text-sm text-center text-[var(--color-text-muted)]">No workspaces yet</div>
       <div v-else class="max-h-64 overflow-auto">
         <div
           v-for="ws in appStore.workspaces"
           :key="ws.id"
-          class="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between cursor-pointer"
+          class="w-full px-3 py-2 text-left text-sm flex items-center justify-between cursor-pointer workspace-item"
           :class="[
-            ws.id === appStore.activeWorkspaceId ? 'bg-[var(--color-accent-soft)]' : '',
+            ws.id === appStore.activeWorkspaceId ? 'workspace-item-active' : '',
             isWorkspaceDeleting(ws.id) ? 'opacity-60 cursor-not-allowed' : ''
           ]"
           @click="!isWorkspaceDeleting(ws.id) && activateWorkspace(ws.id)"
           @contextmenu.prevent="!isWorkspaceDeleting(ws.id) && openWorkspaceContextMenu($event, ws.id)"
         >
-          <span class="truncate" :class="isWorkspaceDeleting(ws.id) ? 'text-gray-400' : ''">{{ ws.name }}</span>
+          <span class="truncate" :class="isWorkspaceDeleting(ws.id) ? 'text-[var(--color-text-muted)]' : ''">{{ ws.name }}</span>
           <button
             @click.stop="confirmDeleteWorkspace(ws.id)"
-            class="text-xs text-red-500 hover:text-red-600 disabled:opacity-40"
+            class="text-xs text-[var(--color-danger)] hover:underline disabled:opacity-40 font-medium"
             :disabled="isWorkspaceDeleting(ws.id)"
           >
             Delete
@@ -54,23 +54,23 @@
   <div
     v-if="isWorkspaceContextMenuOpen"
     ref="contextMenuRef"
-    class="fixed z-[80] w-56 rounded-lg border border-gray-200 bg-white shadow-xl py-1"
+    class="fixed z-[80] w-56 rounded-lg border shadow-xl py-1 workspace-context-menu"
     :style="{ left: `${workspaceContextMenuX}px`, top: `${workspaceContextMenuY}px` }"
   >
     <button
-      class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+      class="w-full text-left px-3 py-2 text-sm context-btn font-medium"
       @click="openRenameDialogFromContext"
     >
       Rename Workspace
     </button>
     <button
-      class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+      class="w-full text-left px-3 py-2 text-sm context-btn font-medium"
       @click="confirmClearWorkspaceFromContext"
     >
       Clear Workspace Database
     </button>
     <button
-      class="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+      class="w-full text-left px-3 py-2 text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] font-medium transition-colors"
       @click="confirmDeleteWorkspaceFromContext"
     >
       Delete Workspace
@@ -313,3 +313,45 @@ onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
 })
 </script>
+
+<style scoped>
+.workspace-trigger-btn {
+  background-color: var(--color-control-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-main);
+  transition: background-color var(--motion-duration-standard) var(--motion-ease-standard),
+              border-color var(--motion-duration-standard) var(--motion-ease-standard);
+}
+.workspace-trigger-btn:hover {
+  background-color: color-mix(in srgb, var(--color-chat-user-bubble) 88%, var(--color-text-main) 12%);
+  border-color: var(--color-border-hover);
+}
+.workspace-dropdown-menu {
+  background-color: var(--color-workspace-surface);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-lifted);
+}
+.workspace-item {
+  color: var(--color-text-main);
+  transition: background-color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+.workspace-item:hover {
+  background-color: color-mix(in srgb, var(--color-text-main) 5%, transparent);
+}
+.workspace-item-active {
+  background-color: var(--color-selected-surface) !important;
+  color: var(--color-text-main);
+}
+.workspace-context-menu {
+  background-color: var(--color-panel-elevated);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-modal);
+}
+.context-btn {
+  color: var(--color-text-main);
+  transition: background-color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+.context-btn:hover {
+  background-color: color-mix(in srgb, var(--color-text-main) 6%, transparent);
+}
+</style>

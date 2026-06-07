@@ -7,7 +7,7 @@ test('chat input action button keeps one shared circular shell across mic, send,
   const componentPath = resolve(process.cwd(), 'src/components/chat/ChatInput.vue')
   const source = readFileSync(componentPath, 'utf-8')
 
-  const sharedShell = 'class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-text-main)] text-[var(--color-on-accent)]"'
+  const sharedShell = 'class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-text-main)] text-[var(--color-on-accent)] transition-all duration-300"'
   const sharedShellMatches = source.split(sharedShell).length - 1
 
   assert.equal(sharedShellMatches, 1)

@@ -13,7 +13,7 @@
           <img :src="logo" alt="Inquira" class="h-full w-full rounded-md" />
         </div>
         <div
-          class="flex items-center overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+          class="flex items-center overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
           :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
         >
           <span class="text-[14px] font-semibold tracking-tight text-[var(--color-text-main)]">
@@ -42,7 +42,7 @@
             <FolderOpenIcon class="h-5 w-5 text-[var(--color-text-main)]" />
           </div>
           <div
-            class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+            class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
             :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
           >
             <span class="block truncate text-[13px] font-semibold leading-snug text-[var(--color-text-main)]">
@@ -117,7 +117,7 @@
             >
               <div
                 v-if="appStore.activeConversationId === conv.id && !appStore.isSidebarCollapsed"
-                class="absolute left-0 top-1/2 -translate-y-1/2 h-1/2 w-[3px] rounded-r-full bg-[var(--color-accent)]"
+                class="absolute left-0 top-1/2 -translate-y-1/2 h-1/2 w-[4px] rounded-r-full bg-[var(--color-accent)] transition-all duration-300"
               />
 
               <div v-if="editingId === conv.id" class="flex w-full items-center gap-1 pl-9" @click.stop>
@@ -144,7 +144,7 @@
                 </div>
 
                 <div
-                  class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+                  class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
                   :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[200px] opacity-100 ml-3'"
                 >
                   <p
@@ -188,58 +188,69 @@
       <!-- ─── Workspace Views ─── -->
       <nav class="flex-none pb-2 pt-2">
         <div class="flex flex-col space-y-0.5">
-          <button
-            type="button"
-            class="flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
-            :class="[
-              appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
-              appStore.activeTab === 'schema-editor' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
-            ]"
-            :title="appStore.isSidebarCollapsed ? 'Open schema editor' : 'Schema editor'"
-            @click="openSchemaEditor"
-          >
-            <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-              <CircleStackIcon class="h-5 w-5" :class="appStore.activeTab === 'schema-editor' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
-            </div>
+          <div class="relative w-full">
             <div
-              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-              :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+              v-if="appStore.activeTab === 'schema-editor' && !appStore.isSidebarCollapsed"
+              class="absolute left-0 top-1/2 -translate-y-1/2 h-[18px] w-[4px] rounded-r-full bg-[var(--color-accent)] transition-all duration-300"
+            />
+            <button
+              type="button"
+              class="flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
+              :class="[
+                appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
+                appStore.activeTab === 'schema-editor' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
+              ]"
+              :title="appStore.isSidebarCollapsed ? 'Open schema editor' : 'Schema editor'"
+              @click="openSchemaEditor"
             >
-              <span class="block truncate text-[13px] font-medium leading-snug text-[var(--color-text-main)]">
-                Schema
-              </span>
-              <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
-                Datasets and column metadata
-              </span>
-            </div>
-          </button>
+              <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+                <CircleStackIcon class="h-5 w-5" :class="appStore.activeTab === 'schema-editor' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
+              </div>
+              <div
+                class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
+                :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+              >
+                <span class="block truncate text-[13px] font-medium leading-snug text-[var(--color-text-main)]">
+                  Schema
+                </span>
+                <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
+                  Datasets and column metadata
+                </span>
+              </div>
+            </button>
+          </div>
 
-          <button
-            type="button"
-            class="flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
-            :class="[
-              appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
-              appStore.activeTab === 'conversation-tree' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
-            ]"
-            :title="appStore.isSidebarCollapsed ? 'Open conversation tree' : 'Conversation tree'"
-            @click="openConversationTree"
-          >
-            <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-              <QueueListIcon class="h-5 w-5" :class="appStore.activeTab === 'conversation-tree' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
-            </div>
+          <div class="relative w-full">
             <div
-              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-              :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+              v-if="appStore.activeTab === 'conversation-tree' && !appStore.isSidebarCollapsed"
+              class="absolute left-0 top-1/2 -translate-y-1/2 h-[18px] w-[4px] rounded-r-full bg-[var(--color-accent)] transition-all duration-300"
+            />
+            <button
+              type="button"
+              class="flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
+              :class="[
+                appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
+                appStore.activeTab === 'conversation-tree' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
+              ]"
+              :title="appStore.isSidebarCollapsed ? 'Open conversation tree' : 'Conversation tree'"
+              @click="openConversationTree"
             >
-              <span class="block truncate text-[13px] font-medium leading-snug text-[var(--color-text-main)]">
-                Conversation Tree
-              </span>
-              <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
-                Turns across this workspace
-              </span>
-            </div>
-          </button>
-
+              <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+                <QueueListIcon class="h-5 w-5" :class="appStore.activeTab === 'conversation-tree' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
+              </div>
+              <div
+                class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
+                :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
+              >
+                <span class="block truncate text-[13px] font-medium leading-snug text-[var(--color-text-main)]">
+                  Conversation Tree
+                </span>
+                <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
+                  Turns across this workspace
+                </span>
+              </div>
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -260,7 +271,7 @@
               <ChevronDoubleLeftIcon v-else class="h-5 w-5" />
             </div>
             <div
-              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
               :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
             >
               <span class="text-[13px] font-medium">
@@ -281,7 +292,7 @@
               <Cog6ToothIcon class="h-5 w-5" />
             </div>
             <div
-              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
               :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
             >
               <span class="text-[13px] font-medium">Settings</span>
@@ -309,7 +320,7 @@
                 </span>
               </div>
               <div
-                class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+                class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
                 :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
               >
                 <span class="text-[13px] font-medium">{{ profileDisplayName }}</span>
@@ -923,5 +934,15 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
   font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.02em;
+  transition: background-color var(--motion-duration-standard) var(--motion-ease-standard),
+              transform var(--motion-duration-standard) var(--motion-ease-standard);
+}
+
+.sidebar-initials-avatar:hover {
+  transform: scale(1.05);
+}
+
+.sidebar-transition {
+  transition: all var(--motion-duration-slow) var(--motion-ease-emphasized) !important;
 }
 </style>

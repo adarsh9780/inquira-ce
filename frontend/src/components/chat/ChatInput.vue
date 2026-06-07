@@ -144,8 +144,8 @@
             :title="actionButtonTitle"
           >
             <span
-              class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-text-main)] text-[var(--color-on-accent)]"
-              :class="{ 'animate-pulse': isVoiceInputActive }"
+              class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-text-main)] text-[var(--color-on-accent)] transition-all duration-300"
+              :class="{ 'voice-input-pulse': isVoiceInputActive }"
             >
               <StopIcon v-if="appStore.activeConversationIsLoading" class="w-3 h-3" />
               <MicrophoneIcon v-else-if="isComposerEmpty" class="w-3 h-3" />
@@ -159,9 +159,9 @@
 
       <div
         v-if="showCommandSuggestions"
-        class="absolute left-0 right-0 z-[70] overflow-hidden rounded-xl border shadow-lg"
+        class="absolute left-0 right-0 z-[70] overflow-hidden rounded-xl border shadow-lg suggestions-glass"
         :class="suggestionsOpenUp ? 'bottom-full mb-2' : 'top-full mt-1'"
-        style="background-color: var(--color-base); border-color: var(--color-border);"
+        style="border-color: var(--color-border);"
       >
         <ul class="py-1">
           <li v-for="(item, index) in commandSuggestions" :key="item.name">
@@ -263,15 +263,15 @@ const imageAttachmentsSupported = computed(() => modelSupportsImages(appStore.se
 const composerCardStyle = computed(() => {
   const style = isFocused.value
     ? {
-      borderColor: 'var(--color-border-hover)',
-      boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-text-main) 5%, transparent)',
+      borderColor: 'var(--color-accent-border)',
+      boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-accent) 15%, transparent)',
     }
     : {}
   if (isAttachmentDragActive.value) {
     return {
       ...style,
-      borderColor: 'var(--color-border-hover)',
-      boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-border-hover) 18%, transparent)',
+      borderColor: 'var(--color-accent)',
+      boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent)',
     }
   }
   return style
@@ -1583,3 +1583,20 @@ watch(() => appStore.ingestedColumns, () => {
   void updateAutocompleteSuggestions()
 }, { deep: true })
 </script>
+
+<style scoped>
+.voice-input-pulse {
+  animation: voice-pulse 1.4s infinite ease-in-out;
+  background-color: var(--color-accent) !important;
+  color: var(--color-on-accent) !important;
+}
+
+@keyframes voice-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 65%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-accent) 0%, transparent);
+  }
+}
+</style>

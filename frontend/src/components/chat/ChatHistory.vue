@@ -1034,33 +1034,42 @@ watch(() => appStore.activeConversationIsLoading, (isLoading, wasLoading) => {
 
 .user-turn-bubble {
   position: relative;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 14%, var(--color-border));
   background-color: var(--color-chat-user-bubble);
+  box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--color-text-main) 6%, transparent);
+  border-radius: 1.25rem !important;
 }
 
 .user-turn-copy-btn {
   position: absolute;
-  top: 0.375rem;
-  right: 0.375rem;
-  width: 1.5rem;
-  height: 1.5rem;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
   border-radius: 0.5rem;
-  border: 1px solid transparent;
+  border: 1px solid var(--color-border);
   color: var(--color-text-muted);
-  background: transparent;
+  background: var(--color-surface);
   opacity: 0;
-  transition: opacity 120ms ease, background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  transform: scale(0.92);
+  box-shadow: var(--shadow-button);
+  transition: opacity var(--motion-duration-standard) var(--motion-ease-standard),
+              background-color var(--motion-duration-standard) var(--motion-ease-standard),
+              border-color var(--motion-duration-standard) var(--motion-ease-standard),
+              color var(--motion-duration-standard) var(--motion-ease-standard),
+              transform var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 .group:hover .user-turn-copy-btn,
 .group:focus-within .user-turn-copy-btn {
   opacity: 1;
+  transform: scale(1);
 }
 
 .user-turn-copy-btn:hover {
   color: var(--color-text-main);
-  border-color: var(--color-border);
-  background-color: color-mix(in srgb, var(--color-surface) 78%, transparent);
+  border-color: var(--color-border-hover);
+  background-color: var(--color-base);
 }
 
 .stream-reasoning-list {
@@ -1336,9 +1345,22 @@ watch(() => appStore.activeConversationIsLoading, (isLoading, wasLoading) => {
 
 :deep(.chat-code-copy[data-copied="true"]),
 .chat-code-copy[data-copied="true"] {
-  border-color: var(--color-border);
-  background-color: color-mix(in srgb, var(--color-surface) 80%, transparent);
-  color: var(--color-text-main);
+  border-color: var(--color-success) !important;
+  background-color: var(--color-success-bg) !important;
+  color: var(--color-success) !important;
+}
+
+:deep(.chat-code-copy[data-copied="true"] svg),
+.chat-code-copy[data-copied="true"] svg {
+  display: none;
+}
+
+:deep(.chat-code-copy[data-copied="true"]::after),
+.chat-code-copy[data-copied="true"]::after {
+  content: '✓';
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--color-success);
 }
 
 :deep(.chat-code-copy svg),

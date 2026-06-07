@@ -299,6 +299,8 @@ body {
   background-color: var(--color-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-hover) transparent;
 }
 
 #app {
@@ -618,10 +620,13 @@ h6 {
   @apply font-bold tracking-tight;
   font-family: var(--font-display);
   color: var(--color-text-main);
+  letter-spacing: -0.02em;
+  line-height: 1.35;
 }
 
 p {
   color: var(--color-text-main);
+  line-height: 1.65;
 }
 
 .font-semibold {
@@ -825,11 +830,16 @@ p {
 
 ::-webkit-scrollbar-thumb {
   background: var(--color-border-hover);
-  border-radius: 3px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background-color var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
+  border: 1px solid transparent;
+  background-clip: padding-box;
 }
 
 .scrollbar-hidden {
@@ -842,3 +852,30 @@ p {
   height: 0;
   display: none;
 }
+
+/* Resizer Interactive Glows */
+.pane-resizer-x,
+.pane-resizer-y {
+  transition: background-color var(--motion-duration-standard) var(--motion-ease-standard),
+              box-shadow var(--motion-duration-standard) var(--motion-ease-standard) !important;
+}
+
+.pane-resizer-x:hover,
+.pane-resizer-x:active {
+  background-color: var(--color-accent) !important;
+  box-shadow: 0 0 8px var(--color-accent) !important;
+}
+
+.pane-resizer-y:hover,
+.pane-resizer-y:active {
+  background-color: var(--color-accent) !important;
+  box-shadow: 0 0 8px var(--color-accent) !important;
+}
+
+/* Glassmorphism helpers */
+.suggestions-glass {
+  background-color: color-mix(in srgb, var(--color-base) 80%, transparent) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
