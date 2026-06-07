@@ -446,7 +446,7 @@ LOG_DIR=logs
 
 - **🔐 API Key Protection**: Keys never stored permanently
 - **📁 File Validation**: Strict file type and size validation
-- **⚡ Sandboxed Execution**: Limited Python imports and execution
+- **⚡ Local Python Execution**: Runs locally with your operating-system user permissions
 - **🚫 No Cloud Storage**: All data remains local
 - **🔍 Input Sanitization**: All user inputs validated
 - **⏰ Execution Timeouts**: Prevents infinite loops
@@ -774,7 +774,7 @@ CODE_TIMEOUT=30
 
 ## Security Considerations
 
-- Code execution is sandboxed with limited imports
+- Code execution is local and is not sandboxed; it runs with your operating-system user permissions
 - File uploads are validated and size-limited
 - API keys are not stored permanently
 - Local logging only (no cloud storage)

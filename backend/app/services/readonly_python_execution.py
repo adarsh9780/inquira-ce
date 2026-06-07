@@ -1,4 +1,7 @@
-"""Isolated read-only Python execution for chat analysis runs."""
+"""Policy-restricted read-only Python execution for chat analysis runs.
+
+These checks reduce accidental writes but are not an operating-system sandbox.
+"""
 
 from __future__ import annotations
 

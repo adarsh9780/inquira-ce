@@ -6,11 +6,14 @@ Python kernels and terminal commands run as the desktop user. They can access th
 network, processes, and available memory. Execution timeouts and captured-output limits are enforced.
 Configured memory, import, and builtin limits are advisory and are not a security boundary.
 
-## Required Design Decision
+Inquira does not plan to describe or market this execution model as sandboxed. Product UI, legal
+terms, prompts, and documentation must consistently disclose the local-user permission boundary.
 
-Before claiming sandboxed execution, choose and validate a platform-specific isolation boundary for
-macOS and Windows. The design must cover CPU and memory limits, process spawning, filesystem mounts,
-network access, package installation, kernel reuse, artifact export, and recovery after termination.
+## Future Isolation Would Require a Separate Design Decision
+
+If operating-system isolation is ever reconsidered, it requires a separate threat model and
+platform-specific design for macOS and Windows. Until then, no runtime control should be described
+as a sandbox or security boundary.
 
 ## Minimum Acceptance Criteria
 

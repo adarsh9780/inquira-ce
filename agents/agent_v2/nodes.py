@@ -1544,7 +1544,7 @@ async def execute_python_runtime_tool(
     analysis_context: Annotated[dict[str, Any], InjectedState("analysis_context")] = None,
     workspace_id: Annotated[str, InjectedState("workspace_id")] = "",
 ) -> dict[str, Any]:
-    """Execute generated Python code in runtime sandbox."""
+    """Execute generated Python code in the local workspace runtime."""
     context = analysis_context if isinstance(analysis_context, dict) else {}
     return await execute_python(
         workspace_id=str(workspace_id or ""),

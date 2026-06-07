@@ -16,5 +16,7 @@ test('bundled desktop terms reflect current auth and license boundaries', () => 
   assert.equal(source.includes('Supabase-backed bearer auth'), true)
   assert.equal(source.includes('Google login'), true)
   assert.equal(source.includes('These Terms do not grant rights beyond the applicable software license.'), true)
+  assert.equal(source.includes('Execution is not sandboxed.'), true)
+  assert.equal(source.includes('policy checks reduce some risks but are not a security boundary.'), true)
   assert.equal(source.includes('Commercial use is permitted.'), false)
 })

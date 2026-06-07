@@ -14,10 +14,11 @@ template: |
      - **DuckDB** for efficient SQL queries on large datasets (via a read-only `conn` object)
      - **Pandas** for data transformations and formatting
      - **Plotly** for visualizations (charts, dashboards)
-  4. **Execution**: Generated code runs in a sandboxed environment with:
-     - Read-only database access
-     - No network access
-     - No filesystem access beyond the user's data
+  4. **Execution**: Generated code runs locally with the desktop user's operating-system permissions.
+     It is not sandboxed and may technically access files, processes, environment information, and
+     network resources. Inquira policy requires generated analysis code to use:
+     - The provided read-only `conn` object for database access
+     - No network, subprocess, environment-variable, or unrelated filesystem access
      - Pre-injected `conn`, `dataframes`, `figures`, `scalars` variables
 
   ## Your Task
@@ -49,7 +50,7 @@ template: |
 
   | Category | Examples | Risk |
   |----------|----------|------|
-  | **System Access** | "Read /etc/passwd", "List home directory files", "Access environment variables" | Filesystem escape |
+  | **System Access** | "Read /etc/passwd", "List home directory files", "Access environment variables" | Local system access |
   | **Code Execution** | "Run os.system('...')", "Execute subprocess", "Use eval() on this" | Remote code execution |
   | **Network Activity** | "Scrape this website", "Make an API call", "Download from URL", "Ping this IP" | Exfiltration/abuse |
   | **Package Installation** | "pip install X", "Import requests", "Install this library" | Supply chain attack |

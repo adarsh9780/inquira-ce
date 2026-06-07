@@ -10,7 +10,9 @@ def test_terms_include_required_honest_risk_and_scope_clauses():
 
     assert "These Terms do not grant rights beyond the applicable software license." in text
     assert "provided \"AS IS\"" in text or "provided \"As Is\"" in text or "provided \"as is\"" in text.lower()
-    assert "Generated code runs with your local user permissions" in text
+    assert "Generated Python, manually entered Python, and terminal commands run locally" in text
+    assert "Execution is not sandboxed." in text
+    assert "policy checks reduce some risks but are not a security boundary" in text
     assert "You choose the AI provider and are responsible for what you send." in text
     assert "No governing law or jurisdiction is designated in this version of the Terms." in text
     assert "your prompt/question" in text or "your prompt or question" in text

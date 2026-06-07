@@ -11,7 +11,7 @@
     <div v-if="!appStore.terminalConsentGranted" class="flex-1 p-5">
       <div class="mx-auto max-w-xl rounded-lg border border-[var(--color-accent-border)] bg-[var(--color-warning-bg)] p-4 text-sm text-[var(--color-warning-text)]">
         <p class="font-semibold">Local terminal access</p>
-        <p class="mt-2">Commands here run on your machine with your user permissions in the active workspace context.</p>
+        <p class="mt-2">Commands here run on your machine with your user permissions in the active workspace context. Terminal execution is not sandboxed.</p>
         <p class="mt-1">Consent is required before terminal use and is remembered for your account.</p>
         <p class="mt-1 text-xs">Some commands may be blocked by terminal security policy.</p>
         <button

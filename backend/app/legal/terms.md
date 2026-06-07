@@ -1,6 +1,6 @@
 # Inquira Terms & Conditions
 
-Last Updated: 2026-03-23
+Last Updated: 2026-06-07
 
 These Terms & Conditions explain what Inquira does today, what it does not promise, and what risks you accept when using it.
 
@@ -18,8 +18,9 @@ By using Inquira, you accept these Terms. If you do not accept them, do not use 
 - We do not claim that every planned auth, billing, or account-management feature already exists in the current product.
 
 ## 3. Main Risks (Read Carefully)
-- Generated code runs with your local user permissions and can read, modify, move, or delete local files.
-- Commands and code may access network resources if your environment allows it.
+- Generated Python, manually entered Python, and terminal commands run locally with your operating-system user permissions.
+- Execution is not sandboxed. Code and commands can access files, processes, network resources, environment information, and memory available to your user account.
+- Timeouts, output bounds, workspace organization, prompts, and policy checks reduce some risks but are not a security boundary.
 - Wrong code or wrong model output can produce wrong analysis, wrong business conclusions, or data loss.
 - You are responsible for reviewing code before execution and maintaining your own backups.
 

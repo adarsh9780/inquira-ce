@@ -85,6 +85,9 @@
           <CodeBracketIcon class="mx-auto mb-2 h-10 w-10" />
           <p class="text-sm text-[var(--color-text-main)]">Start writing your Python code</p>
           <p class="mt-1 text-xs text-[var(--color-text-muted)]">One file per session - your code is automatically saved</p>
+          <p class="mt-2 max-w-md text-xs text-[var(--color-warning-text)]">
+            Python runs locally with your user permissions and is not sandboxed. Review code before running it.
+          </p>
         </div>
       </div>
     </div>
