@@ -14,10 +14,10 @@ test('workspace setup combines context and dataset management without steps', ()
   assert.equal(source.includes('workspace-stepper'), false)
 })
 
-test('workspace dataset view keeps import and schema management actions', () => {
-  assert.equal(source.includes('>Import datasets</span>'), true)
-  assert.equal(source.includes('data-testid="workspace-import-datasets-header"'), true)
-  assert.equal(source.includes('data-testid="workspace-import-datasets-empty"'), true)
+test('workspace dataset view keeps one import target and schema management actions', () => {
+  assert.equal(source.includes('data-testid="workspace-import-datasets-dropzone"'), true)
+  assert.equal(source.includes('data-testid="workspace-import-datasets-header"'), false)
+  assert.equal(source.includes('data-testid="workspace-import-datasets-empty"'), false)
   assert.equal(source.includes('title="Regenerate schema"'), true)
   assert.equal(source.includes('title="Remove dataset"'), true)
   assert.equal(source.includes('apiService.v1EnqueueDatasetSchemaRegeneration('), true)

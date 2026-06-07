@@ -65,7 +65,7 @@ test('workspace tab uses modal confirmation for dataset deletion and polls clean
   assert.equal(source.includes('apiService.v1ListDatasetDeletionJobs(workspaceId)'), true)
 })
 
-test('workspace delete uses shared confirmation modal from list and detail', () => {
+test('workspace delete uses a shared confirmation modal from the workspace list', () => {
   const source = readSource('src/components/modals/tabs/WorkspaceTab.vue')
 
   assert.equal(source.includes('isWorkspaceDeleteDialogOpen'), true)
@@ -73,7 +73,7 @@ test('workspace delete uses shared confirmation modal from list and detail', () 
   assert.equal(source.includes('@click.stop="requestDeleteWorkspace(workspace.id)"'), true)
   assert.equal(source.includes('title="Delete workspace"'), true)
   assert.equal(source.includes('aria-label="Delete workspace"'), true)
-  assert.equal(source.includes('group-hover:opacity-100'), false)
+  assert.equal(source.includes('group-hover:opacity-100'), true)
   assert.equal(source.includes('showDeleteConfirm'), false)
   assert.equal(source.includes('Danger zone'), false)
 })
@@ -82,7 +82,7 @@ test('workspace tab disables dataset mutation until the inspected workspace is a
   const source = readSource('src/components/modals/tabs/WorkspaceTab.vue')
 
   assert.equal(source.includes('const requiresWorkspaceActivation = computed(() => !isWorkspaceActive.value)'), true)
-  assert.equal(source.includes('Activate workspace to add data'), true)
+  assert.equal(source.includes('Activate workspace to add files'), true)
   assert.equal(source.includes("toast.info('Activate workspace first', 'Activate this workspace before importing datasets.')"), true)
   assert.equal(source.includes("toast.info('Activate workspace first', 'Activate this workspace before generating schemas.')"), true)
 })

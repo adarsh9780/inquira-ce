@@ -58,7 +58,7 @@ test('workspace tab uses a unified summary and editor instead of panel or step r
   assert.equal(tabSource.includes('No workspaces yet'), true)
   assert.equal(tabSource.includes('Create your first workspace'), true)
   assert.equal(tabSource.includes('Delete workspace'), true)
-  assert.equal(tabSource.includes('Import datasets'), true)
+  assert.equal(tabSource.includes('data-testid="workspace-import-datasets-dropzone"'), true)
   assert.equal(tabSource.includes('title="Remove dataset"'), true)
   assert.equal(tabSource.includes('Save context'), true)
   assert.equal(tabSource.includes('workspace-stepper'), false)

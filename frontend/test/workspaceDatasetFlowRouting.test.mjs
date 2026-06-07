@@ -10,7 +10,7 @@ test('unified sidebar routes workspace entry points to settings workspace tab an
   assert.equal(source.includes("@click=\"appStore.openSettings('workspace')\""), true)
   assert.equal(source.includes("openSettings('workspace', 1)"), false)
   assert.equal(source.includes('settingsInitialStep'), false)
-  assert.equal(workspaceTabSource.includes('Import datasets'), true)
+  assert.equal(workspaceTabSource.includes('data-testid="workspace-import-datasets-dropzone"'), true)
   assert.equal(workspaceTabSource.includes('title="Delete Dataset"'), true)
   assert.equal(source.includes('WorkspaceCreateModal'), false)
 })

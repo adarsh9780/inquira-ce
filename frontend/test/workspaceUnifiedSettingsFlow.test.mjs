@@ -34,7 +34,8 @@ test('new workspace is created from an autofocus inline row and opens the combin
   assert.equal(workspace.includes('newWorkspaceInputRef.value?.focus?.()'), true)
   assert.equal(workspace.includes("editorOpenedAfterCreate.value = true"), true)
   assert.equal(workspace.includes("workspaceSurface.value = 'editor'"), true)
-  assert.equal(workspace.includes("editorOpenedAfterCreate ? '< New Workspace' : '< Workspace Summary'"), true)
+  assert.equal(workspace.includes('← Back to workspace summary'), true)
+  assert.equal(workspace.includes("editorOpenedAfterCreate ? 'Set up' : 'Edit'"), true)
   assert.equal(workspace.includes('Quick create + Enter'), false)
 })
 
@@ -67,4 +68,23 @@ test('selected summary keeps actions separate from metrics and uses one create e
   assert.equal(template.includes('class="grid grid-cols-2 gap-x-6 gap-y-3"'), true)
   assert.equal(template.includes('class="grid min-w-0 flex-1 grid-cols-3 gap-3"'), false)
   assert.equal(template.match(/@click="beginInlineCreate"/g)?.length, 2)
+})
+
+test('workspace editor clearly separates selection, saved context, and file import actions', () => {
+  const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
+  const template = workspace.slice(0, workspace.indexOf('<script setup>'))
+
+  assert.equal(template.includes('workspace.id === activeWorkspaceId'), true)
+  assert.equal(template.includes('>Selected</span>'), true)
+  assert.equal(template.includes('opacity-40 transition-all'), true)
+  assert.equal(template.includes('focus-visible:opacity-100 group-hover:opacity-100'), true)
+  assert.equal(workspace.includes("const savedWorkspaceContext = ref('')"), true)
+  assert.equal(workspace.includes('const isWorkspaceContextDirty = computed('), true)
+  assert.equal(template.includes(':disabled="isSavingWorkspaceIdentity || !isWorkspaceContextDirty"'), true)
+  assert.equal(template.includes("isWorkspaceContextDirty ? 'Unsaved changes' : 'Saved'"), true)
+  assert.equal(template.includes('data-testid="workspace-import-datasets-dropzone"'), true)
+  assert.equal(template.includes(':disabled="isDatasetIngesting || isDeletingDataset || requiresWorkspaceActivation"'), true)
+  assert.equal(template.includes('data-testid="workspace-import-datasets-header"'), false)
+  assert.equal(template.includes('data-testid="workspace-import-datasets-empty"'), false)
+  assert.equal(template.match(/CSV, TSV, Parquet, JSON, XLSX, and XLS/g)?.length, 1)
 })

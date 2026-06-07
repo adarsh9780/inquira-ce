@@ -37,12 +37,13 @@
             @click="selectWorkspaceSummary(workspace.id)"
           >
             <div class="flex items-start justify-between gap-2">
-              <p class="truncate text-xs font-medium text-[var(--color-text-main)]">{{ workspace.name || 'Untitled workspace' }}</p>
+              <p class="min-w-0 flex-1 truncate text-xs font-medium text-[var(--color-text-main)]">{{ workspace.name || 'Untitled workspace' }}</p>
               <div class="flex shrink-0 items-center gap-1.5">
+                <span v-if="workspace.id === activeWorkspaceId" class="rounded-full bg-[var(--color-accent-soft)] px-1.5 py-0.5 text-[9px] text-[var(--color-accent)]">Selected</span>
                 <span v-if="workspace.is_active" class="rounded-full bg-[var(--color-success-bg)] px-1.5 py-0.5 text-[9px] text-[var(--color-success)]">Active</span>
                 <button
                   type="button"
-                  class="rounded p-1 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger)]"
+                  class="rounded p-1 text-[var(--color-text-muted)] opacity-40 transition-all hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger)] focus-visible:opacity-100 group-hover:opacity-100"
                   title="Delete workspace"
                   aria-label="Delete workspace"
                   @click.stop="requestDeleteWorkspace(workspace.id)"
@@ -129,45 +130,61 @@
         <div v-else class="flex h-full min-h-0 flex-col">
           <header class="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] pb-3 pt-1">
             <button type="button" class="text-xs font-semibold text-[var(--color-accent)] hover:underline" @click="returnToWorkspaceSummary">
-              {{ editorOpenedAfterCreate ? '< New Workspace' : '< Workspace Summary' }}
+              ← Back to workspace summary
             </button>
             <span v-if="isWorkspaceActive" class="inline-flex items-center rounded-full bg-[var(--color-success-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-success)]">Active</span>
           </header>
 
           <div
-            class="min-h-0 flex-1 space-y-5 overflow-y-auto pt-5 scrollbar-thin"
+            class="min-h-0 flex-1 space-y-4 overflow-y-auto pt-4 scrollbar-thin"
             @dragenter.prevent="handleDropDragEnter"
             @dragover.prevent="handleDropDragOver"
             @dragleave.prevent="handleDropDragLeave"
             @drop.prevent="handleDatasetDrop"
           >
-            <section class="space-y-3 border-b border-[var(--color-border)] pb-5">
+            <section class="space-y-3 border-b border-[var(--color-border)] pb-4">
               <div>
-                <h2 class="text-sm font-bold text-[var(--color-text-main)]">{{ activeWorkspace?.name || 'Workspace setup' }}</h2>
-                <p class="mt-1 text-xs text-[var(--color-text-muted)]">Add optional context and import the files used in this workspace.</p>
+                <h2 class="text-sm font-bold text-[var(--color-text-main)]">{{ editorOpenedAfterCreate ? 'Set up' : 'Edit' }} {{ activeWorkspace?.name || 'workspace' }}</h2>
+                <p class="mt-1 text-xs text-[var(--color-text-muted)]">Add context that helps Inquira understand this workspace.</p>
               </div>
               <label class="flex flex-col gap-1.5">
                 <span class="section-label">Workspace context <span class="normal-case tracking-normal text-[var(--color-text-muted)]">(Optional)</span></span>
-                <textarea v-model="setupWorkspaceContext" rows="5" class="input-base input-outlined resize-none py-1.5 text-xs" placeholder="Describe the business purpose, terms, and schema context for this workspace..." :disabled="isSavingWorkspaceIdentity"></textarea>
+                <textarea v-model="setupWorkspaceContext" rows="4" class="input-base input-outlined resize-none py-1.5 text-xs" placeholder="Describe the business purpose, terms, and schema context for this workspace..." :disabled="isSavingWorkspaceIdentity"></textarea>
               </label>
-              <div class="flex justify-end">
-                <button type="button" class="btn-primary px-4 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-60" :disabled="isSavingWorkspaceIdentity" @click="saveWorkspaceContext">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-[10px]" :class="isWorkspaceContextDirty ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'">
+                  {{ isWorkspaceContextDirty ? 'Unsaved changes' : 'Saved' }}
+                </span>
+                <button type="button" class="btn-primary px-4 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-60" :disabled="isSavingWorkspaceIdentity || !isWorkspaceContextDirty" @click="saveWorkspaceContext">
                   {{ isSavingWorkspaceIdentity ? 'Saving...' : 'Save context' }}
                 </button>
               </div>
             </section>
 
-            <section class="space-y-3">
-              <div class="flex items-center justify-between gap-3">
-                <div><p class="section-label">Files</p><p class="mt-1 text-xs text-[var(--color-text-muted)]">CSV, TSV, Parquet, JSON, XLSX, and XLS</p></div>
-                <button type="button" data-testid="workspace-import-datasets-header" class="btn-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" :disabled="isDatasetIngesting || isDeletingDataset || requiresWorkspaceActivation" @click="openDatasetPicker">
-                  <span v-if="isDatasetIngesting">Processing dataset...</span><span v-else-if="requiresWorkspaceActivation">Activate workspace to add data</span><span v-else>Import datasets</span>
-                </button>
+            <section class="space-y-3 pb-2">
+              <div>
+                <p class="section-label">Files</p>
+                <p class="mt-1 text-xs text-[var(--color-text-muted)]">Add the datasets used in this workspace.</p>
               </div>
 
-              <div v-if="isDropActive" class="rounded-xl border-2 border-dashed border-[var(--color-accent-border)] bg-[var(--color-accent-soft)] px-5 py-8 text-center text-sm font-medium text-[var(--color-accent)]">
-                Drop accepted data files to import them
-              </div>
+              <button
+                type="button"
+                class="w-full rounded-xl border border-dashed px-5 py-5 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-70"
+                :class="isDropActive
+                  ? 'border-[var(--color-accent-border)] bg-[var(--color-accent-soft)]'
+                  : 'border-[var(--color-border)] bg-[var(--color-base-soft)]/50 hover:bg-[var(--color-base-soft)]/80'"
+                :disabled="isDatasetIngesting || isDeletingDataset || requiresWorkspaceActivation"
+                data-testid="workspace-import-datasets-dropzone"
+                @click="openDatasetPicker"
+              >
+                <p class="text-sm font-medium" :class="isDropActive ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'">
+                  <template v-if="isDatasetIngesting">Processing dataset...</template>
+                  <template v-else-if="requiresWorkspaceActivation">Activate workspace to add files</template>
+                  <template v-else-if="isDropActive">Drop files to import them</template>
+                  <template v-else>Drop files here or choose files</template>
+                </p>
+                <p class="mt-1 text-xs text-[var(--color-text-muted)]">CSV, TSV, Parquet, JSON, XLSX, and XLS</p>
+              </button>
 
               <div v-if="isDatasetIngesting" class="rounded-lg px-4 py-3" :class="datasetIngestHasError ? 'bg-[var(--color-danger-bg)]' : 'bg-[var(--color-accent-soft)]'" aria-live="polite">
                 <div class="flex items-start justify-between gap-3">
@@ -187,11 +204,6 @@
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <div v-else class="cursor-pointer rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-base-soft)]/50 px-5 py-8 text-center transition-colors hover:bg-[var(--color-base-soft)]/80" data-testid="workspace-import-datasets-empty" @click="openDatasetPicker">
-                <p class="text-sm font-medium text-[var(--color-text-main)]">Drop files here or choose files to import.</p>
-                <p class="mt-1 text-xs text-[var(--color-text-muted)]">Accepted: CSV, TSV, Parquet, JSON, XLSX, and XLS.</p>
               </div>
             </section>
           </div>
@@ -298,6 +310,7 @@ const activeWorkspaceOperation = ref('')
 const activeWorkspaceOperationMessage = ref('')
 const setupWorkspaceName = ref('')
 const setupWorkspaceContext = ref('')
+const savedWorkspaceContext = ref('')
 const isSavingWorkspaceIdentity = ref(false)
 const isCheckingWorkspaceReadiness = ref(false)
 const workspaceSurface = ref('summary')
@@ -335,6 +348,8 @@ const workspaceCards = computed(() => {
 
 const activeWorkspace = computed(() => workspaceCards.value.find((workspace) => workspace.id === String(props.activeWorkspaceId || '').trim()) || null)
 const isWorkspaceActive = computed(() => !!activeWorkspace.value && !!activeWorkspace.value.is_active)
+const normalizedSetupWorkspaceContext = computed(() => String(setupWorkspaceContext.value || '').trim())
+const isWorkspaceContextDirty = computed(() => normalizedSetupWorkspaceContext.value !== String(savedWorkspaceContext.value || '').trim())
 const detailWorkspaceSelected = computed(() => Boolean(String(props.activeWorkspaceId || '').trim()))
 const requiresWorkspaceActivation = computed(() => !isWorkspaceActive.value)
 const detailCreatedAt = computed(() => formatCreatedDate(workspaceDetail.value?.created_at || activeWorkspace.value?.created_at))
@@ -582,13 +597,18 @@ function resolveWorkspaceContext() {
 
 function syncSetupIdentity() {
   setupWorkspaceName.value = normalizeWorkspaceName(String(activeWorkspace.value?.name || '').trim())
-  setupWorkspaceContext.value = resolveWorkspaceContext()
+  const context = resolveWorkspaceContext()
+  setupWorkspaceContext.value = context
+  savedWorkspaceContext.value = context
 }
 
 async function saveWorkspaceContext() {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   if (!workspaceId) return
-  await ensureWorkspaceContextPersisted()
+  const persisted = await ensureWorkspaceContextPersisted()
+  if (persisted) {
+    savedWorkspaceContext.value = normalizedSetupWorkspaceContext.value
+  }
 }
 
 async function ensureWorkspaceNamePersisted({ silent = false } = {}) {
@@ -1350,6 +1370,10 @@ async function handleDatasetDrop(event) {
 async function openDatasetPicker() {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   if (!workspaceId) return
+  if (requiresWorkspaceActivation.value) {
+    toast.info('Activate workspace first', 'Activate this workspace before importing datasets.')
+    return
+  }
   try {
     const { open } = await import('@tauri-apps/plugin-dialog')
     const selected = await open({
