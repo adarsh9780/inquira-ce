@@ -46,13 +46,15 @@
         <div class="mt-1 px-1 flex items-center gap-1.5">
           <span class="text-[12px] font-normal leading-[1.3]" style="color: var(--color-text-muted);">{{ formatTimestamp(message.timestamp) }}</span>
           <button
-            @click.stop="copyQuestion(message.question)"
+            @click.stop="copyQuestion(message)"
             type="button"
             aria-label="Copy question"
-            class="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] inline-flex items-center"
+            class="transition-opacity text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] inline-flex items-center"
+            :class="copiedUserMessageId === message.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'"
             title="Copy question"
           >
-            <DocumentDuplicateIcon class="h-3 w-3" />
+            <span v-if="copiedUserMessageId === message.id" class="text-[12px] font-medium text-[var(--color-success)]">Copied</span>
+            <DocumentDuplicateIcon v-else class="h-3 w-3" />
           </button>
         </div>
       </div>
@@ -152,15 +154,20 @@
 
         </div>
         <div v-if="message.explanation" class="flex items-center justify-end mt-1 px-4">
-          <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+          <div
+            class="flex items-center space-x-2 transition-opacity"
+            :class="copiedAssistantMessageId === message.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'"
+          >
             <button
-              @click="copyExplanation(message.explanation)"
+              @click="copyExplanation(message)"
               type="button"
               aria-label="Copy explanation"
-              class="btn-icon text-xs p-1"
+              class="text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] transition-colors inline-flex items-center"
+              :class="copiedAssistantMessageId === message.id ? '' : 'btn-icon text-xs p-1'"
               title="Copy explanation"
             >
-              <DocumentDuplicateIcon class="h-3 w-3" />
+              <span v-if="copiedAssistantMessageId === message.id" class="text-[12px] font-medium text-[var(--color-success)] px-1">Copied</span>
+              <DocumentDuplicateIcon v-else class="h-3 w-3" />
             </button>
           </div>
         </div>
@@ -468,20 +475,35 @@ onUnmounted(() => {
 })
 
 
-async function copyQuestion(question) {
+const copiedUserMessageId = ref(null)
+const copiedAssistantMessageId = ref(null)
+
+async function copyQuestion(message) {
+  if (!message) return
   try {
-    await navigator.clipboard.writeText(question)
-    toast.success('Copied!', 'Question copied to clipboard')
+    await navigator.clipboard.writeText(message.question || '')
+    copiedUserMessageId.value = message.id
+    window.setTimeout(() => {
+      if (copiedUserMessageId.value === message.id) {
+        copiedUserMessageId.value = null
+      }
+    }, 3000)
   } catch (error) {
     console.error('Failed to copy question:', error)
     toast.error('Copy failed', 'Unable to copy question to clipboard')
   }
 }
 
-async function copyExplanation(explanation) {
+async function copyExplanation(message) {
+  if (!message) return
   try {
-    await navigator.clipboard.writeText(explanation)
-    toast.success('Copied!', 'Explanation copied to clipboard')
+    await navigator.clipboard.writeText(message.explanation || '')
+    copiedAssistantMessageId.value = message.id
+    window.setTimeout(() => {
+      if (copiedAssistantMessageId.value === message.id) {
+        copiedAssistantMessageId.value = null
+      }
+    }, 3000)
   } catch (error) {
     console.error('Failed to copy explanation:', error)
     toast.error('Copy failed', 'Unable to copy explanation to clipboard')
