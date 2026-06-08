@@ -94,7 +94,7 @@ test('style sheet declares theme presets and shared token aliases', () => {
 test('appearance tab previews a miniature shell instead of only color swatches', () => {
   const source = read('src/components/modals/tabs/AppearanceTab.vue')
 
-  assert.equal(source.includes('Each preview mirrors the shell hierarchy'), true)
+  assert.equal(source.includes('v-for="theme in themes"'), true)
   assert.equal(source.includes('class="mt-3 rounded-xl border p-2"'), true)
   assert.equal(source.includes('class="flex h-20 overflow-hidden rounded-lg border"'), true)
   assert.equal(source.includes("backgroundColor: theme.preview[0]"), true)

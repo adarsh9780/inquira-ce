@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('dataset switcher only shows selectable datasets without unsupported refresh/delete actions', () => {
-  const switcherPath = resolve(process.cwd(), 'src/components/DatasetSwitcher.vue')
+  const switcherPath = resolve(process.cwd(), 'src/components/layout/sidebar/SidebarDatasets.vue')
   const source = readFileSync(switcherPath, 'utf-8')
 
   assert.equal(source.includes('promptDelete('), false)

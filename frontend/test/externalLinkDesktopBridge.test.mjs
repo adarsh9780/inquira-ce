@@ -11,13 +11,13 @@ test('external link service routes desktop links through open_external_url comma
   assert.equal(source.includes('window.open(url, \"_blank\"') || source.includes("window.open(url, '_blank'"), true)
 })
 
-test('ApiTab uses external link handler for provider URLs', () => {
-  const path = resolve(process.cwd(), 'src/components/modals/ApiTab.vue')
+test('LLM settings use external link handler for provider URLs', () => {
+  const path = resolve(process.cwd(), 'src/components/modals/tabs/LLMSettingsTab.vue')
   const source = readFileSync(path, 'utf-8')
 
-  assert.equal(source.includes('@click.prevent="openLink(openrouterAccountModelsUrl)"'), true)
-  assert.equal(source.includes('@click.prevent="openLink(providerKeyUrl)"'), true)
-  assert.equal(source.includes('import { openExternalUrl } from \'../../services/externalLinkService\''), true)
+  assert.equal(source.includes('@click.prevent="openProviderApiKeyPortal"'), true)
+  assert.equal(source.includes('void openExternalUrl(url)'), true)
+  assert.equal(source.includes("import { openExternalUrl } from '../../../services/externalLinkService'"), true)
 })
 
 test('StatusBar uses external link helper (CE: AuthModal removed)', () => {

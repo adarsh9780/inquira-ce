@@ -8,7 +8,7 @@ test('sidebar shows active workspace context with conversations beneath it', () 
 
   assert.equal(source.includes('activeWorkspaceName'), true)
   assert.equal(source.includes('activeWorkspaceCaption'), true)
-  assert.equal(source.includes("@click=\"openSettings('workspace', 1)\""), true)
+  assert.equal(source.includes("@click=\"appStore.openSettings('workspace')\""), true)
   assert.equal(source.includes('openSchemaEditor'), true)
   assert.equal(source.includes('CircleStackIcon'), true)
   assert.equal(source.includes('conversationBadgeLabel(index, appStore.conversations.length)'), true)

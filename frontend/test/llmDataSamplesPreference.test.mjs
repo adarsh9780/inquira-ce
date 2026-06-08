@@ -27,12 +27,10 @@ test('app store syncs LLM data samples preference with backend preferences', () 
 
 test('LLM config save paths persist bounded samples preference', () => {
   const configPath = resolve(process.cwd(), 'src/composables/useLLMConfig.js')
-  const apiTabPath = resolve(process.cwd(), 'src/components/modals/ApiTab.vue')
   const configSource = readFileSync(configPath, 'utf-8')
-  const apiTabSource = readFileSync(apiTabPath, 'utf-8')
 
   assert.equal(configSource.includes('async function saveDataSamplesPreference()'), true)
   assert.equal(configSource.includes('allow_llm_data_samples: Boolean(allowLlmDataSamples.value)'), true)
   assert.equal(configSource.includes('await saveDataSamplesPreference()'), true)
-  assert.equal(apiTabSource.includes('allow_llm_data_samples: appStore.allowLlmDataSamples'), true)
+  assert.equal(configSource.includes('selected_coding_model: String(mainModel.value || \'\').trim()'), true)
 })

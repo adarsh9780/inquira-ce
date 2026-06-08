@@ -23,13 +23,9 @@ test('settings modal uses v-model contract and two-column panel navigation', () 
   assert.equal(source.includes('closeWorkspaceLevel'), false)
   assert.equal(source.includes('@click="openWorkspaceSection"'), true)
   assert.equal(source.includes('Appearance'), true)
-  assert.equal(source.includes('Terms &amp; Conditions'), true)
   assert.equal(source.includes("@click=\"openLeafSection('appearance')\""), true)
-  assert.equal(source.includes("@click=\"openLeafSection('terms')\""), true)
   assert.equal(source.includes('<AppearanceTab />'), true)
-  assert.equal(source.includes("<TermsTab :active=\"currentPanel === 'terms'\" />"), true)
-  assert.equal(source.includes("if (candidate === 'legal') return 'terms'"), true)
-  assert.equal(source.includes("if (candidate === 'llm' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'account' || candidate === 'terms')"), true)
+  assert.equal(source.includes("if (candidate === 'llm' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'account')"), true)
   assert.equal(source.includes('<span class="text-xs">›</span>'), false)
   assert.equal(source.includes('navigateTo'), true)
   assert.equal(source.includes("<LLMSettingsTab @close-request=\"closeModal\" />"), true)
@@ -38,7 +34,6 @@ test('settings modal uses v-model contract and two-column panel navigation', () 
   assert.equal(source.includes('panel-mode='), false)
   assert.equal(source.includes("panelClass('workspace')"), true)
   assert.equal(source.includes('Active Details'), false)
-  assert.equal(source.includes("panelClass('terms')"), true)
   assert.equal(source.includes('panelClass(\'account\')'), true)
   assert.equal(source.includes("if (candidate === 'data') return 'workspace'"), true)
   assert.equal(source.includes("if (candidate === 'api') return 'llm'"), true)
@@ -72,7 +67,6 @@ test('settings tab nested scroll containers hide scrollbars while keeping overfl
     'src/components/modals/tabs/AccountTab.vue',
     'src/components/modals/tabs/AppearanceTab.vue',
     'src/components/modals/tabs/LLMSettingsTab.vue',
-    'src/components/modals/tabs/TermsTab.vue',
     'src/components/modals/tabs/WorkspaceTab.vue',
   ]
 
@@ -83,6 +77,6 @@ test('settings tab nested scroll containers hide scrollbars while keeping overfl
   }
 
   const llmSource = read('src/components/modals/tabs/LLMSettingsTab.vue')
-  assert.equal(llmSource.includes('class="scrollbar-hidden h-full overflow-y-auto pb-24"'), true)
+  assert.equal(llmSource.includes('class="scrollbar-hidden relative h-full overflow-y-auto"'), true)
   assert.equal(llmSource.includes(":class=\"showAdvanced ? 'scrollbar-hidden' : ''\""), false)
 })

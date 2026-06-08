@@ -3,12 +3,12 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('dataset switcher is disabled when no workspace exists', () => {
-  const componentPath = resolve(process.cwd(), 'src/components/DatasetSwitcher.vue')
+test('sidebar datasets are gated when no workspace exists', () => {
+  const componentPath = resolve(process.cwd(), 'src/components/layout/sidebar/SidebarDatasets.vue')
   const source = readFileSync(componentPath, 'utf-8')
 
-  assert.equal(source.includes(':disabled="loading || !appStore.hasWorkspace"'), true)
-  assert.equal(source.includes("Select Workspace First"), true)
+  assert.equal(source.includes("if (!appStore.hasWorkspace) return"), true)
+  assert.equal(source.includes('v-show="isExpanded && appStore.hasWorkspace"'), true)
 })
 
 test('app store clears stale dataset state when workspace list is empty', () => {

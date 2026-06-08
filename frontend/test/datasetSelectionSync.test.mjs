@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('dataset switcher re-syncs non-browser dataset before dispatching refresh event', () => {
-  const switcherPath = resolve(process.cwd(), 'src/components/DatasetSwitcher.vue')
+  const switcherPath = resolve(process.cwd(), 'src/components/layout/sidebar/SidebarDatasets.vue')
   const source = readFileSync(switcherPath, 'utf-8')
 
   assert.equal(source.includes('await apiService.v1AddDataset(appStore.activeWorkspaceId, ds.file_path)'), true)

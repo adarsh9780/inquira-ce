@@ -20,16 +20,15 @@ test('auth store is guest-first and wires Google OAuth through the desktop callb
   assert.equal(source.includes("window.__TAURI_INTERNALS__"), true)
 })
 
-test('account tab shows Google login for guests and manage account for signed-in users', () => {
-  const source = readSource('src/components/modals/AccountTab.vue')
+test('account tab shows Google login for guests and Google sign-out for linked users', () => {
+  const source = readSource('src/components/modals/tabs/AccountTab.vue')
 
   assert.equal(source.includes("v-if=\"authStore.isGuest\""), true)
-  assert.equal(source.includes('Continue with Google'), true)
-  assert.equal(source.includes('Manage Account'), true)
-  assert.equal(source.includes('Sign Out'), true)
+  assert.equal(source.includes('Sign in with Google'), true)
+  assert.equal(source.includes('Sign out from Google'), true)
   assert.equal(source.includes('startGoogleSignIn'), true)
-  assert.equal(source.includes('authStore.manageAccountUrl'), true)
-  assert.equal(source.includes('You are currently using the free local mode.'), true)
+  assert.equal(source.includes('signOutGoogle'), true)
+  assert.equal(source.includes('Local User mode active.'), true)
 })
 
 test('auth config loads from the backend first and falls back to env values', () => {

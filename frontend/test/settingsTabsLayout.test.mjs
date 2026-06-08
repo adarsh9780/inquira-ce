@@ -10,7 +10,6 @@ test('settings modal keeps left nav static and routes workspace panels on the ri
   assert.equal(source.includes('LLM &amp; API Keys'), true)
   assert.equal(source.includes('Workspace'), true)
   assert.equal(source.includes('Appearance'), true)
-  assert.equal(source.includes('Terms &amp; Conditions'), true)
   assert.equal(source.includes('Account'), true)
   assert.equal(source.includes('const navLevel = ref(1)'), false)
   assert.equal(source.includes('openWorkspaceSection'), true)
@@ -22,19 +21,8 @@ test('settings modal keeps left nav static and routes workspace panels on the ri
   assert.equal(source.includes('panel-mode='), false)
   assert.equal(source.includes('Active Details'), false)
   assert.equal(source.includes('<AppearanceTab />'), true)
-  assert.equal(source.includes("<TermsTab :active=\"currentPanel === 'terms'\" />"), true)
   assert.equal(source.includes('<AccountTab />'), true)
   assert.equal(source.includes('activeTab ==='), false)
   assert.equal(source.includes("if (candidate === 'api') return 'llm'"), true)
-  assert.equal(source.includes("if (candidate === 'legal') return 'terms'"), true)
-  assert.equal(source.includes("if (candidate === 'llm' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'account' || candidate === 'terms')"), true)
-})
-
-test('packages tab routes installs to terminal workflow', () => {
-  const path = resolve(process.cwd(), 'src/components/modals/PackagesTab.vue')
-  const source = readFileSync(path, 'utf-8')
-
-  assert.equal(source.includes('Install packages from Terminal'), true)
-  assert.equal(source.includes('uv pip install package==version'), true)
-  assert.equal(source.includes('appStore.toggleTerminal()'), true)
+  assert.equal(source.includes("if (candidate === 'llm' || candidate === 'workspace' || candidate === 'appearance' || candidate === 'account')"), true)
 })

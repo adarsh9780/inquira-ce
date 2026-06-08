@@ -69,9 +69,9 @@ test('modal surfaces use shared tokenized dialog transition primitives', () => {
   const settingsModal = readFileSync(resolve(process.cwd(), 'src/components/modals/SettingsModal.vue'), 'utf-8')
   const confirmationModal = readFileSync(resolve(process.cwd(), 'src/components/modals/ConfirmationModal.vue'), 'utf-8')
   const renameModal = readFileSync(resolve(process.cwd(), 'src/components/modals/WorkspaceRenameModal.vue'), 'utf-8')
-  const progressModal = readFileSync(resolve(process.cwd(), 'src/components/modals/SettingsProgressModal.vue'), 'utf-8')
+  const termsModal = readFileSync(resolve(process.cwd(), 'src/components/modals/TermsModal.vue'), 'utf-8')
 
-  for (const source of [settingsModal, confirmationModal, renameModal, progressModal]) {
+  for (const source of [settingsModal, confirmationModal, renameModal, termsModal]) {
     assert.equal(source.includes('dialog-fade-enter-active'), true)
     assert.equal(source.includes('dialog-pop-enter-active'), true)
     assert.match(source, /class="[^"]*\bmodal-overlay\b[^"]*"/)

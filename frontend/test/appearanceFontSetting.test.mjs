@@ -13,7 +13,7 @@ test('appearance tab exposes app and code font selectors wired to app store stat
   assert.equal(source.includes('>Fonts</h3>'), true)
   assert.equal(source.includes('label class="mb-2 block text-sm font-semibold text-[var(--color-text-main)]">App Font</label>'), true)
   assert.equal(source.includes('label class="mb-2 block text-sm font-semibold text-[var(--color-text-main)]">Code Font</label>'), true)
-  assert.equal(source.includes('class="border-y border-[var(--color-border)] py-5"'), true)
+  assert.equal(source.includes('class="border-t border-[var(--color-border)] py-5"'), true)
   assert.equal(source.includes('class="grid grid-cols-1 gap-4 sm:grid-cols-2"'), true)
   assert.equal(source.includes('rounded-lg border border-[var(--color-border)] bg-[var(--color-base)] p-4'), false)
   assert.equal(source.includes("import HeaderDropdown from '../../ui/HeaderDropdown.vue'"), true)

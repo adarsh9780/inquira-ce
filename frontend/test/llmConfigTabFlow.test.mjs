@@ -63,14 +63,12 @@ test('useLLMConfig composable exposes provider-aware save flow and advanced fiel
   assert.equal(source.includes('await loadPreferences(selectedProvider, true)'), true)
 })
 
-test('LLM settings tab uses provider dropdown, searchable model selects, and advanced controls', () => {
+test('LLM settings tab uses provider cards, searchable model selects, and advanced controls', () => {
   const source = read('src/components/modals/tabs/LLMSettingsTab.vue')
 
-  assert.equal(source.includes(':model-value="provider"'), true)
-  assert.equal(source.includes('search-placeholder="Search provider"'), true)
-  assert.equal(source.includes('placeholder="Select provider"'), true)
-  assert.equal(source.includes('aria-label="Provider"'), true)
-  assert.equal(source.includes('@update:model-value="handleProviderSelect"'), true)
+  assert.equal(source.includes("handleProviderSelect('openai')"), true)
+  assert.equal(source.includes("handleProviderSelect('openrouter')"), true)
+  assert.equal(source.includes("handleProviderSelect('ollama')"), true)
   assert.equal(source.includes('Provider'), true)
   assert.equal(source.includes('OpenAI'), true)
   assert.equal(source.includes('OpenRouter'), true)
@@ -86,6 +84,7 @@ test('LLM settings tab uses provider dropdown, searchable model selects, and adv
   assert.equal(source.includes('@click="openPanel'), false)
   assert.equal(source.includes('v-for="card in providerCards"'), false)
   assert.equal(source.includes('<HeaderDropdown'), true)
+  assert.equal(source.includes(':backend-search="searchProviderModels"'), true)
   assert.equal(source.includes('max-options-without-search="100"'), true)
   assert.equal(source.includes('v-model="mainSearch"'), false)
   assert.equal(source.includes('v-model="liteSearch"'), false)
