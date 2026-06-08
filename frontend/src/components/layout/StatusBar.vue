@@ -87,6 +87,18 @@
 
     <!-- Right Section: Layout, Terminal & Version -->
     <div class="flex items-center gap-3 h-full">
+      <div
+        data-websocket-status
+        class="flex items-center gap-1.5 h-full px-1 text-[10px] font-medium"
+        :class="wsConnectionMeta.textClass"
+        :title="`Realtime connection: ${wsConnectionMeta.label}`"
+      >
+        <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="wsConnectionMeta.dotClass"></span>
+        <span>{{ wsConnectionMeta.label }}</span>
+      </div>
+
+      <div class="w-px h-3.5 bg-[var(--color-border)]"></div>
+
       <!-- Workspace Layout Toggle -->
       <button
         @click="appStore.cycleWorkspaceLayoutMode()"

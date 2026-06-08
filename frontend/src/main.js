@@ -8,8 +8,3 @@ const pinia = createPinia()
 
 app.use(pinia)
 app.mount('#app')
-
-// Load WebSocket test utilities in development
-if (import.meta.env.DEV) {
-  import('./utils/websocketTest.js')
-}
