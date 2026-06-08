@@ -14,7 +14,7 @@ vi.mock('../src/composables/useToast', () => ({ toast: { error: vi.fn(), success
 
 import SidebarGlobalTurnTree from '../src/components/layout/sidebar/SidebarGlobalTurnTree.vue'
 
-describe('SidebarGlobalTurnTree view switcher', () => {
+describe('SidebarGlobalTurnTree graph view', () => {
   beforeEach(() => {
     const values = new Map()
     vi.stubGlobal('localStorage', {
@@ -25,32 +25,31 @@ describe('SidebarGlobalTurnTree view switcher', () => {
     store.loadWorkspaceTurnTree.mockClear()
   })
 
-  it('defaults to list, switches to graph, and persists the selection', async () => {
+  it('renders only the graph and opens the conversation tree rules', async () => {
+    const setItem = vi.fn()
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(),
+      setItem,
+      clear: vi.fn(),
+    })
     const wrapper = mount(SidebarGlobalTurnTree, {
       global: {
         stubs: {
-          TurnTreeView: { template: '<div data-view="list"></div>' },
           TurnTreeGraphView: { template: '<div data-view="graph"></div>' },
+          ConversationTreeRulesModal: {
+            props: ['isOpen'],
+            template: '<div v-if="isOpen" data-rules-modal></div>',
+          },
           ConfirmationModal: true,
         },
       },
     })
 
-    expect(wrapper.get('[data-view="list"]').exists()).toBe(true)
-    await wrapper.get('button[aria-pressed="false"]').trigger('click')
     expect(wrapper.get('[data-view="graph"]').exists()).toBe(true)
-    expect(localStorage.getItem('inquira.conversation-tree.view')).toBe('graph')
-
-    wrapper.unmount()
-    const restored = mount(SidebarGlobalTurnTree, {
-      global: {
-        stubs: {
-          TurnTreeView: { template: '<div data-view="list"></div>' },
-          TurnTreeGraphView: { template: '<div data-view="graph"></div>' },
-          ConfirmationModal: true,
-        },
-      },
-    })
-    expect(restored.get('[data-view="graph"]').exists()).toBe(true)
+    expect(wrapper.find('[data-view="list"]').exists()).toBe(false)
+    expect(wrapper.find('[data-rules-modal]').exists()).toBe(false)
+    await wrapper.get('button[aria-label="Open conversation tree rules"]').trigger('click')
+    expect(wrapper.get('[data-rules-modal]').exists()).toBe(true)
+    expect(setItem).not.toHaveBeenCalled()
   })
 })

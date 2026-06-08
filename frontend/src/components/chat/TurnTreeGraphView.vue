@@ -57,7 +57,7 @@
                 :width="NODE_WIDTH"
                 :height="NODE_HEIGHT"
               >
-                <div class="h-full p-0.5" data-graph-interactive>
+                <div class="h-full" data-graph-interactive>
                   <div class="relative h-full rounded-lg border transition-colors" :class="nodeClass(conversation, node)">
                     <button
                       type="button"
@@ -84,6 +84,27 @@
                   </div>
                 </div>
               </foreignObject>
+              <g
+                v-for="node in conversation.layout.nodes"
+                :key="`${node.id}-ports`"
+                class="pointer-events-none"
+                aria-hidden="true"
+              >
+                <circle
+                  v-if="node.depth > 0"
+                  :cx="nodeInputPort(node).x"
+                  :cy="nodeInputPort(node).y"
+                  :r="PORT_RADIUS"
+                  class="turn-tree-port"
+                />
+                <circle
+                  v-if="node.children?.length"
+                  :cx="nodeOutputPort(node).x"
+                  :cy="nodeOutputPort(node).y"
+                  :r="PORT_RADIUS"
+                  class="turn-tree-port"
+                />
+              </g>
             </g>
           </svg>
           <div class="absolute bottom-2 right-2 flex items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-panel-elevated)] p-1 shadow-sm" data-graph-interactive>
@@ -110,8 +131,10 @@ import { ChevronRightIcon } from '@heroicons/vue/24/outline'
 import {
   layoutTurnTree,
   turnTreeGraphEdgePath,
+  turnTreeGraphPort,
   TURN_TREE_GRAPH_NODE_HEIGHT,
   TURN_TREE_GRAPH_NODE_WIDTH,
+  TURN_TREE_GRAPH_PORT_RADIUS,
 } from '../../utils/turnTreeGraphLayout'
 import TurnTreeNodeActions from './TurnTreeNodeActions.vue'
 
@@ -119,6 +142,7 @@ const MIN_SCALE = 0.35
 const MAX_SCALE = 2.4
 const NODE_WIDTH = TURN_TREE_GRAPH_NODE_WIDTH
 const NODE_HEIGHT = TURN_TREE_GRAPH_NODE_HEIGHT
+const PORT_RADIUS = TURN_TREE_GRAPH_PORT_RADIUS
 
 const props = defineProps({
   conversations: { type: Array, default: () => [] },
@@ -209,6 +233,14 @@ function edgePath(conversation, edge) {
   const parent = conversation.layout.nodes.find((node) => node.id === edge.parentId)
   const child = conversation.layout.nodes.find((node) => node.id === edge.childId)
   return turnTreeGraphEdgePath(parent, child)
+}
+
+function nodeInputPort(node) {
+  return turnTreeGraphPort(node, 'input')
+}
+
+function nodeOutputPort(node) {
+  return turnTreeGraphPort(node, 'output')
 }
 
 function fitToView(conversationId) {
@@ -349,5 +381,12 @@ defineExpose({ fitToView, zoomBy })
 .graph-control:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
+}
+
+.turn-tree-port {
+  fill: var(--color-border-hover);
+  stroke: var(--color-surface);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
 }
 </style>

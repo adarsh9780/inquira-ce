@@ -3,6 +3,7 @@ export const TURN_TREE_GRAPH_NODE_HEIGHT = 88
 export const TURN_TREE_GRAPH_COLUMN_GAP = 96
 export const TURN_TREE_GRAPH_ROW_GAP = 40
 export const TURN_TREE_GRAPH_PADDING = 32
+export const TURN_TREE_GRAPH_PORT_RADIUS = 4
 
 export function layoutTurnTree(roots) {
   const nodes = []
@@ -98,10 +99,16 @@ export function layoutTurnTree(roots) {
 
 export function turnTreeGraphEdgePath(parent, child) {
   if (!parent || !child) return ''
-  const startX = parent.x + TURN_TREE_GRAPH_NODE_WIDTH
-  const startY = parent.y + (TURN_TREE_GRAPH_NODE_HEIGHT / 2)
-  const endX = child.x
-  const endY = child.y + (TURN_TREE_GRAPH_NODE_HEIGHT / 2)
+  const { x: startX, y: startY } = turnTreeGraphPort(parent, 'output')
+  const { x: endX, y: endY } = turnTreeGraphPort(child, 'input')
   const middleX = startX + ((endX - startX) / 2)
   return `M ${startX} ${startY} H ${middleX} V ${endY} H ${endX}`
+}
+
+export function turnTreeGraphPort(node, side) {
+  if (!node) return { x: 0, y: 0 }
+  return {
+    x: side === 'output' ? node.x + TURN_TREE_GRAPH_NODE_WIDTH : node.x,
+    y: node.y + (TURN_TREE_GRAPH_NODE_HEIGHT / 2),
+  }
 }
