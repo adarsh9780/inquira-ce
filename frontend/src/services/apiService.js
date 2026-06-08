@@ -196,27 +196,6 @@ async function waitForApiBaseReady(timeoutMs = 5000) {
   })
 }
 
-async function waitForBackendReady(timeoutMs = 30000) {
-  const baseUrl = await waitForApiBaseReady()
-  const startedAt = Date.now()
-
-  while (Date.now() - startedAt < timeoutMs) {
-    try {
-      const response = await fetch(`${String(baseUrl || '').replace(/\/+$/, '')}/health`, {
-        method: 'GET',
-      })
-      if (response.ok) {
-        return true
-      }
-    } catch (_error) {
-      // Keep polling while the backend is starting up.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 400))
-  }
-
-  throw new Error('Backend did not become ready in time.')
-}
-
 // Request interceptor
 axios.interceptors.request.use(
   async (config) => {
@@ -291,7 +270,6 @@ export const apiService = {
   setAuthToken,
   getAuthToken,
   waitForApiBaseReady,
-  waitForBackendReady,
   async logout() {
     return client.logoutUserAuthLogoutPost()
   },
@@ -776,11 +754,6 @@ export const apiService = {
 
   async getHistory() {
     return client.getChatHistoryHistoryGet()
-  },
-
-  // Health check
-  async healthCheck() {
-    return { status: 'ok' }
   },
 
   // test gemini api

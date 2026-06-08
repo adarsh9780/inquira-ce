@@ -73,12 +73,6 @@ class SettingsWebSocket {
   constructor() {
     this.socket = null
     this.isConnected = false
-    this.reconnectAttempts = 0
-    this.maxReconnectAttempts = 50 // Increased for persistent connections
-    this.messageHandlers = new Map()
-    this.progressCallback = null
-    this.errorCallback = null
-    this.completeCallback = null
     this.progressListeners = new Set()
     this.errorListeners = new Set()
     this.completeListeners = new Set()
@@ -108,10 +102,6 @@ class SettingsWebSocket {
       this.connectionAcknowledged = false
 
       this.socket.onopen = () => {
-        this.reconnectAttempts = 0
-
-        // For debugging - let's also consider the WebSocket as "connected" when it opens
-        // This will make the indicator green even if backend doesn't send acknowledgment
         this.isConnected = true
         this.notifyConnectionListeners(true)
         this.sendKernelStatusSubscription()
@@ -172,7 +162,6 @@ class SettingsWebSocket {
     console.debug('Starting persistent WebSocket connection for user:', userId)
     this.isPersistentMode = true
     this.userId = userId
-    this.reconnectAttempts = 0
 
     return this.attemptConnection()
   }
@@ -195,7 +184,6 @@ class SettingsWebSocket {
     return this.connect(this.userId)
       .then(() => {
         console.debug('✅ Persistent connection established')
-        this.reconnectAttempts = 0
         this.stopReconnectTimer()
       })
       .catch((error) => {
@@ -235,25 +223,9 @@ class SettingsWebSocket {
     switch (data.type) {
       case 'connected':
         console.debug('WebSocket connection confirmed')
-        if (this.progressCallback) {
-          this.progressCallback({
-            type: 'connected',
-            message: data.message
-          })
-        }
         break
 
       case 'progress':
-        if (this.progressCallback) {
-          // Pass the message directly without step mapping
-          this.progressCallback({
-            type: 'progress',
-            message: data.message,
-            fact: data.fact,
-            stage: data.stage,
-            progress: data.progress
-          })
-        }
         this.progressListeners.forEach((listener) => {
           try {
             listener({
@@ -270,9 +242,6 @@ class SettingsWebSocket {
         break
 
       case 'completed':
-        if (this.completeCallback) {
-          this.completeCallback(data.result)
-        }
         this.completeListeners.forEach((listener) => {
           try {
             listener(data.result)
@@ -283,9 +252,6 @@ class SettingsWebSocket {
         break
 
       case 'error':
-        if (this.errorCallback) {
-          this.errorCallback(data.message || data.error)
-        }
         this.errorListeners.forEach((listener) => {
           try {
             listener(data.message || data.error)
@@ -314,24 +280,9 @@ class SettingsWebSocket {
   }
 
   handleReconnect() {
-    if (this.isPersistentMode) {
-      // Use persistent reconnection logic
-      console.debug('Connection lost, scheduling persistent reconnection...')
-      this.scheduleReconnect()
-    } else {
-      // Use legacy reconnection logic for non-persistent mode
-      if (this.reconnectAttempts < this.maxReconnectAttempts) {
-        this.reconnectAttempts++
-        console.debug(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`)
-
-        setTimeout(() => {
-          // Legacy reconnection - just log for now
-          console.debug('Legacy reconnection attempt completed')
-        }, 1000 * this.reconnectAttempts)
-      } else {
-        console.error('Max reconnection attempts reached')
-      }
-    }
+    if (!this.isPersistentMode) return
+    console.debug('Connection lost, scheduling persistent reconnection...')
+    this.scheduleReconnect()
   }
 
   send(message) {
@@ -340,12 +291,6 @@ class SettingsWebSocket {
     } else {
       console.error('WebSocket not connected')
     }
-  }
-
-  startSettingsSave(settings) {
-    // The backend expects individual API calls, not a single WebSocket message
-    // We'll use the existing API endpoints but with WebSocket monitoring
-    console.debug('WebSocket monitoring started for settings save')
   }
 
   setKernelStatusWorkspace(workspaceId) {
@@ -367,18 +312,6 @@ class SettingsWebSocket {
       workspace_id: workspaceId,
     }))
     this.lastKernelStatusSubscriptionWorkspaceId = workspaceId
-  }
-
-  onProgress(callback) {
-    this.progressCallback = callback
-  }
-
-  onComplete(callback) {
-    this.completeCallback = callback
-  }
-
-  onError(callback) {
-    this.errorCallback = callback
   }
 
   subscribeProgress(callback) {
@@ -456,16 +389,9 @@ class SettingsWebSocket {
     return {
       isConnected: this.isConnected,
       isPersistentMode: this.isPersistentMode,
-      reconnectAttempts: this.reconnectAttempts,
-      maxReconnectAttempts: this.maxReconnectAttempts,
       lastConnectionAttempt: this.lastConnectionAttempt,
       timeSinceLastAttempt: this.lastConnectionAttempt ? Date.now() - this.lastConnectionAttempt : null
     }
-  }
-
-  // Expose handleMessage for testing
-  testHandleMessage(data) {
-    this.handleMessage(data)
   }
 }
 

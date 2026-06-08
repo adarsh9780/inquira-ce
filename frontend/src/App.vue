@@ -73,7 +73,6 @@
     </div>
 
     <div v-if="authStore.isAuthenticated && appBootstrap.ready" class="flex flex-col h-screen">
-      <ConnectionStatusIndicator />
       <div class="flex-1 flex overflow-hidden app-shell-frame relative">
         <div
           class="h-full shrink-0 app-nav-pane"
@@ -161,7 +160,6 @@ import RightPanel from './components/layout/RightPanel.vue'
 import StatusBar from './components/layout/StatusBar.vue'
 import ToastContainer from './components/ui/ToastContainer.vue'
 import StartupFailureActions from './components/startup/StartupFailureActions.vue'
-import ConnectionStatusIndicator from './components/ui/ConnectionStatusIndicator.vue'
 import SettingsModal from './components/modals/SettingsModal.vue'
 
 const appStore = useAppStore()
