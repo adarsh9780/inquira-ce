@@ -66,6 +66,68 @@ describe('TurnTreeGraphView', () => {
     expect(wrapper.get('svg g').attributes('transform')).not.toContain('scale(0.35)')
   })
 
+  it('zooms from the full canvas even when the pointer is over a node card', async () => {
+    const wrapper = mount(TurnTreeGraphView, { props: { conversations: [conversations[0]] } })
+    const graph = wrapper.get('[data-turn-tree-graph="conversation-1"]').element
+    graph.getBoundingClientRect = () => ({ left: 0, top: 0, width: 600, height: 360 })
+    const before = wrapper.get('svg g').attributes('transform')
+
+    await wrapper.get('button[aria-label="Open turn 1"]').trigger('wheel', {
+      deltaY: -100,
+      clientX: 100,
+      clientY: 100,
+    })
+
+    expect(wrapper.get('svg g').attributes('transform')).not.toBe(before)
+  })
+
+  it('collapses and expands each conversation from its header', async () => {
+    const wrapper = mount(TurnTreeGraphView, { props: { conversations: [conversations[0]] } })
+    await wrapper.vm.$nextTick()
+    const header = wrapper.get('button[aria-controls="conversation-graph-conversation-1"]')
+
+    expect(header.attributes('aria-expanded')).toBe('true')
+    expect(wrapper.get('[data-turn-tree-graph="conversation-1"]').isVisible()).toBe(true)
+
+    await header.trigger('click')
+    expect(header.attributes('aria-expanded')).toBe('false')
+    expect(wrapper.get('[data-turn-tree-graph="conversation-1"]').attributes('style')).toContain('display: none')
+  })
+
+  it('shows contiguous visible turn numbers when persisted sequence numbers have gaps', () => {
+    const wrapper = mount(TurnTreeGraphView, {
+      props: {
+        conversations: [{
+          id: 'conversation-gaps',
+          roots: [{ id: 'turn-1', seq_no: 1, children: [{ id: 'turn-4', seq_no: 4 }, { id: 'turn-6', seq_no: 6 }] }],
+        }],
+      },
+    })
+
+    expect(wrapper.findAll('button[aria-label^="Open turn"]').map((button) => button.attributes('aria-label'))).toEqual([
+      'Open turn 2',
+      'Open turn 3',
+      'Open turn 1',
+    ])
+    expect(wrapper.text()).not.toContain('Turn 4')
+    expect(wrapper.text()).not.toContain('Turn 6')
+  })
+
+  it('moves stale ancestor final markers to the latest visible leaf', () => {
+    const wrapper = mount(TurnTreeGraphView, {
+      props: {
+        conversations: [{
+          id: 'conversation-stale-final',
+          final_turn_id: 'turn-1',
+          roots: [{ id: 'turn-1', seq_no: 1, children: [{ id: 'turn-2', seq_no: 2 }] }],
+        }],
+      },
+    })
+
+    expect(wrapper.get('button[aria-label="Open turn 1"]').text()).not.toContain('Final')
+    expect(wrapper.get('button[aria-label="Open turn 2"]').text()).toContain('Final')
+  })
+
   it('pans from background pointer drags without treating nodes as the canvas', async () => {
     const wrapper = mount(TurnTreeGraphView, { props: { conversations: [conversations[0]] } })
     const svg = wrapper.get('svg')

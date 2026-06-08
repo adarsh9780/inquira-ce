@@ -5,15 +5,28 @@
     </div>
     <div v-else class="space-y-4">
       <section v-for="conversation in graphConversations" :key="conversation.id" class="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-base)]">
-        <header class="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-3 py-2">
-          <h3 class="truncate text-[12px] font-semibold text-[var(--color-text-main)]">{{ conversation.title || 'Untitled' }}</h3>
-          <span class="shrink-0 text-[10px] text-[var(--color-text-muted)]">{{ conversation.layout.nodes.length }} turns</span>
-        </header>
+        <button
+          type="button"
+          class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-[var(--color-text-main)]/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-accent)]"
+          :class="isExpanded(conversation.id) ? 'border-b border-[var(--color-border)]' : ''"
+          :aria-expanded="isExpanded(conversation.id)"
+          :aria-controls="`conversation-graph-${conversation.id}`"
+          @click="toggleConversation(conversation.id)"
+        >
+          <span class="flex min-w-0 items-center gap-2">
+            <ChevronRightIcon class="h-3 w-3 shrink-0 transition-transform" :class="isExpanded(conversation.id) ? 'rotate-90' : ''" />
+            <span class="truncate text-[12px] font-semibold text-[var(--color-text-main)]">{{ conversation.title || 'Untitled' }}</span>
+          </span>
+          <span class="shrink-0 text-[10px] text-[var(--color-text-muted)]">{{ turnCountLabel(conversation) }}</span>
+        </button>
         <div
+          v-show="isExpanded(conversation.id)"
+          :id="`conversation-graph-${conversation.id}`"
           :ref="(element) => setCanvasRef(conversation.id, element)"
           class="relative overflow-hidden bg-[var(--color-surface)]"
           :class="variant === 'page' ? 'h-[360px]' : 'h-[300px]'"
           :data-turn-tree-graph="conversation.id"
+          @wheel.prevent="handleWheel(conversation.id, $event)"
         >
           <svg
             class="h-full w-full touch-none select-none"
@@ -23,7 +36,6 @@
             @pointermove="movePan(conversation.id, $event)"
             @pointerup="stopPan(conversation.id, $event)"
             @pointercancel="stopPan(conversation.id, $event)"
-            @wheel.prevent="handleWheel(conversation.id, $event)"
           >
             <g :transform="viewportTransform(conversation.id)">
               <path
@@ -31,8 +43,10 @@
                 :key="edge.id"
                 :d="edgePath(conversation, edge)"
                 fill="none"
-                stroke="var(--color-border)"
+                stroke="var(--color-border-hover)"
                 stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
                 vector-effect="non-scaling-stroke"
               />
               <foreignObject
@@ -48,12 +62,12 @@
                     <button
                       type="button"
                       class="flex h-full w-full flex-col overflow-hidden rounded-lg px-3 py-2 pr-8 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
-                      :aria-label="`Open turn ${node.seq_no || node.id}`"
+                      :aria-label="`Open turn ${node.display_no || node.id}`"
                       @click="selectNode(conversation.id, node.id)"
                       @contextmenu.prevent="openNodeMenu(conversation.id, node.id, $event)"
                     >
                       <span class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
-                        Turn {{ node.seq_no || '?' }}
+                        Turn {{ node.display_no || '?' }}
                         <span v-if="isFinal(conversation, node)" class="rounded-full border border-[var(--color-border)] px-1.5 py-0.5 normal-case tracking-normal">Final</span>
                       </span>
                       <span class="mt-1 truncate text-[12px] font-medium text-[var(--color-text-main)]">{{ questionLine(node) }}</span>
@@ -62,7 +76,7 @@
                     <button
                       type="button"
                       class="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-md text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-panel-muted)] hover:text-[var(--color-text-main)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
-                      :aria-label="`Actions for turn ${node.seq_no || node.id}`"
+                      :aria-label="`Actions for turn ${node.display_no || node.id}`"
                       @click.stop="openNodeMenu(conversation.id, node.id, $event)"
                     >
                       ⋯
@@ -92,6 +106,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { ChevronRightIcon } from '@heroicons/vue/24/outline'
 import {
   layoutTurnTree,
   turnTreeGraphEdgePath,
@@ -116,20 +131,57 @@ const emit = defineEmits(['select', 'mark-final', 'delete-turn'])
 const nodeActionsRef = ref(null)
 const canvasRefs = new Map()
 const viewports = reactive({})
+const expandedConversationIds = ref(new Set())
 let resizeObserver = null
 
 const rootClass = computed(() => props.variant === 'page' ? 'min-h-0 flex-1 overflow-y-auto px-1 py-3' : 'min-h-0 flex-1 overflow-y-auto px-3 py-3')
-const graphConversations = computed(() => (Array.isArray(props.conversations) ? props.conversations : []).map((conversation) => ({
-  id: String(conversation?.id || '').trim(),
-  title: String(conversation?.title || '').trim(),
-  finalTurnId: String(conversation?.final_turn_id || conversation?.finalTurnId || '').trim(),
-  layout: layoutTurnTree(conversation?.roots),
-})).filter((conversation) => conversation.id))
+const graphConversations = computed(() => (Array.isArray(props.conversations) ? props.conversations : []).map((conversation) => {
+  const layout = layoutTurnTree(conversation?.roots)
+  return {
+    id: String(conversation?.id || '').trim(),
+    title: String(conversation?.title || '').trim(),
+    finalTurnId: resolveGraphFinalTurnId(
+      layout,
+      String(conversation?.final_turn_id || conversation?.finalTurnId || '').trim(),
+    ),
+    layout,
+  }
+}).filter((conversation) => conversation.id))
 const isEmpty = computed(() => graphConversations.value.length === 0 || graphConversations.value.every((conversation) => conversation.layout.nodes.length === 0))
 
 function ensureViewport(conversationId) {
   if (!viewports[conversationId]) viewports[conversationId] = { x: 0, y: 0, scale: 1, pointerId: null, lastX: 0, lastY: 0 }
   return viewports[conversationId]
+}
+
+function resolveGraphFinalTurnId(layout, configuredFinalTurnId) {
+  const configuredFinal = layout.nodes.find((node) => node.id === configuredFinalTurnId)
+  if (configuredFinal && (!Array.isArray(configuredFinal.children) || configuredFinal.children.length === 0)) {
+    return configuredFinal.id
+  }
+  const leaves = layout.nodes.filter((node) => !Array.isArray(node.children) || node.children.length === 0)
+  return leaves.reduce((latest, node) => (
+    !latest || Number(node.display_no || 0) > Number(latest.display_no || 0) ? node : latest
+  ), null)?.id || ''
+}
+
+function isExpanded(conversationId) {
+  return expandedConversationIds.value.has(String(conversationId || '').trim())
+}
+
+function toggleConversation(conversationId, forceOpen = false) {
+  const id = String(conversationId || '').trim()
+  if (!id) return
+  const next = new Set(expandedConversationIds.value)
+  if (forceOpen || !next.has(id)) next.add(id)
+  else next.delete(id)
+  expandedConversationIds.value = next
+  if (next.has(id)) void nextTick(() => fitToView(id))
+}
+
+function turnCountLabel(conversation) {
+  const count = conversation.layout.nodes.length
+  return `${count} ${count === 1 ? 'turn' : 'turns'}`
 }
 
 function setCanvasRef(conversationId, element) {
@@ -235,7 +287,7 @@ function isFinal(conversation, node) {
 }
 
 function questionLine(node) {
-  return String(node?.user_text || '').trim() || `Turn ${node?.seq_no || ''}`.trim()
+  return String(node?.user_text || '').trim() || `Turn ${node?.display_no || ''}`.trim()
 }
 
 function answerLine(node) {
@@ -252,6 +304,7 @@ async function fitAll() {
 }
 
 onMounted(() => {
+  for (const conversation of graphConversations.value) toggleConversation(conversation.id, true)
   if ('ResizeObserver' in window) {
     resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -266,6 +319,11 @@ onMounted(() => {
 
 onBeforeUnmount(() => resizeObserver?.disconnect())
 watch(() => graphConversations.value.map((conversation) => `${conversation.id}:${conversation.layout.nodes.length}`).join('|'), () => void fitAll())
+watch(() => graphConversations.value.map((conversation) => conversation.id).join('|'), () => {
+  const next = new Set(expandedConversationIds.value)
+  for (const conversation of graphConversations.value) next.add(conversation.id)
+  expandedConversationIds.value = next
+})
 
 defineExpose({ fitToView, zoomBy })
 </script>

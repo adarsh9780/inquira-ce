@@ -8,7 +8,28 @@ export function layoutTurnTree(roots) {
   const nodes = []
   const edges = []
   const seenIds = new Set()
+  const displayNumbers = new Map()
   let nextLeafY = TURN_TREE_GRAPH_PADDING
+
+  const visibleNodes = []
+  function collectVisibleNodes(rawNodes) {
+    for (const rawNode of Array.isArray(rawNodes) ? rawNodes : []) {
+      const id = String(rawNode?.id || '').trim()
+      if (!id || displayNumbers.has(id)) continue
+      visibleNodes.push(rawNode)
+      displayNumbers.set(id, 0)
+      collectVisibleNodes(rawNode?.children)
+    }
+  }
+
+  collectVisibleNodes(roots)
+  visibleNodes
+    .sort((left, right) => (
+      Number(left?.seq_no || 0) - Number(right?.seq_no || 0)
+      || String(left?.created_at || '').localeCompare(String(right?.created_at || ''))
+      || String(left?.id || '').localeCompare(String(right?.id || ''))
+    ))
+    .forEach((node, index) => displayNumbers.set(String(node?.id || '').trim(), index + 1))
 
   function visit(rawNode, depth, ancestors) {
     const id = String(rawNode?.id || '').trim()
@@ -40,6 +61,7 @@ export function layoutTurnTree(roots) {
     const node = {
       ...rawNode,
       id,
+      display_no: displayNumbers.get(id),
       x: TURN_TREE_GRAPH_PADDING + (depth * (TURN_TREE_GRAPH_NODE_WIDTH + TURN_TREE_GRAPH_COLUMN_GAP)),
       y,
       depth,
@@ -80,6 +102,6 @@ export function turnTreeGraphEdgePath(parent, child) {
   const startY = parent.y + (TURN_TREE_GRAPH_NODE_HEIGHT / 2)
   const endX = child.x
   const endY = child.y + (TURN_TREE_GRAPH_NODE_HEIGHT / 2)
-  const controlOffset = Math.max(36, (endX - startX) / 2)
-  return `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${endX - controlOffset} ${endY}, ${endX} ${endY}`
+  const middleX = startX + ((endX - startX) / 2)
+  return `M ${startX} ${startY} H ${middleX} V ${endY} H ${endX}`
 }

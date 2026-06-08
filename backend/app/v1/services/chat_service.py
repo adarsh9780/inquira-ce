@@ -1829,9 +1829,13 @@ class ChatService:
             result_kind=str(response_payload.get("result_kind") or ""),
             artifacts=artifacts,
         )
-        if not str(getattr(conversation, "final_turn_id", "") or "").strip():
-            conversation.final_turn_id = turn.id
-            turn.is_final = True
+        previous_final_id = str(getattr(conversation, "final_turn_id", "") or "").strip()
+        if previous_final_id and previous_final_id != turn.id:
+            previous_final_turn = await ConversationRepository.get_turn(session, previous_final_id)
+            if previous_final_turn is not None and previous_final_turn.conversation_id == conversation_id:
+                previous_final_turn.is_final = False
+        conversation.final_turn_id = turn.id
+        turn.is_final = True
         await session.commit()
         return turn.id
 

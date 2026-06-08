@@ -73,3 +73,71 @@ async def test_persist_turn_defaults_first_saved_turn_to_final(monkeypatch) -> N
     assert turn_id == "turn-1"
     assert conversation.final_turn_id == "turn-1"
     assert created_turn.is_final is True
+
+
+@pytest.mark.asyncio
+async def test_persist_turn_advances_final_marker_to_latest_saved_turn(monkeypatch) -> None:
+    previous_turn = SimpleNamespace(id="turn-1", conversation_id="conversation-1", is_final=True)
+    created_turn = SimpleNamespace(
+        id="turn-2",
+        conversation_id="conversation-1",
+        is_final=False,
+        code_path=None,
+        manifest_path=None,
+        artifact_summary_json=None,
+        execution_summary_json=None,
+        schema_usage_json=None,
+        parent_turn_id="turn-1",
+    )
+
+    async def fake_get_turn(_session, turn_id):
+        return previous_turn if turn_id == previous_turn.id else None
+
+    async def fake_persist_turn_artifacts(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr("app.v1.services.chat_service.ConversationRepository.get_turn", fake_get_turn)
+    monkeypatch.setattr(
+        "app.v1.services.chat_service.TurnArtifactStorageService.persist_turn_artifacts",
+        staticmethod(fake_persist_turn_artifacts),
+    )
+
+    session = SimpleNamespace()
+
+    async def _commit():
+        return None
+
+    session.commit = _commit
+    conversation = SimpleNamespace(
+        title="Conversation",
+        final_turn_id="turn-1",
+        schema_memory_json=None,
+        schema_memory_version=None,
+        branch_summary_json=None,
+    )
+
+    await ChatService._persist_turn(
+        session=session,
+        conversation=conversation,
+        turn=created_turn,
+        seq_no=2,
+        username="alice",
+        workspace_id="workspace-1",
+        workspace_schema=None,
+        data_path=None,
+        conversation_id="conversation-1",
+        question="Add strike rate",
+        attachments=None,
+        response_payload={
+            "explanation": "Added strike rate.",
+            "code": "",
+            "artifacts": [],
+            "execution": {"status": "success", "success": True},
+        },
+        result={},
+        parent_turn_id="turn-1",
+    )
+
+    assert conversation.final_turn_id == "turn-2"
+    assert previous_turn.is_final is False
+    assert created_turn.is_final is True
