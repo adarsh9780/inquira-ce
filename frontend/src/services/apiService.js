@@ -942,6 +942,10 @@ export const apiService = {
     return v1Api.conversations.update(conversationId, { title })
   },
 
+  async v1GetConversationUsage(conversationId) {
+    return v1Api.conversations.usage(conversationId)
+  },
+
   async v1ListTurns(conversationId, limit = 5, before = null) {
     const params = { limit }
     if (before) params.before = before

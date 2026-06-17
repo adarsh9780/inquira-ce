@@ -1138,6 +1138,11 @@ async function handleSlashCommand(questionText) {
     if (persistedConversationId) {
       await appStore.fetchConversations()
       await appStore.loadWorkspaceTurnTree()
+      try {
+        await appStore.fetchActiveConversationUsage(persistedConversationId)
+      } catch (_error) {
+        // Usage display is informational; command output should still render.
+      }
     }
     appStore.updateLastMessageExplanation(
       String(result?.output || `/${String(result?.name || 'command')} executed.`)
@@ -1404,6 +1409,11 @@ async function handleSubmit() {
     const { is_safe, code, current_code, explanation, result_explanation, code_explanation } = response
     const finalCode = (code ?? current_code ?? '').toString()
     appStore.setLastMessageAnalysisMetadata(response?.metadata || {}, localMessageId)
+    try {
+      await appStore.fetchActiveConversationUsage(String(response?.conversation_id || requestConversationId || '').trim())
+    } catch (_error) {
+      // Usage display is informational; the completed response should still render.
+    }
     const finalExplanation = (result_explanation ?? explanation ?? '').toString()
     appStore.setLastMessageCodeSnapshot(finalCode, localMessageId)
     appStore.setLastMessageCodeExplanation((code_explanation ?? '').toString(), localMessageId)

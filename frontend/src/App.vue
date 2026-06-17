@@ -154,6 +154,7 @@ import { toast } from './composables/useToast'
 import { normalizeThemeId } from './constants/themes'
 import { normalizeAppFontId, normalizeCodeFontId } from './constants/fonts'
 import { filterSupportedDatasetPaths, getDroppedDatasetPaths, SUPPORTED_DATASET_EXTENSIONS } from './utils/datasetImport'
+import { matchShortcut } from './utils/keyboardShortcuts'
 import { resolveWorkspaceLayoutShortcut, WORKSPACE_LAYOUT_MODES } from './utils/workspaceLayout'
 import logo from './assets/favicon.svg'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
@@ -521,7 +522,6 @@ function handleGlobalShortcuts(event) {
   if (event.defaultPrevented) return
   if (event.repeat) return
 
-  const key = String(event.key || '').toLowerCase()
   const hasPrimaryModifier = event.metaKey || event.ctrlKey
   const layoutShortcut = resolveWorkspaceLayoutShortcut(event)
   if (layoutShortcut) {
@@ -531,25 +531,43 @@ function handleGlobalShortcuts(event) {
   }
   if (!hasPrimaryModifier || event.altKey) return
 
-  if (key === 'o') {
+  if (matchShortcut(event, 'conversation-tree')) {
+    event.preventDefault()
+    appStore.setActiveTab('conversation-tree')
+    return
+  }
+
+  if (matchShortcut(event, 'schema')) {
+    event.preventDefault()
+    appStore.setActiveTab('schema-editor')
+    return
+  }
+
+  if (matchShortcut(event, 'keyboard-shortcuts')) {
+    event.preventDefault()
+    appStore.openKeyboardShortcuts()
+    return
+  }
+
+  if (matchShortcut(event, 'dataset-import')) {
     event.preventDefault()
     void openGlobalDatasetPicker()
     return
   }
 
-  if (key === 'b') {
+  if (matchShortcut(event, 'sidebar')) {
     event.preventDefault()
     toggleSidebarVisibility()
     return
   }
 
-  if (key === 'j') {
+  if (matchShortcut(event, 'terminal')) {
     event.preventDefault()
     appStore.toggleTerminal()
     return
   }
 
-  if (key === 'd' && event.shiftKey) {
+  if (matchShortcut(event, 'layout-cycle')) {
     event.preventDefault()
     appStore.cycleWorkspaceLayoutMode()
   }

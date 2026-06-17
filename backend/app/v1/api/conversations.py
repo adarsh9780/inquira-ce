@@ -13,6 +13,7 @@ from ..schemas.conversation import (
     ConversationCreateRequest,
     ConversationListResponse,
     ConversationResponse,
+    ConversationUsageResponse,
     FinalTurnRerunResponse,
     GlobalTurnTreeConversationResponse,
     GlobalTurnTreeResponse,
@@ -348,7 +349,24 @@ def _build_turn_tree_node(payload: dict) -> TurnTreeNodeResponse:
         user_text=payload["user_text"],
         assistant_text=payload.get("assistant_text", ""),
         created_at=payload["created_at"],
+        usage=payload.get("usage"),
         children=[_build_turn_tree_node(child) for child in payload.get("children") or []],
+    )
+
+
+@router.get("/conversations/{conversation_id}/usage", response_model=ConversationUsageResponse)
+async def get_conversation_usage(
+    conversation_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Return provider-reported usage totals for one conversation."""
+    return ConversationUsageResponse(
+        **await ConversationService.get_conversation_usage(
+            session=session,
+            principal_id=current_user.id,
+            conversation_id=conversation_id,
+        )
     )
 
 
@@ -373,6 +391,7 @@ async def get_workspace_turn_tree(
                 created_at=conversation["created_at"],
                 updated_at=conversation["updated_at"],
                 final_turn_id=conversation.get("final_turn_id"),
+                usage_summary=conversation.get("usage_summary"),
                 roots=[_build_turn_tree_node(node) for node in conversation.get("roots") or []],
             )
             for conversation in payload["conversations"]

@@ -54,6 +54,25 @@ class TurnResponse(BaseModel):
     created_at: datetime
 
 
+class ConversationUsageSummary(BaseModel):
+    """Provider-reported token and cost usage summary."""
+
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cached_tokens: int | None = None
+    total_tokens: int | None = None
+    price_usd: float | None = None
+
+
+class ConversationUsageResponse(BaseModel):
+    """Full visible-turn usage aggregate for one conversation."""
+
+    conversation_id: str
+    turn_count: int
+    turns_with_usage: int
+    usage: ConversationUsageSummary
+
+
 class TurnPageResponse(BaseModel):
     """Paginated turn response."""
 
@@ -141,6 +160,7 @@ class TurnTreeNodeResponse(BaseModel):
     user_text: str
     assistant_text: str
     created_at: datetime
+    usage: ConversationUsageSummary | None = None
     children: list[TurnTreeNodeResponse] = Field(default_factory=list)
 
 
@@ -174,6 +194,7 @@ class GlobalTurnTreeConversationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     final_turn_id: str | None = None
+    usage_summary: ConversationUsageResponse | None = None
     roots: list[TurnTreeNodeResponse] = Field(default_factory=list)
 
 

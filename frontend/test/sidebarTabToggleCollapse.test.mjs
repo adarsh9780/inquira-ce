@@ -15,7 +15,7 @@ test('workspace views live in the sidebar instead of the status bar', () => {
   assert.equal(sidebarSource.includes('@click="openConversationTree"'), true)
   assert.equal(sidebarSource.includes('ChatBubbleLeftRightIcon'), false)
   assert.equal(sidebarSource.includes('CircleStackIcon'), true)
-  assert.equal(sidebarSource.includes('QueueListIcon'), true)
+  assert.equal(sidebarSource.includes('ShareIcon'), true)
   assert.equal(sidebarSource.includes('Conversations and analysis'), false)
   assert.equal(sidebarSource.includes('Schema'), true)
   assert.equal(sidebarSource.includes('Conversation Tree'), true)

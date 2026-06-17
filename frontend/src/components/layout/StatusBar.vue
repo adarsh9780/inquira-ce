@@ -249,6 +249,7 @@ import { useAuthStore } from '../../stores/authStore'
 import apiService from '../../services/apiService'
 import { openExternalUrl } from '../../services/externalLinkService'
 import { settingsWebSocket } from '../../services/websocketService'
+import { formatUsageCompact, formatUsageTooltip } from '../../utils/usageFormat'
 import {
   BellIcon,
   CommandLineIcon,
@@ -311,62 +312,18 @@ const unreadNotificationBadge = computed(() => {
   return count > 99 ? '99+' : String(count)
 })
 
-function toNonNegativeInt(value) {
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed)) return null
-  return parsed > 0 ? Math.floor(parsed) : 0
-}
-
-function toNonNegativeFloat(value) {
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed)) return null
-  return parsed > 0 ? parsed : 0
-}
-
-function formatTokenCount(value) {
-  const parsed = toNonNegativeInt(value)
-  if (!Number.isInteger(parsed)) return '-'
-  return parsed.toLocaleString()
-}
-
-function formatUsd(value) {
-  const amount = toNonNegativeFloat(value)
-  if (typeof amount !== 'number') return '$-'
-  if (amount <= 0) return '$-'
-  return `$${amount.toFixed(6)}`
-}
-
 const tokenUsageSummaryLabel = computed(() => {
-  const usage = appStore.liveTokenUsage && typeof appStore.liveTokenUsage === 'object'
-    ? appStore.liveTokenUsage
-    : {}
-  const inputTokens = formatTokenCount(usage.input_tokens)
-  const cachedInputTokens = formatTokenCount(usage.cached_tokens)
-  const outputTokens = formatTokenCount(usage.output_tokens)
-  const priceLabel = formatUsd(usage.price_usd)
-  const parts = [
-    inputTokens,
-    cachedInputTokens,
-    outputTokens,
-    priceLabel,
-  ]
-  return parts.join(' | ')
+  const summary = appStore.activeConversationUsage && typeof appStore.activeConversationUsage === 'object'
+    ? appStore.activeConversationUsage
+    : null
+  return formatUsageCompact(summary?.usage || appStore.liveTokenUsage)
 })
 
 const tokenUsageHoverLabel = computed(() => {
-  const usage = appStore.liveTokenUsage && typeof appStore.liveTokenUsage === 'object'
-    ? appStore.liveTokenUsage
-    : {}
-  const inputTokens = formatTokenCount(usage.input_tokens)
-  const cachedInputTokens = formatTokenCount(usage.cached_tokens)
-  const outputTokens = formatTokenCount(usage.output_tokens)
-  const priceLabel = formatUsd(usage.price_usd)
-  return [
-    `Input tokens: ${inputTokens}`,
-    `Cached input tokens: ${cachedInputTokens}`,
-    `Output tokens: ${outputTokens}`,
-    `Price (USD): ${priceLabel}`,
-  ].join('\n')
+  const summary = appStore.activeConversationUsage && typeof appStore.activeConversationUsage === 'object'
+    ? appStore.activeConversationUsage
+    : null
+  return formatUsageTooltip(summary?.usage || appStore.liveTokenUsage, summary)
 })
 
 const primaryBackgroundOperation = computed(() => appStore.primaryBackgroundOperation)

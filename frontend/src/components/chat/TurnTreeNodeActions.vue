@@ -29,6 +29,10 @@
           </div>
         </div>
         <div>
+          <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">Usage</p>
+          <p class="mt-1 text-sm text-[var(--color-text-main)]" :title="detailUsageTooltip">{{ detailUsageLabel }}</p>
+        </div>
+        <div>
           <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">Question</p>
           <p class="mt-1 whitespace-pre-wrap text-sm text-[var(--color-text-main)]">{{ detailTurn?.user_text || '-' }}</p>
         </div>
@@ -61,6 +65,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { apiService } from '../../services/apiService'
 import { formatTimestamp } from '../../utils/dateUtils'
+import { formatUsageCompact, formatUsageTooltip } from '../../utils/usageFormat'
 
 const emit = defineEmits(['select', 'mark-final', 'delete-turn'])
 const actions = [
@@ -72,6 +77,9 @@ const actions = [
 const contextMenu = ref({ open: false, conversationId: '', turnId: '', x: 0, y: 0 })
 const detailModalOpen = ref(false)
 const detailTurn = ref(null)
+const detailUsage = computed(() => detailTurn.value?.metadata?.token_usage || null)
+const detailUsageLabel = computed(() => formatUsageCompact(detailUsage.value))
+const detailUsageTooltip = computed(() => formatUsageTooltip(detailUsage.value))
 
 const detailArtifacts = computed(() => {
   const events = Array.isArray(detailTurn.value?.tool_events) ? detailTurn.value.tool_events : []

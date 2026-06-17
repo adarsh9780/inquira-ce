@@ -200,7 +200,7 @@
                 appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
                 appStore.activeTab === 'schema-editor' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
               ]"
-              :title="appStore.isSidebarCollapsed ? 'Open schema editor' : 'Schema editor'"
+              :title="shortcutTooltip('schema', appStore.isSidebarCollapsed ? 'Open schema editor' : 'Schema editor')"
               @click="openSchemaEditor"
             >
               <div class="flex h-6 w-6 shrink-0 items-center justify-center">
@@ -232,11 +232,11 @@
                 appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
                 appStore.activeTab === 'conversation-tree' ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
               ]"
-              :title="appStore.isSidebarCollapsed ? 'Open conversation tree' : 'Conversation tree'"
+              :title="shortcutTooltip('conversation-tree', appStore.isSidebarCollapsed ? 'Open conversation tree' : 'Conversation tree')"
               @click="openConversationTree"
             >
               <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-                <QueueListIcon class="h-5 w-5" :class="appStore.activeTab === 'conversation-tree' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
+                <ShareIcon class="h-5 w-5" :class="appStore.activeTab === 'conversation-tree' ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
               </div>
               <div
                 class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
@@ -347,6 +347,10 @@
       :is-open="isTermsOpen"
       @close="isTermsOpen = false"
     />
+    <KeyboardShortcutsModal
+      :is-open="appStore.isKeyboardShortcutsOpen"
+      @close="appStore.closeKeyboardShortcuts()"
+    />
     <Teleport to="body">
       <div
         v-if="profileMenuOpen"
@@ -367,6 +371,14 @@
           @click="openProfileSection('appearance')"
         >
           Theme Preference
+        </button>
+        <button
+          type="button"
+          class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
+          :title="shortcutTooltip('keyboard-shortcuts', 'Keyboard Shortcuts')"
+          @click="openKeyboardShortcuts"
+        >
+          Keyboard Shortcuts
         </button>
         <div class="h-px bg-[var(--color-border)] my-1 opacity-60" />
         <template v-if="false">
@@ -420,7 +432,9 @@ import { useAuthStore } from '../../stores/authStore'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { formatTimestamp } from '../../utils/dateUtils'
+import { shortcutTitle } from '../../utils/keyboardShortcuts'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
+import KeyboardShortcutsModal from '../modals/KeyboardShortcutsModal.vue'
 import TermsModal from '../modals/TermsModal.vue'
 import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
@@ -430,7 +444,7 @@ import {
   PlusIcon,
   EllipsisHorizontalIcon,
   CircleStackIcon,
-  QueueListIcon,
+  ShareIcon,
   Cog6ToothIcon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
@@ -631,7 +645,7 @@ function updateProfileMenuPosition() {
     Math.max(rect.left, gap),
     Math.max(gap, viewportWidth - menuWidth - gap),
   )
-  const fallbackHeight = 124
+  const fallbackHeight = 160
   const top = Math.max(gap, Math.min(rect.top - fallbackHeight - gap, viewportHeight - fallbackHeight - gap))
   profileMenuPosition.value = { left, top }
 }
@@ -656,6 +670,16 @@ function openProfileSection(tab) {
 function openTermsModal() {
   closeProfileMenu()
   isTermsOpen.value = true
+}
+
+function openKeyboardShortcuts() {
+  closeProfileMenu()
+  appStore.openKeyboardShortcuts()
+}
+
+function shortcutTooltip(shortcutId, fallback) {
+  const platform = typeof navigator !== 'undefined' ? navigator.platform : ''
+  return shortcutTitle(shortcutId, fallback, platform)
 }
 
 // ─── Global click — close menus ───────────────────────────────────────────────

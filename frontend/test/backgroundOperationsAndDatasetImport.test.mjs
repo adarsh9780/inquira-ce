@@ -32,7 +32,7 @@ test('status bar renders active background operation progress without replacing 
 test('global dataset import supports Cmd/Ctrl+O and app-level drops through shared ingestion', () => {
   const app = read('src/App.vue')
 
-  assert.equal(app.includes("if (key === 'o')"), true)
+  assert.equal(app.includes("matchShortcut(event, 'dataset-import')"), true)
   assert.equal(app.includes('void openGlobalDatasetPicker()'), true)
   assert.equal(app.includes("import('@tauri-apps/plugin-dialog')"), true)
   assert.equal(app.includes('document.addEventListener(\'dragover\', handleAppDatasetDragOver)'), true)

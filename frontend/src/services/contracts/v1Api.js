@@ -78,6 +78,7 @@ export const v1Api = {
       axios.post(`/api/v1/workspaces/${workspaceId}/conversations`, { title }),
     remove: (conversationId) => axios.delete(`/api/v1/conversations/${conversationId}`),
     update: (conversationId, payload) => axios.patch(`/api/v1/conversations/${conversationId}`, payload),
+    usage: (conversationId) => axios.get(`/api/v1/conversations/${conversationId}/usage`),
     turns: (conversationId, params) => axios.get(`/api/v1/conversations/${conversationId}/turns`, { params })
   },
   chat: {

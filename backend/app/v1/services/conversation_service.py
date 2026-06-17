@@ -19,6 +19,8 @@ from .cursor_service import decode_cursor, encode_cursor
 class ConversationService:
     """Business logic for conversations and turns."""
 
+    USAGE_FIELDS = ("input_tokens", "output_tokens", "cached_tokens", "total_tokens", "price_usd")
+
     @staticmethod
     def _has_turn_bundle(turn: Turn) -> bool:
         code_path = str(getattr(turn, "code_path", "") or "").strip()
@@ -43,6 +45,69 @@ class ConversationService:
             "metadata": json.loads(turn.metadata_json) if turn.metadata_json else None,
             "code_snapshot": turn.code_snapshot,
             "created_at": turn.created_at,
+        }
+
+    @staticmethod
+    def _safe_json(value: str | None) -> dict[str, Any]:
+        if not value:
+            return {}
+        try:
+            parsed = json.loads(value)
+        except (TypeError, ValueError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+
+    @staticmethod
+    def _normalize_usage_value(field: str, value: Any) -> int | float | None:
+        if value is None or isinstance(value, bool):
+            return None
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return None
+        if parsed < 0:
+            return None
+        if field == "price_usd":
+            return parsed
+        return int(parsed)
+
+    @staticmethod
+    def normalize_token_usage(value: Any) -> dict[str, int | float | None] | None:
+        if not isinstance(value, dict):
+            return None
+        usage: dict[str, int | float | None] = {}
+        has_value = False
+        for field in ConversationService.USAGE_FIELDS:
+            parsed = ConversationService._normalize_usage_value(field, value.get(field))
+            usage[field] = parsed
+            if parsed is not None:
+                has_value = True
+        return usage if has_value else None
+
+    @staticmethod
+    def turn_token_usage(turn: Turn) -> dict[str, int | float | None] | None:
+        metadata = ConversationService._safe_json(turn.metadata_json)
+        return ConversationService.normalize_token_usage(metadata.get("token_usage"))
+
+    @staticmethod
+    def aggregate_turn_usage(conversation_id: str, turns: list[Turn]) -> dict[str, Any]:
+        totals: dict[str, int | float | None] = {field: None for field in ConversationService.USAGE_FIELDS}
+        turns_with_usage = 0
+        for turn in turns:
+            usage = ConversationService.turn_token_usage(turn)
+            if not usage:
+                continue
+            turns_with_usage += 1
+            for field, value in usage.items():
+                if value is None:
+                    continue
+                current = totals.get(field)
+                totals[field] = value if current is None else current + value
+        return {
+            "conversation_id": conversation_id,
+            "turn_count": len(turns),
+            "turns_with_usage": turns_with_usage,
+            "usage": totals,
         }
 
     @staticmethod
@@ -76,6 +141,20 @@ class ConversationService:
         await session.commit()
         await session.refresh(conversation)
         return conversation
+
+    @staticmethod
+    async def get_conversation_usage(
+        session: AsyncSession,
+        principal_id: str,
+        conversation_id: str,
+    ) -> dict[str, Any]:
+        """Return provider-reported usage totals for all visible turns."""
+        conversation = await ConversationRepository.get_conversation(session, conversation_id)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        await ConversationService.ensure_workspace_access(session, principal_id, conversation.workspace_id)
+        turns = await ConversationRepository.list_turns_in_sequence(session, conversation_id)
+        return ConversationService.aggregate_turn_usage(conversation_id, turns)
 
     @staticmethod
     async def list_conversations(
@@ -248,6 +327,7 @@ class ConversationService:
                 "user_text": turn.user_text,
                 "assistant_text": turn.assistant_text,
                 "created_at": turn.created_at,
+                "usage": ConversationService.turn_token_usage(turn),
                 "children": [],
             }
 
@@ -294,6 +374,7 @@ class ConversationService:
                 "user_text": turn.user_text,
                 "assistant_text": turn.assistant_text,
                 "created_at": turn.created_at,
+                "usage": ConversationService.turn_token_usage(turn),
                 "children": [],
             }
         for turn in turns:
@@ -341,6 +422,10 @@ class ConversationService:
                     "created_at": conversation.created_at,
                     "updated_at": conversation.updated_at,
                     "final_turn_id": conversation.final_turn_id,
+                    "usage_summary": ConversationService.aggregate_turn_usage(
+                        conversation.id,
+                        turns_by_conversation.get(conversation.id, []),
+                    ),
                     "roots": ConversationService._build_tree_from_turns(turns_by_conversation.get(conversation.id, [])),
                 }
                 for conversation in conversations

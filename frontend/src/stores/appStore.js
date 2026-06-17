@@ -19,6 +19,7 @@ import {
   normalizeAppFontId,
   normalizeCodeFontId,
 } from '../constants/fonts'
+import { mergeUsageTotals, normalizeUsage } from '../utils/usageFormat'
 
 export const useAppStore = defineStore('app', () => {
   const authStore = useAuthStore()
@@ -85,6 +86,8 @@ export const useAppStore = defineStore('app', () => {
   const currentQuestion = ref('')
   const currentExplanation = ref('')
   const liveTokenUsage = ref(null)
+  const activeConversationUsage = ref(null)
+  const conversationUsageById = ref({})
   const workspaces = ref([])
   const workspaceDeletionJobs = ref([])
   const activeWorkspaceId = ref('')
@@ -141,6 +144,7 @@ export const useAppStore = defineStore('app', () => {
   const isSidebarCollapsed = ref(false)
   const workspaceLayoutMode = ref(WORKSPACE_LAYOUT_MODES.VIEW)
   const hideShortcutsModal = ref(false)
+  const isKeyboardShortcutsOpen = ref(false)
 
   // Editor State
   const editorLine = ref(1)
@@ -624,6 +628,9 @@ export const useAppStore = defineStore('app', () => {
     questionHistory.value = []
     currentQuestion.value = ''
     currentExplanation.value = ''
+    liveTokenUsage.value = null
+    activeConversationUsage.value = null
+    conversationUsageById.value = {}
     workspaces.value = []
     workspaceDeletionJobs.value = []
     activeWorkspaceId.value = ''
@@ -1064,19 +1071,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function mergeTokenUsageTotals(base, incoming) {
-    const left = base && typeof base === 'object' ? base : {}
-    const right = incoming && typeof incoming === 'object' ? incoming : {}
-    const merged = {
-      input_tokens: toTokenUsageNumber(left.input_tokens) + toTokenUsageNumber(right.input_tokens),
-      output_tokens: toTokenUsageNumber(left.output_tokens) + toTokenUsageNumber(right.output_tokens),
-      cached_tokens: toTokenUsageNumber(left.cached_tokens) + toTokenUsageNumber(right.cached_tokens),
-      total_tokens: toTokenUsageNumber(left.total_tokens) + toTokenUsageNumber(right.total_tokens),
-      price_usd: toTokenUsageNumber(left.price_usd) + toTokenUsageNumber(right.price_usd),
-    }
-    if (merged.total_tokens <= 0) {
-      merged.total_tokens = merged.input_tokens + merged.output_tokens
-    }
-    return merged
+    return mergeUsageTotals(base, incoming)
   }
 
   function setLiveTokenUsage(usage) {
@@ -1084,17 +1079,70 @@ export const useAppStore = defineStore('app', () => {
       liveTokenUsage.value = null
       return
     }
-    liveTokenUsage.value = { ...usage }
+    const normalized = normalizeUsage(usage)
+    liveTokenUsage.value = normalized ? { ...normalized } : null
   }
 
   function setLiveTokenUsageForCurrentTurn(usage) {
     if (!usage || typeof usage !== 'object') return
-    const prior = resolveTokenUsageFromChatHistory({ excludeLast: true })
-    setLiveTokenUsage(mergeTokenUsageTotals(prior, usage))
+    const conversationId = String(activeConversationId.value || '').trim()
+    const persistedUsage = conversationUsageById.value?.[conversationId]?.usage || resolveTokenUsageFromChatHistory({ excludeLast: true })
+    const merged = mergeTokenUsageTotals(persistedUsage, usage)
+    setLiveTokenUsage(merged)
+    if (activeConversationUsage.value && typeof activeConversationUsage.value === 'object') {
+      activeConversationUsage.value = {
+        ...activeConversationUsage.value,
+        usage: merged,
+      }
+    }
   }
 
   function clearLiveTokenUsage() {
     liveTokenUsage.value = null
+  }
+
+  function clearActiveConversationUsage() {
+    activeConversationUsage.value = null
+  }
+
+  function setActiveConversationUsage(summary) {
+    const conversationId = String(summary?.conversation_id || activeConversationId.value || '').trim()
+    if (!conversationId) {
+      clearActiveConversationUsage()
+      return
+    }
+    const normalized = {
+      conversation_id: conversationId,
+      turn_count: Number.isFinite(Number(summary?.turn_count)) ? Number(summary.turn_count) : 0,
+      turns_with_usage: Number.isFinite(Number(summary?.turns_with_usage)) ? Number(summary.turns_with_usage) : 0,
+      usage: normalizeUsage(summary?.usage) || {
+        input_tokens: null,
+        output_tokens: null,
+        cached_tokens: null,
+        total_tokens: null,
+        price_usd: null,
+      },
+    }
+    conversationUsageById.value = {
+      ...(conversationUsageById.value || {}),
+      [conversationId]: normalized,
+    }
+    if (conversationId === String(activeConversationId.value || '').trim()) {
+      activeConversationUsage.value = normalized
+      setLiveTokenUsage(normalized.usage)
+    }
+  }
+
+  async function fetchActiveConversationUsage(conversationId = activeConversationId.value) {
+    const targetConversationId = String(conversationId || '').trim()
+    if (!targetConversationId) {
+      clearActiveConversationUsage()
+      clearLiveTokenUsage()
+      return null
+    }
+    const summary = await apiService.v1GetConversationUsage(targetConversationId)
+    setActiveConversationUsage(summary)
+    return summary
   }
 
   function resolveTokenUsageFromChatHistory(options = {}) {
@@ -1578,6 +1626,9 @@ export const useAppStore = defineStore('app', () => {
       chatHistory.value = []
     }
     clearLiveTokenUsage()
+    if (!preserveChatHistory) {
+      clearActiveConversationUsage()
+    }
   }
 
   function setActiveConversationId(conversationId) {
@@ -1585,6 +1636,13 @@ export const useAppStore = defineStore('app', () => {
     activeTab.value = 'workspace'
     workspacePane.value = 'chat'
     clearConversationScopedState({ preserveChatHistory: true })
+    const cachedUsage = conversationUsageById.value?.[String(conversationId || '').trim()]
+    if (cachedUsage) {
+      activeConversationUsage.value = cachedUsage
+      setLiveTokenUsage(cachedUsage.usage)
+    } else {
+      clearActiveConversationUsage()
+    }
     saveLocalConfig()
   }
 
@@ -1805,6 +1863,7 @@ export const useAppStore = defineStore('app', () => {
     if (targetConversationId === String(activeConversationId.value || '').trim()) {
       finalTurnId.value = String(turn?.id || '').trim()
       await loadActiveTurnRelations(targetTurnId)
+      await fetchActiveConversationUsage(targetConversationId)
     }
     await loadWorkspaceTurnTree()
     return turn
@@ -1819,6 +1878,7 @@ export const useAppStore = defineStore('app', () => {
       await fetchConversationTurns({ reset: true })
       await loadActiveTurnRelations(rerunTurnId)
       await loadWorkspaceTurnTree()
+      await fetchActiveConversationUsage(conversationId)
     }
     return result
   }
@@ -2190,6 +2250,9 @@ export const useAppStore = defineStore('app', () => {
     }
     prependChatHistoryFromTurns(turns)
     if (reset) {
+      await fetchActiveConversationUsage(activeConversationId.value)
+    }
+    if (reset) {
       const newestTurnId = String(turns[0]?.id || '').trim()
       const targetTurnId = preferLatest ? newestTurnId : (preferredTurnId || newestTurnId)
       if (targetTurnId) {
@@ -2221,6 +2284,9 @@ export const useAppStore = defineStore('app', () => {
 
     await apiService.v1DeleteConversation(targetId)
     conversations.value = conversations.value.filter((conversation) => String(conversation?.id || '').trim() !== targetId)
+    const usageMap = { ...(conversationUsageById.value || {}) }
+    delete usageMap[targetId]
+    conversationUsageById.value = usageMap
 
     const currentActiveId = String(activeConversationId.value || '').trim()
     const activeStillExists = currentActiveId
@@ -2869,6 +2935,14 @@ export const useAppStore = defineStore('app', () => {
     saveLocalConfig()
   }
 
+  function openKeyboardShortcuts() {
+    isKeyboardShortcutsOpen.value = true
+  }
+
+  function closeKeyboardShortcuts() {
+    isKeyboardShortcutsOpen.value = false
+  }
+
   // Editor tracking
   function setEditorPosition(line, col) {
     editorLine.value = line
@@ -3019,6 +3093,8 @@ export const useAppStore = defineStore('app', () => {
   function resetSession() {
     chatHistory.value = []
     liveTokenUsage.value = null
+    activeConversationUsage.value = null
+    conversationUsageById.value = {}
     currentQuestion.value = ''
     currentExplanation.value = ''
     generatedCode.value = ''
@@ -3238,6 +3314,8 @@ export const useAppStore = defineStore('app', () => {
     currentQuestion,
     currentExplanation,
     liveTokenUsage,
+    activeConversationUsage,
+    conversationUsageById,
     workspaces,
     workspaceDeletionJobs,
     activeWorkspaceId,
@@ -3293,6 +3371,7 @@ export const useAppStore = defineStore('app', () => {
     isSidebarCollapsed,
     isDataFocusMode,
     hideShortcutsModal,
+    isKeyboardShortcutsOpen,
     editorLine,
     editorCol,
     isEditorFocused,
@@ -3354,6 +3433,9 @@ export const useAppStore = defineStore('app', () => {
     setLiveTokenUsage,
     setLiveTokenUsageForCurrentTurn,
     clearLiveTokenUsage,
+    clearActiveConversationUsage,
+    setActiveConversationUsage,
+    fetchActiveConversationUsage,
     syncLiveTokenUsageFromChatHistory,
     appendLastMessageExplanationChunk,
     appendLastMessagePlanChunk,
@@ -3454,6 +3536,8 @@ export const useAppStore = defineStore('app', () => {
     setWorkspaceLayoutMode,
     cycleWorkspaceLayoutMode,
     setHideShortcutsModal,
+    openKeyboardShortcuts,
+    closeKeyboardShortcuts,
     setEditorPosition,
     setEditorFocused,
     loadUserPreferences,

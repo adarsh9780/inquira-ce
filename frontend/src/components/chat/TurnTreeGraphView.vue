@@ -17,7 +17,9 @@
             <ChevronRightIcon class="h-3 w-3 shrink-0 transition-transform" :class="isExpanded(conversation.id) ? 'rotate-90' : ''" />
             <span class="truncate text-[12px] font-semibold text-[var(--color-text-main)]">{{ conversation.title || 'Untitled' }}</span>
           </span>
-          <span class="shrink-0 text-[10px] text-[var(--color-text-muted)]">{{ turnCountLabel(conversation) }}</span>
+          <span class="shrink-0 text-[10px] text-[var(--color-text-muted)]" :title="conversationUsageTooltip(conversation)">
+            {{ turnCountLabel(conversation) }} · {{ conversationUsageLabel(conversation) }}
+          </span>
         </button>
         <div
           v-show="isExpanded(conversation.id)"
@@ -63,6 +65,7 @@
                       type="button"
                       class="flex h-full w-full flex-col overflow-hidden rounded-lg px-3 py-2 pr-8 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
                       :aria-label="`Open turn ${node.display_no || node.id}`"
+                      :title="nodeUsageTooltip(node)"
                       @click="selectNode(conversation.id, node.id)"
                       @contextmenu.prevent="openNodeMenu(conversation.id, node.id, $event)"
                     >
@@ -136,6 +139,7 @@ import {
   TURN_TREE_GRAPH_NODE_WIDTH,
   TURN_TREE_GRAPH_PORT_RADIUS,
 } from '../../utils/turnTreeGraphLayout'
+import { formatUsageCompact, formatUsageTooltip } from '../../utils/usageFormat'
 import TurnTreeNodeActions from './TurnTreeNodeActions.vue'
 
 const MIN_SCALE = 0.35
@@ -168,6 +172,7 @@ const graphConversations = computed(() => (Array.isArray(props.conversations) ? 
       layout,
       String(conversation?.final_turn_id || conversation?.finalTurnId || '').trim(),
     ),
+    usageSummary: conversation?.usage_summary || null,
     layout,
   }
 }).filter((conversation) => conversation.id))
@@ -206,6 +211,14 @@ function toggleConversation(conversationId, forceOpen = false) {
 function turnCountLabel(conversation) {
   const count = conversation.layout.nodes.length
   return `${count} ${count === 1 ? 'turn' : 'turns'}`
+}
+
+function conversationUsageLabel(conversation) {
+  return formatUsageCompact(conversation?.usageSummary?.usage)
+}
+
+function conversationUsageTooltip(conversation) {
+  return formatUsageTooltip(conversation?.usageSummary?.usage, conversation?.usageSummary)
 }
 
 function setCanvasRef(conversationId, element) {
@@ -324,6 +337,13 @@ function questionLine(node) {
 
 function answerLine(node) {
   return String(node?.assistant_text || '').replace(/\s+/g, ' ').trim() || 'No response saved'
+}
+
+function nodeUsageTooltip(node) {
+  return [
+    `Open turn ${node?.display_no || node?.id || ''}`.trim(),
+    formatUsageTooltip(node?.usage || null),
+  ].join('\n')
 }
 
 function clamp(value, minimum, maximum) {
