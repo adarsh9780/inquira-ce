@@ -67,6 +67,25 @@
         </div>
       </template>
       <template v-else>
+        <div
+          v-if="primaryBackgroundOperation"
+          class="flex max-w-[360px] items-center gap-1.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-text-muted)]"
+          :title="primaryBackgroundOperationTitle"
+          data-background-operation-status
+        >
+          <span
+            v-if="primaryBackgroundOperationIsRunning"
+            class="inquira-spinner h-2.5 w-2.5 shrink-0 border-[1.5px]"
+            aria-hidden="true"
+          ></span>
+          <span
+            v-else
+            class="h-2 w-2 shrink-0 rounded-full"
+            :class="primaryBackgroundOperation.status === 'failed' ? 'bg-[var(--color-error)]' : 'bg-[var(--color-success)]'"
+          ></span>
+          <span class="truncate">{{ primaryBackgroundOperationLabel }}</span>
+          <span v-if="backgroundOperationCountLabel" class="shrink-0 text-[var(--color-text-sub)]">{{ backgroundOperationCountLabel }}</span>
+        </div>
         <div v-if="appStore.activeWorkspaceId && paneArtifactCountLabel" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium"
              :class="artifactCountClass">
           <span>{{ paneArtifactCountLabel }}</span>
@@ -348,6 +367,42 @@ const tokenUsageHoverLabel = computed(() => {
     `Output tokens: ${outputTokens}`,
     `Price (USD): ${priceLabel}`,
   ].join('\n')
+})
+
+const primaryBackgroundOperation = computed(() => appStore.primaryBackgroundOperation)
+
+const primaryBackgroundOperationIsRunning = computed(() => {
+  const status = String(primaryBackgroundOperation.value?.status || '')
+  return status === 'queued' || status === 'running'
+})
+
+const backgroundOperationCountLabel = computed(() => {
+  const count = Number(appStore.activeBackgroundOperations?.length || 0)
+  return count > 1 ? `+${count - 1}` : ''
+})
+
+const primaryBackgroundOperationLabel = computed(() => {
+  const operation = primaryBackgroundOperation.value
+  if (!operation) return ''
+  const message = String(operation.message || operation.title || '').trim()
+  const progress = Number(operation.progress)
+  if (Number.isFinite(progress)) {
+    return `${message} ${Math.round(progress)}%`
+  }
+  return message
+})
+
+const primaryBackgroundOperationTitle = computed(() => {
+  const operation = primaryBackgroundOperation.value
+  if (!operation) return ''
+  const title = String(operation.title || 'Background task').trim()
+  const message = String(operation.message || '').trim()
+  const count = Number(appStore.activeBackgroundOperations?.length || 0)
+  return [
+    title,
+    message,
+    count > 1 ? `${count} background tasks active` : '',
+  ].filter(Boolean).join('\n')
 })
 
 const wsConnectionMeta = computed(() => {

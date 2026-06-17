@@ -63,7 +63,7 @@
         <div v-if="schemaLoading" class="flex h-40 flex-col items-center justify-center">
           <div class="relative w-10 h-10 mb-3">
             <div class="absolute inset-0 rounded-full border-2 border-[var(--color-border)] opacity-30"></div>
-            <div class="absolute inset-0 rounded-full border-2 border-t-[var(--color-accent)] animate-spin border-r-transparent border-b-transparent border-l-transparent"></div>
+            <div class="inquira-spinner absolute inset-0 border-2 border-r-transparent border-b-transparent border-l-transparent"></div>
           </div>
           <p class="text-sm font-medium text-[var(--color-text-muted)]">Loading workspace schema...</p>
         </div>
@@ -80,11 +80,12 @@
                 {{ group.tableName }}
               </h3>
               <div class="flex items-center gap-2.5">
-                <button @click="regenerateTableSchema(group.tableName)" :disabled="schemaLoading" class="text-[12px] font-medium text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 px-2 py-0.5 rounded transition-colors flex items-center gap-1" title="Regenerate descriptions for this table only">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <button @click="regenerateTableSchema(group.tableName)" :disabled="schemaLoading || Boolean(regeneratingTableName)" class="text-[12px] font-medium text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 px-2 py-0.5 rounded transition-colors flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-60" title="Regenerate descriptions for this table only">
+                  <span v-if="regeneratingTableName === group.tableName" class="inquira-spinner h-3.5 w-3.5 border-2"></span>
+                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                   </svg>
-                  Regenerate
+                  {{ regeneratingTableName === group.tableName ? 'Regenerating...' : 'Regenerate' }}
                 </button>
                 <span class="text-[12px] font-medium text-[var(--color-text-muted)] bg-[var(--color-base)] px-2 py-1 rounded-md border border-[var(--color-border)]">{{ group.columns.length }} columns</span>
               </div>
@@ -161,6 +162,7 @@ const md = new MarkdownIt({ breaks: true, linkify: true })
 const appStore = useAppStore()
 
 const schemaLoading = ref(false)
+const regeneratingTableName = ref('')
 const schemaEdited = ref(false)
 const dirtyTables = ref(new Set())
 const workspaceColumns = ref([])
@@ -365,7 +367,15 @@ async function saveAllSchema() {
 
 async function regenerateTableSchema(tableName) {
   if (!appStore.activeWorkspaceId || !tableName) return
-  schemaLoading.value = true
+  if (regeneratingTableName.value) return
+  regeneratingTableName.value = tableName
+  const operationId = appStore.startBackgroundOperation({
+    id: `schema-regeneration-${tableName}`,
+    type: 'schema',
+    title: 'Regenerating schema',
+    message: `Generating schema for ${tableName}...`,
+    priority: 75,
+  })
   try {
     toast.info('Regenerating table schema', `Generating AI descriptions for ${tableName}...`)
     const regenerated = await apiService.v1RegenerateDatasetSchema(appStore.activeWorkspaceId, tableName, {
@@ -384,11 +394,20 @@ async function regenerateTableSchema(tableName) {
     if (dirtyTables.value.size === 0) {
       schemaEdited.value = false
     }
+    appStore.finishBackgroundOperation(operationId, {
+      title: 'Schema regenerated',
+      message: `Schema updated for ${tableName}.`,
+    })
     toast.success('Table schema regenerated', `AI descriptions updated for ${tableName}.`)
   } catch (error) {
+    appStore.finishBackgroundOperation(operationId, {
+      status: 'failed',
+      title: 'Schema regeneration failed',
+      message: error?.message || 'Unable to regenerate schema.',
+    })
     toast.error('Regeneration failed', error?.message || 'Unable to regenerate schema.')
   } finally {
-    schemaLoading.value = false
+    regeneratingTableName.value = ''
   }
 }
 

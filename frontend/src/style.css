@@ -1530,6 +1530,21 @@ p {
   border-top-color: var(--color-on-accent);
 }
 
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.inquira-spinner {
+  display: inline-block;
+  border-style: solid;
+  border-color: var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 9999px;
+  animation: spin 0.8s linear infinite;
+}
+
 .settings-footer-actions {
   position: absolute;
   left: 0;
@@ -1566,5 +1581,4 @@ p {
 .save-btn:hover:not(:disabled) {
   opacity: 0.9;
 }
-
 

@@ -9,15 +9,16 @@ function readSource(relativePath) {
 
 test('workspace tab dataset add flow syncs shared selection state and dispatches dataset-switched event', () => {
   const source = readSource('src/components/modals/tabs/WorkspaceTab.vue')
+  const store = readSource('src/stores/appStore.js')
 
   assert.equal(source.includes('function applyDatasetSelectionFromUpload(uploadResult, fallbackPath = \'\') {'), true)
   assert.equal(source.includes('appStore.setDataFilePath(resolvedPath)'), true)
   assert.equal(source.includes('appStore.setIngestedTableName(resolvedTableName)'), true)
   assert.equal(source.includes('appStore.setSchemaFileId(resolvedPath || resolvedTableName)'), true)
   assert.equal(source.includes("window.dispatchEvent(new CustomEvent('dataset-switched', {"), true)
-  assert.equal(source.includes('function applyDatasetSelectionFromIngestionJob(job) {'), true)
-  assert.equal(source.includes('applyDatasetSelectionFromUpload({'), true)
-  assert.equal(source.includes('await apiService.v1AddDatasetsBatch(workspaceId, sourcePaths)'), true)
+  assert.equal(store.includes('function applyDatasetSelectionFromIngestionJob(job) {'), true)
+  assert.equal(store.includes("dispatchDatasetWorkspaceEvent('dataset-switched'"), true)
+  assert.equal(source.includes('await appStore.startDatasetIngestion(sourcePaths'), true)
   assert.equal(source.includes('const uploadResult = await apiService.uploadDataPath(sourcePath)'), false)
   assert.equal(source.includes('applyDatasetSelectionFromUpload(uploadResult, sourcePath)'), false)
   assert.equal(source.includes('await apiService.v1EnqueueDatasetSchemaRegeneration(workspaceId, tableName)'), true)

@@ -207,6 +207,12 @@ import { settingsWebSocket } from '../../../services/websocketService'
 import { useAppStore } from '../../../stores/appStore'
 import { toast } from '../../../composables/useToast'
 import { extractApiErrorMessage } from '../../../utils/apiError'
+import {
+  datasetImportLabel,
+  filterSupportedDatasetPaths,
+  getDroppedDatasetPaths,
+  SUPPORTED_DATASET_EXTENSIONS,
+} from '../../../utils/datasetImport'
 import ConfirmationModal from '../ConfirmationModal.vue'
 
 const props = defineProps({
@@ -252,7 +258,6 @@ const pendingSchemaReadyNotifications = new Set()
 let unsubscribeProgress = null
 let unsubscribeRuntimeError = null
 let unsubscribeRuntimeComplete = null
-let unsubscribeNativeDragDrop = null
 let datasetSchemaPoller = null
 
 const isCreatingWorkspace = ref(false)
@@ -275,7 +280,6 @@ const isEditingContext = ref(false)
 const newWorkspaceInputRef = ref(null)
 const isDropActive = ref(false)
 const dropDepth = ref(0)
-const SUPPORTED_DATASET_EXTENSIONS = new Set(['.csv', '.tsv', '.parquet', '.json', '.xlsx', '.xls'])
 
 function normalizeWorkspaceName(value) {
   return String(value || '').toUpperCase()
@@ -443,7 +447,7 @@ onMounted(async () => {
   unsubscribeProgress = settingsWebSocket.subscribeProgress(handleSettingsProgressUpdate)
   unsubscribeRuntimeError = settingsWebSocket.subscribeError(handleRuntimeSocketError)
   unsubscribeRuntimeComplete = settingsWebSocket.subscribeComplete(handleRuntimeSocketComplete)
-  await subscribeNativeDatasetDrops()
+  window.addEventListener('dataset-switched', handleExternalDatasetRefresh)
   await hydrateWorkspaceCards()
   await loadActiveDatasetDeletionJobs()
   syncSetupIdentity()
@@ -462,15 +466,17 @@ onUnmounted(() => {
     unsubscribeRuntimeComplete()
     unsubscribeRuntimeComplete = null
   }
-  if (typeof unsubscribeNativeDragDrop === 'function') {
-    unsubscribeNativeDragDrop()
-    unsubscribeNativeDragDrop = null
-  }
+  window.removeEventListener('dataset-switched', handleExternalDatasetRefresh)
   clearWorkspaceOperation()
   stopDatasetDeletionPollers()
   stopDatasetIngestionPollers()
   stopDatasetSchemaPolling()
 })
+
+function handleExternalDatasetRefresh() {
+  if (!isWorkspaceActive.value) return
+  void loadWorkspaceDatasets()
+}
 
 async function hydrateWorkspaceCards() {
   const ids = workspaceCards.value.map((workspace) => workspace.id).filter(Boolean)
@@ -761,10 +767,19 @@ function notifyReadyDatasetSchemas(datasets) {
     const status = datasetSchemaStatusState(dataset)
     if (status === 'ready') {
       pendingSchemaReadyNotifications.delete(tableName)
+      appStore.finishBackgroundOperation(`schema-regeneration-${tableName}`, {
+        title: 'Schema ready',
+        message: `Schema is ready for ${formatFilename(tableName)}.`,
+      })
       toast.success('Schema ready', `Schema is ready for ${formatFilename(tableName)}.`)
       dispatchDatasetSchemaReady(dataset)
     } else if (status === 'failed') {
       pendingSchemaReadyNotifications.delete(tableName)
+      appStore.finishBackgroundOperation(`schema-regeneration-${tableName}`, {
+        status: 'failed',
+        title: 'Schema generation failed',
+        message: dataset?.schema_error_message || `Schema generation failed for ${formatFilename(tableName)}.`,
+      })
       toast.error('Schema generation failed', dataset?.schema_error_message || `Schema generation failed for ${formatFilename(tableName)}.`)
       dispatchDatasetSchemaReady(dataset)
     }
@@ -830,6 +845,15 @@ function setWorkspaceOperation(operation, message) {
   const normalizedMessage = String(message || 'Workspace setup is still running.').trim()
   activeWorkspaceOperation.value = normalizedOperation
   activeWorkspaceOperationMessage.value = normalizedMessage
+  if (normalizedOperation && normalizedOperation !== 'ingest') {
+    appStore.startForegroundOperation({
+      id: `workspace-${normalizedOperation}`,
+      type: `workspace-${normalizedOperation}`,
+      title: 'Workspace operation',
+      message: normalizedMessage,
+      priority: 100,
+    })
+  }
   emit('workspace-operation-change', {
     locked: Boolean(normalizedOperation),
     operation: normalizedOperation,
@@ -838,6 +862,9 @@ function setWorkspaceOperation(operation, message) {
 }
 
 function clearWorkspaceOperation() {
+  if (activeWorkspaceOperation.value && activeWorkspaceOperation.value !== 'ingest') {
+    appStore.clearForegroundOperation(`workspace-${activeWorkspaceOperation.value}`)
+  }
   activeWorkspaceOperation.value = ''
   activeWorkspaceOperationMessage.value = ''
   emit('workspace-operation-change', { locked: false, operation: '', message: '' })
@@ -969,6 +996,13 @@ function trackDatasetDeletionJob(workspaceId, jobId, datasetLabel, timeoutMs = 3
   if (datasetDeletionPollers.has(normalizedJobId)) return
   const startedAt = Date.now()
   const displayName = String(datasetLabel || '').trim() || 'dataset'
+  appStore.startBackgroundOperation({
+    id: `dataset-deletion-${normalizedJobId}`,
+    type: 'dataset-delete',
+    title: 'Deleting dataset',
+    message: `Cleaning up ${displayName}...`,
+    priority: 60,
+  })
 
   const poll = async () => {
     try {
@@ -976,12 +1010,21 @@ function trackDatasetDeletionJob(workspaceId, jobId, datasetLabel, timeoutMs = 3
       const status = String(job?.status || '').trim().toLowerCase()
       if (status === 'completed') {
         datasetDeletionPollers.delete(normalizedJobId)
+        appStore.finishBackgroundOperation(`dataset-deletion-${normalizedJobId}`, {
+          title: 'Dataset deletion complete',
+          message: `"${displayName}" cleanup finished.`,
+        })
         toast.success('Dataset deletion completed', `"${displayName}" cleanup finished.`)
         return
       }
       if (status === 'failed') {
         datasetDeletionPollers.delete(normalizedJobId)
         const detail = String(job?.error_message || '').trim()
+        appStore.finishBackgroundOperation(`dataset-deletion-${normalizedJobId}`, {
+          status: 'failed',
+          title: 'Dataset deletion failed',
+          message: detail || `Background cleanup failed for "${displayName}".`,
+        })
         toast.error('Dataset deletion failed', detail || `Background cleanup failed for "${displayName}".`)
         return
       }
@@ -1084,22 +1127,41 @@ async function startBatchDatasetIngestion(paths) {
 
   startDatasetIngest(sourcePaths.length === 1 ? sourcePaths[0] : `${sourcePaths.length} selected files`)
   lastSelectedDatasetPaths.value = [...sourcePaths]
-  setWorkspaceOperation('ingest', 'Importing selected datasets into the workspace.')
-  datasetIngestMessage.value = 'Preparing workspace...'
+  datasetIngestFilename.value = datasetImportLabel(sourcePaths)
+  datasetIngestMessage.value = 'Queueing dataset ingestion...'
   try {
-    datasetIngestMessage.value = 'Queueing dataset ingestion...'
-    const job = await apiService.v1AddDatasetsBatch(workspaceId, sourcePaths)
-    const jobId = String(job?.job_id || '').trim()
-    if (!jobId) {
-      finishDatasetIngest()
-      clearWorkspaceOperation()
-      toast.error('Dataset Error', 'Backend did not return an ingestion job.')
-      return
-    }
-    trackDatasetIngestionJob(workspaceId, jobId)
+    await appStore.startDatasetIngestion(sourcePaths, {
+      workspaceId,
+      operationId: `workspace-tab-dataset-ingestion-${Date.now()}`,
+      onProgress: (job) => {
+        const completed = Number(job?.completed_count || 0)
+        const failed = Number(job?.failed_count || 0)
+        const total = Number(job?.total_count || 0)
+        if (total > 0) {
+          datasetIngestPercent.value = Math.round(((completed + failed) / total) * 100)
+        }
+        datasetIngestMessage.value = `Processed ${completed + failed} of ${total || '?'} datasets`
+      },
+      onComplete: async (job) => {
+        trackSchemaReadyNotificationsFromIngestionJob(job)
+        await loadWorkspaceDatasets()
+        const failedCount = Number(job?.failed_count || 0)
+        datasetIngestPercent.value = 100
+        datasetIngestMessage.value = failedCount > 0
+          ? `Completed with ${failedCount} failed import${failedCount === 1 ? '' : 's'}.`
+          : 'Import complete.'
+        await new Promise((resolve) => setTimeout(resolve, 700))
+        finishDatasetIngest()
+        if (failedCount > 0) {
+          toast.error('Dataset ingestion completed with errors', `${failedCount} file${failedCount === 1 ? '' : 's'} failed to import.`)
+        }
+      },
+      onError: (error) => {
+        markDatasetIngestFailed(extractApiErrorMessage(error, 'Failed to queue dataset import.'))
+      },
+    })
   } catch (error) {
     markDatasetIngestFailed(extractApiErrorMessage(error, 'Failed to queue dataset import.'))
-    clearWorkspaceOperation()
     toast.error('Dataset Error', extractApiErrorMessage(error, 'Failed to add datasets.'))
   }
 }
@@ -1276,33 +1338,33 @@ async function confirmRegenerateDatasetSchema() {
     toast.info('Activate workspace first', 'Activate this workspace before generating schemas.')
     return
   }
+  const operationId = appStore.startBackgroundOperation({
+    id: `schema-regeneration-${tableName}`,
+    type: 'schema',
+    title: 'Regenerating schema',
+    message: `Schema generation queued for ${tableName}.`,
+    priority: 75,
+  })
   try {
     isSchemaRegenerateSubmitting.value = true
     await apiService.v1EnqueueDatasetSchemaRegeneration(workspaceId, tableName)
     await loadWorkspaceDatasets()
+    appStore.updateBackgroundOperation(operationId, {
+      message: `Generating schema for ${tableName}...`,
+      progress: null,
+    })
     toast.success('Schema regeneration queued', 'Schema generation will continue in the background.')
   } catch (error) {
+    appStore.finishBackgroundOperation(operationId, {
+      status: 'failed',
+      title: 'Schema regeneration failed',
+      message: extractApiErrorMessage(error, 'Failed to queue schema regeneration.'),
+    })
     toast.error('Schema regeneration failed', extractApiErrorMessage(error, 'Failed to queue schema regeneration.'))
   } finally {
     isSchemaRegenerateSubmitting.value = false
     closeSchemaRegenerateDialog()
   }
-}
-
-function filterSupportedDatasetPaths(paths) {
-  return Array.from(paths || [])
-    .map((pathValue) => {
-      const path = String(pathValue || '').trim()
-      const lowerPath = path.toLowerCase()
-      const extension = lowerPath.includes('.') ? lowerPath.slice(lowerPath.lastIndexOf('.')) : ''
-      if (!path || !SUPPORTED_DATASET_EXTENSIONS.has(extension)) return null
-      return path
-    })
-    .filter(Boolean)
-}
-
-function getDroppedDatasetPaths(files) {
-  return filterSupportedDatasetPaths(Array.from(files || []).map((file) => file?.path))
 }
 
 function handleDropDragEnter() {
@@ -1341,30 +1403,6 @@ async function ingestDroppedDatasetPaths(paths) {
   await startBatchDatasetIngestion(droppedPaths)
 }
 
-async function subscribeNativeDatasetDrops() {
-  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) return
-  try {
-    const { getCurrentWebview } = await import('@tauri-apps/api/webview')
-    unsubscribeNativeDragDrop = await getCurrentWebview().onDragDropEvent((event) => {
-      const type = String(event?.payload?.type || '').trim()
-      if (!isWorkspaceActive.value) {
-        isDropActive.value = false
-        return
-      }
-      if (type === 'enter' || type === 'over') {
-        isDropActive.value = true
-        return
-      }
-      isDropActive.value = false
-      if (type === 'drop') {
-        void ingestDroppedDatasetPaths(event?.payload?.paths || [])
-      }
-    })
-  } catch {
-    unsubscribeNativeDragDrop = null
-  }
-}
-
 async function openDatasetPicker() {
   const workspaceId = String(props.activeWorkspaceId || '').trim()
   if (!workspaceId) return
@@ -1376,7 +1414,7 @@ async function openDatasetPicker() {
     const { open } = await import('@tauri-apps/plugin-dialog')
     const selected = await open({
       multiple: true,
-      filters: [{ name: 'Data files', extensions: ['csv', 'parquet', 'xlsx', 'xls', 'json', 'tsv'] }],
+      filters: [{ name: 'Data files', extensions: SUPPORTED_DATASET_EXTENSIONS }],
     })
     const selectedPaths = Array.isArray(selected)
       ? selected.map((item) => String(item || '').trim()).filter(Boolean)

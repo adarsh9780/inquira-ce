@@ -1102,12 +1102,31 @@ function normalizeScalarResult(response) {
 async function handleSlashCommand(questionText) {
   appStore.setLoading(true)
   let commandMessageCreated = false
+  let requestConversationId = ''
+  let operationId = ''
+  let commandFailed = false
   try {
     const workspaceId = appStore.activeWorkspaceId
     if (!workspaceId) {
       throw new Error('Create/select a workspace before analysis.')
     }
 
+    requestConversationId = String(await appStore.ensureActiveConversation('New chat') || '').trim()
+    if (!requestConversationId) {
+      throw new Error('Could not create a chat for this command.')
+    }
+    appStore.setConversationRun(requestConversationId, {
+      status: 'running',
+      requestId: `command-${Date.now()}`,
+      startedAt: new Date().toISOString(),
+    })
+    operationId = appStore.startBackgroundOperation({
+      id: `chat-command-${requestConversationId}`,
+      type: 'chat',
+      title: 'Running command',
+      message: 'Executing chat command...',
+      priority: 70,
+    })
     appStore.addChatMessage(questionText, 'Running command...')
     commandMessageCreated = true
     await ensureWorkspaceDatasetReady(workspaceId)
@@ -1125,6 +1144,7 @@ async function handleSlashCommand(questionText) {
     )
     applyCommandResultToStore(result)
   } catch (error) {
+    commandFailed = true
     const message = extractApiErrorMessage(error, 'Failed to run command.')
     if (commandMessageCreated) {
       appStore.updateLastMessageExplanation(`Command failed: ${message}`)
@@ -1144,6 +1164,16 @@ async function handleSlashCommand(questionText) {
     appStore.setActiveTab('output')
   } finally {
     appStore.setLoading(false)
+    if (requestConversationId) {
+      appStore.clearConversationRun(requestConversationId)
+    }
+    if (operationId) {
+      appStore.finishBackgroundOperation(operationId, {
+        status: commandFailed ? 'failed' : 'complete',
+        title: commandFailed ? 'Command failed' : 'Command complete',
+        message: commandFailed ? 'Chat command failed.' : 'Chat command finished.',
+      })
+    }
   }
 }
 
@@ -1189,23 +1219,45 @@ async function handleSubmit() {
     return
   }
 
-  const requestConversationId = String(appStore.activeConversationId || '').trim()
-  if (requestConversationId && appStore.isConversationRunning(requestConversationId)) {
+  let requestConversationId = ''
+  try {
+    requestConversationId = String(await appStore.ensureActiveConversation('New chat') || '').trim()
+  } catch (error) {
+    toast.error('Conversation Error', extractApiErrorMessage(error, 'Could not create a chat.'))
+    question.value = rawQuestionText
+    pendingAttachments.value = attachmentsPayload.map((item) => ({
+      ...item,
+      preview_url: `data:${item.media_type};base64,${item.data_base64}`,
+      size: 0,
+    }))
+    return
+  }
+  if (!requestConversationId) {
+    toast.error('Conversation Error', 'Could not create a chat.')
+    question.value = rawQuestionText
+    return
+  }
+  if (appStore.isConversationRunning(requestConversationId)) {
     toast.warning('Conversation Running', 'Wait for this conversation to finish before sending another prompt.')
     return
   }
   const localMessageId = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`
   appStore.addChatMessage(questionText, '', { attachments: attachmentsPayload, localMessageId })
   appStore.syncLiveTokenUsageFromChatHistory()
-  if (requestConversationId) {
-    appStore.setConversationRun(requestConversationId, {
-      status: 'running',
-      requestId: localMessageId,
-      startedAt: new Date().toISOString(),
-    })
-  } else {
-    appStore.setLoading(true)
-  }
+  appStore.setConversationRun(requestConversationId, {
+    status: 'running',
+    requestId: localMessageId,
+    startedAt: new Date().toISOString(),
+  })
+  const operationId = appStore.startBackgroundOperation({
+    id: `chat-stream-${requestConversationId}`,
+    type: 'chat',
+    title: 'Generating response',
+    message: 'Streaming chat response...',
+    priority: 80,
+  })
+  let operationStatus = 'complete'
+  let operationMessage = 'Chat response finished.'
 
   const abortController = new AbortController()
   activeAbortController.value = abortController
@@ -1237,7 +1289,7 @@ async function handleSubmit() {
     response = await apiService.v1AnalyzeStream(
       {
         workspace_id: workspaceId,
-        conversation_id: requestConversationId || null,
+        conversation_id: requestConversationId,
         question: questionText,
         current_code: appStore.pythonFileContent || '',
         model: appStore.selectedModel,
@@ -1480,6 +1532,8 @@ async function handleSubmit() {
       if (userRequestedStop.value) {
         errorTitle = 'Generation Stopped'
         errorMessage = 'Response generation was stopped.'
+        operationStatus = 'failed'
+        operationMessage = errorMessage
         appStore.markLastMessageStreamStopped(errorMessage, localMessageId)
         toast.error(errorTitle, errorMessage)
         return
@@ -1509,6 +1563,8 @@ async function handleSubmit() {
       errorMessage = backendDetail
     }
 
+    operationStatus = 'failed'
+    operationMessage = errorMessage
     toast.error(
       errorTitle,
       errorMessage,
@@ -1533,11 +1589,12 @@ async function handleSubmit() {
     if (cancelTimer) clearTimeout(cancelTimer)
     activeAbortController.value = null
     userRequestedStop.value = false
-    if (requestConversationId) {
-      appStore.clearConversationRun(requestConversationId)
-    } else {
-      appStore.setLoading(false)
-    }
+    appStore.clearConversationRun(requestConversationId)
+    appStore.finishBackgroundOperation(operationId, {
+      status: operationStatus,
+      title: operationStatus === 'failed' ? 'Chat response failed' : 'Chat response complete',
+      message: operationMessage,
+    })
   }
 }
 

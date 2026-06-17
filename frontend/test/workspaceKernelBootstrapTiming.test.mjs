@@ -50,7 +50,7 @@ test('workspace creation starts hidden runtime warmup and batch dataset import d
     'function datasetSchemaStatusState(dataset) {',
   )
   assert.equal(uploadBlock.includes('await appStore.ensureWorkspaceKernelConnected(workspaceId)'), false)
-  assert.equal(uploadBlock.includes('await apiService.v1AddDatasetsBatch(workspaceId, sourcePaths)'), true)
+  assert.equal(uploadBlock.includes('await appStore.startDatasetIngestion(sourcePaths'), true)
   assert.equal(warmupBlock.includes('await appStore.ensureWorkspaceKernelConnected(targetWorkspaceId)'), true)
 })
 

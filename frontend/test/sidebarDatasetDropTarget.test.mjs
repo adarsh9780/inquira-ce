@@ -9,6 +9,8 @@ test('sidebar datasets supports drag and drop ingest into the active workspace',
 
   assert.equal(source.includes('@drop.prevent="handleDatasetDrop"'), true)
   assert.equal(source.includes('Drop CSV, Parquet, Excel, JSON, or TSV files'), true)
-  assert.equal(source.includes('apiService.uploadDataPath(path)'), true)
-  assert.equal(source.includes('toast.success('), true)
+  assert.equal(source.includes('getDroppedDatasetPaths'), true)
+  assert.equal(source.includes('await appStore.startDatasetIngestion(droppedPaths'), true)
+  assert.equal(source.includes('apiService.uploadDataPath(path)'), false)
+  assert.equal(source.includes('toast.info('), true)
 })

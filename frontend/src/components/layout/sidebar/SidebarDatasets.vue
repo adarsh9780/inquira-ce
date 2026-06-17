@@ -91,6 +91,7 @@ import { apiService } from '../../../services/apiService'
 import { previewService } from '../../../services/previewService'
 import { inferTableNameFromDataPath } from '../../../utils/chatBootstrap'
 import { mergeDatasetSources } from '../../../utils/datasetCatalogMerge'
+import { getDroppedDatasetPaths } from '../../../utils/datasetImport'
 import { toast } from '../../../composables/useToast'
 import {
   ChevronRightIcon,
@@ -110,8 +111,6 @@ const datasets = ref([])
 const isDropActive = ref(false)
 const dropDepth = ref(0)
 const isExpanded = ref(true)
-
-const SUPPORTED_DATASET_EXTENSIONS = new Set(['.csv', '.tsv', '.parquet', '.json', '.xlsx', '.xls'])
 
 const currentDataPath = computed(() => appStore.dataFilePath)
 
@@ -236,18 +235,6 @@ function handleDatasetSwitched() {
   void loadDatasets()
 }
 
-function getDroppedDatasetPaths(files) {
-  return Array.from(files || [])
-    .map((file) => {
-      const path = String(file?.path || '')
-      const lowerPath = path.toLowerCase()
-      const extension = lowerPath.includes('.') ? lowerPath.slice(lowerPath.lastIndexOf('.')) : ''
-      if (!path || !SUPPORTED_DATASET_EXTENSIONS.has(extension)) return null
-      return path
-    })
-    .filter(Boolean)
-}
-
 function handleDropDragEnter() {
   dropDepth.value += 1
   isDropActive.value = true
@@ -278,36 +265,15 @@ async function handleDatasetDrop(event) {
     return
   }
 
-  const successes = []
-  const failures = []
-
-  for (const path of droppedPaths) {
-    try {
-      const result = await apiService.uploadDataPath(path)
-      successes.push(result)
-    } catch (error) {
-      failures.push({ path, error })
-    }
-  }
-
-  if (successes.length > 0) {
-    const last = successes[successes.length - 1]
-    await loadDatasets()
-    if (last?.file_path) {
-      await selectDataset({
-        file_path: last.file_path,
-        table_name: last.table_name,
-      })
-    }
-    toast.success(
-      'Datasets Added',
-      failures.length > 0
-        ? `${successes.length} file(s) added. ${failures.length} file(s) failed.`
-        : `${successes.length} file(s) added to this workspace.`
-    )
-  }
-
-  if (failures.length > 0 && successes.length === 0) {
+  try {
+    await appStore.startDatasetIngestion(droppedPaths, {
+      operationId: `sidebar-dataset-ingestion-${Date.now()}`,
+      onComplete: async () => {
+        await loadDatasets()
+      },
+    })
+    toast.info('Dataset import started', 'Progress is shown in the status bar.')
+  } catch (_error) {
     toast.error('Dataset Import Failed', 'None of the dropped files could be added.')
   }
 }

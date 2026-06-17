@@ -38,17 +38,18 @@ test('new workspace is created from an autofocus inline row and opens inline con
 
 test('active workspace summary saves context explicitly and accepts desktop file drops', () => {
   const workspace = read('src/components/modals/tabs/WorkspaceTab.vue')
+  const app = read('src/App.vue')
 
   assert.equal(workspace.includes('@click="saveWorkspaceContext"'), true)
   assert.equal(workspace.includes('@click="saveWorkspaceContext"'), true)
   assert.equal(workspace.includes('async function saveWorkspaceContext()'), true)
   assert.equal(workspace.includes('@drop.prevent="handleDatasetDrop"'), true)
-  assert.equal(workspace.includes("import('@tauri-apps/api/webview')"), true)
-  assert.equal(workspace.includes('getCurrentWebview().onDragDropEvent'), true)
-  assert.equal(workspace.includes('event?.payload?.paths || []'), true)
-  assert.equal(workspace.includes("new Set(['.csv', '.tsv', '.parquet', '.json', '.xlsx', '.xls'])"), true)
+  assert.equal(app.includes("import('@tauri-apps/api/webview')"), true)
+  assert.equal(app.includes('getCurrentWebview().onDragDropEvent'), true)
+  assert.equal(app.includes('event?.payload?.paths || []'), true)
+  assert.equal(workspace.includes('filterSupportedDatasetPaths'), true)
   assert.equal(workspace.includes('await startBatchDatasetIngestion(droppedPaths)'), true)
-  assert.equal(workspace.includes("filters: [{ name: 'Data files', extensions: ['csv', 'parquet', 'xlsx', 'xls', 'json', 'tsv'] }]"), true)
+  assert.equal(workspace.includes("filters: [{ name: 'Data files', extensions: SUPPORTED_DATASET_EXTENSIONS }]"), true)
 })
 
 test('selected summary exposes only activation until the workspace is active', () => {

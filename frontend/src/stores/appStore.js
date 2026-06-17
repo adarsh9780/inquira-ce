@@ -150,6 +150,8 @@ export const useAppStore = defineStore('app', () => {
   // UI State
   const isLoading = ref(false)
   const isCodeRunning = ref(false)
+  const foregroundOperation = ref(null)
+  const backgroundOperations = ref([])
 
   // Settings trigger
   const isSettingsOpen = ref(false)
@@ -189,6 +191,22 @@ export const useAppStore = defineStore('app', () => {
   })
   const activeWorkspaceKernelStatus = computed(() => getWorkspaceKernelStatus())
   const activeConversationIsLoading = computed(() => isConversationRunning(activeConversationId.value))
+  const activeBackgroundOperations = computed(() => {
+    const items = Array.isArray(backgroundOperations.value) ? backgroundOperations.value : []
+    return items.filter((item) => ['queued', 'running', 'failed', 'complete'].includes(String(item?.status || '')))
+  })
+  const primaryBackgroundOperation = computed(() => {
+    const items = activeBackgroundOperations.value
+    const running = items.filter((item) => ['queued', 'running'].includes(String(item?.status || '')))
+    const candidates = running.length ? running : items
+    return candidates
+      .slice()
+      .sort((left, right) => {
+        const priorityDelta = Number(right?.priority || 0) - Number(left?.priority || 0)
+        if (priorityDelta !== 0) return priorityDelta
+        return Number(right?.updatedAt || 0) - Number(left?.updatedAt || 0)
+      })[0] || null
+  })
 
   let preferenceSyncTimer = null
   let localStateSyncTimer = null
@@ -636,6 +654,8 @@ export const useAppStore = defineStore('app', () => {
     terminalConsentGranted.value = false
     terminalCwd.value = ''
     workspaceLayoutMode.value = WORKSPACE_LAYOUT_MODES.VIEW
+    foregroundOperation.value = null
+    backgroundOperations.value = []
     historicalCodeBlocks.value = []
   }
 
@@ -1982,6 +2002,125 @@ export const useAppStore = defineStore('app', () => {
     return result
   }
 
+  function dispatchDatasetWorkspaceEvent(name, detail = null) {
+    if (typeof window === 'undefined') return
+    window.dispatchEvent(new CustomEvent(name, { detail }))
+  }
+
+  function applyDatasetSelectionFromIngestionJob(job) {
+    const items = Array.isArray(job?.items) ? job.items : []
+    const firstCompleted = items.find((item) => String(item?.status || '').toLowerCase() === 'completed')
+    if (!firstCompleted) return
+    const resolvedPath = String(firstCompleted?.source_path || '').trim()
+    const resolvedTableName = String(firstCompleted?.table_name || '').trim()
+    if (!resolvedPath && !resolvedTableName) return
+
+    setDataFilePath(resolvedPath)
+    setIngestedTableName(resolvedTableName)
+    setIngestedColumns([])
+    setSchemaFileId(resolvedPath || resolvedTableName)
+    dispatchDatasetWorkspaceEvent('dataset-switched', {
+      tableName: resolvedTableName || null,
+      dataPath: resolvedPath || null,
+    })
+  }
+
+  async function startDatasetIngestion(paths, options = {}) {
+    const workspaceId = String(options?.workspaceId || activeWorkspaceId.value || '').trim()
+    const sourcePaths = Array.isArray(paths)
+      ? paths.map((item) => String(item || '').trim()).filter(Boolean)
+      : []
+    if (!workspaceId || sourcePaths.length === 0) return null
+    if (workspaceId !== String(activeWorkspaceId.value || '').trim()) {
+      throw new Error('Activate the target workspace before importing datasets.')
+    }
+
+    const operationId = startBackgroundOperation({
+      id: String(options?.operationId || `dataset-ingestion-${Date.now()}`).trim(),
+      type: 'dataset-import',
+      title: sourcePaths.length === 1 ? 'Importing dataset' : 'Importing datasets',
+      message: 'Queueing dataset ingestion...',
+      priority: 90,
+    })
+    const notifyProgress = typeof options?.onProgress === 'function' ? options.onProgress : null
+    const notifyComplete = typeof options?.onComplete === 'function' ? options.onComplete : null
+    const notifyError = typeof options?.onError === 'function' ? options.onError : null
+
+    try {
+      const queued = await apiService.v1AddDatasetsBatch(workspaceId, sourcePaths)
+      const jobId = String(queued?.job_id || '').trim()
+      if (!jobId) {
+        throw new Error('Backend did not return an ingestion job.')
+      }
+      updateBackgroundOperation(operationId, {
+        message: 'Processing 0 of ? datasets',
+        progress: null,
+      })
+
+      const poll = async () => {
+        try {
+          const job = await apiService.v1GetDatasetIngestionJob(workspaceId, jobId)
+          const status = String(job?.status || '').trim().toLowerCase()
+          const completed = Number(job?.completed_count || 0)
+          const failed = Number(job?.failed_count || 0)
+          const total = Number(job?.total_count || 0)
+          const processed = completed + failed
+          const progress = total > 0 ? Math.round((processed / total) * 100) : null
+          const message = `Processed ${processed} of ${total || '?'} datasets`
+
+          updateBackgroundOperation(operationId, {
+            message,
+            progress,
+          })
+          if (notifyProgress) notifyProgress(job)
+
+          if (['completed', 'completed_with_errors', 'failed'].includes(status)) {
+            applyDatasetSelectionFromIngestionJob(job)
+            dispatchDatasetWorkspaceEvent('dataset-switched', {
+              workspaceId,
+              source: 'dataset-ingestion',
+            })
+            await fetchColumnCatalog({ force: true }).catch(() => {})
+
+            const failedCount = Number(job?.failed_count || 0)
+            const finalMessage = failedCount > 0
+              ? `Completed with ${failedCount} failed import${failedCount === 1 ? '' : 's'}.`
+              : 'Import complete.'
+            finishBackgroundOperation(operationId, {
+              status: status === 'failed' || failedCount > 0 ? 'failed' : 'complete',
+              title: failedCount > 0 ? 'Dataset import finished with errors' : 'Dataset import complete',
+              message: finalMessage,
+            })
+            if (notifyComplete) notifyComplete(job)
+            return
+          }
+
+          setTimeout(poll, 1500)
+        } catch (error) {
+          const message = String(error?.message || 'Failed to poll dataset ingestion.')
+          finishBackgroundOperation(operationId, {
+            status: 'failed',
+            title: 'Dataset import failed',
+            message,
+          })
+          if (notifyError) notifyError(error)
+        }
+      }
+
+      setTimeout(poll, 300)
+      return { jobId, operationId }
+    } catch (error) {
+      const message = String(error?.message || 'Failed to queue dataset import.')
+      finishBackgroundOperation(operationId, {
+        status: 'failed',
+        title: 'Dataset import failed',
+        message,
+      })
+      if (notifyError) notifyError(error)
+      throw error
+    }
+  }
+
   async function fetchConversations() {
     if (!activeWorkspaceId.value) return
     const response = await apiService.v1ListConversations(activeWorkspaceId.value, 50)
@@ -2014,6 +2153,26 @@ export const useAppStore = defineStore('app', () => {
     await loadWorkspaceTurnTree()
     saveLocalConfig()
     return conv
+  }
+
+  async function ensureActiveConversation(title = null) {
+    const workspaceId = String(activeWorkspaceId.value || '').trim()
+    if (!workspaceId) return null
+    const currentId = String(activeConversationId.value || '').trim()
+    if (currentId) return currentId
+
+    const conv = await apiService.v1CreateConversation(workspaceId, title)
+    const conversationId = String(conv?.id || '').trim()
+    if (!conversationId) return null
+
+    const existing = Array.isArray(conversations.value) ? conversations.value : []
+    const withoutDuplicate = existing.filter((item) => String(item?.id || '') !== conversationId)
+    conversations.value = [conv, ...withoutDuplicate]
+    setActiveConversationId(conversationId)
+    await fetchConversations()
+    await loadWorkspaceTurnTree()
+    saveLocalConfig()
+    return conversationId
   }
 
   async function fetchConversationTurns({ reset = true, preferLatest = false } = {}) {
@@ -2134,6 +2293,16 @@ export const useAppStore = defineStore('app', () => {
   async function deleteWorkspaceAsync(workspaceId) {
     const job = await apiService.v1DeleteWorkspace(workspaceId)
     upsertWorkspaceDeletionJob(job)
+    const jobId = String(job?.job_id || '').trim()
+    if (jobId) {
+      startBackgroundOperation({
+        id: `workspace-deletion-${jobId}`,
+        type: 'workspace-delete',
+        title: 'Deleting workspace',
+        message: 'Workspace cleanup is running...',
+        priority: 65,
+      })
+    }
     setSelectedTableArtifact(workspaceId, '')
     setSelectedFigureArtifact(workspaceId, '')
     if (activeWorkspaceId.value === workspaceId) {
@@ -2163,6 +2332,11 @@ export const useAppStore = defineStore('app', () => {
         if (job.status === 'completed' || job.status === 'failed') {
           deletionPollers.delete(jobId)
           removeWorkspaceDeletionJob(jobId)
+          finishBackgroundOperation(`workspace-deletion-${jobId}`, {
+            status: job.status === 'failed' ? 'failed' : 'complete',
+            title: job.status === 'failed' ? 'Workspace deletion failed' : 'Workspace deleted',
+            message: job.status === 'failed' ? 'Workspace cleanup failed.' : 'Workspace cleanup finished.',
+          })
           await fetchWorkspaces()
           return
         }
@@ -2708,6 +2882,95 @@ export const useAppStore = defineStore('app', () => {
     isLoading.value = loading
   }
 
+  function normalizeOperationPayload(payload = {}) {
+    const now = Date.now()
+    const id = String(payload?.id || `${payload?.type || 'operation'}-${now}-${Math.random().toString(36).slice(2, 8)}`).trim()
+    return {
+      id,
+      type: String(payload?.type || 'operation').trim(),
+      title: String(payload?.title || 'Working').trim(),
+      message: String(payload?.message || '').trim(),
+      status: String(payload?.status || 'running').trim(),
+      progress: Number.isFinite(Number(payload?.progress)) ? Math.max(0, Math.min(100, Number(payload.progress))) : null,
+      priority: Number.isFinite(Number(payload?.priority)) ? Number(payload.priority) : 0,
+      createdAt: Number(payload?.createdAt || now),
+      updatedAt: now,
+    }
+  }
+
+  function startForegroundOperation(payload = {}) {
+    foregroundOperation.value = normalizeOperationPayload({
+      type: 'foreground',
+      title: 'Working',
+      ...payload,
+      status: 'running',
+      priority: Number(payload?.priority ?? 100),
+    })
+    return foregroundOperation.value.id
+  }
+
+  function updateForegroundOperation(payload = {}) {
+    if (!foregroundOperation.value) return ''
+    foregroundOperation.value = {
+      ...foregroundOperation.value,
+      ...payload,
+      progress: Number.isFinite(Number(payload?.progress))
+        ? Math.max(0, Math.min(100, Number(payload.progress)))
+        : foregroundOperation.value.progress,
+      updatedAt: Date.now(),
+    }
+    return foregroundOperation.value.id
+  }
+
+  function clearForegroundOperation(operationId = '') {
+    const id = String(operationId || '').trim()
+    if (id && String(foregroundOperation.value?.id || '') !== id) return
+    foregroundOperation.value = null
+  }
+
+  function startBackgroundOperation(payload = {}) {
+    const operation = normalizeOperationPayload(payload)
+    const existing = backgroundOperations.value.filter((item) => String(item?.id || '') !== operation.id)
+    backgroundOperations.value = [...existing, operation]
+    return operation.id
+  }
+
+  function updateBackgroundOperation(operationId, payload = {}) {
+    const id = String(operationId || '').trim()
+    if (!id) return
+    backgroundOperations.value = backgroundOperations.value.map((item) => {
+      if (String(item?.id || '') !== id) return item
+      return {
+        ...item,
+        ...payload,
+        progress: Number.isFinite(Number(payload?.progress))
+          ? Math.max(0, Math.min(100, Number(payload.progress)))
+          : item.progress,
+        updatedAt: Date.now(),
+      }
+    })
+  }
+
+  function removeBackgroundOperation(operationId) {
+    const id = String(operationId || '').trim()
+    if (!id) return
+    backgroundOperations.value = backgroundOperations.value.filter((item) => String(item?.id || '') !== id)
+  }
+
+  function finishBackgroundOperation(operationId, payload = {}) {
+    const id = String(operationId || '').trim()
+    if (!id) return
+    updateBackgroundOperation(id, {
+      ...payload,
+      status: String(payload?.status || 'complete'),
+      progress: Number.isFinite(Number(payload?.progress)) ? payload.progress : 100,
+    })
+    const removeAfterMs = Number(payload?.removeAfterMs ?? 3500)
+    if (removeAfterMs >= 0) {
+      setTimeout(() => removeBackgroundOperation(id), removeAfterMs)
+    }
+  }
+
   function isConversationRunning(conversationId) {
     const id = String(conversationId || '').trim()
     if (!id) return false
@@ -2737,6 +3000,20 @@ export const useAppStore = defineStore('app', () => {
 
   function setCodeRunning(running) {
     isCodeRunning.value = running
+    if (running) {
+      startBackgroundOperation({
+        id: 'code-execution',
+        type: 'code',
+        title: 'Running code',
+        message: 'Executing workspace code...',
+        priority: 60,
+      })
+    } else {
+      finishBackgroundOperation('code-execution', {
+        title: 'Code run complete',
+        message: 'Workspace code execution finished.',
+      })
+    }
   }
 
   function resetSession() {
@@ -2767,6 +3044,8 @@ export const useAppStore = defineStore('app', () => {
     terminalConsentGranted.value = false
     terminalCwd.value = ''
     isCodeRunning.value = false
+    foregroundOperation.value = null
+    backgroundOperations.value = []
     schemaFileId.value = ''
     isSchemaFileUploaded.value = false
     columnCatalog.value = []
@@ -3020,6 +3299,10 @@ export const useAppStore = defineStore('app', () => {
     isLoading,
     activeConversationIsLoading,
     isCodeRunning,
+    foregroundOperation,
+    backgroundOperations,
+    activeBackgroundOperations,
+    primaryBackgroundOperation,
     historicalCodeBlocks,
 
     // Computed
@@ -3091,6 +3374,7 @@ export const useAppStore = defineStore('app', () => {
     ensureWorkspaceKernelConnected,
     setConversations,
     setActiveConversationId,
+    ensureActiveConversation,
     setTurnViewEnabled,
     setActiveTurnId,
     setActiveTurnPayload,
@@ -3117,6 +3401,7 @@ export const useAppStore = defineStore('app', () => {
     activateWorkspace,
     renameWorkspace,
     clearWorkspaceDatabase,
+    startDatasetIngestion,
     fetchConversations,
     createConversation,
     fetchConversationTurns,
@@ -3173,6 +3458,13 @@ export const useAppStore = defineStore('app', () => {
     setEditorFocused,
     loadUserPreferences,
     setLoading,
+    startForegroundOperation,
+    updateForegroundOperation,
+    clearForegroundOperation,
+    startBackgroundOperation,
+    updateBackgroundOperation,
+    finishBackgroundOperation,
+    removeBackgroundOperation,
     isConversationRunning,
     setConversationRun,
     clearConversationRun,

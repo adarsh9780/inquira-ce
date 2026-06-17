@@ -99,9 +99,9 @@
     <Teleport to="body">
       <div
         data-testid="startup-overlay"
-        :data-active="startupOverlayActive ? 'true' : 'false'"
+        :data-active="blockingOverlayActive ? 'true' : 'false'"
         class="layer-blocking fixed inset-0 flex items-center justify-center bg-[var(--color-base)] transition-opacity duration-300"
-        :class="startupOverlayActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
+        :class="blockingOverlayActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
       >
         <div class="w-full max-w-md px-6 text-center">
           <!-- Logo -->
@@ -153,6 +153,7 @@ import { fontService } from './services/fontService'
 import { toast } from './composables/useToast'
 import { normalizeThemeId } from './constants/themes'
 import { normalizeAppFontId, normalizeCodeFontId } from './constants/fonts'
+import { filterSupportedDatasetPaths, getDroppedDatasetPaths, SUPPORTED_DATASET_EXTENSIONS } from './utils/datasetImport'
 import { resolveWorkspaceLayoutShortcut, WORKSPACE_LAYOUT_MODES } from './utils/workspaceLayout'
 import logo from './assets/favicon.svg'
 import UnifiedSidebar from './components/layout/UnifiedSidebar.vue'
@@ -195,6 +196,7 @@ const applyingFontPreference = ref(false)
 const hasLoadedCodeFontPreference = ref(false)
 const applyingCodeFontPreference = ref(false)
 let startupClockTimer = null
+let unsubscribeAppNativeDragDrop = null
 const isE2EMode = import.meta.env.VITE_E2E === '1'
 
 const STARTUP_SCOPE_LABELS = {
@@ -307,7 +309,14 @@ const startupOverlayActive = computed(() => {
   return Boolean(appBootstrap.active)
 })
 
+const blockingOverlayActive = computed(() => {
+  return Boolean(startupOverlayActive.value || appStore.foregroundOperation)
+})
+
 const currentStartupElapsedLabel = computed(() => {
+  if (appStore.foregroundOperation) {
+    return String(appStore.foregroundOperation.message || 'Please wait for this operation to finish.')
+  }
   const current = startupTimeline.value[startupTimeline.value.length - 1]
   if (!current) return 'Waiting for first startup checkpoint...'
   const elapsed = (current.endedAt || startupClock.value) - current.startedAt
@@ -344,10 +353,16 @@ const desktopStartupTimelineEntries = computed(() => {
 })
 
 const startupOverlayTitle = computed(() => {
+  if (appStore.foregroundOperation) {
+    return String(appStore.foregroundOperation.title || 'Working')
+  }
   return 'Loading your workspace.'
 })
 
 const startupOverlayMessage = computed(() => {
+  if (appStore.foregroundOperation) {
+    return String(appStore.foregroundOperation.message || 'Please wait for this operation to finish.')
+  }
   return String(appBootstrap.message || '').trim() || 'Restoring your account, workspace, and runtime state.'
 })
 
@@ -359,6 +374,7 @@ const startupOverlayHint = computed(() => {
 })
 
 const startupOverlayPill = computed(() => {
+  if (appStore.foregroundOperation) return 'Foreground task'
   if (appBootstrap.active) return 'Workspace restore'
   return 'Workspace restore'
 })
@@ -420,6 +436,86 @@ function toggleSidebarVisibility() {
   appStore.setSidebarCollapsed(!appStore.isSidebarCollapsed)
 }
 
+async function startGlobalDatasetImport(paths, source = 'drop') {
+  if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {
+    toast.error('Workspace Required', 'Create or select a workspace before importing datasets.')
+    return
+  }
+  const sourcePaths = filterSupportedDatasetPaths(paths)
+  if (sourcePaths.length === 0) {
+    toast.error('Unsupported Files', 'Use CSV, TSV, Parquet, JSON, XLSX, or XLS files.')
+    return
+  }
+  try {
+    await appStore.startDatasetIngestion(sourcePaths, {
+      operationId: `global-dataset-${source}-${Date.now()}`,
+    })
+    toast.info('Dataset import started', 'Progress is shown in the status bar.')
+  } catch (error) {
+    toast.error('Dataset Error', error?.message || 'Failed to start dataset import.')
+  }
+}
+
+async function openGlobalDatasetPicker() {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
+    toast.error('Desktop Only', 'Dataset file selection is only available in the desktop app.')
+    return
+  }
+  if (!appStore.activeWorkspaceId || !appStore.hasWorkspace) {
+    toast.error('Workspace Required', 'Create or select a workspace before importing datasets.')
+    return
+  }
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const selected = await open({
+      multiple: true,
+      filters: [{ name: 'Data files', extensions: SUPPORTED_DATASET_EXTENSIONS }],
+    })
+    const selectedPaths = Array.isArray(selected)
+      ? selected.map((item) => String(item || '').trim()).filter(Boolean)
+      : [String(selected || '').trim()].filter(Boolean)
+    if (selectedPaths.length === 0) return
+    await startGlobalDatasetImport(selectedPaths, 'picker')
+  } catch (error) {
+    toast.error('Dataset Error', error?.message || 'Failed to open dataset picker.')
+  }
+}
+
+function handleAppDatasetDragOver(event) {
+  if (event.defaultPrevented) return
+  const paths = getDroppedDatasetPaths(event?.dataTransfer?.files || [])
+  if (paths.length === 0) return
+  event.preventDefault()
+}
+
+function handleAppDatasetDrop(event) {
+  if (event.defaultPrevented) return
+  const files = Array.from(event?.dataTransfer?.files || [])
+  const paths = getDroppedDatasetPaths(files)
+  if (paths.length === 0 && files.length > 0 && (typeof window === 'undefined' || !window.__TAURI_INTERNALS__)) {
+    event.preventDefault()
+    toast.error('Desktop Only', 'Local dataset drops are only available in the desktop app.')
+    return
+  }
+  if (paths.length === 0) return
+  event.preventDefault()
+  void startGlobalDatasetImport(paths, 'drop')
+}
+
+async function subscribeAppNativeDatasetDrops() {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) return
+  try {
+    const { getCurrentWebview } = await import('@tauri-apps/api/webview')
+    unsubscribeAppNativeDragDrop = await getCurrentWebview().onDragDropEvent((event) => {
+      const type = String(event?.payload?.type || '').trim()
+      if (type !== 'drop') return
+      void startGlobalDatasetImport(event?.payload?.paths || [], 'native-drop')
+    })
+  } catch {
+    unsubscribeAppNativeDragDrop = null
+  }
+}
+
 function handleGlobalShortcuts(event) {
   if (!authStore.isAuthenticated) return
   if (event.defaultPrevented) return
@@ -434,6 +530,12 @@ function handleGlobalShortcuts(event) {
     return
   }
   if (!hasPrimaryModifier || event.altKey) return
+
+  if (key === 'o') {
+    event.preventDefault()
+    void openGlobalDatasetPicker()
+    return
+  }
 
   if (key === 'b') {
     event.preventDefault()
@@ -700,6 +802,9 @@ onMounted(async () => {
     startupClock.value = Date.now()
   }, 1000)
   document.addEventListener('keydown', handleGlobalShortcuts)
+  document.addEventListener('dragover', handleAppDatasetDragOver)
+  document.addEventListener('drop', handleAppDatasetDrop)
+  void subscribeAppNativeDatasetDrops()
   wsUnsubscribers.value.push(
     settingsWebSocket.subscribeProgress((data) => {
       const stage = String(data?.stage || '')
@@ -814,6 +919,12 @@ onUnmounted(() => {
     startupClockTimer = null
   }
   document.removeEventListener('keydown', handleGlobalShortcuts)
+  document.removeEventListener('dragover', handleAppDatasetDragOver)
+  document.removeEventListener('drop', handleAppDatasetDrop)
+  if (typeof unsubscribeAppNativeDragDrop === 'function') {
+    unsubscribeAppNativeDragDrop()
+    unsubscribeAppNativeDragDrop = null
+  }
   window.removeEventListener('beforeunload', handleBeforeUnload)
   // Disconnect persistent WebSocket connection
   if (settingsWebSocket.isPersistentMode) {
