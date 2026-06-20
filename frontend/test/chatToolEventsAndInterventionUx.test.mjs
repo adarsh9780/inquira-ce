@@ -47,9 +47,9 @@ test('app store preserves tool-call explanations in stream trace', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/stores/appStore.js'), 'utf-8')
   assert.equal(source.includes('existing.explanation = String(event.explanation || existing.explanation || \'\')'), true)
   assert.equal(source.includes('explanation: String(event.explanation || \'\')'), true)
-  assert.equal(source.includes('function appendLastMessageReasoningEvent(event)'), true)
+  assert.equal(source.includes('function appendLastMessageReasoningEvent(event, messageId = null, options = {})'), true)
   assert.equal(source.includes('function markLastMessageStreamStopped(reason'), true)
-  assert.equal(source.includes('const messageId = arguments[1] || null'), true)
+  assert.equal(source.includes('const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)'), true)
 })
 
 test('v1 contract includes intervention response endpoint', () => {

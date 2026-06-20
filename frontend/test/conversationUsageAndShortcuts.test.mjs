@@ -21,7 +21,7 @@ test('status bar and store use full active conversation usage aggregate', () => 
   assert.equal(statusBar.includes('formatUsageCompact'), true)
   assert.equal(store.includes('activeConversationUsage'), true)
   assert.equal(store.includes('conversationUsageById'), true)
-  assert.equal(store.includes('await fetchActiveConversationUsage(activeConversationId.value)'), true)
+  assert.equal(store.includes('await fetchActiveConversationUsage(targetConversationId)'), true)
 })
 
 test('turn details and conversation graph render usage summaries', () => {
@@ -52,4 +52,3 @@ test('shortcut registry drives global shortcuts and keyboard shortcuts panel', (
   assert.equal(modal.includes('shortcutsByCategory'), true)
   assert.equal(modal.includes('shortcutLabel(shortcut, platform)'), true)
 })
-

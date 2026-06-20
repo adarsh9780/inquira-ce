@@ -15,7 +15,7 @@ test('chat execution output is appended to rendered output entries', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/chat/ChatInput.vue'), 'utf-8')
   const helperBlock = extractBlock(
     source,
-    'function appendChatExecutionOutput(response) {',
+    'function appendChatExecutionOutput(response, conversationId = appStore.activeConversationId) {',
     'async function handleSlashCommand(questionText) {',
   )
   const submitBlock = extractBlock(
@@ -34,7 +34,7 @@ test('chat execution output is appended to rendered output entries', () => {
   assert.equal(helperBlock.includes('stdout,'), true)
   assert.equal(helperBlock.includes('stderr,'), true)
   assert.equal(helperBlock.includes('durationMs: Number.isFinite(Number(execution.duration_ms))'), true)
-  assert.equal(submitBlock.includes('const hasChatExecutionOutput = appendChatExecutionOutput(response)'), true)
-  assert.equal(submitBlock.includes('} else if (hasChatExecutionOutput) {\n        appStore.revealArtifactsPane({ hasOutput: true })'), true)
+  assert.equal(submitBlock.includes('const hasChatExecutionOutput = appendChatExecutionOutput(response, requestConversationId)'), true)
+  assert.equal(submitBlock.includes('} else if (hasChatExecutionOutput) {\n        applyConversationResultState(requestConversationId, finalStatePatch, { hasOutput: true })'), true)
   assert.equal(submitBlock.includes("appStore.setTerminalOutput(executionStderr || executionStdout || response.stdout || response.terminal_output || 'Code generated and executed.')"), false)
 })

@@ -12,5 +12,5 @@ test('chat input surfaces backend error detail instead of flattening 5xx into ge
   assert.equal(source.includes("source: status > 0 ? 'Backend' : 'Frontend'"), true)
   assert.equal(source.includes("category: 'llm_api'"), true)
   assert.equal(source.includes("if (evt.event === 'error')"), true)
-  assert.equal(source.includes("appStore.updateLastMessageExplanation(streamErrorMessage, localMessageId)"), true)
+  assert.equal(source.includes("appStore.updateLastMessageExplanation(streamErrorMessage, localMessageId, { conversationId: requestConversationId })"), true)
 })

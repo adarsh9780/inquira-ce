@@ -8,8 +8,9 @@ test('chat response hydrates editor content directly from code/current_code payl
   const source = readFileSync(chatPath, 'utf-8')
 
   assert.equal(source.includes('const finalCode = (code ?? current_code ?? \'\').toString()'), true)
-  assert.equal(source.includes('appStore.setGeneratedCode(finalCode)'), true)
-  assert.equal(source.includes('appStore.setPythonFileContent(finalCode)'), true)
+  assert.equal(source.includes('finalStatePatch.generatedCode = finalCode'), true)
+  assert.equal(source.includes('finalStatePatch.pythonFileContent = finalCode'), true)
+  assert.equal(source.includes('applyConversationResultState(requestConversationId, finalStatePatch'), true)
 })
 
 test('v1 analyze helper returns payload directly without double-unwrapping .data', () => {

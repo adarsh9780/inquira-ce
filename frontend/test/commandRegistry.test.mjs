@@ -76,6 +76,6 @@ test('chat input routes slash commands through the command handler path', () => 
   assert.equal(source.includes('if (isCommand(questionText)) {'), true)
   assert.equal(source.includes('await handleSlashCommand(questionText)'), true)
   assert.equal(source.includes('const result = await executeCommand(questionText'), true)
-  assert.equal(source.includes("appStore.addChatMessage(questionText, 'Running command...')"), true)
+  assert.equal(source.includes("appStore.addChatMessage(questionText, 'Running command...', { conversationId: requestConversationId })"), true)
   assert.equal(source.includes('getRegisteredCommands()'), true)
 })

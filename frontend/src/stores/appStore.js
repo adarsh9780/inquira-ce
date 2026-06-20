@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, markRaw } from 'vue'
 import { apiService } from '../services/apiService'
 import { localStateService } from '../services/localStateService'
 import { useAuthStore } from './authStore'
@@ -96,6 +96,7 @@ export const useAppStore = defineStore('app', () => {
   const activeWorkspaceId = ref('')
   const conversations = ref([])
   const activeConversationId = ref('')
+  const conversationStateById = ref({})
   const conversationRuns = ref({})
   const turnViewEnabled = ref(true)
   const activeTurnId = ref('')
@@ -198,6 +199,11 @@ export const useAppStore = defineStore('app', () => {
   })
   const activeWorkspaceKernelStatus = computed(() => getWorkspaceKernelStatus())
   const activeConversationIsLoading = computed(() => isConversationRunning(activeConversationId.value))
+  const runningConversationCount = computed(() => (
+    Object.values(conversationRuns.value || {})
+      .filter((item) => String(item?.status || '') === 'running')
+      .length
+  ))
   const activeBackgroundOperations = computed(() => {
     const items = Array.isArray(backgroundOperations.value) ? backgroundOperations.value : []
     return items.filter((item) => ['queued', 'running', 'failed', 'complete'].includes(String(item?.status || '')))
@@ -227,6 +233,236 @@ export const useAppStore = defineStore('app', () => {
   const MAX_TERMINAL_STREAM_CHARS = 200000
   const MAX_TERMINAL_TOTAL_CHARS = 2000000
   const MAX_QUESTION_HISTORY = 30
+
+  function cloneConversationValue(value) {
+    if (Array.isArray(value)) return value.map((item) => cloneConversationValue(item))
+    if (!value || typeof value !== 'object') return value
+    return { ...value }
+  }
+
+  function normalizeConversationId(conversationId = activeConversationId.value) {
+    return String(conversationId || '').trim()
+  }
+
+  function isActiveConversation(conversationId) {
+    const id = normalizeConversationId(conversationId)
+    return Boolean(id && id === normalizeConversationId(activeConversationId.value))
+  }
+
+  function getSelectedTableArtifactForActiveWorkspace() {
+    const key = workspaceSelectionKey(activeWorkspaceId.value)
+    return key ? String(selectedTableArtifactsByWorkspace.value?.[key] || '') : ''
+  }
+
+  function getSelectedFigureArtifactForActiveWorkspace() {
+    const key = workspaceSelectionKey(activeWorkspaceId.value)
+    return key ? String(selectedFigureArtifactsByWorkspace.value?.[key] || '') : ''
+  }
+
+  function buildConversationStateSnapshot(options = {}) {
+    const existing = options?.existing && typeof options.existing === 'object' ? options.existing : {}
+    return {
+      ...existing,
+      chatHistory: cloneConversationValue(chatHistory.value),
+      currentQuestion: currentQuestion.value,
+      currentExplanation: currentExplanation.value,
+      activeTurnId: activeTurnId.value,
+      activeTurn: cloneConversationValue(activeTurn.value),
+      activeTurnCode: activeTurnCode.value,
+      activeTurnArtifacts: cloneConversationValue(activeTurnArtifacts.value),
+      activeTurnRelations: cloneConversationValue(activeTurnRelations.value),
+      activeTurnTree: cloneConversationValue(activeTurnTree.value),
+      finalTurnId: finalTurnId.value,
+      turnsNextCursor: turnsNextCursor.value,
+      liveTokenUsage: cloneConversationValue(liveTokenUsage.value),
+      activeConversationUsage: cloneConversationValue(activeConversationUsage.value),
+      generatedCode: generatedCode.value,
+      pythonFileContent: pythonFileContent.value,
+      userEditedCode: userEditedCode.value,
+      hasUserEditedCode: hasUserEditedCode.value,
+      codeEditorSource: codeEditorSource.value,
+      resultData: cloneConversationValue(resultData.value),
+      plotlyFigure: cloneConversationValue(plotlyFigure.value),
+      dataframes: cloneConversationValue(dataframes.value),
+      figures: cloneConversationValue(figures.value),
+      scalars: cloneConversationValue(scalars.value),
+      dataframeCount: dataframeCount.value,
+      tableRowCount: tableRowCount.value,
+      tableWindowStart: tableWindowStart.value,
+      tableWindowEnd: tableWindowEnd.value,
+      selectedTableArtifactId: getSelectedTableArtifactForActiveWorkspace(),
+      selectedFigureArtifactId: getSelectedFigureArtifactForActiveWorkspace(),
+      dataPane: dataPane.value,
+      dataPaneError: dataPaneError.value,
+      figureCount: figureCount.value,
+      terminalOutput: terminalOutput.value,
+      hasLoadedTurns: existing.hasLoadedTurns === true,
+      updatedAt: Date.now(),
+    }
+  }
+
+  function setConversationState(conversationId, statePatch = {}) {
+    const id = normalizeConversationId(conversationId)
+    if (!id) return null
+    const current = conversationStateById.value?.[id] || {}
+    const next = {
+      ...current,
+      ...statePatch,
+      updatedAt: Date.now(),
+    }
+    conversationStateById.value = {
+      ...(conversationStateById.value || {}),
+      [id]: next,
+    }
+    return next
+  }
+
+  function patchConversationState(conversationId, statePatch = {}) {
+    const id = normalizeConversationId(conversationId)
+    if (!id || !statePatch || typeof statePatch !== 'object') return null
+    if (isActiveConversation(id)) {
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'chatHistory')) chatHistory.value = cloneConversationValue(statePatch.chatHistory || [])
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'currentQuestion')) currentQuestion.value = String(statePatch.currentQuestion || '')
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'currentExplanation')) currentExplanation.value = String(statePatch.currentExplanation || '')
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'generatedCode')) generatedCode.value = String(statePatch.generatedCode || '')
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'pythonFileContent')) pythonFileContent.value = String(statePatch.pythonFileContent || '')
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'userEditedCode')) userEditedCode.value = String(statePatch.userEditedCode || '')
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'hasUserEditedCode')) hasUserEditedCode.value = Boolean(statePatch.hasUserEditedCode)
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'codeEditorSource')) codeEditorSource.value = statePatch.codeEditorSource === 'user' ? 'user' : 'agent'
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'resultData')) resultData.value = cloneConversationValue(statePatch.resultData || null)
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'plotlyFigure')) plotlyFigure.value = cloneConversationValue(statePatch.plotlyFigure || null)
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'dataframes')) dataframes.value = cloneConversationValue(statePatch.dataframes || [])
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'figures')) figures.value = cloneConversationValue(statePatch.figures || [])
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'scalars')) scalars.value = cloneConversationValue(statePatch.scalars || [])
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'dataframeCount')) dataframeCount.value = Number(statePatch.dataframeCount || 0)
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'figureCount')) figureCount.value = Number(statePatch.figureCount || 0)
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'terminalOutput')) terminalOutput.value = String(statePatch.terminalOutput || '')
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'dataPane')) dataPane.value = ['table', 'figure', 'output'].includes(String(statePatch.dataPane || '')) ? statePatch.dataPane : dataPane.value
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'activeTurnId')) activeTurnId.value = String(statePatch.activeTurnId || '')
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'activeTurn')) activeTurn.value = cloneConversationValue(statePatch.activeTurn || null)
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'activeTurnCode')) activeTurnCode.value = String(statePatch.activeTurnCode || '')
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'activeTurnRelations')) activeTurnRelations.value = cloneConversationValue(statePatch.activeTurnRelations || null)
+      if (Object.prototype.hasOwnProperty.call(statePatch, 'finalTurnId')) finalTurnId.value = String(statePatch.finalTurnId || '')
+      return syncActiveConversationState({ conversationId: id })
+    }
+    return setConversationState(id, statePatch)
+  }
+
+  function getConversationState(conversationId, options = {}) {
+    const id = normalizeConversationId(conversationId)
+    if (!id) return null
+    const existing = conversationStateById.value?.[id]
+    if (existing || options?.create !== true) return existing || null
+    return setConversationState(id, {
+      chatHistory: [],
+      currentQuestion: '',
+      currentExplanation: '',
+      activeTurnId: '',
+      activeTurn: null,
+      activeTurnCode: '',
+      activeTurnArtifacts: [],
+      activeTurnRelations: null,
+      activeTurnTree: null,
+      finalTurnId: '',
+      turnsNextCursor: null,
+      liveTokenUsage: null,
+      activeConversationUsage: null,
+      generatedCode: '',
+      pythonFileContent: '',
+      userEditedCode: '',
+      hasUserEditedCode: false,
+      codeEditorSource: 'agent',
+      resultData: null,
+      plotlyFigure: null,
+      dataframes: [],
+      figures: [],
+      scalars: [],
+      dataframeCount: 0,
+      tableRowCount: 0,
+      tableWindowStart: 0,
+      tableWindowEnd: 0,
+      selectedTableArtifactId: '',
+      selectedFigureArtifactId: '',
+      dataPane: dataPane.value,
+      dataPaneError: '',
+      figureCount: 0,
+      terminalOutput: '',
+      hasLoadedTurns: false,
+    })
+  }
+
+  function syncActiveConversationState(options = {}) {
+    const id = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    if (!id || id !== normalizeConversationId(activeConversationId.value)) return null
+    const existing = conversationStateById.value?.[id] || {}
+    return setConversationState(id, buildConversationStateSnapshot({ existing }))
+  }
+
+  function applyConversationStateToActive(conversationId, state) {
+    const id = normalizeConversationId(conversationId)
+    if (!id) {
+      clearConversationScopedState()
+      return
+    }
+    const source = state && typeof state === 'object' ? state : getConversationState(id, { create: true })
+    if (!source) {
+      clearConversationScopedState()
+      return
+    }
+    chatHistory.value = cloneConversationValue(source.chatHistory || [])
+    currentQuestion.value = String(source.currentQuestion || '')
+    currentExplanation.value = String(source.currentExplanation || '')
+    activeTurnId.value = String(source.activeTurnId || '')
+    activeTurn.value = cloneConversationValue(source.activeTurn || null)
+    activeTurnCode.value = String(source.activeTurnCode || '')
+    activeTurnArtifacts.value = cloneConversationValue(source.activeTurnArtifacts || [])
+    activeTurnRelations.value = cloneConversationValue(source.activeTurnRelations || null)
+    activeTurnTree.value = cloneConversationValue(source.activeTurnTree || null)
+    finalTurnId.value = String(source.finalTurnId || '')
+    turnsNextCursor.value = source.turnsNextCursor || null
+    liveTokenUsage.value = cloneConversationValue(source.liveTokenUsage || null)
+    activeConversationUsage.value = cloneConversationValue(source.activeConversationUsage || null)
+    generatedCode.value = String(source.generatedCode || '')
+    pythonFileContent.value = String(source.pythonFileContent || '')
+    userEditedCode.value = String(source.userEditedCode || '')
+    hasUserEditedCode.value = Boolean(source.hasUserEditedCode)
+    codeEditorSource.value = source.codeEditorSource === 'user' ? 'user' : 'agent'
+    resultData.value = cloneConversationValue(source.resultData || null)
+    plotlyFigure.value = cloneConversationValue(source.plotlyFigure || null)
+    dataframes.value = cloneConversationValue(source.dataframes || [])
+    figures.value = cloneConversationValue(source.figures || [])
+    scalars.value = cloneConversationValue(source.scalars || [])
+    dataframeCount.value = Number(source.dataframeCount || 0)
+    tableRowCount.value = Number(source.tableRowCount || 0)
+    tableWindowStart.value = Number(source.tableWindowStart || 0)
+    tableWindowEnd.value = Number(source.tableWindowEnd || 0)
+    dataPane.value = ['table', 'figure', 'output'].includes(String(source.dataPane || '')) ? source.dataPane : dataPane.value
+    dataPaneError.value = String(source.dataPaneError || '')
+    figureCount.value = Number(source.figureCount || 0)
+    terminalOutput.value = String(source.terminalOutput || '')
+    if (activeWorkspaceId.value) {
+      setSelectedTableArtifact(activeWorkspaceId.value, source.selectedTableArtifactId || '')
+      setSelectedFigureArtifact(activeWorkspaceId.value, source.selectedFigureArtifactId || '')
+    }
+  }
+
+  function mutateConversationState(conversationId, mutator) {
+    const id = normalizeConversationId(conversationId)
+    if (!id || typeof mutator !== 'function') return null
+    if (isActiveConversation(id)) {
+      const result = mutator(null, true)
+      syncActiveConversationState({ conversationId: id })
+      return result
+    }
+    const current = getConversationState(id, { create: true })
+    const draft = {
+      ...current,
+      chatHistory: Array.isArray(current.chatHistory) ? [...current.chatHistory] : [],
+    }
+    const result = mutator(draft, false)
+    setConversationState(id, draft)
+    return result
+  }
 
   function normalizeSlowRequestWarningSeconds(rawValue) {
     const parsed = Number.parseInt(rawValue, 10)
@@ -1019,6 +1255,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function addChatMessage(question, explanation, options = {}) {
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
     const codeSnapshot = String(options?.codeSnapshot || '')
     const resultExplanation = String(options?.resultExplanation || explanation || '')
     const codeExplanation = String(options?.codeExplanation || '')
@@ -1058,9 +1295,17 @@ export const useAppStore = defineStore('app', () => {
       toolEvents: Array.isArray(options?.toolEvents) ? options.toolEvents : null,
       timestamp: new Date().toISOString()
     }
-    chatHistory.value.push(message)
-    currentQuestion.value = question
-    currentExplanation.value = resultExplanation
+    mutateConversationState(targetConversationId, (state, active) => {
+      if (active) {
+        chatHistory.value.push(message)
+        currentQuestion.value = question
+        currentExplanation.value = resultExplanation
+      } else {
+        state.chatHistory = [...(state.chatHistory || []), message]
+        state.currentQuestion = question
+        state.currentExplanation = resultExplanation
+      }
+    })
     return message.id
   }
 
@@ -1076,50 +1321,81 @@ export const useAppStore = defineStore('app', () => {
     saveLocalConfig()
   }
 
-  function getChatMessageById(messageId) {
+  function getChatMessageById(messageId, options = {}) {
     const targetId = String(messageId || '').trim()
     if (!targetId) return null
-    return chatHistory.value.find((message) => String(message?.id || '') === targetId) || null
-  }
-
-  function getTargetChatMessage(messageId) {
-    return getChatMessageById(messageId) || getLastChatMessage()
-  }
-
-  function updateLastMessageExplanation(explanation, messageId = null) {
-    const lastMessage = getTargetChatMessage(messageId)
-    if (!lastMessage) return
-    lastMessage.explanation = explanation
-    lastMessage.resultExplanation = explanation
-    currentExplanation.value = explanation
-  }
-
-  function appendLastMessageExplanationChunk(text) {
-    const messageId = arguments[1] || null
-    const lastMessage = getTargetChatMessage(messageId)
-    if (!lastMessage || typeof text !== 'string' || !text) return
-    const current = String(lastMessage.explanation || '')
-    const updated = current + text
-    lastMessage.explanation = updated
-    lastMessage.resultExplanation = updated
-    currentExplanation.value = updated
-  }
-
-  function setLastMessageCodeExplanation(explanation) {
-    const messageId = arguments[1] || null
-    const lastMessage = getTargetChatMessage(messageId)
-    if (!lastMessage) return
-    lastMessage.codeExplanation = String(explanation || '')
-  }
-
-  function setLastMessageAnalysisMetadata(metadata, messageId = null) {
-    const lastMessage = getTargetChatMessage(messageId)
-    if (!lastMessage) return
-    const normalized = metadata && typeof metadata === 'object' ? { ...metadata } : {}
-    lastMessage.analysisMetadata = normalized
-    if (normalized.token_usage && typeof normalized.token_usage === 'object') {
-      syncLiveTokenUsageFromChatHistory()
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    if (!targetConversationId || isActiveConversation(targetConversationId)) {
+      return chatHistory.value.find((message) => String(message?.id || '') === targetId) || null
     }
+    const state = getConversationState(targetConversationId)
+    return (state?.chatHistory || []).find((message) => String(message?.id || '') === targetId) || null
+  }
+
+  function getTargetChatMessage(messageId, options = {}) {
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    const byId = getChatMessageById(messageId, { conversationId: targetConversationId })
+    if (byId) return byId
+    if (targetConversationId && !isActiveConversation(targetConversationId)) {
+      const state = getConversationState(targetConversationId)
+      const history = Array.isArray(state?.chatHistory) ? state.chatHistory : []
+      return history[history.length - 1] || null
+    }
+    return getLastChatMessage()
+  }
+
+  function updateLastMessageExplanation(explanation, messageId = null, options = {}) {
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    mutateConversationState(targetConversationId, (state, active) => {
+      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
+      if (!lastMessage) return
+      lastMessage.explanation = explanation
+      lastMessage.resultExplanation = explanation
+      if (active) {
+        currentExplanation.value = explanation
+      } else {
+        state.currentExplanation = explanation
+      }
+    })
+  }
+
+  function appendLastMessageExplanationChunk(text, messageId = null, options = {}) {
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    mutateConversationState(targetConversationId, (state, active) => {
+      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
+      if (!lastMessage || typeof text !== 'string' || !text) return
+      const current = String(lastMessage.explanation || '')
+      const updated = current + text
+      lastMessage.explanation = updated
+      lastMessage.resultExplanation = updated
+      if (active) {
+        currentExplanation.value = updated
+      } else {
+        state.currentExplanation = updated
+      }
+    })
+  }
+
+  function setLastMessageCodeExplanation(explanation, messageId = null, options = {}) {
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    mutateConversationState(targetConversationId, () => {
+      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
+      if (!lastMessage) return
+      lastMessage.codeExplanation = String(explanation || '')
+    })
+  }
+
+  function setLastMessageAnalysisMetadata(metadata, messageId = null, options = {}) {
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    mutateConversationState(targetConversationId, () => {
+      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
+      if (!lastMessage) return
+      const normalized = metadata && typeof metadata === 'object' ? { ...metadata } : {}
+      lastMessage.analysisMetadata = normalized
+      if (normalized.token_usage && typeof normalized.token_usage === 'object') {
+        syncLiveTokenUsageFromChatHistory({ conversationId: targetConversationId })
+      }
+    })
   }
 
   function toTokenUsageNumber(value) {
@@ -1140,18 +1416,29 @@ export const useAppStore = defineStore('app', () => {
     liveTokenUsage.value = normalized ? { ...normalized } : null
   }
 
-  function setLiveTokenUsageForCurrentTurn(usage) {
+  function setLiveTokenUsageForCurrentTurn(usage, options = {}) {
     if (!usage || typeof usage !== 'object') return
-    const conversationId = String(activeConversationId.value || '').trim()
-    const persistedUsage = conversationUsageById.value?.[conversationId]?.usage || resolveTokenUsageFromChatHistory({ excludeLast: true })
+    const conversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    const persistedUsage = conversationUsageById.value?.[conversationId]?.usage || resolveTokenUsageFromChatHistory({ excludeLast: true, conversationId })
     const merged = mergeTokenUsageTotals(persistedUsage, usage)
-    setLiveTokenUsage(merged)
-    if (activeConversationUsage.value && typeof activeConversationUsage.value === 'object') {
-      activeConversationUsage.value = {
-        ...activeConversationUsage.value,
-        usage: merged,
+    if (isActiveConversation(conversationId)) {
+      setLiveTokenUsage(merged)
+      if (activeConversationUsage.value && typeof activeConversationUsage.value === 'object') {
+        activeConversationUsage.value = {
+          ...activeConversationUsage.value,
+          usage: merged,
+        }
       }
+      syncActiveConversationState({ conversationId })
+      return
     }
+    const state = getConversationState(conversationId, { create: true })
+    setConversationState(conversationId, {
+      liveTokenUsage: merged,
+      activeConversationUsage: state?.activeConversationUsage
+        ? { ...state.activeConversationUsage, usage: merged }
+        : state?.activeConversationUsage || null,
+    })
   }
 
   function clearLiveTokenUsage() {
@@ -1204,11 +1491,15 @@ export const useAppStore = defineStore('app', () => {
 
   function resolveTokenUsageFromChatHistory(options = {}) {
     const excludeLast = Boolean(options?.excludeLast)
-    if (!Array.isArray(chatHistory.value) || chatHistory.value.length === 0) return null
+    const conversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    const history = isActiveConversation(conversationId)
+      ? chatHistory.value
+      : (getConversationState(conversationId)?.chatHistory || [])
+    if (!Array.isArray(history) || history.length === 0) return null
     let totals = null
-    const end = excludeLast ? chatHistory.value.length - 1 : chatHistory.value.length
+    const end = excludeLast ? history.length - 1 : history.length
     for (let index = 0; index < end; index += 1) {
-      const message = chatHistory.value[index]
+      const message = history[index]
       const metadata = message?.analysisMetadata
       const tokenUsage = metadata?.token_usage
       if (tokenUsage && typeof tokenUsage === 'object') {
@@ -1218,183 +1509,219 @@ export const useAppStore = defineStore('app', () => {
     return totals
   }
 
-  function resolveLatestTokenUsageFromChatHistory() {
-    return resolveTokenUsageFromChatHistory()
+  function resolveLatestTokenUsageFromChatHistory(options = {}) {
+    return resolveTokenUsageFromChatHistory(options)
   }
 
-  function syncLiveTokenUsageFromChatHistory() {
-    const usage = resolveLatestTokenUsageFromChatHistory()
-    if (usage && typeof usage === 'object') {
-      setLiveTokenUsage(usage)
+  function syncLiveTokenUsageFromChatHistory(options = {}) {
+    const conversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    const usage = resolveLatestTokenUsageFromChatHistory({ conversationId })
+    if (isActiveConversation(conversationId)) {
+      if (usage && typeof usage === 'object') {
+        setLiveTokenUsage(usage)
+      } else {
+        clearLiveTokenUsage()
+      }
+      syncActiveConversationState({ conversationId })
       return
     }
-    clearLiveTokenUsage()
-  }
-
-  function appendLastMessagePlanChunk(text, node = '') {
-    const messageId = arguments[2] || null
-    const lastMessage = getTargetChatMessage(messageId)
-    if (!lastMessage || typeof text !== 'string' || !text) return
-    const trace = ensureMessageStreamTrace(lastMessage)
-    if (!trace) return
-    trace.planText += text
-    if (node) trace.planNode = String(node)
-  }
-
-  function appendLastMessageReasoningEvent(event) {
-    const messageId = arguments[1] || null
-    const lastMessage = getTargetChatMessage(messageId)
-    if (!lastMessage || !event || typeof event !== 'object') return
-    const trace = ensureMessageStreamTrace(lastMessage)
-    if (!trace) return
-    const message = String(event.message || '').trim()
-    if (!message) return
-    const stage = String(event.stage || 'intent').trim() || 'intent'
-    const route = String(event.route || '').trim()
-    const existing = trace.reasoning.find(
-      (item) => String(item.stage || '') === stage && String(item.message || '') === message
-    )
-    if (existing) return
-    trace.reasoning.push({
-      stage,
-      message,
-      route,
-      timestamp: new Date().toISOString(),
+    setConversationState(conversationId, {
+      liveTokenUsage: usage && typeof usage === 'object' ? usage : null,
     })
   }
 
-  function appendLastMessageTraceEvent(event) {
-    const messageId = arguments[1] || null
-    const lastMessage = getTargetChatMessage(messageId)
-    if (!lastMessage || !event || typeof event !== 'object') return
-    const trace = ensureMessageStreamTrace(lastMessage)
-    if (!trace) return
-    trace.events.push({
-      type: String(event.type || 'status'),
-      node: String(event.node || ''),
-      stage: String(event.stage || ''),
-      message: String(event.message || event.node || ''),
-      output: String(event.output || ''),
-      timestamp: new Date().toISOString()
+  function appendLastMessagePlanChunk(text, node = '', messageId = null, options = {}) {
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    mutateConversationState(targetConversationId, () => {
+      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
+      if (!lastMessage || typeof text !== 'string' || !text) return
+      const trace = ensureMessageStreamTrace(lastMessage)
+      if (!trace) return
+      trace.planText += text
+      if (node) trace.planNode = String(node)
     })
   }
 
-  function markLastMessageStreamStopped(reason = 'Response generation stopped.') {
-    const messageId = arguments[1] || null
-    const lastMessage = getTargetChatMessage(messageId)
-    if (!lastMessage) return
-    const trace = ensureMessageStreamTrace(lastMessage)
-    if (!trace) return
-    trace.stopped = true
-    trace.stoppedReason = String(reason || 'Response generation stopped.')
-    trace.events.push({
-      type: 'status',
-      node: 'stream_control',
-      stage: 'stopped',
-      message: trace.stoppedReason,
-      output: '',
-      timestamp: new Date().toISOString()
+  function appendLastMessageReasoningEvent(event, messageId = null, options = {}) {
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    mutateConversationState(targetConversationId, () => {
+      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
+      if (!lastMessage || !event || typeof event !== 'object') return
+      const trace = ensureMessageStreamTrace(lastMessage)
+      if (!trace) return
+      const message = String(event.message || '').trim()
+      if (!message) return
+      const stage = String(event.stage || 'intent').trim() || 'intent'
+      const route = String(event.route || '').trim()
+      const existing = trace.reasoning.find(
+        (item) => String(item.stage || '') === stage && String(item.message || '') === message
+      )
+      if (existing) return
+      trace.reasoning.push({
+        stage,
+        message,
+        route,
+        timestamp: new Date().toISOString(),
+      })
+    })
+  }
+
+  function appendLastMessageTraceEvent(event, messageId = null, options = {}) {
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    mutateConversationState(targetConversationId, () => {
+      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
+      if (!lastMessage || !event || typeof event !== 'object') return
+      const trace = ensureMessageStreamTrace(lastMessage)
+      if (!trace) return
+      trace.events.push({
+        type: String(event.type || 'status'),
+        node: String(event.node || ''),
+        stage: String(event.stage || ''),
+        message: String(event.message || event.node || ''),
+        output: String(event.output || ''),
+        timestamp: new Date().toISOString()
+      })
+    })
+  }
+
+  function markLastMessageStreamStopped(reason = 'Response generation stopped.', messageId = null, options = {}) {
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    mutateConversationState(targetConversationId, () => {
+      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
+      if (!lastMessage) return
+      const trace = ensureMessageStreamTrace(lastMessage)
+      if (!trace) return
+      trace.stopped = true
+      trace.stoppedReason = String(reason || 'Response generation stopped.')
+      trace.events.push({
+        type: 'status',
+        node: 'stream_control',
+        stage: 'stopped',
+        message: trace.stoppedReason,
+        output: '',
+        timestamp: new Date().toISOString()
+      })
     })
   }
 
   function appendLastMessageToolCall(event, messageId = null) {
-    const lastMessage = getTargetChatMessage(messageId)
-    if (!lastMessage || !event || typeof event !== 'object') return
-    const trace = ensureMessageStreamTrace(lastMessage)
-    if (!trace) return
-    const callId = String(event.call_id || '')
-    if (!callId) return
-    const existing = trace.toolCalls.find((item) => String(item.call_id || '') === callId)
-    if (existing) {
-      existing.tool = String(event.tool || existing.tool || '')
-      existing.args = event.args && typeof event.args === 'object' ? event.args : existing.args || {}
-      existing.explanation = String(event.explanation || existing.explanation || '')
-      if (!Array.isArray(existing.lines)) existing.lines = []
-      existing.status = String(existing.status || 'running')
-      return
-    }
-    trace.toolCalls.push({
-      call_id: callId,
-      tool: String(event.tool || ''),
-      args: event.args && typeof event.args === 'object' ? event.args : {},
-      explanation: String(event.explanation || ''),
-      lines: [],
-      output: null,
-      status: 'running',
-      duration_ms: null,
-      started_at: new Date().toISOString(),
+    const options = arguments[2] || {}
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    mutateConversationState(targetConversationId, () => {
+      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
+      if (!lastMessage || !event || typeof event !== 'object') return
+      const trace = ensureMessageStreamTrace(lastMessage)
+      if (!trace) return
+      const callId = String(event.call_id || '')
+      if (!callId) return
+      const existing = trace.toolCalls.find((item) => String(item.call_id || '') === callId)
+      if (existing) {
+        existing.tool = String(event.tool || existing.tool || '')
+        existing.args = event.args && typeof event.args === 'object' ? event.args : existing.args || {}
+        existing.explanation = String(event.explanation || existing.explanation || '')
+        if (!Array.isArray(existing.lines)) existing.lines = []
+        existing.status = String(existing.status || 'running')
+        return
+      }
+      trace.toolCalls.push({
+        call_id: callId,
+        tool: String(event.tool || ''),
+        args: event.args && typeof event.args === 'object' ? event.args : {},
+        explanation: String(event.explanation || ''),
+        lines: [],
+        output: null,
+        status: 'running',
+        duration_ms: null,
+        started_at: new Date().toISOString(),
+      })
     })
   }
 
   function appendLastMessageToolProgress(event, messageId = null) {
-    const lastMessage = getTargetChatMessage(messageId)
-    if (!lastMessage || !event || typeof event !== 'object') return
-    const trace = ensureMessageStreamTrace(lastMessage)
-    if (!trace) return
-    const callId = String(event.call_id || '')
-    if (!callId) return
-    const tool = trace.toolCalls.find((item) => String(item.call_id || '') === callId)
-    if (!tool) return
-    if (!Array.isArray(tool.lines)) tool.lines = []
-    tool.lines.push(String(event.line || ''))
-    if (tool.lines.length > 500) {
-      tool.lines.splice(0, tool.lines.length - 500)
-    }
+    const options = arguments[2] || {}
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    mutateConversationState(targetConversationId, () => {
+      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
+      if (!lastMessage || !event || typeof event !== 'object') return
+      const trace = ensureMessageStreamTrace(lastMessage)
+      if (!trace) return
+      const callId = String(event.call_id || '')
+      if (!callId) return
+      const tool = trace.toolCalls.find((item) => String(item.call_id || '') === callId)
+      if (!tool) return
+      if (!Array.isArray(tool.lines)) tool.lines = []
+      tool.lines.push(String(event.line || ''))
+      if (tool.lines.length > 500) {
+        tool.lines.splice(0, tool.lines.length - 500)
+      }
+    })
   }
 
   function appendLastMessageToolResult(event, messageId = null) {
-    const lastMessage = getTargetChatMessage(messageId)
-    if (!lastMessage || !event || typeof event !== 'object') return
-    const trace = ensureMessageStreamTrace(lastMessage)
-    if (!trace) return
-    const callId = String(event.call_id || '')
-    if (!callId) return
-    const tool = trace.toolCalls.find((item) => String(item.call_id || '') === callId)
-    if (!tool) {
-      trace.toolCalls.push({
-        call_id: callId,
-        tool: '',
-        args: {},
-        lines: [],
-        output: event.output ?? null,
-        status: String(event.status || 'success'),
-        duration_ms: Number.isFinite(Number(event.duration_ms)) ? Number(event.duration_ms) : null,
-        started_at: new Date().toISOString(),
-      })
-      return
-    }
-    tool.output = event.output ?? null
-    tool.status = String(event.status || tool.status || 'success')
-    tool.duration_ms = Number.isFinite(Number(event.duration_ms)) ? Number(event.duration_ms) : null
-    tool.completed_at = new Date().toISOString()
+    const options = arguments[2] || {}
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    mutateConversationState(targetConversationId, () => {
+      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
+      if (!lastMessage || !event || typeof event !== 'object') return
+      const trace = ensureMessageStreamTrace(lastMessage)
+      if (!trace) return
+      const callId = String(event.call_id || '')
+      if (!callId) return
+      const tool = trace.toolCalls.find((item) => String(item.call_id || '') === callId)
+      if (!tool) {
+        trace.toolCalls.push({
+          call_id: callId,
+          tool: '',
+          args: {},
+          lines: [],
+          output: event.output ?? null,
+          status: String(event.status || 'success'),
+          duration_ms: Number.isFinite(Number(event.duration_ms)) ? Number(event.duration_ms) : null,
+          started_at: new Date().toISOString(),
+        })
+        return
+      }
+      tool.output = event.output ?? null
+      tool.status = String(event.status || tool.status || 'success')
+      tool.duration_ms = Number.isFinite(Number(event.duration_ms)) ? Number(event.duration_ms) : null
+      tool.completed_at = new Date().toISOString()
+    })
   }
 
   function setLastMessageInterventionRequest(event, messageId = null) {
-    const lastMessage = getTargetChatMessage(messageId)
-    if (!lastMessage || !event || typeof event !== 'object') return
-    const trace = ensureMessageStreamTrace(lastMessage)
-    if (!trace) return
-    trace.intervention = {
-      id: String(event.id || ''),
-      prompt: String(event.prompt || ''),
-      options: Array.isArray(event.options) ? event.options.map((item) => String(item || '')) : [],
-      multi_select: Boolean(event.multi_select),
-      timeout_sec: Number.isFinite(Number(event.timeout_sec)) ? Number(event.timeout_sec) : null,
-      selected: [],
-      status: 'pending',
-      requested_at: new Date().toISOString(),
-    }
+    const options = arguments[2] || {}
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    mutateConversationState(targetConversationId, () => {
+      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
+      if (!lastMessage || !event || typeof event !== 'object') return
+      const trace = ensureMessageStreamTrace(lastMessage)
+      if (!trace) return
+      trace.intervention = {
+        id: String(event.id || ''),
+        prompt: String(event.prompt || ''),
+        options: Array.isArray(event.options) ? event.options.map((item) => String(item || '')) : [],
+        multi_select: Boolean(event.multi_select),
+        timeout_sec: Number.isFinite(Number(event.timeout_sec)) ? Number(event.timeout_sec) : null,
+        selected: [],
+        status: 'pending',
+        requested_at: new Date().toISOString(),
+      }
+    })
   }
 
   function setLastMessageInterventionResponse(event, messageId = null) {
-    const lastMessage = getTargetChatMessage(messageId)
-    if (!lastMessage || !event || typeof event !== 'object') return
-    const trace = ensureMessageStreamTrace(lastMessage)
-    if (!trace || !trace.intervention) return
-    if (String(event.id || '') !== String(trace.intervention.id || '')) return
-    trace.intervention.selected = Array.isArray(event.selected) ? event.selected.map((item) => String(item || '')) : []
-    trace.intervention.status = 'submitted'
-    trace.intervention.responded_at = new Date().toISOString()
+    const options = arguments[2] || {}
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    mutateConversationState(targetConversationId, () => {
+      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
+      if (!lastMessage || !event || typeof event !== 'object') return
+      const trace = ensureMessageStreamTrace(lastMessage)
+      if (!trace || !trace.intervention) return
+      if (String(event.id || '') !== String(trace.intervention.id || '')) return
+      trace.intervention.selected = Array.isArray(event.selected) ? event.selected.map((item) => String(item || '')) : []
+      trace.intervention.status = 'submitted'
+      trace.intervention.responded_at = new Date().toISOString()
+    })
   }
 
   function markLastMessageInterventionError(interventionId) {
@@ -1406,22 +1733,31 @@ export const useAppStore = defineStore('app', () => {
     trace.intervention.status = 'error'
   }
 
-  function setLastMessageCodeSnapshot(code) {
-    const messageId = arguments[1] || null
-    const lastMessage = getTargetChatMessage(messageId)
-    if (!lastMessage) return
-    const codeSnapshot = String(code || '')
-    lastMessage.codeSnapshot = codeSnapshot
-    lastMessage.codeUpdated = Boolean(codeSnapshot.trim())
+  function setLastMessageCodeSnapshot(code, messageId = null, options = {}) {
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    mutateConversationState(targetConversationId, () => {
+      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
+      if (!lastMessage) return
+      const codeSnapshot = String(code || '')
+      lastMessage.codeSnapshot = codeSnapshot
+      lastMessage.codeUpdated = Boolean(codeSnapshot.trim())
+    })
   }
 
-  function setLastMessageTurnId(turnId) {
-    const messageId = arguments[1] || null
-    const lastMessage = getTargetChatMessage(messageId)
-    if (!lastMessage) return
-    const normalizedTurnId = String(turnId || '').trim()
-    if (!normalizedTurnId) return
-    lastMessage.id = normalizedTurnId
+  function setLastMessageTurnId(turnId, messageId = null, options = {}) {
+    const targetConversationId = normalizeConversationId(options?.conversationId || activeConversationId.value)
+    mutateConversationState(targetConversationId, (state, active) => {
+      const lastMessage = getTargetChatMessage(messageId, { conversationId: targetConversationId })
+      if (!lastMessage) return
+      const normalizedTurnId = String(turnId || '').trim()
+      if (!normalizedTurnId) return
+      lastMessage.id = normalizedTurnId
+      if (active) {
+        activeTurnId.value = normalizedTurnId
+      } else {
+        state.activeTurnId = normalizedTurnId
+      }
+    })
   }
 
   async function fetchChatHistory() {
@@ -1692,15 +2028,26 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setActiveConversationId(conversationId) {
-    activeConversationId.value = conversationId || ''
+    const previousConversationId = normalizeConversationId(activeConversationId.value)
+    if (previousConversationId) {
+      syncActiveConversationState({ conversationId: previousConversationId })
+    }
+    const nextConversationId = normalizeConversationId(conversationId)
+    activeConversationId.value = nextConversationId
     activeTab.value = 'workspace'
     workspacePane.value = 'chat'
-    clearConversationScopedState({ preserveChatHistory: true })
-    const cachedUsage = conversationUsageById.value?.[String(conversationId || '').trim()]
+    if (!nextConversationId) {
+      clearConversationScopedState()
+      saveLocalConfig()
+      return
+    }
+    const existingState = getConversationState(nextConversationId, { create: true })
+    applyConversationStateToActive(nextConversationId, existingState)
+    const cachedUsage = conversationUsageById.value?.[nextConversationId]
     if (cachedUsage) {
       activeConversationUsage.value = cachedUsage
       setLiveTokenUsage(cachedUsage.usage)
-    } else {
+    } else if (!existingState?.activeConversationUsage) {
       clearActiveConversationUsage()
     }
     saveLocalConfig()
@@ -2307,10 +2654,21 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function fetchConversationTurns({ reset = true, preferLatest = false } = {}) {
-    if (!activeConversationId.value) return
+    const targetConversationId = normalizeConversationId(activeConversationId.value)
+    if (!targetConversationId) return
+    const cachedState = getConversationState(targetConversationId)
+    if (
+      reset &&
+      isConversationRunning(targetConversationId) &&
+      Array.isArray(cachedState?.chatHistory) &&
+      cachedState.chatHistory.length > 0
+    ) {
+      applyConversationStateToActive(targetConversationId, cachedState)
+      return
+    }
     const preferredTurnId = String(activeTurnId.value || '').trim()
     const response = await apiService.v1ListTurns(
-      activeConversationId.value,
+      targetConversationId,
       5,
       reset ? null : turnsNextCursor.value
     )
@@ -2321,7 +2679,7 @@ export const useAppStore = defineStore('app', () => {
     }
     prependChatHistoryFromTurns(turns)
     if (reset) {
-      await fetchActiveConversationUsage(activeConversationId.value)
+      await fetchActiveConversationUsage(targetConversationId)
     }
     if (reset) {
       const newestTurnId = String(turns[0]?.id || '').trim()
@@ -2341,12 +2699,16 @@ export const useAppStore = defineStore('app', () => {
       } else {
         clearConversationScopedState()
       }
-      await loadFinalTurn(activeConversationId.value)
+      await loadFinalTurn(targetConversationId)
     }
     if (reset && turns.length === 0) {
       clearConversationScopedState()
     }
     turnsNextCursor.value = response?.next_cursor || null
+    if (reset) {
+      syncActiveConversationState({ conversationId: targetConversationId })
+      setConversationState(targetConversationId, { hasLoadedTurns: true })
+    }
   }
 
   async function deleteConversationById(conversationId) {
@@ -3141,20 +3503,38 @@ export const useAppStore = defineStore('app', () => {
     if (!id) return
     const next = { ...(conversationRuns.value || {}) }
     if (runState && typeof runState === 'object') {
+      const current = next[id] || {}
       next[id] = {
         status: String(runState.status || 'running'),
-        requestId: String(runState.requestId || ''),
-        startedAt: runState.startedAt || new Date().toISOString(),
+        requestId: String(runState.requestId || current.requestId || ''),
+        startedAt: runState.startedAt || current.startedAt || new Date().toISOString(),
+        updatedAt: runState.updatedAt || new Date().toISOString(),
+        message: String(runState.message || current.message || ''),
+        abortController: runState.abortController ? markRaw(runState.abortController) : current.abortController || null,
       }
     } else {
       delete next[id]
     }
     conversationRuns.value = next
-    isLoading.value = Object.values(next).some((item) => String(item?.status || '') === 'running')
   }
 
   function clearConversationRun(conversationId) {
     setConversationRun(conversationId, null)
+  }
+
+  function getConversationRun(conversationId) {
+    const id = normalizeConversationId(conversationId)
+    return id ? conversationRuns.value?.[id] || null : null
+  }
+
+  function abortConversationRun(conversationId) {
+    const run = getConversationRun(conversationId)
+    const controller = run?.abortController
+    if (controller && typeof controller.abort === 'function') {
+      controller.abort()
+      return true
+    }
+    return false
   }
 
   function setCodeRunning(running) {
@@ -3413,6 +3793,7 @@ export const useAppStore = defineStore('app', () => {
     activeWorkspaceId,
     conversations,
     activeConversationId,
+    conversationStateById,
     conversationRuns,
     turnViewEnabled,
     activeTurnId,
@@ -3469,6 +3850,7 @@ export const useAppStore = defineStore('app', () => {
     isEditorFocused,
     isLoading,
     activeConversationIsLoading,
+    runningConversationCount,
     isCodeRunning,
     foregroundOperation,
     backgroundOperations,
@@ -3531,6 +3913,7 @@ export const useAppStore = defineStore('app', () => {
     setActiveConversationUsage,
     fetchActiveConversationUsage,
     syncLiveTokenUsageFromChatHistory,
+    patchConversationState,
     appendLastMessageExplanationChunk,
     appendLastMessagePlanChunk,
     appendLastMessageReasoningEvent,
@@ -3647,6 +4030,8 @@ export const useAppStore = defineStore('app', () => {
     isConversationRunning,
     setConversationRun,
     clearConversationRun,
+    getConversationRun,
+    abortConversationRun,
     setCodeRunning,
     resetSession,
     fetchChatHistory,

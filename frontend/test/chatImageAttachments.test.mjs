@@ -13,5 +13,5 @@ test('chat input supports image attachment selection and multimodal submit paylo
   assert.equal(source.includes('preferred_table_name:'), false)
   assert.equal(source.includes('active_schema:'), false)
   assert.equal(source.includes('attachments: attachmentsPayload'), true)
-  assert.equal(source.includes('appStore.setLastMessageAnalysisMetadata(response?.metadata || {}, localMessageId)'), true)
+  assert.equal(source.includes('appStore.setLastMessageAnalysisMetadata(response?.metadata || {}, localMessageId, { conversationId: requestConversationId })'), true)
 })

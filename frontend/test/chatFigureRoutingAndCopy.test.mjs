@@ -7,7 +7,7 @@ test('chat input routes chart-like responses to figure data pane', () => {
   const chatInputPath = resolve(process.cwd(), 'src/components/chat/ChatInput.vue')
   const source = readFileSync(chatInputPath, 'utf-8')
 
-  assert.equal(source.includes('appStore.revealArtifactsPane({ hasFigures: true })'), true)
+  assert.equal(source.includes('applyConversationResultState(requestConversationId, finalStatePatch, { hasFigures: true })'), true)
   assert.equal(source.includes("appStore.setActiveTab('chart')"), false)
 })
 

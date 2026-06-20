@@ -17,7 +17,7 @@ test('chat submit ensures an active conversation before optimistic render and st
   assert.equal(chatInput.includes('conversation_id: requestConversationId || null'), false)
 
   const ensureIndex = chatInput.indexOf("requestConversationId = String(await appStore.ensureActiveConversation('New chat') || '').trim()")
-  const optimisticIndex = chatInput.indexOf('appStore.addChatMessage(questionText, \'\', { attachments: attachmentsPayload, localMessageId })')
+  const optimisticIndex = chatInput.indexOf('appStore.addChatMessage(questionText, \'\', { attachments: attachmentsPayload, localMessageId, conversationId: requestConversationId })')
   assert.notEqual(ensureIndex, -1)
   assert.notEqual(optimisticIndex, -1)
   assert.equal(ensureIndex < optimisticIndex, true)

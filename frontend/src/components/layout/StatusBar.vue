@@ -339,6 +339,8 @@ const backgroundOperationCountLabel = computed(() => {
 })
 
 const primaryBackgroundOperationLabel = computed(() => {
+  const runningChats = Number(appStore.runningConversationCount || 0)
+  if (runningChats > 1) return `${runningChats} conversations running`
   const operation = primaryBackgroundOperation.value
   if (!operation) return ''
   const message = String(operation.message || operation.title || '').trim()

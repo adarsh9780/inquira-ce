@@ -254,8 +254,7 @@ const supportsVoiceInput = ref(false)
 const isVoiceInputActive = ref(false)
 const speechRecognition = ref(null)
 const voiceDraftPrefix = ref('')
-const activeAbortController = ref(null)
-const userRequestedStop = ref(false)
+const stoppedConversationIds = ref(new Set())
 
 const showCommandSuggestions = computed(() => commandSuggestions.value.length > 0)
 const showColumnSuggestions = computed(() => columnSuggestions.value.length > 0)
@@ -568,8 +567,10 @@ function stopVoiceInput() {
 }
 
 function handleStopGeneration() {
-  userRequestedStop.value = true
-  activeAbortController.value?.abort()
+  const conversationId = String(appStore.activeConversationId || '').trim()
+  if (!conversationId) return
+  stoppedConversationIds.value = new Set([...stoppedConversationIds.value, conversationId])
+  appStore.abortConversationRun(conversationId)
 }
 
 function handleActionButtonClick() {
@@ -1036,7 +1037,7 @@ function applyCommandResultToStore(commandResult) {
   })
 }
 
-function appendChatExecutionOutput(response) {
+function appendChatExecutionOutput(response, conversationId = appStore.activeConversationId) {
   const execution = response?.execution && typeof response.execution === 'object'
     ? response.execution
     : null
@@ -1048,19 +1049,24 @@ function appendChatExecutionOutput(response) {
   if (!hasOutput) return false
 
   const success = execution.success !== false && String(execution.status || 'success').toLowerCase() !== 'failed'
-  appStore.setTerminalOutput(stderr || stdout)
-  appStore.appendTerminalEntry({
-    kind: 'output',
-    source: 'analysis',
-    label: execution.output_truncated ? 'Run output (truncated)' : 'Run output',
-    runId: String(response?.run_id || ''),
-    status: success ? 'success' : 'error',
-    stdout,
-    stderr,
-    exitCode: success ? 0 : 1,
-    durationMs: Number.isFinite(Number(execution.duration_ms)) ? Number(execution.duration_ms) : null,
-    truncated: Boolean(execution.output_truncated),
-  })
+  const terminalOutput = stderr || stdout
+  if (String(conversationId || '').trim() === String(appStore.activeConversationId || '').trim()) {
+    appStore.setTerminalOutput(terminalOutput)
+    appStore.appendTerminalEntry({
+      kind: 'output',
+      source: 'analysis',
+      label: execution.output_truncated ? 'Run output (truncated)' : 'Run output',
+      runId: String(response?.run_id || ''),
+      status: success ? 'success' : 'error',
+      stdout,
+      stderr,
+      exitCode: success ? 0 : 1,
+      durationMs: Number.isFinite(Number(execution.duration_ms)) ? Number(execution.duration_ms) : null,
+      truncated: Boolean(execution.output_truncated),
+    })
+  } else {
+    appStore.patchConversationState(conversationId, { terminalOutput })
+  }
   return true
 }
 
@@ -1099,8 +1105,36 @@ function normalizeScalarResult(response) {
   }
 }
 
+function preferredDataPane(payload = {}) {
+  if (payload?.hasFigures) return 'figure'
+  if (payload?.hasDataframes) return 'table'
+  if (payload?.hasOutput) return 'output'
+  return appStore.dataPane || 'table'
+}
+
+function applyConversationResultState(conversationId, statePatch = {}, revealPayload = {}) {
+  const targetConversationId = String(conversationId || '').trim()
+  if (!targetConversationId) return
+  const active = targetConversationId === String(appStore.activeConversationId || '').trim()
+  if (active) {
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'generatedCode')) appStore.setGeneratedCode(statePatch.generatedCode)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'pythonFileContent')) appStore.setPythonFileContent(statePatch.pythonFileContent)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'resultData')) appStore.setResultData(statePatch.resultData)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'plotlyFigure')) appStore.setPlotlyFigure(statePatch.plotlyFigure)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'dataframes')) appStore.setDataframes(statePatch.dataframes)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'figures')) appStore.setFigures(statePatch.figures)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'scalars')) appStore.setScalars(statePatch.scalars)
+    if (Object.prototype.hasOwnProperty.call(statePatch, 'terminalOutput')) appStore.setTerminalOutput(statePatch.terminalOutput)
+    appStore.revealArtifactsPane(revealPayload)
+    return
+  }
+  appStore.patchConversationState(targetConversationId, {
+    ...statePatch,
+    dataPane: preferredDataPane(revealPayload),
+  })
+}
+
 async function handleSlashCommand(questionText) {
-  appStore.setLoading(true)
   let commandMessageCreated = false
   let requestConversationId = ''
   let operationId = ''
@@ -1127,12 +1161,16 @@ async function handleSlashCommand(questionText) {
       message: 'Executing chat command...',
       priority: 70,
     })
-    appStore.addChatMessage(questionText, 'Running command...')
+    appStore.addChatMessage(questionText, 'Running command...', { conversationId: requestConversationId })
     commandMessageCreated = true
     await ensureWorkspaceDatasetReady(workspaceId)
     const result = await executeCommand(questionText, { appStore, apiService, executionService })
     const persistedConversationId = String(result?.conversation_id || '').trim()
-    if (persistedConversationId && persistedConversationId !== String(appStore.activeConversationId || '').trim()) {
+    if (
+      persistedConversationId &&
+      persistedConversationId !== String(appStore.activeConversationId || '').trim() &&
+      requestConversationId === String(appStore.activeConversationId || '').trim()
+    ) {
       appStore.setActiveConversationId(persistedConversationId)
     }
     if (persistedConversationId) {
@@ -1145,30 +1183,40 @@ async function handleSlashCommand(questionText) {
       }
     }
     appStore.updateLastMessageExplanation(
-      String(result?.output || `/${String(result?.name || 'command')} executed.`)
+      String(result?.output || `/${String(result?.name || 'command')} executed.`),
+      null,
+      { conversationId: requestConversationId },
     )
-    applyCommandResultToStore(result)
+    if (requestConversationId === String(appStore.activeConversationId || '').trim()) {
+      applyCommandResultToStore(result)
+    }
   } catch (error) {
     commandFailed = true
     const message = extractApiErrorMessage(error, 'Failed to run command.')
     if (commandMessageCreated) {
-      appStore.updateLastMessageExplanation(`Command failed: ${message}`)
+      appStore.updateLastMessageExplanation(`Command failed: ${message}`, null, { conversationId: requestConversationId })
     }
     toast.error('Command Failed', message)
-    appStore.setTerminalOutput(`Error: ${message}`)
-    appStore.appendTerminalEntry({
-      kind: 'output',
-      source: 'analysis',
-      label: 'Command error',
-      status: 'error',
-      stdout: '',
-      stderr: message,
-      exitCode: 1,
-    })
-    appStore.setDataPane('output')
-    appStore.setActiveTab('output')
+    if (requestConversationId === String(appStore.activeConversationId || '').trim()) {
+      appStore.setTerminalOutput(`Error: ${message}`)
+      appStore.appendTerminalEntry({
+        kind: 'output',
+        source: 'analysis',
+        label: 'Command error',
+        status: 'error',
+        stdout: '',
+        stderr: message,
+        exitCode: 1,
+      })
+      appStore.setDataPane('output')
+      appStore.setActiveTab('output')
+    } else {
+      appStore.patchConversationState(requestConversationId, {
+        terminalOutput: `Error: ${message}`,
+        dataPane: 'output',
+      })
+    }
   } finally {
-    appStore.setLoading(false)
     if (requestConversationId) {
       appStore.clearConversationRun(requestConversationId)
     }
@@ -1247,13 +1295,8 @@ async function handleSubmit() {
     return
   }
   const localMessageId = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`
-  appStore.addChatMessage(questionText, '', { attachments: attachmentsPayload, localMessageId })
-  appStore.syncLiveTokenUsageFromChatHistory()
-  appStore.setConversationRun(requestConversationId, {
-    status: 'running',
-    requestId: localMessageId,
-    startedAt: new Date().toISOString(),
-  })
+  appStore.addChatMessage(questionText, '', { attachments: attachmentsPayload, localMessageId, conversationId: requestConversationId })
+  appStore.syncLiveTokenUsageFromChatHistory({ conversationId: requestConversationId })
   const operationId = appStore.startBackgroundOperation({
     id: `chat-stream-${requestConversationId}`,
     type: 'chat',
@@ -1265,8 +1308,12 @@ async function handleSubmit() {
   let operationMessage = 'Chat response finished.'
 
   const abortController = new AbortController()
-  activeAbortController.value = abortController
-  userRequestedStop.value = false
+  appStore.setConversationRun(requestConversationId, {
+    status: 'running',
+    requestId: localMessageId,
+    startedAt: new Date().toISOString(),
+    abortController,
+  })
   const signal = abortController.signal
 
   let warningTimer = null
@@ -1310,7 +1357,7 @@ async function handleSubmit() {
           if ((evt.event === 'messages' || evt.event === 'messages/partial' || evt.event === 'messages-tuple')) {
             const text = extractLangGraphTokenText(evt.data)
             if (text) {
-              appStore.appendLastMessageExplanationChunk(text, localMessageId)
+              appStore.appendLastMessageExplanationChunk(text, localMessageId, { conversationId: requestConversationId })
             }
             return
           }
@@ -1320,9 +1367,9 @@ async function handleSubmit() {
           if (evt.event === 'token' && typeof evt.data?.text === 'string') {
             const nodeName = String(evt.data?.node || '').trim().toLowerCase()
             if (FINAL_STREAM_NODES.has(nodeName)) {
-              appStore.appendLastMessageExplanationChunk(evt.data.text, localMessageId)
+              appStore.appendLastMessageExplanationChunk(evt.data.text, localMessageId, { conversationId: requestConversationId })
             } else {
-              appStore.appendLastMessagePlanChunk(evt.data.text, evt.data.node || '', localMessageId)
+              appStore.appendLastMessagePlanChunk(evt.data.text, evt.data.node || '', localMessageId, { conversationId: requestConversationId })
             }
             return
           }
@@ -1332,7 +1379,7 @@ async function handleSubmit() {
               stage: evt.data?.stage || '',
               message: evt.data.message,
               output: ''
-            }, localMessageId)
+            }, localMessageId, { conversationId: requestConversationId })
             return
           }
           if (evt.event === 'reasoning' && evt.data?.message) {
@@ -1340,7 +1387,7 @@ async function handleSubmit() {
               stage: evt.data?.stage || 'intent',
               message: evt.data.message,
               route: evt.data?.route || ''
-            }, localMessageId)
+            }, localMessageId, { conversationId: requestConversationId })
             return
           }
           if (evt.event === 'agent_status' && evt.data?.message) {
@@ -1350,27 +1397,27 @@ async function handleSubmit() {
               stage: evt.data.step || '',
               message: evt.data.message,
               output: evt.data?.detail || evt.data?.output || ''
-            }, localMessageId)
+            }, localMessageId, { conversationId: requestConversationId })
             return
           }
           if (evt.event === 'tool_call' && evt.data?.call_id) {
-            appStore.appendLastMessageToolCall(evt.data, localMessageId)
+            appStore.appendLastMessageToolCall(evt.data, localMessageId, { conversationId: requestConversationId })
             return
           }
           if (evt.event === 'tool_progress' && evt.data?.call_id) {
-            appStore.appendLastMessageToolProgress(evt.data, localMessageId)
+            appStore.appendLastMessageToolProgress(evt.data, localMessageId, { conversationId: requestConversationId })
             return
           }
           if (evt.event === 'tool_result' && evt.data?.call_id) {
-            appStore.appendLastMessageToolResult(evt.data, localMessageId)
+            appStore.appendLastMessageToolResult(evt.data, localMessageId, { conversationId: requestConversationId })
             return
           }
           if (evt.event === 'intervention_request' && evt.data?.id) {
-            appStore.setLastMessageInterventionRequest(evt.data, localMessageId)
+            appStore.setLastMessageInterventionRequest(evt.data, localMessageId, { conversationId: requestConversationId })
             return
           }
           if (evt.event === 'intervention_response' && evt.data?.id) {
-            appStore.setLastMessageInterventionResponse(evt.data, localMessageId)
+            appStore.setLastMessageInterventionResponse(evt.data, localMessageId, { conversationId: requestConversationId })
             return
           }
           if (evt.event === 'error') {
@@ -1378,27 +1425,31 @@ async function handleSubmit() {
               { data: evt.data },
               'Streaming analysis failed.',
             )
-            appStore.updateLastMessageExplanation(streamErrorMessage, localMessageId)
+            appStore.updateLastMessageExplanation(streamErrorMessage, localMessageId, { conversationId: requestConversationId })
             return
           }
           if (evt.event === 'token_usage' && evt.data && typeof evt.data === 'object') {
             const tokenUsage = evt.data?.token_usage
             if (tokenUsage && typeof tokenUsage === 'object') {
-              appStore.setLiveTokenUsageForCurrentTurn(tokenUsage)
+              appStore.setLiveTokenUsageForCurrentTurn(tokenUsage, { conversationId: requestConversationId })
             }
           }
         }
       }
     )
 
-    if (response?.conversation_id && response.conversation_id !== appStore.activeConversationId) {
+    if (
+      response?.conversation_id &&
+      response.conversation_id !== appStore.activeConversationId &&
+      requestConversationId === String(appStore.activeConversationId || '').trim()
+    ) {
       appStore.setActiveConversationId(response.conversation_id)
       await appStore.fetchConversations()
     }
 
     const responseTurnId = String(response?.turn_id || '').trim()
     if (responseTurnId) {
-      appStore.setLastMessageTurnId(responseTurnId, localMessageId)
+      appStore.setLastMessageTurnId(responseTurnId, localMessageId, { conversationId: requestConversationId })
       if (String(response?.conversation_id || requestConversationId) === String(appStore.activeConversationId || '')) {
         await appStore.loadActiveTurnRelations(responseTurnId)
         await appStore.loadFinalTurn()
@@ -1408,48 +1459,54 @@ async function handleSubmit() {
 
     const { is_safe, code, current_code, explanation, result_explanation, code_explanation } = response
     const finalCode = (code ?? current_code ?? '').toString()
-    appStore.setLastMessageAnalysisMetadata(response?.metadata || {}, localMessageId)
+    appStore.setLastMessageAnalysisMetadata(response?.metadata || {}, localMessageId, { conversationId: requestConversationId })
     try {
       await appStore.fetchActiveConversationUsage(String(response?.conversation_id || requestConversationId || '').trim())
     } catch (_error) {
       // Usage display is informational; the completed response should still render.
     }
     const finalExplanation = (result_explanation ?? explanation ?? '').toString()
-    appStore.setLastMessageCodeSnapshot(finalCode, localMessageId)
-    appStore.setLastMessageCodeExplanation((code_explanation ?? '').toString(), localMessageId)
+    appStore.setLastMessageCodeSnapshot(finalCode, localMessageId, { conversationId: requestConversationId })
+    appStore.setLastMessageCodeExplanation((code_explanation ?? '').toString(), localMessageId, { conversationId: requestConversationId })
 
     if (!is_safe) {
-      appStore.updateLastMessageExplanation(finalExplanation || 'Your query was flagged as potentially unsafe.', localMessageId)
+      appStore.updateLastMessageExplanation(finalExplanation || 'Your query was flagged as potentially unsafe.', localMessageId, { conversationId: requestConversationId })
       return
     }
 
-    appStore.updateLastMessageExplanation(finalExplanation, localMessageId)
-    appStore.setGeneratedCode(finalCode)
+    appStore.updateLastMessageExplanation(finalExplanation, localMessageId, { conversationId: requestConversationId })
+    const finalStatePatch = {}
     if (finalCode.trim()) {
-      appStore.setPythonFileContent(finalCode)
+      finalStatePatch.generatedCode = finalCode
+      finalStatePatch.pythonFileContent = finalCode
+      finalStatePatch.userEditedCode = ''
+      finalStatePatch.hasUserEditedCode = false
+      finalStatePatch.codeEditorSource = 'agent'
     }
 
     if (finalCode && finalCode.trim()) {
-      const hasChatExecutionOutput = appendChatExecutionOutput(response)
+      const hasChatExecutionOutput = appendChatExecutionOutput(response, requestConversationId)
 
       const inlineFigure = normalizePlotlyFigure(response.plotly_figure || response.result)
       if (inlineFigure) {
-        appStore.setPlotlyFigure(inlineFigure)
-        appStore.setResultData(null)
-        appStore.revealArtifactsPane({ hasFigures: true })
+        finalStatePatch.plotlyFigure = inlineFigure
+        finalStatePatch.resultData = null
+        applyConversationResultState(requestConversationId, finalStatePatch, { hasFigures: true })
       } else if (response.result?.columns && response.result?.data) {
-        appStore.setResultData(response.result)
-        appStore.setPlotlyFigure(null)
-        appStore.revealArtifactsPane({ hasDataframes: true })
+        finalStatePatch.resultData = response.result
+        finalStatePatch.plotlyFigure = null
+        applyConversationResultState(requestConversationId, finalStatePatch, { hasDataframes: true })
       } else if (hasChatExecutionOutput) {
-        appStore.revealArtifactsPane({ hasOutput: true })
+        applyConversationResultState(requestConversationId, finalStatePatch, { hasOutput: true })
+      } else if (Object.keys(finalStatePatch).length > 0) {
+        applyConversationResultState(requestConversationId, finalStatePatch)
       }
     }
 
     const artifactItems = sortArtifactsNewestFirst(Array.isArray(response?.artifacts) ? response.artifacts : [])
     const inlineScalarResult = normalizeScalarResult(response)
     if (artifactItems.length === 0 && !inlineScalarResult) {
-      appStore.setScalars([])
+      finalStatePatch.scalars = []
     }
     if (artifactItems.length > 0) {
       const dataframeArtifacts = artifactItems
@@ -1499,24 +1556,27 @@ async function handleSubmit() {
           }
         })
 
-      appStore.setDataframes(dataframeArtifacts)
-      appStore.setFigures(figureArtifacts)
-      appStore.setScalars(inlineScalarResult ? [...scalarArtifacts, inlineScalarResult] : scalarArtifacts)
+      finalStatePatch.dataframes = dataframeArtifacts
+      finalStatePatch.figures = figureArtifacts
+      finalStatePatch.scalars = inlineScalarResult ? [...scalarArtifacts, inlineScalarResult] : scalarArtifacts
+      finalStatePatch.figureCount = figureArtifacts.length
       if (figureArtifacts.length > 0) {
-        appStore.setPlotlyFigure(figureArtifacts[0].data)
-        appStore.revealArtifactsPane({ hasFigures: true })
+        finalStatePatch.plotlyFigure = figureArtifacts[0].data
+        applyConversationResultState(requestConversationId, finalStatePatch, { hasFigures: true })
       } else if (dataframeArtifacts.length > 0) {
-        appStore.setResultData(dataframeArtifacts[0].data)
-        appStore.revealArtifactsPane({ hasDataframes: true })
+        finalStatePatch.resultData = dataframeArtifacts[0].data
+        applyConversationResultState(requestConversationId, finalStatePatch, { hasDataframes: true })
       } else if (scalarArtifacts.length > 0 || inlineScalarResult) {
-        appStore.revealArtifactsPane({ hasOutput: true })
+        applyConversationResultState(requestConversationId, finalStatePatch, { hasOutput: true })
       } else if (artifactItems.length > 0) {
-        appStore.revealArtifactsPane({ hasOutput: true })
+        applyConversationResultState(requestConversationId, finalStatePatch, { hasOutput: true })
       }
     } else {
       if (inlineScalarResult) {
-        appStore.setScalars([inlineScalarResult])
-        appStore.revealArtifactsPane({ hasOutput: true })
+        finalStatePatch.scalars = [inlineScalarResult]
+        applyConversationResultState(requestConversationId, finalStatePatch, { hasOutput: true })
+      } else if (Object.keys(finalStatePatch).length > 0) {
+        applyConversationResultState(requestConversationId, finalStatePatch)
       }
     }
 
@@ -1539,12 +1599,12 @@ async function handleSubmit() {
     const backendDetail = extractApiErrorMessage(error, '')
 
     if (error.name === 'AbortError' || signal.aborted) {
-      if (userRequestedStop.value) {
+      if (stoppedConversationIds.value.has(requestConversationId)) {
         errorTitle = 'Generation Stopped'
         errorMessage = 'Response generation was stopped.'
         operationStatus = 'failed'
         operationMessage = errorMessage
-        appStore.markLastMessageStreamStopped(errorMessage, localMessageId)
+        appStore.markLastMessageStreamStopped(errorMessage, localMessageId, { conversationId: requestConversationId })
         toast.error(errorTitle, errorMessage)
         return
       } else {
@@ -1585,8 +1645,8 @@ async function handleSubmit() {
         category: 'llm_api',
       },
     )
-    appStore.setTerminalOutput(`Error: ${errorMessage}`)
-    appStore.updateLastMessageExplanation(errorMessage, localMessageId)
+    applyConversationResultState(requestConversationId, { terminalOutput: `Error: ${errorMessage}` }, { hasOutput: true })
+    appStore.updateLastMessageExplanation(errorMessage, localMessageId, { conversationId: requestConversationId })
     if (attachmentsPayload.length > 0) {
       pendingAttachments.value = attachmentsPayload.map((item) => ({
         ...item,
@@ -1597,8 +1657,9 @@ async function handleSubmit() {
   } finally {
     if (warningTimer) clearTimeout(warningTimer)
     if (cancelTimer) clearTimeout(cancelTimer)
-    activeAbortController.value = null
-    userRequestedStop.value = false
+    const nextStopped = new Set(stoppedConversationIds.value)
+    nextStopped.delete(requestConversationId)
+    stoppedConversationIds.value = nextStopped
     appStore.clearConversationRun(requestConversationId)
     appStore.finishBackgroundOperation(operationId, {
       status: operationStatus,

@@ -33,5 +33,5 @@ test('app store exposes active turn state and loaders', () => {
   assert.equal(source.includes('async function fetchConversationTurns({ reset = true, preferLatest = false } = {})'), true)
   assert.equal(source.includes('const targetTurnId = preferLatest ? newestTurnId : (preferredTurnId || newestTurnId)'), true)
   assert.equal(source.includes('async function loadFinalTurn('), true)
-  assert.equal(source.includes('function setLastMessageTurnId(turnId)'), true)
+  assert.equal(source.includes('function setLastMessageTurnId(turnId, messageId = null, options = {})'), true)
 })
