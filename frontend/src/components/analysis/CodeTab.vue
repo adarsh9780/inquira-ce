@@ -404,11 +404,11 @@ async function syncTableNameInCode(silent = false) {
   const current = appStore.pythonFileContent
   const updated = replaceTableNameInCode(current, tableName)
   if (updated !== current) {
-    appStore.noteUserEditedCode(updated)
+    appStore.noteUserEditedCode(updated, { baselineCode: current })
     updateEditorContent()
     if (!silent) toast.success('Synced table name in code')
   } else if (isDefaultEditorContent(current.trim())) {
-    appStore.noteUserEditedCode(defaultCodeTemplate.value)
+    appStore.noteUserEditedCode(defaultCodeTemplate.value, { baselineCode: current })
     updateEditorContent()
     if (!silent) toast.success('Refreshed code template with new table name')
   } else if (!silent) {
@@ -420,8 +420,9 @@ const canRunCode = computed(() => appStore.pythonFileContent.trim() && !isRunnin
 const canUndo = computed(() => editor && editor.state && editor.state.undoDepth > 0)
 const canRedo = computed(() => editor && editor.state && editor.state.redoDepth > 0)
 const showCodeSourceToggle = computed(() => {
-  const generated = String(appStore.generatedCode || '')
-  return Boolean(generated && appStore.hasUserEditedCode && appStore.userEditedCode !== generated)
+  const generated = String(appStore.generatedCode || appStore.activeTurnCode || '')
+  const edited = String(appStore.userEditedCode || appStore.pythonFileContent || '')
+  return Boolean(generated && appStore.hasUserEditedCode && edited !== generated)
 })
 
 function codeSourceButtonStyle(source) {
@@ -822,9 +823,10 @@ async function initializeEditor() {
     EditorView.updateListener.of((update) => {
       // Handle content changes
       if (update.docChanged && !isUpdatingFromStore) {
-        const content = editor.state.doc.toString()
+        const content = update.state.doc.toString()
+        const previousContent = update.startState.doc.toString()
         isUpdatingFromStore = true
-        appStore.noteUserEditedCode(content)
+        appStore.noteUserEditedCode(content, { baselineCode: previousContent })
         setTimeout(() => {
           isUpdatingFromStore = false
         }, 10)
@@ -917,12 +919,13 @@ onUnmounted(() => {
 })
 
 watch(() => appStore.generatedCode, (newCode) => {
-  if (newCode) {
+  if (newCode && appStore.codeEditorSource === 'agent' && !appStore.hasUserEditedCode) {
     appStore.setPythonFileContent(newCode)
     updateEditorContent()
     isGeneratingCode.value = false
     appStore.setLoading(false)
-    appStore.setCodeRunning(false)  }
+    appStore.setCodeRunning(false)
+  }
 })
 
 watch(() => appStore.isLoading, (loading) => {

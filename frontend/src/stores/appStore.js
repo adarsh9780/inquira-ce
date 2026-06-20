@@ -526,6 +526,9 @@ export const useAppStore = defineStore('app', () => {
     } else if (typeof editor.generated_code === 'string') {
       pythonFileContent.value = editor.generated_code
     }
+    if (!userEditedCode.value && hasUserEditedCode.value && pythonFileContent.value) {
+      userEditedCode.value = pythonFileContent.value
+    }
 
     return true
   }
@@ -934,10 +937,32 @@ export const useAppStore = defineStore('app', () => {
     saveLocalConfig()
   }
 
-  function noteUserEditedCode(content) {
+  function resolveAgentCodeBaseline(fallbackCode = '') {
+    const generated = String(generatedCode.value || '')
+    if (generated) return generated
+
+    const activeCode = String(activeTurnCode.value || '')
+    if (activeCode) {
+      generatedCode.value = activeCode
+      return activeCode
+    }
+
+    const fallback = String(fallbackCode || '')
+    if (fallback) {
+      generatedCode.value = fallback
+      return fallback
+    }
+
+    return ''
+  }
+
+  function noteUserEditedCode(content, options = {}) {
     const edited = String(content || '')
+    const previousContent = String(options?.baselineCode || '')
+    const baselineFallback = previousContent && previousContent !== edited ? previousContent : ''
+    const agentCode = resolveAgentCodeBaseline(baselineFallback)
     userEditedCode.value = edited
-    hasUserEditedCode.value = edited !== String(generatedCode.value || '')
+    hasUserEditedCode.value = agentCode ? edited !== agentCode : Boolean(edited)
     codeEditorSource.value = hasUserEditedCode.value ? 'user' : 'agent'
     pythonFileContent.value = edited
     saveLocalConfig()
@@ -2483,10 +2508,11 @@ export const useAppStore = defineStore('app', () => {
 
   function setCodeEditorSource(source) {
     const normalized = source === 'user' ? 'user' : 'agent'
+    const agentCode = resolveAgentCodeBaseline()
     codeEditorSource.value = normalized
     pythonFileContent.value = normalized === 'user'
       ? String(userEditedCode.value || '')
-      : String(generatedCode.value || '')
+      : agentCode
     saveLocalConfig()
   }
 
