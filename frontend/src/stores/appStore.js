@@ -79,6 +79,9 @@ export const useAppStore = defineStore('app', () => {
 
   // Single Python File per Session (simplified)
   const pythonFileContent = ref('')
+  const userEditedCode = ref('')
+  const hasUserEditedCode = ref(false)
+  const codeEditorSource = ref('agent')
 
   // Chat
   const chatHistory = ref([])
@@ -352,7 +355,10 @@ export const useAppStore = defineStore('app', () => {
       },
       editor: {
         generated_code: generatedCode.value || '',
-        python_file_content: pythonFileContent.value || ''
+        python_file_content: pythonFileContent.value || '',
+        user_edited_code: userEditedCode.value || '',
+        has_user_edited_code: !!hasUserEditedCode.value,
+        code_editor_source: codeEditorSource.value === 'user' ? 'user' : 'agent',
       }
     }
   }
@@ -504,6 +510,17 @@ export const useAppStore = defineStore('app', () => {
     if (typeof editor.generated_code === 'string') {
       generatedCode.value = editor.generated_code
     }
+    if (typeof editor.user_edited_code === 'string') {
+      userEditedCode.value = editor.user_edited_code
+    }
+    if (typeof editor.has_user_edited_code === 'boolean') {
+      hasUserEditedCode.value = editor.has_user_edited_code
+    } else {
+      hasUserEditedCode.value = Boolean(userEditedCode.value && userEditedCode.value !== generatedCode.value)
+    }
+    if (typeof editor.code_editor_source === 'string') {
+      codeEditorSource.value = editor.code_editor_source === 'user' ? 'user' : 'agent'
+    }
     if (typeof editor.python_file_content === 'string') {
       pythonFileContent.value = editor.python_file_content
     } else if (typeof editor.generated_code === 'string') {
@@ -623,6 +640,9 @@ export const useAppStore = defineStore('app', () => {
     uiFont.value = DEFAULT_APP_FONT_ID
     uiCodeFont.value = DEFAULT_CODE_FONT_ID
     pythonFileContent.value = ''
+    userEditedCode.value = ''
+    hasUserEditedCode.value = false
+    codeEditorSource.value = 'agent'
 
     chatHistory.value = []
     questionHistory.value = []
@@ -709,6 +729,9 @@ export const useAppStore = defineStore('app', () => {
       chatHistory.value = []
       generatedCode.value = ''
       pythonFileContent.value = ''
+      userEditedCode.value = ''
+      hasUserEditedCode.value = false
+      codeEditorSource.value = 'agent'
       schemaFileId.value = ''
       isSchemaFileUploaded.value = false
       ingestedTableName.value = ''
@@ -908,6 +931,15 @@ export const useAppStore = defineStore('app', () => {
   // Python File Management (simplified to single file)
   function setPythonFileContent(content) {
     pythonFileContent.value = content
+    saveLocalConfig()
+  }
+
+  function noteUserEditedCode(content) {
+    const edited = String(content || '')
+    userEditedCode.value = edited
+    hasUserEditedCode.value = edited !== String(generatedCode.value || '')
+    codeEditorSource.value = hasUserEditedCode.value ? 'user' : 'agent'
+    pythonFileContent.value = edited
     saveLocalConfig()
   }
 
@@ -1608,6 +1640,9 @@ export const useAppStore = defineStore('app', () => {
     turnsNextCursor.value = null
     generatedCode.value = ''
     pythonFileContent.value = ''
+    userEditedCode.value = ''
+    hasUserEditedCode.value = false
+    codeEditorSource.value = 'agent'
     resultData.value = null
     plotlyFigure.value = null
     setDataframes([])
@@ -1658,6 +1693,10 @@ export const useAppStore = defineStore('app', () => {
   function setActiveTurnPayload(turn) {
     activeTurn.value = turn && typeof turn === 'object' ? { ...turn } : null
     activeTurnCode.value = String(turn?.code_snapshot || '')
+    generatedCode.value = activeTurnCode.value
+    userEditedCode.value = ''
+    hasUserEditedCode.value = false
+    codeEditorSource.value = 'agent'
     setPythonFileContent(activeTurnCode.value)
   }
 
@@ -2053,6 +2092,9 @@ export const useAppStore = defineStore('app', () => {
       isSchemaFileUploaded.value = false
       generatedCode.value = ''
       pythonFileContent.value = ''
+      userEditedCode.value = ''
+      hasUserEditedCode.value = false
+      codeEditorSource.value = 'agent'
       resultData.value = null
       plotlyFigure.value = null
       dataPaneError.value = ''
@@ -2431,7 +2473,20 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function setGeneratedCode(code) {
-    generatedCode.value = code
+    const generated = String(code || '')
+    generatedCode.value = generated
+    userEditedCode.value = ''
+    hasUserEditedCode.value = false
+    codeEditorSource.value = 'agent'
+    saveLocalConfig()
+  }
+
+  function setCodeEditorSource(source) {
+    const normalized = source === 'user' ? 'user' : 'agent'
+    codeEditorSource.value = normalized
+    pythonFileContent.value = normalized === 'user'
+      ? String(userEditedCode.value || '')
+      : String(generatedCode.value || '')
     saveLocalConfig()
   }
 
@@ -3102,6 +3157,10 @@ export const useAppStore = defineStore('app', () => {
     currentQuestion.value = ''
     currentExplanation.value = ''
     generatedCode.value = ''
+    pythonFileContent.value = ''
+    userEditedCode.value = ''
+    hasUserEditedCode.value = false
+    codeEditorSource.value = 'agent'
     resultData.value = null
     plotlyFigure.value = null
     terminalOutput.value = ''
@@ -3313,6 +3372,9 @@ export const useAppStore = defineStore('app', () => {
     uiCodeFont,
     availableCodeFonts,
     pythonFileContent,
+    userEditedCode,
+    hasUserEditedCode,
+    codeEditorSource,
     chatHistory,
     questionHistory,
     currentQuestion,
@@ -3429,6 +3491,8 @@ export const useAppStore = defineStore('app', () => {
     setUiFont,
     setUiCodeFont,
     setPythonFileContent,
+    noteUserEditedCode,
+    setCodeEditorSource,
     addChatMessage,
     addQuestionHistoryEntry,
     updateLastMessageExplanation,

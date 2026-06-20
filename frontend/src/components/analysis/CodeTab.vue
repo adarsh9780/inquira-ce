@@ -1,7 +1,36 @@
 <template>
   <div class="flex h-full flex-col">
     <Teleport to="#workspace-left-pane-toolbar" v-if="isMounted && appStore.workspacePane === 'code'">
-      <div class="flex items-center w-full justify-end">
+      <div class="flex items-center w-full justify-between gap-2">
+        <div
+          v-if="showCodeSourceToggle"
+          class="flex items-center gap-0.5 rounded-lg border p-0.5"
+          style="border-color: color-mix(in srgb, var(--color-border) 80%, transparent); background-color: color-mix(in srgb, var(--color-base) 82%, var(--color-surface));"
+        >
+          <button
+            type="button"
+            class="rounded-md px-2.5 py-1 text-[11px] font-medium leading-4 transition-colors"
+            :class="appStore.codeEditorSource === 'agent' ? 'shadow-sm' : ''"
+            :style="codeSourceButtonStyle('agent')"
+            :aria-pressed="appStore.codeEditorSource === 'agent'"
+            title="Use agent generated code"
+            @click="selectCodeSource('agent')"
+          >
+            Agent
+          </button>
+          <button
+            type="button"
+            class="rounded-md px-2.5 py-1 text-[11px] font-medium leading-4 transition-colors"
+            :class="appStore.codeEditorSource === 'user' ? 'shadow-sm' : ''"
+            :style="codeSourceButtonStyle('user')"
+            :aria-pressed="appStore.codeEditorSource === 'user'"
+            title="Use your edited code"
+            @click="selectCodeSource('user')"
+          >
+            Edited
+          </button>
+        </div>
+        <div v-else></div>
         <div class="flex items-center gap-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
           <button
             @click="runCode"
@@ -375,11 +404,11 @@ async function syncTableNameInCode(silent = false) {
   const current = appStore.pythonFileContent
   const updated = replaceTableNameInCode(current, tableName)
   if (updated !== current) {
-    appStore.setPythonFileContent(updated)
+    appStore.noteUserEditedCode(updated)
     updateEditorContent()
     if (!silent) toast.success('Synced table name in code')
   } else if (isDefaultEditorContent(current.trim())) {
-    appStore.setPythonFileContent(defaultCodeTemplate.value)
+    appStore.noteUserEditedCode(defaultCodeTemplate.value)
     updateEditorContent()
     if (!silent) toast.success('Refreshed code template with new table name')
   } else if (!silent) {
@@ -390,6 +419,31 @@ async function syncTableNameInCode(silent = false) {
 const canRunCode = computed(() => appStore.pythonFileContent.trim() && !isRunning.value && !appStore.isCodeRunning)
 const canUndo = computed(() => editor && editor.state && editor.state.undoDepth > 0)
 const canRedo = computed(() => editor && editor.state && editor.state.redoDepth > 0)
+const showCodeSourceToggle = computed(() => {
+  const generated = String(appStore.generatedCode || '')
+  return Boolean(generated && appStore.hasUserEditedCode && appStore.userEditedCode !== generated)
+})
+
+function codeSourceButtonStyle(source) {
+  const active = appStore.codeEditorSource === source
+  if (active) {
+    return {
+      backgroundColor: 'var(--color-surface)',
+      color: 'var(--color-text-main)',
+      borderColor: 'color-mix(in srgb, var(--color-border) 80%, transparent)',
+    }
+  }
+  return {
+    backgroundColor: 'transparent',
+    color: 'var(--color-text-muted)',
+    borderColor: 'transparent',
+  }
+}
+
+function selectCodeSource(source) {
+  if (source === appStore.codeEditorSource) return
+  appStore.setCodeEditorSource(source)
+}
 
 function executionInProgress() {
   return isRunning.value || appStore.isCodeRunning
@@ -770,7 +824,7 @@ async function initializeEditor() {
       if (update.docChanged && !isUpdatingFromStore) {
         const content = editor.state.doc.toString()
         isUpdatingFromStore = true
-        appStore.setPythonFileContent(content)
+        appStore.noteUserEditedCode(content)
         setTimeout(() => {
           isUpdatingFromStore = false
         }, 10)
