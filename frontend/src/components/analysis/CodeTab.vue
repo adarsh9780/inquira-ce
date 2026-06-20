@@ -259,6 +259,14 @@ function applyExecutionArtifactsToStore(viewModel) {
   if (viewModel.figures.length > 0) {
     appStore.setPlotlyFigure(viewModel.figures[0].data)
   }
+
+  appStore.setScalars(viewModel.scalars)
+
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (workspaceId) {
+    appStore.setSelectedTableArtifact(workspaceId, viewModel.dataframes[0]?.data?.artifact_id || '')
+    appStore.setSelectedFigureArtifact(workspaceId, viewModel.figures[0]?.artifact_id || '')
+  }
 }
 
 async function fetchDatabasePaths() {
@@ -514,6 +522,14 @@ async function executeSnippet(code, successLine, options = {}) {
   const hasConsoleOutput = Boolean(outputStdout || outputStderr)
 
   applyExecutionArtifactsToStore(orderedViewModel)
+  if (
+    Array.isArray(normalized?.artifacts)
+    && normalized.artifacts.length > 0
+    && String(appStore.activeConversationId || '').trim()
+    && String(appStore.activeTurnId || '').trim()
+  ) {
+    appStore.refreshActiveTurnArtifacts()
+  }
   const targetTab = hasArtifacts || hasConsoleOutput
     ? appStore.selectDataPaneForArtifacts({
         hasFigures: orderedViewModel.figures.length > 0,

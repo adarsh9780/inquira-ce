@@ -1740,6 +1740,10 @@ export const useAppStore = defineStore('app', () => {
     activeTurnArtifactRefreshKey.value += 1
   }
 
+  function refreshActiveTurnArtifacts() {
+    activeTurnArtifactRefreshKey.value += 1
+  }
+
   function setActiveTurnTree(payload) {
     activeTurnTree.value = payload && typeof payload === 'object' ? { ...payload } : null
   }
@@ -3461,6 +3465,7 @@ export const useAppStore = defineStore('app', () => {
     setActiveTurnId,
     setActiveTurnPayload,
     setActiveTurnRelations,
+    refreshActiveTurnArtifacts,
     setActiveTurnTree,
     loadActiveTurn,
     loadActiveTurnRelations,

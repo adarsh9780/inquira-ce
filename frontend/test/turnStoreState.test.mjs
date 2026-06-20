@@ -22,6 +22,7 @@ test('app store exposes active turn state and loaders', () => {
   assert.equal(source.includes('function hydrateArtifactsFromToolEvents(toolEvents)'), true)
   assert.equal(source.includes('hydrateArtifactsFromToolEvents(payload?.current?.tool_events)'), true)
   assert.equal(source.includes('activeTurnArtifactRefreshKey.value += 1'), true)
+  assert.equal(source.includes('function refreshActiveTurnArtifacts()'), true)
   assert.equal(source.includes("data: Array.isArray(artifact?.preview_rows) ? artifact.preview_rows : []"), true)
   assert.equal(source.includes('const figure = normalizePlotlyFigure(artifact?.payload?.figure ?? artifact?.payload)'), true)
   assert.equal(source.includes('async function loadActiveTurn('), true)

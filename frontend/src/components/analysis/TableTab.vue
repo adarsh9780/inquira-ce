@@ -288,11 +288,71 @@ onUnmounted(() => {
 })
 
 const allArtifacts = computed(() => (Array.isArray(workspaceArtifacts.value) ? workspaceArtifacts.value : []))
+
+function normalizeClientRowsFromDataframeValue(value) {
+  if (Array.isArray(value)) {
+    return value
+      .filter((row) => row && typeof row === 'object' && !Array.isArray(row))
+      .map((row) => ({ ...row }))
+  }
+  if (!value || typeof value !== 'object') return []
+
+  const rawRows = Array.isArray(value.data) ? value.data : []
+  if (!rawRows.length) return []
+  if (rawRows[0] && typeof rawRows[0] === 'object' && !Array.isArray(rawRows[0])) {
+    return rawRows.map((row) => ({ ...row }))
+  }
+
+  const columns = Array.isArray(value.columns) ? value.columns.map((column) => String(column)) : []
+  if (!columns.length) return []
+  return rawRows
+    .map((row) => {
+      if (!Array.isArray(row)) return null
+      const mapped = {}
+      columns.forEach((column, idx) => {
+        mapped[column] = row[idx]
+      })
+      return mapped
+    })
+    .filter(Boolean)
+}
+
+function normalizeLiveDataframeArtifact(item, index) {
+  const data = item?.data && typeof item.data === 'object' ? item.data : item
+  const rows = normalizeClientRowsFromDataframeValue(data)
+  const columns = Array.isArray(data?.columns) && data.columns.length > 0
+    ? data.columns.map((column) => String(column))
+    : (rows[0] ? Object.keys(rows[0]) : [])
+  const artifactId = String(data?.artifact_id || item?.artifact_id || `live-dataframe-${index + 1}`).trim()
+  const logicalName = String(data?.logical_name || item?.logical_name || item?.name || `dataframe_${index + 1}`).trim()
+  return {
+    artifact_id: artifactId,
+    logical_name: logicalName,
+    display_name: String(data?.display_name || item?.display_name || logicalName).trim(),
+    row_count: Number(data?.row_count || rows.length || 0),
+    schema: columns.map((name) => ({ name })),
+    preview_rows: rows,
+    source: 'live',
+  }
+}
+
+const liveDataframeArtifacts = computed(() => {
+  const persistedIds = new Set(
+    allArtifacts.value
+      .map((artifact) => String(artifact?.artifact_id || '').trim())
+      .filter(Boolean),
+  )
+  return (Array.isArray(appStore.dataframes) ? appStore.dataframes : [])
+    .map((item, index) => normalizeLiveDataframeArtifact(item, index))
+    .filter((artifact) => artifact.artifact_id && !persistedIds.has(artifact.artifact_id))
+})
+
 const displayArtifacts = computed(() => {
-  return allArtifacts.value.map((artifact) => ({
+  const persistedArtifacts = allArtifacts.value.map((artifact) => ({
     ...artifact,
     source: 'artifact',
   }))
+  return [...liveDataframeArtifacts.value, ...persistedArtifacts]
 })
 
 const showArtifactListLoadingState = computed(() => {
@@ -309,10 +369,10 @@ const tableDropdownOptions = computed(() => displayArtifacts.value.map((artifact
 }))
 
 // Expose dataframe count to the store so StatusBar can read it
-watch(allArtifacts, (list) => {
+watch(allArtifacts, () => {
   if (
     selectedArtifactId.value
-    && !list.some((item) => item.artifact_id === selectedArtifactId.value)
+    && !displayArtifacts.value.some((item) => item.artifact_id === selectedArtifactId.value)
   ) {
     selectedArtifactId.value = null
   }
@@ -320,6 +380,20 @@ watch(allArtifacts, (list) => {
 
 watch(displayArtifacts, (list) => {
   appStore.setDataframeCount(list.length)
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  const preferredArtifactId = workspaceId ? appStore.getSelectedTableArtifact(workspaceId) : ''
+  if (
+    preferredArtifactId
+    && preferredArtifactId !== selectedArtifactId.value
+    && list.some((item) => item.artifact_id === preferredArtifactId)
+  ) {
+    selectedArtifactId.value = preferredArtifactId
+    return
+  }
+  if (!selectedArtifactId.value && list.length > 0) {
+    selectedArtifactId.value = list[0]?.artifact_id || null
+    return
+  }
   if (selectedArtifactId.value && !list.some((item) => item.artifact_id === selectedArtifactId.value)) {
     selectedArtifactId.value = null
   }
@@ -355,7 +429,7 @@ async function loadActiveTurnArtifacts() {
   const turnId = String(appStore.activeTurnId || '').trim()
   if (!conversationId || !turnId || !appStore.hasWorkspace) {
     workspaceArtifacts.value = []
-    selectedArtifactId.value = null
+    selectedArtifactId.value = liveDataframeArtifacts.value[0]?.artifact_id || null
     return
   }
   listAbortController?.abort()
@@ -464,7 +538,28 @@ watch(selectedArtifactId, async (newId) => {
     (entry) => String(entry?.artifact_id || '').trim() === String(newId || '').trim(),
   )
   if (!isKnownPersistedArtifact) {
-    tableError.value = 'Selected table is not available for this turn.'
+    const liveArtifact = liveDataframeArtifacts.value.find(
+      (entry) => String(entry?.artifact_id || '').trim() === String(newId || '').trim(),
+    )
+    if (!liveArtifact) {
+      tableError.value = 'Selected table is not available for this turn.'
+      return
+    }
+    const rows = normalizeClientRowsFromDataframeValue({
+      columns: Array.isArray(liveArtifact.schema) ? liveArtifact.schema.map((column) => column?.name).filter(Boolean) : [],
+      data: liveArtifact.preview_rows,
+      row_count: liveArtifact.row_count,
+    })
+    useClientFallback.value = true
+    clientRows.value = rows
+    serverRows.value = rows
+    serverColumns.value = rows[0]
+      ? Object.keys(rows[0])
+      : (Array.isArray(liveArtifact.schema) ? liveArtifact.schema.map((column) => String(column?.name || '')).filter(Boolean) : [])
+    rowCountValue.value = Number(liveArtifact.row_count || rows.length || 0)
+    windowStart.value = rows.length > 0 ? 1 : 0
+    windowEnd.value = rows.length > 0 ? Math.min(pageSize, rowCountValue.value || rows.length) : 0
+    appStore.setTableViewport(windowStart.value, windowEnd.value, rowCountValue.value)
     return
   }
   const rememberedPage = appStore.getTablePageOffset(appStore.activeWorkspaceId, newId)

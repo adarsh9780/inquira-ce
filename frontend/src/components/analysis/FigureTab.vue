@@ -199,9 +199,38 @@ let listAbortController = null
 let figureAbortController = null
 const DEFAULT_PLOTLY_THEME_MODE = PLOTLY_THEME_MODE.SOFT
 
+const persistedFigureArtifacts = computed(() => (
+  Array.isArray(workspaceFigureArtifacts.value) ? workspaceFigureArtifacts.value : []
+))
+
+const liveFigureArtifacts = computed(() => {
+  const persistedIds = new Set(
+    persistedFigureArtifacts.value
+      .map((fig) => String(fig?.artifact_id || '').trim())
+      .filter(Boolean),
+  )
+  return (Array.isArray(appStore.figures) ? appStore.figures : [])
+    .map((fig, index) => {
+      const figurePayload = normalizePlotlyFigure(fig?.data ?? fig)
+      if (!figurePayload) return null
+      const artifactId = String(fig?.artifact_id || figurePayload?.artifact_id || `live-figure-${index + 1}`).trim()
+      if (!artifactId || persistedIds.has(artifactId)) return null
+      const logicalName = String(fig?.logical_name || figurePayload?.logical_name || fig?.name || `figure_${index + 1}`).trim()
+      return {
+        ...(fig || {}),
+        artifact_id: artifactId,
+        logical_name: logicalName,
+        display_name: String(fig?.display_name || logicalName).trim(),
+        data: figurePayload,
+        source: 'live',
+      }
+    })
+    .filter(Boolean)
+})
+
 const orderedFigures = computed(() => {
-  return (Array.isArray(workspaceFigureArtifacts.value) ? workspaceFigureArtifacts.value : [])
-    .map((fig) => ({ ...fig, source: 'artifact' }))
+  const persisted = persistedFigureArtifacts.value.map((fig) => ({ ...fig, source: 'artifact' }))
+  return [...liveFigureArtifacts.value, ...persisted]
 })
 
 const figureDropdownOptions = computed(() => orderedFigures.value.map((fig, index) => ({
@@ -293,6 +322,20 @@ watch(
 
 watch(orderedFigures, (figures) => {
   appStore.setFigureCount(Array.isArray(figures) ? figures.length : 0)
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  const preferredArtifactId = workspaceId ? appStore.getSelectedFigureArtifact(workspaceId) : ''
+  if (
+    preferredArtifactId
+    && preferredArtifactId !== selectedArtifactId.value
+    && orderedFigures.value.some((fig) => fig.artifact_id === preferredArtifactId)
+  ) {
+    selectedArtifactId.value = preferredArtifactId
+    return
+  }
+  if (!selectedArtifactId.value && orderedFigures.value.length > 0) {
+    selectedArtifactId.value = orderedFigures.value[0]?.artifact_id || null
+    return
+  }
   if (selectedArtifactId.value && !orderedFigures.value.some((fig) => fig.artifact_id === selectedArtifactId.value)) {
     selectedArtifactId.value = orderedFigures.value[0]?.artifact_id || null
   }
@@ -323,9 +366,9 @@ async function loadActiveTurnFigureArtifacts() {
   const turnId = String(appStore.activeTurnId || '').trim()
   if (!conversationId || !turnId || !appStore.hasWorkspace) {
     workspaceFigureArtifacts.value = []
-    selectedArtifactId.value = null
-    selectedFigurePayload.value = null
-    appStore.setFigureCount(0)
+    selectedArtifactId.value = liveFigureArtifacts.value[0]?.artifact_id || null
+    selectedFigurePayload.value = liveFigureArtifacts.value[0]?.data || null
+    appStore.setFigureCount(liveFigureArtifacts.value.length)
     return
   }
   listAbortController?.abort()
@@ -341,7 +384,7 @@ async function loadActiveTurnFigureArtifacts() {
     )
     const artifacts = Array.isArray(response?.artifacts) ? response.artifacts : []
     workspaceFigureArtifacts.value = artifacts
-    appStore.setFigureCount(artifacts.length)
+    appStore.setFigureCount(orderedFigures.value.length)
 
     const candidates = orderedFigures.value
     if (!candidates.length) {
@@ -378,7 +421,20 @@ async function loadSelectedFigurePayload(artifactId) {
   const conversationId = String(appStore.activeConversationId || '').trim()
   const turnId = String(appStore.activeTurnId || '').trim()
   const normalizedArtifactId = String(artifactId || '').trim()
-  if (!conversationId || !turnId || !normalizedArtifactId || !appStore.hasWorkspace) {
+  if (!normalizedArtifactId || !appStore.hasWorkspace) {
+    selectedFigurePayload.value = null
+    appStore.setPlotlyFigure(null)
+    return
+  }
+  const liveFigure = liveFigureArtifacts.value.find(
+    (fig) => String(fig?.artifact_id || '').trim() === normalizedArtifactId,
+  )
+  if (liveFigure) {
+    selectedFigurePayload.value = liveFigure.data
+    appStore.setPlotlyFigure(liveFigure.data)
+    return
+  }
+  if (!conversationId || !turnId) {
     selectedFigurePayload.value = null
     appStore.setPlotlyFigure(null)
     return
