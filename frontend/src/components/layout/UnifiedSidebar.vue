@@ -30,7 +30,7 @@
       <div class="flex min-h-0 flex-1 flex-col pt-3">
         <div
           class="flex h-9 w-full items-center transition-all duration-300"
-          :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-4'"
+          :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3'"
         >
           <button
             v-if="appStore.isSidebarCollapsed"
@@ -43,7 +43,7 @@
           </button>
 
           <template v-else>
-            <span class="text-[24px] font-normal leading-none text-[var(--color-text-muted)] opacity-80">
+            <span class="text-[20px] font-normal leading-none text-[var(--color-text-muted)] opacity-80">
               Projects
             </span>
           </template>
@@ -58,9 +58,9 @@
             Create a workspace to start.
           </div>
 
-          <div v-else class="mt-5 space-y-7">
-            <div v-for="workspace in appStore.workspaces" :key="workspace.id" class="space-y-3">
-              <div class="group relative flex min-h-8 select-none items-center">
+          <div v-else class="mt-4 space-y-6">
+            <div v-for="workspace in appStore.workspaces" :key="workspace.id" class="space-y-2">
+              <div class="group relative flex min-h-7 select-none items-center">
                 <button
                   type="button"
                   class="flex min-w-0 flex-1 items-center text-left focus:outline-none"
@@ -68,28 +68,28 @@
                   :title="workspace.name || 'Untitled workspace'"
                   @click="selectWorkspace(workspace.id)"
                 >
-                  <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-                    <FolderOpenIcon class="h-6 w-6 text-[var(--color-text-main)]" />
+                  <div class="flex h-5 w-5 shrink-0 items-center justify-center">
+                    <FolderOpenIcon class="h-5 w-5 text-[var(--color-text-main)]" />
                   </div>
                   <div
                     class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
-                    :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[210px] opacity-100 ml-3'"
+                    :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[210px] opacity-100 ml-2'"
                   >
-                    <p class="truncate text-[24px] font-normal leading-tight text-[var(--color-text-main)]">
+                    <p class="truncate text-[20px] font-normal leading-tight text-[var(--color-text-main)]">
                       {{ workspace.name || 'Untitled workspace' }}
                     </p>
                   </div>
                 </button>
               </div>
 
-              <div v-if="!appStore.isSidebarCollapsed" class="space-y-2 pl-12">
-                <div v-if="isWorkspaceConversationsLoading(workspace.id)" class="py-1 text-[20px] font-normal text-[var(--color-text-muted)]">
+              <div v-if="!appStore.isSidebarCollapsed" class="space-y-1 pl-8">
+                <div v-if="isWorkspaceConversationsLoading(workspace.id)" class="py-1 text-[18px] font-normal text-[var(--color-text-muted)]">
                   Loading conversations
                 </div>
                 <button
                   v-else-if="conversationsForWorkspace(workspace.id).length === 0"
                   type="button"
-                  class="w-full py-1 text-left text-[20px] font-normal text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
+                  class="w-full py-1 text-left text-[18px] font-normal text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
                   @click="createConversation(workspace.id)"
                 >
                   New conversation
@@ -98,9 +98,9 @@
                   <div
                     v-for="conv in visibleConversationsForWorkspace(workspace.id)"
                     :key="conv.id"
-                    class="group relative flex min-h-12 select-none items-center rounded-[14px] cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
+                    class="group relative flex min-h-10 select-none items-center rounded-[10px] cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
                     :class="[
-                      'justify-start px-4 py-2',
+                      'justify-start px-3 py-1.5',
                       appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : '',
                     ]"
                     :title="conv.title || 'Untitled'"
@@ -111,7 +111,7 @@
                       <input
                         :ref="(el) => { if (el) editInputs[conv.id] = el }"
                         v-model="editingTitleValue"
-                        class="w-full rounded border border-[var(--color-accent)] bg-[var(--color-surface)] px-2 py-1 text-[20px] text-[var(--color-text-main)] outline-none"
+                        class="w-full rounded border border-[var(--color-accent)] bg-[var(--color-surface)] px-2 py-1 text-[18px] text-[var(--color-text-main)] outline-none"
                         @keydown.enter.prevent="saveTitle(conv.id)"
                         @keydown.esc.prevent="cancelEditing"
                         @blur="saveTitle(conv.id)"
@@ -121,7 +121,7 @@
                     <template v-else>
                       <div class="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
                         <p
-                          class="truncate text-[24px] leading-tight"
+                          class="truncate text-[20px] leading-tight"
                           :class="appStore.activeConversationId === conv.id
                             ? 'font-normal text-[var(--color-text-main)]'
                             : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
@@ -130,7 +130,7 @@
                           {{ conv.title || 'Untitled' }}
                         </p>
                       </div>
-                      <span class="ml-3 shrink-0 text-[20px] font-normal leading-none text-[var(--color-text-muted)]">
+                      <span class="ml-2 shrink-0 text-[16px] font-normal leading-none text-[var(--color-text-muted)]">
                         {{ formatConversationTimestamp(conv) }}
                       </span>
 
@@ -149,7 +149,7 @@
                   <button
                     v-if="hasHiddenConversations(workspace.id)"
                     type="button"
-                    class="py-1 text-left text-[22px] font-normal text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
+                    class="py-1 text-left text-[18px] font-normal text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
                     @click="showMoreConversations(workspace.id)"
                   >
                     Show more

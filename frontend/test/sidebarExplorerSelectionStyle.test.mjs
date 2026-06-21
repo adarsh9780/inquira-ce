@@ -21,5 +21,5 @@ test('sidebar renders minimal explorer style with compact brand active highlight
   assert.equal(unifiedSource.includes("bg-emerald-50 text-emerald-800"), false)
   assert.equal(datasetsSource.includes('ChevronRightIcon'), true)
   assert.equal(datasetsSource.includes('text-[11px] uppercase tracking'), true)
-  assert.equal(unifiedSource.includes('text-[24px] font-normal leading-none'), true)
+  assert.equal(unifiedSource.includes('text-[20px] font-normal leading-none'), true)
 })
