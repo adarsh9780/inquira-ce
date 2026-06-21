@@ -30,7 +30,7 @@
       <div class="flex min-h-0 flex-1 flex-col pt-3">
         <div
           class="flex h-9 w-full items-center transition-all duration-300"
-          :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'"
+          :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-4'"
         >
           <button
             v-if="appStore.isSidebarCollapsed"
@@ -43,17 +43,9 @@
           </button>
 
           <template v-else>
-            <span class="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] opacity-80">
-              Workspaces
+            <span class="text-[24px] font-normal leading-none text-[var(--color-text-muted)] opacity-80">
+              Projects
             </span>
-            <button
-              type="button"
-              class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none"
-              title="Workspace settings"
-              @click.stop="appStore.openSettings('workspace')"
-            >
-              <FolderOpenIcon class="h-4 w-4" />
-            </button>
           </template>
         </div>
 
@@ -66,15 +58,9 @@
             Create a workspace to start.
           </div>
 
-          <div v-else class="space-y-1 mt-1">
-            <div v-for="workspace in appStore.workspaces" :key="workspace.id" class="space-y-0.5">
-              <div
-                class="group relative flex min-h-10 select-none items-center rounded-lg transition-colors hover:bg-[var(--color-text-main)]/5"
-                :class="[
-                  appStore.isSidebarCollapsed ? 'justify-center px-0 py-1.5' : 'justify-start px-2 py-1.5',
-                  workspace.id === appStore.activeWorkspaceId ? 'bg-[var(--color-selected-surface)]' : '',
-                ]"
-              >
+          <div v-else class="mt-5 space-y-7">
+            <div v-for="workspace in appStore.workspaces" :key="workspace.id" class="space-y-3">
+              <div class="group relative flex min-h-8 select-none items-center">
                 <button
                   type="button"
                   class="flex min-w-0 flex-1 items-center text-left focus:outline-none"
@@ -83,77 +69,49 @@
                   @click="selectWorkspace(workspace.id)"
                 >
                   <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-                    <FolderOpenIcon class="h-5 w-5" :class="workspace.id === appStore.activeWorkspaceId ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
+                    <FolderOpenIcon class="h-6 w-6 text-[var(--color-text-main)]" />
                   </div>
                   <div
                     class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
-                    :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[160px] opacity-100 ml-2'"
+                    :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[210px] opacity-100 ml-3'"
                   >
-                    <p class="truncate text-[13px] font-semibold text-[var(--color-text-main)]">
+                    <p class="truncate text-[24px] font-normal leading-tight text-[var(--color-text-main)]">
                       {{ workspace.name || 'Untitled workspace' }}
-                    </p>
-                    <p class="mt-0.5 truncate text-[10px] leading-none text-[var(--color-text-muted)]">
-                      {{ workspaceRuntimeLabel(workspace.id) }}
                     </p>
                   </div>
                 </button>
-
-                <div v-if="!appStore.isSidebarCollapsed" class="ml-1 flex shrink-0 items-center gap-0.5">
-                  <button
-                    type="button"
-                    class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
-                    title="New conversation"
-                    @click.stop="createConversation(workspace.id)"
-                  >
-                    <PlusIcon class="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
-                    :title="isWorkspaceExpanded(workspace.id) ? 'Collapse workspace' : 'Expand workspace'"
-                    @click.stop="toggleWorkspaceExpanded(workspace.id)"
-                  >
-                    <ChevronDownIcon v-if="isWorkspaceExpanded(workspace.id)" class="h-4 w-4" />
-                    <ChevronRightIcon v-else class="h-4 w-4" />
-                  </button>
-                </div>
               </div>
 
-              <div v-if="!appStore.isSidebarCollapsed && isWorkspaceExpanded(workspace.id)" class="space-y-0.5 pl-5">
-                <div v-if="isWorkspaceConversationsLoading(workspace.id)" class="px-3 py-1.5 text-[11px] text-[var(--color-text-muted)]">
+              <div v-if="!appStore.isSidebarCollapsed" class="space-y-2 pl-12">
+                <div v-if="isWorkspaceConversationsLoading(workspace.id)" class="py-1 text-[20px] font-normal text-[var(--color-text-muted)]">
                   Loading conversations
                 </div>
                 <button
                   v-else-if="conversationsForWorkspace(workspace.id).length === 0"
                   type="button"
-                  class="w-full rounded-lg px-3 py-1.5 text-left text-[12px] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/5 hover:text-[var(--color-text-main)]"
+                  class="w-full py-1 text-left text-[20px] font-normal text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
                   @click="createConversation(workspace.id)"
                 >
                   New conversation
                 </button>
                 <template v-else>
                   <div
-                    v-for="(conv, index) in conversationsForWorkspace(workspace.id)"
+                    v-for="conv in visibleConversationsForWorkspace(workspace.id)"
                     :key="conv.id"
-                    class="group relative flex min-h-10 select-none items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
+                    class="group relative flex min-h-12 select-none items-center rounded-[14px] cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
                     :class="[
-                      'justify-start px-3 py-1.5',
+                      'justify-start px-4 py-2',
                       appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : '',
                     ]"
                     :title="conv.title || 'Untitled'"
                     @click="selectConversation(workspace.id, conv.id)"
                     @contextmenu.prevent="openConversationContextMenu($event, conv.id)"
                   >
-                    <div
-                      v-if="appStore.activeConversationId === conv.id"
-                      class="absolute left-0 top-1/2 -translate-y-1/2 h-1/2 w-[4px] rounded-r-full bg-[var(--color-accent)] transition-all duration-300"
-                    />
-
-                    <div v-if="editingId === conv.id" class="flex w-full items-center gap-1 pl-7" @click.stop>
+                    <div v-if="editingId === conv.id" class="flex w-full items-center gap-1" @click.stop>
                       <input
                         :ref="(el) => { if (el) editInputs[conv.id] = el }"
                         v-model="editingTitleValue"
-                        class="w-full rounded border border-[var(--color-accent)] bg-[var(--color-surface)] px-2 py-1 text-[13px] text-[var(--color-text-main)] outline-none"
+                        class="w-full rounded border border-[var(--color-accent)] bg-[var(--color-surface)] px-2 py-1 text-[20px] text-[var(--color-text-main)] outline-none"
                         @keydown.enter.prevent="saveTitle(conv.id)"
                         @keydown.esc.prevent="cancelEditing"
                         @blur="saveTitle(conv.id)"
@@ -161,36 +119,20 @@
                     </div>
 
                     <template v-else>
-                      <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-                        <span
-                          class="inline-flex min-w-[1.5rem] items-center justify-center px-1 text-[11px] font-semibold leading-none tabular-nums tracking-[0.02em] transition-colors duration-200"
-                          :class="appStore.activeConversationId === conv.id
-                            ? 'text-[var(--color-accent)]'
-                            : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
-                        >
-                          {{ conversationBadgeLabel(index, conversationsForWorkspace(workspace.id).length) }}
-                        </span>
-                      </div>
-
-                      <div class="min-w-0 flex-1 overflow-hidden whitespace-nowrap ml-2">
+                      <div class="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
                         <p
-                          class="truncate text-[13px]"
+                          class="truncate text-[24px] leading-tight"
                           :class="appStore.activeConversationId === conv.id
-                            ? 'font-medium text-[var(--color-text-main)]'
+                            ? 'font-normal text-[var(--color-text-main)]'
                             : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
                           :title="conv.title || 'Untitled'"
                         >
                           {{ conv.title || 'Untitled' }}
                         </p>
-                        <p
-                          class="mt-0.5 truncate text-[10px] leading-none"
-                          :class="appStore.activeConversationId === conv.id
-                            ? 'text-[var(--color-accent)]/80'
-                            : 'text-[var(--color-text-muted)]/80'"
-                        >
-                          {{ formatConversationTimestamp(conv) }}
-                        </p>
                       </div>
+                      <span class="ml-3 shrink-0 text-[20px] font-normal leading-none text-[var(--color-text-muted)]">
+                        {{ formatConversationTimestamp(conv) }}
+                      </span>
 
                       <div class="relative shrink-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
@@ -204,6 +146,14 @@
                       </div>
                     </template>
                   </div>
+                  <button
+                    v-if="hasHiddenConversations(workspace.id)"
+                    type="button"
+                    class="py-1 text-left text-[22px] font-normal text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
+                    @click="showMoreConversations(workspace.id)"
+                  >
+                    Show more
+                  </button>
                 </template>
               </div>
             </div>
@@ -474,8 +424,6 @@ import {
   Cog6ToothIcon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
 } from '@heroicons/vue/24/outline'
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -496,7 +444,8 @@ const profileMenuButtonRef = ref(null)
 const profileMenuPosition  = ref({ left: 0, top: 0 })
 const sidebarConversationsByWorkspace = ref({})
 const loadingConversationsByWorkspace = ref({})
-const expandedWorkspaceIds = ref(new Set())
+const visibleConversationCountByWorkspace = ref({})
+const DEFAULT_VISIBLE_CONVERSATION_COUNT = 5
 
 // ─── Settings Modal ───────────────────────────────────────────────────────────
 const isTermsOpen         = ref(false)
@@ -603,6 +552,31 @@ function conversationsForWorkspace(workspaceId) {
     : []
 }
 
+function visibleConversationCount(workspaceId) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  const value = Number(visibleConversationCountByWorkspace.value?.[normalizedWorkspaceId])
+  return Number.isFinite(value) && value > 0
+    ? Math.max(DEFAULT_VISIBLE_CONVERSATION_COUNT, Math.floor(value))
+    : DEFAULT_VISIBLE_CONVERSATION_COUNT
+}
+
+function visibleConversationsForWorkspace(workspaceId) {
+  return conversationsForWorkspace(workspaceId).slice(0, visibleConversationCount(workspaceId))
+}
+
+function hasHiddenConversations(workspaceId) {
+  return conversationsForWorkspace(workspaceId).length > visibleConversationCount(workspaceId)
+}
+
+function showMoreConversations(workspaceId) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId) return
+  visibleConversationCountByWorkspace.value = {
+    ...visibleConversationCountByWorkspace.value,
+    [normalizedWorkspaceId]: visibleConversationCount(normalizedWorkspaceId) + DEFAULT_VISIBLE_CONVERSATION_COUNT,
+  }
+}
+
 function updateSidebarConversationCache(workspaceId, conversations) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return
@@ -638,28 +612,6 @@ function removeConversationFromSidebarCache(conversationId) {
   sidebarConversationsByWorkspace.value = nextCache
 }
 
-function workspaceRuntimeLabel(workspaceId) {
-  const status = appStore.getWorkspaceRuntimeStatus(workspaceId)
-  if (status === 'ready') return 'Ready'
-  if (status === 'busy') return 'Working'
-  if (status === 'starting' || status === 'connecting') return 'Starting'
-  if (status === 'error') return 'Needs attention'
-  return 'Idle'
-}
-
-function isWorkspaceExpanded(workspaceId) {
-  return expandedWorkspaceIds.value.has(String(workspaceId || '').trim())
-}
-
-function setWorkspaceExpanded(workspaceId, expanded) {
-  const normalizedWorkspaceId = String(workspaceId || '').trim()
-  if (!normalizedWorkspaceId) return
-  const next = new Set(expandedWorkspaceIds.value)
-  if (expanded) next.add(normalizedWorkspaceId)
-  else next.delete(normalizedWorkspaceId)
-  expandedWorkspaceIds.value = next
-}
-
 function isWorkspaceConversationsLoading(workspaceId) {
   return Boolean(loadingConversationsByWorkspace.value?.[String(workspaceId || '').trim()])
 }
@@ -690,14 +642,14 @@ async function loadSidebarConversations(workspaceId, { force = false } = {}) {
   }
 }
 
-async function toggleWorkspaceExpanded(workspaceId) {
-  const normalizedWorkspaceId = String(workspaceId || '').trim()
-  if (!normalizedWorkspaceId) return
-  const nextExpanded = !isWorkspaceExpanded(normalizedWorkspaceId)
-  setWorkspaceExpanded(normalizedWorkspaceId, nextExpanded)
-  if (nextExpanded) {
-    await loadSidebarConversations(normalizedWorkspaceId)
-  }
+async function loadAllSidebarConversations({ force = false } = {}) {
+  const workspaces = Array.isArray(appStore.workspaces) ? appStore.workspaces : []
+  await Promise.all(
+    workspaces
+      .map((workspace) => String(workspace?.id || '').trim())
+      .filter(Boolean)
+      .map((workspaceId) => loadSidebarConversations(workspaceId, { force })),
+  )
 }
 
 async function refreshWorkspaceDatasetSummary() {
@@ -756,15 +708,6 @@ function openSchemaEditor() {
 
 function openConversationTree() {
   appStore.setActiveTab('conversation-tree')
-}
-
-function conversationBadgeLabel(index, totalCount = 0) {
-  const total = Number(totalCount)
-  const offset = Number(index)
-  const ordinal = total - offset
-  if (!Number.isFinite(ordinal) || ordinal <= 0) return '1'
-  if (ordinal > 99) return '99+'
-  return String(ordinal)
 }
 
 function formatConversationTimestamp(conversation) {
@@ -841,7 +784,6 @@ function handleOpenSettingsRequest(event) {
 async function selectWorkspace(workspaceId) {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return
-  setWorkspaceExpanded(normalizedWorkspaceId, true)
   try {
     if (normalizedWorkspaceId !== String(appStore.activeWorkspaceId || '').trim()) {
       await appStore.activateWorkspace(normalizedWorkspaceId)
@@ -863,7 +805,6 @@ async function createConversation(workspaceId = appStore.activeWorkspaceId) {
     }
     const conversation = await appStore.createConversation()
     updateSidebarConversationCache(String(appStore.activeWorkspaceId || '').trim(), appStore.conversations)
-    setWorkspaceExpanded(String(appStore.activeWorkspaceId || '').trim(), true)
     if (conversation?.id) {
       appStore.setActiveConversationId(conversation.id)
       await appStore.fetchConversationTurns({ reset: true })
@@ -885,7 +826,6 @@ async function selectConversation(workspaceId, id) {
       await appStore.fetchConversations()
       updateSidebarConversationCache(normalizedWorkspaceId, appStore.conversations)
     }
-    setWorkspaceExpanded(String(appStore.activeWorkspaceId || normalizedWorkspaceId || '').trim(), true)
     if (target !== current) {
       appStore.setActiveConversationId(target)
     } else {
@@ -1070,10 +1010,10 @@ onMounted(async () => {
     await appStore.fetchWorkspaces()
     await appStore.fetchWorkspaceDeletionJobs()
     if (appStore.activeWorkspaceId) {
-      setWorkspaceExpanded(appStore.activeWorkspaceId, true)
       await appStore.fetchConversations()
       updateSidebarConversationCache(appStore.activeWorkspaceId, appStore.conversations)
     }
+    await loadAllSidebarConversations()
   } catch {
     // Recovery handled by parent app
   }
@@ -1096,10 +1036,13 @@ onUnmounted(() => {
 watch(() => appStore.activeWorkspaceId, async (newId) => {
   void refreshWorkspaceDatasetSummary()
   if (newId) {
-    setWorkspaceExpanded(newId, true)
     await appStore.fetchConversations()
     updateSidebarConversationCache(newId, appStore.conversations)
   }
+})
+
+watch(() => appStore.workspaces.map((workspace) => workspace.id).join('|'), async () => {
+  await loadAllSidebarConversations()
 })
 
 watch(() => appStore.conversations, (items) => {

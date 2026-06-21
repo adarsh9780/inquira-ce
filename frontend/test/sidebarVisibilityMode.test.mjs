@@ -24,5 +24,5 @@ test('app keeps one sidebar container with separate hidden and collapsed states'
   assert.equal(sidebarSource.includes('title="Conversations"'), false)
   assert.equal(sidebarSource.includes('title="Settings"'), true)
   assert.equal(sidebarSource.includes('<SidebarConversations'), false)
-  assert.equal(sidebarSource.includes('conversationBadgeLabel(index, conversationsForWorkspace(workspace.id).length)'), true)
+  assert.equal(sidebarSource.includes('visibleConversationsForWorkspace(workspace.id)'), true)
 })

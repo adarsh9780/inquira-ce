@@ -22,7 +22,7 @@ test('right panel animates terminal open and close via height and opacity transi
 test('sidebar keeps the current animated text-collapse and scroll layout', () => {
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
-  assert.equal(sidebarSource.includes('workspaceRuntimeLabel'), true)
+  assert.equal(sidebarSource.includes('workspaceRuntimeLabel'), false)
   assert.equal(sidebarSource.includes('class="flex min-h-0 flex-1 flex-col overflow-hidden px-2"'), true)
   assert.equal(sidebarSource.includes('class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-1 custom-scrollbar"'), true)
   assert.equal(sidebarSource.includes('<SidebarConversations'), false)

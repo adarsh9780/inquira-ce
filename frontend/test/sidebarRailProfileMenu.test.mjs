@@ -17,7 +17,7 @@ test('sidebar keeps the bottom action stack and expanded-only labels', () => {
   assert.equal(source.includes('sidebar-initials-avatar'), true)
   assert.equal(source.includes('UserCircleIcon'), false)
   assert.equal(source.includes('Workspace settings'), true)
-  assert.equal(source.includes('conversationBadgeLabel(index, conversationsForWorkspace(workspace.id).length)'), true)
+  assert.equal(source.includes('visibleConversationsForWorkspace(workspace.id)'), true)
   assert.equal(source.includes('Conversation Tree'), true)
 })
 

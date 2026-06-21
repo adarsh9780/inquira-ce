@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-test('sidebar adds workspace view entries and uses numbered conversation badges', () => {
+test('sidebar adds workspace view entries and uses simple project conversations', () => {
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
   assert.equal(sidebarSource.includes('@click="openChat"'), false)
@@ -24,16 +24,15 @@ test('sidebar adds workspace view entries and uses numbered conversation badges'
   assert.equal(sidebarSource.includes('min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-1 custom-scrollbar'), true)
   assert.equal(sidebarSource.includes('max-h-[11.75rem] flex-none overflow-y-auto overflow-x-hidden pb-1'), false)
   assert.equal(sidebarSource.includes('<SidebarConversations'), false)
-  assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'justify-center px-0 py-1.5' : 'justify-start px-2 py-1.5'"), true)
-  assert.equal(sidebarSource.includes('conversationBadgeLabel(index, conversationsForWorkspace(workspace.id).length)'), true)
+  assert.equal(sidebarSource.includes("v-for=\"conv in visibleConversationsForWorkspace(workspace.id)\""), true)
+  assert.equal(sidebarSource.includes('visibleConversationsForWorkspace(workspace.id)'), true)
   assert.equal(sidebarSource.includes('appStore.fetchConversationTurns({ reset: true, preferLatest: true })'), true)
   assert.equal(sidebarSource.includes('conversation?.last_turn_at || conversation?.updated_at || conversation?.created_at'), true)
   assert.equal(sidebarSource.includes("return 'Running...'"), true)
-  assert.equal(sidebarSource.includes('const ordinal = total - offset'), true)
-  assert.equal(sidebarSource.includes("if (ordinal > 99) return '99+'"), true)
+  assert.equal(sidebarSource.includes('Show more'), true)
   assert.equal(sidebarSource.includes('rounded-md bg-[var(--color-accent)]/10'), false)
   assert.equal(sidebarSource.includes('rounded-md bg-[var(--color-selected-surface)]'), false)
-  assert.equal(sidebarSource.includes('text-[11px] font-semibold leading-none tabular-nums'), true)
+  assert.equal(sidebarSource.includes('text-[11px] font-semibold leading-none tabular-nums'), false)
   assert.equal(sidebarSource.includes('bg-[var(--color-accent)] text-white'), false)
 })
 
