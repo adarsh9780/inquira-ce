@@ -11,7 +11,7 @@ function extractBlock(source, startMarker, endMarker) {
   return source.slice(start, end)
 }
 
-test('dataset upload retries once after resetting the kernel on workspace lock conflicts', () => {
+test('dataset upload retries once after resetting the runtime on workspace lock conflicts', () => {
   const apiServicePath = resolve(process.cwd(), 'src/services/apiService.js')
   const source = readFileSync(apiServicePath, 'utf-8')
   const uploadBlock = extractBlock(
@@ -22,8 +22,8 @@ test('dataset upload retries once after resetting the kernel on workspace lock c
 
   assert.equal(uploadBlock.includes('const isWorkspaceLockConflict ='), true)
   assert.equal(uploadBlock.includes("normalizedDetail.includes('workspace database is currently locked')"), true)
-  assert.equal(uploadBlock.includes('await this.v1ResetWorkspaceKernel(workspaceId)'), true)
-  assert.equal(uploadBlock.includes('await appStore.ensureWorkspaceKernelConnected(workspaceId)'), true)
+  assert.equal(uploadBlock.includes('await this.v1ResetWorkspaceRuntime(workspaceId)'), true)
+  assert.equal(uploadBlock.includes('await appStore.ensureWorkspaceRuntimeReady(workspaceId)'), true)
   assert.equal(
     uploadBlock.includes('ds = await this.v1AddDataset(workspaceId, filePath)'),
     true,

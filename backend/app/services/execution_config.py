@@ -41,6 +41,9 @@ class ExecutionRuntimeConfig:
     terminal_enabled: bool = False
     runner_install_max_packages_per_request: int = 1
     kernel_idle_minutes: int = 30
+    workspace_idle_warning_minutes: int = 20
+    workspace_memory_min_available_percent: float = 15.0
+    workspace_memory_min_available_mb: int = 2048
     plotly_theme_mode: str = "soft"
     runner_policy: RunnerPolicyConfig = field(default_factory=RunnerPolicyConfig)
 
@@ -76,6 +79,15 @@ def _as_bool(value: Any, default: bool) -> bool:
         if normalized in {"0", "false", "no", "off"}:
             return False
     return default
+
+
+def _as_float(value: Any, default: float) -> float:
+    """Return ``value`` coerced to ``float`` or ``default`` when invalid."""
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _normalize_plotly_theme_mode(value: Any) -> str:
@@ -157,6 +169,18 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
         1,
     )
     kernel_idle_minutes = _as_int(runner.get("kernel-idle-minutes", 30), 30)
+    workspace_idle_warning_minutes = _as_int(
+        runner.get("workspace-idle-warning-minutes", 20),
+        20,
+    )
+    workspace_memory_min_available_percent = _as_float(
+        runner.get("workspace-memory-min-available-percent", 15.0),
+        15.0,
+    )
+    workspace_memory_min_available_mb = _as_int(
+        runner.get("workspace-memory-min-available-mb", 2048),
+        2048,
+    )
     plotly_theme_mode = _normalize_plotly_theme_mode(ui.get("plotly-theme-mode", "soft"))
 
     policy = RunnerPolicyConfig(
@@ -179,6 +203,9 @@ def load_execution_runtime_config() -> ExecutionRuntimeConfig:
         terminal_enabled=terminal_enabled,
         runner_install_max_packages_per_request=max(1, runner_install_max_packages_per_request),
         kernel_idle_minutes=max(1, kernel_idle_minutes),
+        workspace_idle_warning_minutes=max(1, workspace_idle_warning_minutes),
+        workspace_memory_min_available_percent=max(0.0, workspace_memory_min_available_percent),
+        workspace_memory_min_available_mb=max(1, workspace_memory_min_available_mb),
         plotly_theme_mode=plotly_theme_mode,
         runner_policy=policy,
     )

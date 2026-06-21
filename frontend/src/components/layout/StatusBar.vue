@@ -1,7 +1,7 @@
 <template>
   <div class="h-7 w-full bg-[var(--color-surface)] border-t border-[var(--color-border)] flex items-center justify-between px-3 text-[12px] text-[var(--color-text-muted)] select-none z-50 shrink-0">
 
-    <!-- Left Section: Token usage, kernel status, and editor position -->
+    <!-- Left Section: Token usage, runtime status, and editor position -->
     <div class="flex items-center gap-3 h-full">
       <div
         v-if="authStore.isAuthenticated"
@@ -14,36 +14,56 @@
 
       <div v-if="authStore.isAuthenticated" class="w-px h-3.5 bg-[var(--color-border)]"></div>
 
-      <!-- Kernel Status -->
-      <div class="flex items-center gap-1.5 h-full px-1">
-        <span
-          v-if="kernelStatusMeta.showSpinner"
-          class="inline-block w-2 h-2 rounded-full border-[1.5px] border-[var(--color-border)] border-t-[var(--color-text-main)] animate-spin shrink-0"
-          aria-hidden="true"
-        ></span>
-        <span v-else class="w-2 h-2 rounded-full shrink-0" :class="kernelStatusMeta.dotClass"></span>
-        <span class="font-medium mr-2" :class="kernelStatusMeta.textClass">
-          {{ kernelStatusMeta.label }}
-        </span>
+      <div class="relative h-full" data-workspace-switcher>
+        <button
+          type="button"
+          class="flex h-full max-w-[260px] items-center gap-1.5 px-1 text-left transition-colors hover:text-[var(--color-text-main)]"
+          :title="`Active workspace: ${activeWorkspaceName}`"
+          @click="toggleWorkspaceSwitcher"
+        >
+          <span
+            v-if="workspaceRuntimeStatusMeta.showSpinner"
+            class="inline-block w-2 h-2 rounded-full border-[1.5px] border-[var(--color-border)] border-t-[var(--color-text-main)] animate-spin shrink-0"
+            aria-hidden="true"
+          ></span>
+          <span v-else class="w-2 h-2 rounded-full shrink-0" :class="workspaceRuntimeStatusMeta.dotClass"></span>
+          <span class="truncate font-medium text-[var(--color-text-main)]">
+            {{ activeWorkspaceName }}
+          </span>
+          <span class="hidden text-[10px] font-medium sm:inline" :class="workspaceRuntimeStatusMeta.textClass">
+            {{ workspaceRuntimeStatusMeta.label }}
+          </span>
+          <ChevronUpDownIcon class="h-3.5 w-3.5 shrink-0 text-[var(--color-text-muted)]" />
+        </button>
 
-        <!-- Kernel Actions -->
-        <div class="flex items-center gap-0.5 ml-1">
-          <button
-            @click="interruptKernel"
-            :disabled="!appStore.activeWorkspaceId || isKernelActionRunning || kernelStatus === 'missing'"
-            class="p-0.5 rounded hover:bg-[var(--color-warning)]/10 text-[var(--color-text-muted)] hover:text-[var(--color-warning)] disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-            title="Interrupt Kernel"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path d="M5.25 3A2.25 2.25 0 003 5.25v9.5A2.25 2.25 0 005.25 17h9.5A2.25 2.25 0 0017 14.75v-9.5A2.25 2.25 0 0014.75 3h-9.5zM6 6.75a.75.75 0 01.75-.75h6.5a.75.75 0 01.75.75v6.5a.75.75 0 01-.75.75h-6.5a.75.75 0 01-.75-.75v-6.5z" /></svg>
-          </button>
-          <button
-            @click="restartKernel"
-            :disabled="!appStore.activeWorkspaceId || isKernelActionRunning"
-            class="p-0.5 rounded hover:bg-[var(--color-error)]/10 text-[var(--color-text-muted)] hover:text-[var(--color-error)] disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-            title="Restart Kernel"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clip-rule="evenodd" /></svg>
-          </button>
+        <div
+          v-if="workspaceSwitcherOpen"
+          class="layer-modal-dropdown absolute left-0 bottom-full mb-2 w-72 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-panel-elevated)] shadow-[var(--shadow-lifted)]"
+        >
+          <div class="border-b border-[var(--color-border)] px-3 py-2">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">Workspaces</p>
+          </div>
+          <div v-if="appStore.workspaces.length === 0" class="px-3 py-3 text-[12px] text-[var(--color-text-muted)]">
+            No workspaces yet.
+          </div>
+          <template v-else>
+            <button
+              v-for="workspace in appStore.workspaces"
+              :key="workspace.id"
+              type="button"
+              class="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--color-panel-muted)]"
+              :class="workspace.id === appStore.activeWorkspaceId ? 'bg-[var(--color-selected-surface)]' : ''"
+              @click="selectWorkspaceFromStatusBar(workspace.id)"
+            >
+              <span class="h-2 w-2 shrink-0 rounded-full" :class="runtimeStatusMetaForWorkspace(workspace.id).dotClass"></span>
+              <span class="min-w-0 flex-1 truncate text-[12px] font-medium text-[var(--color-text-main)]">
+                {{ workspace.name || 'Untitled workspace' }}
+              </span>
+              <span class="shrink-0 text-[10px]" :class="runtimeStatusMetaForWorkspace(workspace.id).textClass">
+                {{ runtimeStatusMetaForWorkspace(workspace.id).label }}
+              </span>
+            </button>
+          </template>
         </div>
       </div>
 
@@ -98,6 +118,14 @@
           class="flex items-center px-1.5 py-0.5 text-[var(--color-warning)]"
           :title="artifactUsageWarningTitle"
           aria-label="Artifact usage warning"
+        >
+          <ExclamationTriangleIcon class="w-3.5 h-3.5" />
+        </div>
+        <div
+          v-if="showWorkspaceResourceWarning"
+          class="flex items-center px-1.5 py-0.5 text-[var(--color-warning)]"
+          :title="workspaceResourceWarningTitle"
+          aria-label="Workspace cleanup recommendation"
         >
           <ExclamationTriangleIcon class="w-3.5 h-3.5" />
         </div>
@@ -252,6 +280,7 @@ import { settingsWebSocket } from '../../services/websocketService'
 import { formatUsageCompact, formatUsageTooltip } from '../../utils/usageFormat'
 import {
   BellIcon,
+  ChevronUpDownIcon,
   CommandLineIcon,
   ViewColumnsIcon,
   ExclamationTriangleIcon,
@@ -271,16 +300,18 @@ const uiVersion = String(
   typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'
 ).trim() || '0.0.0'
 
-// --- Kernel Status Management ---
-const kernelStatus = computed(() => appStore.activeWorkspaceKernelStatus)
-const isKernelActionRunning = ref(false)
+// --- Workspace Status Management ---
+const workspaceRuntimeStatus = computed(() => appStore.activeWorkspaceRuntimeStatus)
+const workspaceSwitcherOpen = ref(false)
 
 const isWebSocketConnected = ref(false)
 const isWebSocketMonitoringActive = ref(false)
 let unsubscribeWebSocketConnection = null
-let unsubscribeKernelStatus = null
+let unsubscribeWorkspaceRuntimeStatus = null
 let artifactUsageStreamAbortController = null
 let artifactUsageReconnectTimer = null
+let workspaceResourceRecommendationTimer = null
+const lastWorkspaceResourceRecommendationKey = ref('')
 const notificationsPanelOpen = ref(false)
 const artifactUsage = ref({
   duckdbBytes: 0,
@@ -291,6 +322,7 @@ const artifactUsage = ref({
   figureWarning: false,
   warning: false,
 })
+const workspaceResourceRecommendation = ref(null)
 
 const workspaceLayoutLabel = computed(() => {
   if (appStore.workspaceLayoutMode === 'chat') return 'Chat'
@@ -386,22 +418,37 @@ const wsConnectionMeta = computed(() => {
   }
 })
 
-const kernelStatusMeta = computed(() => {
-  switch (kernelStatus.value) {
+const activeWorkspaceName = computed(() => {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (!workspaceId) return 'No workspace'
+  const workspace = appStore.workspaces.find((item) => String(item?.id || '').trim() === workspaceId)
+  return String(workspace?.name || '').trim() || 'Untitled workspace'
+})
+
+function runtimeStatusMeta(status) {
+  switch (status) {
     case 'ready':
-      return { dotClass: 'bg-[var(--color-success)]', textClass: 'text-[var(--color-success)]', label: 'Kernel Ready', showSpinner: false }
+      return { dotClass: 'bg-[var(--color-success)]', textClass: 'text-[var(--color-success)]', label: 'Ready', showSpinner: false }
     case 'busy':
-      return { dotClass: 'bg-[var(--color-warning)]', textClass: 'text-[var(--color-warning)]', label: 'Kernel Busy', showSpinner: true }
+      return { dotClass: 'bg-[var(--color-warning)]', textClass: 'text-[var(--color-warning)]', label: 'Working', showSpinner: true }
     case 'starting':
     case 'connecting':
-      return { dotClass: 'bg-[var(--color-accent)]', textClass: 'text-[var(--color-accent)]', label: 'Kernel Starting', showSpinner: true }
+      return { dotClass: 'bg-[var(--color-accent)]', textClass: 'text-[var(--color-accent)]', label: 'Starting', showSpinner: true }
     case 'error':
-      return { dotClass: 'bg-[var(--color-error)]', textClass: 'text-[var(--color-error)]', label: 'Kernel Error', showSpinner: false }
+      return { dotClass: 'bg-[var(--color-error)]', textClass: 'text-[var(--color-error)]', label: 'Needs attention', showSpinner: false }
     case 'missing':
     default:
-      return { dotClass: 'bg-[var(--color-text-muted)]', textClass: 'text-[var(--color-text-muted)]', label: 'No Kernel', showSpinner: false }
+      return { dotClass: 'bg-[var(--color-text-muted)]', textClass: 'text-[var(--color-text-muted)]', label: 'Idle', showSpinner: false }
   }
+}
+
+const workspaceRuntimeStatusMeta = computed(() => {
+  return runtimeStatusMeta(workspaceRuntimeStatus.value)
 })
+
+function runtimeStatusMetaForWorkspace(workspaceId) {
+  return runtimeStatusMeta(appStore.getWorkspaceRuntimeStatus(workspaceId))
+}
 
 const tableViewportLabel = computed(() => {
   if (appStore.dataPane !== 'table') return null
@@ -461,6 +508,26 @@ const artifactUsageWarningTitle = computed(() => {
   return `Turn artifact usage warning. ${details.join(' | ')}. Delete unused artifacts to avoid performance issues.`
 })
 
+const workspaceResourceCandidates = computed(() => {
+  const candidates = workspaceResourceRecommendation.value?.candidates
+  return Array.isArray(candidates) ? candidates : []
+})
+
+const showWorkspaceResourceWarning = computed(() => {
+  return workspaceResourceCandidates.value.length > 0
+})
+
+const workspaceResourceWarningTitle = computed(() => {
+  const count = workspaceResourceCandidates.value.length
+  if (count <= 0) return 'Workspace resource usage is within safe limits.'
+  const names = workspaceResourceCandidates.value
+    .map((candidate) => String(candidate?.workspace_name || candidate?.workspace_id || '').trim())
+    .filter(Boolean)
+    .slice(0, 3)
+  const label = count === 1 ? 'workspace' : 'workspaces'
+  return `Consider closing ${count} idle ${label}: ${names.join(', ')}`
+})
+
 function updateWebSocketStatus(connected) {
   const status = settingsWebSocket.getConnectionStatus()
   const shouldMonitor = Boolean(status.isPersistentMode || status.lastConnectionAttempt)
@@ -477,14 +544,14 @@ function setupWebSocketMonitoring() {
   unsubscribeWebSocketConnection = settingsWebSocket.onConnection((connected) => {
     updateWebSocketStatus(connected)
   })
-  if (typeof unsubscribeKernelStatus === 'function') {
-    unsubscribeKernelStatus()
-    unsubscribeKernelStatus = null
+  if (typeof unsubscribeWorkspaceRuntimeStatus === 'function') {
+    unsubscribeWorkspaceRuntimeStatus()
+    unsubscribeWorkspaceRuntimeStatus = null
   }
-  unsubscribeKernelStatus = settingsWebSocket.subscribeKernelStatus(({ workspaceId, status }) => {
+  unsubscribeWorkspaceRuntimeStatus = settingsWebSocket.subscribeWorkspaceRuntimeStatus(({ workspaceId, status }) => {
     const normalizedWorkspaceId = String(workspaceId || '').trim()
     if (!normalizedWorkspaceId) return
-    appStore.setWorkspaceKernelStatus(normalizedWorkspaceId, status)
+    appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, status)
     if (normalizedWorkspaceId !== String(appStore.activeWorkspaceId || '').trim()) return
     if (['ready', 'busy', 'starting'].includes(status)) {
       appStore.setRuntimeError('')
@@ -520,8 +587,8 @@ function isUnauthorizedError(error) {
 
 async function handleUnauthorizedPollingError() {
   stopArtifactUsageStream()
-  settingsWebSocket.setKernelStatusWorkspace('')
-  appStore.setWorkspaceKernelStatus(appStore.activeWorkspaceId, 'connecting')
+  settingsWebSocket.setWorkspaceRuntimeStatusWorkspace('')
+  appStore.setWorkspaceRuntimeStatus(appStore.activeWorkspaceId, 'connecting')
   appStore.setRuntimeError('Background auth check failed. Reconnecting your session...')
   if (authStore.isAuthenticated) {
     await authStore.checkAuth({ preserveSession: true })
@@ -595,16 +662,64 @@ function stopArtifactUsageStream() {
   artifactUsageStreamAbortController = null
 }
 
-async function refreshKernelStatusFromApi(workspaceId, fallbackStatus = 'missing') {
+function workspaceResourceRecommendationKey(payload) {
+  const candidates = Array.isArray(payload?.candidates) ? payload.candidates : []
+  return candidates
+    .map((candidate) => `${candidate?.workspace_id || ''}:${candidate?.idle_seconds || 0}`)
+    .sort()
+    .join('|')
+}
+
+async function refreshWorkspaceResourceRecommendation({ notify = false } = {}) {
+  if (!authStore.isAuthenticated) {
+    workspaceResourceRecommendation.value = null
+    lastWorkspaceResourceRecommendationKey.value = ''
+    return
+  }
+  try {
+    const payload = await apiService.v1GetWorkspaceResourceRecommendation()
+    workspaceResourceRecommendation.value = payload
+    const candidates = Array.isArray(payload?.candidates) ? payload.candidates : []
+    const key = workspaceResourceRecommendationKey(payload)
+    if (notify && candidates.length > 0 && key && key !== lastWorkspaceResourceRecommendationKey.value) {
+      toast.warning('Workspace cleanup suggested', workspaceResourceWarningTitle.value)
+      lastWorkspaceResourceRecommendationKey.value = key
+    }
+    if (candidates.length === 0) {
+      lastWorkspaceResourceRecommendationKey.value = ''
+    }
+  } catch (_error) {
+    workspaceResourceRecommendation.value = null
+  }
+}
+
+function startWorkspaceResourceRecommendationPolling() {
+  stopWorkspaceResourceRecommendationPolling()
+  void refreshWorkspaceResourceRecommendation({ notify: true })
+  workspaceResourceRecommendationTimer = setInterval(() => {
+    if (!document.hidden) {
+      void refreshWorkspaceResourceRecommendation({ notify: true })
+    }
+  }, 60000)
+}
+
+function stopWorkspaceResourceRecommendationPolling() {
+  if (workspaceResourceRecommendationTimer) {
+    clearInterval(workspaceResourceRecommendationTimer)
+    workspaceResourceRecommendationTimer = null
+  }
+}
+
+async function refreshWorkspaceRuntimeStatusFromApi(workspaceId, fallbackStatus = 'missing') {
   const normalizedWorkspaceId = String(workspaceId || '').trim()
   if (!normalizedWorkspaceId) return 'missing'
   try {
-    const payload = await apiService.v1GetWorkspaceKernelStatus(normalizedWorkspaceId)
+    const payload = await apiService.v1GetWorkspaceRuntimeStatus(normalizedWorkspaceId)
     const status = String(payload?.status || '').trim().toLowerCase() || fallbackStatus
-    appStore.setWorkspaceKernelStatus(normalizedWorkspaceId, status)
+    appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, status)
     return status
   } catch (_error) {
-    appStore.setWorkspaceKernelStatus(normalizedWorkspaceId, fallbackStatus)
+    appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, fallbackStatus)
     return fallbackStatus
   }
 }
@@ -650,11 +765,14 @@ function handleGlobalPointerDown(event) {
   const target = event?.target
   if (!(target instanceof Element)) return
   if (target.closest('[data-notification-center]')) return
+  if (target.closest('[data-workspace-switcher]')) return
+  closeWorkspaceSwitcher()
   closeNotificationsPanel()
 }
 
 function handleStatusBarEscape(event) {
   if (event.key === 'Escape') {
+    closeWorkspaceSwitcher()
     closeNotificationsPanel()
   }
 }
@@ -662,56 +780,40 @@ function handleStatusBarEscape(event) {
 function syncWorkspaceRealtimeSubscriptions() {
   const workspaceId = String(appStore.activeWorkspaceId || '').trim()
   if (!authStore.isAuthenticated || !workspaceId || !appStore.hasWorkspace) {
-    settingsWebSocket.setKernelStatusWorkspace('')
+    settingsWebSocket.setWorkspaceRuntimeStatusWorkspace('')
     stopArtifactUsageStream()
-    appStore.setWorkspaceKernelStatus(workspaceId, 'missing')
+    appStore.setWorkspaceRuntimeStatus(workspaceId, 'missing')
     resetArtifactUsage()
     return
   }
 
-  appStore.setWorkspaceKernelStatus(workspaceId, 'connecting')
-  settingsWebSocket.setKernelStatusWorkspace(workspaceId)
-  void refreshKernelStatusFromApi(workspaceId, 'connecting')
+  appStore.setWorkspaceRuntimeStatus(workspaceId, 'connecting')
+  settingsWebSocket.setWorkspaceRuntimeStatusWorkspace(workspaceId)
+  void refreshWorkspaceRuntimeStatusFromApi(workspaceId, 'connecting')
   void startArtifactUsageStream()
 }
 
-async function interruptKernel() {
-  if (!appStore.activeWorkspaceId || !appStore.hasWorkspace || isKernelActionRunning.value) return
-  isKernelActionRunning.value = true
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
-  appStore.setWorkspaceKernelStatus(workspaceId, 'busy')
-  try {
-    const response = await apiService.v1InterruptWorkspaceKernel(workspaceId)
-    if (response?.reset) toast.success('Kernel Interrupted', 'Execution interrupt signal sent.')
-    else toast.error('Interrupt Failed', 'No running kernel found.')
-    await refreshKernelStatusFromApi(workspaceId, response?.reset ? 'ready' : 'missing')
-  } catch (error) {
-    toast.error('Interrupt Failed', error?.response?.data?.detail || error.message)
-    await refreshKernelStatusFromApi(workspaceId, 'error')
-  } finally {
-    isKernelActionRunning.value = false
-  }
+function toggleWorkspaceSwitcher() {
+  workspaceSwitcherOpen.value = !workspaceSwitcherOpen.value
 }
 
-async function restartKernel() {
-  if (!appStore.activeWorkspaceId || !appStore.hasWorkspace || isKernelActionRunning.value) return
-  isKernelActionRunning.value = true
-  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
-  appStore.setWorkspaceKernelStatus(workspaceId, 'connecting')
+function closeWorkspaceSwitcher() {
+  workspaceSwitcherOpen.value = false
+}
+
+async function selectWorkspaceFromStatusBar(workspaceId) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId || normalizedWorkspaceId === String(appStore.activeWorkspaceId || '').trim()) {
+    closeWorkspaceSwitcher()
+    return
+  }
   try {
-    const response = await apiService.v1RestartWorkspaceKernel(workspaceId)
-    if (response?.reset) {
-      appStore.setCodeRunning(false)
-      toast.success('Kernel Restarted', 'Workspace kernel has been restarted.')
-    } else {
-      toast.error('Restart Failed', 'No kernel session existed.')
-    }
-    await refreshKernelStatusFromApi(workspaceId, response?.reset ? 'starting' : 'missing')
+    await appStore.activateWorkspace(normalizedWorkspaceId)
+    await appStore.fetchConversations()
   } catch (error) {
-    toast.error('Restart Failed', error?.response?.data?.detail || error.message)
-    await refreshKernelStatusFromApi(workspaceId, 'error')
+    toast.error('Workspace switch failed', error?.response?.data?.detail || error?.message || 'Could not switch workspace.')
   } finally {
-    isKernelActionRunning.value = false
+    closeWorkspaceSwitcher()
   }
 }
 
@@ -726,18 +828,20 @@ function handleVisibilityChange() {
 onMounted(() => {
   setupWebSocketMonitoring()
   syncWorkspaceRealtimeSubscriptions()
+  startWorkspaceResourceRecommendationPolling()
   document.addEventListener('visibilitychange', handleVisibilityChange)
   document.addEventListener('pointerdown', handleGlobalPointerDown)
   document.addEventListener('keydown', handleStatusBarEscape)
 })
 
 onUnmounted(() => {
-  settingsWebSocket.setKernelStatusWorkspace('')
+  settingsWebSocket.setWorkspaceRuntimeStatusWorkspace('')
   stopArtifactUsageStream()
+  stopWorkspaceResourceRecommendationPolling()
   resetArtifactUsage()
-  if (typeof unsubscribeKernelStatus === 'function') {
-    unsubscribeKernelStatus()
-    unsubscribeKernelStatus = null
+  if (typeof unsubscribeWorkspaceRuntimeStatus === 'function') {
+    unsubscribeWorkspaceRuntimeStatus()
+    unsubscribeWorkspaceRuntimeStatus = null
   }
   if (typeof unsubscribeWebSocketConnection === 'function') {
     unsubscribeWebSocketConnection()
@@ -753,14 +857,25 @@ watch([() => appStore.activeWorkspaceId, () => appStore.hasWorkspace, () => auth
   if (isAuthenticated && newId && hasWorkspace) {
     syncWorkspaceRealtimeSubscriptions()
   } else {
-    settingsWebSocket.setKernelStatusWorkspace('')
+    settingsWebSocket.setWorkspaceRuntimeStatusWorkspace('')
     stopArtifactUsageStream()
-    appStore.setWorkspaceKernelStatus(normalizedWorkspaceId, 'missing')
+    workspaceResourceRecommendation.value = null
+    appStore.setWorkspaceRuntimeStatus(normalizedWorkspaceId, 'missing')
     resetArtifactUsage()
   }
 })
 
 watch(() => isWebSocketConnected.value, () => {
   syncWorkspaceRealtimeSubscriptions()
+})
+
+watch(() => authStore.isAuthenticated, (authenticated) => {
+  if (authenticated) {
+    startWorkspaceResourceRecommendationPolling()
+  } else {
+    stopWorkspaceResourceRecommendationPolling()
+    workspaceResourceRecommendation.value = null
+    lastWorkspaceResourceRecommendationKey.value = ''
+  }
 })
 </script>

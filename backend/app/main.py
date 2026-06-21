@@ -291,7 +291,7 @@ async def _cancel_task(task: asyncio.Task | None) -> None:
         pass
 
 
-async def _stream_kernel_status_updates(user_id: str, workspace_id: str) -> None:
+async def _stream_workspace_runtime_status_updates(user_id: str, workspace_id: str) -> None:
     last_status: str | None = None
     while True:
         status_value = await get_workspace_kernel_status(workspace_id)
@@ -299,7 +299,7 @@ async def _stream_kernel_status_updates(user_id: str, workspace_id: str) -> None
             await websocket_manager.send_to_user(
                 user_id,
                 {
-                    "type": "kernel_status",
+                    "type": "workspace_runtime_status",
                     "workspace_id": workspace_id,
                     "status": status_value,
                 },
@@ -322,7 +322,7 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
         f"🔍 [WebSocket] Active connections after connect: {list(websocket_manager.active_connections.keys())}"
     )
 
-    kernel_status_task: asyncio.Task | None = None
+    workspace_runtime_status_task: asyncio.Task | None = None
     try:
         while True:
             logprint(f"👂 [WebSocket] Waiting for messages from user {auth_user_id}...")
@@ -334,23 +334,23 @@ async def settings_websocket(websocket: WebSocket, user_id: str):
                 continue
 
             message_type = str(message.get("type") or "").strip().lower()
-            if message_type != "subscribe_kernel_status":
+            if message_type not in {"subscribe_workspace_runtime_status", "subscribe_kernel_status"}:
                 continue
 
             workspace_id = str(message.get("workspace_id") or "").strip()
-            await _cancel_task(kernel_status_task)
-            kernel_status_task = None
+            await _cancel_task(workspace_runtime_status_task)
+            workspace_runtime_status_task = None
 
             if not workspace_id:
                 continue
 
-            kernel_status_task = asyncio.create_task(
-                _stream_kernel_status_updates(auth_user_id, workspace_id)
+            workspace_runtime_status_task = asyncio.create_task(
+                _stream_workspace_runtime_status_updates(auth_user_id, workspace_id)
             )
     except Exception as e:
         logprint(f"❌ [WebSocket] Error for user {auth_user_id}: {e}", level="error")
     finally:
-        await _cancel_task(kernel_status_task)
+        await _cancel_task(workspace_runtime_status_task)
         logprint(f"🔌 [WebSocket] Cleaning up connection for user {auth_user_id}")
         await websocket_manager.disconnect(auth_user_id)
 

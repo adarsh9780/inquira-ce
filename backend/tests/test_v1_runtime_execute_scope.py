@@ -806,7 +806,7 @@ async def test_workspace_artifact_list_endpoint_returns_only_turn_artifact_metad
 
 
 @pytest.mark.asyncio
-async def test_workspace_kernel_status_endpoint(monkeypatch, tmp_path):
+async def test_workspace_runtime_status_endpoint(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws3"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     duckdb_path = workspace_dir / "workspace.duckdb"
@@ -822,9 +822,20 @@ async def test_workspace_kernel_status_endpoint(monkeypatch, tmp_path):
         return "ready"
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
-    monkeypatch.setattr(runtime_api, "get_workspace_kernel_status", fake_status)
+    async def fake_snapshots():
+        return [
+            {
+                "workspace_id": "ws-3",
+                "status": "ready",
+                "last_used_at": "2026-06-21T00:00:00+00:00",
+                "idle_seconds": 12,
+            }
+        ]
 
-    response = await runtime_api.get_workspace_kernel_runtime_status(
+    monkeypatch.setattr(runtime_api, "get_workspace_runtime_status", fake_status)
+    monkeypatch.setattr(runtime_api, "list_workspace_runtime_snapshots", fake_snapshots)
+
+    response = await runtime_api.get_workspace_runtime_status_endpoint(
         workspace_id="ws-3",
         session=object(),
         current_user=SimpleNamespace(id="user-1"),
@@ -832,10 +843,11 @@ async def test_workspace_kernel_status_endpoint(monkeypatch, tmp_path):
 
     assert response.workspace_id == "ws-3"
     assert response.status == "ready"
+    assert response.idle_seconds == 12
 
 
 @pytest.mark.asyncio
-async def test_workspace_kernel_reset_endpoint(monkeypatch, tmp_path):
+async def test_workspace_runtime_reset_endpoint(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws4"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     duckdb_path = workspace_dir / "workspace.duckdb"
@@ -860,7 +872,7 @@ async def test_workspace_kernel_reset_endpoint(monkeypatch, tmp_path):
     monkeypatch.setattr(runtime_api, "reset_workspace_kernel", fake_reset)
     monkeypatch.setattr(runtime_api, "bootstrap_workspace_runtime", fake_bootstrap_workspace_runtime)
 
-    response = await runtime_api.reset_workspace_kernel_runtime(
+    response = await runtime_api.reset_workspace_runtime(
         workspace_id="ws-4",
         session=object(),
         current_user=SimpleNamespace(id="user-1"),
@@ -889,7 +901,7 @@ async def test_workspace_kernel_interrupt_endpoint(monkeypatch, tmp_path):
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(runtime_api, "interrupt_workspace_kernel", fake_interrupt)
 
-    response = await runtime_api.interrupt_workspace_kernel_runtime(
+    response = await runtime_api.interrupt_workspace_runtime(
         workspace_id="ws-6",
         session=object(),
         current_user=SimpleNamespace(id="user-1"),
@@ -1110,7 +1122,7 @@ async def test_workspace_kernel_restart_endpoint(monkeypatch, tmp_path):
     monkeypatch.setattr(runtime_api, "reset_workspace_kernel", fake_reset)
     monkeypatch.setattr(runtime_api, "bootstrap_workspace_runtime", fake_bootstrap_workspace_runtime)
 
-    response = await runtime_api.restart_workspace_kernel_runtime(
+    response = await runtime_api.restart_workspace_runtime(
         workspace_id="ws-7",
         session=object(),
         current_user=SimpleNamespace(id="user-1"),
@@ -1146,7 +1158,7 @@ async def test_workspace_kernel_restart_warms_when_no_existing_session(monkeypat
     monkeypatch.setattr(runtime_api, "reset_workspace_kernel", fake_reset)
     monkeypatch.setattr(runtime_api, "bootstrap_workspace_runtime", fake_bootstrap_workspace_runtime)
 
-    response = await runtime_api.restart_workspace_kernel_runtime(
+    response = await runtime_api.restart_workspace_runtime(
         workspace_id="ws-8",
         session=object(),
         current_user=SimpleNamespace(id="user-1"),

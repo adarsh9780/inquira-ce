@@ -12,7 +12,7 @@ test('status bar preserves the local session while background auth errors are re
   assert.equal(source.includes("appStore.setRuntimeError('Background auth check failed. Reconnecting your session...')"), true)
   assert.equal(source.includes('await authStore.checkAuth({ preserveSession: true })'), true)
   assert.equal(source.includes('stopArtifactUsageStream()'), true)
-  assert.equal(source.includes("settingsWebSocket.setKernelStatusWorkspace('')"), true)
+  assert.equal(source.includes("settingsWebSocket.setWorkspaceRuntimeStatusWorkspace('')"), true)
   assert.equal(source.includes('if (isUnauthorizedError(error)) {'), true)
   assert.equal(source.includes('scheduleArtifactUsageReconnect()'), true)
 })

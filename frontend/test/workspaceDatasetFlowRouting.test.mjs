@@ -7,7 +7,7 @@ test('unified sidebar routes workspace entry points to settings workspace tab an
   const source = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
   const workspaceTabSource = readFileSync(resolve(process.cwd(), 'src/components/modals/tabs/WorkspaceTab.vue'), 'utf-8')
 
-  assert.equal(source.includes("@click=\"appStore.openSettings('workspace')\""), true)
+  assert.equal(source.includes("@click.stop=\"appStore.openSettings('workspace')\""), true)
   assert.equal(source.includes("openSettings('workspace', 1)"), false)
   assert.equal(source.includes('settingsInitialStep'), false)
   assert.equal(workspaceTabSource.includes('data-testid="workspace-import-datasets-dropzone"'), true)

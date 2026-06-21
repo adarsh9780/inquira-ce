@@ -21,9 +21,10 @@ from ...services.code_executor import (
     bootstrap_workspace_runtime,
     execute_code,
     get_workspace_columns_via_kernel,
-    get_workspace_kernel_status,
+    get_workspace_runtime_status,
     get_workspace_table_schema_via_kernel,
     interrupt_workspace_kernel,
+    list_workspace_runtime_snapshots,
     reset_workspace_kernel,
 )
 from ...services.output_capture import build_run_wrapped_code
@@ -48,6 +49,7 @@ from ...services.llm_provider_catalog import (
 )
 from ...services.execution_config import load_execution_runtime_config
 from ...services.runner_env import install_runner_package
+from ...services.workspace_resource_monitor import build_workspace_resource_recommendation
 from ...services.runner_env import delete_workspace_runner_environment
 from ...services.terminal_executor import (
     run_workspace_terminal_command,
@@ -269,18 +271,35 @@ class RunnerPackageInstallResponse(BaseModel):
     command: list[str]
     stdout: str = ""
     stderr: str = ""
-    workspace_kernel_reset: bool
+    workspace_runtime_reset: bool
     saved_as_default: bool
 
 
-class KernelStatusResponse(BaseModel):
+class WorkspaceRuntimeStatusResponse(BaseModel):
     workspace_id: str
     status: str
+    last_used_at: str | None = None
+    idle_seconds: int | None = None
 
 
-class KernelResetResponse(BaseModel):
+class WorkspaceRuntimeActionResponse(BaseModel):
     workspace_id: str
     reset: bool
+    ok: bool | None = None
+    status: str | None = None
+
+
+class WorkspaceResourceRecommendationResponse(BaseModel):
+    type: str
+    available_memory_bytes: int
+    available_memory_percent: float
+    memory_pressure: bool
+    idle_warning_minutes: int
+    candidates: list[dict[str, Any]]
+
+
+KernelStatusResponse = WorkspaceRuntimeStatusResponse
+KernelResetResponse = WorkspaceRuntimeActionResponse
 
 
 class WorkspacePathsResponse(BaseModel):
@@ -1521,7 +1540,7 @@ async def install_runner_runtime_package(
         command=install_result.command,
         stdout=install_result.stdout,
         stderr=install_result.stderr,
-        workspace_kernel_reset=reset,
+        workspace_runtime_reset=reset,
         saved_as_default=saved_default,
     )
 
@@ -1649,23 +1668,77 @@ async def reset_workspace_terminal_session(
 
 
 @router.get(
+    "/workspace-runtime/resource-recommendation",
+    response_model=WorkspaceResourceRecommendationResponse,
+)
+async def get_workspace_runtime_resource_recommendation(
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Return prompt-only recommendations for idle workspace runtimes."""
+    workspaces = await WorkspaceRepository.list_for_principal(session, current_user.id)
+    workspace_names = {
+        str(workspace.id): str(workspace.name or "")
+        for workspace in workspaces
+    }
+    runtime = load_execution_runtime_config()
+    snapshots = await list_workspace_runtime_snapshots()
+    recommendation = build_workspace_resource_recommendation(
+        runtime_snapshots=snapshots,
+        workspace_names=workspace_names,
+        idle_warning_minutes=runtime.workspace_idle_warning_minutes,
+        min_available_percent=runtime.workspace_memory_min_available_percent,
+        min_available_bytes=runtime.workspace_memory_min_available_mb * 1024 * 1024,
+    )
+    return WorkspaceResourceRecommendationResponse(**recommendation)
+
+
+@router.get(
+    "/workspaces/{workspace_id}/runtime/status",
+    response_model=WorkspaceRuntimeStatusResponse,
+)
+async def get_workspace_runtime_status_endpoint(
+    workspace_id: str,
+    session: AsyncSession = Depends(get_appdata_db_session),
+    current_user=Depends(get_current_user),
+):
+    """Return current workspace runtime status."""
+    await _require_workspace_access(session, current_user.id, workspace_id)
+    status = await get_workspace_runtime_status(workspace_id)
+    snapshots = await list_workspace_runtime_snapshots()
+    snapshot = next(
+        (
+            item
+            for item in snapshots
+            if str(item.get("workspace_id") or "") == str(workspace_id)
+        ),
+        {},
+    )
+    return WorkspaceRuntimeStatusResponse(
+        workspace_id=workspace_id,
+        status=status,
+        last_used_at=snapshot.get("last_used_at"),
+        idle_seconds=snapshot.get("idle_seconds"),
+    )
+
+
+@router.get(
     "/workspaces/{workspace_id}/kernel/status",
-    response_model=KernelStatusResponse,
+    response_model=WorkspaceRuntimeStatusResponse,
+    include_in_schema=False,
 )
 async def get_workspace_kernel_runtime_status(
     workspace_id: str,
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
-    """Return current workspace kernel status."""
-    await _require_workspace_access(session, current_user.id, workspace_id)
-    status = await get_workspace_kernel_status(workspace_id)
-    return KernelStatusResponse(workspace_id=workspace_id, status=status)
+    """Compatibility alias for current workspace runtime status."""
+    return await get_workspace_runtime_status_endpoint(workspace_id, session, current_user)
 
 
 @router.post(
     "/workspaces/{workspace_id}/runtime/bootstrap",
-    response_model=KernelResetResponse,
+    response_model=WorkspaceRuntimeActionResponse,
 )
 async def bootstrap_workspace_runtime_endpoint(
     workspace_id: str,
@@ -1715,16 +1788,6 @@ async def bootstrap_workspace_runtime_endpoint(
             )
     except HTTPException:
         raise
-    except HTTPException:
-        raise
-    except HTTPException:
-        raise
-    except HTTPException:
-        raise
-    except HTTPException:
-        raise
-    except HTTPException:
-        raise
     except Exception as exc:
         detail = _describe_exception(exc)
         if websocket_user_id:
@@ -1733,19 +1796,19 @@ async def bootstrap_workspace_runtime_endpoint(
                 f"Workspace runtime bootstrap failed: {detail}",
             )
         raise HTTPException(status_code=500, detail=detail) from exc
-    return KernelResetResponse(workspace_id=workspace_id, reset=bool(ready))
+    return WorkspaceRuntimeActionResponse(workspace_id=workspace_id, reset=bool(ready))
 
 
 @router.post(
     "/workspaces/{workspace_id}/runtime/retry",
-    response_model=KernelResetResponse,
+    response_model=WorkspaceRuntimeActionResponse,
 )
 async def retry_workspace_runtime_endpoint(
     workspace_id: str,
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
-    """Reset the current kernel session and rebuild the runtime with progress events."""
+    """Reset the current workspace runtime and rebuild it with progress events."""
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
     websocket_user_id = _resolve_websocket_user_id(current_user.id)
@@ -1769,7 +1832,7 @@ async def retry_workspace_runtime_endpoint(
     try:
         await _progress(
             "workspace_runtime_cleanup",
-            "Resetting the current workspace kernel...",
+            "Resetting the current workspace runtime...",
         )
         await reset_workspace_kernel(workspace_id)
         await _progress(
@@ -1800,19 +1863,19 @@ async def retry_workspace_runtime_endpoint(
                 f"Workspace runtime retry failed: {detail}",
             )
         raise HTTPException(status_code=500, detail=detail) from exc
-    return KernelResetResponse(workspace_id=workspace_id, reset=bool(ready))
+    return WorkspaceRuntimeActionResponse(workspace_id=workspace_id, reset=bool(ready))
 
 
 @router.post(
     "/workspaces/{workspace_id}/runtime/hard-reset",
-    response_model=KernelResetResponse,
+    response_model=WorkspaceRuntimeActionResponse,
 )
 async def hard_reset_workspace_runtime_endpoint(
     workspace_id: str,
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
-    """Delete the workspace runner venv, reset the kernel, then rebuild the runtime."""
+    """Delete the workspace runner venv, reset the runtime, then rebuild it."""
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
     websocket_user_id = _resolve_websocket_user_id(current_user.id)
@@ -1837,7 +1900,7 @@ async def hard_reset_workspace_runtime_endpoint(
     try:
         await _progress(
             "workspace_runtime_cleanup",
-            "Stopping the current workspace kernel...",
+            "Stopping the current workspace runtime...",
         )
         await WorkspaceMaintenanceService.drain_runtime(
             workspace_id=workspace_id,
@@ -1892,59 +1955,80 @@ async def hard_reset_workspace_runtime_endpoint(
                 f"Workspace hard reset failed: {detail}",
             )
         raise HTTPException(status_code=500, detail=detail) from exc
-    return KernelResetResponse(workspace_id=workspace_id, reset=bool(ready))
+    return WorkspaceRuntimeActionResponse(workspace_id=workspace_id, reset=bool(ready))
 
 
 @router.post(
-    "/workspaces/{workspace_id}/kernel/interrupt",
-    response_model=KernelResetResponse,
+    "/workspaces/{workspace_id}/runtime/interrupt",
+    response_model=WorkspaceRuntimeActionResponse,
 )
-async def interrupt_workspace_kernel_runtime(
+@router.post(
+    "/workspaces/{workspace_id}/kernel/interrupt",
+    response_model=WorkspaceRuntimeActionResponse,
+    include_in_schema=False,
+)
+async def interrupt_workspace_runtime(
     workspace_id: str,
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
-    """Interrupt currently running code in workspace kernel."""
+    """Interrupt currently running code in a workspace runtime."""
     await _require_workspace_access(session, current_user.id, workspace_id)
     await _release_appdata_session_before_kernel(session)
     interrupted = await interrupt_workspace_kernel(workspace_id)
-    return KernelResetResponse(workspace_id=workspace_id, reset=interrupted)
+    status = await get_workspace_runtime_status(workspace_id)
+    return WorkspaceRuntimeActionResponse(
+        workspace_id=workspace_id,
+        reset=interrupted,
+        ok=interrupted,
+        status=status,
+    )
 
 
+@router.post(
+    "/workspaces/{workspace_id}/runtime/reset",
+    response_model=WorkspaceRuntimeActionResponse,
+)
 @router.post(
     "/workspaces/{workspace_id}/kernel/reset",
-    response_model=KernelResetResponse,
+    response_model=WorkspaceRuntimeActionResponse,
+    include_in_schema=False,
 )
-async def reset_workspace_kernel_runtime(
+async def reset_workspace_runtime(
     workspace_id: str,
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
-    """Reset workspace kernel and clear in-memory execution context."""
+    """Reset workspace runtime and clear in-memory execution context."""
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     await _release_appdata_session_before_kernel(session)
-    return await _restart_workspace_kernel(workspace_id, workspace)
+    return await _restart_workspace_runtime(workspace_id, workspace)
 
 
 @router.post(
-    "/workspaces/{workspace_id}/kernel/restart",
-    response_model=KernelResetResponse,
+    "/workspaces/{workspace_id}/runtime/restart",
+    response_model=WorkspaceRuntimeActionResponse,
 )
-async def restart_workspace_kernel_runtime(
+@router.post(
+    "/workspaces/{workspace_id}/kernel/restart",
+    response_model=WorkspaceRuntimeActionResponse,
+    include_in_schema=False,
+)
+async def restart_workspace_runtime(
     workspace_id: str,
     session: AsyncSession = Depends(get_appdata_db_session),
     current_user=Depends(get_current_user),
 ):
-    """Restart workspace kernel and warm it immediately."""
+    """Restart workspace runtime and warm it immediately."""
     workspace = await _require_workspace_access(session, current_user.id, workspace_id)
     await _release_appdata_session_before_kernel(session)
-    return await _restart_workspace_kernel(workspace_id, workspace)
+    return await _restart_workspace_runtime(workspace_id, workspace)
 
 
-async def _restart_workspace_kernel(
+async def _restart_workspace_runtime(
     workspace_id: str, workspace: Any
-) -> KernelResetResponse:
-    """Shared reset/restart flow: reset session then warm-start kernel."""
+) -> WorkspaceRuntimeActionResponse:
+    """Shared reset/restart flow: reset session then warm-start runtime."""
     _ensure_workspace_db_exists_or_raise(str(workspace.duckdb_path))
     await reset_workspace_kernel(workspace_id)
     try:
@@ -1954,7 +2038,12 @@ async def _restart_workspace_kernel(
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    return KernelResetResponse(workspace_id=workspace_id, reset=bool(ready))
+    return WorkspaceRuntimeActionResponse(
+        workspace_id=workspace_id,
+        reset=bool(ready),
+        ok=bool(ready),
+        status="ready" if ready else "missing",
+    )
 
 
 @router.get(

@@ -41,7 +41,7 @@ test('workspace tab shows inline dataset processing card and consumes websocket 
   assert.equal(source.includes('trackSchemaReadyNotificationsFromIngestionJob(job)'), true)
   assert.equal(source.includes('notifyReadyDatasetSchemas(datasetEntries.value)'), true)
   assert.equal(source.includes('setupStep'), false)
-  assert.equal(ingestBlock.includes('await appStore.ensureWorkspaceKernelConnected(workspaceId)'), false)
+  assert.equal(ingestBlock.includes('await appStore.ensureWorkspaceRuntimeConnected(workspaceId)'), false)
   assert.equal(source.includes('void generateWorkspaceSchemas({'), false)
   assert.equal(source.includes('autoStart: true'), false)
   assert.equal(source.includes('clearWorkspaceOperation()'), true)

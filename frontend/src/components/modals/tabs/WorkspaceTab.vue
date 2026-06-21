@@ -318,35 +318,35 @@ const detailConversationCount = computed(() => Number(workspaceDetail.value?.con
 const detailLastActive = computed(() => formatRelativeTime(workspaceDetail.value?.updated_at || activeWorkspace.value?.updated_at))
 const datasetIngestStatusLabel = computed(() => String(datasetIngestMessage.value || 'Processing dataset...').trim() || 'Processing dataset...')
 const datasetIngestHasError = computed(() => Boolean(String(datasetIngestError.value || '').trim()))
-const workspaceKernelStatus = computed(() => appStore.getWorkspaceKernelStatus(props.activeWorkspaceId))
-const workspaceKernelReady = computed(() => ['ready', 'busy'].includes(workspaceKernelStatus.value))
+const workspaceRuntimeStatus = computed(() => appStore.getWorkspaceRuntimeStatus(props.activeWorkspaceId))
+const workspaceRuntimeReady = computed(() => ['ready', 'busy'].includes(workspaceRuntimeStatus.value))
 const isRuntimeActionInProgress = computed(() => (
   isCreatingWorkspaceRuntime.value || isRetryingWorkspaceRuntime.value || isHardResettingWorkspaceRuntime.value
 ))
 const runtimeStatusTone = computed(() => {
   if (runtimeProgressError.value) return 'danger'
-  if (workspaceKernelReady.value) return 'success'
-  if (isRuntimeActionInProgress.value || ['starting', 'connecting'].includes(String(workspaceKernelStatus.value || ''))) {
+  if (workspaceRuntimeReady.value) return 'success'
+  if (isRuntimeActionInProgress.value || ['starting', 'connecting'].includes(String(workspaceRuntimeStatus.value || ''))) {
     return 'accent'
   }
   return 'muted'
 })
 const runtimeStatusLabel = computed(() => {
   if (runtimeProgressError.value) return 'Runtime failed'
-  if (workspaceKernelStatus.value === 'busy') return 'Kernel busy'
-  if (workspaceKernelStatus.value === 'ready') return 'Kernel ready'
+  if (workspaceRuntimeStatus.value === 'busy') return 'Runtime working'
+  if (workspaceRuntimeStatus.value === 'ready') return 'Runtime ready'
   if (isHardResettingWorkspaceRuntime.value) return 'Hard reset in progress'
   if (isRetryingWorkspaceRuntime.value) return 'Retry in progress'
   if (isCreatingWorkspaceRuntime.value) return 'Preparing runtime'
-  if (workspaceKernelStatus.value === 'starting' || workspaceKernelStatus.value === 'connecting') return 'Starting runtime'
-  if (workspaceKernelStatus.value === 'error') return 'Runtime needs attention'
+  if (workspaceRuntimeStatus.value === 'starting' || workspaceRuntimeStatus.value === 'connecting') return 'Starting runtime'
+  if (workspaceRuntimeStatus.value === 'error') return 'Runtime needs attention'
   return 'Runtime not started'
 })
 const runtimeStatusMessage = computed(() => {
   if (runtimeProgressError.value) return runtimeProgressError.value
   const latestEntry = runtimeProgressEntries.value[runtimeProgressEntries.value.length - 1]
   if (latestEntry?.message) return latestEntry.message
-  const fallback = readinessKernelDetail(workspaceKernelStatus.value)
+  const fallback = readinessRuntimeDetail(workspaceRuntimeStatus.value)
   return fallback === 'Runtime is connected' ? '' : fallback
 })
 const currentRuntimeProgressMessage = computed(() => {
@@ -359,8 +359,8 @@ const workspaceReadinessItems = computed(() => {
   const context = String(resolveWorkspaceContext()).trim()
   const registered = Boolean(workspaceId && registeredName)
   const active = Boolean(workspaceId && String(appStore.activeWorkspaceId || '').trim() === workspaceId)
-  const kernelStatus = String(workspaceKernelStatus.value || 'missing').trim()
-  const kernelChecking = isCreatingWorkspaceRuntime.value || isCheckingWorkspaceReadiness.value || ['starting', 'connecting'].includes(kernelStatus)
+  const runtimeStatus = String(workspaceRuntimeStatus.value || 'missing').trim()
+  const runtimeChecking = isCreatingWorkspaceRuntime.value || isCheckingWorkspaceReadiness.value || ['starting', 'connecting'].includes(runtimeStatus)
 
   return [
     {
@@ -382,10 +382,10 @@ const workspaceReadinessItems = computed(() => {
       state: active ? 'done' : 'pending',
     },
     {
-      id: 'kernel',
-      label: 'Kernel ready',
-      detail: readinessKernelDetail(kernelStatus),
-      state: workspaceKernelReady.value ? 'done' : (kernelChecking ? 'checking' : 'pending'),
+      id: 'runtime',
+      label: 'Runtime ready',
+      detail: readinessRuntimeDetail(runtimeStatus),
+      state: workspaceRuntimeReady.value ? 'done' : (runtimeChecking ? 'checking' : 'pending'),
     },
   ]
 })
@@ -879,7 +879,7 @@ function notifyWorkspaceOperationBlocked() {
   return true
 }
 
-function readinessKernelDetail(status) {
+function readinessRuntimeDetail(status) {
   const normalized = String(status || '').trim()
   if (normalized === 'ready') return 'Runtime is connected'
   if (normalized === 'busy') return 'Runtime is busy but available'
@@ -908,7 +908,7 @@ async function refreshWorkspaceReadiness() {
   isCheckingWorkspaceReadiness.value = true
   clearRuntimeProgress()
   try {
-    const ready = await appStore.ensureWorkspaceKernelConnected(workspaceId)
+    const ready = await appStore.ensureWorkspaceRuntimeReady(workspaceId)
     if (ready) {
       toast.success('Workspace ready', 'Runtime is ready for dataset uploads.')
     } else {
@@ -928,20 +928,20 @@ async function retryWorkspaceRuntime() {
   runtimeActionMode.value = 'retry'
   isRetryingWorkspaceRuntime.value = true
   setWorkspaceOperation('runtime', 'Retrying the workspace runtime.')
-  appStore.clearWorkspaceKernelStatus(workspaceId)
+  appStore.clearWorkspaceRuntimeStatus(workspaceId)
   try {
     const response = await apiService.v1RetryWorkspaceRuntime(workspaceId)
     await appStore.fetchWorkspaces()
     if (!response?.reset) {
       throw new Error('Workspace runtime retry did not finish successfully.')
     }
-    appStore.setWorkspaceKernelStatus(workspaceId, 'ready')
+    appStore.setWorkspaceRuntimeStatus(workspaceId, 'ready')
     clearRuntimeProgress()
     toast.success('Runtime ready', 'Workspace runtime restarted successfully.')
   } catch (error) {
     runtimeProgressError.value = extractApiErrorMessage(error, 'Failed to retry workspace runtime.')
     appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
-    appStore.setWorkspaceKernelStatus(workspaceId, 'error')
+    appStore.setWorkspaceRuntimeStatus(workspaceId, 'error')
     toast.error('Runtime retry failed', runtimeProgressError.value)
   } finally {
     isRetryingWorkspaceRuntime.value = false
@@ -957,20 +957,20 @@ async function hardResetWorkspaceRuntime() {
   runtimeActionMode.value = 'hard-reset'
   isHardResettingWorkspaceRuntime.value = true
   setWorkspaceOperation('runtime', 'Rebuilding the workspace runtime from scratch.')
-  appStore.clearWorkspaceKernelStatus(workspaceId)
+  appStore.clearWorkspaceRuntimeStatus(workspaceId)
   try {
     const response = await apiService.v1HardResetWorkspaceRuntime(workspaceId)
     await appStore.fetchWorkspaces()
     if (!response?.reset) {
       throw new Error('Workspace hard reset did not finish successfully.')
     }
-    appStore.setWorkspaceKernelStatus(workspaceId, 'ready')
+    appStore.setWorkspaceRuntimeStatus(workspaceId, 'ready')
     clearRuntimeProgress()
     toast.success('Runtime rebuilt', 'Workspace runtime was rebuilt from scratch.')
   } catch (error) {
     runtimeProgressError.value = extractApiErrorMessage(error, 'Failed to rebuild workspace runtime.')
     appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
-    appStore.setWorkspaceKernelStatus(workspaceId, 'error')
+    appStore.setWorkspaceRuntimeStatus(workspaceId, 'error')
     toast.error('Hard reset failed', runtimeProgressError.value)
   } finally {
     isHardResettingWorkspaceRuntime.value = false
@@ -1554,7 +1554,7 @@ async function warmWorkspaceRuntimeInBackground(workspaceId) {
   if (!targetWorkspaceId) return
   clearRuntimeProgress()
   try {
-    const ready = await appStore.ensureWorkspaceKernelConnected(targetWorkspaceId)
+    const ready = await appStore.ensureWorkspaceRuntimeReady(targetWorkspaceId)
     if (!ready) {
       runtimeProgressError.value = String(appStore.runtimeError || 'Workspace runtime bootstrap failed.')
       appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
@@ -1564,7 +1564,7 @@ async function warmWorkspaceRuntimeInBackground(workspaceId) {
   } catch (error) {
     runtimeProgressError.value = extractApiErrorMessage(error, 'Workspace runtime bootstrap failed.')
     appendRuntimeProgress('workspace_runtime_error', runtimeProgressError.value)
-    appStore.setWorkspaceKernelStatus(targetWorkspaceId, 'error')
+    appStore.setWorkspaceRuntimeStatus(targetWorkspaceId, 'error')
   } finally {
     if (runtimeActionMode.value === 'create') {
       runtimeActionMode.value = ''

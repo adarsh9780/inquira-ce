@@ -153,7 +153,7 @@ async def test_workspace_columns_endpoint_returns_catalog(monkeypatch, tmp_path)
 
 
 @pytest.mark.asyncio
-async def test_workspace_columns_endpoint_returns_explicit_error_when_kernel_is_inactive(monkeypatch, tmp_path):
+async def test_workspace_columns_endpoint_returns_explicit_error_when_runtime_is_inactive(monkeypatch, tmp_path):
     workspace_dir = tmp_path / "ws-columns-kernel-missing"
     workspace_dir.mkdir(parents=True, exist_ok=True)
     duckdb_path = workspace_dir / "workspace.duckdb"
@@ -166,9 +166,8 @@ async def test_workspace_columns_endpoint_returns_explicit_error_when_kernel_is_
 
     async def fake_get_workspace_columns_via_kernel(_workspace_id):
         raise RuntimeError(
-            "Loading workspace columns requires an active workspace kernel because Inquira now "
-            "reuses the kernel-owned DuckDB connections for workspace data and artifacts. Start "
-            "or restart the workspace kernel, wait for Kernel Ready, then try again."
+            "Loading workspace columns requires an active workspace runtime. Open the workspace "
+            "and try again after it is ready."
         )
 
     monkeypatch.setattr(runtime_api, "_require_workspace_access", fake_require_workspace_access)
@@ -182,7 +181,7 @@ async def test_workspace_columns_endpoint_returns_explicit_error_when_kernel_is_
         )
 
     assert exc.value.status_code == 409
-    assert "active workspace kernel" in str(exc.value.detail).lower()
+    assert "active workspace runtime" in str(exc.value.detail).lower()
 
 
 @pytest.mark.asyncio

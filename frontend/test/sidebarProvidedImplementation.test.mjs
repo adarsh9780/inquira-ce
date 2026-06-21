@@ -7,8 +7,8 @@ test('unified sidebar keeps the current compact workspace and chat layout', () =
   const source = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
   assert.equal(source.includes('class="relative z-40 flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden sidebar-root"'), true)
-  assert.equal(source.includes('activeWorkspaceCaption'), true)
-  assert.equal(source.includes('conversationBadgeLabel(index, appStore.conversations.length)'), true)
+  assert.equal(source.includes('sidebarConversationsByWorkspace'), true)
+  assert.equal(source.includes('conversationBadgeLabel(index, conversationsForWorkspace(workspace.id).length)'), true)
   assert.equal(source.includes('data-conversation-actions-menu'), true)
   assert.equal(source.includes('sidebar-initials-avatar'), true)
   assert.equal(source.includes('UserCircleIcon'), false)

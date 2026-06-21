@@ -9,7 +9,7 @@ test('workspace views live in the sidebar instead of the status bar', () => {
   const sidebarSource = readFileSync(sidebarPath, 'utf-8')
   const statusBarSource = readFileSync(statusBarPath, 'utf-8')
 
-  assert.equal(sidebarSource.includes("@click=\"appStore.openSettings('workspace')\""), true)
+  assert.equal(sidebarSource.includes("@click.stop=\"appStore.openSettings('workspace')\""), true)
   assert.equal(sidebarSource.includes('@click="openChat"'), false)
   assert.equal(sidebarSource.includes('@click="openSchemaEditor"'), true)
   assert.equal(sidebarSource.includes('@click="openConversationTree"'), true)

@@ -235,6 +235,25 @@ class WorkspaceKernelManager:
             return "missing"
         return session.status
 
+    async def list_session_snapshots(self) -> list[dict[str, Any]]:
+        """Return lightweight status snapshots for active workspace runtimes."""
+        now = datetime.now(UTC)
+        async with self._sessions_lock:
+            sessions = list(self._sessions.values())
+        snapshots: list[dict[str, Any]] = []
+        for session in sessions:
+            idle_seconds = max(0, int((now - session.last_used).total_seconds()))
+            snapshots.append(
+                {
+                    "workspace_id": session.workspace_id,
+                    "status": session.status,
+                    "last_used_at": session.last_used.isoformat(),
+                    "idle_seconds": idle_seconds,
+                    "busy": session.lock.locked(),
+                }
+            )
+        return snapshots
+
     async def interrupt_workspace(self, workspace_id: str) -> bool:
         """Interrupt a running workspace kernel if present."""
         async with self._sessions_lock:
@@ -428,9 +447,9 @@ class WorkspaceKernelManager:
 
         if parsed.error is not None:
             message = str(parsed.error).strip().splitlines()[-1].strip()
-            raise RuntimeError(message or "Dataset import failed in workspace kernel.")
+            raise RuntimeError(message or "Dataset import failed in workspace runtime.")
         if not isinstance(parsed.result, dict):
-            raise RuntimeError("Dataset import failed in workspace kernel.")
+            raise RuntimeError("Dataset import failed in workspace runtime.")
         return parsed.result
 
     async def ensure_ready(
@@ -577,13 +596,13 @@ class WorkspaceKernelManager:
             if session is not None:
                 await self._release_runtime_lease(session)
             raise RuntimeError(
-                f"Timed out waiting for workspace kernel to become ready after {ready_timeout} seconds."
+                f"Timed out waiting for workspace runtime to become ready after {ready_timeout} seconds."
             ) from exc
         except Exception as exc:
             await self._shutdown_partial_startup(km, kc)
             if session is not None:
                 await self._release_runtime_lease(session)
-            raise RuntimeError(f"Failed to start workspace kernel: {self._describe_exception(exc)}") from exc
+            raise RuntimeError(f"Failed to start workspace runtime: {self._describe_exception(exc)}") from exc
 
     async def _bootstrap_workspace(self, session: WorkspaceKernelSession) -> None:
         await WorkspaceOfflineAdapter().ensure_database_file(session.workspace_duckdb_path)

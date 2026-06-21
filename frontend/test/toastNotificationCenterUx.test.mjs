@@ -29,8 +29,8 @@ test('toast system deduplicates repeated runtime errors while preserving distinc
   clearAllToasts()
   clearNotificationHistory()
 
-  const firstId = toast.error('Workspace Runtime Error', 'Failed to start workspace kernel')
-  const duplicateId = toast.error('Workspace Runtime Error', 'Failed to start workspace kernel')
+  const firstId = toast.error('Workspace Runtime Error', 'Failed to start workspace runtime')
+  const duplicateId = toast.error('Workspace Runtime Error', 'Failed to start workspace runtime')
   const distinctId = toast.error('Workspace Runtime Error', 'Workspace runtime bootstrap failed')
 
   assert.ok(firstId > 0)

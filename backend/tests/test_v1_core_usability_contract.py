@@ -26,9 +26,12 @@ def test_openapi_contains_core_workspace_dataset_chat_and_conversation_routes():
     assert "/api/v1/conversations/{conversation_id}/turns" in paths
 
     assert "/api/v1/workspaces/{workspace_id}/execute" in paths
-    assert "/api/v1/workspaces/{workspace_id}/kernel/status" in paths
-    assert "/api/v1/workspaces/{workspace_id}/kernel/reset" in paths
-    assert "/api/v1/workspaces/{workspace_id}/kernel/restart" in paths
+    assert "/api/v1/workspaces/{workspace_id}/runtime/status" in paths
+    assert "/api/v1/workspaces/{workspace_id}/runtime/reset" in paths
+    assert "/api/v1/workspaces/{workspace_id}/runtime/restart" in paths
+    assert "/api/v1/workspaces/{workspace_id}/kernel/status" not in paths
+    assert "/api/v1/workspaces/{workspace_id}/kernel/reset" not in paths
+    assert "/api/v1/workspaces/{workspace_id}/kernel/restart" not in paths
 
 
 def test_openapi_contains_methods_for_core_user_actions():

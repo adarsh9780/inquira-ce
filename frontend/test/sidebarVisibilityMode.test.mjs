@@ -19,10 +19,10 @@ test('app keeps one sidebar container with separate hidden and collapsed states'
   assert.equal(appSource.includes('.app-nav-pane-hidden {'), true)
   assert.equal(appSource.includes('<StatusBar />'), true)
 
-  assert.equal(sidebarSource.includes('Open workspace settings'), true)
+  assert.equal(sidebarSource.includes('Workspace settings'), true)
   assert.equal(sidebarSource.includes('function openWorkspaceRail(target = \'\') {'), false)
   assert.equal(sidebarSource.includes('title="Conversations"'), false)
   assert.equal(sidebarSource.includes('title="Settings"'), true)
-  assert.equal(sidebarSource.includes('SidebarConversations'), false)
-  assert.equal(sidebarSource.includes('conversationBadgeLabel(index, appStore.conversations.length)'), true)
+  assert.equal(sidebarSource.includes('<SidebarConversations'), false)
+  assert.equal(sidebarSource.includes('conversationBadgeLabel(index, conversationsForWorkspace(workspace.id).length)'), true)
 })

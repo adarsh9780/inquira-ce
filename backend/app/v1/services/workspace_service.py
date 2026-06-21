@@ -148,7 +148,7 @@ class WorkspaceService:
                 await reset_workspace_kernel(previous_workspace_id)
             except Exception as exc:
                 logprint(
-                    "Failed to reset previous workspace kernel during activation switch.",
+                    "Failed to reset previous workspace runtime during activation switch.",
                     level="WARNING",
                     user_id=str(user.id),
                     previous_workspace_id=previous_workspace_id,

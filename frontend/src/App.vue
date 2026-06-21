@@ -369,7 +369,7 @@ const startupOverlayMessage = computed(() => {
 
 const startupOverlayHint = computed(() => {
   if (workspaceRuntimeStatus.active) {
-    return 'Kernel and environment work now stays visible inside the app shell instead of appearing as a detached dialog.'
+    return 'Workspace environment work now stays visible inside the app shell instead of appearing as a detached dialog.'
   }
   return 'Authentication finishes first, then the authenticated workspace restore runs as its own separate phase.'
 })
@@ -729,7 +729,7 @@ async function handleAuthenticated(userData) {
     await appStore.fetchWorkspaces()
     if (appStore.activeWorkspaceId) {
       appBootstrap.message = 'Starting your workspace runtime...'
-      await appStore.ensureWorkspaceKernelConnected(appStore.activeWorkspaceId)
+      await appStore.ensureWorkspaceRuntimeReady(appStore.activeWorkspaceId)
       appBootstrap.message = 'Loading workspace history...'
       await appStore.fetchConversations()
       if (appStore.activeConversationId) {

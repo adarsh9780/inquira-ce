@@ -171,9 +171,9 @@ class DatasetService:
                 file_type=file_type,
             )
         except RuntimeError as exc:
-            detail = str(exc).strip() or "Failed to load dataset through the workspace kernel."
+            detail = str(exc).strip() or "Failed to load dataset through the workspace runtime."
             lowered = detail.lower()
-            if "requires an active workspace kernel" in lowered or "kernel ready" in lowered:
+            if "requires an active workspace runtime" in lowered or "workspace to be ready" in lowered:
                 raise HTTPException(status_code=409, detail=detail) from exc
             if "openpyxl" in lowered or "failed to read" in lowered or "unsupported file type" in lowered:
                 raise HTTPException(status_code=400, detail=detail) from exc

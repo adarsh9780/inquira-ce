@@ -76,7 +76,7 @@ class SettingsWebSocket {
     this.progressListeners = new Set()
     this.errorListeners = new Set()
     this.completeListeners = new Set()
-    this.kernelStatusListeners = new Set()
+    this.workspaceRuntimeStatusListeners = new Set()
     // Support multiple subscribers for connection state
     this.connectionListeners = new Set()
 
@@ -86,8 +86,8 @@ class SettingsWebSocket {
     this.reconnectTimer = null
     this.reconnectInterval = 5000 // 5 seconds
     this.lastConnectionAttempt = null
-    this.kernelStatusWorkspaceId = ''
-    this.lastKernelStatusSubscriptionWorkspaceId = ''
+    this.workspaceRuntimeStatusWorkspaceId = ''
+    this.lastWorkspaceRuntimeStatusSubscriptionWorkspaceId = ''
   }
 
   connect(userId) {
@@ -104,7 +104,7 @@ class SettingsWebSocket {
       this.socket.onopen = () => {
         this.isConnected = true
         this.notifyConnectionListeners(true)
-        this.sendKernelStatusSubscription()
+        this.sendWorkspaceRuntimeStatusSubscription()
       }
 
       this.socket.onmessage = (event) => {
@@ -117,7 +117,7 @@ class SettingsWebSocket {
             this.isConnected = true
             this.connectionAcknowledged = true
             this.notifyConnectionListeners(true)
-            this.sendKernelStatusSubscription()
+            this.sendWorkspaceRuntimeStatusSubscription()
             resolve()
           }
         } catch (error) {
@@ -127,7 +127,7 @@ class SettingsWebSocket {
 
       this.socket.onclose = (event) => {
         this.isConnected = false
-        this.lastKernelStatusSubscriptionWorkspaceId = ''
+        this.lastWorkspaceRuntimeStatusSubscriptionWorkspaceId = ''
         this.notifyConnectionListeners(false)
         this.handleReconnect()
       }
@@ -135,7 +135,7 @@ class SettingsWebSocket {
       this.socket.onerror = (error) => {
         console.error('❌ Settings WebSocket error:', error)
         this.isConnected = false
-        this.lastKernelStatusSubscriptionWorkspaceId = ''
+        this.lastWorkspaceRuntimeStatusSubscriptionWorkspaceId = ''
         this.notifyConnectionListeners(false)
         reject(error)
       }
@@ -261,8 +261,8 @@ class SettingsWebSocket {
         })
         break
 
-      case 'kernel_status':
-        this.kernelStatusListeners.forEach((listener) => {
+      case 'workspace_runtime_status':
+        this.workspaceRuntimeStatusListeners.forEach((listener) => {
           try {
             listener({
               workspaceId: String(data.workspace_id || '').trim(),
@@ -293,25 +293,25 @@ class SettingsWebSocket {
     }
   }
 
-  setKernelStatusWorkspace(workspaceId) {
-    this.kernelStatusWorkspaceId = String(workspaceId || '').trim()
-    if (!this.kernelStatusWorkspaceId) {
-      this.lastKernelStatusSubscriptionWorkspaceId = ''
+  setWorkspaceRuntimeStatusWorkspace(workspaceId) {
+    this.workspaceRuntimeStatusWorkspaceId = String(workspaceId || '').trim()
+    if (!this.workspaceRuntimeStatusWorkspaceId) {
+      this.lastWorkspaceRuntimeStatusSubscriptionWorkspaceId = ''
       return
     }
-    this.sendKernelStatusSubscription()
+    this.sendWorkspaceRuntimeStatusSubscription()
   }
 
-  sendKernelStatusSubscription() {
+  sendWorkspaceRuntimeStatusSubscription() {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
-    const workspaceId = String(this.kernelStatusWorkspaceId || '').trim()
+    const workspaceId = String(this.workspaceRuntimeStatusWorkspaceId || '').trim()
     if (!workspaceId) return
-    if (workspaceId === this.lastKernelStatusSubscriptionWorkspaceId) return
+    if (workspaceId === this.lastWorkspaceRuntimeStatusSubscriptionWorkspaceId) return
     this.socket.send(JSON.stringify({
-      type: 'subscribe_kernel_status',
+      type: 'subscribe_workspace_runtime_status',
       workspace_id: workspaceId,
     }))
-    this.lastKernelStatusSubscriptionWorkspaceId = workspaceId
+    this.lastWorkspaceRuntimeStatusSubscriptionWorkspaceId = workspaceId
   }
 
   subscribeProgress(callback) {
@@ -338,11 +338,11 @@ class SettingsWebSocket {
     }
   }
 
-  subscribeKernelStatus(callback) {
+  subscribeWorkspaceRuntimeStatus(callback) {
     if (typeof callback !== 'function') return () => { }
-    this.kernelStatusListeners.add(callback)
+    this.workspaceRuntimeStatusListeners.add(callback)
     return () => {
-      this.kernelStatusListeners.delete(callback)
+      this.workspaceRuntimeStatusListeners.delete(callback)
     }
   }
 
@@ -362,7 +362,7 @@ class SettingsWebSocket {
       this.socket.close()
       this.socket = null
       this.isConnected = false
-      this.lastKernelStatusSubscriptionWorkspaceId = ''
+      this.lastWorkspaceRuntimeStatusSubscriptionWorkspaceId = ''
       this.notifyConnectionListeners(false)
     }
 

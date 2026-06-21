@@ -59,7 +59,7 @@ test('critical workflow waits for the schema regenerate action to become enabled
   assert.equal(source.includes("await expect(regenerateButton).toBeEnabled({ timeout: 30_000 })"), true)
 })
 
-test('critical workflow mocks runtime bootstrap and kernel readiness so schema/chat flows do not wait on a real kernel startup', () => {
+test('critical workflow mocks runtime bootstrap and runtime readiness so schema/chat flows do not wait on a real runtime startup', () => {
   const source = readFileSync(
     resolve(process.cwd(), 'e2e/support/criticalWorkflow.js'),
     'utf-8',
@@ -68,6 +68,6 @@ test('critical workflow mocks runtime bootstrap and kernel readiness so schema/c
   assert.equal(source.includes('mockWorkspaceRuntime = true'), true)
   assert.equal(source.includes("'**/api/v1/workspaces/*/runtime/bootstrap'"), true)
   assert.equal(source.includes("body: JSON.stringify({ reset: true })"), true)
-  assert.equal(source.includes("'**/api/v1/workspaces/*/kernel/status'"), true)
+  assert.equal(source.includes("'**/api/v1/workspaces/*/runtime/status'"), true)
   assert.equal(source.includes("body: JSON.stringify({ status: 'ready' })"), true)
 })

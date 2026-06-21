@@ -24,7 +24,7 @@ class _Session:
 
 
 @pytest.mark.asyncio
-async def test_add_dataset_returns_explicit_error_when_kernel_is_inactive(monkeypatch, tmp_path):
+async def test_add_dataset_returns_explicit_error_when_runtime_is_inactive(monkeypatch, tmp_path):
     source = tmp_path / "demo.csv"
     source.write_text("a\n1\n", encoding="utf-8")
     workspace_db = tmp_path / "workspace.duckdb"
@@ -37,11 +37,10 @@ async def test_add_dataset_returns_explicit_error_when_kernel_is_inactive(monkey
         _ = (session, workspace_id, user_id)
         return workspace
 
-    async def fake_ensure_kernel(_workspace_id, _operation_name):
+    async def fake_ensure_runtime(_workspace_id, _operation_name):
         raise RuntimeError(
-            "Loading a dataset requires an active workspace kernel because Inquira now reuses the "
-            "kernel-owned DuckDB connections for workspace data and artifacts. Start or restart the "
-            "workspace kernel, wait for Kernel Ready, then try again."
+            "Loading a dataset requires an active workspace runtime. Open the workspace and try again "
+            "after it is ready."
         )
 
     monkeypatch.setattr(
@@ -49,7 +48,7 @@ async def test_add_dataset_returns_explicit_error_when_kernel_is_inactive(monkey
         "get_by_id",
         fake_get_by_id,
     )
-    monkeypatch.setattr(dataset_service_module, "ensure_workspace_kernel_active", fake_ensure_kernel)
+    monkeypatch.setattr(dataset_service_module, "ensure_workspace_kernel_active", fake_ensure_runtime)
 
     with pytest.raises(HTTPException) as exc:
         await DatasetService.add_dataset(
@@ -59,4 +58,4 @@ async def test_add_dataset_returns_explicit_error_when_kernel_is_inactive(monkey
             source_path=str(source),
         )
     assert exc.value.status_code == 409
-    assert "active workspace kernel" in str(exc.value.detail).lower()
+    assert "active workspace runtime" in str(exc.value.detail).lower()

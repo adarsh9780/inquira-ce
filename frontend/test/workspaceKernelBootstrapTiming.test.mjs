@@ -11,7 +11,7 @@ function extractBlock(source, startMarker, endMarker) {
   return source.slice(start, end)
 }
 
-test('workspace listing no longer bootstraps kernels as a side effect', () => {
+test('workspace listing no longer bootstraps runtimes as a side effect', () => {
   const appStorePath = resolve(process.cwd(), 'src/stores/appStore.js')
   const source = readFileSync(appStorePath, 'utf-8')
 
@@ -31,9 +31,9 @@ test('workspace listing no longer bootstraps kernels as a side effect', () => {
     'async function fetchConversations() {',
   )
 
-  assert.equal(fetchBlock.includes('ensureWorkspaceKernelConnected('), false)
-  assert.equal(createBlock.includes('ensureWorkspaceKernelConnected('), false)
-  assert.equal(activateBlock.includes('ensureWorkspaceKernelConnected('), false)
+  assert.equal(fetchBlock.includes('ensureWorkspaceRuntimeReady('), false)
+  assert.equal(createBlock.includes('ensureWorkspaceRuntimeReady('), false)
+  assert.equal(activateBlock.includes('ensureWorkspaceRuntimeReady('), false)
 })
 
 test('workspace creation starts hidden runtime warmup and batch dataset import does not block on frontend runtime readiness', () => {
@@ -49,9 +49,9 @@ test('workspace creation starts hidden runtime warmup and batch dataset import d
     'async function warmWorkspaceRuntimeInBackground(workspaceId) {',
     'function datasetSchemaStatusState(dataset) {',
   )
-  assert.equal(uploadBlock.includes('await appStore.ensureWorkspaceKernelConnected(workspaceId)'), false)
+  assert.equal(uploadBlock.includes('await appStore.ensureWorkspaceRuntimeReady(workspaceId)'), false)
   assert.equal(uploadBlock.includes('await appStore.startDatasetIngestion(sourcePaths'), true)
-  assert.equal(warmupBlock.includes('await appStore.ensureWorkspaceKernelConnected(targetWorkspaceId)'), true)
+  assert.equal(warmupBlock.includes('await appStore.ensureWorkspaceRuntimeReady(targetWorkspaceId)'), true)
 })
 
 test('column catalog path bootstraps runtime before loading columns', () => {
@@ -60,8 +60,8 @@ test('column catalog path bootstraps runtime before loading columns', () => {
   const catalogBlock = extractBlock(
     source,
     'async function fetchColumnCatalog({ force = false } = {}) {',
-    'async function ensureWorkspaceKernelConnected(workspaceId = activeWorkspaceId.value) {',
+    'async function ensureWorkspaceRuntimeReady(workspaceId = activeWorkspaceId.value) {',
   )
-  assert.equal(catalogBlock.includes('await ensureWorkspaceKernelConnected(workspaceId)'), true)
+  assert.equal(catalogBlock.includes('await ensureWorkspaceRuntimeReady(workspaceId)'), true)
   assert.equal(catalogBlock.includes('apiService.getWorkspaceColumns(workspaceId)'), true)
 })

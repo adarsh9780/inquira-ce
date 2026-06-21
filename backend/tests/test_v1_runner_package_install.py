@@ -119,5 +119,5 @@ async def test_install_runner_package_success_resets_kernel(monkeypatch):
 
     assert response.installed is True
     assert response.package_spec == "seaborn==0.13.2"
-    assert response.workspace_kernel_reset is True
+    assert response.workspace_runtime_reset is True
     assert response.saved_as_default is False

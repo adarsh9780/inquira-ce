@@ -90,6 +90,8 @@ export const v1Api = {
   runtime: {
     installRunnerPackage: (payload) =>
       axios.post('/api/v1/runtime/runner/packages/install', payload),
+    workspaceResourceRecommendation: () =>
+      axios.get('/api/v1/workspace-runtime/resource-recommendation'),
     workspaceColumns: (workspaceId) =>
       axios.get(`/api/v1/workspaces/${workspaceId}/columns`),
     listWorkspaceCommands: (workspaceId) =>
@@ -102,14 +104,14 @@ export const v1Api = {
       axios.post(`/api/v1/workspaces/${workspaceId}/runtime/retry`),
     hardResetWorkspaceRuntime: (workspaceId) =>
       axios.post(`/api/v1/workspaces/${workspaceId}/runtime/hard-reset`),
-    kernelStatus: (workspaceId) =>
-      axios.get(`/api/v1/workspaces/${workspaceId}/kernel/status`),
-    kernelInterrupt: (workspaceId) =>
-      axios.post(`/api/v1/workspaces/${workspaceId}/kernel/interrupt`),
-    kernelReset: (workspaceId) =>
-      axios.post(`/api/v1/workspaces/${workspaceId}/kernel/reset`),
-    kernelRestart: (workspaceId) =>
-      axios.post(`/api/v1/workspaces/${workspaceId}/kernel/restart`)
+    workspaceRuntimeStatus: (workspaceId) =>
+      axios.get(`/api/v1/workspaces/${workspaceId}/runtime/status`),
+    workspaceRuntimeInterrupt: (workspaceId) =>
+      axios.post(`/api/v1/workspaces/${workspaceId}/runtime/interrupt`),
+    workspaceRuntimeReset: (workspaceId) =>
+      axios.post(`/api/v1/workspaces/${workspaceId}/runtime/reset`),
+    workspaceRuntimeRestart: (workspaceId) =>
+      axios.post(`/api/v1/workspaces/${workspaceId}/runtime/restart`)
   }
 }
 

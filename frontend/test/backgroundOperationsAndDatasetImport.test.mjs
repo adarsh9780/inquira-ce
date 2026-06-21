@@ -18,15 +18,15 @@ test('app store exposes foreground and background operation state with status he
   assert.equal(store.includes('function finishBackgroundOperation(operationId, payload = {})'), true)
 })
 
-test('status bar renders active background operation progress without replacing kernel controls', () => {
+test('status bar renders active background operation progress without replacing workspace status', () => {
   const statusBar = read('src/components/layout/StatusBar.vue')
 
   assert.equal(statusBar.includes('data-background-operation-status'), true)
   assert.equal(statusBar.includes('primaryBackgroundOperationLabel'), true)
   assert.equal(statusBar.includes('backgroundOperationCountLabel'), true)
   assert.equal(statusBar.includes('inquira-spinner'), true)
-  assert.equal(statusBar.includes('interruptKernel'), true)
-  assert.equal(statusBar.includes('restartKernel'), true)
+  assert.equal(statusBar.includes('data-workspace-switcher'), true)
+  assert.equal(statusBar.includes('workspaceRuntimeStatusMeta'), true)
 })
 
 test('global dataset import supports Cmd/Ctrl+O and app-level drops through shared ingestion', () => {

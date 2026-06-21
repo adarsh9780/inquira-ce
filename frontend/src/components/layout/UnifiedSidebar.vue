@@ -26,160 +26,186 @@
     <!-- ─── Main Scroll Area ─── -->
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden px-2">
 
-      <!-- Active Workspace -->
-      <div class="pt-3 pb-2">
-        <button
-          type="button"
-          class="flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-[var(--color-text-main)]/5 focus:outline-none"
-          :class="[
-            appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3',
-            'text-[var(--color-text-muted)]',
-          ]"
-          :title="appStore.isSidebarCollapsed ? activeWorkspaceName : 'Open workspace settings'"
-          @click="appStore.openSettings('workspace')"
-        >
-          <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-            <FolderOpenIcon class="h-5 w-5 text-[var(--color-text-main)]" />
-          </div>
-          <div
-            class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
-            :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'"
-          >
-            <span class="block truncate text-[13px] font-semibold leading-snug text-[var(--color-text-main)]">
-              {{ activeWorkspaceName }}
-            </span>
-            <span class="block truncate text-[11px] leading-snug text-[var(--color-text-muted)]">
-              {{ activeWorkspaceCaption }}
-            </span>
-          </div>
-        </button>
-
-      </div>
-
-      <div class="mx-1 mb-2 h-px bg-[var(--color-border)] opacity-60" />
-
-      <!-- ─── Conversations ─── -->
-      <div class="flex min-h-0 flex-1 flex-col">
-
-        <!-- Section Header -->
+      <!-- ─── Workspaces and conversations ─── -->
+      <div class="flex min-h-0 flex-1 flex-col pt-3">
         <div
-          class="flex h-10 w-full items-center transition-all duration-300"
+          class="flex h-9 w-full items-center transition-all duration-300"
           :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'"
         >
           <button
-            v-if="appStore.isSidebarCollapsed && appStore.hasWorkspace"
+            v-if="appStore.isSidebarCollapsed"
             type="button"
             class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none transition-colors"
-            title="New Conversation"
-            @click.stop="createConversation"
+            title="Workspace settings"
+            @click.stop="appStore.openSettings('workspace')"
           >
-            <PlusIcon class="h-4 w-4" />
+            <FolderOpenIcon class="h-5 w-5" />
           </button>
 
-          <template v-if="!appStore.isSidebarCollapsed">
+          <template v-else>
             <span class="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] opacity-80">
-              Chats
+              Workspaces
             </span>
             <button
-              v-if="appStore.hasWorkspace"
               type="button"
               class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/10 hover:text-[var(--color-text-main)] focus:outline-none"
-              title="New Conversation"
-              @click.stop="createConversation"
+              title="Workspace settings"
+              @click.stop="appStore.openSettings('workspace')"
             >
-              <PlusIcon class="h-4 w-4" />
+              <FolderOpenIcon class="h-4 w-4" />
             </button>
           </template>
         </div>
 
-        <!-- Conversation List -->
         <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-1 custom-scrollbar">
           <div
-            v-if="!appStore.hasWorkspace"
+            v-if="appStore.workspaces.length === 0"
             class="px-3 py-2 text-[12px] text-[var(--color-text-muted)] transition-opacity"
             :class="appStore.isSidebarCollapsed ? 'opacity-0' : 'opacity-100'"
           >
             Create a workspace to start.
           </div>
 
-          <div v-else class="space-y-0.5 mt-1">
-            <div
-              v-for="(conv, index) in appStore.conversations"
-              :key="conv.id"
-              class="group relative flex min-h-11 select-none items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
-              :class="[
-                appStore.isSidebarCollapsed ? 'justify-center px-0 py-1.5' : 'justify-start px-3 py-1.5',
-                appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : '',
-              ]"
-              :title="conv.title || 'Untitled'"
-              @click="selectConversation(conv.id)"
-              @contextmenu.prevent="openConversationContextMenu($event, conv.id)"
-            >
+          <div v-else class="space-y-1 mt-1">
+            <div v-for="workspace in appStore.workspaces" :key="workspace.id" class="space-y-0.5">
               <div
-                v-if="appStore.activeConversationId === conv.id && !appStore.isSidebarCollapsed"
-                class="absolute left-0 top-1/2 -translate-y-1/2 h-1/2 w-[4px] rounded-r-full bg-[var(--color-accent)] transition-all duration-300"
-              />
-
-              <div v-if="editingId === conv.id" class="flex w-full items-center gap-1 pl-9" @click.stop>
-                <input
-                  :ref="(el) => { if (el) editInputs[conv.id] = el }"
-                  v-model="editingTitleValue"
-                  class="w-full rounded border border-[var(--color-accent)] bg-[var(--color-surface)] px-2 py-1 text-[13px] text-[var(--color-text-main)] outline-none"
-                  @keydown.enter.prevent="saveTitle(conv.id)"
-                  @keydown.esc.prevent="cancelEditing"
-                  @blur="saveTitle(conv.id)"
-                />
-              </div>
-
-              <template v-else>
-                <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-                  <span
-                    class="inline-flex min-w-[1.5rem] items-center justify-center px-1 text-[11px] font-semibold leading-none tabular-nums tracking-[0.02em] transition-colors duration-200"
-                    :class="appStore.activeConversationId === conv.id
-                      ? 'text-[var(--color-accent)]'
-                      : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
-                  >
-                    {{ conversationBadgeLabel(index, appStore.conversations.length) }}
-                  </span>
-                </div>
-
-                <div
-                  class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
-                  :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[200px] opacity-100 ml-3'"
+                class="group relative flex min-h-10 select-none items-center rounded-lg transition-colors hover:bg-[var(--color-text-main)]/5"
+                :class="[
+                  appStore.isSidebarCollapsed ? 'justify-center px-0 py-1.5' : 'justify-start px-2 py-1.5',
+                  workspace.id === appStore.activeWorkspaceId ? 'bg-[var(--color-selected-surface)]' : '',
+                ]"
+              >
+                <button
+                  type="button"
+                  class="flex min-w-0 flex-1 items-center text-left focus:outline-none"
+                  :class="appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start'"
+                  :title="workspace.name || 'Untitled workspace'"
+                  @click="selectWorkspace(workspace.id)"
                 >
-                  <p
-                    class="truncate text-[13px]"
-                    :class="appStore.activeConversationId === conv.id
-                      ? 'font-medium text-[var(--color-text-main)]'
-                      : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
-                    :title="conv.title || 'Untitled'"
+                  <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+                    <FolderOpenIcon class="h-5 w-5" :class="workspace.id === appStore.activeWorkspaceId ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-main)]'" />
+                  </div>
+                  <div
+                    class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
+                    :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[160px] opacity-100 ml-2'"
                   >
-                    {{ conv.title || 'Untitled' }}
-                  </p>
-                  <p
-                    class="mt-0.5 truncate text-[10px] leading-none"
-                    :class="appStore.activeConversationId === conv.id
-                      ? 'text-[var(--color-accent)]/80'
-                      : 'text-[var(--color-text-muted)]/80'"
-                  >
-                    {{ formatConversationTimestamp(conv) }}
-                  </p>
-                </div>
+                    <p class="truncate text-[13px] font-semibold text-[var(--color-text-main)]">
+                      {{ workspace.name || 'Untitled workspace' }}
+                    </p>
+                    <p class="mt-0.5 truncate text-[10px] leading-none text-[var(--color-text-muted)]">
+                      {{ workspaceRuntimeLabel(workspace.id) }}
+                    </p>
+                  </div>
+                </button>
 
-                <div
-                  v-if="!appStore.isSidebarCollapsed"
-                  class="relative shrink-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
+                <div v-if="!appStore.isSidebarCollapsed" class="ml-1 flex shrink-0 items-center gap-0.5">
                   <button
                     type="button"
                     class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
-                    title="Conversation actions"
-                    @click.stop="toggleConversationMenu($event, conv.id)"
+                    title="New conversation"
+                    @click.stop="createConversation(workspace.id)"
                   >
-                    <EllipsisHorizontalIcon class="h-4 w-4" />
+                    <PlusIcon class="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
+                    :title="isWorkspaceExpanded(workspace.id) ? 'Collapse workspace' : 'Expand workspace'"
+                    @click.stop="toggleWorkspaceExpanded(workspace.id)"
+                  >
+                    <ChevronDownIcon v-if="isWorkspaceExpanded(workspace.id)" class="h-4 w-4" />
+                    <ChevronRightIcon v-else class="h-4 w-4" />
                   </button>
                 </div>
-              </template>
+              </div>
+
+              <div v-if="!appStore.isSidebarCollapsed && isWorkspaceExpanded(workspace.id)" class="space-y-0.5 pl-5">
+                <div v-if="isWorkspaceConversationsLoading(workspace.id)" class="px-3 py-1.5 text-[11px] text-[var(--color-text-muted)]">
+                  Loading conversations
+                </div>
+                <button
+                  v-else-if="conversationsForWorkspace(workspace.id).length === 0"
+                  type="button"
+                  class="w-full rounded-lg px-3 py-1.5 text-left text-[12px] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-text-main)]/5 hover:text-[var(--color-text-main)]"
+                  @click="createConversation(workspace.id)"
+                >
+                  New conversation
+                </button>
+                <template v-else>
+                  <div
+                    v-for="(conv, index) in conversationsForWorkspace(workspace.id)"
+                    :key="conv.id"
+                    class="group relative flex min-h-10 select-none items-center rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
+                    :class="[
+                      'justify-start px-3 py-1.5',
+                      appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : '',
+                    ]"
+                    :title="conv.title || 'Untitled'"
+                    @click="selectConversation(workspace.id, conv.id)"
+                    @contextmenu.prevent="openConversationContextMenu($event, conv.id)"
+                  >
+                    <div
+                      v-if="appStore.activeConversationId === conv.id"
+                      class="absolute left-0 top-1/2 -translate-y-1/2 h-1/2 w-[4px] rounded-r-full bg-[var(--color-accent)] transition-all duration-300"
+                    />
+
+                    <div v-if="editingId === conv.id" class="flex w-full items-center gap-1 pl-7" @click.stop>
+                      <input
+                        :ref="(el) => { if (el) editInputs[conv.id] = el }"
+                        v-model="editingTitleValue"
+                        class="w-full rounded border border-[var(--color-accent)] bg-[var(--color-surface)] px-2 py-1 text-[13px] text-[var(--color-text-main)] outline-none"
+                        @keydown.enter.prevent="saveTitle(conv.id)"
+                        @keydown.esc.prevent="cancelEditing"
+                        @blur="saveTitle(conv.id)"
+                      />
+                    </div>
+
+                    <template v-else>
+                      <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+                        <span
+                          class="inline-flex min-w-[1.5rem] items-center justify-center px-1 text-[11px] font-semibold leading-none tabular-nums tracking-[0.02em] transition-colors duration-200"
+                          :class="appStore.activeConversationId === conv.id
+                            ? 'text-[var(--color-accent)]'
+                            : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
+                        >
+                          {{ conversationBadgeLabel(index, conversationsForWorkspace(workspace.id).length) }}
+                        </span>
+                      </div>
+
+                      <div class="min-w-0 flex-1 overflow-hidden whitespace-nowrap ml-2">
+                        <p
+                          class="truncate text-[13px]"
+                          :class="appStore.activeConversationId === conv.id
+                            ? 'font-medium text-[var(--color-text-main)]'
+                            : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
+                          :title="conv.title || 'Untitled'"
+                        >
+                          {{ conv.title || 'Untitled' }}
+                        </p>
+                        <p
+                          class="mt-0.5 truncate text-[10px] leading-none"
+                          :class="appStore.activeConversationId === conv.id
+                            ? 'text-[var(--color-accent)]/80'
+                            : 'text-[var(--color-text-muted)]/80'"
+                        >
+                          {{ formatConversationTimestamp(conv) }}
+                        </p>
+                      </div>
+
+                      <div class="relative shrink-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
+                          title="Conversation actions"
+                          @click.stop="toggleConversationMenu($event, conv.id)"
+                        >
+                          <EllipsisHorizontalIcon class="h-4 w-4" />
+                        </button>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
             </div>
           </div>
         </div>
@@ -448,6 +474,8 @@ import {
   Cog6ToothIcon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
 } from '@heroicons/vue/24/outline'
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -466,6 +494,9 @@ const profileMenuOpen      = ref(false)
 const profileMenuRef       = ref(null)
 const profileMenuButtonRef = ref(null)
 const profileMenuPosition  = ref({ left: 0, top: 0 })
+const sidebarConversationsByWorkspace = ref({})
+const loadingConversationsByWorkspace = ref({})
+const expandedWorkspaceIds = ref(new Set())
 
 // ─── Settings Modal ───────────────────────────────────────────────────────────
 const isTermsOpen         = ref(false)
@@ -528,7 +559,7 @@ const conversationMenuStyle = computed(() => ({
 const activeConversationMenuTarget = computed(() => {
   const id = String(conversationMenuId.value || '').trim()
   if (!id) return null
-  return appStore.conversations.find((conversation) => String(conversation?.id || '').trim() === id) || null
+  return findSidebarConversation(id)
 })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -559,6 +590,114 @@ function formatStorage(bytes) {
   }
   const precision = size >= 10 ? 0 : 1
   return `${size.toFixed(precision)} ${units[unitIndex]}`
+}
+
+function conversationsForWorkspace(workspaceId) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId) return []
+  if (normalizedWorkspaceId === String(appStore.activeWorkspaceId || '').trim()) {
+    return Array.isArray(appStore.conversations) ? appStore.conversations : []
+  }
+  return Array.isArray(sidebarConversationsByWorkspace.value?.[normalizedWorkspaceId])
+    ? sidebarConversationsByWorkspace.value[normalizedWorkspaceId]
+    : []
+}
+
+function updateSidebarConversationCache(workspaceId, conversations) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId) return
+  sidebarConversationsByWorkspace.value = {
+    ...sidebarConversationsByWorkspace.value,
+    [normalizedWorkspaceId]: Array.isArray(conversations) ? conversations : [],
+  }
+}
+
+function findSidebarConversation(conversationId) {
+  const normalizedConversationId = String(conversationId || '').trim()
+  if (!normalizedConversationId) return null
+  const activeMatch = appStore.conversations.find((conversation) => String(conversation?.id || '').trim() === normalizedConversationId)
+  if (activeMatch) return activeMatch
+  for (const conversations of Object.values(sidebarConversationsByWorkspace.value || {})) {
+    const match = Array.isArray(conversations)
+      ? conversations.find((conversation) => String(conversation?.id || '').trim() === normalizedConversationId)
+      : null
+    if (match) return match
+  }
+  return null
+}
+
+function removeConversationFromSidebarCache(conversationId) {
+  const normalizedConversationId = String(conversationId || '').trim()
+  if (!normalizedConversationId) return
+  const nextCache = {}
+  for (const [workspaceId, conversations] of Object.entries(sidebarConversationsByWorkspace.value || {})) {
+    nextCache[workspaceId] = Array.isArray(conversations)
+      ? conversations.filter((conversation) => String(conversation?.id || '').trim() !== normalizedConversationId)
+      : []
+  }
+  sidebarConversationsByWorkspace.value = nextCache
+}
+
+function workspaceRuntimeLabel(workspaceId) {
+  const status = appStore.getWorkspaceRuntimeStatus(workspaceId)
+  if (status === 'ready') return 'Ready'
+  if (status === 'busy') return 'Working'
+  if (status === 'starting' || status === 'connecting') return 'Starting'
+  if (status === 'error') return 'Needs attention'
+  return 'Idle'
+}
+
+function isWorkspaceExpanded(workspaceId) {
+  return expandedWorkspaceIds.value.has(String(workspaceId || '').trim())
+}
+
+function setWorkspaceExpanded(workspaceId, expanded) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId) return
+  const next = new Set(expandedWorkspaceIds.value)
+  if (expanded) next.add(normalizedWorkspaceId)
+  else next.delete(normalizedWorkspaceId)
+  expandedWorkspaceIds.value = next
+}
+
+function isWorkspaceConversationsLoading(workspaceId) {
+  return Boolean(loadingConversationsByWorkspace.value?.[String(workspaceId || '').trim()])
+}
+
+async function loadSidebarConversations(workspaceId, { force = false } = {}) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId) return []
+  if (!force && sidebarConversationsByWorkspace.value?.[normalizedWorkspaceId]) {
+    return sidebarConversationsByWorkspace.value[normalizedWorkspaceId]
+  }
+  loadingConversationsByWorkspace.value = {
+    ...loadingConversationsByWorkspace.value,
+    [normalizedWorkspaceId]: true,
+  }
+  try {
+    const response = await apiService.v1ListConversations(normalizedWorkspaceId, 50)
+    const conversations = Array.isArray(response?.conversations) ? response.conversations : []
+    updateSidebarConversationCache(normalizedWorkspaceId, conversations)
+    return conversations
+  } catch (_error) {
+    updateSidebarConversationCache(normalizedWorkspaceId, [])
+    return []
+  } finally {
+    loadingConversationsByWorkspace.value = {
+      ...loadingConversationsByWorkspace.value,
+      [normalizedWorkspaceId]: false,
+    }
+  }
+}
+
+async function toggleWorkspaceExpanded(workspaceId) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId) return
+  const nextExpanded = !isWorkspaceExpanded(normalizedWorkspaceId)
+  setWorkspaceExpanded(normalizedWorkspaceId, nextExpanded)
+  if (nextExpanded) {
+    await loadSidebarConversations(normalizedWorkspaceId)
+  }
 }
 
 async function refreshWorkspaceDatasetSummary() {
@@ -619,7 +758,7 @@ function openConversationTree() {
   appStore.setActiveTab('conversation-tree')
 }
 
-function conversationBadgeLabel(index, totalCount = appStore.conversations.length) {
+function conversationBadgeLabel(index, totalCount = 0) {
   const total = Number(totalCount)
   const offset = Number(index)
   const ordinal = total - offset
@@ -699,9 +838,32 @@ function handleOpenSettingsRequest(event) {
 }
 
 // ─── Conversations ────────────────────────────────────────────────────────────
-async function createConversation() {
+async function selectWorkspace(workspaceId) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  if (!normalizedWorkspaceId) return
+  setWorkspaceExpanded(normalizedWorkspaceId, true)
   try {
+    if (normalizedWorkspaceId !== String(appStore.activeWorkspaceId || '').trim()) {
+      await appStore.activateWorkspace(normalizedWorkspaceId)
+    }
+    await appStore.fetchConversations()
+    updateSidebarConversationCache(normalizedWorkspaceId, appStore.conversations)
+    await loadSidebarConversations(normalizedWorkspaceId, { force: true })
+  } catch (error) {
+    toast.error('Workspace Error', extractApiErrorMessage(error, 'Failed to open workspace'))
+  }
+}
+
+async function createConversation(workspaceId = appStore.activeWorkspaceId) {
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
+  try {
+    if (normalizedWorkspaceId && normalizedWorkspaceId !== String(appStore.activeWorkspaceId || '').trim()) {
+      await appStore.activateWorkspace(normalizedWorkspaceId)
+      await appStore.fetchConversations()
+    }
     const conversation = await appStore.createConversation()
+    updateSidebarConversationCache(String(appStore.activeWorkspaceId || '').trim(), appStore.conversations)
+    setWorkspaceExpanded(String(appStore.activeWorkspaceId || '').trim(), true)
     if (conversation?.id) {
       appStore.setActiveConversationId(conversation.id)
       await appStore.fetchConversationTurns({ reset: true })
@@ -711,12 +873,19 @@ async function createConversation() {
   }
 }
 
-async function selectConversation(id) {
+async function selectConversation(workspaceId, id) {
   closeConversationMenu()
+  const normalizedWorkspaceId = String(workspaceId || '').trim()
   const target = String(id || '').trim()
   if (!target) return
   const current = String(appStore.activeConversationId || '').trim()
   try {
+    if (normalizedWorkspaceId && normalizedWorkspaceId !== String(appStore.activeWorkspaceId || '').trim()) {
+      await appStore.activateWorkspace(normalizedWorkspaceId)
+      await appStore.fetchConversations()
+      updateSidebarConversationCache(normalizedWorkspaceId, appStore.conversations)
+    }
+    setWorkspaceExpanded(String(appStore.activeWorkspaceId || normalizedWorkspaceId || '').trim(), true)
     if (target !== current) {
       appStore.setActiveConversationId(target)
     } else {
@@ -752,7 +921,7 @@ async function saveTitle(id) {
   if (editingId.value !== id || isSaving.value) return
 
   const newTitle = editingTitleValue.value.trim()
-  const conv = appStore.conversations.find((conversation) => conversation.id === id)
+  const conv = findSidebarConversation(id)
 
   if (!newTitle || newTitle === (conv?.title || 'Untitled')) {
     cancelEditing()
@@ -773,6 +942,16 @@ async function saveTitle(id) {
       const idx = appStore.conversations.findIndex((conversation) => conversation.id === id)
       if (idx !== -1) {
         appStore.conversations[idx] = { ...appStore.conversations[idx], title: updated.title }
+      }
+      for (const [workspaceId, conversations] of Object.entries(sidebarConversationsByWorkspace.value || {})) {
+        const cachedIndex = Array.isArray(conversations)
+          ? conversations.findIndex((conversation) => String(conversation?.id || '').trim() === id)
+          : -1
+        if (cachedIndex === -1) continue
+        const nextConversations = [...conversations]
+        nextConversations[cachedIndex] = { ...nextConversations[cachedIndex], title: updated.title }
+        updateSidebarConversationCache(workspaceId, nextConversations)
+        break
       }
     }
   } catch (error) {
@@ -844,7 +1023,7 @@ function confirmDeleteConversation(conversationId) {
   cancelEditing()
   closeConversationMenu()
 
-  const target = appStore.conversations.find((conversation) => conversation.id === conversationId)
+  const target = findSidebarConversation(conversationId)
   pendingDeleteType.value   = 'conversation'
   pendingDeleteId.value     = conversationId
   pendingDeleteIds.value    = []
@@ -867,11 +1046,13 @@ async function confirmDelete() {
   try {
     if (pendingDeleteType.value === 'conversation') {
       await appStore.deleteConversationById(pendingDeleteId.value)
+      removeConversationFromSidebarCache(pendingDeleteId.value)
       toast.success('Conversation Deleted', 'Conversation has been removed.')
     } else if (pendingDeleteType.value === 'conversations') {
       const ids = [...pendingDeleteIds.value]
       for (const id of ids) {
         await appStore.deleteConversationById(id)
+        removeConversationFromSidebarCache(id)
       }
       toast.success('Conversations Deleted', `${ids.length} conversations have been removed.`)
     }
@@ -889,7 +1070,9 @@ onMounted(async () => {
     await appStore.fetchWorkspaces()
     await appStore.fetchWorkspaceDeletionJobs()
     if (appStore.activeWorkspaceId) {
+      setWorkspaceExpanded(appStore.activeWorkspaceId, true)
       await appStore.fetchConversations()
+      updateSidebarConversationCache(appStore.activeWorkspaceId, appStore.conversations)
     }
   } catch {
     // Recovery handled by parent app
@@ -912,8 +1095,18 @@ onUnmounted(() => {
 
 watch(() => appStore.activeWorkspaceId, async (newId) => {
   void refreshWorkspaceDatasetSummary()
-  if (newId) await appStore.fetchConversations()
+  if (newId) {
+    setWorkspaceExpanded(newId, true)
+    await appStore.fetchConversations()
+    updateSidebarConversationCache(newId, appStore.conversations)
+  }
 })
+
+watch(() => appStore.conversations, (items) => {
+  const workspaceId = String(appStore.activeWorkspaceId || '').trim()
+  if (!workspaceId) return
+  updateSidebarConversationCache(workspaceId, Array.isArray(items) ? items : [])
+}, { deep: true })
 
 watch(() => appStore.isSidebarCollapsed, (collapsed) => {
   if (collapsed) {

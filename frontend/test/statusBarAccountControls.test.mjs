@@ -16,7 +16,7 @@ test('status bar stays focused on runtime status and no longer renders workspace
   assert.equal(statusBarSource.includes('FolderOpenIcon'), false)
   assert.equal(statusBarSource.includes('DocumentTextIcon'), false)
   assert.equal(statusBarSource.includes('tokenUsageSummaryLabel'), true)
-  assert.equal(statusBarSource.includes('kernelStatusMeta'), true)
+  assert.equal(statusBarSource.includes('workspaceRuntimeStatusMeta'), true)
 })
 
 test('sidebar owns the profile and bottom action stack', () => {
@@ -28,9 +28,10 @@ test('sidebar owns the profile and bottom action stack', () => {
   assert.equal(sidebarSource.includes('Terms &amp; Conditions'), true)
   assert.equal(sidebarSource.includes('Account Settings'), true)
   assert.equal(sidebarSource.includes('Theme Preference'), true)
-  assert.equal(sidebarSource.includes("@click=\"appStore.openSettings('workspace')\""), true)
-  assert.equal(sidebarSource.includes('SidebarConversations'), false)
-  assert.equal(sidebarSource.includes('conversationBadgeLabel(index, appStore.conversations.length)'), true)
+  assert.equal(sidebarSource.includes("@click.stop=\"appStore.openSettings('workspace')\""), true)
+  assert.equal(sidebarSource.includes('<SidebarConversations'), false)
+  assert.equal(sidebarSource.includes('v-for="workspace in appStore.workspaces"'), true)
+  assert.equal(sidebarSource.includes('conversationsForWorkspace(workspace.id)'), true)
   assert.equal(sidebarSource.includes('Conversation Tree'), true)
   assert.equal(sidebarSource.includes('Datasets</p>'), false)
   assert.equal(sidebarSource.includes('CircleStackIcon'), true)

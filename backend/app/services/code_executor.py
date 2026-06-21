@@ -55,24 +55,32 @@ async def get_workspace_kernel_status(workspace_id: str) -> str:
     return await manager.get_status(workspace_id)
 
 
+async def get_workspace_runtime_status(workspace_id: str) -> str:
+    """Return status for a workspace runtime."""
+    return await get_workspace_kernel_status(workspace_id)
+
+
+async def list_workspace_runtime_snapshots() -> list[dict[str, Any]]:
+    """Return status snapshots for active workspace runtimes."""
+    manager = await get_workspace_kernel_manager()
+    return await manager.list_session_snapshots()
+
+
 def _kernel_required_message(operation_name: str, status: str) -> str:
     operation = str(operation_name or "This operation").strip() or "This operation"
     if status == "error":
         return (
-            f"{operation} requires an active workspace kernel because Inquira now reuses the "
-            "kernel-owned DuckDB connections for workspace data and artifacts. The current kernel "
-            "is in an error state. Restart the workspace kernel and try again."
+            f"{operation} requires an active workspace runtime. The current workspace runtime "
+            "needs attention. Retry the workspace action and try again."
         )
     if status == "starting":
         return (
-            f"{operation} requires the workspace kernel to finish starting because Inquira now "
-            "reuses the kernel-owned DuckDB connections for workspace data and artifacts. Wait "
-            "for the status bar to show Kernel Ready, then try again."
+            f"{operation} requires the workspace runtime to finish starting. Wait for the "
+            "workspace to be ready, then try again."
         )
     return (
-        f"{operation} requires an active workspace kernel because Inquira now reuses the "
-        "kernel-owned DuckDB connections for workspace data and artifacts. Start or restart "
-        "the workspace kernel, wait for Kernel Ready, then try again."
+        f"{operation} requires an active workspace runtime. Open the workspace and try again "
+        "after it is ready."
     )
 
 

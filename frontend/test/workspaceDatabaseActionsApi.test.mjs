@@ -44,6 +44,6 @@ test('dataset API contract exposes async batch ingestion and polling', () => {
   assert.equal(store.includes('const queued = await apiService.v1AddDatasetsBatch(workspaceId, sourcePaths)'), true)
   assert.equal(store.includes('const job = await apiService.v1GetDatasetIngestionJob(workspaceId, jobId)'), true)
   assert.equal(tab.includes('multiple: true'), true)
-  assert.equal(ingestionBlock.includes('await appStore.ensureWorkspaceKernelConnected(workspaceId)'), false)
+  assert.equal(ingestionBlock.includes('await appStore.ensureWorkspaceRuntimeConnected(workspaceId)'), false)
   assert.equal(ingestionBlock.includes('await appStore.startDatasetIngestion(sourcePaths'), true)
 })

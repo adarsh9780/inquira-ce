@@ -223,7 +223,7 @@ axios.interceptors.response.use(
     const isExpectedAuthCheckFailure =
       (status === 401 || !status) &&
       (isAuthProbe || url.includes('/api/v1/auth/logout'))
-    const isWorkspaceKernelPending409 =
+    const isWorkspaceRuntimePending409 =
       status === 409 &&
       url.includes('/api/v1/workspaces/') &&
       (
@@ -231,12 +231,12 @@ axios.interceptors.response.use(
         url.includes('/artifacts') ||
         url.includes('/commands')
       ) &&
-      detailText.toLowerCase().includes('workspace kernel')
+      detailText.toLowerCase().includes('workspace runtime')
 
-    if (!isExpectedAuthCheckFailure && !isWorkspaceKernelPending409) {
+    if (!isExpectedAuthCheckFailure && !isWorkspaceRuntimePending409) {
       console.error('API Error:', error)
-    } else if (isWorkspaceKernelPending409) {
-      console.debug('Runtime pending while kernel starts:', url, detailText)
+    } else if (isWorkspaceRuntimePending409) {
+      console.debug('Runtime pending while workspace starts:', url, detailText)
     }
 
     // Add more specific error information
@@ -443,8 +443,8 @@ export const apiService = {
     if (!targetWorkspaceId) {
       return { columns: [] }
     }
-    const kernelReady = await appStore.ensureWorkspaceKernelConnected(targetWorkspaceId)
-    if (!kernelReady) {
+    const runtimeReady = await appStore.ensureWorkspaceRuntimeReady(targetWorkspaceId)
+    if (!runtimeReady) {
       return { columns: [] }
     }
     return this.v1GetWorkspaceColumns(targetWorkspaceId)
@@ -703,8 +703,8 @@ export const apiService = {
     }
 
     const workspaceId = appStore.activeWorkspaceId
-    const kernelReady = await appStore.ensureWorkspaceKernelConnected(workspaceId)
-    if (!kernelReady) {
+    const runtimeReady = await appStore.ensureWorkspaceRuntimeReady(workspaceId)
+    if (!runtimeReady) {
       const reason = String(appStore.runtimeError || 'Workspace runtime bootstrap failed.')
       throw new Error(reason)
     }
@@ -722,7 +722,7 @@ export const apiService = {
         throw error
       }
 
-      await this.v1ResetWorkspaceKernel(workspaceId)
+      await this.v1ResetWorkspaceRuntime(workspaceId)
       ds = await this.v1AddDataset(workspaceId, filePath)
     }
     let columns = []
@@ -1037,20 +1037,24 @@ export const apiService = {
     return v1Api.runtime.hardResetWorkspaceRuntime(workspaceId)
   },
 
-  async v1GetWorkspaceKernelStatus(workspaceId) {
-    return v1Api.runtime.kernelStatus(workspaceId)
+  async v1GetWorkspaceResourceRecommendation() {
+    return v1Api.runtime.workspaceResourceRecommendation()
   },
 
-  async v1InterruptWorkspaceKernel(workspaceId) {
-    return v1Api.runtime.kernelInterrupt(workspaceId)
+  async v1GetWorkspaceRuntimeStatus(workspaceId) {
+    return v1Api.runtime.workspaceRuntimeStatus(workspaceId)
   },
 
-  async v1ResetWorkspaceKernel(workspaceId) {
-    return v1Api.runtime.kernelReset(workspaceId)
+  async v1InterruptWorkspaceRuntime(workspaceId) {
+    return v1Api.runtime.workspaceRuntimeInterrupt(workspaceId)
   },
 
-  async v1RestartWorkspaceKernel(workspaceId) {
-    return v1Api.runtime.kernelRestart(workspaceId)
+  async v1ResetWorkspaceRuntime(workspaceId) {
+    return v1Api.runtime.workspaceRuntimeReset(workspaceId)
+  },
+
+  async v1RestartWorkspaceRuntime(workspaceId) {
+    return v1Api.runtime.workspaceRuntimeRestart(workspaceId)
   },
 
   async v1AnalyzeStream(payload, { signal = null, onEvent = null } = {}) {

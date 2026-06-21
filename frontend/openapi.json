@@ -5003,14 +5003,64 @@
         }
       }
     },
-    "/api/v1/workspaces/{workspace_id}/kernel/status": {
+    "/api/v1/workspace-runtime/resource-recommendation": {
       "get": {
         "tags": [
           "V1 Runtime"
         ],
-        "summary": "Get Workspace Kernel Runtime Status",
-        "description": "Return current workspace kernel status.",
-        "operationId": "get_workspace_kernel_runtime_status_api_v1_workspaces__workspace_id__kernel_status_get",
+        "summary": "Get Workspace Runtime Resource Recommendation",
+        "description": "Return prompt-only recommendations for idle workspace runtimes.",
+        "operationId": "get_workspace_runtime_resource_recommendation_api_v1_workspace_runtime_resource_recommendation_get",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceResourceRecommendationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/runtime/status": {
+      "get": {
+        "tags": [
+          "V1 Runtime"
+        ],
+        "summary": "Get Workspace Runtime Status Endpoint",
+        "description": "Return current workspace runtime status.",
+        "operationId": "get_workspace_runtime_status_endpoint_api_v1_workspaces__workspace_id__runtime_status_get",
         "parameters": [
           {
             "name": "workspace_id",
@@ -5044,7 +5094,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/KernelStatusResponse"
+                  "$ref": "#/components/schemas/WorkspaceRuntimeStatusResponse"
                 }
               }
             }
@@ -5102,7 +5152,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/KernelResetResponse"
+                  "$ref": "#/components/schemas/WorkspaceRuntimeActionResponse"
                 }
               }
             }
@@ -5126,7 +5176,7 @@
           "V1 Runtime"
         ],
         "summary": "Retry Workspace Runtime Endpoint",
-        "description": "Reset the current kernel session and rebuild the runtime with progress events.",
+        "description": "Reset the current workspace runtime and rebuild it with progress events.",
         "operationId": "retry_workspace_runtime_endpoint_api_v1_workspaces__workspace_id__runtime_retry_post",
         "parameters": [
           {
@@ -5161,7 +5211,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/KernelResetResponse"
+                  "$ref": "#/components/schemas/WorkspaceRuntimeActionResponse"
                 }
               }
             }
@@ -5185,7 +5235,7 @@
           "V1 Runtime"
         ],
         "summary": "Hard Reset Workspace Runtime Endpoint",
-        "description": "Delete the workspace runner venv, reset the kernel, then rebuild the runtime.",
+        "description": "Delete the workspace runner venv, reset the runtime, then rebuild it.",
         "operationId": "hard_reset_workspace_runtime_endpoint_api_v1_workspaces__workspace_id__runtime_hard_reset_post",
         "parameters": [
           {
@@ -5220,7 +5270,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/KernelResetResponse"
+                  "$ref": "#/components/schemas/WorkspaceRuntimeActionResponse"
                 }
               }
             }
@@ -5238,14 +5288,14 @@
         }
       }
     },
-    "/api/v1/workspaces/{workspace_id}/kernel/interrupt": {
+    "/api/v1/workspaces/{workspace_id}/runtime/interrupt": {
       "post": {
         "tags": [
           "V1 Runtime"
         ],
-        "summary": "Interrupt Workspace Kernel Runtime",
-        "description": "Interrupt currently running code in workspace kernel.",
-        "operationId": "interrupt_workspace_kernel_runtime_api_v1_workspaces__workspace_id__kernel_interrupt_post",
+        "summary": "Interrupt Workspace Runtime",
+        "description": "Interrupt currently running code in a workspace runtime.",
+        "operationId": "interrupt_workspace_runtime_api_v1_workspaces__workspace_id__runtime_interrupt_post",
         "parameters": [
           {
             "name": "workspace_id",
@@ -5279,7 +5329,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/KernelResetResponse"
+                  "$ref": "#/components/schemas/WorkspaceRuntimeActionResponse"
                 }
               }
             }
@@ -5297,14 +5347,14 @@
         }
       }
     },
-    "/api/v1/workspaces/{workspace_id}/kernel/reset": {
+    "/api/v1/workspaces/{workspace_id}/runtime/reset": {
       "post": {
         "tags": [
           "V1 Runtime"
         ],
-        "summary": "Reset Workspace Kernel Runtime",
-        "description": "Reset workspace kernel and clear in-memory execution context.",
-        "operationId": "reset_workspace_kernel_runtime_api_v1_workspaces__workspace_id__kernel_reset_post",
+        "summary": "Reset Workspace Runtime",
+        "description": "Reset workspace runtime and clear in-memory execution context.",
+        "operationId": "reset_workspace_runtime_api_v1_workspaces__workspace_id__runtime_reset_post",
         "parameters": [
           {
             "name": "workspace_id",
@@ -5338,7 +5388,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/KernelResetResponse"
+                  "$ref": "#/components/schemas/WorkspaceRuntimeActionResponse"
                 }
               }
             }
@@ -5356,14 +5406,14 @@
         }
       }
     },
-    "/api/v1/workspaces/{workspace_id}/kernel/restart": {
+    "/api/v1/workspaces/{workspace_id}/runtime/restart": {
       "post": {
         "tags": [
           "V1 Runtime"
         ],
-        "summary": "Restart Workspace Kernel Runtime",
-        "description": "Restart workspace kernel and warm it immediately.",
-        "operationId": "restart_workspace_kernel_runtime_api_v1_workspaces__workspace_id__kernel_restart_post",
+        "summary": "Restart Workspace Runtime",
+        "description": "Restart workspace runtime and warm it immediately.",
+        "operationId": "restart_workspace_runtime_api_v1_workspaces__workspace_id__runtime_restart_post",
         "parameters": [
           {
             "name": "workspace_id",
@@ -5397,7 +5447,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/KernelResetResponse"
+                  "$ref": "#/components/schemas/WorkspaceRuntimeActionResponse"
                 }
               }
             }
@@ -7661,42 +7711,6 @@
         "title": "InterventionResponseRequest",
         "description": "User decision payload for a pending agent intervention."
       },
-      "KernelResetResponse": {
-        "properties": {
-          "workspace_id": {
-            "type": "string",
-            "title": "Workspace Id"
-          },
-          "reset": {
-            "type": "boolean",
-            "title": "Reset"
-          }
-        },
-        "type": "object",
-        "required": [
-          "workspace_id",
-          "reset"
-        ],
-        "title": "KernelResetResponse"
-      },
-      "KernelStatusResponse": {
-        "properties": {
-          "workspace_id": {
-            "type": "string",
-            "title": "Workspace Id"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          }
-        },
-        "type": "object",
-        "required": [
-          "workspace_id",
-          "status"
-        ],
-        "title": "KernelStatusResponse"
-      },
       "MessageResponse": {
         "properties": {
           "message": {
@@ -8876,9 +8890,9 @@
             "title": "Stderr",
             "default": ""
           },
-          "workspace_kernel_reset": {
+          "workspace_runtime_reset": {
             "type": "boolean",
-            "title": "Workspace Kernel Reset"
+            "title": "Workspace Runtime Reset"
           },
           "saved_as_default": {
             "type": "boolean",
@@ -8891,7 +8905,7 @@
           "package_spec",
           "installer",
           "command",
-          "workspace_kernel_reset",
+          "workspace_runtime_reset",
           "saved_as_default"
         ],
         "title": "RunnerPackageInstallResponse"
@@ -10094,6 +10108,48 @@
         "title": "WorkspaceRenameRequest",
         "description": "Workspace rename payload."
       },
+      "WorkspaceResourceRecommendationResponse": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "available_memory_bytes": {
+            "type": "integer",
+            "title": "Available Memory Bytes"
+          },
+          "available_memory_percent": {
+            "type": "number",
+            "title": "Available Memory Percent"
+          },
+          "memory_pressure": {
+            "type": "boolean",
+            "title": "Memory Pressure"
+          },
+          "idle_warning_minutes": {
+            "type": "integer",
+            "title": "Idle Warning Minutes"
+          },
+          "candidates": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Candidates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "available_memory_bytes",
+          "available_memory_percent",
+          "memory_pressure",
+          "idle_warning_minutes",
+          "candidates"
+        ],
+        "title": "WorkspaceResourceRecommendationResponse"
+      },
       "WorkspaceResponse": {
         "properties": {
           "id": {
@@ -10139,6 +10195,86 @@
         ],
         "title": "WorkspaceResponse",
         "description": "Workspace response payload."
+      },
+      "WorkspaceRuntimeActionResponse": {
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "reset": {
+            "type": "boolean",
+            "title": "Reset"
+          },
+          "ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ok"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "reset"
+        ],
+        "title": "WorkspaceRuntimeActionResponse"
+      },
+      "WorkspaceRuntimeStatusResponse": {
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "idle_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idle Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "status"
+        ],
+        "title": "WorkspaceRuntimeStatusResponse"
       },
       "WorkspaceSummaryResponse": {
         "properties": {

@@ -342,7 +342,7 @@ quoted_table = quote_ident(table_name)
 try:
     conn  # type: ignore  # noqa
 except NameError:
-    raise RuntimeError("Workspace kernel connection is not ready. Start or restart the workspace kernel, wait for Kernel Ready, then run this code again.")
+    raise RuntimeError("Workspace runtime connection is not ready. Wait for the workspace to be ready, then run this code again.")
 
 head_100 = conn.sql(f"SELECT * FROM {quoted_table} LIMIT {limit_rows}").df()
 tail_100 = conn.sql(

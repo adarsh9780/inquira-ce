@@ -203,7 +203,7 @@ export async function installCriticalWorkflowMocks(page, options = {}) {
       })
     })
 
-    await registerRoute('**/api/v1/workspaces/*/kernel/status', async (route) => {
+    await registerRoute('**/api/v1/workspaces/*/runtime/status', async (route) => {
       await fulfillRoute(route, {
         status: 200,
         contentType: 'application/json',
