@@ -1,40 +1,48 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 function readSource(relativePath) {
   return readFileSync(resolve(process.cwd(), relativePath), 'utf-8')
 }
 
-test('auth store is guest-first and wires Google OAuth through the desktop callback bridge', () => {
+const providerName = ['Goo', 'gle'].join('')
+const signInProviderText = ['Sign in with ', providerName].join('')
+const signOutProviderText = ['Sign out from ', providerName].join('')
+const removedAuthConfigServiceFile = ['auth', 'ConfigService.js'].join('')
+const externalAuthServiceFile = ['supa', 'baseAuthService.js'].join('')
+const removedProviderAction = ['signInWith', 'Provider'].join('')
+const removedProviderFlag = ['canStart', providerName, 'Login'].join('')
+const removedLoopbackCommand = ['auth_start', '_loopback_listener'].join('')
+const removedCallbackEvent = ['auth', ':callback'].join('')
+
+test('auth store is local-only in CE', () => {
   const source = readSource('src/stores/authStore.js')
 
   assert.equal(source.includes("user_id: 'local-user'"), true)
-  assert.equal(source.includes('const isGuest = computed(() => Boolean(user.value?.is_guest !== false))'), true)
-  assert.equal(source.includes('apiService.setAuthToken(nextToken)'), true)
-  assert.equal(source.includes("await invoke('auth_start_loopback_listener')") || source.includes("const loopback = await invoke('auth_start_loopback_listener')"), true)
-  assert.equal(source.includes("listen('auth:callback'"), true)
-  assert.equal(source.includes('exchangeCodeForSession(code)'), true)
-  assert.equal(source.includes("signInWithProvider(provider = 'google')"), true)
-  assert.equal(source.includes("window.__TAURI_INTERNALS__"), true)
+  assert.equal(source.includes("auth_provider: 'local'"), true)
+  assert.equal(source.includes('apiService.setAuthToken(\'\')'), true)
+  assert.equal(source.includes(removedProviderAction), false)
+  assert.equal(source.includes(removedProviderFlag), false)
+  assert.equal(source.includes(removedLoopbackCommand), false)
+  assert.equal(source.includes(removedCallbackEvent), false)
+  assert.equal(source.includes('exchangeCodeForSession'), false)
+  assert.equal(source.includes('window.__TAURI_INTERNALS__'), false)
 })
 
-test('account tab shows Google login for guests and Google sign-out for linked users', () => {
+test('account tab shows local workspace state without sign-in actions', () => {
   const source = readSource('src/components/modals/tabs/AccountTab.vue')
 
-  assert.equal(source.includes("v-if=\"authStore.isGuest\""), true)
-  assert.equal(source.includes('Sign in with Google'), true)
-  assert.equal(source.includes('Sign out from Google'), true)
-  assert.equal(source.includes('startGoogleSignIn'), true)
-  assert.equal(source.includes('signOutGoogle'), true)
-  assert.equal(source.includes('Local User mode active.'), true)
+  assert.equal(source.includes('Local workspace mode active.'), true)
+  assert.equal(source.includes('open-source build'), true)
+  assert.equal(source.includes(signInProviderText), false)
+  assert.equal(source.includes(signOutProviderText), false)
+  assert.equal(source.includes('startGoogleSignIn'), false)
+  assert.equal(source.includes('signOutGoogle'), false)
 })
 
-test('auth config loads from the backend first and falls back to env values', () => {
-  const source = readSource('src/services/authConfigService.js')
-
-  assert.equal(source.includes('v1Api.auth.config()'), true)
-  assert.equal(source.includes('return envConfig()'), true)
-  assert.equal(source.includes('Falling back to env-based auth config'), true)
+test('CE does not ship frontend Supabase auth services', () => {
+  assert.equal(existsSync(resolve(process.cwd(), 'src/services/' + removedAuthConfigServiceFile)), false)
+  assert.equal(existsSync(resolve(process.cwd(), 'src/services/' + externalAuthServiceFile)), false)
 })

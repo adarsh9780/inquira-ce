@@ -1,4 +1,4 @@
-"""Auth/session schemas for CE desktop flows."""
+"""Local auth/session schemas for CE desktop flows."""
 
 from __future__ import annotations
 
@@ -10,8 +10,6 @@ from .common import MessageResponse
 class AuthConfigResponse(BaseModel):
     configured: bool
     auth_provider: str
-    supabase_url: str = ""
-    publishable_key: str = ""
     site_url: str = ""
     manage_account_url: str = ""
 

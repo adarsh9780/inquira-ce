@@ -454,7 +454,7 @@
           "V1 Workspaces"
         ],
         "summary": "Clear Workspace Database",
-        "description": "Clear workspace DB/scratchpad content and reset dataset catalog metadata.",
+        "description": "Clear workspace DB content and reset dataset catalog metadata.",
         "operationId": "clear_workspace_database_api_v1_workspaces__workspace_id__database_clear_post",
         "parameters": [
           {
@@ -2275,6 +2275,457 @@
         }
       }
     },
+    "/api/v1/conversations/{conversation_id}/turns/{turn_id}/artifacts": {
+      "get": {
+        "tags": [
+          "V1 Conversations"
+        ],
+        "summary": "List Turn Artifacts",
+        "description": "List artifacts owned by one turn only.",
+        "operationId": "list_turn_artifacts_api_v1_conversations__conversation_id__turns__turn_id__artifacts_get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "turn_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Turn Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by artifact kind, e.g. dataframe or figure",
+              "title": "Kind"
+            },
+            "description": "Filter by artifact kind, e.g. dataframe or figure"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnArtifactListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/turns/{turn_id}/artifacts/{artifact_id}": {
+      "get": {
+        "tags": [
+          "V1 Conversations"
+        ],
+        "summary": "Get Turn Artifact Metadata",
+        "description": "Fetch metadata for one artifact owned by one turn.",
+        "operationId": "get_turn_artifact_metadata_api_v1_conversations__conversation_id__turns__turn_id__artifacts__artifact_id__get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "turn_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Turn Id"
+            }
+          },
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnArtifactMetadataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "V1 Conversations"
+        ],
+        "summary": "Delete Turn Artifact",
+        "description": "Delete one artifact owned by one turn.",
+        "operationId": "delete_turn_artifact_api_v1_conversations__conversation_id__turns__turn_id__artifacts__artifact_id__delete",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "turn_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Turn Id"
+            }
+          },
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnArtifactDeleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/turns/{turn_id}/artifacts/{artifact_id}/rows": {
+      "get": {
+        "tags": [
+          "V1 Conversations"
+        ],
+        "summary": "Get Turn Artifact Rows",
+        "description": "Fetch rows for one dataframe artifact owned by one turn.",
+        "operationId": "get_turn_artifact_rows_api_v1_conversations__conversation_id__turns__turn_id__artifacts__artifact_id__rows_get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "turn_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Turn Id"
+            }
+          },
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 1000,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "sort_model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "AG Grid sort model JSON",
+              "title": "Sort Model"
+            },
+            "description": "AG Grid sort model JSON"
+          },
+          {
+            "name": "filter_model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "AG Grid filter model JSON",
+              "title": "Filter Model"
+            },
+            "description": "AG Grid filter model JSON"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Global text search applied across columns",
+              "title": "Search"
+            },
+            "description": "Global text search applied across columns"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnDataframeArtifactRowsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/usage": {
+      "get": {
+        "tags": [
+          "V1 Conversations"
+        ],
+        "summary": "Get Conversation Usage",
+        "description": "Return provider-reported usage totals for one conversation.",
+        "operationId": "get_conversation_usage_api_v1_conversations__conversation_id__usage_get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationUsageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/turn-tree": {
       "get": {
         "tags": [
@@ -3982,7 +4433,7 @@
           "V1 Runtime"
         ],
         "summary": "Get Workspace Artifact Usage",
-        "description": "Return scratchpad usage summary used by status-bar artifact pressure warning.",
+        "description": "Return turn artifact usage summary used by status-bar artifact pressure warning.",
         "operationId": "get_workspace_artifact_usage_api_v1_workspaces__workspace_id__artifacts_usage_get",
         "parameters": [
           {
@@ -4041,7 +4492,7 @@
           "V1 Runtime"
         ],
         "summary": "Stream Workspace Artifact Usage",
-        "description": "Stream scratchpad usage snapshots for status-bar warnings.",
+        "description": "Stream turn artifact usage snapshots for status-bar warnings.",
         "operationId": "stream_workspace_artifact_usage_api_v1_workspaces__workspace_id__artifacts_usage_stream_get",
         "parameters": [
           {
@@ -5886,16 +6337,6 @@
             "type": "string",
             "title": "Auth Provider"
           },
-          "supabase_url": {
-            "type": "string",
-            "title": "Supabase Url",
-            "default": ""
-          },
-          "publishable_key": {
-            "type": "string",
-            "title": "Publishable Key",
-            "default": ""
-          },
           "site_url": {
             "type": "string",
             "title": "Site Url",
@@ -6285,6 +6726,96 @@
         "type": "object",
         "title": "ConversationUpdateRequest",
         "description": "Conversation update payload."
+      },
+      "ConversationUsageResponse": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "turn_count": {
+            "type": "integer",
+            "title": "Turn Count"
+          },
+          "turns_with_usage": {
+            "type": "integer",
+            "title": "Turns With Usage"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/ConversationUsageSummary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "turn_count",
+          "turns_with_usage",
+          "usage"
+        ],
+        "title": "ConversationUsageResponse",
+        "description": "Full visible-turn usage aggregate for one conversation."
+      },
+      "ConversationUsageSummary": {
+        "properties": {
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "cached_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Tokens"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          },
+          "price_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Usd"
+          }
+        },
+        "type": "object",
+        "title": "ConversationUsageSummary",
+        "description": "Provider-reported token and cost usage summary."
       },
       "DataframeArtifactRowsResponse": {
         "properties": {
@@ -6739,6 +7270,18 @@
             "description": "Max execution time in seconds",
             "default": 60
           },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id",
+            "description": "Optional stable run id for artifact export"
+          },
           "conversation_id": {
             "anyOf": [
               {
@@ -6762,6 +7305,18 @@
             ],
             "title": "Turn Id",
             "description": "Owning turn to overwrite in-place"
+          },
+          "artifact_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Dir",
+            "description": "Internal server-owned turn artifact directory"
           }
         },
         "type": "object",
@@ -6805,6 +7360,21 @@
           "has_stderr": {
             "type": "boolean",
             "title": "Has Stderr",
+            "default": false
+          },
+          "stdout_truncated": {
+            "type": "boolean",
+            "title": "Stdout Truncated",
+            "default": false
+          },
+          "stderr_truncated": {
+            "type": "boolean",
+            "title": "Stderr Truncated",
+            "default": false
+          },
+          "output_truncated": {
+            "type": "boolean",
+            "title": "Output Truncated",
             "default": false
           },
           "error": {
@@ -6998,6 +7568,16 @@
               }
             ],
             "title": "Final Turn Id"
+          },
+          "usage_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConversationUsageResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "roots": {
             "items": {
@@ -8481,6 +9061,305 @@
         "title": "TermsResponse",
         "description": "Rendered terms source payload."
       },
+      "TurnArtifactDeleteResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id"
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "deleted"
+        ],
+        "title": "TurnArtifactDeleteResponse",
+        "description": "Turn artifact deletion response."
+      },
+      "TurnArtifactListResponse": {
+        "properties": {
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/TurnArtifactSummary"
+            },
+            "type": "array",
+            "title": "Artifacts"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifacts",
+          "total"
+        ],
+        "title": "TurnArtifactListResponse",
+        "description": "Turn-owned artifact list response."
+      },
+      "TurnArtifactMetadataResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "logical_name": {
+            "type": "string",
+            "title": "Logical Name"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "pointer": {
+            "type": "string",
+            "title": "Pointer"
+          },
+          "table_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Name"
+          },
+          "schema": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema"
+          },
+          "row_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Count"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "run_id",
+          "workspace_id",
+          "logical_name",
+          "kind",
+          "pointer",
+          "created_at",
+          "expires_at",
+          "status"
+        ],
+        "title": "TurnArtifactMetadataResponse",
+        "description": "Turn-owned artifact metadata response."
+      },
+      "TurnArtifactSummary": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id"
+          },
+          "logical_name": {
+            "type": "string",
+            "title": "Logical Name"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "row_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Count"
+          },
+          "columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columns"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "logical_name",
+          "kind",
+          "created_at",
+          "status"
+        ],
+        "title": "TurnArtifactSummary",
+        "description": "Turn-owned artifact summary."
+      },
+      "TurnDataframeArtifactRowsResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "name",
+          "row_count",
+          "columns",
+          "rows",
+          "offset",
+          "limit"
+        ],
+        "title": "TurnDataframeArtifactRowsResponse",
+        "description": "Rows for one turn-owned dataframe artifact."
+      },
       "TurnOrderUpdateRequest": {
         "properties": {
           "parent_turn_id": {
@@ -8770,6 +9649,16 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConversationUsageSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "children": {
             "items": {

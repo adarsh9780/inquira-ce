@@ -182,8 +182,6 @@ export interface ArtifactMetadataResponse {
 export interface AuthConfigResponse {
   configured: boolean;
   auth_provider: string;
-  supabase_url?: string;
-  publishable_key?: string;
   site_url?: string;
   manage_account_url?: string;
 }
@@ -311,6 +309,37 @@ export type ConversationUpdateRequestTitle = string | null;
  */
 export interface ConversationUpdateRequest {
   title?: ConversationUpdateRequestTitle;
+}
+
+/**
+ * Full visible-turn usage aggregate for one conversation.
+ */
+export interface ConversationUsageResponse {
+  conversation_id: string;
+  turn_count: number;
+  turns_with_usage: number;
+  usage: ConversationUsageSummary;
+}
+
+export type ConversationUsageSummaryInputTokens = number | null;
+
+export type ConversationUsageSummaryOutputTokens = number | null;
+
+export type ConversationUsageSummaryCachedTokens = number | null;
+
+export type ConversationUsageSummaryTotalTokens = number | null;
+
+export type ConversationUsageSummaryPriceUsd = number | null;
+
+/**
+ * Provider-reported token and cost usage summary.
+ */
+export interface ConversationUsageSummary {
+  input_tokens?: ConversationUsageSummaryInputTokens;
+  output_tokens?: ConversationUsageSummaryOutputTokens;
+  cached_tokens?: ConversationUsageSummaryCachedTokens;
+  total_tokens?: ConversationUsageSummaryTotalTokens;
+  price_usd?: ConversationUsageSummaryPriceUsd;
 }
 
 export type DataframeArtifactRowsResponseDisplayName = string | null;
@@ -449,6 +478,11 @@ export interface DatasetSchemaResponse {
 }
 
 /**
+ * Optional stable run id for artifact export
+ */
+export type ExecuteRequestRunId = string | null;
+
+/**
  * Owning conversation to update in-place
  */
 export type ExecuteRequestConversationId = string | null;
@@ -457,6 +491,11 @@ export type ExecuteRequestConversationId = string | null;
  * Owning turn to overwrite in-place
  */
 export type ExecuteRequestTurnId = string | null;
+
+/**
+ * Internal server-owned turn artifact directory
+ */
+export type ExecuteRequestArtifactDir = string | null;
 
 export interface ExecuteRequest {
   /** Python code to execute */
@@ -467,10 +506,14 @@ export interface ExecuteRequest {
    * @maximum 300
    */
   timeout?: number;
+  /** Optional stable run id for artifact export */
+  run_id?: ExecuteRequestRunId;
   /** Owning conversation to update in-place */
   conversation_id?: ExecuteRequestConversationId;
   /** Owning turn to overwrite in-place */
   turn_id?: ExecuteRequestTurnId;
+  /** Internal server-owned turn artifact directory */
+  artifact_dir?: ExecuteRequestArtifactDir;
 }
 
 export type ExecuteResponseRunId = string | null;
@@ -494,6 +537,9 @@ export interface ExecuteResponse {
   stderr?: string;
   has_stdout?: boolean;
   has_stderr?: boolean;
+  stdout_truncated?: boolean;
+  stderr_truncated?: boolean;
+  output_truncated?: boolean;
   error?: ExecuteResponseError;
   result?: ExecuteResponseResult;
   result_type?: ExecuteResponseResultType;
@@ -542,6 +588,8 @@ export type GlobalTurnTreeConversationResponseLastTurnAt = string | null;
 
 export type GlobalTurnTreeConversationResponseFinalTurnId = string | null;
 
+export type GlobalTurnTreeConversationResponseUsageSummary = ConversationUsageResponse | null;
+
 /**
  * Workspace-level tree group for one conversation.
  */
@@ -552,6 +600,7 @@ export interface GlobalTurnTreeConversationResponse {
   created_at: string;
   updated_at: string;
   final_turn_id?: GlobalTurnTreeConversationResponseFinalTurnId;
+  usage_summary?: GlobalTurnTreeConversationResponseUsageSummary;
   roots?: TurnTreeNodeResponse[];
 }
 
@@ -953,6 +1002,99 @@ export interface TermsResponse {
   last_updated?: TermsResponseLastUpdated;
 }
 
+/**
+ * Turn artifact deletion response.
+ */
+export interface TurnArtifactDeleteResponse {
+  artifact_id: string;
+  deleted: boolean;
+}
+
+/**
+ * Turn-owned artifact list response.
+ */
+export interface TurnArtifactListResponse {
+  artifacts: TurnArtifactSummary[];
+  total: number;
+}
+
+export type TurnArtifactMetadataResponseDisplayName = string | null;
+
+export type TurnArtifactMetadataResponseTableName = string | null;
+
+export type TurnArtifactMetadataResponseSchemaAnyOfItem = { [key: string]: unknown };
+
+export type TurnArtifactMetadataResponseSchema = TurnArtifactMetadataResponseSchemaAnyOfItem[] | null;
+
+export type TurnArtifactMetadataResponseRowCount = number | null;
+
+export type TurnArtifactMetadataResponsePayloadAnyOf = { [key: string]: unknown };
+
+export type TurnArtifactMetadataResponsePayload = TurnArtifactMetadataResponsePayloadAnyOf | null;
+
+export type TurnArtifactMetadataResponseError = string | null;
+
+/**
+ * Turn-owned artifact metadata response.
+ */
+export interface TurnArtifactMetadataResponse {
+  artifact_id: string;
+  run_id: string;
+  workspace_id: string;
+  logical_name: string;
+  display_name?: TurnArtifactMetadataResponseDisplayName;
+  kind: string;
+  pointer: string;
+  table_name?: TurnArtifactMetadataResponseTableName;
+  schema?: TurnArtifactMetadataResponseSchema;
+  row_count?: TurnArtifactMetadataResponseRowCount;
+  payload?: TurnArtifactMetadataResponsePayload;
+  created_at: string;
+  expires_at: string;
+  status: string;
+  error?: TurnArtifactMetadataResponseError;
+}
+
+export type TurnArtifactSummaryDisplayName = string | null;
+
+export type TurnArtifactSummaryRowCount = number | null;
+
+export type TurnArtifactSummaryColumnsAnyOfItem = { [key: string]: unknown };
+
+export type TurnArtifactSummaryColumns = TurnArtifactSummaryColumnsAnyOfItem[] | null;
+
+/**
+ * Turn-owned artifact summary.
+ */
+export interface TurnArtifactSummary {
+  artifact_id: string;
+  logical_name: string;
+  display_name?: TurnArtifactSummaryDisplayName;
+  kind: string;
+  row_count?: TurnArtifactSummaryRowCount;
+  columns?: TurnArtifactSummaryColumns;
+  created_at: string;
+  status: string;
+}
+
+export type TurnDataframeArtifactRowsResponseDisplayName = string | null;
+
+export type TurnDataframeArtifactRowsResponseRowsItem = { [key: string]: unknown };
+
+/**
+ * Rows for one turn-owned dataframe artifact.
+ */
+export interface TurnDataframeArtifactRowsResponse {
+  artifact_id: string;
+  name: string;
+  display_name?: TurnDataframeArtifactRowsResponseDisplayName;
+  row_count: number;
+  columns: string[];
+  rows: TurnDataframeArtifactRowsResponseRowsItem[];
+  offset: number;
+  limit: number;
+}
+
 export type TurnOrderUpdateRequestParentTurnId = string | null;
 
 /**
@@ -1037,6 +1179,8 @@ export interface TurnResponse {
 
 export type TurnTreeNodeResponseParentTurnId = string | null;
 
+export type TurnTreeNodeResponseUsage = ConversationUsageSummary | null;
+
 /**
  * Recursive turn tree node.
  */
@@ -1048,6 +1192,7 @@ export interface TurnTreeNodeResponse {
   user_text: string;
   assistant_text: string;
   created_at: string;
+  usage?: TurnTreeNodeResponseUsage;
   children?: TurnTreeNodeResponse[];
 }
 
@@ -1234,6 +1379,37 @@ export type ListTurnsApiV1ConversationsConversationIdTurnsGetParams = {
  */
 limit?: number;
 before?: string | null;
+};
+
+export type ListTurnArtifactsApiV1ConversationsConversationIdTurnsTurnIdArtifactsGetParams = {
+/**
+ * Filter by artifact kind, e.g. dataframe or figure
+ */
+kind?: string | null;
+};
+
+export type GetTurnArtifactRowsApiV1ConversationsConversationIdTurnsTurnIdArtifactsArtifactIdRowsGetParams = {
+/**
+ * @minimum 0
+ */
+offset?: number;
+/**
+ * @minimum 1
+ * @maximum 1000
+ */
+limit?: number;
+/**
+ * AG Grid sort model JSON
+ */
+sort_model?: string | null;
+/**
+ * AG Grid filter model JSON
+ */
+filter_model?: string | null;
+/**
+ * Global text search applied across columns
+ */
+search?: string | null;
 };
 
 export type GetTurnTreeApiV1ConversationsConversationIdTurnTreeGetParams = {
@@ -1786,6 +1962,79 @@ const getTurnRelationsApiV1ConversationsConversationIdTurnsTurnIdRelationsGet = 
  ): Promise<TData> => {
     return axios.get(
       `/api/v1/conversations/${conversationId}/turns/${turnId}/relations`,options
+    );
+  }
+
+/**
+ * List artifacts owned by one turn only.
+ * @summary List Turn Artifacts
+ */
+const listTurnArtifactsApiV1ConversationsConversationIdTurnsTurnIdArtifactsGet = <TData = AxiosResponse<TurnArtifactListResponse>>(
+    conversationId: string,
+    turnId: string,
+    params?: ListTurnArtifactsApiV1ConversationsConversationIdTurnsTurnIdArtifactsGetParams, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/api/v1/conversations/${conversationId}/turns/${turnId}/artifacts`,{
+    ...options,
+        params: {...params, ...options?.params},}
+    );
+  }
+
+/**
+ * Fetch metadata for one artifact owned by one turn.
+ * @summary Get Turn Artifact Metadata
+ */
+const getTurnArtifactMetadataApiV1ConversationsConversationIdTurnsTurnIdArtifactsArtifactIdGet = <TData = AxiosResponse<TurnArtifactMetadataResponse>>(
+    conversationId: string,
+    turnId: string,
+    artifactId: string, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/api/v1/conversations/${conversationId}/turns/${turnId}/artifacts/${artifactId}`,options
+    );
+  }
+
+/**
+ * Delete one artifact owned by one turn.
+ * @summary Delete Turn Artifact
+ */
+const deleteTurnArtifactApiV1ConversationsConversationIdTurnsTurnIdArtifactsArtifactIdDelete = <TData = AxiosResponse<TurnArtifactDeleteResponse>>(
+    conversationId: string,
+    turnId: string,
+    artifactId: string, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.delete(
+      `/api/v1/conversations/${conversationId}/turns/${turnId}/artifacts/${artifactId}`,options
+    );
+  }
+
+/**
+ * Fetch rows for one dataframe artifact owned by one turn.
+ * @summary Get Turn Artifact Rows
+ */
+const getTurnArtifactRowsApiV1ConversationsConversationIdTurnsTurnIdArtifactsArtifactIdRowsGet = <TData = AxiosResponse<TurnDataframeArtifactRowsResponse>>(
+    conversationId: string,
+    turnId: string,
+    artifactId: string,
+    params?: GetTurnArtifactRowsApiV1ConversationsConversationIdTurnsTurnIdArtifactsArtifactIdRowsGetParams, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/api/v1/conversations/${conversationId}/turns/${turnId}/artifacts/${artifactId}/rows`,{
+    ...options,
+        params: {...params, ...options?.params},}
+    );
+  }
+
+/**
+ * Return provider-reported usage totals for one conversation.
+ * @summary Get Conversation Usage
+ */
+const getConversationUsageApiV1ConversationsConversationIdUsageGet = <TData = AxiosResponse<ConversationUsageResponse>>(
+    conversationId: string, options?: AxiosRequestConfig
+ ): Promise<TData> => {
+    return axios.get(
+      `/api/v1/conversations/${conversationId}/usage`,options
     );
   }
 
@@ -2381,7 +2630,7 @@ const rootGet = <TData = AxiosResponse<unknown>>(
     );
   }
 
-return {getAuthConfigApiV1AuthConfigGet,getCurrentUserProfileApiV1AuthMeGet,logoutUserApiV1AuthLogoutPost,listWorkspacesApiV1WorkspacesGet,createWorkspaceApiV1WorkspacesPost,activateWorkspaceApiV1WorkspacesWorkspaceIdActivatePut,getWorkspaceSummaryApiV1WorkspacesWorkspaceIdSummaryGet,renameWorkspaceApiV1WorkspacesWorkspaceIdPatch,deleteWorkspaceApiV1WorkspacesWorkspaceIdDelete,clearWorkspaceDatabaseApiV1WorkspacesWorkspaceIdDatabaseClearPost,listWorkspaceDeletionsApiV1WorkspacesDeletionsGet,getWorkspaceDeletionApiV1WorkspacesDeletionsJobIdGet,getPreferencesApiV1PreferencesGet,updatePreferencesApiV1PreferencesPut,refreshProviderModelsApiV1PreferencesModelsRefreshPost,verifyApiKeyApiV1PreferencesVerifyKeyPost,searchProviderModelsApiV1PreferencesModelsSearchGet,setApiKeyApiV1PreferencesApiKeyPut,deleteApiKeyApiV1PreferencesApiKeyDelete,listWorkspaceDatasetsApiV1WorkspacesWorkspaceIdDatasetsGet,addWorkspaceDatasetApiV1WorkspacesWorkspaceIdDatasetsPost,addWorkspaceDatasetsBatchApiV1WorkspacesWorkspaceIdDatasetsBatchPost,listWorkspaceDatasetIngestionsApiV1WorkspacesWorkspaceIdDatasetsIngestionsGet,getWorkspaceDatasetIngestionApiV1WorkspacesWorkspaceIdDatasetsIngestionsJobIdGet,syncBrowserWorkspaceDatasetApiV1WorkspacesWorkspaceIdDatasetsBrowserSyncPost,enqueueWorkspaceDatasetSchemaRegenerationApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaEnqueuePost,removeWorkspaceDatasetApiV1WorkspacesWorkspaceIdDatasetsTableNameDelete,listWorkspaceDatasetDeletionsApiV1WorkspacesWorkspaceIdDatasetsDeletionsGet,getWorkspaceDatasetDeletionApiV1WorkspacesWorkspaceIdDatasetsDeletionsJobIdGet,getTermsApiV1LegalTermsGet,createConversationApiV1WorkspacesWorkspaceIdConversationsPost,listConversationsApiV1WorkspacesWorkspaceIdConversationsGet,deleteConversationApiV1ConversationsConversationIdDelete,patchConversationApiV1ConversationsConversationIdPatch,listTurnsApiV1ConversationsConversationIdTurnsGet,getTurnApiV1ConversationsConversationIdTurnsTurnIdGet,deleteTurnApiV1ConversationsConversationIdTurnsTurnIdDelete,getTurnRelationsApiV1ConversationsConversationIdTurnsTurnIdRelationsGet,getWorkspaceTurnTreeApiV1WorkspacesWorkspaceIdTurnTreeGet,getTurnTreeApiV1ConversationsConversationIdTurnTreeGet,moveTurnParentApiV1ConversationsConversationIdTurnsTurnIdParentPatch,reorderTurnsApiV1ConversationsConversationIdTurnsOrderPatch,getFinalTurnApiV1ConversationsConversationIdFinalTurnGet,markFinalTurnApiV1ConversationsConversationIdTurnsTurnIdFinalPost,rerunFinalTurnApiV1ConversationsConversationIdFinalTurnRerunPost,analyzeApiV1ChatAnalyzePost,streamAnalyzeApiV1ChatStreamPost,respondToInterventionApiV1ChatInterventionsInterventionIdResponsePost,proxyOkApiV1AgentOkGet,proxyInfoApiV1AgentInfoGet,proxyAssistantsSearchApiV1AgentAssistantsSearchPost,proxyAssistantsCreateApiV1AgentAssistantsPost,proxyRunsWaitApiV1AgentRunsWaitPost,proxyRunsStreamApiV1AgentRunsStreamPost,resetEverythingApiV1AdminResetPost,testGeminiApiKeyApiV1AdminTestGeminiPost,getWorkspacePathsApiV1WorkspacesWorkspaceIdPathsGet,getWorkspaceColumnsApiV1WorkspacesWorkspaceIdColumnsGet,listWorkspaceCommandsApiV1WorkspacesWorkspaceIdCommandsGet,executeWorkspaceSlashCommandApiV1WorkspacesWorkspaceIdCommandsExecutePost,executeWorkspaceCodeApiV1WorkspacesWorkspaceIdExecutePost,getWorkspaceDataframeArtifactRowsApiV1WorkspacesWorkspaceIdArtifactsDataframesArtifactIdRowsGet,getWorkspaceArtifactRowsApiV1WorkspacesWorkspaceIdArtifactsArtifactIdRowsGet,getWorkspaceArtifactUsageApiV1WorkspacesWorkspaceIdArtifactsUsageGet,streamWorkspaceArtifactUsageApiV1WorkspacesWorkspaceIdArtifactsUsageStreamGet,getWorkspaceArtifactMetadataApiV1WorkspacesWorkspaceIdArtifactsArtifactIdGet,deleteWorkspaceArtifactApiV1WorkspacesWorkspaceIdArtifactsArtifactIdDelete,listWorkspaceArtifactsApiV1WorkspacesWorkspaceIdArtifactsGet,installRunnerRuntimePackageApiV1RuntimeRunnerPackagesInstallPost,executeWorkspaceTerminalCommandApiV1WorkspacesWorkspaceIdTerminalExecutePost,streamWorkspaceTerminalCommandSseApiV1WorkspacesWorkspaceIdTerminalStreamPost,resetWorkspaceTerminalSessionApiV1WorkspacesWorkspaceIdTerminalSessionResetPost,getWorkspaceKernelRuntimeStatusApiV1WorkspacesWorkspaceIdKernelStatusGet,bootstrapWorkspaceRuntimeEndpointApiV1WorkspacesWorkspaceIdRuntimeBootstrapPost,retryWorkspaceRuntimeEndpointApiV1WorkspacesWorkspaceIdRuntimeRetryPost,hardResetWorkspaceRuntimeEndpointApiV1WorkspacesWorkspaceIdRuntimeHardResetPost,interruptWorkspaceKernelRuntimeApiV1WorkspacesWorkspaceIdKernelInterruptPost,resetWorkspaceKernelRuntimeApiV1WorkspacesWorkspaceIdKernelResetPost,restartWorkspaceKernelRuntimeApiV1WorkspacesWorkspaceIdKernelRestartPost,getWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaGet,saveWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaPost,regenerateWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaRegeneratePost,listWorkspaceSchemasApiV1WorkspacesWorkspaceIdSchemasGet,healthHealthGet,rootGet}};
+return {getAuthConfigApiV1AuthConfigGet,getCurrentUserProfileApiV1AuthMeGet,logoutUserApiV1AuthLogoutPost,listWorkspacesApiV1WorkspacesGet,createWorkspaceApiV1WorkspacesPost,activateWorkspaceApiV1WorkspacesWorkspaceIdActivatePut,getWorkspaceSummaryApiV1WorkspacesWorkspaceIdSummaryGet,renameWorkspaceApiV1WorkspacesWorkspaceIdPatch,deleteWorkspaceApiV1WorkspacesWorkspaceIdDelete,clearWorkspaceDatabaseApiV1WorkspacesWorkspaceIdDatabaseClearPost,listWorkspaceDeletionsApiV1WorkspacesDeletionsGet,getWorkspaceDeletionApiV1WorkspacesDeletionsJobIdGet,getPreferencesApiV1PreferencesGet,updatePreferencesApiV1PreferencesPut,refreshProviderModelsApiV1PreferencesModelsRefreshPost,verifyApiKeyApiV1PreferencesVerifyKeyPost,searchProviderModelsApiV1PreferencesModelsSearchGet,setApiKeyApiV1PreferencesApiKeyPut,deleteApiKeyApiV1PreferencesApiKeyDelete,listWorkspaceDatasetsApiV1WorkspacesWorkspaceIdDatasetsGet,addWorkspaceDatasetApiV1WorkspacesWorkspaceIdDatasetsPost,addWorkspaceDatasetsBatchApiV1WorkspacesWorkspaceIdDatasetsBatchPost,listWorkspaceDatasetIngestionsApiV1WorkspacesWorkspaceIdDatasetsIngestionsGet,getWorkspaceDatasetIngestionApiV1WorkspacesWorkspaceIdDatasetsIngestionsJobIdGet,syncBrowserWorkspaceDatasetApiV1WorkspacesWorkspaceIdDatasetsBrowserSyncPost,enqueueWorkspaceDatasetSchemaRegenerationApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaEnqueuePost,removeWorkspaceDatasetApiV1WorkspacesWorkspaceIdDatasetsTableNameDelete,listWorkspaceDatasetDeletionsApiV1WorkspacesWorkspaceIdDatasetsDeletionsGet,getWorkspaceDatasetDeletionApiV1WorkspacesWorkspaceIdDatasetsDeletionsJobIdGet,getTermsApiV1LegalTermsGet,createConversationApiV1WorkspacesWorkspaceIdConversationsPost,listConversationsApiV1WorkspacesWorkspaceIdConversationsGet,deleteConversationApiV1ConversationsConversationIdDelete,patchConversationApiV1ConversationsConversationIdPatch,listTurnsApiV1ConversationsConversationIdTurnsGet,getTurnApiV1ConversationsConversationIdTurnsTurnIdGet,deleteTurnApiV1ConversationsConversationIdTurnsTurnIdDelete,getTurnRelationsApiV1ConversationsConversationIdTurnsTurnIdRelationsGet,listTurnArtifactsApiV1ConversationsConversationIdTurnsTurnIdArtifactsGet,getTurnArtifactMetadataApiV1ConversationsConversationIdTurnsTurnIdArtifactsArtifactIdGet,deleteTurnArtifactApiV1ConversationsConversationIdTurnsTurnIdArtifactsArtifactIdDelete,getTurnArtifactRowsApiV1ConversationsConversationIdTurnsTurnIdArtifactsArtifactIdRowsGet,getConversationUsageApiV1ConversationsConversationIdUsageGet,getWorkspaceTurnTreeApiV1WorkspacesWorkspaceIdTurnTreeGet,getTurnTreeApiV1ConversationsConversationIdTurnTreeGet,moveTurnParentApiV1ConversationsConversationIdTurnsTurnIdParentPatch,reorderTurnsApiV1ConversationsConversationIdTurnsOrderPatch,getFinalTurnApiV1ConversationsConversationIdFinalTurnGet,markFinalTurnApiV1ConversationsConversationIdTurnsTurnIdFinalPost,rerunFinalTurnApiV1ConversationsConversationIdFinalTurnRerunPost,analyzeApiV1ChatAnalyzePost,streamAnalyzeApiV1ChatStreamPost,respondToInterventionApiV1ChatInterventionsInterventionIdResponsePost,proxyOkApiV1AgentOkGet,proxyInfoApiV1AgentInfoGet,proxyAssistantsSearchApiV1AgentAssistantsSearchPost,proxyAssistantsCreateApiV1AgentAssistantsPost,proxyRunsWaitApiV1AgentRunsWaitPost,proxyRunsStreamApiV1AgentRunsStreamPost,resetEverythingApiV1AdminResetPost,testGeminiApiKeyApiV1AdminTestGeminiPost,getWorkspacePathsApiV1WorkspacesWorkspaceIdPathsGet,getWorkspaceColumnsApiV1WorkspacesWorkspaceIdColumnsGet,listWorkspaceCommandsApiV1WorkspacesWorkspaceIdCommandsGet,executeWorkspaceSlashCommandApiV1WorkspacesWorkspaceIdCommandsExecutePost,executeWorkspaceCodeApiV1WorkspacesWorkspaceIdExecutePost,getWorkspaceDataframeArtifactRowsApiV1WorkspacesWorkspaceIdArtifactsDataframesArtifactIdRowsGet,getWorkspaceArtifactRowsApiV1WorkspacesWorkspaceIdArtifactsArtifactIdRowsGet,getWorkspaceArtifactUsageApiV1WorkspacesWorkspaceIdArtifactsUsageGet,streamWorkspaceArtifactUsageApiV1WorkspacesWorkspaceIdArtifactsUsageStreamGet,getWorkspaceArtifactMetadataApiV1WorkspacesWorkspaceIdArtifactsArtifactIdGet,deleteWorkspaceArtifactApiV1WorkspacesWorkspaceIdArtifactsArtifactIdDelete,listWorkspaceArtifactsApiV1WorkspacesWorkspaceIdArtifactsGet,installRunnerRuntimePackageApiV1RuntimeRunnerPackagesInstallPost,executeWorkspaceTerminalCommandApiV1WorkspacesWorkspaceIdTerminalExecutePost,streamWorkspaceTerminalCommandSseApiV1WorkspacesWorkspaceIdTerminalStreamPost,resetWorkspaceTerminalSessionApiV1WorkspacesWorkspaceIdTerminalSessionResetPost,getWorkspaceKernelRuntimeStatusApiV1WorkspacesWorkspaceIdKernelStatusGet,bootstrapWorkspaceRuntimeEndpointApiV1WorkspacesWorkspaceIdRuntimeBootstrapPost,retryWorkspaceRuntimeEndpointApiV1WorkspacesWorkspaceIdRuntimeRetryPost,hardResetWorkspaceRuntimeEndpointApiV1WorkspacesWorkspaceIdRuntimeHardResetPost,interruptWorkspaceKernelRuntimeApiV1WorkspacesWorkspaceIdKernelInterruptPost,resetWorkspaceKernelRuntimeApiV1WorkspacesWorkspaceIdKernelResetPost,restartWorkspaceKernelRuntimeApiV1WorkspacesWorkspaceIdKernelRestartPost,getWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaGet,saveWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaPost,regenerateWorkspaceDatasetSchemaApiV1WorkspacesWorkspaceIdDatasetsTableNameSchemaRegeneratePost,listWorkspaceSchemasApiV1WorkspacesWorkspaceIdSchemasGet,healthHealthGet,rootGet}};
 export type GetAuthConfigApiV1AuthConfigGetResult = AxiosResponse<AuthConfigResponse>
 export type GetCurrentUserProfileApiV1AuthMeGetResult = AxiosResponse<AuthProfileResponse>
 export type LogoutUserApiV1AuthLogoutPostResult = AxiosResponse<MessageResponse>
@@ -2420,6 +2669,11 @@ export type ListTurnsApiV1ConversationsConversationIdTurnsGetResult = AxiosRespo
 export type GetTurnApiV1ConversationsConversationIdTurnsTurnIdGetResult = AxiosResponse<TurnResponse>
 export type DeleteTurnApiV1ConversationsConversationIdTurnsTurnIdDeleteResult = AxiosResponse<MessageResponse>
 export type GetTurnRelationsApiV1ConversationsConversationIdTurnsTurnIdRelationsGetResult = AxiosResponse<TurnRelationsResponse>
+export type ListTurnArtifactsApiV1ConversationsConversationIdTurnsTurnIdArtifactsGetResult = AxiosResponse<TurnArtifactListResponse>
+export type GetTurnArtifactMetadataApiV1ConversationsConversationIdTurnsTurnIdArtifactsArtifactIdGetResult = AxiosResponse<TurnArtifactMetadataResponse>
+export type DeleteTurnArtifactApiV1ConversationsConversationIdTurnsTurnIdArtifactsArtifactIdDeleteResult = AxiosResponse<TurnArtifactDeleteResponse>
+export type GetTurnArtifactRowsApiV1ConversationsConversationIdTurnsTurnIdArtifactsArtifactIdRowsGetResult = AxiosResponse<TurnDataframeArtifactRowsResponse>
+export type GetConversationUsageApiV1ConversationsConversationIdUsageGetResult = AxiosResponse<ConversationUsageResponse>
 export type GetWorkspaceTurnTreeApiV1WorkspacesWorkspaceIdTurnTreeGetResult = AxiosResponse<GlobalTurnTreeResponse>
 export type GetTurnTreeApiV1ConversationsConversationIdTurnTreeGetResult = AxiosResponse<TurnTreeResponse>
 export type MoveTurnParentApiV1ConversationsConversationIdTurnsTurnIdParentPatchResult = AxiosResponse<TurnResponse>

@@ -5,7 +5,6 @@ use std::fs;
 use std::fs::OpenOptions;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::{Read, Write};
-use std::net::TcpListener;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::{Child as StdChild, Command, Stdio};
@@ -460,11 +459,6 @@ struct PtyStopResponse {
     stopped: bool,
 }
 
-#[derive(Serialize)]
-struct AuthLoopbackResponse {
-    redirect_url: String,
-}
-
 fn stop_child_process(name: &str, child: &mut StdChild) {
     #[cfg(unix)]
     const GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(3);
@@ -764,69 +758,6 @@ fn open_external_url(url: String) -> Result<(), String> {
         .spawn()
         .map(|_| ())
         .map_err(|error| format!("Failed to open URL: {error}"))
-}
-
-#[tauri::command]
-fn auth_start_loopback_listener(app: tauri::AppHandle) -> Result<AuthLoopbackResponse, String> {
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .map_err(|error| format!("Failed to bind auth callback listener: {error}"))?;
-    let address = listener
-        .local_addr()
-        .map_err(|error| format!("Failed to inspect auth callback listener: {error}"))?;
-    let redirect_url = format!("http://127.0.0.1:{}/auth/callback", address.port());
-    let app_handle = app.clone();
-
-    thread::spawn(move || {
-        if let Ok((mut stream, _peer)) = listener.accept() {
-            let mut buffer = [0_u8; 4096];
-            let read_len = stream.read(&mut buffer).unwrap_or(0);
-            let request = String::from_utf8_lossy(&buffer[..read_len]);
-            let request_line = request.lines().next().unwrap_or_default();
-            let target = request_line.split_whitespace().nth(1).unwrap_or_default();
-            let query = target
-                .split_once('?')
-                .map(|(_, raw)| raw)
-                .unwrap_or_default();
-            let params: HashMap<String, String> = url::form_urlencoded::parse(query.as_bytes())
-                .into_owned()
-                .collect();
-            let code = params.get("code").cloned().unwrap_or_default();
-            let error = params.get("error").cloned().unwrap_or_default();
-            let error_description = params.get("error_description").cloned().unwrap_or_default();
-
-            let body = if code.is_empty() {
-                let _ = app_handle.emit(
-                    "auth:callback",
-                    serde_json::json!({
-                        "code": "",
-                        "error": error,
-                        "error_description": error_description,
-                    }),
-                );
-                "<html><body><h2>Inquira sign-in failed.</h2><p>You can close this window and try again.</p></body></html>"
-            } else {
-                let _ = app_handle.emit(
-                    "auth:callback",
-                    serde_json::json!({
-                        "code": code,
-                        "error": error,
-                        "error_description": error_description,
-                    }),
-                );
-                "<html><body><h2>Inquira sign-in complete.</h2><p>You can close this window and return to the app.</p></body></html>"
-            };
-
-            let response = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                body.len(),
-                body
-            );
-            let _ = stream.write_all(response.as_bytes());
-            let _ = stream.flush();
-        }
-    });
-
-    Ok(AuthLoopbackResponse { redirect_url })
 }
 
 fn detect_default_shell() -> (String, Vec<String>) {
@@ -2098,7 +2029,6 @@ pub fn run() {
             get_startup_state,
             open_startup_logs,
             restart_desktop_app,
-            auth_start_loopback_listener,
             open_external_url,
             tauri_terminal_start,
             tauri_terminal_write,

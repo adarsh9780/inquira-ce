@@ -3,31 +3,15 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.v1.api.deps import get_current_user, require_minimum_plan
 from app.v1.models.enums import UserPlan
-from app.v1.services.supabase_auth_service import SupabaseAuthService
+from app.v1.services.local_auth_service import LocalAuthService
 
 
-def test_auth_routes_are_served_from_v1_api(monkeypatch):
-    monkeypatch.setattr(
-        'app.v1.api.auth.SupabaseAuthService.public_auth_config',
-        lambda: SimpleNamespace(
-            configured=True,
-            auth_provider='supabase',
-            supabase_url='https://example.supabase.co',
-            publishable_key='anon-key',
-            site_url='https://app.inquira.dev',
-            manage_account_url='https://account.inquira.dev',
-        ),
-    )
-    monkeypatch.setattr(
-        'app.v1.api.auth.SupabaseAuthService.manage_account_url',
-        lambda: 'https://account.inquira.dev',
-    )
+def test_auth_routes_are_local_only_in_v1_api():
     app.dependency_overrides.clear()
     app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(
         id='local-user',
@@ -42,7 +26,13 @@ def test_auth_routes_are_served_from_v1_api(monkeypatch):
         client = TestClient(app)
         config_response = client.get('/api/v1/auth/config')
         assert config_response.status_code == 200
-        assert config_response.json()['configured'] is True
+        config_payload = config_response.json()
+        assert config_payload['configured'] is False
+        assert config_payload['auth_provider'] == 'local'
+        external_provider_url_key = ''.join(['supa', 'base', '_url'])
+        external_public_client_key = ''.join(['publish', 'able_key'])
+        assert external_provider_url_key not in config_payload
+        assert external_public_client_key not in config_payload
 
         me_response = client.get('/api/v1/auth/me')
         assert me_response.status_code == 200
@@ -50,6 +40,8 @@ def test_auth_routes_are_served_from_v1_api(monkeypatch):
         assert payload['user_id'] == 'local-user'
         assert payload['plan'] == 'FREE'
         assert payload['is_guest'] is True
+        assert payload['auth_provider'] == 'local'
+        assert payload['manage_account_url'] == ''
 
         logout_response = client.post('/api/v1/auth/logout')
         assert logout_response.status_code == 200
@@ -85,30 +77,26 @@ async def test_require_minimum_plan_allows_enterprise_users():
     assert result is current_user
 
 
-def test_supabase_plan_order_matches_expected_tiers():
-    assert SupabaseAuthService.plan_rank('FREE') < SupabaseAuthService.plan_rank('PRO')
-    assert SupabaseAuthService.plan_rank('PRO') < SupabaseAuthService.plan_rank('ENTERPRISE')
-    assert SupabaseAuthService.has_minimum_plan('ENTERPRISE', 'PRO') is True
-    assert SupabaseAuthService.has_minimum_plan('FREE', 'PRO') is False
+def test_local_plan_order_matches_expected_tiers():
+    assert LocalAuthService.plan_rank('FREE') < LocalAuthService.plan_rank('PRO')
+    assert LocalAuthService.plan_rank('PRO') < LocalAuthService.plan_rank('ENTERPRISE')
+    assert LocalAuthService.has_minimum_plan('ENTERPRISE', 'PRO') is True
+    assert LocalAuthService.has_minimum_plan('FREE', 'PRO') is False
 
 
 @pytest.mark.asyncio
-async def test_signed_in_session_does_not_fall_back_to_guest_when_auth_is_unconfigured(monkeypatch):
-    monkeypatch.setattr(
-        "app.v1.services.supabase_auth_service.settings",
-        SimpleNamespace(supabase_url="", supabase_publishable_key=""),
-    )
+async def test_bearer_token_still_resolves_to_local_user():
+    user = await LocalAuthService.resolve_current_user("Bearer signed-in-token")
 
-    with pytest.raises(HTTPException) as exc:
-        await SupabaseAuthService.resolve_current_user("Bearer signed-in-token")
-
-    assert exc.value.status_code == 503
-    assert "not changed to guest" in str(exc.value.detail)
+    assert user.is_guest is True
+    assert user.is_authenticated is False
+    assert user.auth_provider == 'local'
+    assert user.id == "local-user"
 
 
 @pytest.mark.asyncio
-async def test_anonymous_session_remains_guest_when_auth_is_unavailable():
-    user = await SupabaseAuthService.resolve_current_user(None)
+async def test_anonymous_session_remains_local_user():
+    user = await LocalAuthService.resolve_current_user(None)
 
     assert user.is_guest is True
     assert user.id == "local-user"

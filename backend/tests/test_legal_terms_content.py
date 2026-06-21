@@ -18,4 +18,6 @@ def test_terms_include_required_honest_risk_and_scope_clauses():
     assert "your prompt/question" in text or "your prompt or question" in text
     assert "schema context needed to generate code" in text
     assert "stored on your device" in text or "primarily stored on your device" in text
-    assert "Supabase-backed bearer auth" in text
+    assert "without account sign-in" in text
+    assert "-backed bearer auth" not in text
+    assert "login" not in text

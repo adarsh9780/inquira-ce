@@ -37,10 +37,9 @@ Typical local paths include:
 You can remove local data by deleting these folders/files.
 
 ## 5. Authentication and Account State
-- Some product flows may require sign-in.
-- Current authenticated desktop flows use Supabase-backed bearer auth.
-- The currently enabled desktop sign-in experience is centered around Google login.
-- Other providers may be added later, but they should not be treated as a current guarantee unless they are enabled in the shipped UI.
+- Inquira CE runs in local workspace mode without account sign-in.
+- Account sign-in, cloud sync, hosted account management, and paid plan gates are not included in this open-source build.
+- If you use a separate paid edition, that edition may provide its own account system under its own configuration and terms.
 
 ## 6. What Is Sent to AI Providers
 You choose the AI provider and are responsible for what you send.

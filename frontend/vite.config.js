@@ -15,7 +15,7 @@ const frontendVersion = String(frontendPackage.version || '0.0.0').trim() || '0.
 // https://vite.dev/config/
 export default defineConfig({
   envDir: '..',
-  envPrefix: ['VITE_', 'SB_INQUIRA_CE_'],
+  envPrefix: ['VITE_'],
   base: './',
   plugins: [
     vue(),
