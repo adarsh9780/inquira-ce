@@ -43,7 +43,7 @@
           </button>
 
           <template v-else>
-            <span class="text-[20px] font-normal leading-none text-[var(--color-text-muted)] opacity-80">
+            <span class="text-[18px] font-normal leading-none text-[var(--color-text-muted)] opacity-80">
               Projects
             </span>
           </template>
@@ -69,27 +69,27 @@
                   @click="selectWorkspace(workspace.id)"
                 >
                   <div class="flex h-5 w-5 shrink-0 items-center justify-center">
-                    <FolderOpenIcon class="h-5 w-5 text-[var(--color-text-main)]" />
+                    <FolderOpenIcon class="h-[18px] w-[18px] text-[var(--color-text-main)]" />
                   </div>
                   <div
                     class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out sidebar-transition"
                     :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'flex-1 max-w-[210px] opacity-100 ml-2'"
                   >
-                    <p class="truncate text-[20px] font-normal leading-tight text-[var(--color-text-main)]">
+                    <p class="truncate text-[18px] font-normal leading-tight text-[var(--color-text-main)]">
                       {{ workspace.name || 'Untitled workspace' }}
                     </p>
                   </div>
                 </button>
               </div>
 
-              <div v-if="!appStore.isSidebarCollapsed" class="space-y-1 pl-8">
-                <div v-if="isWorkspaceConversationsLoading(workspace.id)" class="py-1 text-[18px] font-normal text-[var(--color-text-muted)]">
+              <div v-if="!appStore.isSidebarCollapsed" class="space-y-1 pl-7">
+                <div v-if="isWorkspaceConversationsLoading(workspace.id)" class="py-1 text-[14px] font-normal text-[var(--color-text-muted)]">
                   Loading conversations
                 </div>
                 <button
                   v-else-if="conversationsForWorkspace(workspace.id).length === 0"
                   type="button"
-                  class="w-full py-1 text-left text-[18px] font-normal text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
+                  class="w-full py-1 text-left text-[14px] font-normal text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
                   @click="createConversation(workspace.id)"
                 >
                   New conversation
@@ -98,9 +98,9 @@
                   <div
                     v-for="conv in visibleConversationsForWorkspace(workspace.id)"
                     :key="conv.id"
-                    class="group relative flex min-h-10 select-none items-center rounded-[10px] cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
+                    class="group relative min-h-11 select-none rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
                     :class="[
-                      'justify-start px-3 py-1.5',
+                      'px-3 py-2',
                       appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)]' : '',
                     ]"
                     :title="conv.title || 'Untitled'"
@@ -111,7 +111,7 @@
                       <input
                         :ref="(el) => { if (el) editInputs[conv.id] = el }"
                         v-model="editingTitleValue"
-                        class="w-full rounded border border-[var(--color-accent)] bg-[var(--color-surface)] px-2 py-1 text-[18px] text-[var(--color-text-main)] outline-none"
+                        class="w-full rounded border border-[var(--color-accent)] bg-[var(--color-surface)] px-2 py-1 text-[14px] text-[var(--color-text-main)] outline-none"
                         @keydown.enter.prevent="saveTitle(conv.id)"
                         @keydown.esc.prevent="cancelEditing"
                         @blur="saveTitle(conv.id)"
@@ -119,9 +119,9 @@
                     </div>
 
                     <template v-else>
-                      <div class="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
+                      <div class="min-w-0 pr-6">
                         <p
-                          class="truncate text-[20px] leading-tight"
+                          class="truncate text-[15px] leading-snug"
                           :class="appStore.activeConversationId === conv.id
                             ? 'font-normal text-[var(--color-text-main)]'
                             : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
@@ -129,15 +129,15 @@
                         >
                           {{ conv.title || 'Untitled' }}
                         </p>
+                        <p class="mt-0.5 truncate text-[12px] leading-none text-[var(--color-text-muted)]">
+                          {{ formatConversationTimestamp(conv) }}
+                        </p>
                       </div>
-                      <span class="ml-2 shrink-0 text-[16px] font-normal leading-none text-[var(--color-text-muted)]">
-                        {{ formatConversationTimestamp(conv) }}
-                      </span>
 
-                      <div class="relative shrink-0 pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100">
                         <button
                           type="button"
-                          class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
+                          class="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--color-panel)] text-[var(--color-text-muted)] shadow-sm hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
                           title="Conversation actions"
                           @click.stop="toggleConversationMenu($event, conv.id)"
                         >
@@ -149,7 +149,7 @@
                   <button
                     v-if="hasHiddenConversations(workspace.id)"
                     type="button"
-                    class="py-1 text-left text-[18px] font-normal text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
+                    class="py-1 text-left text-[14px] font-normal text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-main)]"
                     @click="showMoreConversations(workspace.id)"
                   >
                     Show more
