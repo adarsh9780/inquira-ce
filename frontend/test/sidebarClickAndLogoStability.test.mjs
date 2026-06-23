@@ -14,7 +14,7 @@ test('collapsed sidebar expands only on explicit click and not on hover', () => 
   assert.equal(sidebarSource.includes('@click="handleBrandClick"'), true)
   assert.equal(sidebarSource.includes('function openWorkspaceRail(target = \'\') {'), false)
   assert.equal(sidebarSource.includes('<SidebarConversations'), false)
-  assert.equal(sidebarSource.includes('visibleConversationsForWorkspace(workspace.id)'), true)
+  assert.equal(sidebarSource.includes('visibleConversationsForSidebar(workspace)'), true)
   assert.equal(sidebarSource.includes('title="Settings"'), true)
   assert.equal(sidebarSource.includes('<ChevronDoubleLeftIcon'), true)
   assert.equal(sidebarSource.includes('<ChevronDoubleRightIcon'), true)
@@ -26,7 +26,7 @@ test('sidebar branding keeps a stable fixed top row while the shell owns width a
 
   assert.equal(appSource.includes('transition: width var(--motion-duration-standard) var(--motion-ease-standard);'), true)
   assert.equal(appSource.includes('.app-nav-pane-collapsed {'), true)
-  assert.equal(sidebarSource.includes('class="h-14 shrink-0 border-b border-[var(--color-border)] flex items-center pl-[20px] pr-4"'), true)
-  assert.equal(sidebarSource.includes('class="flex h-full w-full items-center transition-opacity hover:opacity-70 focus:outline-none"'), true)
+  assert.equal(sidebarSource.includes('class="sidebar-brand-row"'), true)
+  assert.equal(sidebarSource.includes('class="sidebar-brand-button"'), true)
   assert.equal(sidebarSource.includes('alt="Inquira"'), true)
 })

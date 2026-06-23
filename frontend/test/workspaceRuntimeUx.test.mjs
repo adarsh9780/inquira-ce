@@ -6,10 +6,11 @@ import { resolve } from 'node:path'
 test('sidebar renders grouped workspaces with lazy conversation caches', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
-  assert.equal(source.includes('v-for="workspace in appStore.workspaces"'), true)
+  assert.equal(source.includes('v-for="workspace in filteredSidebarWorkspaces"'), true)
   assert.equal(source.includes('sidebarConversationsByWorkspace'), true)
   assert.equal(source.includes('loadSidebarConversations'), true)
   assert.equal(source.includes('selectConversation(workspace.id, conv.id)'), true)
+  assert.equal(source.includes('normalizedSidebarSearchQuery'), true)
   assert.equal(source.includes('appStore.conversations.length'), false)
 })
 

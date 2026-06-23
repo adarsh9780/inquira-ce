@@ -8,9 +8,10 @@ test('unified sidebar keeps the current compact workspace and chat layout', () =
 
   assert.equal(source.includes('class="relative z-40 flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden sidebar-root"'), true)
   assert.equal(source.includes('sidebarConversationsByWorkspace'), true)
-  assert.equal(source.includes('visibleConversationsForWorkspace(workspace.id)'), true)
+  assert.equal(source.includes('visibleConversationsForSidebar(workspace)'), true)
   assert.equal(source.includes('data-conversation-actions-menu'), true)
   assert.equal(source.includes('sidebar-initials-avatar'), true)
   assert.equal(source.includes('UserCircleIcon'), false)
   assert.equal(source.includes('sidebar-brand-toggle'), false)
+  assert.equal(source.includes('filteredSidebarWorkspaces'), true)
 })

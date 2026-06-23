@@ -10,14 +10,14 @@ function read(relativePath) {
 test('sidebar keeps the bottom action stack and expanded-only labels', () => {
   const source = read('src/components/layout/UnifiedSidebar.vue')
 
-  assert.equal(source.includes("appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-3'"), true)
-  assert.equal(source.includes('class="text-[13px] font-medium">Settings</span>'), true)
-  assert.equal(source.includes("{{ appStore.isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar' }}"), true)
+  assert.equal(source.includes("appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-2.5'"), true)
+  assert.equal(source.includes('Settings'), true)
+  assert.equal(source.includes("{{ appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar' }}"), true)
   assert.equal(source.includes('{{ profileDisplayName }}'), true)
   assert.equal(source.includes('sidebar-initials-avatar'), true)
   assert.equal(source.includes('UserCircleIcon'), false)
   assert.equal(source.includes('Workspace settings'), true)
-  assert.equal(source.includes('visibleConversationsForWorkspace(workspace.id)'), true)
+  assert.equal(source.includes('visibleConversationsForSidebar(workspace)'), true)
   assert.equal(source.includes('Conversation Tree'), true)
 })
 

@@ -54,7 +54,7 @@ test('global tree lives in the dedicated page and opens turns', () => {
   assert.equal(sidebarSource.includes("appStore.activeTab === 'conversation-tree'"), true)
   assert.equal(sidebarSource.includes('SidebarGlobalTurnTree'), false)
   assert.equal(sidebarSource.includes('<SidebarConversations'), false)
-  assert.equal(sidebarSource.includes('visibleConversationsForWorkspace(workspace.id)'), true)
+  assert.equal(sidebarSource.includes('visibleConversationsForSidebar(workspace)'), true)
   assert.equal(rightPanelSource.includes("appStore.activeTab === 'conversation-tree'"), true)
   assert.equal(rightPanelSource.includes('<SidebarGlobalTurnTree variant="page" />'), true)
   assert.equal(globalTreeSource.includes('TurnTreeGraphView'), true)

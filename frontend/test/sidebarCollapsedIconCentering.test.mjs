@@ -9,7 +9,7 @@ test('collapsed sidebar relies on app-shell width and visually hidden label copy
 
   assert.equal(appSource.includes('width: 64px;'), true)
   assert.equal(sidebarSource.includes("max-w-0 opacity-0 ml-0"), true)
-  assert.equal(sidebarSource.includes("'max-w-[200px] opacity-100 ml-3'"), true)
+  assert.equal(sidebarSource.includes("'max-w-[176px] opacity-100 ml-2.5'"), true)
 })
 
 test('collapsed sidebar rows keep centered fixed-size icon containers', () => {
@@ -17,7 +17,9 @@ test('collapsed sidebar rows keep centered fixed-size icon containers', () => {
 
   const justifyCenterCount = (sidebarSource.match(/justify-center px-0/g) || []).length
   assert.ok(justifyCenterCount >= 3)
-  assert.ok(sidebarSource.includes('h-6 w-6 shrink-0 items-center justify-center'))
+  assert.ok(sidebarSource.includes('.sidebar-row-icon'))
+  assert.ok(sidebarSource.includes('height: 1.5rem;'))
+  assert.ok(sidebarSource.includes('width: 1.5rem;'))
   assert.ok(sidebarSource.includes("appStore.isSidebarCollapsed ? 'justify-center px-0'"))
 })
 
