@@ -17,7 +17,7 @@ test('collapsed sidebar expands only on explicit click and not on hover', () => 
   assert.equal(sidebarSource.includes('visibleConversationsForSidebar(workspace)'), true)
   assert.equal(sidebarSource.includes('title="Settings"'), true)
   assert.equal(sidebarSource.includes('<ChevronDoubleLeftIcon'), true)
-  assert.equal(sidebarSource.includes('<ChevronDoubleRightIcon'), true)
+  assert.equal(sidebarSource.includes('<ChevronDoubleRightIcon'), false)
 })
 
 test('sidebar branding keeps a stable fixed top row while the shell owns width animation', () => {
@@ -26,7 +26,8 @@ test('sidebar branding keeps a stable fixed top row while the shell owns width a
 
   assert.equal(appSource.includes('transition: width var(--motion-duration-standard) var(--motion-ease-standard);'), true)
   assert.equal(appSource.includes('.app-nav-pane-collapsed {'), true)
-  assert.equal(sidebarSource.includes('class="sidebar-brand-row"'), true)
-  assert.equal(sidebarSource.includes('class="sidebar-brand-button"'), true)
+  assert.equal(sidebarSource.includes('class="sidebar-brand-row justify-between px-4"'), true)
+  assert.equal(sidebarSource.includes('class="sidebar-brand-button justify-start"'), true)
+  assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start'"), false)
   assert.equal(sidebarSource.includes('alt="Inquira"'), true)
 })

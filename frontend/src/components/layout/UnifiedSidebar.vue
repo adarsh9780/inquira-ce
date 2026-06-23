@@ -4,12 +4,10 @@
   >
     <!-- ─── Brand / Collapse Toggle ─── -->
     <div
-      class="sidebar-brand-row"
-      :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'"
+      class="sidebar-brand-row justify-between px-4"
     >
       <button
-        class="sidebar-brand-button"
-        :class="appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start'"
+        class="sidebar-brand-button justify-start"
         :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         @click="handleBrandClick"
       >
@@ -42,8 +40,7 @@
       <nav class="flex-none space-y-1 py-3">
         <button
           type="button"
-          class="sidebar-nav-row sidebar-primary-row"
-          :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-2.5'"
+          class="sidebar-nav-row sidebar-primary-row justify-start px-2.5"
           title="New conversation"
           @click="createConversation()"
         >
@@ -60,8 +57,7 @@
 
         <button
           type="button"
-          class="sidebar-nav-row sidebar-primary-row"
-          :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-2.5'"
+          class="sidebar-nav-row sidebar-primary-row justify-start px-2.5"
           :title="sidebarSearchOpen ? 'Close search' : 'Search conversations'"
           @click="toggleSidebarSearch"
         >
@@ -89,9 +85,8 @@
 
         <button
           type="button"
-          class="sidebar-nav-row"
+          class="sidebar-nav-row justify-start px-2.5"
           :class="[
-            appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-2.5',
             appStore.activeTab === 'schema-editor' ? 'sidebar-nav-row-active' : '',
           ]"
           :title="shortcutTooltip('schema', appStore.isSidebarCollapsed ? 'Open schema editor' : 'Schema editor')"
@@ -110,9 +105,8 @@
 
         <button
           type="button"
-          class="sidebar-nav-row"
+          class="sidebar-nav-row justify-start px-2.5"
           :class="[
-            appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-2.5',
             appStore.activeTab === 'conversation-tree' ? 'sidebar-nav-row-active' : '',
           ]"
           :title="shortcutTooltip('conversation-tree', appStore.isSidebarCollapsed ? 'Open conversation tree' : 'Conversation tree')"
@@ -133,20 +127,10 @@
       <!-- ─── Workspaces and conversations ─── -->
       <div class="flex min-h-0 flex-1 flex-col border-t border-[var(--color-border)]/70 pt-3">
         <div
-          class="flex h-7 w-full items-center transition-all duration-300"
-          :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-between px-2.5'"
+          class="flex w-full items-center overflow-hidden transition-all duration-300"
+          :class="appStore.isSidebarCollapsed ? 'h-0 px-0 opacity-0' : 'h-7 justify-between px-2.5 opacity-100'"
         >
-          <button
-            v-if="appStore.isSidebarCollapsed"
-            type="button"
-            class="sidebar-icon-button"
-            title="Workspace settings"
-            @click.stop="appStore.openSettings('workspace')"
-          >
-            <Cog6ToothIcon class="h-4 w-4" />
-          </button>
-
-          <template v-else>
+          <template v-if="!appStore.isSidebarCollapsed">
             <span class="sidebar-section-label">
               Projects
             </span>
@@ -179,9 +163,8 @@
               <div class="group relative flex min-h-8 select-none items-center">
                 <button
                   type="button"
-                  class="sidebar-workspace-row"
+                  class="sidebar-workspace-row justify-start px-2.5"
                   :class="[
-                    appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-2.5',
                     appStore.activeWorkspaceId === workspace.id ? 'sidebar-workspace-row-active' : '',
                   ]"
                   :title="workspace.name || 'Untitled workspace'"
@@ -284,31 +267,10 @@
       <nav class="mt-auto pb-4 pt-2">
         <div class="mx-1 mb-2 h-px bg-[var(--color-border)] opacity-70" />
         <div class="flex flex-col space-y-0.5">
-
-          <button
-            type="button"
-            class="sidebar-nav-row"
-            :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-2.5'"
-            :title="appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-            @click="handleBrandClick"
-          >
-            <span class="sidebar-row-icon">
-              <ChevronDoubleRightIcon v-if="appStore.isSidebarCollapsed" class="h-5 w-5" />
-              <ChevronDoubleLeftIcon v-else class="h-5 w-5" />
-            </span>
-            <span
-              class="sidebar-row-label"
-              :class="appStore.isSidebarCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[176px] opacity-100 ml-2.5'"
-            >
-              {{ appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar' }}
-            </span>
-          </button>
-
           <!-- Settings -->
           <button
             type="button"
-            class="sidebar-nav-row"
-            :class="appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-2.5'"
+            class="sidebar-nav-row justify-start px-2.5"
             title="Settings"
             @click="appStore.openSettings('llm')"
           >
@@ -328,9 +290,8 @@
             <button
               ref="profileMenuButtonRef"
               type="button"
-              class="sidebar-nav-row"
+              class="sidebar-nav-row justify-start px-2.5"
               :class="[
-                appStore.isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-2.5',
                 profileMenuOpen
                   ? 'sidebar-nav-row-active'
                   : '',
@@ -470,7 +431,6 @@ import {
   ShareIcon,
   Cog6ToothIcon,
   ChevronDoubleLeftIcon,
-  ChevronDoubleRightIcon,
   MagnifyingGlassIcon,
   PencilSquareIcon,
   XMarkIcon,
@@ -1129,11 +1089,12 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 .sidebar-nav-row,
 .sidebar-workspace-row {
   display: flex;
-  min-height: 2.25rem;
+  height: 2.25rem;
   width: 100%;
   align-items: center;
   border-radius: 0.5rem;
   color: var(--color-text-muted);
+  overflow: hidden;
   text-align: left;
   transition:
     background-color var(--motion-duration-standard) var(--motion-ease-standard),
@@ -1163,6 +1124,11 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
+}
+
+.sidebar-row-icon :deep(svg) {
+  height: 1.25rem;
+  width: 1.25rem;
 }
 
 .sidebar-row-label {
@@ -1248,6 +1214,10 @@ watch(() => appStore.isSidebarCollapsed, (collapsed) => {
 }
 
 .sidebar-transition {
-  transition: all var(--motion-duration-slow) var(--motion-ease-emphasized) !important;
+  transition:
+    max-width var(--motion-duration-slow) var(--motion-ease-emphasized),
+    opacity var(--motion-duration-standard) var(--motion-ease-standard),
+    margin-left var(--motion-duration-slow) var(--motion-ease-emphasized) !important;
+  will-change: max-width, opacity, margin-left;
 }
 </style>

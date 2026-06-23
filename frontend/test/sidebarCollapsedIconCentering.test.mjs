@@ -12,15 +12,18 @@ test('collapsed sidebar relies on app-shell width and visually hidden label copy
   assert.equal(sidebarSource.includes("'max-w-[176px] opacity-100 ml-2.5'"), true)
 })
 
-test('collapsed sidebar rows keep centered fixed-size icon containers', () => {
+test('collapsed sidebar rows keep a stable fixed-size icon rail', () => {
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
 
-  const justifyCenterCount = (sidebarSource.match(/justify-center px-0/g) || []).length
-  assert.ok(justifyCenterCount >= 3)
+  assert.ok(sidebarSource.includes('class="sidebar-nav-row sidebar-primary-row justify-start px-2.5"'))
+  assert.ok(sidebarSource.includes('class="sidebar-workspace-row justify-start px-2.5"'))
   assert.ok(sidebarSource.includes('.sidebar-row-icon'))
   assert.ok(sidebarSource.includes('height: 1.5rem;'))
   assert.ok(sidebarSource.includes('width: 1.5rem;'))
-  assert.ok(sidebarSource.includes("appStore.isSidebarCollapsed ? 'justify-center px-0'"))
+  assert.ok(sidebarSource.includes('height: 2.25rem;'))
+  assert.ok(sidebarSource.includes('.sidebar-row-icon :deep(svg)'))
+  assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'justify-center' : 'justify-start'"), false)
+  assert.equal(sidebarSource.includes('transition: all var(--motion-duration-slow) var(--motion-ease-emphasized)'), false)
 })
 
 test('conversation ellipsis menu is restored on the sidebar conversation list', () => {

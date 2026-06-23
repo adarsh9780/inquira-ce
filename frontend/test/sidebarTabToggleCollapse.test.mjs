@@ -29,7 +29,7 @@ test('workspace views live in the sidebar instead of the status bar', () => {
   assert.equal(statusBarSource.includes('DocumentTextIcon'), false)
 })
 
-test('sidebar uses settings, collapse, and profile actions in the footer', () => {
+test('sidebar uses settings and profile actions in the footer', () => {
   const sidebarPath = resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue')
   const sidebarSource = readFileSync(sidebarPath, 'utf-8')
 
@@ -42,4 +42,5 @@ test('sidebar uses settings, collapse, and profile actions in the footer', () =>
   assert.equal(sidebarSource.includes('Account Settings'), true)
   assert.equal(sidebarSource.includes('Theme Preference'), true)
   assert.equal(sidebarSource.includes('@click="promptLogout'), false)
+  assert.equal(sidebarSource.includes("{{ appStore.isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar' }}"), false)
 })
