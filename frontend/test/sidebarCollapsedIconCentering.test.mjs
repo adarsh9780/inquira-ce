@@ -28,8 +28,11 @@ test('collapsed sidebar rows keep a stable fixed-size icon rail', () => {
 
 test('conversation ellipsis menu is restored on the sidebar conversation list', () => {
   const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
+  const rowSource = readFileSync(resolve(process.cwd(), 'src/components/layout/sidebar/SidebarConversationRow.vue'), 'utf-8')
+  const menuSource = readFileSync(resolve(process.cwd(), 'src/components/layout/sidebar/SidebarConversationActionsMenu.vue'), 'utf-8')
 
   assert.equal(sidebarSource.includes("appStore.isSidebarCollapsed ? 'hidden' :"), false)
-  assert.equal(sidebarSource.includes('data-conversation-actions-menu'), true)
-  assert.equal(sidebarSource.includes('EllipsisHorizontalIcon'), true)
+  assert.equal(sidebarSource.includes('<SidebarConversationRow'), true)
+  assert.equal(menuSource.includes('data-conversation-actions-menu'), true)
+  assert.equal(rowSource.includes('EllipsisHorizontalIcon'), true)
 })

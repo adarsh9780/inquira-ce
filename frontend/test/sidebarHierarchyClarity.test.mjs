@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 
 test('sidebar communicates active workspace context, chats, and bottom actions', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/layout/UnifiedSidebar.vue'), 'utf-8')
+  const menuSource = readFileSync(resolve(process.cwd(), 'src/components/layout/sidebar/SidebarConversationActionsMenu.vue'), 'utf-8')
 
   assert.equal(source.includes('Workspace settings'), true)
   assert.equal(source.includes('workspaceRuntimeLabel'), false)
@@ -12,7 +13,7 @@ test('sidebar communicates active workspace context, chats, and bottom actions',
   assert.equal(source.includes('visibleConversationsForSidebar(workspace)'), true)
   assert.equal(source.includes('Search conversations'), true)
   assert.equal(source.includes('New conversation'), true)
-  assert.equal(source.includes('data-conversation-actions-menu'), true)
+  assert.equal(menuSource.includes('data-conversation-actions-menu'), true)
   assert.equal(source.includes('Conversation Tree'), true)
   assert.equal(source.includes('Profile Settings'), true)
   assert.equal(source.includes('Datasets</p>'), false)

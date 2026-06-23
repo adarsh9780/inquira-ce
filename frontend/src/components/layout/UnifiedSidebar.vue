@@ -197,57 +197,21 @@
                   New conversation
                 </button>
                 <template v-else>
-                  <div
+                  <SidebarConversationRow
                     v-for="conv in visibleConversationsForSidebar(workspace)"
                     :key="conv.id"
-                    class="group relative min-h-8 select-none rounded-md cursor-pointer transition-colors hover:bg-[var(--color-text-main)]/5"
-                    :class="[
-                      'px-2 py-1.5',
-                      appStore.activeConversationId === conv.id ? 'bg-[var(--color-selected-surface)] text-[var(--color-text-main)]' : 'text-[var(--color-text-muted)]',
-                    ]"
-                    :title="conv.title || 'Untitled'"
-                    @click="selectConversation(workspace.id, conv.id)"
-                    @contextmenu.prevent="openConversationContextMenu($event, conv.id)"
-                  >
-                    <div v-if="editingId === conv.id" class="flex w-full items-center gap-1" @click.stop>
-                      <input
-                        :ref="(el) => { if (el) editInputs[conv.id] = el }"
-                        v-model="editingTitleValue"
-                        class="w-full rounded border border-[var(--color-accent)] bg-[var(--color-surface)] px-2 py-1 text-[14px] text-[var(--color-text-main)] outline-none"
-                        @keydown.enter.prevent="saveTitle(conv.id)"
-                        @keydown.esc.prevent="cancelEditing"
-                        @blur="saveTitle(conv.id)"
-                      />
-                    </div>
-
-                    <template v-else>
-                      <div class="flex min-w-0 items-center gap-2 pr-6">
-                        <p
-                          class="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug"
-                          :class="appStore.activeConversationId === conv.id
-                            ? 'text-[var(--color-text-main)]'
-                            : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]'"
-                          :title="conv.title || 'Untitled'"
-                        >
-                          {{ conv.title || 'Untitled' }}
-                        </p>
-                        <p class="shrink-0 text-[12px] leading-none text-[var(--color-text-muted)]">
-                          {{ formatConversationTimestamp(conv) }}
-                        </p>
-                      </div>
-
-                      <div class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100">
-                        <button
-                          type="button"
-                          class="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--color-panel)] text-[var(--color-text-muted)] shadow-sm hover:bg-[var(--color-surface)] hover:text-[var(--color-text-main)] focus:outline-none"
-                          title="Conversation actions"
-                          @click.stop="toggleConversationMenu($event, conv.id)"
-                        >
-                          <EllipsisHorizontalIcon class="h-4 w-4" />
-                        </button>
-                      </div>
-                    </template>
-                  </div>
+                    v-model:editing-title-value="editingTitleValue"
+                    :conversation="conv"
+                    :active="appStore.activeConversationId === conv.id"
+                    :is-editing="editingId === conv.id"
+                    :compact-timestamp="formatConversationTimestamp(conv)"
+                    :menu-open="conversationMenuId === conv.id"
+                    @select="selectConversation(workspace.id, conv.id)"
+                    @contextmenu="openConversationContextMenu($event, conv.id)"
+                    @toggle-menu="toggleConversationMenu($event, conv.id)"
+                    @save-title="saveTitle(conv.id)"
+                    @cancel-edit="cancelEditing"
+                  />
                   <button
                     v-if="hasHiddenConversationsForSidebar(workspace)"
                     type="button"
@@ -366,15 +330,6 @@
           Keyboard Shortcuts
         </button>
         <div class="h-px bg-[var(--color-border)] my-1 opacity-60" />
-        <template v-if="false">
-          <button
-            type="button"
-            class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
-            @click="openProfileSection('terms')"
-          >
-            Legal &amp; Terms
-          </button>
-        </template>
         <button
           type="button"
           class="w-full px-3 py-2 text-left text-[13px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
@@ -384,29 +339,14 @@
         </button>
       </div>
     </Teleport>
-    <Teleport to="body">
-      <div
-        v-if="conversationMenuId"
-        class="fixed z-50 w-32 rounded-lg border border-[var(--color-border)] bg-[var(--color-panel-elevated)] py-1 shadow-lg"
-        :style="conversationMenuStyle"
-        data-conversation-actions-menu
-      >
-        <button
-          type="button"
-          class="w-full px-3 py-1.5 text-left text-[12px] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-panel-muted)] transition-colors"
-          @click.stop="startEditingFromMenu(activeConversationMenuTarget)"
-        >
-          Rename
-        </button>
-        <button
-          type="button"
-          class="w-full px-3 py-1.5 text-left text-[12px] font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
-          @click.stop="confirmDeleteConversation(conversationMenuId)"
-        >
-          Delete
-        </button>
-      </div>
-    </Teleport>
+    <SidebarConversationActionsMenu
+      :is-open="Boolean(conversationMenuId)"
+      :position="conversationMenuPosition"
+      :exact-date="activeConversationMenuExactDate"
+      @rename="startEditingFromMenu(activeConversationMenuTarget)"
+      @delete="confirmDeleteConversation(conversationMenuId)"
+      @close="closeConversationMenu"
+    />
   </div>
 </template>
 
@@ -416,17 +356,18 @@ import { useAppStore } from '../../stores/appStore'
 import { useAuthStore } from '../../stores/authStore'
 import { toast } from '../../composables/useToast'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { formatTimestamp } from '../../utils/dateUtils'
+import { formatCompactRelativeTimestamp, formatExactTimestamp } from '../../utils/dateUtils'
 import { shortcutTitle } from '../../utils/keyboardShortcuts'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
 import KeyboardShortcutsModal from '../modals/KeyboardShortcutsModal.vue'
 import TermsModal from '../modals/TermsModal.vue'
+import SidebarConversationActionsMenu from './sidebar/SidebarConversationActionsMenu.vue'
+import SidebarConversationRow from './sidebar/SidebarConversationRow.vue'
 import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
 
 import {
   FolderOpenIcon,
-  EllipsisHorizontalIcon,
   CircleStackIcon,
   ShareIcon,
   Cog6ToothIcon,
@@ -443,7 +384,6 @@ const authStore = useAuthStore()
 // ─── UI State ────────────────────────────────────────────────────────────────
 const editingId         = ref(null)
 const editingTitleValue = ref('')
-const editInputs        = ref({})
 const isSaving          = ref(false)
 
 const conversationMenuId       = ref(null)
@@ -466,9 +406,7 @@ const isTermsOpen         = ref(false)
 const isDeleteDialogOpen  = ref(false)
 const deleteDialogTitle   = ref('')
 const deleteDialogMessage = ref('')
-const pendingDeleteType   = ref('')
 const pendingDeleteId     = ref('')
-const pendingDeleteIds    = ref([])
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const profileDisplayName = computed(() => {
@@ -489,16 +427,15 @@ const profileMenuStyle = computed(() => ({
   top: `${profileMenuPosition.value.top}px`,
 }))
 
-const conversationMenuStyle = computed(() => ({
-  left: `${conversationMenuPosition.value.x}px`,
-  top: `${conversationMenuPosition.value.y}px`,
-}))
-
 const activeConversationMenuTarget = computed(() => {
   const id = String(conversationMenuId.value || '').trim()
   if (!id) return null
   return findSidebarConversation(id)
 })
+
+const activeConversationMenuExactDate = computed(() => (
+  formatExactTimestamp(conversationTimestampValue(activeConversationMenuTarget.value))
+))
 
 const normalizedSidebarSearchQuery = computed(() => (
   String(sidebarSearchQuery.value || '').trim().toLowerCase()
@@ -692,9 +629,13 @@ function openConversationTree() {
   appStore.setActiveTab('conversation-tree')
 }
 
+function conversationTimestampValue(conversation) {
+  return conversation?.last_turn_at || conversation?.updated_at || conversation?.created_at
+}
+
 function formatConversationTimestamp(conversation) {
-  if (appStore.isConversationRunning(conversation?.id)) return 'Running...'
-  return formatTimestamp(conversation?.last_turn_at || conversation?.updated_at || conversation?.created_at)
+  if (appStore.isConversationRunning(conversation?.id)) return 'Run'
+  return formatCompactRelativeTimestamp(conversationTimestampValue(conversation)) || '-'
 }
 
 // ─── Profile menu ─────────────────────────────────────────────────────────────
@@ -825,13 +766,6 @@ function startEditing(conv) {
   closeConversationMenu()
   editingId.value         = conv.id
   editingTitleValue.value = conv.title || 'Untitled'
-  setTimeout(() => {
-    const el = editInputs.value[conv.id]
-    if (el) {
-      el.focus()
-      el.select()
-    }
-  }, 50)
 }
 
 function cancelEditing() {
@@ -885,7 +819,7 @@ async function saveTitle(id) {
 }
 
 // ─── Conversation context menu ────────────────────────────────────────────────
-function clampMenuPosition(x, y, width = 160, height = 96) {
+function clampMenuPosition(x, y, width = 208, height = 128) {
   const gap = 8
   const viewportWidth = typeof window === 'undefined' ? width + gap * 2 : window.innerWidth
   const viewportHeight = typeof window === 'undefined' ? height + gap * 2 : window.innerHeight
@@ -898,9 +832,9 @@ function clampMenuPosition(x, y, width = 160, height = 96) {
 function positionConversationMenuFromEvent(event) {
   const rect = event?.currentTarget?.getBoundingClientRect?.()
   if (rect) {
-    return clampMenuPosition(rect.right - 128, rect.bottom + 4, 128, 88)
+    return clampMenuPosition(rect.right - 208, rect.bottom + 4, 208, 128)
   }
-  return clampMenuPosition(event?.clientX || 0, event?.clientY || 0, 128, 88)
+  return clampMenuPosition(event?.clientX || 0, event?.clientY || 0, 208, 128)
 }
 
 function openSingleConversationMenu(conversationId, position) {
@@ -924,7 +858,7 @@ function openConversationContextMenu(event, conversationId) {
   closeConversationMenu()
   const id = String(conversationId || '').trim()
   if (!id) return
-  openSingleConversationMenu(id, clampMenuPosition(event?.clientX || 0, event?.clientY || 0, 128, 88))
+  openSingleConversationMenu(id, clampMenuPosition(event?.clientX || 0, event?.clientY || 0, 208, 128))
 }
 
 function startEditingFromMenu(conv) {
@@ -946,9 +880,7 @@ function confirmDeleteConversation(conversationId) {
   closeConversationMenu()
 
   const target = findSidebarConversation(conversationId)
-  pendingDeleteType.value   = 'conversation'
   pendingDeleteId.value     = conversationId
-  pendingDeleteIds.value    = []
   deleteDialogTitle.value   = 'Delete Conversation'
   deleteDialogMessage.value = `Are you sure you want to delete "${target?.title || 'Untitled'}"? This action cannot be undone.`
   isDeleteDialogOpen.value  = true
@@ -956,28 +888,17 @@ function confirmDeleteConversation(conversationId) {
 
 function closeDeleteDialog() {
   isDeleteDialogOpen.value  = false
-  pendingDeleteType.value   = ''
   pendingDeleteId.value     = ''
-  pendingDeleteIds.value    = []
   deleteDialogTitle.value   = ''
   deleteDialogMessage.value = ''
 }
 
 async function confirmDelete() {
-  if (!pendingDeleteId.value && pendingDeleteIds.value.length === 0) return
+  if (!pendingDeleteId.value) return
   try {
-    if (pendingDeleteType.value === 'conversation') {
-      await appStore.deleteConversationById(pendingDeleteId.value)
-      removeConversationFromSidebarCache(pendingDeleteId.value)
-      toast.success('Conversation Deleted', 'Conversation has been removed.')
-    } else if (pendingDeleteType.value === 'conversations') {
-      const ids = [...pendingDeleteIds.value]
-      for (const id of ids) {
-        await appStore.deleteConversationById(id)
-        removeConversationFromSidebarCache(id)
-      }
-      toast.success('Conversations Deleted', `${ids.length} conversations have been removed.`)
-    }
+    await appStore.deleteConversationById(pendingDeleteId.value)
+    removeConversationFromSidebarCache(pendingDeleteId.value)
+    toast.success('Conversation Deleted', 'Conversation has been removed.')
     closeDeleteDialog()
   } catch (error) {
     toast.error('Delete Error', extractApiErrorMessage(error, 'Failed to delete'))
