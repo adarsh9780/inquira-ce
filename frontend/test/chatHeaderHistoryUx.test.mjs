@@ -1,12 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 test('chat tab uses compact header controls without history modal', () => {
   const componentPath = resolve(process.cwd(), 'src/components/chat/ChatTab.vue')
+  const obsoleteHistoryModalPath = resolve(process.cwd(), 'src/components/chat/ConversationHistoryModal.vue')
   const source = readFileSync(componentPath, 'utf-8')
 
+  assert.equal(existsSync(obsoleteHistoryModalPath), false)
   assert.equal(source.includes('ConversationHistoryModal'), false)
   assert.equal(source.includes('title="Conversation history"'), false)
   assert.equal(source.includes('title="New Conversation"'), true)

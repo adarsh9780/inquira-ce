@@ -18,6 +18,7 @@ import pytest
         "app.database.database",
         "app.database.database_manager",
         "app.core.path_utils",
+        "app.services.execution_service",
     ],
 )
 def test_removed_legacy_modules_fail_fast(module_name):
@@ -31,3 +32,4 @@ def test_legacy_source_directories_removed():
     assert (root / "agent").exists() is False
     assert (root / "database").exists() is False
     assert (root / "core" / "path_utils.py").exists() is False
+    assert (root / "services" / "execution_service.py").exists() is False
