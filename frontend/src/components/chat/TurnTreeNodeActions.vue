@@ -1,17 +1,18 @@
 <template>
-  <div
-    v-if="contextMenu.open"
-    class="fixed z-[85] w-36 rounded-lg border border-[var(--color-border)] bg-[var(--color-panel-elevated)] py-1 shadow-lg"
-    :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
-    data-turn-tree-context-menu
-  >
-    <button v-for="action in actions" :key="action.id" type="button" class="w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors hover:bg-[var(--color-panel-muted)]" :class="action.id === 'delete' ? 'text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)]' : 'text-[var(--color-text-main)]'" @click="handleContextAction(action.id)">
-      {{ action.label }}
-    </button>
-  </div>
+  <FloatingActionMenu
+    :is-open="contextMenu.open"
+    :position="{ x: contextMenu.x, y: contextMenu.y }"
+    :items="actions"
+    marker-attr="data-turn-tree-context-menu"
+    width-class="w-40"
+    :width="160"
+    :height="144"
+    @select="handleContextAction"
+    @close="closeContextMenu"
+  />
 
   <div v-if="detailModalOpen" class="fixed inset-0 z-[86] flex items-center justify-center p-4" role="dialog" aria-modal="true">
-    <div class="absolute inset-0 bg-black/25" @click="closeDetailModal"></div>
+    <div class="modal-overlay" @click="closeDetailModal"></div>
     <div class="modal-card relative flex w-full max-w-2xl flex-col overflow-hidden" @click.stop>
       <div class="modal-header flex-col items-start gap-1">
         <h3 class="text-base font-semibold text-[var(--color-text-main)]">Turn Details</h3>
@@ -66,13 +67,14 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { apiService } from '../../services/apiService'
 import { formatTimestamp } from '../../utils/dateUtils'
 import { formatUsageCompact, formatUsageTooltip } from '../../utils/usageFormat'
+import FloatingActionMenu from '../ui/FloatingActionMenu.vue'
 
 const emit = defineEmits(['select', 'mark-final', 'delete-turn'])
 const actions = [
   { id: 'open', label: 'Open' },
   { id: 'mark-final', label: 'Mark Final' },
   { id: 'view-details', label: 'View Details' },
-  { id: 'delete', label: 'Delete' },
+  { id: 'delete', label: 'Delete', destructive: true, dividerBefore: true },
 ]
 const contextMenu = ref({ open: false, conversationId: '', turnId: '', x: 0, y: 0 })
 const detailModalOpen = ref(false)
@@ -131,18 +133,11 @@ function handleEscape(event) {
   }
 }
 
-function handleGlobalPointerDown(event) {
-  if (!(event?.target instanceof Element) || event.target.closest('[data-turn-tree-context-menu]')) return
-  closeContextMenu()
-}
-
 onMounted(() => {
   document.addEventListener('keydown', handleEscape)
-  document.addEventListener('pointerdown', handleGlobalPointerDown)
 })
 onUnmounted(() => {
   document.removeEventListener('keydown', handleEscape)
-  document.removeEventListener('pointerdown', handleGlobalPointerDown)
 })
 
 defineExpose({ open })

@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import TurnTreeGraphView from '../src/components/chat/TurnTreeGraphView.vue'
 
@@ -18,6 +18,10 @@ const conversations = [
 ]
 
 describe('TurnTreeGraphView', () => {
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
   it('renders separate accessible graphs and emits node selections', async () => {
     const wrapper = mount(TurnTreeGraphView, {
       props: { conversations, currentTurnId: 'turn-2', currentParentTurnId: 'turn-1', variant: 'page' },
@@ -36,10 +40,12 @@ describe('TurnTreeGraphView', () => {
     const wrapper = mount(TurnTreeGraphView, { props: { conversations } })
 
     await wrapper.get('button[aria-label="Actions for turn 1"]').trigger('click', { clientX: 20, clientY: 30 })
-    expect(wrapper.text()).toContain('Mark Final')
+    expect(document.body.textContent).toContain('Mark Final')
 
-    const markFinal = wrapper.findAll('[data-turn-tree-context-menu] button').find((button) => button.text() === 'Mark Final')
-    await markFinal.trigger('click')
+    const markFinal = Array.from(document.body.querySelectorAll('[data-turn-tree-context-menu] button'))
+      .find((button) => button.textContent.trim() === 'Mark Final')
+    markFinal.click()
+    await wrapper.vm.$nextTick()
     expect(wrapper.emitted('mark-final')).toEqual([[{ conversationId: 'conversation-1', turnId: 'turn-1' }]])
   })
 
@@ -48,8 +54,9 @@ describe('TurnTreeGraphView', () => {
 
     await wrapper.get('button[aria-label="Open turn 2"]').trigger('contextmenu', { clientX: 40, clientY: 50 })
 
-    expect(wrapper.find('[data-turn-tree-context-menu]').exists()).toBe(true)
-    expect(wrapper.find('[data-turn-tree-context-menu]').attributes('style')).toContain('left: 40px')
+    const menu = document.body.querySelector('[data-turn-tree-context-menu]')
+    expect(menu).toBeTruthy()
+    expect(menu.getAttribute('style')).toContain('left: 40px')
   })
 
   it('provides zoom and reset controls with clamped zoom behavior', async () => {

@@ -186,7 +186,7 @@
           <span>Alerts</span>
           <span
             v-if="unreadNotificationCount > 0"
-            class="absolute -right-0.5 -top-0.5 inline-flex min-w-[1rem] items-center justify-center rounded-full px-1 text-[9px] font-semibold leading-4 text-white"
+            class="absolute -right-0.5 -top-0.5 inline-flex min-w-[1rem] items-center justify-center rounded-full px-1 text-[9px] font-semibold leading-4 text-[var(--color-on-accent)]"
             style="background-color: var(--color-error);"
           >
             {{ unreadNotificationBadge }}

@@ -40,11 +40,11 @@
                 <div class="h-5 w-12 rounded-full" :style="{ backgroundColor: theme.preview[2] }"></div>
               </div>
               <div class="mt-3 grid grid-cols-2 gap-2">
-                <div class="rounded-md border p-2" :style="{ borderColor: theme.preview[1], backgroundColor: 'color-mix(in srgb, white 35%, transparent)' }">
+                <div class="theme-preview-surface theme-preview-surface-raised rounded-md border p-2" :style="{ borderColor: theme.preview[1] }">
                   <div class="h-1.5 w-10 rounded-full opacity-30" :style="{ backgroundColor: theme.preview[2] }"></div>
                   <div class="mt-2 h-4 w-full rounded-md" :style="{ backgroundColor: theme.preview[2] }"></div>
                 </div>
-                <div class="rounded-md border p-2" :style="{ borderColor: theme.preview[1], backgroundColor: 'color-mix(in srgb, black 4%, transparent)' }">
+                <div class="theme-preview-surface theme-preview-surface-muted rounded-md border p-2" :style="{ borderColor: theme.preview[1] }">
                   <div class="h-1.5 w-8 rounded-full opacity-30" :style="{ backgroundColor: theme.preview[2] }"></div>
                   <div class="mt-2 h-4 w-full rounded-md opacity-30" :style="{ backgroundColor: theme.preview[2] }"></div>
                 </div>
@@ -145,3 +145,13 @@ function selectCodeFont(fontId) {
   appStore.setUiCodeFont(fontId)
 }
 </script>
+
+<style scoped>
+.theme-preview-surface-raised {
+  background-color: color-mix(in srgb, var(--color-base) 72%, transparent);
+}
+
+.theme-preview-surface-muted {
+  background-color: color-mix(in srgb, var(--color-text-main) 4%, transparent);
+}
+</style>

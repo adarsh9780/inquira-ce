@@ -56,11 +56,13 @@ test('settings-related modals use shared modal primitives and avoid scoped globa
 test('dropdown, toast, and blocking overlays use layer utility classes', () => {
   const headerDropdown = read('src/components/ui/HeaderDropdown.vue')
   const multiSelectDropdown = read('src/components/ui/MultiSelectDropdown.vue')
+  const sharedDropdown = read('src/components/ui/dropdownShared.js')
   const toastContainer = read('src/components/ui/ToastContainer.vue')
   const appSource = read('src/App.vue')
 
-  assert.equal(headerDropdown.includes('class="layer-modal-dropdown fixed'), true)
-  assert.equal(multiSelectDropdown.includes('class="layer-modal-dropdown fixed'), true)
+  assert.equal(headerDropdown.includes('dropdownSurfaceClass'), true)
+  assert.equal(multiSelectDropdown.includes('dropdownSurfaceClass'), true)
+  assert.equal(sharedDropdown.includes("layer-modal-dropdown fixed"), true)
   assert.equal(toastContainer.includes('class="layer-toast fixed'), true)
 
   assert.equal(appSource.includes('class="layer-blocking fixed inset-0'), true)

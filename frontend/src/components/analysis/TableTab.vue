@@ -20,7 +20,7 @@
     </Teleport>
 
     <Teleport to="#workspace-right-pane-toolbar-right" v-if="isMounted && appStore.dataPane === 'table'">
-      <div class="flex min-w-0 items-center justify-end w-full gap-2">
+      <TableToolbar>
         <div v-if="tableStatusMessage" class="flex items-center gap-2 text-[12px] leading-[1.3] mr-1" :class="tableStatusClass">
           <div
             v-if="isPageLoading"
@@ -83,10 +83,10 @@
           <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4" />
           <div v-else class="h-4 w-4 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-text-main)]"></div>
         </button>
-      </div>
+      </TableToolbar>
     </Teleport>
 
-    <div class="flex-1 relative mt-1 table-pane-surface">
+    <TableGridShell>
       <!-- Grid: infinite model -->
       <ag-grid-vue
         v-if="selectedArtifactId && hasRenderableRows && useInfiniteModel"
@@ -193,18 +193,16 @@
       </div>
 
       <!-- Empty state: no artifacts at all -->
-      <div
+      <TableEmptyState
         v-else
-        class="absolute inset-0 flex items-center justify-center"
-        style="background-color: var(--color-base);"
+        title="No data to display"
+        subtitle="Run code to generate table data"
       >
-        <div class="text-center">
+        <template #icon>
           <TableCellsIcon class="h-12 w-12 mx-auto mb-3" style="color: var(--color-border);" />
-          <p class="text-sm" style="color: var(--color-text-muted);">No data to display</p>
-          <p class="text-xs mt-1" style="color: var(--color-text-muted);">Run code to generate table data</p>
-        </div>
-      </div>
-    </div>
+        </template>
+      </TableEmptyState>
+    </TableGridShell>
   </div>
 
   <ConfirmationModal
@@ -227,8 +225,12 @@ import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
+import TableEmptyState from './table/TableEmptyState.vue'
+import TableGridShell from './table/TableGridShell.vue'
+import TableToolbar from './table/TableToolbar.vue'
 import { toast } from '../../composables/useToast'
 import { persistExportFile } from '../../utils/exportFile'
+import { useTableArtifacts } from '../../composables/useTableArtifacts'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 import {
@@ -239,6 +241,7 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const appStore = useAppStore()
+useTableArtifacts()
 
 const pageSize = 100
 const isDownloading = ref(false)

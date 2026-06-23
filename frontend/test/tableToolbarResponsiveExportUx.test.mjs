@@ -5,12 +5,15 @@ import { resolve } from 'node:path'
 
 test('table toolbar keeps selector flexible and uses icon-only actions with hover labels', () => {
   const tableTabPath = resolve(process.cwd(), 'src/components/analysis/TableTab.vue')
+  const tableToolbarPath = resolve(process.cwd(), 'src/components/analysis/table/TableToolbar.vue')
   const source = readFileSync(tableTabPath, 'utf-8')
+  const toolbar = readFileSync(tableToolbarPath, 'utf-8')
 
   assert.equal(source.includes('Teleport to="#workspace-right-pane-toolbar-center"'), true)
   assert.equal(source.includes('Teleport to="#workspace-right-pane-toolbar-right"'), true)
   assert.equal(source.includes('class="flex min-w-0 w-full items-center justify-center"'), true)
-  assert.equal(source.includes('class="flex min-w-0 items-center justify-end w-full gap-2"'), true)
+  assert.equal(source.includes('<TableToolbar'), true)
+  assert.equal(toolbar.includes('class="flex min-w-0 items-center justify-end w-full gap-2"'), true)
   assert.equal(source.includes('class="flex min-w-[11rem] w-full items-center"'), true)
   assert.equal(source.includes('style="max-width: clamp(11rem, 34vw, 20rem);"'), true)
   assert.equal(source.includes('FunnelIcon'), true)

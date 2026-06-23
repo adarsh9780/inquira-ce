@@ -41,34 +41,11 @@
         :disabled="!appStore.canAnalyze || appStore.activeConversationIsLoading"
       />
 
-      <div v-if="pendingAttachments.length" class="px-4 pb-2">
-        <div class="flex flex-wrap gap-2">
-          <div
-            v-for="attachment in pendingAttachments"
-            :key="attachment.attachment_id"
-            class="group/attachment flex items-center gap-2 rounded-xl border px-2 py-2"
-            style="border-color: var(--color-border); background-color: color-mix(in srgb, var(--color-surface) 75%, transparent);"
-          >
-            <img
-              :src="attachment.preview_url"
-              :alt="attachment.filename"
-              class="h-12 w-12 rounded-lg object-cover"
-            />
-            <div class="min-w-0">
-              <p class="max-w-[150px] truncate text-xs font-medium" style="color: var(--color-text-main);">{{ attachment.filename }}</p>
-              <p class="text-[11px]" style="color: var(--color-text-muted);">{{ formatAttachmentSize(attachment.size) }}</p>
-            </div>
-            <button
-              type="button"
-              class="btn-icon opacity-70 transition-opacity group-hover/attachment:opacity-100"
-              title="Remove image"
-              @click="removePendingAttachment(attachment.attachment_id)"
-            >
-              <XMarkIcon class="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </div>
+      <ChatAttachmentTray
+        :attachments="pendingAttachments"
+        :format-size="formatAttachmentSize"
+        @remove="removePendingAttachment"
+      />
 
       <div
         v-if="isAttachmentDragActive"
@@ -82,7 +59,7 @@
       </div>
 
       <!-- Bottom Action Row -->
-      <div class="flex flex-wrap items-center justify-between gap-2 px-3 pb-3 pt-1">
+      <ChatComposerActions>
 
         <!-- Left: Add button + turn controls -->
         <div class="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -154,7 +131,7 @@
           </button>
         </div>
 
-      </div>
+      </ChatComposerActions>
       </div>
 
       <div
@@ -221,10 +198,14 @@ import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import { modelSupportsImages, SUPPORTED_CHAT_IMAGE_TYPES } from '../../utils/modelCapabilities'
 import ModelSelector from '../ui/ModelSelector.vue'
 import ColumnSuggest from './ColumnSuggest.vue'
+import ChatAttachmentTray from './ChatAttachmentTray.vue'
+import ChatComposerActions from './ChatComposerActions.vue'
+import { useChatAttachments } from '../../composables/useChatAttachments'
+import { useChatAutocomplete } from '../../composables/useChatAutocomplete'
+import { useVoiceInput } from '../../composables/useVoiceInput'
 import {
   PlusIcon,
   ExclamationTriangleIcon,
-  XMarkIcon,
   PhotoIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -232,6 +213,9 @@ import {
 import { ArrowUpIcon, MicrophoneIcon, StopIcon } from '@heroicons/vue/24/solid'
 
 const appStore = useAppStore()
+const { formatAttachmentSize } = useChatAttachments()
+useChatAutocomplete()
+useVoiceInput()
 
 const question = ref('')
 const isFocused = ref(false)
@@ -376,14 +360,6 @@ function sortArtifactsNewestFirst(items) {
     if (delta !== 0) return delta
     return String(right?.artifact_id || '').localeCompare(String(left?.artifact_id || ''))
   })
-}
-
-function formatAttachmentSize(size) {
-  const bytes = Number(size || 0)
-  if (!Number.isFinite(bytes) || bytes <= 0) return 'Image'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function buildAttachmentId(file) {

@@ -25,7 +25,7 @@
       class="group"
     >
       <!-- User Message -->
-      <div class="w-full mb-1">
+      <ChatUserMessage>
         <div class="user-turn-bubble px-3 py-2.5 rounded-2xl rounded-tl-sm">
           <div v-if="message.attachments && message.attachments.length" class="mb-3 grid grid-cols-2 gap-2">
             <img
@@ -57,10 +57,10 @@
             <DocumentDuplicateIcon v-else class="h-3 w-3" />
           </button>
         </div>
-      </div>
+      </ChatUserMessage>
 
       <!-- Assistant Response -->
-      <div v-if="hasAssistantContent(message)" class="w-full group">
+      <ChatAssistantMessage v-if="hasAssistantContent(message)">
         <div class="px-3 py-2.5 rounded-2xl rounded-tl-sm" style="background-color: transparent">
           <div v-if="reasoningRows(message).length" class="stream-reasoning-list">
             <div v-for="row in reasoningRows(message)" :key="row.id" class="stream-reasoning-item">
@@ -171,7 +171,7 @@
             </button>
           </div>
         </div>
-      </div>
+      </ChatAssistantMessage>
     </div>
 
     <!-- Loading indicator when analyzing - shown below last message -->
@@ -225,6 +225,8 @@ import {
 } from '@heroicons/vue/24/outline'
 import ToolActivityCard from './ToolActivityCard.vue'
 import AgentIntervention from './AgentIntervention.vue'
+import ChatAssistantMessage from './ChatAssistantMessage.vue'
+import ChatUserMessage from './ChatUserMessage.vue'
 import { toolOutputHasRenderableContent } from '../../utils/toolOutputPreview'
 import MarkdownIt from 'markdown-it'
 import markdownItKatex from 'markdown-it-katex'
@@ -234,6 +236,7 @@ import 'prismjs/components/prism-python'
 import 'prismjs/components/prism-sql'
 import { formatTimestamp } from '../../utils/dateUtils'
 import { toast } from '../../composables/useToast'
+import { useChatScrollFollow } from '../../composables/useChatScrollFollow'
 import 'katex/dist/katex.min.css'
 
 // Configure DOMPurify to add security attributes to links
@@ -246,6 +249,7 @@ DOMPurify.addHook('afterSanitizeAttributes', function(node) {
 
 
 const appStore = useAppStore()
+useChatScrollFollow()
 const chatContainer = ref(null)
 const scrollHost = ref(null)
 const end = ref(null)

@@ -23,21 +23,21 @@
           leave-to-class="opacity-0"
         >
           <ListboxOptions
-            class="absolute z-50 bottom-full mb-2 right-0 min-w-[200px] rounded-lg py-1 text-xs shadow-md focus:outline-none overflow-hidden"
+            :class="modelDropdownSurfaceClass"
             style="background-color: var(--color-workspace-surface); border: 1px solid var(--color-border);"
           >
             <div class="px-2 pb-1 pt-1">
               <input
                 v-model="searchQuery"
                 type="text"
-                class="w-full rounded-md border px-2 py-1 text-[12px] focus:outline-none"
+                :class="dropdownSearchInputClass"
                 placeholder="Search model"
-                style="background-color: var(--color-base); border-color: var(--color-border); color: var(--color-text-main);"
+                :style="dropdownSearchInputStyle"
                 @click.stop
                 @keydown.stop
               />
             </div>
-            <div v-if="backendLoading && searchQuery" class="px-3 pb-1 text-[11px]" style="color: var(--color-text-muted);">
+            <div v-if="backendLoading && searchQuery" class="px-3 pb-1 text-[11px]" :style="dropdownMutedTextStyle">
               Searching...
             </div>
             <ListboxOption
@@ -48,11 +48,8 @@
               as="template"
             >
               <li
-                :style="{
-                  backgroundColor: active ? 'color-mix(in srgb, var(--color-surface) 78%, transparent)' : 'transparent',
-                  color: 'var(--color-text-main)'
-                }"
-                class="relative cursor-default select-none py-2 pl-3 pr-9 flex items-center justify-between"
+                :style="dropdownOptionStyle(active, { activeMix: 'var(--color-surface) 78%' })"
+                :class="[dropdownOptionClass, 'pl-3 pr-9 flex items-center justify-between']"
               >
                 <span :class="selected ? 'font-semibold' : 'font-normal'" class="block truncate">
                   {{ model.label }}
@@ -64,8 +61,8 @@
             </ListboxOption>
             <li
               v-if="!backendLoading && filteredModels.length === 0"
-              class="px-3 py-2 text-[11px]"
-              style="color: var(--color-text-muted);"
+              :class="dropdownEmptyClass"
+              :style="dropdownMutedTextStyle"
             >
               No models found.
             </li>
@@ -91,6 +88,15 @@ import {
   optionMatchesSearch,
   prettifyModelName,
 } from './modelDropdownUtils'
+import {
+  dropdownEmptyClass,
+  dropdownMutedTextStyle,
+  dropdownOptionClass,
+  dropdownOptionStyle,
+  dropdownSearchInputClass,
+  dropdownSearchInputStyle,
+  dropdownSurfaceClass,
+} from './dropdownShared'
 
 const props = defineProps({
   selectedModel: {
@@ -143,6 +149,7 @@ const backendModels = ref([])
 const backendLoadingLocal = ref(false)
 let backendSearchTimer = null
 let backendSearchToken = 0
+const modelDropdownSurfaceClass = `${dropdownSurfaceClass.replace('fixed', 'absolute')} z-50 bottom-full mb-2 right-0 min-w-[200px] rounded-lg text-xs overflow-hidden`
 
 const fallbackModels = [
   'google/gemini-3-flash-preview',

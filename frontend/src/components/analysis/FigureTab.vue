@@ -53,64 +53,24 @@
             <TrashIcon v-else class="h-4 w-4" />
           </button>
 
-          <!-- Export Menu -->
-          <Menu as="div" class="relative inline-flex">
-            <MenuButton
-              :disabled="!selectedFigure || isDownloading"
-              class="btn-icon h-8 w-8 shrink-0 border"
-              style="border-color: var(--color-border); color: var(--color-text-muted);"
-              :class="(!selectedFigure || isDownloading) ? 'opacity-50 cursor-not-allowed' : ''"
-              :title="isDownloading ? 'Exporting chart' : 'Export chart'"
-              :aria-label="isDownloading ? 'Exporting chart' : 'Export chart'"
-            >
-              <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4" />
-              <div
-                v-else
-                class="h-4 w-4 animate-spin rounded-full border-2"
-                style="border-color: var(--color-border); border-top-color: var(--color-text-main);"
-              ></div>
-            </MenuButton>
-            <transition
-              enter-active-class="transition duration-100 ease-out"
-              enter-from-class="opacity-0 scale-95 -translate-y-1"
-              enter-to-class="opacity-100 scale-100 translate-y-0"
-              leave-active-class="transition duration-75 ease-in"
-              leave-from-class="opacity-100"
-              leave-to-class="opacity-0"
-            >
-              <MenuItems
-                class="absolute right-0 z-30 mt-9 min-w-[180px] overflow-hidden rounded-md border shadow-lg focus:outline-none"
-                style="background-color: var(--color-surface); border-color: var(--color-border);"
-              >
-                <MenuItem v-slot="{ active }">
-                  <button
-                    type="button"
-                    class="w-full text-left px-3 py-2 text-sm transition-colors"
-                    :style="{
-                      color: 'var(--color-text-main)',
-                      backgroundColor: active ? 'color-mix(in srgb, var(--color-text-main) 7%, transparent)' : 'transparent'
-                    }"
-                    @click="downloadPng"
-                  >
-                    PNG image (.png)
-                  </button>
-                </MenuItem>
-                <MenuItem v-slot="{ active }">
-                  <button
-                    type="button"
-                    class="w-full text-left px-3 py-2 text-sm transition-colors"
-                    :style="{
-                      color: 'var(--color-text-main)',
-                      backgroundColor: active ? 'color-mix(in srgb, var(--color-text-main) 7%, transparent)' : 'transparent'
-                    }"
-                    @click="downloadHtml"
-                  >
-                    HTML file (.html)
-                  </button>
-                </MenuItem>
-              </MenuItems>
-            </transition>
-          </Menu>
+          <button
+            ref="exportMenuButtonRef"
+            type="button"
+            :disabled="!selectedFigure || isDownloading"
+            class="btn-icon h-8 w-8 shrink-0 border"
+            style="border-color: var(--color-border); color: var(--color-text-muted);"
+            :class="(!selectedFigure || isDownloading) ? 'opacity-50 cursor-not-allowed' : ''"
+            :title="isDownloading ? 'Exporting chart' : 'Export chart'"
+            :aria-label="isDownloading ? 'Exporting chart' : 'Export chart'"
+            @click="toggleExportMenu"
+          >
+            <ArrowDownTrayIcon v-if="!isDownloading" class="h-4 w-4" />
+            <div
+              v-else
+              class="h-4 w-4 animate-spin rounded-full border-2"
+              style="border-color: var(--color-border); border-top-color: var(--color-text-main);"
+            ></div>
+          </button>
         </div>
       </div>
     </Teleport>
@@ -161,15 +121,26 @@
     @close="closeDeleteDialog"
     @confirm="deleteSelectedFigure"
   />
+  <FloatingActionMenu
+    :is-open="exportMenuOpen"
+    :position="exportMenuPosition"
+    :items="exportMenuItems"
+    marker-attr="data-figure-export-menu"
+    width-class="w-48"
+    :width="192"
+    :height="96"
+    @select="handleExportMenuSelect"
+    @close="exportMenuOpen = false"
+  />
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
-import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
 import { useAppStore } from '../../stores/appStore'
 import Plotly from 'plotly.js-dist-min'
 import HeaderDropdown from '../ui/HeaderDropdown.vue'
 import ConfirmationModal from '../modals/ConfirmationModal.vue'
+import FloatingActionMenu from '../ui/FloatingActionMenu.vue'
 import apiService from '../../services/apiService'
 import { normalizePlotlyFigure } from '../../utils/figurePayload'
 import { persistExportFile } from '../../utils/exportFile'
@@ -195,9 +166,17 @@ const isMounted = ref(false)
 const workspaceFigureArtifacts = ref([])
 const selectedFigurePayload = ref(null)
 const artifactListError = ref('')
+const exportMenuOpen = ref(false)
+const exportMenuButtonRef = ref(null)
+const exportMenuPosition = ref({ x: 0, y: 0 })
 let listAbortController = null
 let figureAbortController = null
 const DEFAULT_PLOTLY_THEME_MODE = PLOTLY_THEME_MODE.SOFT
+
+const exportMenuItems = [
+  { id: 'png', label: 'PNG image (.png)' },
+  { id: 'html', label: 'HTML file (.html)' },
+]
 
 const persistedFigureArtifacts = computed(() => (
   Array.isArray(workspaceFigureArtifacts.value) ? workspaceFigureArtifacts.value : []
@@ -253,6 +232,26 @@ const deleteDialogMessage = computed(() => {
 })
 
 const selectedFigure = computed(() => normalizePlotlyFigure(selectedFigurePayload.value))
+
+function updateExportMenuPosition() {
+  const rect = exportMenuButtonRef.value?.getBoundingClientRect?.()
+  if (!rect) return
+  exportMenuPosition.value = {
+    x: rect.right - 192,
+    y: rect.bottom + 8,
+  }
+}
+
+function toggleExportMenu() {
+  if (!selectedFigure.value || isDownloading.value) return
+  updateExportMenuPosition()
+  exportMenuOpen.value = !exportMenuOpen.value
+}
+
+function handleExportMenuSelect(action) {
+  if (action === 'png') void downloadPng()
+  if (action === 'html') void downloadHtml()
+}
 
 onMounted(async () => {
   isMounted.value = true

@@ -37,7 +37,7 @@
     <!-- ─── Main Scroll Area ─── -->
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden px-2">
       <!-- ─── Primary Actions ─── -->
-      <nav class="flex-none space-y-1 py-3">
+      <SidebarPrimaryNav>
         <button
           type="button"
           class="sidebar-nav-row sidebar-primary-row justify-start px-2.5"
@@ -122,10 +122,10 @@
             Conversation Tree
           </span>
         </button>
-      </nav>
+      </SidebarPrimaryNav>
 
       <!-- ─── Workspaces and conversations ─── -->
-      <div class="flex min-h-0 flex-1 flex-col border-t border-[var(--color-border)]/70 pt-3">
+      <SidebarWorkspaceConversations>
         <div
           class="flex w-full items-center overflow-hidden transition-all duration-300"
           :class="appStore.isSidebarCollapsed ? 'h-0 px-0 opacity-0' : 'h-7 justify-between px-2.5 opacity-100'"
@@ -225,10 +225,10 @@
             </div>
           </div>
         </div>
-      </div>
+      </SidebarWorkspaceConversations>
 
       <!-- ─── Footer Navigation ─── -->
-      <nav class="mt-auto pb-4 pt-2">
+      <SidebarFooter>
         <div class="mx-1 mb-2 h-px bg-[var(--color-border)] opacity-70" />
         <div class="flex flex-col space-y-0.5">
           <!-- Settings -->
@@ -279,7 +279,7 @@
           </div>
 
         </div>
-      </nav>
+      </SidebarFooter>
     </div>
 
 
@@ -363,8 +363,12 @@ import KeyboardShortcutsModal from '../modals/KeyboardShortcutsModal.vue'
 import TermsModal from '../modals/TermsModal.vue'
 import SidebarConversationActionsMenu from './sidebar/SidebarConversationActionsMenu.vue'
 import SidebarConversationRow from './sidebar/SidebarConversationRow.vue'
+import SidebarFooter from './sidebar/SidebarFooter.vue'
+import SidebarPrimaryNav from './sidebar/SidebarPrimaryNav.vue'
+import SidebarWorkspaceConversations from './sidebar/SidebarWorkspaceConversations.vue'
 import logo from '../../assets/favicon.svg'
 import apiService from '../../services/apiService'
+import { sidebarConversationPageSize, useSidebarConversations } from '../../composables/useSidebarConversations'
 
 import {
   FolderOpenIcon,
@@ -397,7 +401,8 @@ const sidebarSearchQuery = ref('')
 const sidebarConversationsByWorkspace = ref({})
 const loadingConversationsByWorkspace = ref({})
 const visibleConversationCountByWorkspace = ref({})
-const DEFAULT_VISIBLE_CONVERSATION_COUNT = 5
+const DEFAULT_VISIBLE_CONVERSATION_COUNT = sidebarConversationPageSize
+useSidebarConversations()
 
 // ─── Settings Modal ───────────────────────────────────────────────────────────
 const isTermsOpen         = ref(false)

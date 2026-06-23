@@ -14,7 +14,7 @@
     <div v-if="isOpen" class="absolute top-full left-0 mt-1 w-80 rounded-lg border z-50 overflow-hidden workspace-dropdown-menu">
       <div class="p-2 border-b flex justify-between items-center" style="border-color: var(--color-border);">
         <span class="text-xs text-[var(--color-text-muted)] font-medium">Workspaces</span>
-        <button class="text-xs px-2 py-1 rounded bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] font-medium transition-colors" @click="openWorkspaceSettings">New</button>
+        <button class="text-xs px-2 py-1 rounded bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)] font-medium transition-colors" @click="openWorkspaceSettings">New</button>
       </div>
 
       <div v-if="appStore.workspaceDeletionJobs.length > 0" class="px-3 py-2 border-b bg-[var(--color-warning-bg)] text-[var(--color-warning-text)] text-xs flex items-center space-x-2" style="border-color: var(--color-border);">
@@ -51,31 +51,17 @@
     </div>
   </div>
 
-  <div
-    v-if="isWorkspaceContextMenuOpen"
-    ref="contextMenuRef"
-    class="fixed z-[80] w-56 rounded-lg border shadow-xl py-1 workspace-context-menu"
-    :style="{ left: `${workspaceContextMenuX}px`, top: `${workspaceContextMenuY}px` }"
-  >
-    <button
-      class="w-full text-left px-3 py-2 text-sm context-btn font-medium"
-      @click="openRenameDialogFromContext"
-    >
-      Rename Workspace
-    </button>
-    <button
-      class="w-full text-left px-3 py-2 text-sm context-btn font-medium"
-      @click="confirmClearWorkspaceFromContext"
-    >
-      Clear Workspace Database
-    </button>
-    <button
-      class="w-full text-left px-3 py-2 text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] font-medium transition-colors"
-      @click="confirmDeleteWorkspaceFromContext"
-    >
-      Delete Workspace
-    </button>
-  </div>
+  <FloatingActionMenu
+    :is-open="isWorkspaceContextMenuOpen"
+    :position="{ x: workspaceContextMenuX, y: workspaceContextMenuY }"
+    :items="workspaceContextMenuItems"
+    marker-attr="data-workspace-context-menu"
+    width-class="w-56"
+    :width="224"
+    :height="132"
+    @select="handleWorkspaceContextAction"
+    @close="closeWorkspaceContextMenu"
+  />
 
 
   <WorkspaceRenameModal
@@ -114,6 +100,7 @@ import { toast } from '../composables/useToast'
 import { extractApiErrorMessage } from '../utils/apiError'
 import WorkspaceRenameModal from './modals/WorkspaceRenameModal.vue'
 import ConfirmationModal from './modals/ConfirmationModal.vue'
+import FloatingActionMenu from './ui/FloatingActionMenu.vue'
 
 const appStore = useAppStore()
 const isOpen = ref(false)
@@ -130,7 +117,12 @@ const isWorkspaceContextMenuOpen = ref(false)
 const workspaceContextMenuX = ref(0)
 const workspaceContextMenuY = ref(0)
 const contextWorkspaceId = ref('')
-const contextMenuRef = ref(null)
+
+const workspaceContextMenuItems = [
+  { id: 'rename', label: 'Rename Workspace' },
+  { id: 'clear', label: 'Clear Workspace Database' },
+  { id: 'delete', label: 'Delete Workspace', destructive: true, dividerBefore: true },
+]
 
 const activeWorkspaceName = computed(() => {
   const active = appStore.workspaces.find((w) => w.id === appStore.activeWorkspaceId)
@@ -277,14 +269,16 @@ function confirmDeleteWorkspaceFromContext() {
   confirmDeleteWorkspace(workspaceId)
 }
 
+function handleWorkspaceContextAction(action) {
+  if (action === 'rename') openRenameDialogFromContext()
+  else if (action === 'clear') confirmClearWorkspaceFromContext()
+  else if (action === 'delete') confirmDeleteWorkspaceFromContext()
+}
+
 function handleClickOutside(event) {
   const clickedOutsideDropdown = containerRef.value && !containerRef.value.contains(event.target)
-  const clickedOutsideContextMenu = contextMenuRef.value && !contextMenuRef.value.contains(event.target)
   if (clickedOutsideDropdown) {
     isOpen.value = false
-  }
-  if (clickedOutsideContextMenu) {
-    closeWorkspaceContextMenu()
   }
 }
 
@@ -330,17 +324,5 @@ onUnmounted(() => {
 .workspace-item-active {
   background-color: var(--color-selected-surface) !important;
   color: var(--color-text-main);
-}
-.workspace-context-menu {
-  background-color: var(--color-panel-elevated);
-  border-color: var(--color-border);
-  box-shadow: var(--shadow-modal);
-}
-.context-btn {
-  color: var(--color-text-main);
-  transition: background-color var(--motion-duration-fast) var(--motion-ease-standard);
-}
-.context-btn:hover {
-  background-color: color-mix(in srgb, var(--color-text-main) 6%, transparent);
 }
 </style>

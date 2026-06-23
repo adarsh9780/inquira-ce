@@ -321,8 +321,9 @@ body {
 
   /* Primary Button - High emphasis actions (e.g., Save, Submit, Create) */
   .btn-primary {
-    @apply inline-flex items-center justify-center font-medium rounded-lg focus:outline-none text-white disabled:opacity-50 disabled:cursor-not-allowed border;
+    @apply inline-flex items-center justify-center font-medium rounded-lg focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed border;
     background-color: var(--color-primary-900);
+    color: var(--color-on-accent);
     border-color: var(--color-primary-900);
     box-shadow: var(--shadow-button);
   }
@@ -373,8 +374,9 @@ body {
 
   /* Danger Button - For destructive actions */
   .btn-danger {
-    @apply inline-flex items-center justify-center font-medium rounded-lg focus:outline-none text-white border disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center font-medium rounded-lg focus:outline-none border disabled:opacity-50 disabled:cursor-not-allowed;
     background-color: var(--color-danger);
+    color: var(--color-on-accent);
     border-color: var(--color-danger);
     box-shadow: var(--shadow-button);
   }
@@ -1581,4 +1583,3 @@ p {
 .save-btn:hover:not(:disabled) {
   opacity: 0.9;
 }
-

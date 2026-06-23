@@ -1,7 +1,7 @@
 <template>
   <section class="scrollbar-hidden h-full overflow-y-auto">
     <div class="grid h-full min-h-0 grid-cols-[240px_1fr] gap-6">
-      <aside class="flex h-full min-h-0 flex-col border-r border-[var(--color-border)] pr-4 select-none">
+      <WorkspaceListPanel>
         <header class="mb-3 flex items-center justify-between">
           <h3 class="section-label">Workspaces</h3>
           <button type="button" class="text-xs font-semibold text-[var(--color-accent)] hover:underline" @click="beginInlineCreate">
@@ -59,7 +59,7 @@
 
           <p v-if="!workspaceCards.length && !isInlineCreating" class="py-4 text-center text-xs text-[var(--color-text-muted)]">No workspaces yet</p>
         </div>
-      </aside>
+      </WorkspaceListPanel>
 
       <div
         class="flex h-full min-w-0 flex-col space-y-4"
@@ -92,7 +92,7 @@
         </header>
 
         <div v-if="activeWorkspace" class="min-h-0 flex-1 space-y-4 overflow-y-auto scrollbar-thin">
-          <section class="space-y-2">
+          <WorkspaceContextSection>
             <div class="flex items-center justify-between gap-3">
               <h4 class="section-label">Workspace Context</h4>
               <button v-if="isWorkspaceActive && !isEditingContext" type="button" class="text-xs font-semibold text-[var(--color-accent)] hover:underline" @click="startContextEdit">Edit</button>
@@ -111,9 +111,9 @@
               <p v-if="selectedWorkspaceContext" class="whitespace-pre-wrap text-xs leading-relaxed text-[var(--color-text-main)]">{{ selectedWorkspaceContext }}</p>
               <p v-else class="text-xs text-[var(--color-text-muted)]">No workspace context added yet.</p>
             </div>
-          </section>
+          </WorkspaceContextSection>
 
-          <section class="space-y-2">
+          <WorkspaceDatasetSection>
             <div class="flex items-center justify-between gap-3">
               <h4 class="section-label">Linked Datasets</h4>
               <button v-if="isWorkspaceActive" type="button" class="text-lg font-semibold leading-none text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50" aria-label="Add dataset" title="Add dataset" :disabled="isDatasetIngesting || isDeletingDataset" @click="openDatasetPicker">+</button>
@@ -157,7 +157,9 @@
             <div v-else-if="!isWorkspaceActive" class="rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-base-soft)]/20 py-6 text-center">
               <p class="text-xs text-[var(--color-text-muted)]">Activate this workspace to add datasets.</p>
             </div>
-          </section>
+          </WorkspaceDatasetSection>
+
+          <WorkspaceRuntimeReadiness />
         </div>
 
         <div v-else class="flex flex-1 flex-col items-center justify-center rounded-lg bg-[var(--color-base-soft)] px-5 py-8 text-center">
@@ -214,6 +216,11 @@ import {
   SUPPORTED_DATASET_EXTENSIONS,
 } from '../../../utils/datasetImport'
 import ConfirmationModal from '../ConfirmationModal.vue'
+import WorkspaceContextSection from './workspace/WorkspaceContextSection.vue'
+import WorkspaceDatasetSection from './workspace/WorkspaceDatasetSection.vue'
+import WorkspaceListPanel from './workspace/WorkspaceListPanel.vue'
+import WorkspaceRuntimeReadiness from './workspace/WorkspaceRuntimeReadiness.vue'
+import { useWorkspaceDatasets } from '../../../composables/useWorkspaceDatasets'
 
 const props = defineProps({
   activeWorkspaceId: {
@@ -229,6 +236,7 @@ const props = defineProps({
 const emit = defineEmits(['select-workspace', 'activate-workspace', 'workspace-operation-change', 'workspace-created'])
 
 const appStore = useAppStore()
+useWorkspaceDatasets()
 
 const workspaceSummaries = ref({})
 const workspaceDetail = ref(null)

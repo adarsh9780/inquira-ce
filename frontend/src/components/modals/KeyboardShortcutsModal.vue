@@ -1,6 +1,6 @@
 <template>
   <div v-if="isOpen" class="fixed inset-0 z-[90] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="keyboard-shortcuts-title">
-    <div class="absolute inset-0 bg-black/25" @click="$emit('close')"></div>
+    <div class="modal-overlay" @click="$emit('close')"></div>
     <div class="modal-card relative flex w-full max-w-lg flex-col overflow-hidden" @click.stop>
       <div class="modal-header">
         <div class="min-w-0">
@@ -43,4 +43,3 @@ const shortcutCategories = computed(() => {
   return Object.keys(groups).map((name) => ({ name, items: groups[name] }))
 })
 </script>
-

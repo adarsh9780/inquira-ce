@@ -24,7 +24,8 @@ test('turn tree is no longer opened from the composer', () => {
 })
 
 test('turn tree exposes delete and final actions without unsupported moving controls', () => {
-  assert.equal(treeActionsSource.includes("{ id: 'delete', label: 'Delete' }"), true)
+  assert.equal(treeActionsSource.includes("id: 'delete'"), true)
+  assert.equal(treeActionsSource.includes("label: 'Delete'"), true)
   assert.equal(treeActionsSource.includes("action === 'mark-final'"), true)
   assert.equal(treeActionsSource.includes("action === 'move-to'"), false)
   assert.equal(treeActionsSource.includes("action === 'move-up'"), false)

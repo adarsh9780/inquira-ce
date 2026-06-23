@@ -52,7 +52,7 @@
           <textarea v-focus v-model="tempContext" class="w-full bg-[var(--color-base)] border border-[var(--color-accent)] rounded-lg p-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/20 resize-y text-[var(--color-text-main)] placeholder:text-[var(--color-text-muted)]" rows="4" placeholder="Example: Daily transaction-level sales data for retail stores. 'channel' means online vs in-store."></textarea>
           <div class="flex justify-end gap-2 mt-3">
             <button @click="cancelEditContext" class="px-4 py-2 text-[13px] font-medium rounded-lg hover:bg-[var(--color-base-muted)] text-[var(--color-text-main)] transition-colors">Cancel</button>
-            <button @click="saveEditContext" class="px-4 py-2 text-[13px] font-semibold rounded-lg bg-[var(--color-accent)] text-white shadow-sm hover:brightness-95 transition-all">Save Context</button>
+            <button @click="saveEditContext" class="px-4 py-2 text-[13px] font-semibold rounded-lg bg-[var(--color-accent)] text-[var(--color-on-accent)] shadow-sm hover:brightness-95 transition-all">Save Context</button>
           </div>
         </div>
         <div v-else class="mt-1.5 text-[13px] text-[var(--color-text-main)] prose prose-sm max-w-none leading-relaxed" v-html="renderedContext || '<i class=\'text-[var(--color-text-muted)]\'>Click edit to add shared workspace context...</i>'"></div>

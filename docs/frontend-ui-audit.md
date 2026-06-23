@@ -28,7 +28,7 @@ This audit focuses on design-token consistency, reusable component opportunities
 ## Stale Code Candidates
 
 - `UnifiedSidebar.vue` had a hidden `v-if="false"` Legal & Terms duplicate and unreachable multi-conversation delete state; these should stay removed.
-- `WorkspaceSwitcher.vue` assigns `isRenamingWorkspace.value = true` twice in `renameWorkspace`.
+- WorkspaceSwitcher.vue was re-checked; `renameWorkspace` now has one `isRenamingWorkspace.value = true` assignment, so the old duplicate-assignment note is no longer valid.
 - Several tests still guard old removed sidebar concepts by string checks. Keep the useful regression intent, but refresh brittle strings when related files are touched.
 - Legacy comments in `executionService.js`, `OutputTab.vue`, and v1 preference/model fallback paths may still describe compatibility behavior; review before removing.
 

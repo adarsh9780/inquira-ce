@@ -24,25 +24,25 @@
             <ListboxOptions
               v-if="open"
               ref="optionsRef"
-              class="layer-modal-dropdown fixed overflow-auto rounded-md py-1 shadow-md focus:outline-none"
+              :class="dropdownSurfaceClass"
               :style="floatingOptionsStyle"
             >
               <div
                 v-if="searchable"
-                class="sticky top-0 z-10 px-2 pb-1 pt-1"
-                style="background-color: var(--color-surface); border-bottom: 1px solid var(--color-border);"
+                :class="dropdownSearchRowClass"
+                :style="dropdownSearchRowStyle"
               >
                 <input
                   v-model="searchQuery"
                   type="text"
-                  class="w-full rounded-md border px-2 py-1 text-[12px] focus:outline-none"
+                  :class="dropdownSearchInputClass"
                   :placeholder="searchPlaceholder"
-                  style="background-color: var(--color-base); border-color: var(--color-border); color: var(--color-text-main);"
+                  :style="dropdownSearchInputStyle"
                   @click.stop
                   @keydown.stop
                 />
               </div>
-              <div v-if="backendLoading && searchable && searchQuery" class="px-3 pb-1 text-[11px]" style="color: var(--color-text-muted);">
+              <div v-if="backendLoading && searchable && searchQuery" class="px-3 pb-1 text-[11px]" :style="dropdownMutedTextStyle">
                 Searching...
               </div>
 
@@ -50,8 +50,8 @@
                 <template v-if="groupedFilteredOptions.length">
                   <template v-for="group in groupedFilteredOptions" :key="group.key">
                     <div
-                      class="px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
-                      style="color: var(--color-text-muted);"
+                      :class="dropdownGroupLabelClass"
+                      :style="dropdownMutedTextStyle"
                     >
                       {{ group.label }}
                     </div>
@@ -63,11 +63,8 @@
                       as="template"
                     >
                       <li
-                        :style="{
-                          backgroundColor: active ? 'color-mix(in srgb, var(--color-text-main) 6%, transparent)' : 'transparent',
-                          color: 'var(--color-text-main)'
-                        }"
-                        class="relative cursor-default select-none py-2 pl-3 pr-9 text-[13px]"
+                        :style="dropdownOptionStyle(active)"
+                        :class="[dropdownOptionClass, 'pl-3 pr-9']"
                       >
                         <span :class="selected ? 'font-semibold' : 'font-normal'" class="block truncate pr-2" :title="option.label">
                           {{ option.label }}
@@ -81,8 +78,8 @@
                 </template>
                 <div
                   v-else
-                  class="px-3 py-2 text-[12px]"
-                  style="color: var(--color-text-muted);"
+                  :class="dropdownEmptyClass"
+                  :style="dropdownMutedTextStyle"
                 >
                   {{ noResultsLabel }}
                 </div>
@@ -98,11 +95,8 @@
                     as="template"
                   >
                     <li
-                      :style="{
-                        backgroundColor: active ? 'color-mix(in srgb, var(--color-text-main) 6%, transparent)' : 'transparent',
-                        color: 'var(--color-text-main)'
-                      }"
-                      class="relative cursor-default select-none py-2 pl-3 pr-9 text-[13px]"
+                      :style="dropdownOptionStyle(active)"
+                      :class="[dropdownOptionClass, 'pl-3 pr-9']"
                     >
                       <span :class="selected ? 'font-semibold' : 'font-normal'" class="block truncate pr-2" :title="option.label">
                         {{ option.label }}
@@ -115,8 +109,8 @@
                 </template>
                 <div
                   v-else
-                  class="px-3 py-2 text-[12px]"
-                  style="color: var(--color-text-muted);"
+                  :class="dropdownEmptyClass"
+                  :style="dropdownMutedTextStyle"
                 >
                   {{ noResultsLabel }}
                 </div>
@@ -139,6 +133,20 @@ import {
   optionMatchesSearch as matchesModelOptionSearch,
   providerLabel as sharedProviderLabel,
 } from './modelDropdownUtils'
+import {
+  dropdownEmptyClass,
+  dropdownGroupLabelClass,
+  dropdownMutedTextStyle,
+  dropdownOptionClass,
+  dropdownOptionStyle,
+  dropdownSearchInputClass,
+  dropdownSearchInputStyle,
+  dropdownSearchRowClass,
+  dropdownSearchRowStyle,
+  dropdownSurfaceClass,
+  dropdownSurfaceStyle,
+} from './dropdownShared'
+import { updateFloatingDropdownPosition } from '../../composables/useFloatingDropdown'
 
 const props = defineProps({
   modelValue: {
@@ -222,8 +230,7 @@ const floatingOptionsStyle = ref({
   top: '0px',
   width: '0px',
   maxHeight: '240px',
-  backgroundColor: 'var(--color-surface)',
-  border: '1px solid var(--color-border)'
+  ...dropdownSurfaceStyle(),
 })
 let backendSearchTimer = null
 let backendSearchToken = 0
@@ -307,30 +314,8 @@ function handleChange(value) {
 }
 
 function updateFloatingPosition() {
-  const triggerEl = triggerRef.value?.el ?? triggerRef.value
-  if (!triggerEl) return
-  const rect = triggerEl.getBoundingClientRect()
-  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
-  const spacing = 6
-  const minDropdownHeight = 180
-  const spaceBelow = Math.max(viewportHeight - rect.bottom - spacing, 120)
-  const spaceAbove = Math.max(rect.top - spacing, 120)
-  const openUpward = spaceBelow < minDropdownHeight && spaceAbove > spaceBelow
-  const nextStyle = {
-    left: `${Math.round(rect.left)}px`,
-    width: `${Math.round(rect.width)}px`,
-    maxHeight: `${Math.round(Math.min(320, openUpward ? spaceAbove : spaceBelow))}px`,
-    backgroundColor: 'var(--color-surface)',
-    border: '1px solid var(--color-border)'
-  }
-  if (openUpward) {
-    nextStyle.bottom = `${Math.max(Math.round(viewportHeight - rect.top + spacing), spacing)}px`
-    nextStyle.top = 'auto'
-  } else {
-    nextStyle.top = `${Math.round(rect.bottom + spacing)}px`
-    nextStyle.bottom = 'auto'
-  }
-  floatingOptionsStyle.value = nextStyle
+  const nextStyle = updateFloatingDropdownPosition(triggerRef)
+  if (nextStyle) floatingOptionsStyle.value = nextStyle
 }
 
 function bindPositionListeners() {
